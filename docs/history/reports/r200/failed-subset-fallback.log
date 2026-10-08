@@ -1,5 +1,0 @@
---- FAIL: TestR200SubsetUnavailableNeverFallsBack (0.00s)
-    r200_test.go:138: fallback wrote/read full heroes: [/lol-champ-select/v1/session /lol-champ-select/v1/all-grid-champions /help /lol-lobby-team-builder/champ-select/v1/subset-champion-list /lol-champ-select/v1/subset-champion-list /lol-champ-select/v1/session /lol-champ-select/v1/all-grid-champions /lol-champ-select/v1/pickable-champion-ids /lol-champ-select/v1/session /lol-champ-select/v1/all-grid-champions /lol-champ-select/v1/pickable-champion-ids /lol-champ-select/v1/session/actions/5]
-FAIL
-FAIL	lol-loot-assistant/backend	0.599s
-FAIL

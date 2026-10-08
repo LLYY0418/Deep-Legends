@@ -61,6 +61,7 @@ riot_key.local.*
 /desktop/backend-digest.cjs
 /Claude outputs/
 
-# R220：校准采集原始数据不入库
-docs/history/reports/*/opgg-*/
-docs/history/reports/*/account-selection/
+# Local project notes and assistant instructions stay in the primary workspace.
+/docs/
+/CLAUDE.md
+/AGENTS.md

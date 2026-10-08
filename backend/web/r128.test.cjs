@@ -3,7 +3,7 @@
 //
 // 三类断言：
 //  1. 全局扫描钉子（§2.6）：生产 JS 里不得再出现「统计口径」「不构成因果」
-//     「仅描述赛后关联」——这是 §2.5 写进 AGENTS.md / CLAUDE.md 那条规则的唯一
+//     「仅描述赛后关联」——直接保护界面文案红线的
 //     自动化护栏，扫描自身带一个「塞回去必须被抓到」的自检。
 //  2. 删除清单（§2.3-A / §2.3-B）：六处口径调用点、实现本体、shared.js、样式，
 //     以及七处方法论/免责说明逐条核对；同时核对 §2.3-C 的保留项没有被动到。
@@ -211,17 +211,4 @@ test("R128 §2.4 概览顺序与推荐卡标题行", () => {
   assert.doesNotMatch(championsScript, /\["官方档位", escapeHTML\(label\), "is-hex-label"\]/);
   assert.match(championsScript, /function renderMayhemStageChips\(items\)/);
   assert.match(championsStyles, /\.recommendation-section > header \{[^}]*justify-content: space-between/);
-});
-
-test("R128 §2.5 规则写进 AGENTS.md 与 CLAUDE.md，旧工单要求标注撤销", () => {
-  for (const file of ["AGENTS.md", "CLAUDE.md"]) {
-    const text = read(repoRoot, file);
-    assert.match(text, /界面上不添加「统计口径」/, `${file} 缺少界面文案红线`);
-    assert.match(text, /数据来源与算法说明写在代码注释或 docs 里，不进 UI/, `${file} 缺少落地方式`);
-    assert.match(text, /确需提示用户的只限：错误\/失败、数据回退/, `${file} 缺少例外范围`);
-  }
-  const review = read(repoRoot, "docs", "r116-proposal-feasibility-review.md");
-  assert.match(review, /已被 2026-09-22 用户指示撤销（R128/);
-  const worklist = read(repoRoot, "docs", "history", "worklists", "R116-B-P0六项与详情页三tab重整-工单.md");
-  assert.match(worklist, /已被 2026-09-22 用户指示撤销（R128/);
 });

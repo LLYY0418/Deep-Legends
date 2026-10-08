@@ -1,7 +1,8 @@
 'use strict';
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 // Production app / synthetic API fixtures. These screenshots do not claim Windows/LCU evidence.
 const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),http=require('node:http'),assert=require('node:assert/strict');
-const baseline=false,guardOnly=false;const root=path.resolve(__dirname,'..'),web=path.join(root,'backend/web'),out=process.env.R252_BROWSER_OUT||path.join(root,'docs/history/reports/r252/chromium');
+const baseline=false,guardOnly=false;const root=path.resolve(__dirname,'..'),web=path.join(root,'backend/web'),out=process.env.R252_BROWSER_OUT||evidencePath('r252/chromium');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r252-chromium-'));let chrome,ws,server,origin;const errors=[],results=[];
 const inject=`
  if(query.has('startup235'))Object.assign(status,{connected:false,identityReady:false,snapshotReady:false,clientDiscovery:'probe-failed',connectionState:'connecting'});

@@ -1,2 +1,0 @@
-ed2f6113d949e9c40e4e4f343433bd60f78cd2f69a89ba7c71a1c9e8b822b3c0  Deep-Legends-Setup-0.12.58-public.exe
-a0ae6ba78528a3c1736cbae9c6a78f73b5ef7ce872696b3e9eff609a207547f2  latest.json

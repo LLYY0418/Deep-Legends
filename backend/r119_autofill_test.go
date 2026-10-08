@@ -8,8 +8,7 @@ import (
 
 // R119 引入、R121 收紧的「补位」标签测试。
 //
-// R121 之后的三条前提，改这里之前先读 docs/r119-execution-ledger.md §7 与
-// WORKLIST-R121：
+// 候选计算必须满足以下三条前提：
 //  1. match-v5 的 teamPosition / individualPosition 按 Riot 官方定义都是服务器
 //     **推算**的「最可能打的位置」，不记录大厅选位，也不记录是否补位。所以这里
 //     测的是「候选计算」，不是「补位事实」。

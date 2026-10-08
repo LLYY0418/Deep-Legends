@@ -1,5 +1,0 @@
---- FAIL: TestR200OfferedSubsetOnly (0.00s)
-    r200_test.go:94: picked outside cards: [{/lol-champ-select/v1/session/actions/5 map[championId:22 completed:true type:pick]}]
-FAIL
-FAIL	lol-loot-assistant/backend	0.880s
-FAIL

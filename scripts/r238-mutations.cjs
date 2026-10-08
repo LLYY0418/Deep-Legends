@@ -1,6 +1,7 @@
 "use strict";
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 const fs=require("node:fs"),path=require("node:path"),os=require("node:os"),assert=require("node:assert/strict"),{spawnSync}=require("node:child_process");
-const root=path.resolve(__dirname,".."),out=process.env.R238_MUTATION_OUT||path.join(root,"docs/history/reports/r238/mutations");
+const root=path.resolve(__dirname,".."),out=process.env.R238_MUTATION_OUT||evidencePath('r238/mutations');
 fs.mkdirSync(out,{recursive:true});
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),"r238-scale-mutants-")),results=[];
 try {

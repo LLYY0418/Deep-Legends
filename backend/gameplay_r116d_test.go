@@ -319,7 +319,6 @@ func TestGameplayRosterChampionIDsStrictParsing(t *testing.T) {
 // 这条测试本身不会红：它把「变异体」与「生产实现」放在同一个 fixture 上对跑，
 // 断言变异体确实退化成 0 条、而生产实现确实命中。如果哪天有人把生产实现写成
 // 变异体这样，上面那几条「恰好 1 条」的判据会立刻红。
-// 实际把源码改反、跑出问题输出、再还原的过程记在 docs/r116d-execution-ledger.md。
 func TestGameplayMatchupNoticesNeverMatchDegenerationIsDetected(t *testing.T) {
 	detail := r116dHeroDetail(t)
 	// 队友 roster 必须与夹具的 14 个对手 ID（200/90/895/122/12/44/31 与
@@ -460,7 +459,7 @@ func TestGameplayRosterInsightsAddZeroHexdataRequests(t *testing.T) {
 }
 
 // Anti-scope 第 4 条：ChampSelect 阶段一律不展示「对面 5 人」相关的克制。
-// 依据是 docs/r116-probe-findings.md §4.4 的 their_team_length 判据仍是「待填」，
+// 依据是海斗选人阶段的 their_team_length 尚未有真实观测，
 // 探测未证实 → 按未证实处理。协同（只需要我方）不受影响，照常展示。
 func TestGameplayRosterInsightsSuppressEnemiesDuringChampSelect(t *testing.T) {
 	_, paths, storage := r116dRecommendationRun(t, r116dBaseQuery+"&phase=ChampSelect"+
@@ -595,7 +594,7 @@ func TestGameplayPeekCachedHexdataPageNeverHitsUpstream(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // r116dPlayerList 拼一份海斗形状的 playerlist：10 人、position 恒为 "OTHER"
-// （docs/r116-probe-findings.md §1.5 的斗魂基线是 position_values:{"OTHER":18}）、
+// （斗魂实测基线是 position_values:{"OTHER":18}）、
 // 无 subteam 字段，items 用斗魂实测的 itemID/slot/count/canUse/consumable 五键。
 func r116dPlayerList(t *testing.T, entries ...map[string]any) []byte {
 	t.Helper()
@@ -1014,7 +1013,7 @@ func TestGameplayNextItemSuggestionDegradesToNothing(t *testing.T) {
 }
 
 // 阶段二「已实现但未接线」这条事实本身要有测试钉住：一旦有人把它接到生产路径上
-// 而没有先回填 docs/r116-probe-findings.md 的判据，这条就会红，逼他去看注释。
+// 而没有先确认真实海斗 items 的字段形状，这条就会红。
 func TestR116DStageTwoStaysUnwired(t *testing.T) {
 	source, err := os.ReadFile("gameplay.go")
 	if err != nil {
@@ -1026,7 +1025,7 @@ func TestR116DStageTwoStaysUnwired(t *testing.T) {
 	for _, name := range []string{"gameplayNextItemSuggestionFromTrios", "gameplayOwnedTerminalItemIDs"} {
 		if got := strings.Count(code, name); got != 1 {
 			t.Fatalf("%s appears %d times in gameplay.go code, want exactly 1 (the definition, no caller). "+
-				"Wiring P1-4 stage two requires docs/r116-probe-findings.md §3.4/§5.3 to be filled in first.", name, got)
+				"Wiring stage two requires observed live-client items and element keys from a real mayhem game.", name, got)
 		}
 	}
 	// bundle 上不许出现「下一件」字段：那是接线时才加的东西。

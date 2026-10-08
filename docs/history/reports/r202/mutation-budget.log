@@ -1,8 +1,0 @@
---- FAIL: TestR202PreFinalFailuresRefunded (0.01s)
-    --- FAIL: TestR202PreFinalFailuresRefunded/false (0.00s)
-        r202_test.go:59: BAN_PICK failures consumed final budget [{/lol-champ-select/v1/session/bench/swap/57 map[]} {/lol-champ-select/v1/session/bench/swap/57 map[]}]
-    --- FAIL: TestR202PreFinalFailuresRefunded/true (0.00s)
-        r202_test.go:59: BAN_PICK failures consumed final budget [{/lol-champ-select/v1/session/bench/swap/57 map[]} {/lol-champ-select/v1/session/bench/swap/57 map[]}]
-FAIL
-FAIL	lol-loot-assistant/backend	0.597s
-FAIL

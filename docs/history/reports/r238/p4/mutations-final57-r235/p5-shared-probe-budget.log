@@ -1,5 +1,0 @@
---- FAIL: TestR235RelayProbeIndependentBudgets (8.00s)
-    r235_test.go:123:  2026-10-07 22:36:30.333341 +0800 CST m=+23.014232626
-FAIL
-FAIL	lol-loot-assistant/backend	8.658s
-FAIL

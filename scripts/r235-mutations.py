@@ -2,8 +2,9 @@
 import os
 """R235: mutate real production source, require assertion failure, always restore bytes."""
 import hashlib,json,pathlib,subprocess,time
+from local_evidence import evidence_path, require_evidence
 root=pathlib.Path(__file__).resolve().parents[1]
-out=pathlib.Path(os.environ.get('R235_MUTATION_OUT',root/'docs/history/reports/r235'))
+out=pathlib.Path(os.environ.get('R235_MUTATION_OUT',evidence_path('r235')))
 out.mkdir(parents=True,exist_ok=True)
 
 def shared_budget(s):

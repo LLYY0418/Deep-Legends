@@ -1,10 +1,11 @@
 "use strict";
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 if (require.main === module && process.env.DEEP_LEGENDS_TEST_LICENSE !== "1" && !["--backend", "--probe-backend"].includes(process.argv[2])) throw Error("Explicit license test switch required: DEEP_LEGENDS_TEST_LICENSE=1");
 
 // All mutations live in disposable copies; production sources are never edited.
 const fs = require("node:fs"), os = require("node:os"), path = require("node:path"), assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
-const root = path.resolve(__dirname, ".."), out = process.env.R239_MUTATION_OUTPUT || path.join(root, "docs/history/reports/r239/mutations");
+const root = path.resolve(__dirname, ".."), out = process.env.R239_MUTATION_OUTPUT || evidencePath('r239/mutations');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "r239-mutations-")), results = [];
 fs.mkdirSync(out, { recursive: true });
 function run(name, args, env, expected) {

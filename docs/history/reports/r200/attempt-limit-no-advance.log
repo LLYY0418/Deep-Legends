@@ -1,5 +1,0 @@
---- FAIL: TestR200PickFailureAdvancesAndStopsAtSix (0.01s)
-    r200_test.go:245: requests=2: [{/lol-champ-select/v1/session/actions/5 map[championId:22 completed:true type:pick]} {/lol-champ-select/v1/session/actions/5 map[championId:22 completed:true type:pick]}]
-FAIL
-FAIL	lol-loot-assistant/backend	0.617s
-FAIL

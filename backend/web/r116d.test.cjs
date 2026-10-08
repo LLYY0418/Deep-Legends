@@ -137,7 +137,7 @@ test("R116-D roster sends both sides in game and only allies during champion sel
   assert.deepEqual(reconnect.enemyIds, [7, 8, 9, 90, 200]);
 
   // Anti-scope 第 4 条：ChampSelect 阶段一律不下发敌方 ID。探测未证实
-  // theirTeam 非空（docs/r116-probe-findings.md §4.4 仍是「待填」）。
+  // 海斗选人阶段 theirTeam 非空。
   const champSelect = liveRecommendationRoster(mayhemLive({ phase: "ChampSelect" }));
   assert.equal(champSelect.matchupAllowed, false);
   assert.deepEqual(champSelect.enemyIds, [], "enemy ids must never leave the client during champion select");
@@ -459,7 +459,7 @@ test("R116-D placeholder mutation is detected by the empty-payload assertions", 
 
 test("R116-D stage two stays out of the client until the probe verdict lands", () => {
   for (const needle of ["nextItem", "terminalItemTrios", "下一步出装", "下一件推荐"]) {
-    assert.ok(!gameplayScript.includes(needle), `gameplay.js must not render ${needle} before docs/r116-probe-findings.md §3.4 is filled in`);
+    assert.ok(!gameplayScript.includes(needle), `gameplay.js must not render ${needle} before live-client item fields are observed in a real mayhem game`);
   }
   // 阶段一的诊断事件是后端埋点，前端不参与，也不该出现任何 UI 文案。
   assert.ok(!gameplayScript.includes("live_client_items_parsed"), "stage one is backend diagnostics only");

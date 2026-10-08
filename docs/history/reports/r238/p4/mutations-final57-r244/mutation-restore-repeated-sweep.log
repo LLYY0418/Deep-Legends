@@ -1,5 +1,0 @@
---- FAIL: TestR244LightDiscoveryAndOneSweepPerLaunch (0.00s)
-    r244_test.go:161: 1 {0 true 0  false 2026-10-07 22:35:38.723899 +0800 CST m=+0.007246043 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 2026-10-07 22:35:38.723956 +0800 CST m=+0.007303084  1 1 0 0 1 0 0 credentials-unreadable 已检测到客户端进程，但无法读取连接凭据} 2
-FAIL
-FAIL	lol-loot-assistant/backend	0.710s
-FAIL

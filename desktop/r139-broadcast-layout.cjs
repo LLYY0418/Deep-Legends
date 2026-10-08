@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// R139_LAYOUT=1 CURRENT_GAME_SHOTS=docs/r139-validation node desktop/current-game-layout.cjs
+// R139_LAYOUT=1 CURRENT_GAME_SHOTS=output/r139-validation node desktop/current-game-layout.cjs
 // Runs the production Suite panel in real Chromium with demo watch settings.
 exports.verify = async ({call, evaluate, output}) => {
   await call('Emulation.setDeviceMetricsOverride', {width: 1200, height: 900, deviceScaleFactor: 1, mobile: false});

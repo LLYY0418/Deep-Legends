@@ -2,8 +2,8 @@ package main
 
 // This is a reviewed first-team roster, NOT the OP.GG team membership list.
 // OP.GG includes coaches, academy teams and historical team assignments. Keep
-// roster changes reviewable; sources and unresolved candidates are in
-// docs/pro-players-sources.md. Production directory rows and badges both use
+// roster changes reviewable and retain the reviewed ownership.
+// Production directory rows and badges both use
 // these six reviewed teams; proDirectoryRoster is reserved for future expansion.
 // Exact PUUID/full Riot ID lookup is allowed;
 // never infer membership from an account name substring or team prefix.

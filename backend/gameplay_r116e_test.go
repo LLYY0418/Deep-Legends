@@ -9,7 +9,7 @@ package main
 //  3. P2-6 静态查询的 HTTP 出口（样本不足时 available=false，前端整块不渲染）。
 //
 // 这些测试刻意不注入任何桩函数：rankedQueueLabel 以前就是因为测试自己塞了桩，
-// 才让「生产代码里根本没定义」这个缺陷活到了真机（见 docs/r116e-execution-ledger.md）。
+// 才让「生产代码里根本没定义」这个缺陷活到了真机。
 
 import (
 	"encoding/json"

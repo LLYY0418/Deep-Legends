@@ -1,7 +1,9 @@
 """R216 credential-safe serial HTTP and dataset provenance helpers."""
 import datetime,hashlib,json,pathlib,re,time,urllib.request,urllib.error,urllib.parse
+from local_evidence import evidence_path, require_evidence
 ROOT=pathlib.Path(__file__).resolve().parent.parent
-REPORT=ROOT/'docs/history/reports/r216'
+require_evidence('r211/opgg-samples/paired.json', 'r211/opgg-validation-new-accounts/paired.json')
+REPORT=evidence_path('r216')
 UA='Mozilla/5.0'
 ACTION='409a2b9ca50d15e50a4dace93552e3a40113dc2753'
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -9,7 +11,7 @@ def write_json(path,value):path.parent.mkdir(parents=True,exist_ok=True);path.wr
 def old_exclusions():
  ids=set();accounts=set()
  for name in ['opgg-samples','opgg-validation-new-accounts']:
-  folder=ROOT/'docs/history/reports/r211'/name
+  folder=evidence_path('r211')/name
   ids.update(p['match_id']for p in json.loads((folder/'paired.json').read_text()))
   accounts.update(json.loads(f.read_text())['puuid']for f in folder.glob('account-*-riot.json'))
  assert len(accounts)==20

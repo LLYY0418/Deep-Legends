@@ -2,7 +2,7 @@
 // Public, pinned release input for the default update compatibility test.
 // Keep the 111 MB installer out of Git; CI must obtain and verify it before tests.
 const fs = require("node:fs/promises"), path = require("node:path"), crypto = require("node:crypto"), assert = require("node:assert/strict");
-const directory = path.resolve(__dirname, "../docs/history/reports/release-0.12.76/anonymous-assets");
+const directory = process.env.DEEP_LEGENDS_UPDATE_FIXTURE_DIR || path.resolve(__dirname, "../output/update-fixtures/release-0.12.76");
 const name = "Deep-Legends-Setup-0.12.76-public.exe";
 const expectedHash = "01014312b60e591a05bfc87f86e098adf6c5fc5e59520db5aedac5b5dba02ff3";
 const origin = "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.76/";

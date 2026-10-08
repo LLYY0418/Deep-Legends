@@ -7,8 +7,9 @@ import os
 import tempfile
 import hashlib
 
+from local_evidence import evidence_path, require_evidence
 root = Path(__file__).resolve().parents[1]
-out = Path(os.environ.get('R244_MUTATION_OUT', root / 'docs/history/reports/r244'))
+out = Path(os.environ.get('R244_MUTATION_OUT', evidence_path('r244')))
 out.mkdir(parents=True, exist_ok=True)
 mutants = [
  ('restore-30-day-cutoff', 'backend/live_history_freshness.go', 'return recentMatchesForPlayer(matches, playerRef, 10, queueID)', 'window := []gameplayMatch{}; for _, match := range matches { if match.CreatedAt >= now.Add(-30*24*time.Hour).UnixMilli() { window = append(window, match) } }; return recentMatchesForPlayer(window, playerRef, 10, queueID)', ['go','test','./backend','-run','^TestR244OldLiveHistoryAndHeaderShareRows$','-count=1']),

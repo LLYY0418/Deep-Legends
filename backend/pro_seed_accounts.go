@@ -26,7 +26,7 @@ type proSeedAccountRef struct {
 	TagLine  string
 }
 
-// R105: fully embedded from docs/pro-accounts-verification-2026-09-17.md.
+// R105: fully embedded from testdata/pro-accounts/pro-accounts-verification-2026-09-17.md.
 // Keep account order stable: the index is the rename-resistant anchor identity.
 var proSeedAccounts = reviewedProSeeds([]proSeedAccount{
 	{TeamCode: "BLG", Player: "Bin", Accounts: []proSeedAccountRef{{"빈 스토리", "KR1"}}},

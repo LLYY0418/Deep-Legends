@@ -5648,8 +5648,8 @@
   // 链路会每 80 秒稳定烧 12 MB 且永不报警）。
   //
   // Anti-scope 第 4 条：ChampSelect 阶段一律不下发敌方 ID。依据是
-  // docs/r116-probe-findings.md §4.4 的 lcu_champ_select_session_shape
-  // .their_team_length 判据目前仍是「待填」（需要 Windows 真机 + 真实海斗对局），
+  // 尚未用 Windows 真机的海斗对局证实 lcu_champ_select_session_shape
+  // .their_team_length，
   // 探测未证实 theirTeam 非空 → 按未证实处理。后端 gameplayRosterMatchupPhases
   // 有一道同样的阶段白名单，两处都要放开才算真的放开。
   //

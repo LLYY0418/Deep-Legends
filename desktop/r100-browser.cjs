@@ -17,7 +17,7 @@ async function main(){
   let output='',recorded=false;
   const record=result=>{
    if(recorded)return;recorded=true;
-   const directory=process.env.R100_BROWSER_OUTPUT||path.join(root,'docs/r100-validation/browser');fs.mkdirSync(directory,{recursive:true});
+   const directory=process.env.R100_BROWSER_OUTPUT||path.join(root,'output/r100-validation/browser');fs.mkdirSync(directory,{recursive:true});
    fs.writeFileSync(path.join(directory,'chrome-startup-stderr.log'),output);
    fs.writeFileSync(path.join(directory,'chrome-startup.json'),JSON.stringify({result,chrome,pid:proc.pid,exitCode:proc.exitCode,signalCode:proc.signalCode,elapsedMs:Date.now()-startupAt},null,2)+'\n');
   };
@@ -39,7 +39,7 @@ async function main(){
  await call('Runtime.enable');
  await call('Page.bringToFront');
 
- const output=process.env.R100_BROWSER_OUTPUT||path.join(root,'docs/r100-validation/browser');fs.mkdirSync(output,{recursive:true});
+ const output=process.env.R100_BROWSER_OUTPUT||path.join(root,'output/r100-validation/browser');fs.mkdirSync(output,{recursive:true});
  const appSource=fs.readFileSync(process.env.R100_APP_SOURCE||path.join(web,'app.js'),'utf8');
  const queueSource=fs.readFileSync(process.env.R100_QUEUE_SOURCE||path.join(web,'image-queue.js'),'utf8');
  const imageQueueLimit=Number(queueSource.match(/const IMAGE_QUEUE_LIMIT\s*=\s*(\d+)/)?.[1]);

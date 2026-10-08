@@ -1,4 +1,5 @@
 "use strict";
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 
 // R231 P13: build two public packages from isolated copies of the same sources.
 // Only the control copy adds CRCCheck off; this never changes the default setup.
@@ -6,7 +7,7 @@ const fs = require("node:fs"), path = require("node:path"), os = require("node:o
 const crypto = require("node:crypto"), { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const output = path.join(root, "dist", "r231-crc-control");
-const reports = path.join(root, "docs", "history", "reports", "r231");
+const reports = evidencePath('r231');
 const version = require("../desktop/package.json").version;
 const baseFingerprint = require("../desktop/source-fingerprint.cjs").sourceFingerprint();
 const electronDist = process.env.ELECTRON_DIST;

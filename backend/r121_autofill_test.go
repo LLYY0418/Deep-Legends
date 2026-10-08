@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// R121：WORKLIST-R121-AUTOFILL-LABEL-GAPS 的验收测试。
+// R121：补位标签门控与位置证据覆盖率测试。
 //
 //   - P1-1 补位标签总开关默认关闭；关闭时 JSON 里没有 autofill 键，但诊断计数
 //     照常产出（否则永远拿不到真机数据）。
@@ -29,7 +29,7 @@ func r121OpenGate(t *testing.T) {
 }
 
 func TestR121AutofillLabelGateIsClosedByDefault(t *testing.T) {
-	// P1-1 的核心判据：真机对照结果回填 docs/r119-execution-ledger.md §5 之前，
+	// 核心判据：真机对照证明候选对应真实补位之前，
 	// 这个开关必须是 false。把它改成 true 的改动必须让本测试 FAIL。
 	if autofillLabelGate {
 		t.Fatal("autofillLabelGate 默认必须为 false（R121 P1-1）：口径尚未经真机验证")

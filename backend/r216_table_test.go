@@ -97,7 +97,7 @@ func TestR216ChampionTableOpponentEvidence(t *testing.T) {
 
 func TestR216OPGGChampionTableObservedPage(t *testing.T) {
 	t.Parallel()
-	raw, err := os.ReadFile("../docs/history/reports/r216/kr-champion-table-probe/champions.html")
+	raw, err := os.ReadFile("testdata/r216/kr-champion-table-probe/champions.html")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestR216OPGGChampionTableObservedPage(t *testing.T) {
 	if _, err := parseOPGGChampionTable(raw, gameplayReference{Region: "kr", GameName: "Wrong", TagLine: "asd"}, "RANKED", nil); err == nil {
 		t.Fatal("unbound player")
 	}
-	solo, err := os.ReadFile("../docs/history/reports/r216/kr-champion-table-probe/solo-queue-type.html")
+	solo, err := os.ReadFile("testdata/r216/kr-champion-table-probe/solo-queue-type.html")
 	if err != nil {
 		t.Fatal(err)
 	}

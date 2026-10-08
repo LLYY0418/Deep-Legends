@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// R122：WORKLIST-R119-AUTOFILL-DIAGNOSTIC-EVENTS-UNTESTED 的验收测试。
+// R122：补位诊断事件与计数字段的验收测试。
 //
 // 缺口是「三个补位计数从汇总结构写进诊断事件」这一步完全没有护栏：删掉事件里
 // 的任意一行赋值，全部既有测试仍然通过。修法是把三行赋值抽成 autofillDiagnosticFields，

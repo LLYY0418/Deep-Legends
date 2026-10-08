@@ -40,7 +40,7 @@ async function main(){
  const measure=()=>evaluate(`(()=>{const strip=document.querySelector('#overview-content .summoner-strip');const image=strip.querySelector('.summoner-strip-art');const box=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};};return {strip:box(strip),copy:box(strip.querySelector('.summoner-strip-copy')),highlights:box(strip.querySelector('.summoner-strip-highlights')),imagePosition:getComputedStyle(image).position,images:[...strip.querySelectorAll(':scope > img')].map(e=>({class:e.className,position:getComputedStyle(e).position}))};})()`);
  // 这一组护栏在"设计单位"下比较绝对像素（列宽、溢出、变异后必须溢出）。
  // .app-frame 现在有全局 CSS zoom，窄视口会自动缩到 0.9 倍，模拟宽度就不等于逻辑宽度了。
- // 把缩放钉死在 100% 再量；缩放本身的行为由 desktop/ui-scale-layout.cjs 单独守。
+ // 把缩放钉死在 100% 再量；缩放行为由界面缩放回归测试保护。
  await evaluate(`(()=>{localStorage.setItem('lol-loot-ui-scale','1');const s=document.getElementById('setting-ui-scale');s.value='1';s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
  for(const width of [820,1440,1920,2164]) {
   await call('Emulation.setDeviceMetricsOverride',{width,height:1100,deviceScaleFactor:1,mobile:false});

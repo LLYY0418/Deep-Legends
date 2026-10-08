@@ -1,5 +1,0 @@
---- FAIL: TestR99IconCatalogProjectionCachingAndClientSwitch (0.00s)
-    r99_test.go:216: leaked ownershipType
-FAIL
-FAIL	lol-loot-assistant	0.586s
-FAIL

@@ -1,7 +1,0 @@
-{
-  "file": ".github/workflows/ci.yml",
-  "sha256": "270b2e40a67335a02efae318b71dd2ff21372092bbe5895b1d9e181a285726fb",
-  "mtime_ns": 1791303918430242605,
-  "staging_filter_unchanged": true,
-  "external_change": "R239 Chromium guards appended after R237 verification; not changed by this session"
-}

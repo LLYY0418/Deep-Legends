@@ -72,7 +72,7 @@ async function main(){
  // 这一组护栏全是"设计单位"下的绝对像素契约（例如段位列固定 104px）。
  // .app-frame 现在有全局 CSS zoom，getBoundingClientRect 返回的是缩放后的视觉像素，
  // 2164x1100 会自动选到 1.1 档，104 就变成 114.39。把缩放钉死在 100% 再量，
- // 缩放本身的行为由 desktop/ui-scale-layout.cjs 单独守。
+ // 缩放行为由界面缩放回归测试保护。
  await evaluate(`(()=>{localStorage.setItem('lol-loot-ui-scale','1');const s=document.getElementById('setting-ui-scale');s.value='1';s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
  for(const theme of ['dark','light','violet']) for(const width of [820,1100,1440,1920,2164]) {
   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:theme}]});

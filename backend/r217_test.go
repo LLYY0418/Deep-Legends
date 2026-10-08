@@ -105,7 +105,7 @@ func TestR217CurveDirectionsAndFourEndingClasses(t *testing.T) {
 }
 
 func TestR217LookupCoversAllFrozenCombinationsAndRejectsUnseen(t *testing.T) {
-	raw, err := os.ReadFile("../docs/history/reports/r217/rule-freeze.json")
+	raw, err := os.ReadFile("testdata/r217/rule-freeze.json")
 	if err != nil {
 		t.Fatal(err)
 	}

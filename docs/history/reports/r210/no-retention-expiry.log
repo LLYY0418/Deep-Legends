@@ -1,5 +1,0 @@
---- FAIL: TestR210RetentionExpiresTwoMinutesAfterCompletionWithoutRestart (0.00s)
-    r210_test.go:77: retention exceeded two minutes after completion
-FAIL
-FAIL	lol-loot-assistant/backend	0.590s
-FAIL

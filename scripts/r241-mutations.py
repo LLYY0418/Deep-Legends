@@ -2,7 +2,8 @@
 import os
 import json,subprocess,hashlib,time
 from pathlib import Path
-root=Path(__file__).resolve().parents[1];out=Path(os.environ.get('R241_MUTATION_OUT',root/'docs/history/reports/r241'));out.mkdir(parents=True,exist_ok=True)
+from local_evidence import evidence_path, require_evidence
+root=Path(__file__).resolve().parents[1];out=Path(os.environ.get('R241_MUTATION_OUT',evidence_path('r241')));out.mkdir(parents=True,exist_ok=True)
 mutations=[
  ('p2-mode-filter','backend/web/gameplay.js',lambda s:s.replace('const modeSet=Number(match.mapId)===11 ? "rift" : Number(match.mapId)===12 ? "aram" : Number(match.mapId)===30 ? "arena" : "other";','const modeSet="rift";'),['node','--test','--test-name-pattern=map matrix','backend/web/r241.test.cjs']),
  ('p3-wrap','backend/web/gameplay.css',lambda s:s.replace('grid-column: 1 / -1; flex-wrap: nowrap;','grid-column: 1 / -1; flex-wrap: wrap;'),['node','scripts/r241-browser.cjs','--guard-only']),

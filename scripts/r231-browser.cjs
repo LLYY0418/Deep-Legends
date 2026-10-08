@@ -1,7 +1,8 @@
 'use strict';
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 // Production app / synthetic API fixtures. These screenshots do not claim Windows/LCU evidence.
 const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),http=require('node:http'),assert=require('node:assert/strict');
-const baseline=process.argv.includes('--baseline-perf');const root=path.resolve(__dirname,'..'),web=path.join(root,'backend/web'),out=path.join(root,'docs/history/reports/r231');
+const baseline=process.argv.includes('--baseline-perf');const root=path.resolve(__dirname,'..'),web=path.join(root,'backend/web'),out=evidencePath('r231');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r231-chromium-'));let chrome,ws,server,origin;const errors=[],results=[];
 const inject=`
  overview.player.serverId='HN1';if(query.has('foreign')){overview.player.region='jp1';overview.player.serverId='';status.clientRegion='jp1';status.clientRegionLabel='日服';status.serverId='';status.serverName='';}overview.player.playerRef='r231-demo-player';overview.seasonChampionStats=overview.championStats;overview.seasonOverall=overview.overall;overview.seasonStatsProgress.tableSupported=true;overview.masteryChampionCount=37;overview.capabilities.push({name:'champion-mastery',state:'available'});

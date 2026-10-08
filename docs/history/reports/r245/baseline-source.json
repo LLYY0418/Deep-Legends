@@ -1,6 +1,0 @@
-{
-  "desktop/license-window.cjs": "1e7e3041cbf2007b46b738eb7045e7e965e5875aab5958a2b7d07ec3af0dc09b",
-  "desktop/main.cjs": "2b37aab1c03e2e73efaa6babc8c96fad87b3ba7a668f606163234f224ce544e9",
-  "backend/license.go": "29354a9a0d5f0e81cb83cc26d3e6b94a15c26854265b693d9d3acc87dc99e9c3",
-  "backend/license_window_diagnostic.go": "e0a1777f2c86a4b7fe7818c53d788b9170fe2fa4477170ffcdc0071f3a5e266e"
-}

@@ -1,7 +1,0 @@
-backend/champions_structured.go:1012:	if division >= 1 && division <= 4 && tier != "master" && tier != "grandmaster" && tier != "challenger" {
-backend/opgg_insights.go:139:		if rawDivision, err := strconv.Atoi(rankMatch[3]); err == nil && rawDivision >= 1 && rawDivision <= 4 {
-backend/overview_current_game.go:121:	if t.Division >= 1 && t.Division <= 4 {
-backend/storage.go:682:				for generation := 1; generation <= 4; generation++ {
-backend/match_timeline.go:209:				if event.SkillSlot >= 1 && event.SkillSlot <= 4 && !strings.EqualFold(event.LevelUpType, "EVOLVE") {
-backend/web/app.js:4423:      if (!Number.isFinite(distance) || distance <= 4) return;
-backend/web/champions.js:165:  function normalizeMayhemStage(value) { const parsed = Number(value); return Number.isInteger(parsed) && parsed >= 0 && parsed <= 4 ? parsed : 0; }

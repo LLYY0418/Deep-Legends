@@ -1,9 +1,11 @@
 'use strict';
+const { evidencePath, requireEvidence } = require('../scripts/local-evidence.cjs');
 // Actual app entry, production scripts/CSS, UI navigation in Chromium. Data and
 // portraits are explicit local fixtures; these screenshots are not Windows/LCU evidence.
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');const {prefix}=require('./r230-fixture.cjs');
-const web=path.resolve(__dirname,'../backend/web'),output=path.resolve(__dirname,'../docs/history/reports/r230'),profile=fs.mkdtempSync(path.join(os.tmpdir(),'r230-chrome-'));
+requireEvidence('r211/mastery-crest-10.png');
+const web=path.resolve(__dirname,'../backend/web'),output=evidencePath('r230'),profile=fs.mkdtempSync(path.join(os.tmpdir(),'r230-chrome-'));
 let chrome,socket,server;
 async function main(){
  fs.mkdirSync(output,{recursive:true});
@@ -13,7 +15,7 @@ async function main(){
   const p=new URL(req.url,'http://localhost').pathname;
   if(p==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream'});res.end();return}
   if(p.startsWith('/api/')){
-   if(p==='/api/champion-asset' && req.url.includes('crest-and-banner-mastery')){res.setHeader('Content-Type','image/png');res.end(fs.readFileSync(path.resolve(__dirname,'../docs/history/reports/r211/mastery-crest-10.png')));return}
+   if(p==='/api/champion-asset' && req.url.includes('crest-and-banner-mastery')){res.setHeader('Content-Type','image/png');res.end(fs.readFileSync(evidencePath('r211/mastery-crest-10.png')));return}
    if(/asset|icon|image/.test(p)){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72"><rect width="72" height="72" fill="#39465b"/><path d="M15 40L36 12 57 40 36 63Z" fill="#b78c45"/></svg>');return}
    res.setHeader('Content-Type','application/json');res.end('{}');return;
   }

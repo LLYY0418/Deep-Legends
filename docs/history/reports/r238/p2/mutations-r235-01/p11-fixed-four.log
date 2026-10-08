@@ -1,5 +1,0 @@
---- FAIL: TestR235ArenaResultBoundariesAndOptionalFields (0.00s)
-    r235_test.go:185: {1750 6 4 loss} win
-FAIL
-FAIL	lol-loot-assistant/backend	0.712s
-FAIL

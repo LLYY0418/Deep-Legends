@@ -1,9 +1,0 @@
---- FAIL: TestR252DefaultEmbeddedAssetsHaveNoActivationContent (0.01s)
-    disabled_build_test.go:31: default embedded asset web/index.html contains 注册码
-    disabled_build_test.go:31: default embedded asset web/index.html contains 授权到期
-    disabled_build_test.go:31: default embedded asset web/index.html contains DL-XXXXX
-    disabled_build_test.go:31: default embedded asset web/license-ui.js contains 注册码
-    disabled_build_test.go:31: default embedded asset web/license-ui.js contains 授权到期
-FAIL
-FAIL	lol-loot-assistant/backend	0.865s
-FAIL

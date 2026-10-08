@@ -1,4 +1,5 @@
 "use strict";
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 if (require.main === module && process.env.DEEP_LEGENDS_TEST_LICENSE !== "1" && !["--backend", "--probe-backend"].includes(process.argv[2])) throw Error("Explicit license test switch required: DEEP_LEGENDS_TEST_LICENSE=1");
 
 // Read-only audit of the actual public staging Setup/dir and a public release
@@ -70,6 +71,7 @@ async function audit() {
     setup_bytes: setupBytes.length, backend_bytes: binary.length, license_origin_and_kid_and_key_match: true, finalized_privacy_embedded: true, r240_css_and_window_module_embedded: true, r242_protocol_and_settings_embedded: true, r243_failure_retry_and_window_guard_embedded: true, r245_geometry_trace_and_startup_embedded: true, r246_two_hour_lease_copy_embedded: true, r247_test_observation_absent: true,
     test_fixtures_and_known_private_material_absent: true, personal_riot_key_absent: true, fixed_backend_digest_matches: true, fuses, asar_integrity: records,
     staging_rejected_by_release_checker: true, release_staging_material_absent: true, release_backend_sha256: digest(releaseBackend) };
-  fs.writeFileSync(path.join(root, "docs/history/reports/r246/package-audit.json"), JSON.stringify(result, null, 2) + "\n"); console.log(JSON.stringify(result));
+  fs.mkdirSync(path.dirname(evidencePath('r246/package-audit.json')), { recursive: true });
+  fs.writeFileSync(evidencePath('r246/package-audit.json'), JSON.stringify(result, null, 2) + "\n"); console.log(JSON.stringify(result));
 }
 audit().catch(error => { console.error(error); process.exitCode = 1; });

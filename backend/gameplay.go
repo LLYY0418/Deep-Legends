@@ -4613,7 +4613,7 @@ type gameplayRecommendationMatchup struct {
 // 唯一差别是 ConfidenceLow/ConfidenceHigh 各带自己的 tag——工单原文写成
 // `json:"confidenceLow,confidenceHigh"` 是笔误：Go 的 struct tag 不支持一个 tag
 // 两个名字，那样会被解析成「字段名叫 confidenceLow,confidenceHigh」而永远匹配不上，
-// 两个值都会被静默丢掉（详见 docs/r116d-execution-ledger.md）。
+// 两个值都会被静默丢掉。
 //
 // CounterDelta 是上游原值（0..1 的胜率差，实测 0.03639 = 3.6 个百分点），
 // 不做任何换算；正负号由 Direction 决定，前端负责换算成百分点。
@@ -4658,10 +4658,8 @@ type gameplayTeamPortrait struct {
 
 // gameplayNextItemSuggestion 是 P1-4 阶段二「下一件推荐」的纯计算结果。
 //
-// ⚠️ 已实现但未接线。docs/r116-probe-findings.md §3.4 的
-// live_client_playerlist_shape.element_keys 判据目前仍是「待填」——海斗（KIWI）的
-// playerlist 形状零观测（19 键基线是在斗魂 CHERRY 下测的）。按工单 P1-4
-// 「对抗变异」最后一条与 Anti-scope 第 3 条，探测结论落地前不许实现渲染层。
+// 已实现但未接线。海斗（KIWI）的 playerlist 形状尚无真实观测，
+// 19 键基线仅在斗魂 CHERRY 下测得；确认海斗 items 字段及元素键名之前不接渲染层。
 // 接线条件与接线点见 gameplayNextItemSuggestionFromTrios 的注释。
 type gameplayNextItemSuggestion struct {
 	ItemID   int     `json:"itemId"`
@@ -4893,7 +4891,7 @@ const gameplayTeamPortraitThresholdRatio = 1.0
 //
 // Anti-scope 第 4 条：不在 ChampSelect 阶段展示「对面 5 人」相关的克制/协同，
 // 除非 R116-探测同时证实 their_team_length > 0 且
-// their_team_nonzero_counts.championId > 0（见 docs/r116-probe-findings.md §4.2）。
+// their_team_nonzero_counts.championId > 0。
 // R153 两局真机样本的 their_team_length 均为 5，但 championId 非零计数均为 0；
 // 选人阶段仍看不到对方英雄，白名单里没有 ChampSelect。
 //
@@ -5940,7 +5938,7 @@ type liveClientArenaGrouping struct {
 //
 // 斗魂（CHERRY）在 R90 的 63 次 200 采样里恒定给出 19 个顶层键，其中含 items；
 // 海斗（KIWI / ARAM_MAYHEM）下这个字段是否存在、元素结构是否一致，
-// docs/r116-probe-findings.md §3.4 与 §5.3 的观测值目前全部是「待填」——零观测。
+// 海斗下尚无真实观测，不能把斗魂的字段形状视为已确认。
 // 所以这里的解析对键名大小写宽松（itemID / itemId / itemid 都认），任何一项缺失
 // 都按零值处理，元素不是对象就整条跳过并计数，绝不 panic、绝不猜字段。
 // 观测到的真实键名会原样进 live_client_items_parsed 事件，真机日志一到就能判读。
@@ -6311,8 +6309,8 @@ func parseLiveClientPlayerList(raw []byte, sizes ...int) (liveClientSnapshot, li
 		rosterPlayer.IsBot, _ = liveClientItemBool(entry, "isBot")
 		snapshot.RosterPlayers = append(snapshot.RosterPlayers, rosterPlayer)
 		// R116-D P1-4 阶段一：读 items。必须放在 position 的 continue 之前——
-		// 海斗的 position 实测恒为 "OTHER"（docs/r116-probe-findings.md §1.5 的
-		// 斗魂基线是 position_values:{"OTHER":18}），normalizePosition 会把它
+		// 夹具中的 position 恒为 "OTHER"（斗魂实测基线为 position_values:{"OTHER":18}），
+		// normalizePosition 会把它
 		// 归一成空串，放在后面就等于永远解析不到。
 		if items, elementKeys, seen, skipped, present := parseLiveClientItems(entry); present {
 			snapshot.ItemElementsSeen += seen
@@ -6442,8 +6440,7 @@ func (a *app) recordLiveClientPlayerListShape(gameID int64, status int, shape li
 // 生产 UI 上不展示任何内容（工单 P1-4 阶段一第 2 条）。
 //
 // 用途：海斗（KIWI / ARAM_MAYHEM）的 /liveclientdata/playerlist 里 items 字段
-// 是否存在、元素结构是否与斗魂一致，docs/r116-probe-findings.md §3.4/§5.3 的观测
-// 值至今是「待填」。这条事件把本人（self）识别到的 items 长度、itemID 集合、
+// 是否存在、元素结构是否与斗魂一致，尚无真实海斗观测。这条事件把本人（self）识别到的 items 长度、itemID 集合、
 // 以及所有玩家 items[] 元素上实际观测到的键名一并落盘，真机日志一到就能直接判读，
 // 不需要再改代码重跑。
 //
@@ -6715,19 +6712,16 @@ func liveClientItemsForIdentities(snapshot liveClientSnapshot, summonerNames, ri
 //
 // ⚠️ 已实现、有完整单测，但**未接线**。
 //
-// 依据：docs/r116-probe-findings.md §3.4 的 live_client_playerlist_shape
-// .element_keys 与 §5.3 的 $.allPlayers[].items element_keys 两项判据，观测值
-// 目前全部是「待填」——需要 Windows 真机 + 真实海斗对局，本轮执行环境无法产出。
-// 工单 P1-4「对抗变异」最后一条明写：「若阶段二判定为不可行（探测结果否定），
-// 本工单只交付阶段一的诊断解析，不强行实现阶段二——验收时以 R116-探测的结论
-// 文档为准，不接受『猜测字段结构强行实现』的交付。」Anti-scope 第 3 条同义。
+// 接线前须用 Windows 真机的海斗对局确认 playerlist 含 items，
+// 且 $.allPlayers[].items 的元素键名与斗魂基线一致。当前尚无真实海斗观测；
+// 若探测否定，只保留诊断解析，不猜字段结构。
 //
 // 所以本轮把能力备好、接线留空：
 //   - 下面两个函数是纯函数，输入输出完全确定，单测覆盖前缀匹配、消耗品过滤、
 //     无匹配降级三条路径；
 //   - 它们没有任何调用方（除测试），不进 gameplayRecommendationBundle，
 //     前端 gameplay.js 里也没有对应的渲染分支；
-//   - 接线条件：§3.4 的 element_keys 回填为「含 items」且 §5.3 的 items 元素
+//   - 接线条件：playerlist 确认含 items，且 items 元素
 //     键名与斗魂基线（itemID/slot/count/canUse/consumable）一致；
 //   - 接线点（两处，各一行量级）：
 //       1. 后端——在 gameplayApplyRosterInsights 里把 liveClientSnapshot
@@ -6745,7 +6739,7 @@ func liveClientItemsForIdentities(snapshot liveClientSnapshot, summonerNames, ri
 // 未解决：工单还要求滤掉「未成型的空槽」，但 playerlist 的 items[] 元素里没有
 // 任何能区分「成品件」与「合成组件」的字段（canUse 是「能不能主动使用」，
 // 与是否成型无关）。要真正过滤组件，需要一份成品件 ID 目录，而那不在本轮
-// 允许改动的文件里。这一点已记入 docs/r116d-execution-ledger.md 的未解决问题，
+// 当前已有的目录里。
 // 接线前必须用真机数据核对：如果组件也会进 items[]，前缀匹配会假命中。
 func gameplayOwnedTerminalItemIDs(items []liveClientItem) []int {
 	if len(items) == 0 {

@@ -71,7 +71,7 @@ func TestGameplayRecommendationBundleDropsAugmentStages(t *testing.T) {
 	}
 
 	// 体积记账：同一份 detail，海克斯段剥掉阶段维度前后各是多少。夹具只裁了 10 条
-	// augment，真实英雄 126 条时这段是 97 KB（docs/r116b-execution-ledger.md 整改节）。
+	// augment，真实英雄 126 条时这段是 97 KB。
 	before, err := json.Marshal(detail.RecommendedAugments)
 	if err != nil {
 		t.Fatal(err)

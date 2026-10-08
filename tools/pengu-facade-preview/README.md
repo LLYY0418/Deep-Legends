@@ -24,8 +24,7 @@
 - **别人看不到**。改的只是你本地客户端读到的数据，服务端真值没变。
 - **不持久**。重启客户端后需要脚本重新施加；目标 ID 写在 `CONFIG` 里所以会自动恢复。
 - **不能让别人也看到未拥有外观**。那需要服务端接受写入，已确认被所有权校验拒绝
-  （`docs/history/ledgers/r106-execution-ledger.md`、`docs/r107-execution-ledger.md`；外部项目
-  league-profile-tool 同样只做到聊天作用域）。
+  （服务器拒绝装备未拥有物品；外部项目 league-profile-tool 同样只做到聊天作用域）。
 - **不改游戏文件、不联网、不上传任何数据、不写持久化存储**。
 
 ## 已知副作用
@@ -54,7 +53,7 @@
      `await __facadePreview.suggestIcons()`，它会列出几个「未拥有且本区域可用」的候选。
      填 `0` 表示不改头像。
    - `banner.enabled: true` + `banner.id`：目标旗帜，用 regalia 目录里的**字符串 id**
-     （不是 `contentId`，也不是 `idSecondary`，见 `docs/r110-execution-ledger.md`）。
+     （目录使用字符串 `id`，不是 `contentId` 或 `idSecondary`）。
      只接受 `[A-Za-z0-9_-]`，其它输入会被拒绝（防原型污染）。
    - 第一次运行保持 `diagnostic: true`。
 6. **重启 LoL 客户端**（脚本在 `init` 阶段挂 hook，必须早于客户端自己的请求）。

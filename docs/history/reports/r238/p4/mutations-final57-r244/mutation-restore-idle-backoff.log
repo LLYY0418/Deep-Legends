@@ -1,5 +1,0 @@
---- FAIL: TestR244ColdConnectionSequenceAndSummonerEvent (0.01s)
-    r244_test.go:294: [8s 8s 8s 8s 500ms]
-FAIL
-FAIL	lol-loot-assistant/backend	0.614s
-FAIL

@@ -403,7 +403,7 @@ func TestR216LegacyRankBadgesAndHiddenPrecision(t *testing.T) {
 
 func TestR216V21ProductionFrozenParams(t *testing.T) {
 	var frozen struct{ Params scoreParams }
-	raw, err := os.ReadFile("../docs/history/reports/r216/v21-candidate.json")
+	raw, err := os.ReadFile("testdata/r216/v21-candidate.json")
 	if err != nil {
 		t.Fatal(err)
 	}

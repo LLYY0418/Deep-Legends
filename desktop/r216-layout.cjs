@@ -1,7 +1,9 @@
 'use strict';
+const { evidencePath, requireEvidence } = require('../scripts/local-evidence.cjs');
 const {spawn}=require('node:child_process');const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
-const {read,compile,escapeHTML}=require('../backend/web/r188-harness.cjs');const output=path.resolve(__dirname,'../docs/history/reports/r216');const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r216-layout-'));let proc,ws,server;
+const {read,compile,escapeHTML}=require('../backend/web/r188-harness.cjs');const output=evidencePath('r216');const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r216-layout-'));let proc,ws,server;
 async function main(){
+ fs.mkdirSync(output,{recursive:true});
  const source=read('gameplay.js');const keys=['unstoppable','resilience','unlucky','struggling'];
  const state={matchTimelines:new Map()};const icon=(_kind,id,name='')=>`<span class="game-icon is-small"><span>${id}</span></span>`;
  const fn=compile(source,['renderMatchTags','renderMultiKillTag','matchKeywordMetadata','scorePlacementChip','scoreBadgeChip','scoreRankChip','renderChampionTable','championTableNumber','championTableSortedRows'],{state,escapeHTML,matchTimelineKey:()=> 'one',iconFigure:icon});

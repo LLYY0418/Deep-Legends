@@ -5,7 +5,9 @@ Search is a deterministic coordinate grid (0.02 weight transfers, sum=1,
 max=0.30), with independent k candidates; held-out matches never select params.
 """
 import json,pathlib,math,random,statistics,numpy as np
-ROOT=pathlib.Path(__file__).resolve().parent.parent;OUT=ROOT/'docs/history/reports/r211';SAMPLES=OUT/'opgg-samples'
+from local_evidence import evidence_path, require_evidence
+ROOT=pathlib.Path(__file__).resolve().parent.parent;OUT=evidence_path('r211');SAMPLES=OUT/'opgg-samples'
+require_evidence('r211/opgg-samples/paired.json')
 KEYS=['kp','kill','death','dmg','gold','cs','vision','tank','util','obj']
 ROLES=['TOP','JUNGLE','MIDDLE','BOTTOM','UTILITY','NONE']
 INITIAL=np.array([[.12,.10,.12,.16,.08,.10,.05,.12,.03,.12],[.16,.10,.12,.12,.06,.08,.08,.08,.04,.16],[.14,.12,.12,.20,.08,.10,.05,.04,.03,.12],[.12,.12,.12,.22,.10,.12,.04,.02,.02,.12],[.20,.04,.12,.08,.02,0,.18,.08,.18,.10],[.18,.12,.12,.22,.06,0,0,.12,.10,.08]])

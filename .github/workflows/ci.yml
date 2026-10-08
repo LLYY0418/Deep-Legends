@@ -25,6 +25,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Verify local notes and assistant instructions are not tracked
+        run: node scripts/verify-no-docs-tracked.cjs
       - name: Prepare verified published update compatibility input
         run: node scripts/prepare-r238-update-fixture.cjs
       - name: Check formatting
@@ -102,6 +104,8 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: desktop/package-lock.json
+      - name: Verify local notes and assistant instructions are not tracked
+        run: node scripts/verify-no-docs-tracked.cjs
       - name: Prepare verified published update compatibility input
         run: node scripts/prepare-r238-update-fixture.cjs
       - name: Install Windows test dependencies

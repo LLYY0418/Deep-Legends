@@ -1,8 +1,0 @@
-{
-  "anonymous_files_rehashed": true,
-  "hashes_match_api_snapshot_and_publication_proof": true,
-  "anonymous_manifest_bytes_equal": true,
-  "subagent_live_api_repeat": "DNS unavailable in subagent network environment; not claimed as independent live success",
-  "main_thread_live_api_repeat": "latest-final.json confirms id403843482/v0.12.74/draftfalse/prereleasefalse after independent check",
-  "player_apis_accessed": false
-}

@@ -1,5 +1,0 @@
---- FAIL: TestR78PickableFailureStillSwapsBench (1.00s)
-    r78_test.go:134: pickable failure prevented bench POST
-FAIL
-FAIL	lol-loot-assistant/backend	255.242s
-FAIL

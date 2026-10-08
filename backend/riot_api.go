@@ -1154,9 +1154,8 @@ func riotPositionKey(participant riotParticipant) string {
 //
 // R121 真机探测在 LCU champ-select myTeam 中找到了直接的 isAutofilled，
 // 仅供实时对局使用；这里仍是 match-v5 的历史对局推断，不与直接字段混用。
-// 证据与边界见 docs/r121-position-probe-findings.md。
 //
-// 在 P3-2 的真机对照结果回填 docs/r119-execution-ledger.md §5 之前，
+// 在真机对照证明候选对应真实补位之前，
 // autofillLabelGate 保持 false：界面不出标签，但候选计算与诊断计数照常运行，
 // 用来收集真机数据。
 // ---------------------------------------------------------------------------
@@ -1199,8 +1198,7 @@ func autofillFlagRatioExcessive(flagged, total int) bool {
 // 所以开关关闭期间仍然能收集真机数据（R121 P1-1 的明确要求）。
 //
 // 范围门禁：只在召唤师峡谷的单双排（420）与灵活组排（440）里计算，其余队列
-// 一律 false——海克斯大乱斗等模式根本没有这两个字段
-// （docs/r116e-execution-ledger.md §5.4）。
+// 一律 false——海克斯大乱斗等模式没有可用于此规则的位置字段。
 func riotAutofillCandidates(info *riotMatchInfo) ([]bool, bool) {
 	if info == nil || len(info.Participants) == 0 {
 		return nil, false

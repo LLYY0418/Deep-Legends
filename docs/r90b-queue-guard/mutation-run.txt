@@ -1,6 +1,0 @@
-channel-select KILLED
-channel-receive KILLED
-struct-field KILLED
-json-marshal KILLED
-binary-buffer KILLED
-generic-comparator KILLED

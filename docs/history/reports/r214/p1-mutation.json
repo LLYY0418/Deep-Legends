@@ -1,6 +1,0 @@
-{
-  "mutation": "remove selected augment-description request from renderBuild",
-  "exit_code": 1,
-  "caught": true,
-  "output": "✖ R214 selected player descriptions load once and redraw only the intersecting build (156.009125ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 751.120666\n\n✖ failing tests:\n\ntest at backend/web/r214.test.cjs:8:1\n✖ R214 selected player descriptions load once and redraw only the intersecting build (156.009125ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n      '1,2',\n  -   '3,4'\n    ]\n  \n      at TestContext.<anonymous> (/Users/ly/personal/personal-work/deep-legends/backend/web/r214.test.cjs:27:9)\n      at async Test.run (node:internal/test_runner/test:1125:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ '1,2' ],\n    expected: [ '1,2', '3,4' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n"
-}

@@ -1,7 +1,0 @@
---- FAIL: TestR206ArenaRetryPartialAndAllFailed (0.00s)
-    --- FAIL: TestR206ArenaRetryPartialAndAllFailed/first-timeout (0.00s)
-        r206_arena_test.go:61: partial/success not 200 502 英雄数据暂时不可用，请稍后重试
-            
-FAIL
-FAIL	lol-loot-assistant/backend	0.516s
-FAIL

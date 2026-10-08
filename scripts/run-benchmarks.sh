@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-report_dir="docs/r115-validation/bench"
+report_dir="${DEEP_LEGENDS_BENCHMARK_OUTPUT:-output/benchmarks}"
 mkdir -p "$report_dir"
 report_base="$report_dir/$(date +%Y%m%d-%H%M%S)"
 GOCACHE="${GOCACHE:-$PWD/.gocache}" go test -run '^$' -bench '^BenchmarkR115' -benchmem -benchtime=200ms -count=5 ./backend > "$report_base.txt"

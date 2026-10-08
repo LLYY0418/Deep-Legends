@@ -1,2 +1,0 @@
-CDP connected
-R100 Chromium PASS {"elapsed":1.5999999940395355,"peakImages":2}

@@ -56,7 +56,7 @@ test("R133 一条 stall 都没有、且日志出自支持该事件的包时判 c
 test("R133 对抗变异：旧包的日志里 0 条 stall 不得判成 clean", () => {
   // card_image_stalled 是 0.12.18 / R130 才加的事件。拿一份 0.12.15 的日志跑这个
   // 脚本，「0 条 stall」只是因为这个包根本不会上报它——判成 clean 就等于凭空
-  // 宣布 P2 通过。这正是拿真实旧日志（docs/r89-kr-player/）冒烟时暴露出来的。
+  // 宣布 P2 通过。这正是拿真实旧日志冒烟时暴露出来的。
   for (const version of ["0.12.15", "0.12.17", "0.11.99"]) {
     const summary = summarize([appStart(version), imageFailure(-5000)]);
     assert.equal(summary.verdict, "clean-unverified", `${version} 的日志不该判 clean`);

@@ -147,7 +147,7 @@ func TestR102DyjkbysbBelongsToWei(t *testing.T) {
 func TestR102SeedAccountsMatchVerificationDoc(t *testing.T) {
 	// Compare each owner and its ordered account list to the user-approved source,
 	// independently of the production catalog. Counts alone miss swapped owners.
-	doc, err := os.ReadFile("../docs/pro-accounts-verification-2026-09-17.md")
+	doc, err := os.ReadFile("testdata/pro-accounts/pro-accounts-verification-2026-09-17.md")
 	if err != nil {
 		t.Fatal(err)
 	}

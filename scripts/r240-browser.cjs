@@ -1,10 +1,11 @@
 "use strict";
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 if (require.main === module && process.env.DEEP_LEGENDS_TEST_LICENSE !== "1" && !["--backend", "--probe-backend"].includes(process.argv[2])) throw Error("Explicit license test switch required: DEEP_LEGENDS_TEST_LICENSE=1");
 
 // Real Chromium / actual client HTML and JS / synthetic local Go-state API.
 // This does not claim a deployed license server or Windows acceptance.
 const { spawn } = require("node:child_process"), fs = require("node:fs"), path = require("node:path"), os = require("node:os"), http = require("node:http"), assert = require("node:assert/strict");
-const root = path.resolve(__dirname, ".."), web = process.env.R240_WEB_ROOT || path.join(root, "backend/web"), out = process.env.R240_BROWSER_OUTPUT || path.join(root, "docs/history/reports/r240/browser");
+const root = path.resolve(__dirname, ".."), web = process.env.R240_WEB_ROOT || path.join(root, "backend/web"), out = process.env.R240_BROWSER_OUTPUT || evidencePath('r240/browser');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "r240-chromium-"));
 let chrome, ws, server, origin, state = "LOCKED", generation = 1, business = 0, privacyRequests = 0, privacyFailure = false, activationCode = "", holdInitialStatus = true, releaseStatus;
 const errors = [], checks = [], started = new Date().toISOString();

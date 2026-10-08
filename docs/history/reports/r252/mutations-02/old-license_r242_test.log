@@ -1,5 +1,0 @@
---- FAIL: TestR242LicenseExpiryStrictSignedField (0.00s)
-    license_r242_test.go:150: valid signed expiry rejected invalid license expiry
-FAIL
-FAIL	lol-loot-assistant/backend	0.661s
-FAIL

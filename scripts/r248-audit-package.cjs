@@ -1,4 +1,5 @@
 "use strict";
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 // Read-only checks of the single default public Windows audit package.
 const fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto"),assert=require("node:assert/strict");
 const root=path.resolve(__dirname,".."),desktop=path.join(root,"desktop"),output=process.env.R248_PACKAGE_DIR||path.join(root,"dist/R248-no-license-public");
@@ -22,5 +23,7 @@ const digest=file=>crypto.createHash("sha256").update(fs.readFileSync(file)).dig
  const {NtExecutable,NtExecutableResource}=await import(path.join(desktop,"node_modules/resedit/dist/index.js")),res=NtExecutableResource.from(NtExecutable.from(fs.readFileSync(exe))),integrity=res.entries.find(e=>e.type==="INTEGRITY"&&e.id==="ELECTRONASAR");assert.ok(integrity);
  const records=JSON.parse(Buffer.from(integrity.bin).toString()),{header}=await require(path.join(desktop,"node_modules/app-builder-lib/out/asar/asar.js")).readAsarHeader(archive),headerSHA=crypto.createHash("sha256").update(header).digest("hex");assert.ok(records.some(r=>r.file==="resources\\app.asar"&&r.alg==="SHA256"&&r.value===headerSHA));
  const result={...receipt,setup,setup_sha256:digest(setup),backend_sha256:digest(backend),archive_sha256:digest(archive),audit_only:true,license_enabled:false,authorization_markers_absent:true,public_riot_key_policy:true,fixed_backend_digest:true,fuses,asar_integrity:records,update_validation:"0.12.76 unsigned manifest validation + size/SHA256; actual published asset passed local test",windows_execution:"未在 Windows 实跑"};
- fs.writeFileSync(process.env.R248_AUDIT_OUT||path.join(root,"docs/history/reports/r248/package-audit.json"),JSON.stringify(result,null,2)+"\n");fs.writeFileSync(path.join(output,"r248-audit.json"),JSON.stringify(result,null,2)+"\n");console.log(JSON.stringify(result));
+ const auditFile=process.env.R248_AUDIT_OUT||evidencePath('r248/package-audit.json');
+ fs.mkdirSync(path.dirname(auditFile),{recursive:true});
+ fs.writeFileSync(auditFile,JSON.stringify(result,null,2)+"\n");fs.writeFileSync(path.join(output,"r248-audit.json"),JSON.stringify(result,null,2)+"\n");console.log(JSON.stringify(result));
 })().catch(e=>{console.error(e);process.exitCode=1});

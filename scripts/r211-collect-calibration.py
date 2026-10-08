@@ -6,8 +6,9 @@ from original response files, serializes Riot reads at <=100 per 130 seconds,
 stops on shared quota/IP/application cooling, and never refreshes OP.GG players.
 """
 import argparse,datetime,json,os,pathlib,re,time,urllib.request,urllib.error,urllib.parse
+from local_evidence import evidence_path, require_evidence
 ROOT=pathlib.Path(__file__).resolve().parent.parent
-OUT=ROOT/'docs/history/reports/r211/opgg-samples'
+OUT=evidence_path('r211/opgg-samples')
 UA='Mozilla/5.0'
 ACTION='409a2b9ca50d15e50a4dace93552e3a40113dc2753'
 ACCOUNTS=[('TOPKING','asd'),('JUGKlNG','kr'),('Hide on bush','KR1'),('DK ShowMaker','KR1'),('허거덩','0303'),('kiin','KR1'),('오 너','111'),('Athene','lll'),('suis','kr7'),('DK Lucid','KR1')]

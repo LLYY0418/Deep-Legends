@@ -1,13 +1,15 @@
 'use strict';
+const { evidencePath, requireEvidence } = require('../scripts/local-evidence.cjs');
 // R211 production renderers/CSS in Chromium; fixture portraits, real 108px mastery crest.
 const {spawn}=require('node:child_process');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
 const {fixture}=require('../backend/web/r190-harness.cjs');
 const {read,extract,compile,escapeHTML}=require('../backend/web/r188-harness.cjs');
-const output=path.resolve(__dirname,'../docs/history/reports/r211');
+const output=evidencePath('r211');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r211-layout-'));
 let proc,ws,server;
 async function main(){
+ requireEvidence('r211/topking-opgg-masteries-parsed.json', 'r211/topking-masteries.json', 'r211/mastery-crest-10.png');
  const source=read('gameplay.js');
  const icon=(_kind,id,name='')=>`<span class="game-icon"><img src="/fixture/${id}.svg" alt="${escapeHTML(name)}"></span>`;
  const route=compile(source,['renderItemRoute','renderSkillOrder','skillPrioritySummary'],{escapeHTML,number:String,itemIconFigure:id=>icon('item',id),SKILL_SLOT_LETTERS:{1:'Q',2:'W',3:'E',4:'R'}});

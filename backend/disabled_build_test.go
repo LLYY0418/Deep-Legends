@@ -98,7 +98,11 @@ func TestR248DisabledStartupNoAuthorizationNetwork(t *testing.T) {
 	}
 }
 func TestR248Existing01276ReleaseAsset(t *testing.T) {
-	dir := filepath.Join("..", "docs", "history", "reports", "release-0.12.76", "anonymous-assets")
+	dir := filepath.Join("testdata", "release-0.12.76")
+	assetDir := os.Getenv("DEEP_LEGENDS_UPDATE_FIXTURE_DIR")
+	if assetDir == "" {
+		assetDir = filepath.Join("..", "output", "update-fixtures", "release-0.12.76")
+	}
 	data, err := os.ReadFile(filepath.Join(dir, "latest.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -125,7 +129,7 @@ func TestR248Existing01276ReleaseAsset(t *testing.T) {
 	if err = verifyUpdateManifestTrust(manifest, nil); err != nil {
 		t.Fatal("existing unsigned Latest rejected", err)
 	}
-	if err = verifyUpdateFile(context.Background(), filepath.Join(dir, manifest.Asset.Name), manifest.Asset); err != nil {
+	if err = verifyUpdateFile(context.Background(), filepath.Join(assetDir, manifest.Asset.Name), manifest.Asset); err != nil {
 		t.Fatal("existing published asset rejected", err)
 	}
 	bad := manifest
@@ -135,7 +139,7 @@ func TestR248Existing01276ReleaseAsset(t *testing.T) {
 	}
 	bad = manifest
 	bad.Asset.SHA256 = strings.Repeat("0", 64)
-	if verifyUpdateFile(context.Background(), filepath.Join(dir, manifest.Asset.Name), bad.Asset) == nil {
+	if verifyUpdateFile(context.Background(), filepath.Join(assetDir, manifest.Asset.Name), bad.Asset) == nil {
 		t.Fatal("checksum mismatch accepted")
 	}
 }

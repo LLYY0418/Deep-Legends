@@ -44,7 +44,7 @@ async function main(){
  await evaluate(`(()=>{const nav=document.querySelector('.pro-page-nav');const button=nav.querySelector('button').cloneNode(true);button.removeAttribute('id');nav.append(button);})()`);
  // 这一组护栏在"设计单位"下比较绝对像素（列宽、溢出、变异后必须溢出）。
  // .app-frame 现在有全局 CSS zoom，窄视口会自动缩到 0.9 倍，模拟宽度就不等于逻辑宽度了。
- // 把缩放钉死在 100% 再量；缩放本身的行为由 desktop/ui-scale-layout.cjs 单独守。
+ // 把缩放钉死在 100% 再量；缩放行为由界面缩放回归测试保护。
  await evaluate(`(()=>{localStorage.setItem('lol-loot-ui-scale','1');const s=document.getElementById('setting-ui-scale');s.value='1';s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
  for(const width of [820,1100,1440,1920]){
   await call('Emulation.setDeviceMetricsOverride',{width,height:1100,deviceScaleFactor:1,mobile:false});

@@ -1,7 +1,0 @@
-{
-  "verified_at": "2026-10-06T04:27:48.395Z",
-  "reviewer": "release_asset_audit",
-  "scope": "independent local size/hash/API digest/checksum/manifest/notes/target verification",
-  "passed": true,
-  "note": "notes match after trimming section boundary blank lines; draft URL uses untagged pending publication"
-}

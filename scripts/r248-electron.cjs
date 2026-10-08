@@ -1,9 +1,10 @@
 "use strict";
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 // Real Electron/production main + isolated synthetic HTTP backend. No license
 // files, real codes, external network, or private-key files are used.
 const fs = require("node:fs"), path = require("node:path"), os = require("node:os"), http = require("node:http"), assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
-const root = path.resolve(__dirname, ".."), out = process.env.R248_ELECTRON_OUTPUT || path.join(root, "docs/history/reports/r248/electron");
+const root = path.resolve(__dirname, ".."), out = process.env.R248_ELECTRON_OUTPUT || evidencePath('r248/electron');
 const domExpression = "(" + (() => {
   const layer = document.querySelector("#license-overlay"), form = document.querySelector("#license-form"), frame = document.querySelector("#app-frame"), expiry=document.querySelector("#setting-license-expiry");
   return { state: document.documentElement.dataset.license, overlayHidden: !layer || getComputedStyle(layer).display === "none", frameHidden: frame.hidden,

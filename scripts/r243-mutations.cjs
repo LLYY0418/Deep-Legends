@@ -1,8 +1,9 @@
 "use strict";
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 if (require.main === module && process.env.DEEP_LEGENDS_TEST_LICENSE !== "1" && !["--backend", "--probe-backend"].includes(process.argv[2])) throw Error("Explicit license test switch required: DEEP_LEGENDS_TEST_LICENSE=1");
 
 const fs=require("node:fs"),os=require("node:os"),path=require("node:path"),assert=require("node:assert/strict"),{spawnSync}=require("node:child_process");
-const root=path.resolve(__dirname,".."),out=path.join(root,"docs/history/reports/r243/mutations"),temp=fs.mkdtempSync(path.join(os.tmpdir(),"r243-mutations-")),results=[];
+const root=path.resolve(__dirname,".."),out=evidencePath('r243/mutations'),temp=fs.mkdtempSync(path.join(os.tmpdir(),"r243-mutations-")),results=[];
 fs.mkdirSync(out,{recursive:true});
 function killed(name,command,args,env,expected){const started=new Date(),r=spawnSync(command,args,{cwd:root,env:{...process.env,...env},encoding:"utf8",timeout:90000}),log=(r.stdout||"")+(r.stderr||"");fs.writeFileSync(path.join(out,name+".log"),log);assert.equal(r.error,undefined);assert.equal(r.status,1);assert.match(log,expected);assert.doesNotMatch(log,/SyntaxError|build failed|undefined:|error: expected/);results.push({name,exit_code:r.status,assertion_killed:true,started:started.toISOString(),finished:new Date().toISOString(),last5:log.trimEnd().split("\n").slice(-5)})}
 try {

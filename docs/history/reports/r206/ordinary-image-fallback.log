@@ -1,5 +1,0 @@
---- FAIL: TestR206LocalImage404NeverFetchesRemote (0.00s)
-    r206_collection_image_test.go:87: local lane leaked remote 200 map[Cache-Control:[private, max-age=86400] Content-Type:[image/png] Etag:["bd54b02fae14b6b9ed73887ded339b8ef846fbcba0d4e5f9d95470ac23ade242"]] 1
-FAIL
-FAIL	lol-loot-assistant/backend	0.528s
-FAIL

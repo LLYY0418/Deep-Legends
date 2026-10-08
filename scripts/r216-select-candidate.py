@@ -6,15 +6,17 @@ candidate fold metrics are descriptive; out-of-fold metrics use fold-fitted para
 """
 import collections,datetime,hashlib,itertools,json,pathlib,statistics
 import numpy as np
+from local_evidence import evidence_path, require_evidence
 ROOT=pathlib.Path(__file__).resolve().parent.parent
-OUT=ROOT/'docs/history/reports/r216/v21-candidate.json'
+require_evidence('r211/opgg-samples/paired.json', 'r211/opgg-validation-new-accounts/paired.json')
+OUT=evidence_path('r216/v21-candidate.json')
 BASE=np.array([.30,.20,.22,.08,.12,.08])
 FACTORS=[.3,.4,.5,.6,.7,.8,1.0]
 
 def historical():
  rows=[];sources={}
  for directory in ['opgg-samples','opgg-validation-new-accounts']:
-  folder=ROOT/'docs/history/reports/r211'/directory
+  folder=evidence_path('r211')/directory
   for f in sorted(folder.glob('account-*-riot.json')):
    sources[json.loads(f.read_text())['puuid']]=directory+':'+f.stem
   for p in json.loads((folder/'paired.json').read_text()):

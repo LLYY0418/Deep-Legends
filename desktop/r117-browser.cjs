@@ -17,7 +17,7 @@ async function main(){
   let output='',recorded=false;
   const record=result=>{
    if(recorded)return;recorded=true;
-   const directory=process.env.R117_BROWSER_OUTPUT||path.join(root,'docs/r117-validation/browser');fs.mkdirSync(directory,{recursive:true});
+   const directory=process.env.R117_BROWSER_OUTPUT||path.join(root,'output/r117-validation/browser');fs.mkdirSync(directory,{recursive:true});
    fs.writeFileSync(path.join(directory,'chrome-startup-stderr.log'),output);
    fs.writeFileSync(path.join(directory,'chrome-startup.json'),JSON.stringify({result,chrome,pid:proc.pid,exitCode:proc.exitCode,signalCode:proc.signalCode,elapsedMs:Date.now()-startupAt},null,2)+'\n');
   };
@@ -38,7 +38,7 @@ async function main(){
  await call('Page.enable');
  await call('Runtime.enable');
  await call('Page.bringToFront');
- const output=process.env.R117_BROWSER_OUTPUT||path.join(root,'docs/r117-validation/browser');fs.mkdirSync(output,{recursive:true});
+ const output=process.env.R117_BROWSER_OUTPUT||path.join(root,'output/r117-validation/browser');fs.mkdirSync(output,{recursive:true});
  server=require('node:http').createServer((req,res)=>{
    const pathname=new URL(req.url,'http://localhost').pathname;
    if(pathname==='/api/license/status'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({state:'ACTIVE'}));return;}

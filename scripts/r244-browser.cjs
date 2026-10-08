@@ -1,7 +1,8 @@
 'use strict';
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 // Production renderer with synthetic local API data; no real Windows/LCU claims.
 const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),http=require('node:http'),assert=require('node:assert/strict');
-const root=path.resolve(__dirname,'..'),web=path.join(root,'backend/web'),out=process.env.R244_BROWSER_OUT||path.join(root,'docs/history/reports/r244');
+const root=path.resolve(__dirname,'..'),web=path.join(root,'backend/web'),out=process.env.R244_BROWSER_OUT||evidencePath('r244');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r244-chromium-'));let chrome,ws,server,origin;const errors=[],results=[];
 const inject=`
  const makeRows=n=>Array.from({length:n},(_,i)=>({championId:61,championName:'奥莉安娜',win:i%2===0,kills:2,deaths:1,assists:3,createdAt:Date.now()-60*86400000-i*60000}));

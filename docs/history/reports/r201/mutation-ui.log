@@ -1,5 +1,0 @@
---- FAIL: TestR201SubsetFirstCardNoUIRecord (0.00s)
-    r201_test.go:226: temporary pick leaked to UI {2026-10-03 20:55:06.051155 +0800 CST m=+0.009538167 ok 已排定：0.0 秒后选用并锁定英雄 107 107}
-FAIL
-FAIL	lol-loot-assistant/backend	1.547s
-FAIL

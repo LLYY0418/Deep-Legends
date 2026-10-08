@@ -1,7 +1,0 @@
-{
-  "mutation": "finalize writes response averages back to accumulator",
-  "exit_code": 1,
-  "caught": true,
-  "duration_seconds": 20.39,
-  "output": "--- FAIL: TestR211SeasonFinalizeNeverMutatesAccumulator (0.00s)\n    r211_test.go:114: finalize changed raw cache: rows=[{ChampionID:13 ChampionName: Games:33 Wins:20 TotalKills:330 TotalDeaths:99 TotalAssists:198 Kills:10 Deaths:3 Assists:6 TotalCS:0 Duration:0 WinRate:61 KDA:5.33 CS:0 CSPerMinute:0}] raw=&{ChampionID:13 ChampionName: Games:33 Wins:20 TotalKills:330 TotalDeaths:99 TotalAssists:198 Kills:10 Deaths:3 Assists:6 TotalCS:0 Duration:0 WinRate:61 KDA:5.33 CS:0 CSPerMinute:0}\nFAIL\nFAIL\tlol-loot-assistant/backend\t1.159s\nFAIL\n"
-}

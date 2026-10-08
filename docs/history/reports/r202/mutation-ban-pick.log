@@ -1,5 +1,0 @@
---- FAIL: TestR202CardBenchWaitsForFinalization (0.00s)
-    r202_test.go:28: BAN_PICK sent swap [{/lol-champ-select/v1/session/bench/swap/57 map[]}]
-FAIL
-FAIL	lol-loot-assistant/backend	0.603s
-FAIL

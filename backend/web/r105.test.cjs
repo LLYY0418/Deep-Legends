@@ -4,7 +4,7 @@ const { JSDOM } = require("../../desktop/node_modules/jsdom");
 const settle=()=>new Promise(setImmediate);
 
 test("R105 all 53 reviewed accounts remain available after expanding unranked groups",async()=>{
-  const doc=fs.readFileSync(path.join(__dirname,"../../docs/pro-accounts-verification-2026-09-17.md"),"utf8");
+  const doc=fs.readFileSync(path.join(__dirname,"../testdata/pro-accounts/pro-accounts-verification-2026-09-17.md"),"utf8");
   const teams=[];let team;
   for(const line of doc.split("\n")) {
     const heading=line.match(/^## (BLG|IG|T1|HLE|GEN|DK)（/);

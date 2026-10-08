@@ -1,4 +1,5 @@
 "use strict";
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 if (require.main === module && process.env.DEEP_LEGENDS_TEST_LICENSE !== "1" && !["--backend", "--probe-backend"].includes(process.argv[2])) throw Error("Explicit license test switch required: DEEP_LEGENDS_TEST_LICENSE=1");
 
 // Real Electron windows + real renderer, isolated synthetic backend/userData.
@@ -27,7 +28,7 @@ if (process.argv[2] === "--backend") {
   server.listen(0, "127.0.0.1", () => { const baseUrl = `http://127.0.0.1:${server.address().port}`; console.log("LOOT_READY " + JSON.stringify({ baseUrl, bootstrapUrl: baseUrl, token: "synthetic-r239-local-token-".repeat(2) })); });
 } else {
   const [label = "after", source = path.join(root, "desktop/main.cjs")] = process.argv.slice(2);
-  const out = path.join(root, "docs/history/reports/r239"), samples = [];
+  const out = evidencePath('r239'), samples = [];
   async function sample(state, index, sourcePath = source, phase = label) {
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), "r239-electron-"));
     try {

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 // R141_LAYOUT=1 R141_BANNER_SAMPLE=/private/tmp/r140-lny-banner.png
-// CURRENT_GAME_SHOTS=docs/r141-validation node desktop/current-game-layout.cjs
+// CURRENT_GAME_SHOTS=output/r141-validation node desktop/current-game-layout.cjs
 // R140_LAYOUT=1 also checks the current banner detail dialog at multiple viewport heights.
 exports.verify = async ({call,evaluate,output}) => {
   assert.ok(process.env.R141_BANNER_SAMPLE||process.env.R140_BANNER_SAMPLE,'banner sample must point to a real game image');

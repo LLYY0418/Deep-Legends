@@ -1,8 +1,0 @@
-{
-  "version": "0.12.74",
-  "fingerprint": "a3d7c1e75735",
-  "key_mode": "public",
-  "native_self_test": true,
-  "windows_cross_compile": true,
-  "windows_executed": false
-}

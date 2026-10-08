@@ -1,7 +1,8 @@
 "use strict";
+const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 // Real Electron and production main/preload with an isolated synthetic backend.
 const fs=require("node:fs"),path=require("node:path"),os=require("node:os"),http=require("node:http"),assert=require("node:assert/strict"),{spawn}=require("node:child_process");
-const root=path.resolve(__dirname,".."),out=path.join(root,"docs/history/reports/r238/electron");
+const root=path.resolve(__dirname,".."),out=evidencePath('r238/electron');
 if(process.argv[2]==="--backend") {
   console.log("LOOT_READY "+JSON.stringify({baseUrl:process.env.R238_ORIGIN,bootstrapUrl:process.env.R238_ORIGIN,token:"r238-synthetic-local-token".repeat(3)}));
   setInterval(()=>{},1000);
