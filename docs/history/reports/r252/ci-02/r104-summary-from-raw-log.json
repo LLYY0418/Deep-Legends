@@ -1,0 +1,248 @@
+{
+  "iterations": 30,
+  "failures": 0,
+  "independent_processes": true,
+  "retries": 0,
+  "rows": [
+    {
+      "iteration": 1,
+      "start": "2026-10-08T12:22:21.126767+08:00",
+      "elapsed_seconds": 0.687,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 2,
+      "start": "2026-10-08T12:22:21.803245+08:00",
+      "elapsed_seconds": 0.594,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 3,
+      "start": "2026-10-08T12:22:22.405087+08:00",
+      "elapsed_seconds": 0.641,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 4,
+      "start": "2026-10-08T12:22:23.034627+08:00",
+      "elapsed_seconds": 0.703,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 5,
+      "start": "2026-10-08T12:22:23.748153+08:00",
+      "elapsed_seconds": 0.672,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 6,
+      "start": "2026-10-08T12:22:24.409107+08:00",
+      "elapsed_seconds": 0.703,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 7,
+      "start": "2026-10-08T12:22:25.126001+08:00",
+      "elapsed_seconds": 0.625,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 8,
+      "start": "2026-10-08T12:22:25.741522+08:00",
+      "elapsed_seconds": 0.734,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 9,
+      "start": "2026-10-08T12:22:26.475747+08:00",
+      "elapsed_seconds": 0.688,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 10,
+      "start": "2026-10-08T12:22:27.165760+08:00",
+      "elapsed_seconds": 0.625,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 11,
+      "start": "2026-10-08T12:22:27.789976+08:00",
+      "elapsed_seconds": 0.656,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 12,
+      "start": "2026-10-08T12:22:28.445314+08:00",
+      "elapsed_seconds": 0.594,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 13,
+      "start": "2026-10-08T12:22:29.042314+08:00",
+      "elapsed_seconds": 1.062,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 14,
+      "start": "2026-10-08T12:22:30.097774+08:00",
+      "elapsed_seconds": 1.5,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 15,
+      "start": "2026-10-08T12:22:31.605167+08:00",
+      "elapsed_seconds": 1.578,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 16,
+      "start": "2026-10-08T12:22:33.175529+08:00",
+      "elapsed_seconds": 0.938,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 17,
+      "start": "2026-10-08T12:22:34.114001+08:00",
+      "elapsed_seconds": 0.609,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 18,
+      "start": "2026-10-08T12:22:34.727634+08:00",
+      "elapsed_seconds": 0.61,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 19,
+      "start": "2026-10-08T12:22:35.343526+08:00",
+      "elapsed_seconds": 0.625,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 20,
+      "start": "2026-10-08T12:22:35.959914+08:00",
+      "elapsed_seconds": 0.672,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 21,
+      "start": "2026-10-08T12:22:36.638779+08:00",
+      "elapsed_seconds": 0.609,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 22,
+      "start": "2026-10-08T12:22:37.250375+08:00",
+      "elapsed_seconds": 0.625,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 23,
+      "start": "2026-10-08T12:22:37.870784+08:00",
+      "elapsed_seconds": 0.594,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 24,
+      "start": "2026-10-08T12:22:38.468991+08:00",
+      "elapsed_seconds": 0.64,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 25,
+      "start": "2026-10-08T12:22:39.098248+08:00",
+      "elapsed_seconds": 0.625,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 26,
+      "start": "2026-10-08T12:22:39.725136+08:00",
+      "elapsed_seconds": 0.594,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 27,
+      "start": "2026-10-08T12:22:40.324245+08:00",
+      "elapsed_seconds": 0.656,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 28,
+      "start": "2026-10-08T12:22:40.971504+08:00",
+      "elapsed_seconds": 0.735,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 29,
+      "start": "2026-10-08T12:22:41.711145+08:00",
+      "elapsed_seconds": 0.765,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 30,
+      "start": "2026-10-08T12:22:42.473060+08:00",
+      "elapsed_seconds": 0.641,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    }
+  ]
+}

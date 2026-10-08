@@ -56,3 +56,5 @@ C3. 只修TestR233FailedCounterSaveDoesNotRefreshCachedLifetime与TestR242Licens
 
 - Windows原生时间转换及旧Parse变异通过，Windows作业整体成功；Linux旧R206并行耗时测试3.062762007秒超过既有3秒，相关测试/生产链相对0505fbb无差异。保存失败，隔离race30次只作为定位证据，不宣称修复。
 - 待范围授权前，不改R206测试调度/断言/预算/业务。独立renderer/Worker/Chromium/installer在前序失败后继续收集结果；失败仍使quality job及整体工作流失败，无continue-on-error。
+
+后续实证：新增条件接法被原R117护栏拒绝（浏览器与前端步骤均不得有if），已全部撤回，不改断言。四worker Linux199209ms仍超目标；改为全量五个有界worker、desktop单独scope仍四个，保持发现集合和90/240秒预算，实际Linux≤192000ms为最终判定。R104找到旧tag原文为foreground超时后临时文件占用，不能仅修清理就宣称根因已解决。

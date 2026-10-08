@@ -1,0 +1,16 @@
+{
+  "command": [
+    "gh",
+    "run",
+    "download",
+    "37726779989",
+    "--name",
+    "r252-r104-windows",
+    "--name",
+    "r238-default-electron-windows",
+    "--dir",
+    "docs/history/reports/r252/ci-02/small-artifacts"
+  ],
+  "exit_code": 0,
+  "timeout_seconds": 120
+}

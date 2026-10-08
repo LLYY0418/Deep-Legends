@@ -1,0 +1,875 @@
+{
+  "scope": "all",
+  "platform": "linux",
+  "concurrency": 4,
+  "groups": [
+    {
+      "name": "shared-pool",
+      "files": 166,
+      "concurrency": 4,
+      "summary": {
+        "success": false,
+        "counts": {
+          "tests": 1337,
+          "failed": 1,
+          "passed": 1334,
+          "cancelled": 0,
+          "skipped": 2,
+          "todo": 0,
+          "topLevel": 1334,
+          "suites": 0
+        },
+        "duration_ms": 199206.969185
+      }
+    }
+  ],
+  "file_budget_ms": 90000,
+  "suite_budget_ms": 240000,
+  "files": [
+    {
+      "file": "desktop/overview-render-200-controls.test.cjs",
+      "duration_ms": 34108.546161,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-career.test.cjs",
+      "duration_ms": 39882.811854,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/pro-players.test.cjs",
+      "duration_ms": 51331.264483,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-200-external.test.cjs",
+      "duration_ms": 57549.112891,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-200-images.test.cjs",
+      "duration_ms": 35471.663734,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-events.test.cjs",
+      "duration_ms": 34394.81338,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-200-expand.test.cjs",
+      "duration_ms": 29454.87422,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-requests-live.test.cjs",
+      "duration_ms": 31255.979851,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-requests.test.cjs",
+      "duration_ms": 27168.674308,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-tools.test.cjs",
+      "duration_ms": 26954.423715,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-200-filter.test.cjs",
+      "duration_ms": 20908.413058,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-200-timeline.test.cjs",
+      "duration_ms": 23631.240803,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render.test.cjs",
+      "duration_ms": 24603.742087,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/pro-runes-render.test.cjs",
+      "duration_ms": 20218.59893,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/overview-render-controls-mutants.test.cjs",
+      "duration_ms": 22412.764211,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/update.test.cjs",
+      "duration_ms": 15223.929557,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r231.test.cjs",
+      "duration_ms": 13211.556496,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r192.test.cjs",
+      "duration_ms": 15546.470564,
+      "group": "shared-pool"
+    },
+    {
+      "file": "scripts/r82-startup-ab-script.test.cjs",
+      "duration_ms": 20979.746316,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/refresh-orchestration.test.cjs",
+      "duration_ms": 15653.658483,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/specialist-overview-render.test.cjs",
+      "duration_ms": 6724.088463,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r116b.test.cjs",
+      "duration_ms": 6188.043253,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r209.test.cjs",
+      "duration_ms": 5604.580935,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/ui-scale-render.test.cjs",
+      "duration_ms": 7072.716998,
+      "group": "shared-pool"
+    },
+    {
+      "file": "scripts/setup-only-build.test.cjs",
+      "duration_ms": 14424.035005,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/champions.test.cjs",
+      "duration_ms": 5335.008298,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r116f.test.cjs",
+      "duration_ms": 5136.573568,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/gameplay.test.cjs",
+      "duration_ms": 5685.582919,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r230-render.test.cjs",
+      "duration_ms": 8898.199218,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r105.test.cjs",
+      "duration_ms": 5337.008311,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r130.test.cjs",
+      "duration_ms": 4410.992375,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r196.test.cjs",
+      "duration_ms": 6445.513245,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r179.test.cjs",
+      "duration_ms": 4132.559711,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r224.test.cjs",
+      "duration_ms": 2812.387399,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/diagnostics-2135.test.cjs",
+      "duration_ms": 2363.980898,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r210.test.cjs",
+      "duration_ms": 2787.538435,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r127.test.cjs",
+      "duration_ms": 2924.697478,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r204.test.cjs",
+      "duration_ms": 2584.806196,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r213.test.cjs",
+      "duration_ms": 2538.775923,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r219.test.cjs",
+      "duration_ms": 2939.542908,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r154.test.cjs",
+      "duration_ms": 2678.35689,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r188.test.cjs",
+      "duration_ms": 2586.964137,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/installer-startup.test.cjs",
+      "duration_ms": 2181.064983,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/suite.test.cjs",
+      "duration_ms": 3045.624192,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r207.test.cjs",
+      "duration_ms": 2353.622975,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r229.test.cjs",
+      "duration_ms": 2057.731292,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/installer-shell.test.cjs",
+      "duration_ms": 2420.085579,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r95.test.cjs",
+      "duration_ms": 2424.824341,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r91-addendum.test.cjs",
+      "duration_ms": 2346.516962,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r241.test.cjs",
+      "duration_ms": 1854.996858,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r191.test.cjs",
+      "duration_ms": 1744.768464,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r91.test.cjs",
+      "duration_ms": 2501.48898,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r129.test.cjs",
+      "duration_ms": 2203.673573,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r101.test.cjs",
+      "duration_ms": 1945.415102,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r158.test.cjs",
+      "duration_ms": 1935.735234,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/startup-assets.test.cjs",
+      "duration_ms": 2822.355076,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r193.test.cjs",
+      "duration_ms": 1539.740007,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r190.test.cjs",
+      "duration_ms": 1912.672412,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/build-fingerprint.test.cjs",
+      "duration_ms": 2222.830414,
+      "group": "shared-pool"
+    },
+    {
+      "file": "scripts/verify-ci-test-filters.test.cjs",
+      "duration_ms": 5176.05117,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r195.test.cjs",
+      "duration_ms": 1992.817936,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/official-login.test.cjs",
+      "duration_ms": 1711.426237,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r235.test.cjs",
+      "duration_ms": 2034.832895,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r220-region.test.cjs",
+      "duration_ms": 1854.751394,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r104.test.cjs",
+      "duration_ms": 1492.324218,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r100.test.cjs",
+      "duration_ms": 1560.503116,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r180.test.cjs",
+      "duration_ms": 2115.488233,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r223.test.cjs",
+      "duration_ms": 2368.551263,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r189.test.cjs",
+      "duration_ms": 1900.788903,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/disabled-build.test.cjs",
+      "duration_ms": 2093.923367,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r111.test.cjs",
+      "duration_ms": 1686.038452,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r136.test.cjs",
+      "duration_ms": 1924.352913,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/friends.test.cjs",
+      "duration_ms": 1615.840435,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r208.test.cjs",
+      "duration_ms": 1532.738189,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r216.test.cjs",
+      "duration_ms": 2303.895997,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r106.test.cjs",
+      "duration_ms": 1965.922105,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r115.test.cjs",
+      "duration_ms": 1682.109328,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r94.test.cjs",
+      "duration_ms": 2209.909479,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/summoner-identity.test.cjs",
+      "duration_ms": 1645.313114,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r110.test.cjs",
+      "duration_ms": 1693.627533,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r117.test.cjs",
+      "duration_ms": 1668.095875,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/diagnostics-2024.test.cjs",
+      "duration_ms": 1774.95028,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r194.test.cjs",
+      "duration_ms": 1511.178421,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r203.test.cjs",
+      "duration_ms": 1708.623483,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r113.test.cjs",
+      "duration_ms": 1658.789758,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r175.test.cjs",
+      "duration_ms": 1493.833384,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r109.test.cjs",
+      "duration_ms": 1720.880903,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r244.test.cjs",
+      "duration_ms": 1439.643034,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r183.test.cjs",
+      "duration_ms": 1637.992801,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r160.test.cjs",
+      "duration_ms": 1441.142916,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r230.test.cjs",
+      "duration_ms": 1948.936845,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r181.test.cjs",
+      "duration_ms": 1486.835132,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r252.test.cjs",
+      "duration_ms": 1459.624078,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/backend-lifecycle.test.cjs",
+      "duration_ms": 1814.730836,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r214.test.cjs",
+      "duration_ms": 1809.108468,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r206-relay.test.cjs",
+      "duration_ms": 1516.059334,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r211.test.cjs",
+      "duration_ms": 1868.111063,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r197.test.cjs",
+      "duration_ms": 1490.853602,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r206-collection-image.test.cjs",
+      "duration_ms": 1736.394372,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/diagnostics-2244.test.cjs",
+      "duration_ms": 1489.496818,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r198.test.cjs",
+      "duration_ms": 1623.924298,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/diagnostics-1042.test.cjs",
+      "duration_ms": 1467.927636,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/release-quality-gates.test.cjs",
+      "duration_ms": 1404.278842,
+      "group": "shared-pool"
+    },
+    {
+      "file": "scripts/build-stage.test.cjs",
+      "duration_ms": 334.135167,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/diagnostics-0006.test.cjs",
+      "duration_ms": 1918.929498,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/runtime.test.cjs",
+      "duration_ms": 307.156505,
+      "group": "shared-pool"
+    },
+    {
+      "file": "scripts/r82-startup-ab-report.test.cjs",
+      "duration_ms": 270.37668,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/desktop-log.test.cjs",
+      "duration_ms": 679.510568,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/export-diagnostics.test.cjs",
+      "duration_ms": 66.849362,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/ui-scale.test.cjs",
+      "duration_ms": 303.32012,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r88.test.cjs",
+      "duration_ms": 266.484856,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r117-style.test.cjs",
+      "duration_ms": 266.788751,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r185.test.cjs",
+      "duration_ms": 204.889066,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r108.test.cjs",
+      "duration_ms": 150.003386,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r87.test.cjs",
+      "duration_ms": 185.243105,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/api-diagnostics.test.cjs",
+      "duration_ms": 136.190918,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r89.test.cjs",
+      "duration_ms": 126.159382,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/installer-nsh.test.cjs",
+      "duration_ms": 178.56423,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r119.test.cjs",
+      "duration_ms": 181.416241,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/remaining-sort.test.cjs",
+      "duration_ms": 121.125406,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r90.test.cjs",
+      "duration_ms": 136.377779,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r116e.test.cjs",
+      "duration_ms": 138.065917,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r116d.test.cjs",
+      "duration_ms": 146.977892,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/position-filter.test.cjs",
+      "duration_ms": 96.704302,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r128.test.cjs",
+      "duration_ms": 127.074906,
+      "group": "shared-pool"
+    },
+    {
+      "file": "scripts/r133-stall-log-report.test.cjs",
+      "duration_ms": 110.522046,
+      "group": "shared-pool"
+    },
+    {
+      "file": "scripts/make-release.test.cjs",
+      "duration_ms": 117.742324,
+      "group": "shared-pool"
+    },
+    {
+      "file": "scripts/go-test-shards.test.cjs",
+      "duration_ms": 135.263708,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r150.test.cjs",
+      "duration_ms": 113.382789,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/portable-template.test.cjs",
+      "duration_ms": 140.944243,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/update-lifecycle.test.cjs",
+      "duration_ms": 84.454094,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r123.test.cjs",
+      "duration_ms": 126.518009,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r114.test.cjs",
+      "duration_ms": 88.933832,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r146.test.cjs",
+      "duration_ms": 97.162977,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/diagnostics-export.test.cjs",
+      "duration_ms": 90.556883,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/startup-visibility.test.cjs",
+      "duration_ms": 100.047933,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r88-diagnostics.test.cjs",
+      "duration_ms": 129.743597,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r175.test.cjs",
+      "duration_ms": 105.274284,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/window-bounds.test.cjs",
+      "duration_ms": 85.762092,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/startup-sequence.test.cjs",
+      "duration_ms": 80.209401,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/share-export.test.cjs",
+      "duration_ms": 117.237044,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r156.test.cjs",
+      "duration_ms": 71.850961,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r115-scoring.test.cjs",
+      "duration_ms": 80.738943,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r164.test.cjs",
+      "duration_ms": 99.187108,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/backend-integrity.test.cjs",
+      "duration_ms": 88.870931,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r166.test.cjs",
+      "duration_ms": 81.854382,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/window-bounds-store.test.cjs",
+      "duration_ms": 76.491341,
+      "group": "shared-pool"
+    },
+    {
+      "file": "scripts/normalize-source-line-endings.test.cjs",
+      "duration_ms": 81.389383,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r100.test.cjs",
+      "duration_ms": 108.004336,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r161.test.cjs",
+      "duration_ms": 86.019302,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r185.test.cjs",
+      "duration_ms": 79.582468,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r126.test.cjs",
+      "duration_ms": 74.77702,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r163.test.cjs",
+      "duration_ms": 79.483653,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r110-export.test.cjs",
+      "duration_ms": 91.779004,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r206-arena.test.cjs",
+      "duration_ms": 91.153318,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/release-build.test.cjs",
+      "duration_ms": 94.618963,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r196.test.cjs",
+      "duration_ms": 83.316764,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r87-p2p3-verify.test.cjs",
+      "duration_ms": 34.677678,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r206.test.cjs",
+      "duration_ms": 65.999176,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/proxy-resolution.test.cjs",
+      "duration_ms": 68.462809,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r204.test.cjs",
+      "duration_ms": 72.251181,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r87-p8-independent-verify.test.cjs",
+      "duration_ms": 37.317824,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r230-clipboard.test.cjs",
+      "duration_ms": 71.543539,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r201.test.cjs",
+      "duration_ms": 71.720574,
+      "group": "shared-pool"
+    },
+    {
+      "file": "backend/web/r87-p5-independent-verify.test.cjs",
+      "duration_ms": 33.231202,
+      "group": "shared-pool"
+    },
+    {
+      "file": "desktop/r87-p8-independent-verify.test.cjs",
+      "duration_ms": 29.470009,
+      "group": "shared-pool"
+    }
+  ],
+  "summary": {
+    "success": false,
+    "counts": {
+      "tests": 1337,
+      "failed": 1,
+      "passed": 1334,
+      "cancelled": 0,
+      "skipped": 2,
+      "todo": 0,
+      "topLevel": 1334,
+      "suites": 0
+    },
+    "duration_ms": 199209.100114
+  },
+  "success": false
+}

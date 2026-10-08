@@ -1,0 +1,1 @@
+{"candidate":"background admission bypasses injected limiter clock","verified_source":"backend/pro_refresh.go:28-30 checks p.limitNow before scoped/window logic","rejected":true,"production_changed":false,"historical_flake_root_cause":"unresolved"}

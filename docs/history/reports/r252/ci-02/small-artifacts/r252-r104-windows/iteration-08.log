@@ -1,0 +1,51 @@
+=== RUN   TestR104ColdStartupDripProtectsForegroundTwentyMatches
+    r104_test.go:206: R252_R104 stage=directory_start elapsed_ms=4
+    r104_test.go:206: R252_R104 stage=directory_returned elapsed_ms=340
+    r104_test.go:206: R252_R104 stage=await_worker_wait elapsed_ms=340
+    r104_test.go:206: R252_R104 stage=worker_wait_enter elapsed_ms=353
+    r104_test.go:206: R252_R104 stage=worker_wait_observed elapsed_ms=353
+    r104_test.go:206: R252_R104 stage=await_worker_wait elapsed_ms=353
+    r104_test.go:206: R252_R104 stage=worker_tick elapsed_ms=353
+    r104_test.go:232: R252_R104 transport=account background=true bg=1 fg=0 elapsed_ms=358
+    r104_test.go:232: R252_R104 transport=account background=true bg=2 fg=0 elapsed_ms=371
+    r104_test.go:232: R252_R104 transport=ids background=true bg=3 fg=0 elapsed_ms=377
+    r104_test.go:232: R252_R104 transport=detail background=true bg=4 fg=0 elapsed_ms=385
+    r104_test.go:206: R252_R104 stage=worker_wait_enter elapsed_ms=394
+    r104_test.go:206: R252_R104 stage=worker_wait_observed elapsed_ms=394
+    r104_test.go:206: R252_R104 stage=foreground_fifo_held elapsed_ms=394
+    r104_test.go:206: R252_R104 stage=foreground_start elapsed_ms=394
+    r104_test.go:206: R252_R104 stage=await_worker_wait elapsed_ms=395
+    r104_test.go:206: R252_R104 stage=worker_tick elapsed_ms=395
+    r104_test.go:206: R252_R104 stage=worker_wait_enter elapsed_ms=401
+    r104_test.go:206: R252_R104 stage=worker_wait_observed elapsed_ms=401
+    r104_test.go:206: R252_R104 stage=foreground_fifo_released elapsed_ms=401
+    r104_test.go:232: R252_R104 transport=account background=false bg=4 fg=1 elapsed_ms=401
+    r104_test.go:232: R252_R104 transport=ids background=false bg=4 fg=2 elapsed_ms=420
+    r104_test.go:232: R252_R104 transport=account background=false bg=4 fg=3 elapsed_ms=420
+    r104_test.go:232: R252_R104 transport=account background=false bg=4 fg=4 elapsed_ms=420
+    r104_test.go:232: R252_R104 transport=account background=false bg=4 fg=5 elapsed_ms=420
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=6 elapsed_ms=431
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=7 elapsed_ms=431
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=8 elapsed_ms=431
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=9 elapsed_ms=431
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=10 elapsed_ms=431
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=11 elapsed_ms=431
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=12 elapsed_ms=431
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=13 elapsed_ms=431
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=14 elapsed_ms=439
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=15 elapsed_ms=463
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=16 elapsed_ms=475
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=17 elapsed_ms=493
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=18 elapsed_ms=500
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=19 elapsed_ms=511
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=20 elapsed_ms=522
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=21 elapsed_ms=529
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=22 elapsed_ms=538
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=23 elapsed_ms=544
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=24 elapsed_ms=554
+    r104_test.go:232: R252_R104 transport=detail background=false bg=4 fg=25 elapsed_ms=568
+    r104_test.go:206: R252_R104 stage=foreground_returned elapsed_ms=679
+    r104_test.go:206: R252_R104 stage=worker_stopped elapsed_ms=679
+    r104_test.go:361: cold startup: 0 Riot; first minute: 4 background; second minute yields; foreground: 20/20, 25 requests
+--- PASS: TestR104ColdStartupDripProtectsForegroundTwentyMatches (0.71s)
+PASS

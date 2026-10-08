@@ -1,0 +1,20 @@
+{
+  "name": "renderer-pool-five-02-20261008T124846.666497",
+  "command": [
+    "node",
+    "scripts/test-renderers.cjs",
+    "all"
+  ],
+  "cwd": "/private/tmp/r252-post-0.12.77",
+  "start": "2026-10-08T12:48:46.666497+08:00",
+  "end": "2026-10-08T12:50:05.472615+08:00",
+  "elapsed_seconds": 78.807,
+  "exit_code": 0,
+  "last_five": [
+    "    },",
+    "    \"duration_ms\": 78757.827833",
+    "  },",
+    "  \"success\": true",
+    "}"
+  ]
+}

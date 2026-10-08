@@ -1,0 +1,17 @@
+{
+  "command": [
+    "gh",
+    "run",
+    "download",
+    "37726779989",
+    "--dir",
+    "docs/history/reports/r252/ci-02/artifacts"
+  ],
+  "process_pid": 96403,
+  "observed_elapsed": "11:51",
+  "outcome": "terminated own stalled read-only download",
+  "stdout": "",
+  "stderr": "",
+  "raw_ci_failure_logs_preserved": true,
+  "retry_tests": false
+}

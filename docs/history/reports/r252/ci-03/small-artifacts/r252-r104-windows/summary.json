@@ -1,0 +1,250 @@
+{
+  "iterations": 30,
+  "failures": 0,
+  "failure_rate": 0.0,
+  "independent_processes": true,
+  "retries": 0,
+  "foreground_wait_seconds": 5,
+  "rows": [
+    {
+      "iteration": 1,
+      "start": "2026-10-08T12:38:54.254344+08:00",
+      "elapsed_seconds": 0.797,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 2,
+      "start": "2026-10-08T12:38:55.047445+08:00",
+      "elapsed_seconds": 0.719,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 3,
+      "start": "2026-10-08T12:38:55.772190+08:00",
+      "elapsed_seconds": 0.734,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 4,
+      "start": "2026-10-08T12:38:56.499024+08:00",
+      "elapsed_seconds": 0.703,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 5,
+      "start": "2026-10-08T12:38:57.204524+08:00",
+      "elapsed_seconds": 0.719,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 6,
+      "start": "2026-10-08T12:38:57.931520+08:00",
+      "elapsed_seconds": 0.719,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 7,
+      "start": "2026-10-08T12:38:58.644787+08:00",
+      "elapsed_seconds": 0.781,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 8,
+      "start": "2026-10-08T12:38:59.421087+08:00",
+      "elapsed_seconds": 0.813,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 9,
+      "start": "2026-10-08T12:39:00.239742+08:00",
+      "elapsed_seconds": 0.718,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 10,
+      "start": "2026-10-08T12:39:00.963872+08:00",
+      "elapsed_seconds": 0.813,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 11,
+      "start": "2026-10-08T12:39:01.769443+08:00",
+      "elapsed_seconds": 0.703,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 12,
+      "start": "2026-10-08T12:39:02.474405+08:00",
+      "elapsed_seconds": 0.734,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 13,
+      "start": "2026-10-08T12:39:03.204382+08:00",
+      "elapsed_seconds": 0.704,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 14,
+      "start": "2026-10-08T12:39:03.909789+08:00",
+      "elapsed_seconds": 0.734,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 15,
+      "start": "2026-10-08T12:39:04.638768+08:00",
+      "elapsed_seconds": 0.687,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 16,
+      "start": "2026-10-08T12:39:05.339280+08:00",
+      "elapsed_seconds": 0.735,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 17,
+      "start": "2026-10-08T12:39:06.069842+08:00",
+      "elapsed_seconds": 0.687,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 18,
+      "start": "2026-10-08T12:39:06.759793+08:00",
+      "elapsed_seconds": 0.75,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 19,
+      "start": "2026-10-08T12:39:07.503589+08:00",
+      "elapsed_seconds": 0.766,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 20,
+      "start": "2026-10-08T12:39:08.268896+08:00",
+      "elapsed_seconds": 0.797,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 21,
+      "start": "2026-10-08T12:39:09.060860+08:00",
+      "elapsed_seconds": 0.75,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 22,
+      "start": "2026-10-08T12:39:09.822571+08:00",
+      "elapsed_seconds": 0.719,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 23,
+      "start": "2026-10-08T12:39:10.531321+08:00",
+      "elapsed_seconds": 0.75,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 24,
+      "start": "2026-10-08T12:39:11.290298+08:00",
+      "elapsed_seconds": 0.703,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 25,
+      "start": "2026-10-08T12:39:11.992992+08:00",
+      "elapsed_seconds": 0.734,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 26,
+      "start": "2026-10-08T12:39:12.727989+08:00",
+      "elapsed_seconds": 0.719,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 27,
+      "start": "2026-10-08T12:39:13.445756+08:00",
+      "elapsed_seconds": 0.75,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 28,
+      "start": "2026-10-08T12:39:14.185524+08:00",
+      "elapsed_seconds": 0.719,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 29,
+      "start": "2026-10-08T12:39:14.906295+08:00",
+      "elapsed_seconds": 0.718,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    },
+    {
+      "iteration": 30,
+      "start": "2026-10-08T12:39:15.638479+08:00",
+      "elapsed_seconds": 0.687,
+      "exit_code": 0,
+      "passed": true,
+      "timeline_logged": true
+    }
+  ]
+}

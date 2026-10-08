@@ -1,0 +1,14 @@
+{
+  "command": [
+    "gh",
+    "run",
+    "download",
+    "37728098263",
+    "--name",
+    "renderer-timings-linux",
+    "--dir",
+    "docs/history/reports/r252/ci-03/renderer-artifact"
+  ],
+  "exit_code": 0,
+  "timeout_seconds": 90
+}

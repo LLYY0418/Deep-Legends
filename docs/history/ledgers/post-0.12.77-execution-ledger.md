@@ -139,3 +139,15 @@ Linux格式/vet/默认授权隔离/标签编译两fixture/filter通过；全量r
 Mac public后端build PASS5.582秒，actual binary SHA-256 `3374f445381b56a2d2e8b0e84b9ea7cc09834f6100d6c80c584b79cf5cc42a79`；隔离全新LOL_LOOT_DATA_DIR自检PASS0.667秒。Mac二进制授权缺失/空Key/指纹及实际Windows ASAR18个脚本/HTML的UTF8、UTF16授权文案缺失追加审计PASS0.427秒；[Mac收据](../reports/r252/macos-public-audit-02.json)。一次手动CLI误传verify-embedded-riot-key.cjs参数（该CLI只读默认路径，不接收参数），报desktop/backend缺失；改用导出的verifyRiotKeyPolicy(binary,"public")验证实际Mac文件，未改验证器或放宽断言，未读取Key。
 
 12:32再次核验152个size/SHA一致、8文件仍缺失、现存文件变更0；[逐项异常](../reports/r252/protected-followup-1234.json)。本会话root dist写入0，不宣称160全部不变。共享向量SHA仍39377b860440d8f609f9d28162afe086e4e01ac91d3d2ff39da2a45d5eebfcc7。
+
+## 第三轮CI、条件接法失败及五worker候选（12:50）
+
+`f5dc2696154de3b355d25c771acff21b23757cbe`，[37728098263](https://github.com/LLYY0418/Deep-Legends/actions/runs/37728098263) **failure**；Windows整体success（包括全量1951/100、原生时间转换变异、R10430轮、public构建、实际三版本升级），Linuxrace通过，但全量renderer199209.100114ms且R117断言FAIL。[原始结果](../reports/r252/ci-03/run.json)，小artifact逐轮日志已下载。R206该轮全量race通过，第二轮3.063秒失败仍保留且未修复，不能将一次通过当作旧竞态已解决；相关生产/测试未改，范围授权仍待回复。
+
+本轮新增`!cancelled()`条件与R117原护栏冲突：真实Chromium步骤不得条件执行。先撤回该步骤if后，本地五worker第一次79.541秒仍FAIL，因为原护栏还要求前端测试步骤本身无if。随后**全部新增条件接法撤回**，R117及三个CI护栏2.446秒PASS；没有改护栏断言。第一轮本地原始FAIL及CI03全部保留，不记为环境错误或成功。
+
+C1：四worker实际Linux199.209秒仍不足20%余量；完整集合含DOM计算与异步等待，改全量scope为五个有界真实worker，desktop-only仍四个。只调整调度/并行分组，不改任何测试body/预算；90秒单文件、240秒总套件以及Linux≤192000ms门槛保持。第二轮本地五worker **PASS78757.827833ms**，166文件、1337/1333PASS/4既有SKIP：[实际timings](../reports/r252/renderer-timings-pool-five-02.json)，外部命令78.807秒。Linux结果待下一SHA，不将Mac耗时充当Linux验收。
+
+C2：补取旧tag CI原文，[37642767328](https://github.com/LLYY0418/Deep-Legends/actions/runs/37642767328)，旧SHA29d57bb2。测试15:21:22.847开始，15:21:39.446首先`foreground search stuck`，随后15:21:43.639 TempDir RemoveAll在riot-matches/.tmp文件占用FAIL20.79秒；另一同SHA历史CI37644705543这项PASS0.67秒。[原始片段/分析](../reports/r252/r104-historical/r104-historical-analysis.json)。不能把文件占用视为唯一根因或只修清理后宣称前台超时已解决。独立探子两项候选经原文排除：pro_refresh.go:28–30同样使用limitNow；riot-matches由newPublicBinaryCache构造strictDisk=true，writeDisk只对!strictDisk排异步prune；本夹具client/storage nil亦不会启动季赛后台。因此不采用错误的cache-prune/season-drain修复。旧日志缺请求/FIFO/磁盘写各阶段及失败堆栈，无法确认Windows fsync/调度具体因果，**仍未解决**；本轮新增时间线与失败堆栈留作后续定位。新Windows前三轮各30加本地30，累计120次0失败，仍不声称修复。
+
+第二轮219MB artifact总体下载11:51未返回，终止本轮自身只读下载，原日志与超时记录保留；后续120秒时限仅下载R104/首帧小artifact成功，不重跑测试。Mac public与Windows默认包来源指纹仍f2794a1d683c；调度/CI接法不改变应用生产指纹。12:36保护tag/发布分支与原值一致，Draft405971661整个JSON与draft-before逐字值一致（draft=true、published_at=null、updated_at未动），无发布动作。

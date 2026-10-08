@@ -1,0 +1,21 @@
+{
+  "run": 37642767328,
+  "sha": "29d57bb2b47f105a7fb99174254987a8e4f1d26b",
+  "primary_failure": "foreground search stuck",
+  "secondary_failure": "TempDir RemoveAll cleanup: riot-matches .tmp file in use",
+  "duration_seconds": 20.79,
+  "exact_failure_lines": [
+    "windows-build\tUNKNOWN STEP\t2026-10-07T15:21:22.8472878Z === RUN   TestR104ColdStartupDripProtectsForegroundTwentyMatches",
+    "windows-build\tUNKNOWN STEP\t2026-10-07T15:21:39.4462409Z     r104_test.go:320: foreground search stuck",
+    "windows-build\tUNKNOWN STEP\t2026-10-07T15:21:43.6391044Z     testing.go:1267: TempDir RemoveAll cleanup: remove C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\TestR104ColdStartupDripProtectsForegroundTwentyMatches3108266059\\001\\riot-matches\\.tmp-522622164: The process cannot access the file because it is being used by another process.",
+    "windows-build\tUNKNOWN STEP\t2026-10-07T15:21:43.6393202Z --- FAIL: TestR104ColdStartupDripProtectsForegroundTwentyMatches (20.79s)"
+  ],
+  "fresh_independent_soak_failed": false,
+  "root_cause": "未确定；旧日志缺少 foreground FIFO/request/disk-write 各阶段与失败堆栈",
+  "rejected_candidates": [
+    "admitRiotBackground bypasses limitNow: actual code checks limitNow",
+    "season backfill lifetime: nil client/storage returns before start",
+    "riot-matches async prune: newPublicBinaryCache strictDisk=true, writeDisk only schedules prune when !strictDisk"
+  ],
+  "production_fix": null
+}
