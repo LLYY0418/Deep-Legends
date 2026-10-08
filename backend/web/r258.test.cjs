@@ -187,3 +187,13 @@ test('R258 account reset cancels a pending mode page before the advanced module 
   assert.equal(tab.data.matches[0].gameId,2);
  } finally {if(previous!==undefined)globalThis.deepLegendsHistoryFilters=previous;}
 });
+
+test('R258 catalogs arriving together invalidate views once at the next frame',()=>{
+ const state={},frames=[];let renders=0;
+ const f=compile(gameplay,['scheduleCatalogViews'],{state,requestAnimationFrame:fn=>frames.push(fn),rerenderCatalogViews:()=>renders++});
+ f.scheduleCatalogViews();f.scheduleCatalogViews();f.scheduleCatalogViews();
+ assert.equal(frames.length,1);assert.equal(renders,0);
+ frames.shift()();assert.equal(renders,1);assert.equal(state.catalogRenderPending,false);
+ f.scheduleCatalogViews();assert.equal(frames.length,1);
+ state.destroyed=true;frames.shift()();assert.equal(renders,1);
+});
