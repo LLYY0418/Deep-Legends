@@ -9,7 +9,7 @@ test('R216 tags show corrected words, four ordered tags, disabled keyword and un
  const match={gameId:1,result:'win'},p={participantId:1,multiKill:5,keyword:'resilience',deaths:0};let html=f.renderMatchTags(match,p,{badge:'MVP'},{});assert.ok(html.indexOf('MVP')<html.indexOf('五杀'));assert.ok(html.indexOf('五杀')<html.indexOf('坚韧'));assert.ok(html.indexOf('坚韧')<html.indexOf('零阵亡'));assert.equal((html.match(/class="(?:multikill-tag|match-keyword-tag|match-zero-deaths)/g)||[]).length,3);
  p.keywordDisabled=true;assert.doesNotMatch(f.renderMatchTags(match,p,{badge:'MVP'},{}),/坚韧/);match.result='unknown';assert.equal(f.renderMatchTags(match,p,{},{}),'');
  for(const [key,label]of [['innocent','竭尽全力'],['slowstarter','慢热'],['unyielding','不屈之志'],['struggling','挣扎'],['dedication','奉献'],['rollercoaster','过山车']])assert.equal(f.matchKeywordMetadata(key)[0],label);
- for(let n=2;n<=5;n++){html=f.renderMultiKillTag(n,1);assert.match(html,/<svg/);assert.match(html,new RegExp(`is-mk-${n}`));assert.match(html,/--mk-/);}assert.equal(f.renderMultiKillTag(1,1),'');
+ for(let n=2;n<=5;n++){html=f.renderMultiKillTag(n,1);assert.match(html,/<svg/);assert.match(html,new RegExp(`is-mk-${n}`));assert.match(html,/class="mk-stop-start"/);assert.doesNotMatch(html,/style=/);}assert.equal(f.renderMultiKillTag(1,1),'');
 });
 test('R216 background timelines pause for KR, hidden, champ select, live and inactive tabs',()=>{
  const tab={},state={section:'overview',beacon:{phase:''}},document={hidden:false};let kr=false;let active=tab;
