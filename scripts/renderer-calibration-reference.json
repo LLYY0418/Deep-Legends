@@ -1,0 +1,10 @@
+{
+  "workload_version": 1,
+  "iterations": 40,
+  "concurrency": 5,
+  "checksum": 49440,
+  "reference_ms": null,
+  "margin_budget_ms": 192000,
+  "hard_budget_ms": 240000,
+  "source": "pending: median calibration of the fast GitHub ubuntu-24.04 runner class, from CI runs of this commit"
+}

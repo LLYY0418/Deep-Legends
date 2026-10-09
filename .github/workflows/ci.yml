@@ -54,6 +54,10 @@ jobs:
           node --check desktop/main.cjs
       - name: Install desktop test dependencies
         run: npm ci --prefix desktop
+      # Option B: measure this runner's speed with a fixed jsdom workload before
+      # and after the suite, so the 192s margin is judged at reference speed.
+      - name: Calibrate runner speed before renderers
+        run: node scripts/runner-calibration.cjs "$RUNNER_TEMP/runner-calibration-before.json"
       - name: Test frontend and desktop renderers
         env:
           R222_NODE_TIMING_OUTPUT: ${{ runner.temp }}/renderer-timings-linux.json
@@ -63,8 +67,19 @@ jobs:
         with:
           name: renderer-timings-linux
           path: ${{ runner.temp }}/renderer-timings-linux.json
+      - name: Calibrate runner speed after renderers
+        run: node scripts/runner-calibration.cjs "$RUNNER_TEMP/runner-calibration-after.json"
       - name: Enforce R252 renderer budget margin
-        run: python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["success"] and r["scope"]=="all" and r["platform"]=="linux"; assert r["summary"]["duration_ms"]<=192000, r["summary"]; print("R252 renderer margin >=20%", r["summary"]["duration_ms"])' "$RUNNER_TEMP/renderer-timings-linux.json"
+        run: node scripts/renderer-budget-gate.cjs "$RUNNER_TEMP/renderer-timings-linux.json" "$RUNNER_TEMP/runner-calibration-before.json" "$RUNNER_TEMP/runner-calibration-after.json" "$RUNNER_TEMP/renderer-budget-gate.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renderer-budget-gate-linux
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/runner-calibration-before.json
+            ${{ runner.temp }}/runner-calibration-after.json
+            ${{ runner.temp }}/renderer-budget-gate.json
       - name: Test Riot relay Worker
         run: node --test relay/riot-worker/*.test.mjs
       # P1-2：这两个脚本以前从不在任何流程里执行，护栏失效了半年没人发现。
