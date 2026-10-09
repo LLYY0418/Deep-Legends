@@ -1,6 +1,8 @@
 name: R261 Windows backend runtime soak
 
 on:
+  push:
+    branches: [codex/r261-windows-runtime-soak]
   workflow_dispatch:
 
 permissions:
