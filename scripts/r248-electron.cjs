@@ -67,14 +67,15 @@ async function probe({ phase, state = "ACTIVE", sourceRoot = root, transition = 
 const cp=require('node:child_process'),nativeSpawn=cp.spawn;
 cp.spawn=function(command,args,options){return command===${JSON.stringify(launcher)}?nativeSpawn(${JSON.stringify(process.execPath)},[${JSON.stringify(__filename)},'--backend'],options):nativeSpawn(command,args,options)};
 app.setName('R240 native probe');app.setPath('userData',${JSON.stringify(userData)});
-const origin=${JSON.stringify(origin)},record=${JSON.stringify(record)},directory=${JSON.stringify(directory)},result={shows:[],samples:[],networkRequests:[],networkDecisions:[],events:[],platform:process.platform,arch:process.arch,electron:process.versions.electron,execPath:process.execPath};
+const origin=${JSON.stringify(origin)},record=${JSON.stringify(record)},directory=${JSON.stringify(directory)},result={shows:[],samples:[],networkRequests:[],networkDecisions:[],events:[],startup:{fixtureStartedAt:Date.now(),appWhenReadyAt:null,firstShowAt:null},platform:process.platform,arch:process.arch,electron:process.versions.electron,execPath:process.execPath};
 let main,shown=0,sampling;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const until=async(fn,limit=5000)=>{const start=Date.now();while(!await fn()){if(Date.now()-start>limit)throw Error('native fixture timeout');await sleep(10)}};
 const getDOM=async w=>w.webContents.executeJavaScript(${JSON.stringify(domExpression)});
 const originalShow=BrowserWindow.prototype.show;
-BrowserWindow.prototype.show=function(...args){const value=originalShow.apply(this,args);
+BrowserWindow.prototype.show=function(...args){const shownAt=Date.now(),value=originalShow.apply(this,args);
  if(this.webContents?.getURL().startsWith(origin)){main=this;const w=this,n=++shown;
+  if(n===1)result.startup.firstShowAt=shownAt;
   // Both requests start in the same call stack as the FIRST native show.
   const page=w.webContents.capturePage(),dom=getDOM(w),bounds=w.getContentBounds();
   Promise.all([page,dom]).then(([image,content])=>{fs.writeFileSync(directory+'/show-'+n+'.png',image.toPNG());
@@ -96,9 +97,11 @@ app.on('browser-window-created',(_event,w)=>{
   sampling=setInterval(()=>{if(!w.isDestroyed())result.samples.push({at:Date.now(),visible:w.isVisible(),opacity:w.getOpacity(),bounds:w.getContentBounds(),maximized:w.isMaximized()})},8);
  });
 });
-app.whenReady().then(()=>require('electron').session.defaultSession.webRequest.onBeforeRequest({urls:['*://*/*']},(d,cb)=>{result.networkRequests.push(d.url);const cancel=!d.url.startsWith(origin+'/');result.networkDecisions.push({url:d.url,resourceType:d.resourceType,cancel,at:Date.now()});cb({cancel})}));
+app.whenReady().then(()=>{result.startup.appWhenReadyAt=Date.now();require('electron').session.defaultSession.webRequest.onBeforeRequest({urls:['*://*/*']},(d,cb)=>{result.networkRequests.push(d.url);const cancel=!d.url.startsWith(origin+'/');result.networkDecisions.push({url:d.url,resourceType:d.resourceType,cancel,at:Date.now()});cb({cancel})})});
 require(${JSON.stringify(path.join(shell, "main.cjs"))});
-(async()=>{await until(()=>main && main.isVisible());await until(()=>result.shows.length>0);
+// Cold startup is fixture setup, not the first-frame content assertion budget.
+// Keep the content capture wait at 5s and the outer process watchdog at 30s.
+(async()=>{await until(()=>main && main.isVisible(),20000);await until(()=>result.shows.length>0);
  if(${transition}){await sleep(700);main.maximize();await sleep(500);result.maximizedBefore=main.isMaximized();result.beforeLock={bounds:main.getContentBounds(),normal:main.getNormalBounds()};
   await main.webContents.executeJavaScript('fetch("/fixture/state?state=REVOKED").then(()=>window.deepLegendsLicense.poll())');await sleep(1800);result.locked={bounds:main.getContentBounds(),maximized:main.isMaximized(),resizable:main.isResizable(),maximizable:main.isMaximizable(),content:await getDOM(main)};
   await main.webContents.executeJavaScript('fetch("/fixture/state?state=ACTIVE").then(()=>window.deepLegendsLicense.poll())');await sleep(1800);result.restored={bounds:main.getContentBounds(),maximized:main.isMaximized(),content:await getDOM(main)};
@@ -109,8 +112,10 @@ require(${JSON.stringify(path.join(shell, "main.cjs"))});
     fs.writeFileSync(path.join(temp, "probe.cjs"), wrapper); fs.writeFileSync(path.join(temp, "package.json"), JSON.stringify({ name: "r240-probe", version: "1.0.0", main: "probe.cjs" }));
     const env = { ...process.env, LOOT_BACKEND: launcher, R240_ORIGIN: origin }; delete env.ELECTRON_RUN_AS_NODE;
     const childOutput = {stdout:"",stderr:""};
+    let processSpawnStartedAt;
     const saveChildOutput=()=>{for(const [stream,value] of Object.entries(childOutput))fs.writeFileSync(path.join(directory,"electron-"+stream+".log"),value);};
     await new Promise((resolve, reject) => {
+      processSpawnStartedAt=Date.now();
       const child = spawn(require(path.join(root, "desktop/node_modules/electron")), ["--disable-gpu", temp], { env, stdio: ["ignore", "pipe", "pipe"] }); let output = "";
       child.stdout.on("data", c => { output += c; childOutput.stdout += c; }); child.stderr.on("data", c => { output += c; childOutput.stderr += c; });
       const timer = setTimeout(() => { saveChildOutput(); child.kill(); reject(Error("real Electron timeout: " + output.slice(-2000))); }, 30000);
@@ -118,6 +123,8 @@ require(${JSON.stringify(path.join(shell, "main.cjs"))});
     });
     const expectedState = flipBeforeAck ? "LOCKED" : state;
     const result = { phase, state, expectedState, index, ...JSON.parse(fs.readFileSync(record)), serverRequests, transportEvents, diagnostics: rows, phases: rows.find(r => r.api.endsWith("/startup"))?.value };
+    result.startup.processSpawnStartedAt=processSpawnStartedAt;
+    result.startup.coldStartToFirstShowMs=result.startup.firstShowAt===null?null:result.startup.firstShowAt-processSpawnStartedAt;
     fs.writeFileSync(path.join(directory, "result.json"), JSON.stringify(result, null, 2));
     fs.writeFileSync(path.join(directory, "diagnostic-export.jsonl"), rows.filter(r => r.value.event).map(r => JSON.stringify(r.value)).join("\n") + "\n");
     if (result.error) throw Error(result.error);
