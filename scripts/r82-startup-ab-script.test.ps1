@@ -1,7 +1,26 @@
 ﻿# Synthetic fixtures exercise the real script and collector, never a real installer.
 [CmdletBinding()]
-param([string]$ScriptPath = (Join-Path $PSScriptRoot 'r82-startup-ab.ps1'))
+param([string]$ScriptPath = (Join-Path $PSScriptRoot 'r82-startup-ab.ps1'), [string]$ScriptPathsFile, [string]$BatchOutputFile)
 $ErrorActionPreference = 'Stop'
+# A script invocation gets a fresh script scope, fixture root and environment
+# restoration. Only the PowerShell engine is reused; every real collector and
+# all 16 checks still execute for each variant in the original order.
+if ($ScriptPathsFile) {
+    $paths = @(Get-Content -LiteralPath $ScriptPathsFile -Raw -Encoding UTF8 | ConvertFrom-Json | ForEach-Object { $_ })
+    $rows = @(foreach ($file in $paths) {
+        $lines = New-Object 'System.Collections.Generic.List[string]'
+        $status = 0
+        try {
+            & $PSCommandPath -ScriptPath $file | ForEach-Object { $lines.Add([string]$_) }
+        } catch {
+            $status = 1
+            $lines.Add($_.Exception.Message)
+        }
+        [PSCustomObject]@{ status = $status; output = ($lines -join "`n") }
+    })
+    [IO.File]::WriteAllText($BatchOutputFile, (ConvertTo-Json -InputObject $rows -Depth 4))
+    return
+}
 $root = Join-Path ([IO.Path]::GetTempPath()) ('r82-ab-script-' + [Guid]::NewGuid().ToString('N'))
 $oldTemp = $env:TEMP
 $oldMode = [Environment]::GetEnvironmentVariable('DEEP_LEGENDS_STARTUP_PREWARM', 'Process')

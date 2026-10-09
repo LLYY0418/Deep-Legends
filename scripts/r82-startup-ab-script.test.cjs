@@ -40,22 +40,28 @@ test("R82 A/B filename, hash mismatch and duplicate mutations reach failing asse
     ["reject at two", "$groupCount -ge 3", "$groupCount -ge 2", /control\/2 must allow the third sample/],
     ["wait until four", "$groupCount -ge 3", "$groupCount -gt 3", /control\/3 full group must fail before launch/],
   ];
-  for (const [name, before, after, failure] of cases) {
+  const files = cases.map(([name, before, after, failure], index) => {
     assert.equal(original.split(before).length, 2, `mutation target changed: ${name}`);
-    const file = path.join(directory, "r82-startup-ab.ps1");
+    const caseDirectory = path.join(directory, String(index));
+    fs.mkdirSync(caseDirectory);
+    const file = path.join(caseDirectory, "r82-startup-ab.ps1");
     fs.writeFileSync(file, original.replace(before, after));
-    const result = run(file);
-    assert.notEqual(result.status, 0, `mutation survived: ${name}`);
-    assert.match(result.output, /ASSERTION FAILED:/, result.output);
-    assert.match(result.output, failure, result.output);
-    t.diagnostic(`KILLED ${name}: expected fixture assertion failed`);
-  }
+    return file;
+  });
   const check = original.match(/    \$groupCount = [\s\S]*?    }\r?\n/)[0];
   const launched = "    $setup = Start-Process -FilePath $setupPath -PassThru";
   assert.ok(original.includes(launched));
   const file = path.join(directory, "late-preflight.ps1");
   fs.writeFileSync(file, original.replace(check, "").replace(launched, `${launched}\n${check}`));
-  const late = run(file);
+  const results = require("./renderer-speedup-powershell.cjs")(engine, harness, [...files, file], directory, childEnvironment);
+  for (const [index, [name, before, after, failure]] of cases.entries()) {
+    const result = results[index];
+    assert.notEqual(result.status, 0, `mutation survived: ${name}`);
+    assert.match(result.output, /ASSERTION FAILED:/, result.output);
+    assert.match(result.output, failure, result.output);
+    t.diagnostic(`KILLED ${name}: expected fixture assertion failed`);
+  }
+  const late = results.at(-1);
   assert.notEqual(late.status, 0, "post-launch preflight mutation survived");
   assert.match(late.output, /ASSERTION FAILED: control\/3 full group must fail before launch/, late.output);
   t.diagnostic("KILLED post-launch group check: installer mock was called before rejection");
