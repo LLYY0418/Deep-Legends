@@ -110,6 +110,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: R261 normal-close window bounds regression and assertion mutation
+        shell: pwsh
+        run: ./scripts/r261-window-bounds.test.ps1
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
