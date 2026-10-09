@@ -13,11 +13,13 @@ const { JSDOM } = require("jsdom");
 
 const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, suiteStyles, functionSource, compileFunctions, collapsedBeaconStyles, bootDemoApp, settled, installWindowCleanup, visitTool, bootLiveTab } = require("./overview-render-helpers.cjs");
 
+const { waitForOverview } = require("./renderer-wait.cjs");
+
 installWindowCleanup(test);
 
 test("收藏账户条复用主页背景和圆头像，并只保留两项事实", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   w.document.querySelector('[data-section="favorites"]').click();
   w.document.querySelector('[data-favorites-page="account"]').click();
   await settled();
@@ -36,7 +38,7 @@ test("收藏账户条复用主页背景和圆头像，并只保留两项事实",
 
 test("游戏时间分布下方提供等栏宽分享按钮，并在选定路径后生成桌面双列长图", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   const overview = w.document.getElementById("overview-content");
   const activity = overview.querySelector(".career-column .activity-section");
   const button = overview.querySelector(".career-column [data-generate-overview-share]");
@@ -85,7 +87,7 @@ test("游戏时间分布下方提供等栏宽分享按钮，并在选定路径�
 
 test("分享图按 50 场设置截断当前已加载战绩", async () => {
 	const { window: w } = bootDemoApp({ matchCount: 50 });
-	await settled();
+	await waitForOverview(w, 50);
 	const overview = w.document.getElementById("overview-content");
 	const matchList = overview.querySelector(".match-list");
 	while (matchList.querySelectorAll(":scope > .match-entry").length < 55) {
@@ -107,7 +109,7 @@ test("分享图按 50 场设置截断当前已加载战绩", async () => {
 
 test("排位分区在负场缺失时也能渲染出胜率提示", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   const ranks = w.document.querySelector("#overview-content .rank-list");
   assert.deepEqual(errors, [], `渲染期出现异常：\n${errors.join("\n")}`);
   assert.ok(ranks, "总览缺少排位分区");
@@ -117,7 +119,7 @@ test("排位分区在负场缺失时也能渲染出胜率提示", async () => {
 
 test("渲染异常会切到可重试的错误态，而不是永远停在骨架屏", async () => {
   const { window: w } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   const overview = w.document.getElementById("overview-content");
   // 走完整的真实链路：让 /api/gameplay/overview 回一份 capabilities 形状非法的载荷，
   // renderCareerSections 会在 capabilities.find 上抛 TypeError。
@@ -140,7 +142,7 @@ test("渲染异常会切到可重试的错误态，而不是永远停在骨架�
 
 test("已有总览刷新时保留当前内容，不退回整页骨架", async () => {
   const { window: w } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   const overview = w.document.getElementById("overview-content");
   w.document.getElementById("overview-refresh").click();
   assert.ok(overview.querySelector(".summoner-strip"), "刷新时应继续展示已有总览");
@@ -152,7 +154,7 @@ test("已有总览刷新时保留当前内容，不退回整页骨架", async ()
 
 test("客户端退出后清空本人总览，国服空分组显示启动入口", async () => {
   const { window: w, errors, eventSources } = bootDemoApp({ liveEvents: true });
-  await settled();
+  await waitForOverview(w, 17);
   const overview = w.document.getElementById("overview-content");
   assert.ok(overview.querySelector(".summoner-strip"), "断连前总览应已完成渲染");
   const previousFetch = w.fetch;
