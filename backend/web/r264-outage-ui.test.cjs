@@ -24,3 +24,8 @@ test('R264 P6 ready avatar survives sparse cards and a late history error',async
  assert.equal(tab.data.player.profileIconId,71);assert.equal(tab.data.player.summonerLevel,30);reject(new Error('战绩服务暂时不可用'));await pending;
  assert.equal(tab.data.player.profileIconId,71);assert.equal(tab.data.player.summonerLevel,30);assert.equal(tab.data.ranks.length,1);assert.equal(tab.data.masteries.length,1);assert(helpers().historyStatsPending(tab.data,tab));
 });
+test('R264 early profile header does not turn unread summoner level into zero',()=>{
+ const f=compile(source,['renderSelfIdentityHeader'],{assetIcon:()=>'',assetPath:()=>'',number:String,escapeHTML,tabServerLabel:()=>''});
+ for(const level of [undefined,0])assert.doesNotMatch(f.renderSelfIdentityHeader({current:true,identity:{summonerLevel:level},label:'Fixture'}),/召唤师等级 (?:0|undefined)/);
+ assert.match(f.renderSelfIdentityHeader({current:true,identity:{summonerLevel:30},label:'Fixture'}),/召唤师等级 30/);
+});

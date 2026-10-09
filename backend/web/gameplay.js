@@ -2167,7 +2167,7 @@
   function renderSelfIdentityHeader(tab) {
     if (!tab.current || !tab.identity) return "";
     const player = tab.identity;
-    return `<section class="summoner-strip">${assetIcon(assetPath("profile", player.profileIconId), tab.label, "profile", false)}<div class="summoner-strip-copy"><div><h2>${escapeHTML(tab.label)}</h2><span class="server-chip">${escapeHTML(tabServerLabel(tab))}</span></div><p class="summoner-level-row"><span>召唤师等级 ${number(player.summonerLevel)}</span></p></div></section>`;
+    return `<section class="summoner-strip">${assetIcon(assetPath("profile", player.profileIconId), tab.label, "profile", false)}<div class="summoner-strip-copy"><div><h2>${escapeHTML(tab.label)}</h2><span class="server-chip">${escapeHTML(tabServerLabel(tab))}</span></div><p class="summoner-level-row"><span>${Number(player.summonerLevel)>0?`召唤师等级 ${number(player.summonerLevel)}`:""}</span></p></div></section>`;
   }
 
   function renderOverviewBodyContent(container, tab) {
@@ -2261,7 +2261,7 @@
       <section class="summoner-strip">
         ${backgroundArt}
         ${profileIcon}
-        <div class="summoner-strip-copy"><div><h2${copyName ? ` class="summoner-copy-name" role="button" tabindex="0" data-copy-summoner="${escapeHTML(copyName)}"` : ""} data-tooltip="${escapeHTML(profileName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(profileName)}</h2>${nameMeta}</div><p class="summoner-level-row"><span>召唤师等级 ${number(player.summonerLevel)}${player.hidden ? " · 身份已隐藏" : ""}</span>${hiddenChip}</p><p class="player-live-chip" data-friend-presence="${escapeHTML(tab.key)}" hidden></p></div>
+        <div class="summoner-strip-copy"><div><h2${copyName ? ` class="summoner-copy-name" role="button" tabindex="0" data-copy-summoner="${escapeHTML(copyName)}"` : ""} data-tooltip="${escapeHTML(profileName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(profileName)}</h2>${nameMeta}</div><p class="summoner-level-row"><span>${Number(player.summonerLevel)>0?`召唤师等级 ${number(player.summonerLevel)}`:""}${player.hidden ? " · 身份已隐藏" : ""}</span>${hiddenChip}</p><p class="player-live-chip" data-friend-presence="${escapeHTML(tab.key)}" hidden></p></div>
         ${highlights}
       </section>`;
     const retainedStrip = sameOverview && container._stripHTML === stripHTML ? container.querySelector(".summoner-strip") : null;
