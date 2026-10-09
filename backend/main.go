@@ -400,6 +400,7 @@ func main() {
 	noBrowser := flag.Bool("no-browser", false, "do not open the default browser")
 	desktopMode := flag.Bool("desktop", false, "emit a desktop-shell bootstrap event and do not open a browser")
 	listenAddress := flag.String("listen", "127.0.0.1:0", "loopback address for the local UI")
+	listenFallback := flag.Bool("listen-fallback", false, "use a random loopback port when the --listen port is busy")
 	encryptRiotKeyFlag := flag.String("encrypt-riot-key", "", "encrypt a Riot API key for embedding in riot_api.go and exit")
 	flag.Parse()
 	// Execution-only warmup must precede every persistent/service initializer.
@@ -679,6 +680,13 @@ func main() {
 	a.updates.diagnostic = a.recordDiagnostic
 
 	listener, err := net.Listen("tcp", *listenAddress)
+	if err != nil && *listenFallback {
+		// The desktop shell asks for a fixed port so the page origin, and with
+		// it localStorage and the renderer code cache, survives restarts. A busy
+		// port must not stop startup.
+		log.Printf("本地界面端口不可用，改用随机端口：%v", err)
+		listener, err = net.Listen("tcp", "127.0.0.1:0")
+	}
 	if err != nil {
 		closeDiagnosticStore(store)
 		log.Fatal(err)

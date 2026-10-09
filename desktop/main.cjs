@@ -54,6 +54,13 @@ const READY_PREFIX = "LOOT_READY ";
 const READY_TIMEOUT_MS = 25_000;
 const SHUTDOWN_TIMEOUT_MS = 1_500;
 const DESKTOP_RENDERER_PERMISSIONS = new Set(["fullscreen", "clipboard-sanitized-write"]);
+// localStorage, cookies and the V8 code cache are keyed by origin, which
+// includes the port. A random port per launch silently reset every saved
+// page setting (default page, match count, saved history filters, search
+// region...) on each restart, so ask for one stable loopback port and let the
+// backend fall back to a random one only when it is busy.
+const BACKEND_UI_PORT = 47391;
+const BACKEND_ARGS = ["--desktop", "--no-browser", "--listen", `127.0.0.1:${BACKEND_UI_PORT}`, "--listen-fallback"];
 
 let mainWindow = null;
 let splashWindow = null;
@@ -117,15 +124,15 @@ function backendSpec() {
     require("./backend-integrity.cjs").verifyBackend(command, require("./backend-digest.cjs"));
     return {
       command,
-      args: ["--desktop", "--no-browser"],
+      args: BACKEND_ARGS,
       cwd: path.dirname(command),
     };
   }
   const configured = process.env.LOOT_BACKEND;
   if (configured) {
-    return { command: configured, args: ["--desktop", "--no-browser"], cwd: projectRoot() };
+    return { command: configured, args: BACKEND_ARGS, cwd: projectRoot() };
   }
-  return { command: "go", args: ["run", ".", "--desktop", "--no-browser"], cwd: projectRoot() };
+  return { command: "go", args: ["run", "./backend", ...BACKEND_ARGS], cwd: projectRoot() };
 }
 
 function iconPath() {
