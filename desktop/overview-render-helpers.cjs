@@ -59,9 +59,9 @@ function collapsedBeaconStyles(css = appStyles) {
 }
 
 const openDemoWindows = new Set();
-function installWindowCleanup(test) {
+function installWindowCleanup(test, { retainedWindows = new Set() } = {}) {
   test.afterEach(() => {
-    for (const w of openDemoWindows) w.close();
+    for (const w of openDemoWindows) if (!retainedWindows.has(w)) w.close();
   });
 }
 

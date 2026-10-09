@@ -15,7 +15,8 @@ const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, su
 
 const { waitForOverview, waitForRender } = require("./renderer-wait.cjs");
 
-installWindowCleanup(test);
+const readOnlyLive = require("./renderer-readonly-live.cjs")(test, bootLiveTab);
+installWindowCleanup(test, { retainedWindows: readOnlyLive.retainedWindows });
 
 test("推荐请求期间遮罩只覆盖 tab 下方面板，并按内容提示", async () => {
   const { window: w, errors } = bootDemoApp();
@@ -56,7 +57,7 @@ test("推荐请求期间遮罩只覆盖 tab 下方面板，并按内容提示", 
 });
 
 test("对局页出装推荐渲染，且不再出现「后期备选」", async () => {
-  const { window: w, errors } = await bootLiveTab();
+  const { window: w, errors } = await readOnlyLive.load();
   const build = w.document.querySelector("#live-content .build-recommendation");
   assert.deepEqual(errors, [], `渲染期出现异常：\n${errors.join("\n")}`);
   assert.ok(build, "对局页缺少出装推荐区");
@@ -64,11 +65,10 @@ test("对局页出装推荐渲染，且不再出现「后期备选」", async ()
   assert.ok(build.querySelector(".build-summary-spells"), "缺少召唤师技能块");
   assert.ok(build.querySelector(".build-summary-starter"), "缺少出门装块");
   assert.ok(build.querySelector(".build-summary-boots"), "缺少鞋子块");
-  w.close();
 });
 
 test("核心装只展示胜率与场次，不再展示选取率", async () => {
-  const { window: w } = await bootLiveTab();
+  const { window: w } = await readOnlyLive.load();
   const core = w.document.querySelector("#live-content .item-core-column");
   assert.ok(core, "缺少核心装分栏");
   const stats = core.querySelector(".config-option .option-stats");
@@ -77,21 +77,19 @@ test("核心装只展示胜率与场次，不再展示选取率", async () => {
   assert.doesNotMatch(core.textContent, /选取率/, "核心装不应再出现选取率");
   assert.match(core.textContent, /胜率/, "核心装应保留胜率");
   assert.match(core.textContent, /场次/, "核心装应保留场次");
-  w.close();
 });
 
 test("技能加点的选取率/胜率/场次与技能图标同一行", async () => {
-  const { window: w } = await bootLiveTab();
+  const { window: w } = await readOnlyLive.load();
   const row = w.document.querySelector("#live-content .skill-plan .skill-priority-row");
   assert.ok(row, "技能加点缺少 skill-priority-row");
   assert.ok(row.querySelector(".skill-priority"), "该行应包含技能图标组");
   assert.ok(row.querySelector(".option-stats"), "该行应包含统计列——统计列还留在标题行上就说明没改对");
   assert.ok(!w.document.querySelector("#live-content .skill-plan-head .option-stats"), "统计列不应再挂在标题行");
-  w.close();
 });
 
 test("对抗样本为空时给出说明文案，而不是一个「—」", async () => {
-  const { window: w } = await bootLiveTab();
+  const { window: w } = await readOnlyLive.load();
   const header = w.document.querySelector("#live-content .champion-matchups");
   assert.ok(header, "缺少优劣势对抗区");
   const empties = header.querySelectorAll(".matchups-empty");
@@ -100,7 +98,6 @@ test("对抗样本为空时给出说明文案，而不是一个「—」", async
     assert.ok(node.dataset.tooltip, "空状态应带解释性 tooltip");
   }
   assert.ok(!/^—$/.test(header.textContent.trim()), "不应只渲染一个破折号");
-  w.close();
 });
 
 test("英雄位置统计为空时显示明确说明，而不是三项破折号", async () => {

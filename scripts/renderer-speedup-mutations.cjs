@@ -22,6 +22,10 @@ for(const testFile of targets){
   file='scripts/r82-startup-ab.ps1';source=fs.readFileSync(path.join(root,file),'utf8');
   const boundary='$_.Value -eq $setupHash';assert.equal(source.split(boundary).length,2);
   mutant=source.replace(boundary,'$_.Name -eq [IO.Path]::GetFileName($setupPath)');
+ }else if(testFile==='desktop/overview-render-requests-live.test.cjs'){
+  file='backend/web/gameplay.js';source=fs.readFileSync(path.join(root,file),'utf8');
+  const boundary='return `<section class="build-recommendation ${buildLayout}"><header';assert.equal(source.split(boundary).length,2);
+  mutant=source.replace(boundary,'return `<section class="build-recommendation ${buildLayout}"><span>后期备选</span><header');
  }else if(testFile==='desktop/overview-render-career.test.cjs'){
   file='backend/web/suite.js';source=fs.readFileSync(path.join(root,file),'utf8');
   const boundary='function facadeTitleText(value) {';assert.equal(source.split(boundary).length,2);

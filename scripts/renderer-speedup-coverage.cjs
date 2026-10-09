@@ -15,7 +15,7 @@ const current=['backend/web','desktop','scripts'].flatMap(d=>fs.readdirSync(d).f
 for(const f of current){const a=facts(fs.readFileSync(f,'utf8'));for(const key of Object.keys(after))after[key].push(...a[key]);}
 for(const key of Object.keys(before))assert.deepEqual(after[key].sort(),before[key].sort(),`original ${key} calls must remain byte-for-byte identical, including duplicates`);
 const changed=[...new Set([...cp.execFileSync('git',['diff','--name-only',base],{encoding:'utf8'}).trim().split('\n'),...cp.execFileSync('git',['ls-files','--others','--exclude-standard'],{encoding:'utf8'}).trim().split('\n')].filter(Boolean))].sort();
-assert(changed.every(f=>/^(desktop\/.*(?:\.test|helpers|card-controls|renderer-wait|pro-players-fixture)\.cjs|scripts\/renderer-speedup[^/]*\.(?:cjs|py)|scripts\/renderer-costs\.json|scripts\/r82-startup-ab-script\.test\.(?:cjs|ps1))$/.test(f)),changed);
+assert(changed.every(f=>/^(desktop\/.*(?:\.test|helpers|card-controls|renderer-wait|renderer-readonly-live|pro-players-fixture)\.cjs|scripts\/renderer-speedup[^/]*\.(?:cjs|py)|scripts\/renderer-costs\.json|scripts\/r82-startup-ab-script\.test\.(?:cjs|ps1))$/.test(f)),changed);
 const psFile='scripts/r82-startup-ab-script.test.ps1';
 const originalPS=cp.execFileSync('git',['show',base+':'+psFile],{encoding:'utf8'}).replace(/^\uFEFF/,'');
 const currentPS=fs.readFileSync(psFile,'utf8').replace(/^\uFEFF/,'');
