@@ -1,0 +1,161 @@
+name: R261 Windows backend runtime soak
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-soak:
+    name: ${{ matrix.slot }}
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - slot: go124-1
+            go_version: ''
+            go_version_file: go.mod
+            rounds: 10
+            race: false
+          - slot: go124-2
+            go_version: ''
+            go_version_file: go.mod
+            rounds: 10
+            race: false
+          - slot: go124-3
+            go_version: ''
+            go_version_file: go.mod
+            rounds: 10
+            race: false
+          - slot: stable
+            go_version: stable
+            go_version_file: ''
+            rounds: 10
+            race: false
+          - slot: go124-race
+            go_version: ''
+            go_version_file: go.mod
+            rounds: 3
+            race: true
+    env:
+      GOTRACEBACK: all
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go_version }}
+          go-version-file: ${{ matrix.go_version_file }}
+          cache: true
+      - name: Record runner and Go environment
+        id: environment
+        shell: pwsh
+        env:
+          SOAK_SLOT: ${{ matrix.slot }}
+          SOAK_RACE: ${{ matrix.race }}
+          SOAK_ROUNDS: ${{ matrix.rounds }}
+          SOAK_LEGACY: ${{ matrix.go_version_file }}
+        run: |
+          $directory = Join-Path $env:RUNNER_TEMP "r261-$env:SOAK_SLOT"
+          New-Item -ItemType Directory -Force $directory | Out-Null
+          $version = (& go version) -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read Go version' }
+          $gcc = Get-Command gcc -ErrorAction SilentlyContinue
+          $raceAvailable = $env:SOAK_RACE -ne 'true' -or $null -ne $gcc
+          $info = [ordered]@{
+            slot=$env:SOAK_SLOT; sha=$env:GITHUB_SHA; go_version=$version
+            runner=$env:RUNNER_NAME; os=$env:RUNNER_OS; image=$env:ImageOS; image_version=$env:ImageVersion
+            cpu_model=@(Get-CimInstance Win32_Processor | ForEach-Object { $_.Name })
+            cpu_count=[Environment]::ProcessorCount; gotraceback=$env:GOTRACEBACK
+            planned_rounds=[int]$env:SOAK_ROUNDS; race=($env:SOAK_RACE -eq 'true')
+            gcc=$(if ($gcc) { $gcc.Source } else { $null }); race_available=$raceAvailable
+          }
+          $info | ConvertTo-Json -Depth 6 | Set-Content -Encoding utf8 (Join-Path $directory 'environment.json')
+          "directory=$directory" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "available=$($raceAvailable.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          if ($env:SOAK_LEGACY -eq 'go.mod' -and $version -notmatch '^go version go1\.24\.13 windows/amd64$') {
+            throw "Expected the original CI Go 1.24.13, got: $version"
+          }
+          if (-not $raceAvailable) {
+            @{slot=$env:SOAK_SLOT; skipped=$true; reason='gcc is not available'; completed_rounds=0; fatal_rounds=0} |
+              ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $directory 'summary.json')
+            Write-Host 'gcc is not available; race comparison is skipped.'
+          }
+      - name: Run sequential backend rounds and preserve every output
+        if: steps.environment.outputs.available == 'true'
+        shell: pwsh
+        env:
+          SOAK_SLOT: ${{ matrix.slot }}
+          SOAK_RACE: ${{ matrix.race }}
+          SOAK_ROUNDS: ${{ matrix.rounds }}
+          SOAK_DIRECTORY: ${{ steps.environment.outputs.directory }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $PSNativeCommandUseErrorActionPreference = $false
+          $directory = $env:SOAK_DIRECTORY
+          $rows = @()
+          for ($round=1; $round -le [int]$env:SOAK_ROUNDS; $round++) {
+            $stem = 'round-{0:D2}' -f $round
+            $log = Join-Path $directory "$stem.log"
+            # Verbose output only adds test names for crash attribution; no filters or budgets change.
+            $arguments = @('test','-v','-count=1')
+            if ($env:SOAK_RACE -eq 'true') { $arguments += '-race'; $env:CGO_ENABLED='1' }
+            $arguments += './backend'
+            $started = [DateTimeOffset]::UtcNow
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            Write-Host "R261_ROUND_START slot=$env:SOAK_SLOT round=$round command=go $($arguments -join ' ')"
+            $code = -1
+            $infrastructureError = $null
+            try {
+              & go @arguments 2>&1 | Tee-Object -FilePath $log
+              $code = $LASTEXITCODE
+            } catch {
+              $infrastructureError = $_.Exception.Message
+              Write-Host "R261 infrastructure error: $infrastructureError"
+            } finally {
+              $clock.Stop()
+              $ended = [DateTimeOffset]::UtcNow
+              $text = [string](Get-Content -Raw $log -ErrorAction SilentlyContinue)
+              if (-not $text) {
+                $infrastructureError = 'Missing or empty complete test output'
+                $code = -1
+              }
+            }
+            $fatal = $text -match '(?im)fatal error:|^panic:|^Exception 0x|unexpected fault address'
+            $runNames = [regex]::Matches($text,'(?m)^=== RUN\s+([^\r\n]+)')
+            $lastTest = if ($runNames.Count) { $runNames[$runNames.Count-1].Groups[1].Value.Trim() } else { $null }
+            $broken = [regex]::Match($text,'runtime: g(\d+): frame\.sp=')
+            $brokenId = if ($broken.Success) { $broken.Groups[1].Value } else { $null }
+            $stack = $null
+            if ($brokenId) {
+              $pattern = '(?ms)^goroutine '+[regex]::Escape($brokenId)+'\b.*?(?=^goroutine \d+\b|\z)'
+              $block = [regex]::Match($text,$pattern)
+              if ($block.Success) { $stack = $block.Value }
+            }
+            $row = [ordered]@{
+              slot=$env:SOAK_SLOT; round=$round; command="go $($arguments -join ' ')"
+              started_at=$started.ToString('o'); ended_at=$ended.ToString('o'); duration_ms=$clock.ElapsedMilliseconds
+              exit_code=$code; infrastructure_error=$infrastructureError; fatal=$fatal; last_running_test=$lastTest; damaged_goroutine_id=$brokenId
+              damaged_goroutine_stack=$stack; last_five_lines=@(Get-Content $log | Select-Object -Last 5)
+            }
+            $row | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 (Join-Path $directory "$stem.json")
+            $rows += $row
+            $summary = [ordered]@{
+              slot=$env:SOAK_SLOT; sha=$env:GITHUB_SHA; planned_rounds=[int]$env:SOAK_ROUNDS; completed_rounds=$rows.Count
+              fatal_rounds=@($rows | Where-Object { $_.fatal }).Count
+              failed_rounds=@($rows | Where-Object { $_.exit_code -ne 0 }).Count
+              rounds=$rows
+            }
+            $summary | ConvertTo-Json -Depth 12 | Set-Content -Encoding utf8 (Join-Path $directory 'summary.json')
+            Write-Host "R261_ROUND_END slot=$env:SOAK_SLOT round=$round exit=$code fatal=$fatal elapsed_ms=$($clock.ElapsedMilliseconds)"
+          }
+          if (@($rows | Where-Object { $_.exit_code -ne 0 }).Count -gt 0) { exit 1 }
+      - name: Upload all round logs and environment even after failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r261-windows-backend-soak-${{ matrix.slot }}
+          path: ${{ runner.temp }}/r261-${{ matrix.slot }}/**
+          if-no-files-found: error
