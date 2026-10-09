@@ -55,7 +55,10 @@ function compileFunctions(source, names, dependencies) {
   return factory(...dependencyNames.map((name) => dependencies[name]));
 }
 
+const demoBootTimings = new WeakMap();
+
 function bootDemoApp({ withEventSource = false, observeCollectionState = false } = {}) {
+  const startedAt = performance.now();
   const html = fs.readFileSync(path.join(WEB, "index.html"), "utf8");
   const errors = [];
   const eventSources = [];
@@ -93,6 +96,7 @@ function bootDemoApp({ withEventSource = false, observeCollectionState = false }
       ? source.replace(/\}\)\(\);\s*$/, "window.__collectionStateForTest = () => ({ dirty: state.status?.collectionDirty, inFlight: state.collectionRescanInFlight });})();")
       : source);
   }
+  demoBootTimings.set(w, { startedAt, domContentLoadedAt: performance.now() });
   w.document.dispatchEvent(new w.Event("DOMContentLoaded", { bubbles: true }));
   return { window: w, errors, eventSources };
 }
@@ -106,6 +110,23 @@ async function waitFor(predicate, message, timeout = 5000) {
   assert.fail(message);
 }
 
+// Demo startup is fixture preparation. Keep the behavior waits below at 5s,
+// and retain the renderer runner's 90s/file and 240s/suite budgets.
+async function waitForInitialOverview(w, predicate = () => w.document.querySelector("#overview-content .summoner-strip")) {
+  const timing = demoBootTimings.get(w);
+  let outcome = "failure";
+  try {
+    await waitFor(predicate, "initial overview did not load during demo fixture preparation", 20000);
+    outcome = "success";
+  } finally {
+    const endedAt = performance.now();
+    console.log(JSON.stringify({ event: "demo_fixture_ready", outcome,
+      setup_ms: Math.round(timing.domContentLoadedAt - timing.startedAt),
+      dom_ready_wait_ms: Math.round(endedAt - timing.domContentLoadedAt),
+      total_ms: Math.round(endedAt - timing.startedAt) }));
+  }
+}
+
 function requestURL(input) {
   return typeof input === "string" ? input : input?.url || "";
 }
@@ -113,7 +134,7 @@ function requestURL(input) {
 test("manual reread recovers a stuck overview and refreshes overview plus live without forcing the overlay", { concurrency: false }, async () => {
   const { window: w, errors } = bootDemoApp();
   try {
-    await waitFor(() => w.document.querySelector("#overview-content .summoner-strip"), "initial overview did not load");
+    await waitForInitialOverview(w);
     const previousFetch = w.fetch;
     const overviewRequests = [];
     let liveRequests = 0;
@@ -209,7 +230,7 @@ test("gameplay soft reset clears stalled pagination and recommendation failures 
 test("collection-dirty is accepted by the SSE whitelist and refreshes status", { concurrency: false }, async () => {
   const { window: w, errors, eventSources } = bootDemoApp({ withEventSource: true });
   try {
-    await waitFor(() => w.document.querySelector("#overview-content .summoner-strip"), "initial overview did not load");
+    await waitForInitialOverview(w);
     let statusRequests = 0;
     const previousFetch = w.fetch;
     w.fetch = (input, init) => {
@@ -230,7 +251,7 @@ test("collection-dirty is accepted by the SSE whitelist and refreshes status", {
 test("dirty collection rescans on entry and view changes without duplicate refresh requests", { concurrency: false }, async () => {
   const { window: w, errors, eventSources } = bootDemoApp({ withEventSource: true, observeCollectionState: true });
   try {
-    await waitFor(() => w.document.querySelector("#overview-content .summoner-strip"), "initial overview did not load");
+    await waitForInitialOverview(w);
     let collectionDirty = false;
     let completedStatusRequests = 0;
     let refreshRequests = 0;
@@ -347,7 +368,7 @@ test("R70 app and gameplay retain cancellation ownership until body parsing comp
 test("R70 cached collection reentry avoids a request and never uses outgoing DOM snapshots", { concurrency: false }, async () => {
   const { window: w, errors } = bootDemoApp();
   try {
-    await waitFor(() => w.document.querySelector("#overview-content .summoner-strip"), "overview did not load");
+    await waitForInitialOverview(w);
     let skinRequests = 0, transitions = 0;
     const original = w.fetch;
     w.fetch = (input, init) => { if (requestURL(input).startsWith("/api/skins")) skinRequests++; return original(input, init); };
@@ -367,7 +388,7 @@ test("R70 cached collection reentry avoids a request and never uses outgoing DOM
 test("R70 SSE overflow and reconnect resync refresh visible collection even with unchanged status", { concurrency: false }, async () => {
   const { window: w, errors, eventSources } = bootDemoApp({ withEventSource: true });
   try {
-    await waitFor(() => eventSources.length && w.document.querySelector("#overview-content .summoner-strip"), "startup incomplete");
+    await waitForInitialOverview(w, () => eventSources.length && w.document.querySelector("#overview-content .summoner-strip"));
     w.document.querySelector('[data-section="favorites"]').click();
     await new Promise(r => setTimeout(r, 300));
     let skins = 0;
