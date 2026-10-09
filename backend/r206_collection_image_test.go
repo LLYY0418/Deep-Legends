@@ -98,7 +98,9 @@ func TestR206LocalImage404NeverFetchesRemote(t *testing.T) {
 
 func TestR206TranslationsTimeoutUsesPreviousCache(t *testing.T) {
 	t.Parallel()
+	const injectedTimeout = 300 * time.Millisecond
 	provider := newChampionProvider()
+	provider.lootTranslationTimeout = injectedTimeout
 	provider.lootTranslations = map[string]lootMetadata{"CHEST_FIXTURE": {Name: "缓存名称"}}
 	provider.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 		if strings.HasSuffix(r.URL.Path, "trans.json") {
@@ -109,9 +111,13 @@ func TestR206TranslationsTimeoutUsesPreviousCache(t *testing.T) {
 	})}
 	started := time.Now()
 	metadata := loadLootMetadata(context.Background(), nil, provider, nil)
-	if time.Since(started) > 3*time.Second || metadata["CHEST_FIXTURE"].Name != "缓存名称" {
-		t.Fatal("translations blocked or lost cache", time.Since(started), metadata)
+	elapsed := time.Since(started)
+	// Exercise timeout fallback with ample scheduling margin; the separate
+	// default-deadline test retains coverage of the production 2800ms value.
+	if elapsed >= injectedTimeout+1200*time.Millisecond || metadata["CHEST_FIXTURE"].Name != "缓存名称" {
+		t.Fatal("translations blocked or lost cache", elapsed, metadata)
 	}
+	t.Logf("R260 translation cache elapsed=%s injected_timeout=%s name=%s", elapsed, injectedTimeout, metadata["CHEST_FIXTURE"].Name)
 }
 
 func TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds(t *testing.T) {

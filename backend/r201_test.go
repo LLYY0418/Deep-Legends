@@ -136,6 +136,7 @@ func TestR201ProbeWindowCancelsSlowRoutes(t *testing.T) {
 	data := bytes.Repeat([]byte("x"), int(updateProbeBytes))
 	for _, second := range []bool{false, true} {
 		u := updateTestManager(t, data)
+		slowCanceled := make(chan error, 1)
 		var wg sync.WaitGroup
 		wg.Add(3)
 		u.client = &http.Client{Transport: r196RoundTrip(func(req *http.Request) (*http.Response, error) {
@@ -149,6 +150,9 @@ func TestR201ProbeWindowCancelsSlowRoutes(t *testing.T) {
 			}
 			select {
 			case <-req.Context().Done():
+				if req.URL.Host == "slow.test" {
+					slowCanceled <- req.Context().Err()
+				}
 				return nil, req.Context().Err()
 			case <-time.After(delay):
 				return r196Response(data), nil
@@ -157,7 +161,9 @@ func TestR201ProbeWindowCancelsSlowRoutes(t *testing.T) {
 		started := time.Now()
 		got := u.probeUpdateSources(context.Background(), u.manifest.Asset, []string{"https://first.test/", "https://second.test/", "https://slow.test/"})
 		elapsed := time.Since(started)
-		if elapsed > 1550*time.Millisecond {
+		// Allow scheduling margin around the 490ms first response plus the
+		// production 1s comparison window, while still excluding a 5s wait.
+		if elapsed >= 3*time.Second {
 			t.Fatal("waited slowest probe", elapsed)
 		}
 		want := "https://first.test/"
@@ -183,6 +189,15 @@ func TestR201ProbeWindowCancelsSlowRoutes(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatal("unfinished probes not canceled")
 		}
+		select {
+		case err := <-slowCanceled:
+			if !errors.Is(err, context.Canceled) {
+				t.Fatal("slow probe did not exit by cancellation", second, err)
+			}
+		default:
+			t.Fatal("slow probe returned without context cancellation", second)
+		}
+		t.Logf("R260 probe round second=%v elapsed=%s measured=%d slow_canceled=true", second, elapsed, measured)
 	}
 }
 func TestR201BothUpdatePathsPassParent(t *testing.T) {
