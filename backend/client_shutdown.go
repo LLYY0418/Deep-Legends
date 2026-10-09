@@ -142,7 +142,7 @@ func (a *app) observeClientShutdownEvent(client *LCUClient, event LCUEvent, now 
 }
 func (a *app) restoreClientShutdown(client *LCUClient, now time.Time) bool {
 	a.mu.Lock()
-	if a.lcu != client || !a.connected || a.shutdownClient != client || now.Sub(a.shutdownAt) < clientShutdownGrace || !a.eventStream || a.clientLastEventAt.IsZero() || now.Sub(a.clientLastEventAt) > 5*time.Second {
+	if a.lcu != client || (!a.connected && !a.identityReady) || a.shutdownClient != client || now.Sub(a.shutdownAt) < clientShutdownGrace || !a.eventStream || a.clientLastEventAt.IsZero() || now.Sub(a.clientLastEventAt) > 5*time.Second {
 		a.mu.Unlock()
 		return false
 	}

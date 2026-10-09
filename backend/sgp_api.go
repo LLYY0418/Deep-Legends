@@ -175,6 +175,8 @@ type sgpProvider struct {
 	sessionAt          time.Time
 	sessionOwner       *LCUClient
 	failUntil          time.Time
+	historyCircuits    map[string]*sgpHistoryCircuit
+	historyClock       func() time.Time
 	historyCache       map[string]sgpHistoryCacheEntry
 	historyGames       *historyGameCache
 	historyGeneration  uint64
@@ -614,6 +616,12 @@ func (p *sgpProvider) recordObservation(event map[string]any) {
 }
 
 func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, kind sgpTokenKind, serverID, route, requestPath, endpoint string, out any) (resultErr error) {
+	probe, circuitErr := p.acquireHistoryCircuit(serverID, route)
+	if circuitErr != nil {
+		p.recordObservation(map[string]any{"event": "sgp_history_circuit", "server_id": serverID, "route": route, "state": "cooldown"})
+		return circuitErr
+	}
+	defer p.releaseHistoryProbe(serverID, probe)
 	requestNumber := 0
 	truncatedJSONRetried := false
 	credentialID := ""
@@ -632,7 +640,11 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 		p.recordObservation(event)
 	}
 	lastAuthStatus := http.StatusUnauthorized
-	for tokenAttempt := 0; tokenAttempt < 2; tokenAttempt++ {
+	retryLimit, tokenLimit := 2, 2
+	if probe {
+		retryLimit, tokenLimit = 0, 1
+	}
+	for tokenAttempt := 0; tokenAttempt < tokenLimit; tokenAttempt++ {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -656,6 +668,12 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 		}
 		authRejected := false
 		for retry := 0; retry <= 2; retry++ {
+			if retry > retryLimit {
+				break
+			}
+			if p.historyCircuitCooling(serverID, route, probe) {
+				return errSGPHistoryCooling
+			}
 			if err := p.waitSGPRetry(ctx, retry); err != nil {
 				return err
 			}
@@ -683,13 +701,16 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 					"error_kind": sgpNetworkErrorKind(err),
 				}, sgpRequestPageFields(route, endpoint))
 				record(diagnostic)
-				if errors.Is(err, context.Canceled) || ctx.Err() != nil || retry == 2 {
+				if errors.Is(err, context.Canceled) || ctx.Err() != nil || retry == retryLimit {
 					return fmt.Errorf("SGP 网关连接失败: %w", err)
 				}
 				continue
 			}
 			body, readErr := readLimited(response.Body, sgpResponseMax)
 			response.Body.Close()
+			if response.StatusCode != http.StatusOK {
+				p.observeHistoryCircuit(serverID, route, response.StatusCode, probe)
+			}
 			overviewCostFromContext(ctx).addRequest(len(body))
 			diagnostic := mergeDiagnosticFields(map[string]any{
 				"event": "sgp_request", "method": http.MethodGet, "route": route, "path": requestPath,
@@ -701,7 +722,7 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 				if readErr != nil {
 					diagnostic["read_failed"] = true
 					record(diagnostic)
-					if errors.Is(readErr, context.Canceled) || ctx.Err() != nil || retry == 2 {
+					if errors.Is(readErr, context.Canceled) || ctx.Err() != nil || retry == retryLimit {
 						return readErr
 					}
 					continue
@@ -714,13 +735,14 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 					record(diagnostic)
 					// A complete HTTP body may still contain an unfinished JSON page.
 					// Retry that shape once within the existing request/time budget.
-					if truncated && !truncatedJSONRetried && retry < 2 {
+					if truncated && !truncatedJSONRetried && retry < retryLimit {
 						truncatedJSONRetried = true
 						continue
 					}
 					return errSGPResponseDecode
 				}
 				record(diagnostic)
+				p.observeHistoryCircuit(serverID, route, response.StatusCode, probe)
 				return nil
 			case response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden:
 				lastAuthStatus = response.StatusCode
@@ -729,7 +751,7 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 				authRejected = true
 			case retryableSGPStatus(response.StatusCode):
 				record(diagnostic)
-				if retry < 2 {
+				if retry < retryLimit {
 					continue
 				}
 				return fmt.Errorf("SGP 网关返回 HTTP %d: %w", response.StatusCode, &sgpHTTPError{StatusCode: response.StatusCode})

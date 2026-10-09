@@ -156,7 +156,7 @@ func (a *app) loadCurrentHistoryFast(ctx context.Context, client *LCUClient, ref
 				clientHistoryEpochMu.Lock()
 				latest := clientHistoryLatest[accountKey] == flight.generation
 				a.mu.RLock()
-				bound := a.lcu == client && a.connected && a.summoner.PUUID == puuid
+				bound := a.lcu == client && a.clientSessionConnectedLocked() && a.summoner.PUUID == puuid
 				a.mu.RUnlock()
 				if key != "" && latest && bound {
 					if raw, err := json.Marshal(result); err == nil {

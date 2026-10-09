@@ -479,7 +479,7 @@ function r71RefreshHarness() {
   const methods = compileFunctions(appSourceR70, ["refreshStatus", "ensureCollection", "triggerCollectionRescanIfDirty"], {
     state, STATUS_INTERVAL: 5000, window: {}, document: { hidden: false },
     api: async (url) => { requests.push(url); if (url === "/api/status") return { ...next }; if (failEnsure && url.startsWith("/api/collection/ensure?")) throw Error("offline"); return null; },
-    clearDisconnectedClientState() {}, updateReadingOverlay() {}, renderStatus() {}, loadClientInstallations() {},
+    clearDisconnectedClientState() {}, updateReadingOverlay() {}, renderStatus() {}, renderItems() {}, loadClientInstallations() {},
     loadSkins: async () => loads.push("skins"), loadAccount() {}, loadPools() {}, showFatal(message) { throw Error(message); }, showToast() {}, scheduleStatus() {},
   });
   return { state, methods, requests, loads, set next(value) { next = { ...next, ...value }; }, set failEnsure(value) { failEnsure = value; } };

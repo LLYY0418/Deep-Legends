@@ -85,6 +85,7 @@ type app struct {
 	fallbackOwned                   []Skin
 	fallbackRemaining               []Skin
 	connected                       bool
+	clientSessionEpoch              uint64
 	manualDisconnected              bool
 	identityReady                   bool
 	selfReadinessClient             *LCUClient
@@ -520,7 +521,7 @@ func main() {
 	a.sgp.gatewayAccount = func(client *LCUClient) string {
 		a.mu.RLock()
 		defer a.mu.RUnlock()
-		if a.lcu != client || !a.connected {
+		if a.lcu != client || !a.clientSessionConnectedLocked() {
 			return ""
 		}
 		return a.summoner.PUUID
@@ -847,7 +848,7 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	}
 	client := a.lcu
 	identity := a.summoner
-	identityReady := a.identityReady || (a.connected && a.summoner.SummonerID != 0)
+	identityReady := a.identityReady || (a.clientSessionConnectedLocked() && a.summoner.SummonerID != 0)
 	ownedCount := len(a.owned)
 	remainingCount := len(a.remaining)
 	if a.snapshotFallback && !a.snapshotReady {
@@ -865,14 +866,14 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	}
 	if a.shutdownClient != nil {
 		clientDiscovery = "exiting"
-	} else if a.connected {
+	} else if a.clientSessionConnectedLocked() {
 		clientDiscovery = "connected"
 	}
 	response := statusResponse{
 		ClientVersion:   client.cachedGameVersion(),
 		SGPReady:        a.selfReadinessClient == client && a.selfReadinessAccount == identity.PUUID && a.selfSGPReady,
 		ClientDiscovery: clientDiscovery,
-		Version:         version, BuildFingerprint: buildFingerprint, Connected: a.connected && a.shutdownClient == nil, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
+		Version:         version, BuildFingerprint: buildFingerprint, Connected: a.clientSessionConnectedLocked() && a.shutdownClient == nil, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
 		Syncing: a.syncing, LastSync: a.lastSync, LastAttempt: a.lastAttempt, LastDurationMS: a.lastDuration.Milliseconds(),
 		LastError: a.lastError, Summoner: summoner, OwnedCount: ownedCount, ChromaOwnedCount: ownedChromaCount(a.chromas), PoolTotal: a.poolTotal,
 		PoolMatched: a.poolMatched, Remaining: remainingCount, CalculationOK: a.calculationOKLocked(),
@@ -927,7 +928,7 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 
 func (a *app) handleChromas(w http.ResponseWriter, _ *http.Request) {
 	a.mu.RLock()
-	if !a.connected || !a.snapshotReady {
+	if !a.clientSessionConnectedLocked() || !a.snapshotReady {
 		a.mu.RUnlock()
 		http.Error(w, "当前没有可用的客户端快照", http.StatusConflict)
 		return
@@ -951,7 +952,7 @@ func ownedChromaCount(items []Chroma) int {
 func (a *app) handleSkins(w http.ResponseWriter, r *http.Request) {
 	view := r.URL.Query().Get("view")
 	a.mu.RLock()
-	if !a.connected || (!a.snapshotReady && !a.snapshotFallback) {
+	if !a.clientSessionConnectedLocked() || (!a.snapshotReady && !a.snapshotFallback) {
 		a.mu.RUnlock()
 		http.Error(w, "当前没有可用的客户端快照", http.StatusConflict)
 		return
@@ -1019,7 +1020,7 @@ func (a *app) handleSkinDetails(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.RLock()
 	client := a.lcu
-	connected := a.connected && a.snapshotReady
+	connected := a.clientSessionConnectedLocked() && a.snapshotReady
 	var skin Skin
 	for _, candidate := range a.allSkins {
 		if candidate.ID == id {
@@ -1094,7 +1095,7 @@ func (a *app) handleSkinDetails(w http.ResponseWriter, r *http.Request) {
 func (a *app) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	a.mu.RLock()
 	client := a.lcu
-	connected := a.connected
+	connected := a.clientSessionConnectedLocked()
 	a.mu.RUnlock()
 	source := r.URL.Query().Get("source")
 	if connected && client != nil && source != "collection_retry" && source != "dirty_rescan" {
@@ -1107,12 +1108,14 @@ func (a *app) handleRefresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) handleCollectionEnsure(w http.ResponseWriter, _ *http.Request) {
+	view := a.currentClientView()
 	a.mu.RLock()
-	connected := a.connected && a.lcu != nil
-	ready := a.snapshotReady
+	connected := a.clientSessionConnectedLocked() && a.lcu != nil && a.shutdownClient == nil
+	ready, rawConnected, present := a.snapshotReady, a.connected, a.lcu != nil
 	a.mu.RUnlock()
+	a.recordDiagnostic(map[string]any{"event": "collection_ensure", "connected": rawConnected, "lcu_present": present, "snapshot_ready": ready, "client_view_state": view.State})
 	if !connected {
-		http.Error(w, "当前没有已连接的英雄联盟客户端", http.StatusConflict)
+		http.Error(w, "客户端连接中", http.StatusConflict)
 		return
 	}
 	if !ready {
@@ -1138,7 +1141,7 @@ func (a *app) handleImage(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.RLock()
 	client := a.lcu
-	connected := a.connected
+	connected := a.clientSessionConnectedLocked()
 	a.mu.RUnlock()
 	if r.URL.Query().Get("source") == "communitydragon" {
 		started := time.Now()
@@ -1319,7 +1322,7 @@ func (a *app) handleMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.RLock()
 	client := a.lcu
-	connected := a.connected
+	connected := a.clientSessionConnectedLocked()
 	a.mu.RUnlock()
 	if client == nil || !connected {
 		http.NotFound(w, r)
@@ -1354,6 +1357,9 @@ func (a *app) handleMedia(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
+	a.mu.RLock()
+	epoch := a.clientSessionEpoch
+	a.mu.RUnlock()
 	a.bindHistoryGameCache(client)
 	a.bindColdRequestCounters(client)
 	client.setDiagnosticObserver(a.recordDiagnostic)
@@ -1372,7 +1378,7 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 		return false
 	}
 	a.mu.Lock()
-	if a.lcu != nil && a.lcu != client {
+	if epoch != a.clientSessionEpoch || a.manualDisconnected || a.lcu != nil && a.lcu != client {
 		a.mu.Unlock()
 		return false
 	}
@@ -1413,7 +1419,7 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 				return
 			}
 			a.mu.Lock()
-			if a.lcu != client || a.summoner.SummonerID != seed.SummonerID {
+			if epoch != a.clientSessionEpoch || a.lcu != client || a.summoner.SummonerID != seed.SummonerID {
 				a.mu.Unlock()
 				return
 			}
@@ -1450,11 +1456,11 @@ func collectionRefreshSource(sources []string) string {
 func (a *app) handleIdentityRefresh(w http.ResponseWriter, r *http.Request) {
 	a.mu.RLock()
 	client := a.lcu
-	connected := a.connected
+	connected := a.clientSessionConnectedLocked()
 	a.mu.RUnlock()
 	a.recordDiagnostic(map[string]any{"event": "identity_refresh_request", "source": "overlay_retry"})
 	if !connected || client == nil {
-		http.Error(w, "当前没有已连接的英雄联盟客户端", http.StatusConflict)
+		http.Error(w, "客户端连接中", http.StatusConflict)
 		return
 	}
 	if _, err := a.refreshSummonerIdentityContext(r.Context(), client, true); err != nil {
@@ -1520,11 +1526,16 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	}
 	a.collectionRefreshPending = true
 	generation := a.poolGeneration
+	epoch := a.clientSessionEpoch
 	initialClient := a.lcu
 	pool := a.pools[a.poolID]
 	a.mu.Unlock()
 	defer func() {
 		a.mu.Lock()
+		if epoch != a.clientSessionEpoch {
+			a.mu.Unlock()
+			return
+		}
 		a.collectionRefreshPending = false
 		a.collectionRefreshPendingSource = ""
 		a.syncing = false
@@ -1561,7 +1572,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	previousRemaining := append([]Skin(nil), a.remaining...)
 	previousSnapshotAt := a.lastSync
 	previousSnapshotUsable := a.snapshotReady && a.calculationOKLocked()
-	if a.manualDisconnected || (a.lcu != initialClient && a.lcu != client) {
+	if epoch != a.clientSessionEpoch || a.manualDisconnected || (a.lcu != initialClient && a.lcu != client) {
 		a.syncing = false
 		a.collectionRefreshFinishedAt = time.Now()
 		a.mu.Unlock()
@@ -1675,11 +1686,12 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 func (a *app) refreshAccountWithClient(client *LCUClient) {
 	client.setDiagnosticObserver(a.recordDiagnostic)
 	a.mu.Lock()
-	if a.syncing || !a.connected || a.lcu != client {
+	if a.syncing || !a.clientSessionConnectedLocked() || a.lcu != client {
 		a.mu.Unlock()
 		return
 	}
 	a.syncing = true
+	epoch := a.clientSessionEpoch
 	skins := append([]Skin(nil), a.allSkins...)
 	a.mu.Unlock()
 	profile, profileCapability := NewSummonerAPI(client).Profile()
@@ -1692,17 +1704,19 @@ func (a *app) refreshAccountWithClient(client *LCUClient) {
 	rewards, rewardsCapability := NewRewardsAPI(client).PendingGrants()
 	account := AccountData{Profile: profile, Loot: loot, Rewards: rewards, SanctumSparks: sanctumSparks, SanctumSparksKnown: sanctumCapability.State == capabilityAvailable, Capabilities: []EndpointCapability{profileCapability, lootCapability, sanctumCapability, rewardsCapability}}
 	a.mu.Lock()
-	if a.connected && a.lcu == client {
+	if epoch == a.clientSessionEpoch && a.clientSessionConnectedLocked() && a.lcu == client {
 		a.account = cloneAccountData(account)
 	}
-	a.syncing = false
+	if epoch == a.clientSessionEpoch {
+		a.syncing = false
+	}
 	a.mu.Unlock()
 	a.publishClientView()
 	a.broadcastEvent("account-updated")
 }
 
 func (a *app) calculationOKLocked() bool {
-	return a.connected && a.snapshotReady && a.poolTotal > 0 && a.poolMatched == a.poolTotal && len(a.poolIssues) == 0
+	return a.clientSessionConnectedLocked() && a.snapshotReady && a.poolTotal > 0 && a.poolMatched == a.poolTotal && len(a.poolIssues) == 0
 }
 
 func (a *app) clearCollectionDirtyThroughLocked(refreshStartedAt time.Time) {
@@ -1714,6 +1728,12 @@ func (a *app) clearCollectionDirtyThroughLocked(refreshStartedAt time.Time) {
 }
 
 func (a *app) clearSnapshotLocked(message string) {
+	a.clientSessionEpoch++
+	a.syncing = false
+	a.selfReadinessPending = false
+	a.selfReadinessClient = nil
+	a.selfReadinessAccount = ""
+	a.selfSGPReady = false
 	if a.collectionDataRetry != nil {
 		a.collectionDataRetry.Stop()
 		a.collectionDataRetry = nil

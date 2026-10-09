@@ -20,9 +20,10 @@ const (
 // may expose different datasets, so callers must record why each compatible
 // source was attempted instead of treating source changes as transparent retry.
 type DataSourceAttempt struct {
-	Source  string `json:"source"`
-	Outcome string `json:"outcome"`
-	Message string `json:"message,omitempty"`
+	StatusCode int    `json:"statusCode,omitempty"`
+	Source     string `json:"source"`
+	Outcome    string `json:"outcome"`
+	Message    string `json:"message,omitempty"`
 }
 
 type rankDataSourceInput struct {

@@ -14,13 +14,13 @@ function fixture(t){
 test('R100 P7 first native save persists independently; second and restart save without prompt; no overwrite',async t=>{
  const f=fixture(t),controller=f.create(),session=new EventEmitter(),completed=[];
  const detach=attachDiagnosticsExport({session,sender:f.sender,getBaseURL:()=> 'http://localhost:7777',getDefaultDirectory:()=>f.downloads,getDirectory:controller.getDirectory,prepareFile:controller.prepareFile,finalizeFile:controller.finalizeFile,discardFile:controller.discardFile,fileSystem:fs,onCompleted:file=>{controller.rememberFile(file);completed.push(file)}});t.after(detach);
- function download(){const item=new EventEmitter();item.getURLChain=()=>['http://localhost:7777/api/diagnostics/log'];item.setSaveDialogOptions=o=>item.options=o;item.setSavePath=p=>item.file=p;item.getSavePath=()=>item.file;session.emit('will-download',{},item,f.sender);return item;}
+ function download(){const item=new EventEmitter();item.getTotalBytes=()=>fs.statSync(item.file).size;item.getReceivedBytes=item.getTotalBytes;item.getURLChain=()=>['http://localhost:7777/api/diagnostics/log'];item.setSaveDialogOptions=o=>item.options=o;item.setSavePath=p=>item.file=p;item.getSavePath=()=>item.file;session.emit('will-download',{},item,f.sender);return item;}
  const first=download();assert.equal(first.file,undefined);assert.equal(path.dirname(first.options.defaultPath),f.downloads);
- first.file=path.join(f.downloads,'first.jsonl');fs.writeFileSync(first.file,'first');first.emit('done',{},'completed');await new Promise(setImmediate);
+ first.file=path.join(f.downloads,'first.jsonl');fs.writeFileSync(first.file,'first\n');first.emit('done',{},'completed');await new Promise(setImmediate);
  assert.equal(controller.getDirectory(),f.downloads);assert.equal(f.create().getDirectory(),f.downloads);assert.equal(completed.length,1);
- const next=download();assert.ok(next.file.includes('diagnostics-stage-'));fs.writeFileSync(next.file,'second');next.emit('done',{},'completed');await new Promise(setImmediate);
- assert.equal(f.prompts,0);assert.equal(completed.length,2);assert.equal(fs.readFileSync(first.file,'utf8'),'first');
- const staged=controller.prepareFile(completed[1]);fs.writeFileSync(staged,'third');const collision=await controller.finalizeFile(staged);assert.notEqual(collision,completed[1]);assert.equal(fs.readFileSync(completed[1],'utf8'),'second');
+ const next=download();assert.ok(next.file.includes('diagnostics-stage-'));fs.writeFileSync(next.file,'second\n');next.emit('done',{},'completed');await new Promise(setImmediate);
+ assert.equal(f.prompts,0);assert.equal(completed.length,2);assert.equal(fs.readFileSync(first.file,'utf8'),'first\n');
+ const staged=controller.prepareFile(completed[1]);fs.writeFileSync(staged,'third');const collision=await controller.finalizeFile(staged);assert.notEqual(collision,completed[1]);assert.equal(fs.readFileSync(completed[1],'utf8'),'second\n');
  assert.equal(fs.existsSync(path.join(f.userData,'share-export.json')),false);
 });
 test('R100 P7 deleted/replaced directory re-prompts at actual write; cancel cleans staging',async t=>{

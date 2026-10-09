@@ -91,6 +91,14 @@ jobs:
           echo "using $chrome"
           CHROME_BIN="$chrome" R100_BROWSER_OUTPUT="$RUNNER_TEMP/r100-browser" node desktop/r100-browser.cjs
           CHROME_BIN="$chrome" R117_BROWSER_OUTPUT="$RUNNER_TEMP/r117-browser" node desktop/r117-browser.cjs
+      - name: R264 real public backend and production CSP regression
+        run: |
+          chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+          test -n "$chrome"
+          version="$(node -p "require('./desktop/package.json').version")"
+          fingerprint="$(node desktop/source-fingerprint.cjs)"
+          go build -tags= -buildvcs=false -ldflags="-X main.version=$version -X main.buildFingerprint=$fingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=" -o "$RUNNER_TEMP/r264-public" ./backend
+          CHROME_BIN="$chrome" R264_BACKEND="$RUNNER_TEMP/r264-public" R264_BROWSER_OUT="$RUNNER_TEMP/r264-browser" node scripts/r264-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -98,6 +106,7 @@ jobs:
           path: |
             ${{ runner.temp }}/r100-browser/**
             ${{ runner.temp }}/r117-browser/**
+            ${{ runner.temp }}/r264-browser/**
           if-no-files-found: warn
       - name: Test installer module
         working-directory: installer

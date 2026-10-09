@@ -415,7 +415,7 @@ func (a *app) collectObjectiveDiagnostics(ctx context.Context, client *LCUClient
 func (a *app) handleObjectiveDiagnostics(w http.ResponseWriter, r *http.Request) {
 	a.mu.RLock()
 	client := a.lcu
-	connected := a.connected
+	connected := a.clientSessionConnectedLocked()
 	a.mu.RUnlock()
 	if !connected || client == nil {
 		http.Error(w, "请先连接客户端", http.StatusServiceUnavailable)

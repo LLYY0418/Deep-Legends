@@ -114,7 +114,7 @@ func (a *app) clientCatalogJSON(ctx context.Context, client *LCUClient, path str
 
 func (a *app) noteAssetClientVersion(client *LCUClient, version string) {
 	a.mu.Lock()
-	if a.lcu != client || !a.connected {
+	if a.lcu != client || !a.clientSessionConnectedLocked() {
 		a.mu.Unlock()
 		return
 	}

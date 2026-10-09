@@ -140,7 +140,7 @@ func (a *app) startOverviewRankedSupplement(client *LCUClient, ref gameplayRefer
 		ctx = context.WithValue(ctx, overviewLoadCostContextKey{}, cost)
 		samples := a.loadRecentRankedSamples(ctx, client, ref, puuid, "all", gameplayPagination{}, matches, names, labels)
 		a.mu.RLock()
-		valid := a.lcu == client && a.connected && a.summoner.PUUID == puuid && a.shutdownClient != client
+		valid := a.lcu == client && a.clientSessionConnectedLocked() && a.summoner.PUUID == puuid && a.shutdownClient != client
 		a.mu.RUnlock()
 		if !valid || ctx.Err() != nil {
 			return

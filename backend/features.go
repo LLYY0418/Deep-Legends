@@ -219,6 +219,11 @@ type clientDiagnosticRequest struct {
 	TransportPending        int                         `json:"transportPending,omitempty"`
 	TransportHTTPStatus     int                         `json:"transportHTTPStatus,omitempty"`
 	TransportErrorKind      string                      `json:"transportErrorKind,omitempty"`
+	ScriptName              string                      `json:"scriptName,omitempty"`
+	ErrorLine               int                         `json:"line,omitempty"`
+	ErrorColumn             int                         `json:"column,omitempty"`
+	CSPDirective            string                      `json:"cspDirective,omitempty"`
+	ErrorDeferred           int                         `json:"errorDeferred,omitempty"`
 }
 
 var specialistRuneClientReasons = map[string]bool{
@@ -228,6 +233,7 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"browser_error_client":          {"error": true, "unhandledrejection": true, "csp": true},
 	"self_tab_client":               {"ready": true, "removed": true, "overlay-shown": true},
 	"license_window_state":          {"transition": true},
 	"collection_card_image_state":   {"waiting": true},
@@ -343,6 +349,31 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	event := map[string]any{"event": request.Event, "reason": request.Reason}
+	if request.Event == "browser_error_client" {
+		errorType := "Error"
+		switch request.RenderErrorType {
+		case "Error", "TypeError", "ReferenceError", "RangeError", "SyntaxError", "URIError", "EvalError", "AggregateError":
+			errorType = request.RenderErrorType
+		}
+		script := "other"
+		if len(request.ScriptName) <= 64 && strings.HasSuffix(request.ScriptName, ".js") && strings.IndexFunc(request.ScriptName, func(r rune) bool { return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '.') }) < 0 {
+			script = request.ScriptName
+		}
+		event["error_type"], event["script"], event["line"], event["column"] = errorType, script, min(1000000, max(0, request.ErrorLine)), min(1000000, max(0, request.ErrorColumn))
+		switch request.CSPDirective {
+		case "script-src-elem", "script-src-attr", "style-src-elem", "style-src-attr", "img-src", "connect-src", "default-src":
+			event["csp_directive"] = request.CSPDirective
+		}
+		counts := map[string]int{}
+		for _, kind := range []string{"error", "unhandledrejection", "csp"} {
+			counts[kind] = min(1000000, max(0, request.Counts[kind]))
+		}
+		event["counts"] = counts
+		event["total"], event["deferred"] = min(1000000, max(0, request.Total)), min(1000000, max(0, request.ErrorDeferred))
+		a.recordDiagnostic(event)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if request.Event == "build_player_selection" {
 		event["game_id_hash"] = diagnosticGameIDHash(request.GameID)
 		event["is_self"] = request.IsSelf
@@ -891,9 +922,9 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 func (a *app) handleDiagnostics(w http.ResponseWriter, _ *http.Request) {
 	a.flushRankedWinrateDiagnostics()
 	a.mu.RLock()
-	identityReady := a.identityReady || (a.connected && a.summoner.SummonerID != 0)
+	identityReady := a.identityReady || (a.clientSessionConnectedLocked() && a.summoner.SummonerID != 0)
 	response := diagnosticsResponse{
-		SchemaVersion: 5, Connected: a.connected, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
+		SchemaVersion: 5, Connected: a.clientSessionConnectedLocked(), IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
 		Syncing: a.syncing, LastAttempt: a.lastAttempt,
 		LastSuccess: a.lastSync, LastDurationMS: a.lastDuration.Milliseconds(), LastError: a.lastError,
 		SnapshotRetryCount: a.snapshotRetryCount, SnapshotRetryExhausted: a.snapshotRetryExhausted,
@@ -932,6 +963,9 @@ func (a *app) handleDiagnostics(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *app) handleDiagnosticLog(w http.ResponseWriter, r *http.Request) {
+	started := time.Now()
+	// Only downloads opt out of the server total write deadline.
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 	if a.champions != nil {
 		a.champions.flushAssetFetch()
 	}
@@ -940,31 +974,29 @@ func (a *app) handleDiagnosticLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.flushRankedWinrateDiagnostics()
-	a.recordItemSetExportSnapshot(r.Context())
 	if runner := a.activeWatch(); runner != nil {
 		runner.recordFlowExportSnapshot()
 	}
 	a.mu.RLock()
 	client := a.lcu
 	a.mu.RUnlock()
-	a.collectObjectiveDiagnostics(r.Context(), client, "export")
-	a.collectAcceptFocusInspection(r.Context(), client)
-	data, err := a.storage.readDiagnosticLogForExport()
+	probes := a.collectDiagnosticExportProbes(r.Context(), client)
+	snapshot, err := a.storage.snapshotDiagnosticExport()
 	if err != nil {
 		a.recordDiagnostic(map[string]any{"event": "diagnostic_export_failed", "stage": "read", "error_kind": diagnosticErrorKind(err)})
 		http.Error(w, "诊断日志读取失败", http.StatusInternalServerError)
 		return
 	}
+	defer snapshot.close()
 	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, diagnosticLogExportFilename(time.Now())))
+	w.Header().Set("Content-Length", fmt.Sprint(snapshot.size))
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	written, err := w.Write(data)
-	if err == nil && written != len(data) {
-		err = io.ErrShortWrite
-	}
+	written, err := snapshot.writeTo(w)
+	a.recordDiagnostic(map[string]any{"event": "diagnostic_export", "total_bytes": snapshot.size, "written_bytes": written, "duration_ms": time.Since(started).Milliseconds(), "probe_duration_ms": probes, "complete": err == nil && written == snapshot.size})
 	if err != nil {
-		a.recordDiagnostic(map[string]any{"event": "diagnostic_export_failed", "stage": "response-write", "error_kind": diagnosticErrorKind(err), "expected_bytes": len(data), "written_bytes": written})
+		a.recordDiagnostic(map[string]any{"event": "diagnostic_export_failed", "stage": "response-write", "error_kind": diagnosticErrorKind(err), "expected_bytes": snapshot.size, "written_bytes": written})
 	}
 }
 
@@ -1077,7 +1109,7 @@ func (a *app) handlePoolSelect(w http.ResponseWriter, r *http.Request) {
 func (a *app) selectedSkins(view string) ([]Skin, PoolManifest, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
-	if !a.connected || !a.snapshotReady {
+	if !a.clientSessionConnectedLocked() || !a.snapshotReady {
 		return nil, PoolManifest{}, errors.New("当前没有可用的客户端快照")
 	}
 	pool := a.pools[a.poolID]

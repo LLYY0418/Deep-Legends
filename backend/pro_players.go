@@ -25,19 +25,20 @@ const (
 // Normalized public directory snapshots have a bounded, private-permission 24h cache.
 // Raw directory HTML is still excluded from the generic OP.GG cache.
 type proPlayersCache struct {
-	disk             *championDataCache
-	diskChecked      bool
-	mu               sync.Mutex
-	teams            []opggProTeam
-	fetchedAt        time.Time
-	attemptedAt      time.Time
-	err              error
-	flight           chan struct{}
-	updating         bool
-	refreshStarted   bool
-	refreshWait      func(context.Context, time.Duration) error
-	refreshNow       func() time.Time
-	refreshAttempted map[string]time.Time
+	disk              *championDataCache
+	diskChecked       bool
+	mu                sync.Mutex
+	teams             []opggProTeam
+	fetchedAt         time.Time
+	attemptedAt       time.Time
+	err               error
+	flight            chan struct{}
+	updating          bool
+	firstScreenFlight bool
+	refreshStarted    bool
+	refreshWait       func(context.Context, time.Duration) error
+	refreshNow        func() time.Time
+	refreshAttempted  map[string]time.Time
 }
 
 type opggProTeam struct {
@@ -161,7 +162,7 @@ func (a *app) handleProPlayers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid pro players query", http.StatusBadRequest)
 		return
 	}
-	teams, fetchedAt, sourceErr := a.loadProPlayers(r.Context(), r.URL.Query().Get("refresh") == "1")
+	teams, fetchedAt, sourceErr := a.proPlayersFirstScreen(r.URL.Query().Get("refresh") == "1")
 	if r.Context().Err() != nil {
 		return
 	}
@@ -171,7 +172,7 @@ func (a *app) handleProPlayers(w http.ResponseWriter, r *http.Request) {
 	if !a.proPlayers.fetchedAt.IsZero() && time.Since(a.proPlayers.fetchedAt) <= proPlayersMaxStale {
 		teams, fetchedAt, sourceErr = a.proPlayers.teams, a.proPlayers.fetchedAt, a.proPlayers.err
 	}
-	updating := a.proPlayers.updating
+	updating := a.proPlayers.updating || a.proPlayers.firstScreenFlight || a.proPlayers.flight != nil
 	a.proPlayers.mu.Unlock()
 	result := a.buildReviewedProPlayers(teams)
 	result.Updating = updating
@@ -179,13 +180,13 @@ func (a *app) handleProPlayers(w http.ResponseWriter, r *http.Request) {
 	result.RosterVerifiedAt = proRosterVerifiedAt
 	verified, _ := time.Parse("2006-01-02", proRosterVerifiedAt)
 	result.RosterStale = time.Since(verified) > 30*24*time.Hour
-	result.Unavailable = len(teams) == 0
+	result.Unavailable = len(teams) == 0 || sourceErr != nil && fetchedAt.IsZero()
 	result.Stale = !result.Unavailable && (sourceErr != nil || time.Since(fetchedAt) >= proPlayersTTL)
 	if sourceErr != nil {
 		// No upstream bodies, identifiers or proxy details in renderer errors.
 		result.Warnings = append(result.Warnings, "OP.GG 账号来源暂不可用，请检查设置中的英雄数据网络后重试。")
 	}
-	if result.Stale {
+	if result.Stale && !fetchedAt.IsZero() {
 		result.Warnings = append(result.Warnings, "当前为上次成功读取的缓存，账号与段位可能已变化。")
 	}
 	if result.RosterStale {

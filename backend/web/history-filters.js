@@ -102,7 +102,13 @@
     }
     return [...map.values()];
   }
-  function readPresets(storage) { try {const saved=JSON.parse(storage.getItem(key) || '[]');return Array.isArray(saved) ? saved.filter(p=>p && typeof p.name==='string').slice(0,12).map(p=>({name:p.name.slice(0,60),conditions:normalize(p.conditions)})) : [];} catch(_){return [];} }
+  function readPresets(storage) {
+    try {
+      const saved=JSON.parse(storage.getItem(key) || '[]');
+      if(!Array.isArray(saved) || saved.some(p=>!p || typeof p.name!=='string' || !p.name.trim() || !p.conditions || typeof p.conditions!=='object' || Array.isArray(p.conditions) || Object.entries(p.conditions).some(([category,c])=>!Object.hasOwn(categories,category) || !c || typeof c!=='object' || !Array.isArray(c.values) || c.values.some(v=>typeof v!=='string'))))throw new Error('Invalid saved filters');
+      return saved.slice(0,12).map(p=>({name:p.name.slice(0,60),conditions:normalize(p.conditions)}));
+    } catch(_) {try{storage.removeItem?.(key);}catch{}return [];}
+  }
   function savePreset(storage,name,cs) { const saved=readPresets(storage),n=String(name || '').trim().slice(0,60);if(!n || !Object.keys(normalize(cs)).length)return false;const index=saved.findIndex(p=>p.name===n);if(index<0 && saved.length>=12)return false;const item={name:n,conditions:normalize(cs)};if(index<0)saved.push(item);else saved[index]=item;try{storage.setItem(key,JSON.stringify(saved));return true;}catch(_){return false;} }
   function writePresets(storage,saved) {try{storage.setItem(key,JSON.stringify(saved.slice(0,12)));return true;}catch(_){return false;} }
   function cancel(tab, abort) { const search=tab.advancedSearch;if(search?.running){search.running=false;search.cancelled=true;search.token++;abort?.();} }

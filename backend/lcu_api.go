@@ -23,6 +23,9 @@ const (
 )
 
 type EndpointCapability struct {
+	FailureStatus  int                 `json:"failureStatus,omitempty"`
+	HistoryStatus  string              `json:"historyStatus,omitempty"`
+	RetryAfter     int                 `json:"retryAfter,omitempty"`
 	Name           string              `json:"name"`
 	Path           string              `json:"path"`
 	State          string              `json:"state"`

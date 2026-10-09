@@ -391,7 +391,9 @@
       if (!response.ok) {
         if (response.status === 401) throw new Error("页面会话已过期，刷新页面即可重新连接");
         const message = (await response.text()).trim();
-        throw new Error(message || `本地服务返回 HTTP ${response.status}`);
+        const error = new Error(message || `本地服务返回 HTTP ${response.status}`);
+        error.status = response.status;
+        throw error;
       }
       const payload = response.status === 202 || response.status === 204 ? null : await response.json();
       if (controller.signal.aborted || state.controllers.get(requestKey) !== controller || state.destroyed) {
@@ -574,15 +576,34 @@
   }
 
   async function ensureCollection() {
-    if (state.collectionEnsureInFlight || state.collectionRescanInFlight || state.status?.syncing || !state.status?.connected || state.status?.snapshotReady) return;
+    if (state.collectionWaitingForConnection || state.collectionEnsureInFlight || state.collectionRescanInFlight || state.status?.syncing || !state.status?.connected || state.status?.snapshotReady) return;
     state.collectionEnsureInFlight = true;
+    const connectionGeneration = Number(state.clientView?.generation || 0);
     state.collectionRequestAt = Date.now();
     state.collectionRequestAttempt = state.status.lastAttempt;
     try {
       await api("/api/collection/ensure?source=ensure", { method: "POST" }, "collection-ensure", 8000);
     } catch (error) {
-      if (error.name !== "RequestCancelled" && !state.destroyed) state.listError = error.message || "收藏读取未启动";
       state.collectionEnsureInFlight = false;
+      if (error.status === 409 && !state.destroyed) {
+        state.collectionWaitingForConnection = true;
+        state.collectionWaitingGeneration = connectionGeneration;
+        state.listError = "";
+        renderItems();
+        retryCollectionAfterConnection(state.clientView);
+      } else if (error.name !== "RequestCancelled" && !state.destroyed) {
+        state.listError = error.message || "收藏读取未启动";
+        renderItems();
+      }
+    }
+  }
+
+  function retryCollectionAfterConnection(view) {
+    if (view?.state === "ready" && state.collectionWaitingForConnection && view.generation > state.collectionWaitingGeneration) {
+      state.collectionWaitingForConnection = false;
+      state.collectionEnsureInFlight = false;
+      renderItems();
+      void ensureCollection();
     }
   }
 
@@ -631,13 +652,12 @@
     const cached = force ? null : state.skinsCache.get(state.view);
     if (cached && Date.now() - cached.at < 10 * 60 * 1000) {
       applySkinsPayload(cached.items, cached.capability, cached.stale, cached.capturedAt);
+      state.collectionRenderPending = false;
       state.loading = false;
       renderItems();
       return;
     }
-    // Keep a usable collection on screen while a snapshot event is verified.
-    // Replacing thousands of cards with skeletons for every identical refresh
-    // caused the collection page to flash even when nothing had changed.
+    // Keep mounted cards for identical refreshes; redraw connection placeholders.
     const keepVisible = state.items.length > 0;
     state.loading = !keepVisible;
     if (state.loading) renderItems();
@@ -649,7 +669,7 @@
       const items = Array.isArray(payload.items) ? payload.items : [];
       const sameStaleContext = Boolean(state.staleSnapshot) === Boolean(payload.stale)
         && (!payload.stale || String(state.staleSnapshotAt || "") === String(payload.capturedAt || ""));
-      const unchanged = keepVisible && sameCollectionItems(state.items, items) && sameStaleContext;
+      const unchanged = keepVisible && !state.collectionRenderPending && sameCollectionItems(state.items, items) && sameStaleContext;
       window.reportFlowDiagnostic?.("collection_render_client", unchanged ? "unchanged-suppressed" : "updated", {
         view: state.view, force: Boolean(force), itemCount: items.length, keptVisible: keepVisible,
       });
@@ -674,7 +694,7 @@
     } finally {
       if (generation !== state.skinLoadGeneration || state.destroyed) return;
       state.loading = false;
-      if (shouldRender) renderItems();
+      if (shouldRender) { renderItems(); if(!state.collectionWaitingForConnection)state.collectionRenderPending=false; }
     }
   }
 
@@ -716,6 +736,7 @@
     renderLaunchpad();
     window.dispatchEvent(new CustomEvent("deep-legends:client-view", {detail:view}));
     if (state.status) window.dispatchEvent(new CustomEvent("deep-legends:status", {detail:state.status}));
+    retryCollectionAfterConnection(view);
     if (state.section === "favorites") queueLiveUpdateSlices(["status"]);
     return true;
   }
@@ -1091,6 +1112,12 @@
     stopHoverVideo();
     const generation = ++state.renderGeneration;
     if (state.section !== "favorites" || state.favoritesPage !== "collection") return;
+    if (state.collectionWaitingForConnection) {
+      state.collectionRenderPending = true;
+      el.listMeta.textContent = "客户端连接中";
+      el.grid.innerHTML = '<div class="empty-state"><strong>客户端连接中</strong></div>';
+      return;
+    }
     el.grid.classList.remove("is-sparse");
     el.grid.style.removeProperty("--sparse-columns");
     el.grid.style.removeProperty("--sparse-max-width");

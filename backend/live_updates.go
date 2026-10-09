@@ -21,7 +21,7 @@ func cloneAccountData(source AccountData) AccountData {
 
 func (a *app) handleAccount(w http.ResponseWriter, _ *http.Request) {
 	a.mu.RLock()
-	if !a.connected || !a.snapshotReady {
+	if !a.clientSessionConnectedLocked() || !a.snapshotReady {
 		a.mu.RUnlock()
 		http.Error(w, "当前没有可用的客户端快照", http.StatusConflict)
 		return

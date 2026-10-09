@@ -278,7 +278,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				a.warmSGPTokens(sessionCtx, client)
 			}, func(event LCUEvent) {
 				a.mu.RLock()
-				currentTokenClient := a.lcu == client && a.connected && a.shutdownClient != client
+				currentTokenClient := a.lcu == client && a.clientSessionConnectedLocked() && a.shutdownClient != client
 				a.mu.RUnlock()
 				if currentTokenClient {
 					a.sgp.observeTokenEvent(client, event)
@@ -875,7 +875,7 @@ func (a *app) maybeStartupPrefetch(client *LCUClient, now time.Time) bool {
 	a.gameplayFlow.mu.Unlock()
 	idle := phaseClient == client && (phase == "None" || phase == "Lobby" || phase == "Matchmaking" || phase == "ReadyCheck")
 	a.mu.Lock()
-	if a.lcu != client || !a.connected || a.shutdownClient == client || !a.identityReady || !idle {
+	if a.lcu != client || !a.clientSessionConnectedLocked() || a.shutdownClient == client || !a.identityReady || !idle {
 		a.startupIdleAt = time.Time{}
 		a.mu.Unlock()
 		return false

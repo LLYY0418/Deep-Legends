@@ -1324,7 +1324,7 @@ func (a *app) clientAssetStatus(ctx context.Context, provider *championProvider,
 	}
 	a.mu.RLock()
 	client := a.lcu
-	connected := a.connected
+	connected := a.clientSessionConnectedLocked()
 	a.mu.RUnlock()
 	if client == nil || !connected {
 		return nil, 0, false

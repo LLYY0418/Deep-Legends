@@ -860,38 +860,16 @@ func (s *localStore) readDiagnosticLog() ([]byte, error) {
 // Export all five retained generations under one lock so rotation cannot cut an
 // accept trace in half while the export-time probes add their observations.
 func (s *localStore) readDiagnosticLogForExport() ([]byte, error) {
-	if s == nil {
-		return nil, errors.New("local storage unavailable")
-	}
-	s.diagnosticMu.Lock()
-	defer s.diagnosticMu.Unlock()
-	if err := s.flushDiagnosticLocked(); err != nil {
+	snapshot, err := s.snapshotDiagnosticExport()
+	if err != nil {
 		return nil, err
 	}
-	var result []byte
-	for _, name := range []string{"diagnostics.4.jsonl", "diagnostics.3.jsonl", "diagnostics.2.jsonl", "diagnostics.1.jsonl", "diagnostics.jsonl"} {
-		path := filepath.Join(s.root, "logs", name)
-		info, err := os.Lstat(path)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
-			return nil, errors.New("diagnostic log is not a trusted regular file")
-		}
-		if info.Size() > 2*1024*1024+64*1024 {
-			return nil, errResponseLimitExceeded
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, data...)
-		if len(data) > 0 && data[len(data)-1] != '\n' {
-			result = append(result, '\n')
-		}
+	defer snapshot.close()
+	// Keep the legacy in-memory reader chronological; downloads stream newest first.
+	for i, j := 0, len(snapshot.parts)-1; i < j; i, j = i+1, j-1 {
+		snapshot.parts[i], snapshot.parts[j] = snapshot.parts[j], snapshot.parts[i]
 	}
-	return result, nil
+	var data bytes.Buffer
+	_, err = snapshot.writeTo(&data)
+	return data.Bytes(), err
 }

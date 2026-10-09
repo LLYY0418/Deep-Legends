@@ -66,7 +66,7 @@ func (a *app) handleGameplayMasteries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.mu.RLock()
-	localClient, localPUUID, localConnected := a.lcu, a.summoner.PUUID, a.connected
+	localClient, localPUUID, localConnected := a.lcu, a.summoner.PUUID, a.clientSessionConnectedLocked()
 	a.mu.RUnlock()
 	localAccount := localConnected && reference.PlayerRef == localPUUID && reference.Region == clientRiotPlatform(localClient)
 	if isRiotRegion(reference.Region) && !localAccount {

@@ -22,7 +22,7 @@ func (p *champSelectPolling) sync(a *app, client *LCUClient) bool {
 	active := a.gameplayFlow.client == client && a.gameplayFlow.phase == "ChampSelect"
 	a.gameplayFlow.mu.Unlock()
 	a.mu.RLock()
-	active = active && a.lcu == client && a.connected && a.eventStream && a.shutdownClient != client
+	active = active && a.lcu == client && a.clientSessionConnectedLocked() && a.eventStream && a.shutdownClient != client
 	a.mu.RUnlock()
 	if !active {
 		p.stop()

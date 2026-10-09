@@ -409,6 +409,9 @@ func TestProDirectoryFailureRetainsRosterAndAuth(t *testing.T) {
 		}
 		return proHTTPBody([]byte("not a directory")), nil
 	})
+	// The first screen is local; establish the failed directory result before
+	// asserting this failure-state contract. Keep every original assertion.
+	_, _, _ = a.loadProPlayers(t.Context(), true)
 	w := httptest.NewRecorder()
 	a.handleProPlayers(w, httptest.NewRequest("GET", "/api/pro-players", nil))
 	var result proPlayersResponse

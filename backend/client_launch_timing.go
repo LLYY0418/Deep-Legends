@@ -70,7 +70,7 @@ func (a *app) handleClientLaunchOverviewReady(w http.ResponseWriter, r *http.Req
 		return
 	}
 	a.mu.RLock()
-	connected := a.connected
+	connected := a.clientSessionConnectedLocked()
 	a.mu.RUnlock()
 	if connected {
 		a.observeConnectionFirstCard()

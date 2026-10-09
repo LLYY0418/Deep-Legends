@@ -31,6 +31,22 @@ function attachDiagnosticsExport({ session, sender, getBaseURL, getDirectory = (
       let destination;
       try { destination = item.getSavePath(); } catch (_) { discardFile(stagedFile); return; }
       if (!destination || !path.isAbsolute(destination)) { discardFile(stagedFile); return; }
+      // Electron completion alone does not prove that the server sent all bytes.
+      let checkFD;
+      try {
+        const stat = fileSystem.lstatSync(destination);
+        const expected = item.getTotalBytes(), received = item.getReceivedBytes();
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.size <= 0 || stat.size > 12 * 1024 * 1024 || expected <= 0 || expected !== stat.size || received !== expected) throw Error("incomplete");
+        checkFD = fileSystem.openSync(destination, fileSystem.constants.O_RDONLY | (fileSystem.constants.O_NOFOLLOW || 0));
+        const opened = fileSystem.fstatSync(checkFD), last = Buffer.alloc(1);
+        if (opened.ino !== stat.ino || opened.dev !== stat.dev || opened.size !== stat.size || fileSystem.readSync(checkFD, last, 0, 1, stat.size - 1) !== 1 || last[0] !== 10) throw Error("incomplete");
+      } catch (_) {
+        if (checkFD !== undefined) { fileSystem.closeSync(checkFD); checkFD = undefined; }
+        discardFile(stagedFile);
+        try { fileSystem.unlinkSync(destination); } catch (_) {}
+        onError(new Error("导出不完整，请重试"));
+        return;
+      } finally { if (checkFD !== undefined) fileSystem.closeSync(checkFD); }
       if (getDesktopLog) {
         let fd;
         try {
@@ -41,7 +57,7 @@ function attachDiagnosticsExport({ session, sender, getBaseURL, getDirectory = (
             fd = fileSystem.openSync(destination, fileSystem.constants.O_WRONLY | fileSystem.constants.O_APPEND | (fileSystem.constants.O_NOFOLLOW || 0));
             const opened = fileSystem.fstatSync(fd);
             if (!opened.isFile() || opened.ino !== stat.ino || opened.dev !== stat.dev) throw Error("export file changed");
-            fileSystem.appendFileSync(fd, "\n" + extra, "utf8");
+            fileSystem.appendFileSync(fd, extra.trimEnd() + "\n", "utf8");
           }
         } catch (_) {
           // Backend evidence remains usable if shell evidence is unavailable.

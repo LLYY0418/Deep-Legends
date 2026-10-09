@@ -28,13 +28,15 @@ type overviewQueryCacheItem struct {
 type localOverviewProgressKey struct{}
 
 type overviewQueryFlight struct {
-	progressMu  sync.Mutex
-	progress    *gameplayOverview
-	listeners   map[uint64]func(gameplayOverview)
-	listenerSeq uint64
-	done        chan struct{}
-	response    gameplayOverview
-	err         error
+	progressMu    sync.Mutex
+	progress      *gameplayOverview
+	cardProgress  *gameplayOverview
+	listeners     map[uint64]func(gameplayOverview)
+	cardListeners map[uint64]func(gameplayOverview)
+	listenerSeq   uint64
+	done          chan struct{}
+	response      gameplayOverview
+	err           error
 }
 
 func riotOverviewQuerySnapshotKey(reference gameplayReference, begIndex, count int, filters ...string) string {
@@ -62,6 +64,8 @@ func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gamepl
 		}
 		if flight := a.overviewQueries.flights[key]; flight != nil {
 			done := flight.done
+			unsubscribe := flight.subscribeOverview(ctx)
+			defer unsubscribe()
 			a.overviewQueries.mu.Unlock()
 			select {
 			case <-done:
@@ -79,6 +83,9 @@ func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gamepl
 		a.overviewQueries.flights[key] = flight
 		a.overviewQueries.mu.Unlock()
 
+		unsubscribe := flight.subscribeOverview(ctx)
+		defer unsubscribe()
+		ctx = context.WithValue(ctx, localOverviewCardsProgressKey{}, flight.publishOverviewCards)
 		response, err := a.loadRiotOverview(ctx, reference, begIndex, count, filters...)
 		a.overviewQueries.complete(key, flight, response, err)
 		return response, err
@@ -222,6 +229,7 @@ func (a *app) loadGameplayOverviewDeduplicated(ctx context.Context, client *LCUC
 	unsubscribe := flight.subscribeOverview(ctx)
 	defer unsubscribe()
 	ctx = context.WithValue(ctx, localOverviewProgressKey{}, flight.publishOverview)
+	ctx = context.WithValue(ctx, localOverviewCardsProgressKey{}, flight.publishOverviewCards)
 	response := a.loadGameplayOverview(ctx, client, current, reference, begIndex, count, matchFilter, false)
 	a.overviewQueries.complete(key, flight, response, ctx.Err())
 	return response
@@ -240,7 +248,8 @@ func overviewSnapshotTTL(entry overviewQueryCacheEntry) time.Duration {
 
 func (flight *overviewQueryFlight) subscribeOverview(ctx context.Context) func() {
 	listener, ok := ctx.Value(localOverviewProgressKey{}).(func(gameplayOverview))
-	if !ok {
+	cardListener, cardsOK := ctx.Value(localOverviewCardsProgressKey{}).(func(gameplayOverview))
+	if !ok && !cardsOK {
 		return func() {}
 	}
 	flight.progressMu.Lock()
@@ -249,18 +258,39 @@ func (flight *overviewQueryFlight) subscribeOverview(ctx context.Context) func()
 	if flight.listeners == nil {
 		flight.listeners = map[uint64]func(gameplayOverview){}
 	}
-	flight.listeners[id] = listener
-	if flight.progress != nil && ctx.Err() == nil {
-		listener(*flight.progress)
+	if ok {
+		flight.listeners[id] = listener
 	}
+	if flight.cardListeners == nil {
+		flight.cardListeners = map[uint64]func(gameplayOverview){}
+	}
+	if cardsOK {
+		flight.cardListeners[id] = cardListener
+	}
+	cardSnapshot, progressSnapshot := flight.cardProgress, flight.progress
 	flight.progressMu.Unlock()
-	return func() { flight.progressMu.Lock(); delete(flight.listeners, id); flight.progressMu.Unlock() }
+	if ok && progressSnapshot != nil && ctx.Err() == nil {
+		listener(*progressSnapshot)
+	}
+	if cardsOK && cardSnapshot != nil && ctx.Err() == nil {
+		cardListener(*cardSnapshot)
+	}
+	return func() {
+		flight.progressMu.Lock()
+		delete(flight.listeners, id)
+		delete(flight.cardListeners, id)
+		flight.progressMu.Unlock()
+	}
 }
 func (flight *overviewQueryFlight) publishOverview(partial gameplayOverview) {
 	flight.progressMu.Lock()
-	defer flight.progressMu.Unlock()
 	flight.progress = &partial
+	listeners := make([]func(gameplayOverview), 0, len(flight.listeners))
 	for _, listener := range flight.listeners {
+		listeners = append(listeners, listener)
+	}
+	flight.progressMu.Unlock()
+	for _, listener := range listeners {
 		listener(partial)
 	}
 }

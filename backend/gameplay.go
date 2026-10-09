@@ -891,7 +891,10 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		phases.mark("identity")
 		stream = strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
 		streamStarted := false
+		var emitMu sync.Mutex
 		emit := func(value any) {
+			emitMu.Lock()
+			defer emitMu.Unlock()
 			if !streamStarted {
 				w.Header().Set("Content-Type", "application/x-ndjson")
 				w.Header().Set("Cache-Control", "no-store")
@@ -907,6 +910,12 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 				partial.Pagination.Filter = request.MatchFilter
 				emit(map[string]any{"type": "progress", "overview": partial})
 			}))
+			if r.Header.Get("X-Overview-Cards") == "1" {
+				r = r.WithContext(context.WithValue(r.Context(), localOverviewCardsProgressKey{}, func(partial gameplayOverview) {
+					partial.Pagination.Filter = request.MatchFilter
+					emit(map[string]any{"type": "cards", "overview": partial})
+				}))
+			}
 		}
 		response, err := a.loadRiotOverviewDeduplicated(r.Context(), reference, request.BegIndex, request.Count, request.Force, request.MatchFilter)
 		phases.mu.Lock()
@@ -989,7 +998,10 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	phases.mark("identity")
 	stream = strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
+	var emitMu sync.Mutex
 	emit := func(kind string, value gameplayOverview) {
+		emitMu.Lock()
+		defer emitMu.Unlock()
 		w.Header().Set("Content-Type", "application/x-ndjson")
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(map[string]any{"type": kind, "overview": value})
@@ -999,6 +1011,9 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	if stream {
 		r = r.WithContext(context.WithValue(r.Context(), localOverviewProgressKey{}, func(partial gameplayOverview) { emit("progress", partial) }))
+		if r.Header.Get("X-Overview-Cards") == "1" {
+			r = r.WithContext(context.WithValue(r.Context(), localOverviewCardsProgressKey{}, func(partial gameplayOverview) { emit("cards", partial) }))
+		}
 	}
 	response := a.loadGameplayOverviewDeduplicated(r.Context(), client, current, reference, request.BegIndex, request.Count, request.MatchFilter, request.Force)
 	a.verifyExpectedOverviewGame(r.Context(), client, reference, request, &response)
@@ -1186,7 +1201,7 @@ func retryableLCUAliasLookupError(err error) bool {
 func (a *app) gameplayClient() (*LCUClient, Summoner, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
-	if !a.connected || a.lcu == nil {
+	if !a.clientSessionConnectedLocked() || a.lcu == nil {
 		return nil, Summoner{}, errors.New("当前没有已连接的英雄联盟客户端")
 	}
 	return a.lcu, a.summoner, nil
@@ -1495,6 +1510,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			} else {
 				value, _ = a.playerRankScoreWithCacheStatus(ctx, client, playerRef, isCurrent, reference.ServerID, reference.Privacy, false, force)
 			}
+			a.publishOverviewCards(ctx, player, reference, isCurrent, value.ranks, nil, value.capability)
 			rankCh <- rankResult{value: value, started: started, ended: time.Now()}
 		}()
 		masteryCh = make(chan masteryResult, 1)
@@ -1529,6 +1545,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 				value, capability = NewChampionMasteryAPI(client).AllContext(ctx, playerRef)
 				capability.Path = "/lol-champion-mastery/v1/{player}/champion-mastery"
 			}
+			a.publishOverviewCards(ctx, player, reference, isCurrent, nil, normalizeMasteries(value, bundledChampionNames(), 6), capability)
 			masteryCh <- masteryResult{value: value, capability: capability, started: started, ended: time.Now()}
 		}()
 	}
@@ -2712,7 +2729,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 				return nil, []EndpointCapability{{Name: "match-history", Path: "sgp: /match-history-query/v1/products/lol/player/{player}/SUMMARY", State: capabilityCanceled, Attempts: attempts}}, filterResolution.pagination(begIndex, 0, false)
 			}
 			reason := safeDiagnosticReason(historyErr)
-			attempts = append(attempts, DataSourceAttempt{Source: dataSourceSGP, Outcome: dataSourceFailed, Message: reason})
+			attempts = append(attempts, DataSourceAttempt{Source: dataSourceSGP, Outcome: dataSourceFailed, Message: reason, StatusCode: historyFailureStatus(historyErr)})
 			fallbackReason = "sgp-failed"
 			a.recordDiagnostic(map[string]any{
 				"event":    "sgp_match_history_failed",
@@ -2720,14 +2737,26 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 				"reason":   reason,
 			})
 			if remoteServer {
-				detail := "所选服务器的 SGP 战绩暂时无法读取"
+				detail := "所选服务器的战绩暂时无法读取"
+				if historyServerError(historyErr) {
+					detail = historyServerUnavailableMessage
+				}
 				capabilities := []EndpointCapability{
 					{Name: "match-history", Path: "sgp: /match-history-query/v1/products/lol/player/{player}/SUMMARY", State: capabilityFailed, Detail: detail, Attempts: attempts, FallbackReason: fallbackReason},
 					{Name: "match-details", Path: "sgp: 同一请求返回全部参与者", State: capabilityFailed, Detail: detail, Attempts: attempts, FallbackReason: fallbackReason},
 				}
+				if retry := a.sgp.historyRetryAfter(serverID); retry > 0 || errors.Is(historyErr, errSGPHistoryCooling) {
+					for i := range capabilities {
+						capabilities[i].HistoryStatus = "official"
+						capabilities[i].RetryAfter = retry
+					}
+				}
 				return nil, capabilities, filterResolution.pagination(begIndex, 0, false)
 			}
-			sgpDetail = "SGP 网关读取失败，已回退客户端接口（该接口可能只返回本人数据）：" + reason
+			sgpDetail = "战绩读取失败，已切换备用数据"
+			if historyServerError(historyErr) {
+				sgpDetail = historyServerUnavailableMessage
+			}
 		}
 	} else if region, platform := client.platformInfo(); strings.EqualFold(region, "TENCENT") {
 		if platform == "" {
@@ -2764,6 +2793,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 			lcuAttempt.Outcome, lcuAttempt.Message = dataSourceSuccess, ""
 		case capabilityFailed:
 			lcuAttempt.Outcome, lcuAttempt.Message = dataSourceFailed, capabilities[index].Detail
+			lcuAttempt.StatusCode = capabilities[index].FailureStatus
 		case capabilityCanceled:
 			lcuCanceled = true
 		}
@@ -2830,6 +2860,13 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 		if capabilities[index].Name == "match-history" || capabilities[index].Name == "match-details" {
 			capabilities[index].Attempts = attempts
 			capabilities[index].FallbackReason = fallbackReason
+			if retry := a.sgp.historyRetryAfter(serverID); historyOfficialOutage(attempts, retry) {
+				capabilities[index].HistoryStatus = "official"
+				capabilities[index].RetryAfter = retry
+			}
+			if capabilities[index].State == capabilityFailed && (sgpDetail == historyServerUnavailableMessage || strings.Contains(capabilities[index].Detail, "HTTP 5")) {
+				capabilities[index].Detail = historyServerUnavailableMessage
+			}
 		}
 	}
 	a.recordDiagnostic(map[string]any{
@@ -11065,6 +11102,10 @@ func gameplayCapabilityError(name, path string, err error) EndpointCapability {
 		return EndpointCapability{Name: name, Path: path, State: capabilityCanceled}
 	}
 	capability := EndpointCapability{Name: name, Path: path, State: capabilityFailed, Detail: "读取失败，界面已保留可核验数据"}
+	if (name == "match-history" || name == "match-details") && historyServerError(err) {
+		capability.Detail = historyServerUnavailableMessage
+		capability.FailureStatus = historyFailureStatus(err)
+	}
 	var httpErr *LCUHTTPError
 	if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
 		capability.State = capabilityUnsupported
@@ -11134,7 +11175,7 @@ func (a *app) enrichCurrentRiotMatches(client *LCUClient, ref gameplayReference,
 			enriched = append(enriched, next)
 		}
 		a.mu.RLock()
-		same := a.lcu == client && a.connected && a.summoner.PUUID == playerRef
+		same := a.lcu == client && a.clientSessionConnectedLocked() && a.summoner.PUUID == playerRef
 		a.mu.RUnlock()
 		if !same || len(enriched) == 0 {
 			return

@@ -70,7 +70,7 @@ func (a *app) scheduleCollectionDataRetry(client *LCUClient, account AccountData
 	}()
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.lcu == client && a.connected {
+	if a.lcu == client && a.clientSessionConnectedLocked() {
 		if settled, suppressed := a.storage.suppressCachedCollectionBlanks(account, time.Now()); suppressed > 0 {
 			account = settled
 			a.account, _ = a.storage.suppressCachedCollectionBlanks(a.account, time.Now())
@@ -85,7 +85,7 @@ func (a *app) scheduleCollectionDataRetry(client *LCUClient, account AccountData
 		a.collectionDataRetryClient = client
 	}
 	delays := []time.Duration{5 * time.Second, 15 * time.Second, 30 * time.Second}
-	if collectionDataPending(account) && a.collectionDataRetry == nil && a.collectionDataRetryCount >= len(delays) && a.lcu == client && a.connected {
+	if collectionDataPending(account) && a.collectionDataRetry == nil && a.collectionDataRetryCount >= len(delays) && a.lcu == client && a.clientSessionConnectedLocked() {
 		// Every retry read the same record back. Stop presenting it as "not
 		// synced yet": the client is returning it as-is.
 		if settled, blanks := settleBlankLoot(a.account); blanks > 0 {
@@ -99,14 +99,14 @@ func (a *app) scheduleCollectionDataRetry(client *LCUClient, account AccountData
 		}
 		return
 	}
-	if !collectionDataPending(account) || a.collectionDataRetry != nil || a.collectionDataRetryCount >= len(delays) || a.lcu != client || !a.connected {
+	if !collectionDataPending(account) || a.collectionDataRetry != nil || a.collectionDataRetryCount >= len(delays) || a.lcu != client || !a.clientSessionConnectedLocked() {
 		return
 	}
 	delay := delays[a.collectionDataRetryCount]
 	a.collectionDataRetryCount++
 	a.collectionDataRetry = time.AfterFunc(delay, func() {
 		a.mu.Lock()
-		valid := a.lcu == client && a.connected && !a.manualDisconnected && collectionDataPending(a.account)
+		valid := a.lcu == client && a.clientSessionConnectedLocked() && !a.manualDisconnected && collectionDataPending(a.account)
 		a.collectionDataRetry = nil
 		a.mu.Unlock()
 		if valid {

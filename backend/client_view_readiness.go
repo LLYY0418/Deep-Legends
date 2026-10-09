@@ -9,7 +9,8 @@ func (a *app) refreshSelfReadinessAsync(client *LCUClient) {
 	}
 	a.mu.Lock()
 	account := a.summoner.PUUID
-	if a.lcu != client || !a.connected || a.selfReadinessPending || a.selfReadinessClient == client && a.selfReadinessAccount == account {
+	epoch := a.clientSessionEpoch
+	if a.lcu != client || !a.clientSessionConnectedLocked() || a.selfReadinessPending || a.selfReadinessClient == client && a.selfReadinessAccount == account {
 		a.mu.Unlock()
 		return
 	}
@@ -18,9 +19,13 @@ func (a *app) refreshSelfReadinessAsync(client *LCUClient) {
 	a.goSafe("client-view-readiness", func() {
 		defer func() {
 			a.mu.Lock()
+			if epoch != a.clientSessionEpoch {
+				a.mu.Unlock()
+				return
+			}
 			a.selfReadinessPending = false
 			next := a.lcu
-			changed := a.connected && (next != client || a.summoner.PUUID != account)
+			changed := a.clientSessionConnectedLocked() && (next != client || a.summoner.PUUID != account)
 			a.mu.Unlock()
 			if changed {
 				a.refreshSelfReadinessAsync(next)
@@ -32,7 +37,7 @@ func (a *app) refreshSelfReadinessAsync(client *LCUClient) {
 			region, _ := client.platformInfo()
 			_, _, ready := a.sgp.available(client)
 			a.mu.Lock()
-			current := a.lcu == client && a.connected && a.summoner.PUUID == account
+			current := epoch == a.clientSessionEpoch && a.lcu == client && a.clientSessionConnectedLocked() && a.summoner.PUUID == account
 			if current && (ready || region != "" && region != "TENCENT") {
 				a.selfReadinessClient, a.selfReadinessAccount, a.selfSGPReady = client, account, ready
 			}

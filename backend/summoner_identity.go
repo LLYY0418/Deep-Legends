@@ -82,7 +82,7 @@ func (a *app) applySummonerIdentity(client *LCUClient, next Summoner, observedAt
 	}
 	if client != nil {
 		a.mu.RLock()
-		becomingReady := !a.identityReady && a.connected && a.lcu == client
+		becomingReady := !a.identityReady && a.clientSessionConnectedLocked() && a.lcu == client
 		a.mu.RUnlock()
 		if becomingReady {
 			client.retryPlatformAfterIdentityReady()
@@ -95,7 +95,7 @@ func (a *app) applySummonerIdentity(client *LCUClient, next Summoner, observedAt
 	}
 	previous := a.summoner
 	a.summonerIdentityAt = observedAt
-	a.identityReady = next.SummonerID != 0 && a.connected
+	a.identityReady = next.SummonerID != 0 && a.clientSessionConnectedLocked()
 	if !summonerIdentityChanged(previous, next) {
 		a.mu.Unlock()
 		return false, nil

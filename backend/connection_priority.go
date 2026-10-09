@@ -26,7 +26,7 @@ func (a *app) beginConnectionPriority(ctx context.Context, client *LCUClient) *c
 func (a *app) observeConnectionFirstCard() {
 	a.mu.RLock()
 	g := a.connectionPriority
-	valid := g != nil && a.connected && a.lcu == g.client && a.shutdownClient != g.client
+	valid := g != nil && a.clientSessionConnectedLocked() && a.lcu == g.client && a.shutdownClient != g.client
 	a.mu.RUnlock()
 	if valid {
 		g.once.Do(func() { close(g.card) })
@@ -92,7 +92,7 @@ func (a *app) scheduleConnectionWork(ctx context.Context, client *LCUClient, nam
 			}
 		}
 		a.mu.RLock()
-		valid := a.lcu == client && a.connected && a.shutdownClient != client
+		valid := a.lcu == client && a.clientSessionConnectedLocked() && a.shutdownClient != client
 		a.mu.RUnlock()
 		if valid && ctx.Err() == nil && g.ctx.Err() == nil {
 			work()

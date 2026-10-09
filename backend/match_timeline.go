@@ -84,6 +84,7 @@ type timelineSkillUp struct {
 }
 
 type matchTimelineResponse struct {
+	HistoryStatus  string                 `json:"historyStatus,omitempty"`
 	Tags           []participantMatchTags `json:"tags,omitempty"`
 	Available      bool                   `json:"available"`
 	Source         string                 `json:"source,omitempty"`
@@ -401,7 +402,7 @@ func (a *app) loadMatchTimelineCNDecision(ctx context.Context, client *LCUClient
 		if strings.Contains(safeDiagnosticReason(lcuErr), "participantId") || strings.Contains(safeDiagnosticReason(lcuErr), "frames") {
 			outcome = dataSourceModeUnsupported
 		}
-		attempts = append(attempts, DataSourceAttempt{Source: dataSourceLCU, Outcome: outcome, Message: safeDiagnosticReason(lcuErr)})
+		attempts = append(attempts, DataSourceAttempt{Source: dataSourceLCU, Outcome: outcome, Message: safeDiagnosticReason(lcuErr), StatusCode: historyFailureStatus(lcuErr)})
 		fallbackReason = map[string]string{dataSourceFailed: "lcu-failed", dataSourceModeUnsupported: "lcu-mode-unsupported"}[outcome]
 	}
 	var frames []timelineFrame
@@ -410,7 +411,7 @@ func (a *app) loadMatchTimelineCNDecision(ctx context.Context, client *LCUClient
 		sgpErr = fmt.Errorf("SGP 时间线数据源不可用")
 		attempts = append(attempts, DataSourceAttempt{Source: dataSourceSGP, Outcome: dataSourceDisabled, Message: sgpErr.Error()})
 		if lcuErr != nil {
-			return nil, "", attempts, fallbackReason, fmt.Errorf("LCU: %s；SGP: %s", safeDiagnosticReason(lcuErr), safeDiagnosticReason(sgpErr))
+			return nil, "", attempts, fallbackReason, fmt.Errorf("LCU: %w；SGP: %w", lcuErr, sgpErr)
 		}
 		return nil, "", attempts, fallbackReason, sgpErr
 	} else if serverID != "" {
@@ -425,9 +426,9 @@ func (a *app) loadMatchTimelineCNDecision(ctx context.Context, client *LCUClient
 		attempts = append(attempts, DataSourceAttempt{Source: dataSourceSGP, Outcome: dataSourceSuccess})
 		return frames, dataSourceSGP, attempts, fallbackReason, nil
 	}
-	attempts = append(attempts, DataSourceAttempt{Source: dataSourceSGP, Outcome: dataSourceFailed, Message: safeDiagnosticReason(sgpErr)})
+	attempts = append(attempts, DataSourceAttempt{Source: dataSourceSGP, Outcome: dataSourceFailed, Message: safeDiagnosticReason(sgpErr), StatusCode: historyFailureStatus(sgpErr)})
 	if lcuErr != nil {
-		return nil, "", attempts, fallbackReason, fmt.Errorf("LCU: %s；SGP: %s", safeDiagnosticReason(lcuErr), safeDiagnosticReason(sgpErr))
+		return nil, "", attempts, fallbackReason, fmt.Errorf("LCU: %w；SGP: %w", lcuErr, sgpErr)
 	}
 	return nil, "", attempts, fallbackReason, sgpErr
 }
@@ -606,11 +607,15 @@ func (a *app) handleGameplayMatchTimeline(w http.ResponseWriter, r *http.Request
 		}
 		// 失败结果不写入缓存：下一次展开构建页时可以重试。
 		detail := "这场对局暂时读取不到时间线数据"
-		if err != nil {
-			detail += "：" + safeDiagnosticReason(err)
+		if historyServerError(err) {
+			detail = historyServerUnavailableMessage
 		}
 		a.recordDiagnostic(map[string]any{"event": "match_timeline_failed", "region": diagnosticRegion, "source": source, "reason": safeDiagnosticReason(err), "attempts": attempts, "fallback_reason": fallbackReason})
-		respondJSON(w, matchTimelineResponse{Available: false, Detail: detail, Attempts: attempts, FallbackReason: fallbackReason})
+		outage := ""
+		if !isKR && historyOfficialOutage(attempts, a.sgp.historyRetryAfter(request.ServerID)) {
+			outage = "official"
+		}
+		respondJSON(w, matchTimelineResponse{Available: false, Detail: detail, Attempts: attempts, FallbackReason: fallbackReason, HistoryStatus: outage})
 		return
 	}
 	participants := extractAllParticipantTimelines(frames)

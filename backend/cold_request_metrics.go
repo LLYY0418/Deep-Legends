@@ -53,7 +53,7 @@ func (a *app) recordColdLCURequest(at time.Time) {
 }
 func (a *app) recordColdSGPBytes(client *LCUClient, bytes int) {
 	a.mu.RLock()
-	current := a.lcu == client && a.connected && a.shutdownClient != client
+	current := a.lcu == client && a.clientSessionConnectedLocked() && a.shutdownClient != client
 	a.mu.RUnlock()
 	if !current || bytes <= 0 {
 		return

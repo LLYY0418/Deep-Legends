@@ -26,10 +26,10 @@ func (a *app) currentClientView() clientView {
 	view := clientView{Type: "client-view", State: "no-client"}
 	a.mu.RLock()
 	client, identity := a.lcu, a.summoner
-	connected := a.connected
+	connected := a.clientSessionConnectedLocked()
 	ready := a.identityReady || connected && identity.SummonerID != 0
 	exiting := client != nil && a.shutdownClient == client
-	if connected && client != nil {
+	if client != nil && (connected || exiting) {
 		client.mu.RLock()
 		region, platform := client.region, client.rsoPlatform
 		view.ClientVersion = client.gameVersion
@@ -54,7 +54,7 @@ func (a *app) currentClientView() clientView {
 		}
 	}
 	a.mu.RUnlock()
-	if connected && client != nil {
+	if (connected || exiting) && client != nil {
 		refRegion := view.Region
 		if refRegion == "TENCENT" {
 			refRegion = ""

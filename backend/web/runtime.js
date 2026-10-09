@@ -1,9 +1,7 @@
 (() => {
   "use strict";
 
-  // Production never downloads demo fixtures. Gate demo API calls until the
-  // dynamically loaded interceptor is installed; do not fall through to live
-  // endpoints if loading the explicit demo fails.
+  // Demo calls wait for fixtures.
   if (typeof document !== "undefined" && typeof location !== "undefined" && typeof window.fetch === "function") {
     const demo = new URLSearchParams(location.search).has("demo") || location.hash.includes("demo") || (() => {
       try { return localStorage.getItem("lol-loot-demo") === "1"; } catch (_) { return false; }
@@ -23,8 +21,7 @@
     }
   }
 
-  // Bounded, access-ordered response caches. In-flight requests deliberately use
-  // ordinary Maps: evicting a flight would permit duplicate network work.
+  // Bounded responses; in-flight work never expires.
   class ResponseCache extends Map {
     constructor({ max = 128, ttl = 300_000, now = Date.now, dispose } = {}) {
       super();
@@ -85,8 +82,7 @@
     const icon = grade === "OP" ? "op" : `yourgg-${grade.toLowerCase()}`;
     return `<img class="tier-badge${extra ? ` ${extra}` : ""}" src="/tier-icons/${icon}.svg" alt="梯度 ${grade}" decoding="async">`;
   };
-  // Shared by the hero directory and history selector; metadata supplies the
-  // server's Chinese/pinyin/initial/alias terms, never inferred from match names.
+  // Catalog search metadata.
   function scoreChampionSearchOption(query, value, label, meta) {
     const normalize=value=>String(value || "").normalize("NFKC").toLocaleLowerCase("zh-CN").replace(/[\s\p{P}\p{S}]+/gu, "");
     query=normalize(query);if(!query)return 0;
@@ -119,7 +115,7 @@
       increment("transportFailed");
       flowDelivery.transportHTTPStatus = status;
       flowDelivery.transportErrorKind = timedOut ? "timeout" : status ? "http" : "network";
-      // A rejected schema or expired page session will not improve by retrying.
+      // Retry only transient transport errors.
       if (attempt === 0 && (status === 0 || status >= 500 || status === 429) && typeof setTimeout === "function") {
         const retry = setTimeout(() => { void sendFlowDiagnostic(body, encoded, 1); }, 750);
         retry?.unref?.();
@@ -132,6 +128,27 @@
       sampledPending.delete(body.event);
     }
   };
+  // Error budget: retain counts.
+  const be = { error:0, unhandledrejection:0, csp:0 }, eq = new Map();
+  let busy=false, deferred=0;
+  const flushErrors = async () => {
+    if(busy || !eq.size)return;
+    const [kind,details]=eq.entries().next().value;eq.delete(kind);busy=true;
+    const body={event:"browser_error_client",reason:kind,...details,counts:{...be},total:be.error+be.unhandledrejection+be.csp,errorDeferred:deferred};
+    const encoded=JSON.stringify(body);flowPending.add(encoded);
+    try{await sendFlowDiagnostic(body,encoded,0);}finally{setTimeout(()=>{busy=false;void flushErrors();},2000)?.unref?.();}
+  };
+  const clampError = n=>Math.max(0,Math.min(1000000,Number(n)||0));
+  window.reportBrowserErrorDiagnostic = (kind,fields={}) => {
+    if(!Object.hasOwn(be,kind))return;
+    be[kind]=Math.min(1000000,be[kind]+1);
+    if(eq.has(kind) || busy)deferred=Math.min(1000000,deferred+1);
+    const errorType=["Error","TypeError","ReferenceError","RangeError","SyntaxError","URIError","EvalError","AggregateError"].includes(fields.errorType)?fields.errorType:"Error";
+    let scriptName="other";try{const name=new URL(fields.filename,location.origin).pathname.split('/').pop();if(/^[a-z][a-z0-9-]{0,60}\.(?:js|cjs)$/.test(name))scriptName=name;}catch{}
+    eq.set(kind,{errorType,scriptName,line:clampError(fields.line),column:clampError(fields.column),cspDirective:String(fields.directive || "").slice(0,40)});
+    void flushErrors();
+  };
+  for(const [name,kind] of [["error","error"],["unhandledrejection","unhandledrejection"],["securitypolicyviolation","csp"]])window.addEventListener?.(name,e=>window.reportBrowserErrorDiagnostic(kind,{errorType:(e.error || e.reason)?.name,filename:e.filename || e.sourceFile,line:e.lineno || e.lineNumber,column:e.colno || e.columnNumber,directive:e.effectiveDirective}));
   // Keep individual phase observations (including identical polls), but send
   // bounded batches through one slot so telemetry cannot crowd out live reads.
   const gameflowQueue = [];

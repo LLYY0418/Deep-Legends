@@ -12,13 +12,14 @@ function harness(onCompleted = () => {}, attach = attachDiagnosticsExport) {
   const endpoint = "http://127.0.0.1:8795/api/diagnostics/log";
   const detach = attach({ session, sender, onCompleted,
     getBaseURL: () => "http://127.0.0.1:8795", getDirectory: () => directory,
-    fileSystem: { statSync() { if (!available) throw Error("missing"); return { isDirectory: () => true }; }, existsSync: (p) => files.has(p) },
+    fileSystem: { constants:fs.constants, lstatSync:()=>({isFile:()=>true,isSymbolicLink:()=>false,size:3,ino:1,dev:1}), fstatSync:()=>({size:3,ino:1,dev:1}), openSync:()=>42, closeSync:()=>{}, readSync:(_fd,buffer)=>{buffer[0]=10;return 1}, statSync() { if (!available) throw Error("missing"); return { isDirectory: () => true }; }, existsSync: (p) => files.has(p) },
     now: () => new Date(2026, 8, 8, 10, 0) });
   function download({ contents = sender, urls = [endpoint], throws = false } = {}) {
     const item = new EventEmitter();
     item.getURLChain = () => urls;
     item.getURL = () => urls.at(-1);
     item.getSavePath = () => item.destination || "";
+    item.getTotalBytes = () => 3; item.getReceivedBytes = () => 3;
     item.setSaveDialogOptions = (value) => { item.dialogOptions = value; };
     item.setSavePath = (value) => { if (throws) throw Error("interrupted"); item.destination = value; };
     session.emit("will-download", {}, item, contents);

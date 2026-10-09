@@ -1532,6 +1532,8 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		tagLine = account.TagLine
 	}
 	phases.markSpan("account", phaseStarted, time.Now())
+	cardReference := mergeGameplayReferences(gameplayReference{PlayerRef: puuid, GameName: gameName, TagLine: tagLine, Region: provider.region()}, reference)
+	cardPlayer := Summoner{PUUID: puuid, GameName: gameName, TagLine: tagLine, ProfileIconID: reference.ProfileIconID, SummonerLevel: reference.SummonerLevel}
 	phaseStarted = time.Now()
 	capabilities := make([]EndpointCapability, 0, 5)
 	// Once the account is known these reads are independent. In particular,
@@ -1553,6 +1555,12 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		defer profileWait.Done()
 		started := time.Now()
 		summoner, summonerErr = provider.summonerByPUUID(ctx, puuid)
+		if summonerErr == nil && begIndex == 0 {
+			profile := cardPlayer
+			profile.ProfileIconID = summoner.ProfileIconID
+			profile.SummonerLevel = summoner.SummonerLevel
+			a.publishOverviewCards(ctx, profile, cardReference, false, nil, nil, EndpointCapability{Name: "summoner", State: capabilityAvailable, Count: 1})
+		}
 		phases.markSpan("summoner", started, time.Now())
 	}()
 	go func() {
@@ -1591,6 +1599,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			defer profileWait.Done()
 			started := time.Now()
 			ranks, rankCapability = provider.loadRiotRanks(ctx, puuid)
+			a.publishOverviewCards(ctx, cardPlayer, cardReference, false, ranks, nil, rankCapability)
 			phases.markSpan("ranks", started, time.Now())
 		}()
 		go func() {
@@ -1601,6 +1610,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			started := time.Now()
 			championNamesRead.Wait()
 			masteries, masteryCapability = provider.loadRiotMasteries(ctx, puuid, names)
+			a.publishOverviewCards(ctx, cardPlayer, cardReference, false, nil, masteries, masteryCapability)
 			phases.markSpan("mastery", started, time.Now())
 		}()
 	}
@@ -1630,10 +1640,11 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	detailsStarted := time.Now()
 	details := make([]*riotMatch, len(ids))
 	progress, _ := ctx.Value(riotOverviewProgressKey{}).(func(gameplayOverview))
+	cardProgress, _ := ctx.Value(localOverviewCardsProgressKey{}).(func(gameplayOverview))
 	completedDetails := make(chan struct{}, len(ids))
 	var detailLoadErr error
-	publishPartial := func() {
-		if progress == nil {
+	publishPartial := func(cardOnly ...bool) {
+		if progress == nil && cardProgress == nil {
 			return
 		}
 		championNamesRead.Wait()
@@ -1676,17 +1687,34 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}
 		a.completeOverviewBackground(&partial, puuid)
 		a.publicizeOverviewReferences(&partial)
-		progress(partial)
+		if len(cardOnly) > 0 && cardOnly[0] {
+			if cardProgress != nil {
+				cardProgress(partial)
+			}
+		} else if progress != nil {
+			progress(partial)
+		}
 	}
+	// All workers remain cancellable; admission follows the newest-first ID order.
+	admission := make([]chan struct{}, len(ids)+1)
+	for i := range admission {
+		admission[i] = make(chan struct{})
+	}
+	close(admission[0])
 	for index := range ids {
 		wait.Add(1)
 		go func(index int) {
 			defer a.recoverPanic("riot_api.loadRiotOverview.6")
-
 			defer wait.Done()
 			defer func() { completedDetails <- struct{}{} }()
 			select {
+			case <-admission[index]:
+			case <-ctx.Done():
+				return
+			}
+			select {
 			case semaphore <- struct{}{}:
+				close(admission[index+1])
 			case <-ctx.Done():
 				return
 			}
@@ -1695,7 +1723,6 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			if detailErr != nil {
 				tracker.recordMatchFailure(detailErr)
 				loadMu.Lock()
-				// Real failures take precedence over quota errors; don't silence them.
 				if detailLoadErr == nil || riotErrorStatus(detailLoadErr) == http.StatusTooManyRequests {
 					detailLoadErr = detailErr
 				}
@@ -1709,11 +1736,16 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}(index)
 	}
 	previewLoaded := 0
+	firstMatchSent := false
 	for range ids {
 		<-completedDetails
 		loadMu.Lock()
 		loaded := loadedDetails
 		loadMu.Unlock()
+		if loaded > 0 && !firstMatchSent {
+			publishPartial(true)
+			firstMatchSent = true
+		}
 		if loaded > previewLoaded && (loaded >= 5 && (previewLoaded == 0 || loaded-previewLoaded >= 2) || loaded == len(ids)) {
 			publishPartial()
 			previewLoaded = loaded
@@ -2088,7 +2120,7 @@ func writeRiotHTTPError(w http.ResponseWriter, err error, regions ...string) {
 
 func (a *app) riotQueueLabels(ctx context.Context) map[int64]string {
 	a.mu.RLock()
-	client, connected := a.lcu, a.connected
+	client, connected := a.lcu, a.clientSessionConnectedLocked()
 	a.mu.RUnlock()
 	if !connected || client == nil {
 		return nil
