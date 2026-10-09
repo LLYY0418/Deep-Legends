@@ -146,7 +146,7 @@ func (a *app) startSelfSeasonSupplement(client *LCUClient, reference gameplayRef
 			if index == 3 {
 				category = "history-1000"
 			}
-			a.recordDiagnostic(map[string]any{"event": "season_self_source_probe", "source": category, "variant": index, "matches": len(infos), "added": added, "oldest_created_at": oldest, "bytes": len(raw), "failed": err != nil, "reason": safeDiagnosticReason(err)})
+			a.recordDiagnostic(seasonSelfProbeDiagnostic(category, index, len(infos), added, oldest, len(raw), err))
 		}
 		if !sameIdentity() {
 			return
@@ -157,4 +157,15 @@ func (a *app) startSelfSeasonSupplement(client *LCUClient, reference gameplayRef
 			a.publishSeasonSnapshot(reference, playerRef, scan.cache)
 		}
 	})
+}
+
+// seasonSelfProbeDiagnostic records one self-supplement probe. A successful
+// probe carries no failure reason: logging "未知错误" for err == nil read as a
+// failure during the R255 log review.
+func seasonSelfProbeDiagnostic(source string, variant, matches, added int, oldest int64, bytes int, err error) map[string]any {
+	probe := map[string]any{"event": "season_self_source_probe", "source": source, "variant": variant, "matches": matches, "added": added, "oldest_created_at": oldest, "bytes": bytes, "failed": err != nil}
+	if err != nil {
+		probe["reason"] = safeDiagnosticReason(err)
+	}
+	return probe
 }
