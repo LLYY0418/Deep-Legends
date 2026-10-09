@@ -1,7 +1,7 @@
 'use strict';
 // Real public backend and its CSP/assets, with explicit synthetic API fixtures.
 const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
-const root=path.resolve(__dirname,'..'),out=process.env.R264_BROWSER_OUT||path.join(root,'docs/history/reports/r264/chromium');
+const root=path.resolve(__dirname,'..'),out=process.env.R264_BROWSER_OUT||path.join(os.tmpdir(),'deep-legends-r264-browser');
 const closedSessions=new Set(), canceledRequests=new Set();let canceledInterceptions=0;
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r264-browser-')),errors=[],violations=[],results=[];let backend,chrome,ws;
 const saved={
