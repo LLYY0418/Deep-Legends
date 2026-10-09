@@ -4,7 +4,7 @@ const { spawnSync } = require("node:child_process");
 module.exports = function runBatch(engine, harness, files, directory, env) {
   const manifest = path.join(directory, "script-paths.json"), output = path.join(directory, "batch-results.json");
   fs.writeFileSync(manifest, JSON.stringify(files));
-  const result = spawnSync(engine, ["-NoProfile", "-NonInteractive", "-File", harness, "-ScriptPathsFile", manifest, "-BatchOutputFile", output],
+  const result = spawnSync(engine, ["-NoProfile", "-NonInteractive", "-File", harness, "-ScriptPath", files[0], "-ScriptPathsFile", manifest, "-BatchOutputFile", output],
     { encoding: "utf8", timeout: 45000, env });
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stdout + result.stderr);
