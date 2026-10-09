@@ -83,3 +83,40 @@ test("CI calibrates before and after the renderer suite and gates with the refer
   assert.match(ci.slice(ci.lastIndexOf("- name:", gate), gate), /name: Enforce R252 renderer budget margin/);
   assert.doesNotMatch(ci, /RUNNER_CALIBRATION_ITERATIONS/, "CI must run the reference workload size");
 });
+
+// The 15 CI runs of 7d5e7b31 (2026-10-09) that set reference_ms:
+// [run id, CPU model, renderer duration_ms, calibration median_ms before, after].
+const observedRuns = [
+  ["37878415874", "7763", 202211, 3605.638, 3404.898],
+  ["37878419296", "7763", 208611, 3927.276, 3542.722],
+  ["37878422975", "9V45", 124582, 2125.201, 2068.054],
+  ["37878426748", "7763", 206418, 3724.57, 3583.799],
+  ["37878430177", "9V74", 161338, 2774.697, 3114.031],
+  ["37878433809", "9V45", 128619, 2268.855, 2333.75],
+  ["37878437058", "7763", 211098, 3756.243, 3698.816],
+  ["37878440316", "7763", 210169, 3828.884, 3602.803],
+  ["37878443558", "9V74", 190370, 3261.235, 3200.662],
+  ["37879575021", "7763", 214397, 3797.589, 3754.496],
+  ["37879578739", "7763", 210783, 3715.116, 3719.034],
+  ["37879582796", "7763", 207615, 3628.338, 3552.657],
+  ["37880652353", "7763", 208899, 3472.032, 3762.583],
+  ["37880655570", "9V74", 162031, 2809.77, 3075.387],
+  ["37880658764", "6973P-C", 134683, 2211.77, 2041.914],
+];
+
+test("committed reference_ms is the fast runner class median from the CI runs of 7d5e7b31", () => {
+  const committed = require("./renderer-calibration-reference.json");
+  const fast = observedRuns.filter(([, cpu]) => cpu === "9V45" || cpu === "6973P-C")
+    .map(([, , , before, after]) => (before + after) / 2).sort((a, b) => a - b);
+  assert.equal(fast.length, 3);
+  assert.equal(committed.reference_ms, Math.round(fast[1]));
+});
+
+test("every observed CI run of 7d5e7b31 passes at the committed reference on all four runner models", () => {
+  const committed = require("./renderer-calibration-reference.json");
+  for (const [run, cpu, duration, before, after] of observedRuns) {
+    const result = evaluate(timings(duration), [calibration(before), calibration(after)], committed);
+    assert.equal(result.ok, true, `${run} ${cpu}: ${result.failures.join("; ")}`);
+    assert.ok(result.normalized_ms < 140000, `${run} ${cpu}: ${result.normalized_ms}`);
+  }
+});
