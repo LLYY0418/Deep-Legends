@@ -13,6 +13,8 @@ const { JSDOM } = require("jsdom");
 
 const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, suiteStyles, functionSource, compileFunctions, collapsedBeaconStyles, bootDemoApp, settled, installWindowCleanup, visitTool, bootLiveTab } = require("./overview-render-helpers.cjs");
 
+const { waitForOverview } = require("./renderer-wait.cjs");
+
 installWindowCleanup(test);
 
 test("R86 hero search preserves input and coalesces five keystrokes (including bypass mutation)", async () => {
@@ -24,7 +26,7 @@ test("R86 hero search preserves input and coalesces five keystrokes (including b
       return source;
     } });
     try {
-      await settled();
+      await waitForOverview(w, 17);
       w.document.querySelector('[data-section="champions"]').click();
       await settled();
       const input = w.document.querySelector('[data-champion-search]');
@@ -55,7 +57,7 @@ test("R86 tools fetch only active tab plus rig, then load claims on demand", asy
  async function check(mutate=false) {
   const { window: w, errors } = bootDemoApp({suiteSourceTransform:mutate ? source=>source.replace('function loadActiveTab(force = false) {','function loadActiveTab(force = false) { void api("/api/claim/scan").catch(()=>{});') : undefined});
   try {
-    await settled();
+    await waitForOverview(w, 17);
     const urls = [], original = w.fetch;
     w.fetch = (url, ...args) => { urls.push(String(url)); return original(url, ...args); };
     w.document.querySelector('[data-section="suite"]').click();
@@ -96,7 +98,7 @@ test("R86 healthy SSE reduces phase polling while closed SSE retains one-second 
   for (const mutate of [false, true]) {
     const {window:w,eventSources}=bootDemoApp({liveEvents:true,gameplaySourceTransform: mutate ? s => s.replace('  let beaconPollTimer = 0;', '  window.addEventListener("deep-legends:live-frame", () => { void api("/api/gameplay/phase").catch(() => {}); });\n  let beaconPollTimer = 0;') : undefined});
     try {
-      await settled();
+      await waitForOverview(w, 17);
       const source=eventSources.at(-1);
       assert.ok(source);
       const advance=r86Clock(w), original=w.fetch;
@@ -117,7 +119,7 @@ test("R86 external match expansion preserves unrelated cards", async () => {
  async function check(mutate=false) {
   const {window:w}=bootDemoApp({gameplaySourceTransform:mutate ? source=>source.replace('render(id = "", options = {}) {','render(id = "", options = {}) { id = "";') : undefined});
   try {
-    await settled();
+    await waitForOverview(w, 17);
     const data=await (await w.fetch('/api/gameplay/overview')).json();
     const host=w.document.createElement('div');w.document.body.append(host);
     w.deepLegendsMatchCards.mount(host,{matches:data.matches,playerRef:data.player.playerRef});
