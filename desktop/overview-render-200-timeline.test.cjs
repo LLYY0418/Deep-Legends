@@ -1,6 +1,8 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
 const { bootDemoApp, settled, installWindowCleanup } = require("./overview-render-helpers.cjs");
+const { waitForOverview } = require("./renderer-wait.cjs");
+
 installWindowCleanup(test);
 
 test("R86 ADD-1 late timeline cannot reveal a filtered-out card", async () => {
@@ -8,7 +10,7 @@ test("R86 ADD-1 late timeline cannot reveal a filtered-out card", async () => {
     const { window: w } = bootDemoApp({ matchCount: mutate ? 30 : 200, gameplaySourceTransform: source => mutate
       ? source.replace("function replaceMatchEntry(entry, tab, rerender, retained = false) {", "function replaceMatchEntry(entry, tab, rerender, retained = false) { if(entry.parentNode && !entry.parentNode.isConnected)document.querySelector(\".match-list\").replaceWith(entry.parentNode);") : source });
     try {
-      await settled();
+      await waitForOverview(w, mutate ? 30 : 200);
       const d = w.document, list = d.querySelector(".match-list");
       const entry = list.querySelector(".match-entry"), id = entry.dataset.matchId;
       const card = () => list.querySelector(`[data-match-id="${id}"]`);
