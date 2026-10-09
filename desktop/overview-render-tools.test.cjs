@@ -13,11 +13,13 @@ const { JSDOM } = require("jsdom");
 
 const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, suiteStyles, functionSource, compileFunctions, collapsedBeaconStyles, bootDemoApp, settled, installWindowCleanup, visitTool, bootLiveTab } = require("./overview-render-helpers.cjs");
 
+const { waitForOverview } = require("./renderer-wait.cjs");
+
 installWindowCleanup(test);
 
 test("演示数据下工具五个页签都渲染完成", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   w.document.querySelector('[data-section="suite"]').click();
   await settled();
   for (const name of ["watch", "rig", "facade", "sweep", "champselect"]) {
@@ -82,7 +84,7 @@ test("演示数据下工具五个页签都渲染完成", async () => {
 test("2351 自定义暂停事件保留真实总开关和卡片高亮", async () => {
   const { window: w, errors } = bootDemoApp();
   try {
-    await settled();
+    await waitForOverview(w, 17);
     w.document.querySelector('[data-section="suite"]').click();
     await settled();
     const root = w.document.getElementById("suite-watch-root");
@@ -104,7 +106,7 @@ test("2351 自定义暂停事件保留真实总开关和卡片高亮", async () 
 test("R149 收藏页仍可独立进入头像与旗帜视图", async () => {
   const { window: w, errors } = bootDemoApp();
   try {
-    await settled();
+    await waitForOverview(w, 17);
     for (const view of ["banners", "icons"]) {
       w.document.querySelector('[data-section="suite"]').click();
       await visitTool(w, "facade");
@@ -124,7 +126,7 @@ test("R149 收藏页仍可独立进入头像与旗帜视图", async () => {
 
 test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   w.document.querySelector('[data-section="suite"]').click();
   await visitTool(w, "facade");
   await visitTool(w, "sweep");
@@ -253,7 +255,7 @@ test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
 
 test("全部原生下拉都增强为可键盘操作的应用菜单，包含动态英雄段位", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   const staticSelects = [...w.document.querySelectorAll(".select-wrap > select")];
   assert.ok(staticSelects.length >= 10, `静态下拉数量异常：${staticSelects.length}`);
   for (const select of staticSelects) {
