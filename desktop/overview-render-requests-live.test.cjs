@@ -13,11 +13,13 @@ const { JSDOM } = require("jsdom");
 
 const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, suiteStyles, functionSource, compileFunctions, collapsedBeaconStyles, bootDemoApp, settled, installWindowCleanup, visitTool, bootLiveTab } = require("./overview-render-helpers.cjs");
 
+const { waitForOverview } = require("./renderer-wait.cjs");
+
 installWindowCleanup(test);
 
 test("推荐请求期间遮罩只覆盖 tab 下方面板，并按内容提示", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   const previousFetch = w.fetch;
   let recommendations;
   let releaseRecommendations;
@@ -162,7 +164,7 @@ test("R86 ADD-1 failed timelines wait for explicit retry and keep unrelated card
     const { window: w, errors } = bootDemoApp({ gameplaySourceTransform: source => mutate
       ? source.replace("if (!state.matchTimelines.has(matchTimelineKey(match, subject, tab)))", "if (true)") : source });
     try {
-      await settled();
+      await waitForOverview(w, 17);
       const d = w.document, list = d.querySelector(".match-list");
       const initial = [...list.querySelectorAll(".match-entry")];
       const id = initial[0].dataset.matchId;
