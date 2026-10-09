@@ -13,6 +13,8 @@ const { JSDOM } = require("jsdom");
 
 const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, suiteStyles, functionSource, compileFunctions, collapsedBeaconStyles, bootDemoApp, settled, installWindowCleanup, visitTool, bootLiveTab } = require("./overview-render-helpers.cjs");
 
+const { waitForOverview, waitForWatch, waitForFacade } = require("./renderer-wait.cjs");
+
 installWindowCleanup(test);
 
 function assertR59FacadeTitleContracts(source) {
@@ -47,10 +49,10 @@ test("R59 生涯预览完整渲染时不泄漏 playerTitleSelected UUID", async 
 			return facade;
 		},
 	});
-	await settled();
+	await waitForOverview(w);
 	w.document.querySelector('[data-section="suite"]').click();
   await visitTool(w, "facade");
-	await settled();
+	await waitForFacade(w);
 	const facadeRoot = w.document.getElementById("suite-facade-root");
 	assert.equal(facadeRoot.querySelector(".facade-signature")?.textContent, "未设置头衔");
 	assert.doesNotMatch(facadeRoot.textContent, new RegExp(uuid), "完整生涯预览泄漏了 UUID");
@@ -60,7 +62,7 @@ test("R59 生涯预览完整渲染时不泄漏 playerTitleSelected UUID", async 
 
 test("R60 生涯事件刷新头衔、保护脏草稿且不在其它页签后台请求", async () => {
 	const { window: w, errors, eventSources } = bootDemoApp({ liveEvents: true });
-	await settled();
+	await waitForOverview(w);
 	let nextTitle = "客户端新头衔";
 	let facadeRequests = 0;
 	const originalFetch = w.fetch;
@@ -75,7 +77,7 @@ test("R60 生涯事件刷新头衔、保护脏草稿且不在其它页签后台�
 	};
 
 	w.document.querySelector('[data-section="suite"]').click();
-	await settled();
+	await waitForWatch(w);
 	w.document.querySelector('[data-suite-tab="facade"]').click();
 	await new Promise((resolve) => setTimeout(resolve, 80));
 	const source = eventSources.at(-1);
@@ -118,9 +120,9 @@ test("R65 生涯事件 20 连发只请求一次、仅时间戳变化不重建且
 		},
 	});
 	t.after(() => w.close());
-	await settled();
+	await waitForOverview(w);
 	w.document.querySelector('[data-section="suite"]').click();
-	await settled();
+	await waitForWatch(w);
 	w.document.querySelector('[data-suite-tab="facade"]').click();
 	await new Promise((resolve) => setTimeout(resolve, 100));
 	const facadeRoot = w.document.getElementById("suite-facade-root");
@@ -164,9 +166,9 @@ test("R65 生涯事件 20 连发只请求一次、仅时间戳变化不重建且
 
 test("R64 生涯皮肤与身份控件局部更新，皮肤图片延迟解码", async () => {
 	const { window: w, errors } = bootDemoApp({facadeStateTransform: facade => ({...facade, skins: facade.skins.map(skin => ({...skin, splashPath: `/lol-game-data/assets/demo/${skin.id}/splash.jpg`}))})});
-	await settled();
+	await waitForOverview(w);
 	w.document.querySelector('[data-section="suite"]').click();
-	await settled();
+	await waitForWatch(w);
 	w.document.querySelector('[data-suite-tab="facade"]').click();
 	await new Promise((resolve) => setTimeout(resolve, 100));
 	const root = w.document.getElementById("suite-facade-root");
@@ -217,10 +219,10 @@ test("R64 生涯头衔和勋章仅在真实值上使用强调色", async () => {
 			return facade;
 		},
 	});
-	await settled();
+	await waitForOverview(w);
 	w.document.querySelector('[data-section="suite"]').click();
   await visitTool(w, "facade");
-	await settled();
+	await waitForFacade(w);
 	const root = w.document.getElementById("suite-facade-root");
 	const title = root.querySelector(".facade-signature");
 	const slots = [...root.querySelectorAll("[data-facade-challenge-slot]")];
@@ -248,10 +250,10 @@ test("R60 生涯勋章缺失槽位稳定回退为未设置", () => {
 
 test("R58 生涯英雄长下拉支持别名搜索，短下拉不显示搜索框", async () => {
 	const { window: w, errors } = bootDemoApp();
-	await settled();
+	await waitForOverview(w);
 	w.document.querySelector('[data-section="suite"]').click();
   await visitTool(w, "facade");
-	await settled();
+	await waitForFacade(w);
 	const heroSelect = w.document.querySelector("[data-facade-hero]");
 	assert.ok(heroSelect.options.length > 20, `演示英雄选项不足以触发长下拉：${heroSelect.options.length}`);
 	const root = heroSelect.parentElement.querySelector(":scope > .native-select-menu");
@@ -316,10 +318,10 @@ test("R58 生涯空皮肤刷新保留草稿并在数据补齐后恢复", async (
 
 	const { window: w, errors } = bootDemoApp();
 	t.after(() => w.close());
-	await settled();
+	await waitForOverview(w);
 	w.document.querySelector('[data-section="suite"]').click();
   await visitTool(w, "facade");
-	await settled();
+	await waitForFacade(w);
 	const initial = await (await w.fetch("/api/facade/state")).json();
 	const originalFetch = w.fetch;
 	let skinsReady = false;
@@ -346,9 +348,9 @@ test("R58 生涯空皮肤刷新保留草稿并在数据补齐后恢复", async (
 test("顶部重新读取实际刷新生涯并丢弃未应用预览", async (t) => {
   const {window:w,errors}=bootDemoApp();
   t.after(()=>w.close());
-  await settled();
+  await waitForOverview(w);
   w.document.querySelector('[data-section="suite"]').click();
-  await settled();
+  await waitForWatch(w);
   w.document.querySelector('[data-suite-tab="facade"]').click();
   const current=await (await w.fetch('/api/facade/state')).json();
   const original=Number(current.profile.backgroundSkinId);
