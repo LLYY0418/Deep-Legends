@@ -28,11 +28,13 @@ test("collapsed sidebar hides the label but keeps the live beacon rendered", () 
   regression.dom.window.close();
 });
 
+const { waitForOverview } = require("./renderer-wait.cjs");
+
 installWindowCleanup(test);
 
 test("R86 DOM teardown disconnects pending observers without disabling live callbacks", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   let callbacks = 0;
   let disposals = 0;
   w.addEventListener("deep-legends:dispose", () => { disposals += 1; });
@@ -55,7 +57,7 @@ test("R86 DOM teardown disconnects pending observers without disabling live call
 test("1110 征召默认值、时间输入、模式能力和总开关真实保存链", async () => {
   const { window: w, errors } = bootDemoApp();
   try {
-    await settled();
+    await waitForOverview(w, 17);
     w.document.querySelector('[data-section="suite"]').click();
     await settled();
     await visitTool(w, "champselect");
@@ -319,7 +321,7 @@ test("non-match overview rerenders preserve the match-list node", () => {
 
 test("玩家覆盖层里的战绩详情也能展开", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   w.dispatchEvent(new w.CustomEvent("deep-legends:open-player", {
     detail: { source: "champions", playerRef: "player_00000000000000000000000000000001", gameName: "覆盖层玩家" },
   }));
@@ -337,7 +339,7 @@ test("玩家覆盖层里的战绩详情也能展开", async () => {
 
 test("演示数据下总览页渲染出真实内容，且渲染期没有异常", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   const overview = w.document.getElementById("overview-content");
   assert.ok(overview, "缺少 #overview-content 容器");
   assert.deepEqual(errors, [], `渲染期出现异常：\n${errors.join("\n")}`);
