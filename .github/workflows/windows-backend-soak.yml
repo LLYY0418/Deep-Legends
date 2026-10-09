@@ -51,6 +51,9 @@ jobs:
           go-version: ${{ matrix.go_version }}
           go-version-file: ${{ matrix.go_version_file }}
           cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Record runner and Go environment
         id: environment
         shell: pwsh
@@ -85,6 +88,14 @@ jobs:
               ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $directory 'summary.json')
             Write-Host 'gcc is not available; race comparison is skipped.'
           }
+      - name: Prepare verified published update compatibility input
+        if: steps.environment.outputs.available == 'true'
+        shell: pwsh
+        env:
+          SOAK_DIRECTORY: ${{ steps.environment.outputs.directory }}
+        run: |
+          node scripts/prepare-r238-update-fixture.cjs 2>&1 | Tee-Object -FilePath (Join-Path $env:SOAK_DIRECTORY 'fixture-preparation.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Published update compatibility input preparation failed' }
       - name: Run sequential backend rounds and preserve every output
         if: steps.environment.outputs.available == 'true'
         shell: pwsh
