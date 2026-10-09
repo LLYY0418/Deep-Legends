@@ -663,14 +663,16 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .lp-delta.is-gain { color: var(--success); background: color-mix(in oklab,var(--success) 16%,transparent); }
 .lp-delta.is-drop { color: var(--danger); background: color-mix(in oklab,var(--danger) 15%,transparent); }
 /* 中部主区：第一行 英雄+技能符文 / KDA / 数据列，第二行装备栏 + 徽章。
-   中列弹性伸缩：宽度变化时 KDA 居中、数据列贴住右侧玩家名单，
-   多余空间均匀分布在块之间，而不是堆在数据列右侧。 */
+   中列弹性伸缩，装备和标签使用全部宽度；统计项保持紧凑间距。 */
 .match-main { display: grid; align-self: start; min-width: 0; grid-template-columns: minmax(0,auto) minmax(96px,1fr) minmax(188px,1.4fr); align-items: center; gap: 9px 22px; }
 .match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(96px,1fr) minmax(188px,1.4fr); }
 .match-champion { position: relative; display: grid; min-width: 0; min-height: 63px; grid-template-columns: 58px minmax(0,auto); align-items: center; gap: 7px; }
 .champion-level { position: absolute; top: 44px; left: 40px; display: grid; width: 22px; height: 22px; place-items: center; color: white; background: #171717; border-radius: 50%; font-size: 10px; }
-/* 召唤师技能一列、主副系符文一列（各上下两格） */
-.match-loadout-mini { display: grid; min-height: 63px; grid-auto-flow: column; grid-template-columns: repeat(2,26px); grid-template-rows: repeat(2,26px); gap: 3px; }
+/* 各模式共用两行两列的外框尺寸，空槽也占同样宽度，后面的 KDA / 数据列才能对齐。
+   召唤师技能一列、主副系符文一列；斗魂为四个海克斯，海斗为技能+海克斯。 */
+.match-loadout-mini { --match-loadout-size: 28px; display: grid; width: calc(2 * var(--match-loadout-size) + 3px); min-height: 63px; grid-auto-flow: column; grid-template-columns: repeat(2,var(--match-loadout-size)); grid-template-rows: repeat(2,var(--match-loadout-size)); gap: 3px; }
+.match-loadout-mini > .game-icon.is-small, .match-loadout-mini > .arena-augment-icon, .match-loadout-mini > .match-loadout-slot, .match-loadout-mini > .arena-augment-slot { width: var(--match-loadout-size); height: var(--match-loadout-size); flex-basis: var(--match-loadout-size); }
+.match-loadout-mini > .arena-augment-icon > .game-icon.is-small { width: 100%; height: 100%; flex-basis: 100%; }
 .match-loadout-slot { display: block; width: 26px; height: 26px; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 7px; }
 .match-loadout-slot.is-empty { opacity: .35; }
 .match-kda { display: grid; min-width: 0; justify-items: center; justify-self: center; font-variant-numeric: tabular-nums; }
@@ -678,10 +680,10 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-kda em { color: var(--danger); font-style: normal; }
 .match-kda small { max-width: 96px; color: var(--muted); font-size: 11px; line-height: 1.25; text-align: center; white-space: normal; }
 /* 数据列：按模式展示参团、补刀、段位或伤害数据，悬停有完整说明；
-   固定最小宽度并靠右，保证多张卡片的左右边缘对齐 */
+   数值在定宽的数据块内对齐，不随标签展示区加宽而被推到中部末端。 */
 /* R132 P3：数据列定宽。平均段位异步回填（「…」→「💠 铂金 III」）时列宽不能跟着内容变，
    否则同一页里已回填和未回填的卡片，参团率/CS 的数值会左右错位。 */
-.match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; width: calc(100% - 64px); min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }
+.match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; width: 188px; max-width: 100%; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }
 .match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }
 .match-stat { display: grid; min-width: 0; grid-template-columns: 72px minmax(0,1fr); align-items: baseline; gap: 8px; font-size: 11px; cursor: help; white-space: nowrap; }
 .match-stat > em { min-width: 0; color: var(--faint); font-size: 10.5px; font-style: normal; }
@@ -747,8 +749,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 /* 两人小队只有两个名字：一个靠左、一个靠右，避免右侧空出一整列。 */
 .arena-team-roster[data-team-size="2"] { display: flex; justify-content: space-between; gap: 8px; }
 .arena-team-roster[data-team-size="2"] button { flex: 0 1 auto; max-width: calc(50% - 4px); }
-.match-loadout-mini.is-augments { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(2,30px); grid-template-rows: repeat(2,30px); }
-.match-loadout-mini.is-augments.is-mayhem { grid-auto-flow: column; grid-template-columns: repeat(2,30px); grid-template-rows: repeat(2,30px); }
+.match-loadout-mini.is-augments { grid-auto-flow: row; grid-auto-columns: auto; }
+.match-loadout-mini.is-augments.is-mayhem { grid-auto-flow: column; }
 .arena-augment-icon { --augment-accent: var(--rarity-iron); display: inline-flex; flex: 0 0 auto; overflow: hidden; background: #090B0F; border: 1px solid var(--augment-accent); border-radius: 7px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .035); }
 .arena-augment-icon.is-bronze { --augment-accent: var(--rarity-bronze); }
 .arena-augment-icon.is-silver { --augment-accent: var(--rarity-silver); }
@@ -784,8 +786,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 @container matches-column (max-width: 1080px) {
 	.match-summary { --match-roster-width: clamp(146px,20cqi,180px); }
 	.match-summary, .match-summary.is-arena { grid-template-columns: 108px minmax(0,1fr) var(--match-roster-width,clamp(146px,20cqi,180px)) 40px; gap: 8px; }
-	.match-main { gap: 8px 12px; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,auto) minmax(0,1fr); }
-	.match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); }
+	.match-main, .match-main.is-arena { gap: 8px 12px; grid-template-columns: minmax(0,auto) minmax(0,96px) minmax(0,1fr); }
 	.match-stats { width: 180px; padding-left: 10px; }
 	.arena-team-row-compact { padding-inline: 4px; }
 }
@@ -806,7 +807,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 @container matches-column (max-width: 640px) {
 	.match-main, .match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(0,1fr); }
-	.match-stats { display: grid; grid-column: 1 / -1; grid-row: 2; width: auto; min-height: 54px; padding-left: 10px; border-left: 0; border-top: 1px solid var(--line); padding-top: 6px; }
+	.match-stats { display: grid; grid-column: 1 / -1; grid-row: 2; width: 180px; min-height: 54px; padding-left: 10px; border-left: 0; border-top: 1px solid var(--line); padding-top: 6px; }
 	.match-build { column-gap: 4px; }
 	.match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }
 	.item-slot.is-trinket { margin-left: 0; }
@@ -2219,7 +2220,6 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 @media (min-width:1101px) {
   @container matches-column (min-width:720px) {
     .match-main,.match-main.is-arena { grid-template-columns:minmax(0,auto) minmax(96px,1fr) minmax(188px,1.4fr); }
-    .match-stats { width:calc(100% - 64px); }
   }
 }
 

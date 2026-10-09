@@ -1464,7 +1464,7 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayScript, /for \(const mountedContainer of externalMatchViews\.keys\(\)\)/);
 	assert.match(gameplayStyles, /\.match-stat-participation > b\s*\{[^}]*var\(--success\)/);
 	assert.match(gameplayStyles, /\.match-taken-value\s*\{[^}]*var\(--muted\)/);
-	assert.match(gameplayStyles, /\.match-loadout-mini\s*\{[^}]*grid-template-columns:\s*repeat\(2,26px\)/);
+	assert.match(gameplayStyles, /\.match-loadout-mini\s*\{[^}]*--match-loadout-size:\s*28px;[^}]*grid-template-columns:\s*repeat\(2,var\(--match-loadout-size\)\)/);
 	assert.match(gameplayStyles, /\.match-summary\.is-arena\s*\{[^}]*minmax\(220px,1fr\)[^}]*var\(--match-roster-width(?:,\s*clamp\([^)]*\))?\)[^}]*40px/s);
 	assert.match(gameplayStyles, /:root\s*\{[^}]*--match-roster-width:\s*clamp\(/s);
 	// R88：名单等宽收窄，两队等分且间距固定。
@@ -1473,9 +1473,8 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.doesNotMatch(gameplayStyles, /\.match-players\s*\{[^}]*justify-content:\s*space-between/s);
 	assert.doesNotMatch(gameplayStyles, /@container arena-first \(max-width: (?:720|520|420)px\)/);
 	assert.match(gameplayStyles, /\.match-players\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/s);
-	// ★战绩条左半边（英雄 / KDA / 击杀·CS·段位）的排布是设计基准，加宽玩家名单不许动它：
-	// 第四条空的 1fr 轨道负责吃掉富余宽度，统计块靠左，KDA 保持在第二条 96px 轨道上。
-	assert.match(gameplayStyles, /\.match-main\s*\{[^}]*grid-template-columns:\s*minmax\(0,auto\) minmax\(0,96px\) minmax\(0,auto\) minmax\(0,1fr\)/s);
+	// 窄窗口下各模式同用三条轨道，KDA 保持 96px，统计块在第三列内靠左。
+	assert.match(gameplayStyles, /\.match-main, \.match-main\.is-arena\s*\{[^}]*grid-template-columns:\s*minmax\(0,auto\) minmax\(0,96px\) minmax\(0,1fr\)/s);
 	assert.doesNotMatch(gameplayStyles, /\.match-main\s*\{[^}]*justify-content:/s);
 	assert.match(gameplayStyles, /\.match-stats\s*\{[^}]*justify-self:\s*start/s);
 	assert.doesNotMatch(gameplayStyles, /\.match-stats\s*\{[^}]*(?:max-)?width:\s*min\(/s);
@@ -1483,7 +1482,7 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayStyles, /\.match-players\.is-arena\s*\{[^}]*max-height:\s*98px[^}]*overflow:\s*hidden/);
 	assert.match(gameplayStyles, /\.arena-team-row-compact\s*\{[^}]*padding:\s*1px 5px/);
 	assert.match(gameplayStyles, /@container matches-column \(max-width: 720px\)[\s\S]{0,260}\.match-players, \.match-players\.is-arena\s*\{\s*display:\s*none/);
-  assert.match(gameplayStyles, /\.match-main\s*\{[^}]*minmax\(0,96px\)/s);
+  assert.match(gameplayStyles, /\.match-main, \.match-main\.is-arena\s*\{[^}]*minmax\(0,96px\)/s);
 	assert.match(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*minmax\(0,96px\)/s);
 	assert.match(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*minmax\(0,1fr\)/s);
 	assert.doesNotMatch(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*row-gap:\s*5px/);
@@ -4494,7 +4493,10 @@ test("match loadout follows the OPGG mode matrix instead of trusting stray augme
   assert.equal(arena.usesAugments, true);
   assert.equal((arena.loadout.match(/<augment>/g) || []).length, 4);
   assert.doesNotMatch(arena.loadout, /<spell>|<perk>|<style>/);
-  assert.match(cssBlockAfter(gameplayStyles, ".match-loadout-mini.is-augments.is-mayhem {"), /grid-template-columns:\s*repeat\(2,30px\)/);
+  // 模式只改变填充顺序，图标轨道尺寸继承普通战绩，避免 KDA / 统计列错位。
+  assert.match(cssBlockAfter(gameplayStyles, ".match-loadout-mini.is-augments.is-mayhem {"), /grid-auto-flow:\s*column/);
+  assert.doesNotMatch(cssBlockAfter(gameplayStyles, ".match-loadout-mini.is-augments {"), /grid-template-(?:columns|rows):/);
+  assert.doesNotMatch(cssBlockAfter(gameplayStyles, ".match-loadout-mini.is-augments.is-mayhem {"), /grid-template-(?:columns|rows):/);
   assert.match(functionSource(gameplayScript, "renderBuild"), /matchAugmentIDs\(subject, 6\)/);
 
   const classic = renderMatchLoadout(subject, "mayhem-classic");
