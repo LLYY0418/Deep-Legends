@@ -189,9 +189,17 @@ async function visitTool(w, name) {
 
 async function bootLiveTab() {
   const boot = bootDemoApp();
-  await settled();
+  const { waitForOverview, waitForRender } = require("./renderer-wait.cjs");
+  await waitForOverview(boot.window);
   boot.window.document.querySelector('[data-section="live"]').click();
-  await settled();
+  await waitForRender(boot.window, () => {
+    const root = boot.window.document.getElementById("live-content");
+    return root.querySelector(".build-recommendation .build-summary-spells")
+      && root.querySelector(".item-core-column .option-stats")
+      && root.querySelector(".skill-plan .skill-priority-row")
+      && root.querySelector(".champion-matchups")
+      && !root.querySelector(".recommendation-panel.is-loading");
+  }, "live recommendations did not finish rendering");
   return boot;
 }
 

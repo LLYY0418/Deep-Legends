@@ -13,7 +13,7 @@ const { JSDOM } = require("jsdom");
 
 const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, suiteStyles, functionSource, compileFunctions, collapsedBeaconStyles, bootDemoApp, settled, installWindowCleanup, visitTool, bootLiveTab } = require("./overview-render-helpers.cjs");
 
-const { waitForOverview } = require("./renderer-wait.cjs");
+const { waitForOverview, waitForRender } = require("./renderer-wait.cjs");
 
 installWindowCleanup(test);
 
@@ -106,7 +106,7 @@ test("对抗样本为空时给出说明文案，而不是一个「—」", async
 test("英雄位置统计为空时显示明确说明，而不是三项破折号", async () => {
   const boot = bootDemoApp();
   const w = boot.window;
-  await settled();
+  await waitForOverview(w, 17);
   const previousFetch = w.fetch;
   w.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : (input && input.url) || "";
@@ -118,7 +118,10 @@ test("英雄位置统计为空时显示明确说明，而不是三项破折号",
     return new w.Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   w.document.querySelector('[data-section="live"]').click();
-  await settled();
+  await waitForRender(w, () => {
+    const summaries = [...w.document.querySelectorAll("#live-content .recommendation-champion-summary")];
+    return summaries.length > 0 && summaries.every(summary => summary.querySelector(".champion-stats-empty")?.textContent === "该英雄在这个位置没有统计样本");
+  }, "empty champion summaries did not render");
   const summaries = [...w.document.querySelectorAll("#live-content .recommendation-champion-summary")];
   assert.ok(summaries.length > 0, "缺少推荐英雄摘要");
   assert.ok(summaries.every((summary) => summary.querySelector(".champion-stats-empty")?.textContent === "该英雄在这个位置没有统计样本"));
