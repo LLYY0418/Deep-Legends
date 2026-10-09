@@ -1,10 +1,10 @@
 module lol-loot-assistant
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/mozillazg/go-pinyin v0.21.0
-	golang.org/x/net v0.43.0
-	golang.org/x/sys v0.35.0
+	golang.org/x/net v0.50.0
+	golang.org/x/sys v0.41.0
 )
