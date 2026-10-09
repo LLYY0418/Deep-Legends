@@ -679,14 +679,7 @@ func main() {
 	a.updates = newUpdateManager(version, a.storage, a.broadcastUpdateEvent)
 	a.updates.diagnostic = a.recordDiagnostic
 
-	listener, err := net.Listen("tcp", *listenAddress)
-	if err != nil && *listenFallback {
-		// The desktop shell asks for a fixed port so the page origin, and with
-		// it localStorage and the renderer code cache, survives restarts. A busy
-		// port must not stop startup.
-		log.Printf("本地界面端口不可用，改用随机端口：%v", err)
-		listener, err = net.Listen("tcp", "127.0.0.1:0")
-	}
+	listener, err := listenLocalUI(*listenAddress, *listenFallback)
 	if err != nil {
 		closeDiagnosticStore(store)
 		log.Fatal(err)
@@ -724,7 +717,7 @@ func main() {
 	}
 
 	server := &http.Server{
-		Handler:           a.trackLocalHTTP(securityHeaders(a.withLicenseProtection(mux))),
+		Handler:           a.localUIHandler(listener, mux),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       45 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -734,6 +727,37 @@ func main() {
 		closeDiagnosticStore(store)
 		log.Fatal(err)
 	}
+}
+
+func (a *app) localUIHandler(listener net.Listener, mux http.Handler) http.Handler {
+	return a.trackLocalHTTP(securityHeaders(localUIHostGuard(listener, a.withLicenseProtection(mux))))
+}
+
+func listenLocalUI(address string, fallback bool) (net.Listener, error) {
+	listener, err := net.Listen("tcp", address)
+	if err != nil && fallback {
+		// The desktop shell asks for a fixed port so the page origin, and with
+		// it localStorage and the renderer code cache, survives restarts. A busy
+		// port must not stop startup.
+		log.Printf("本地界面端口不可用，改用随机端口：%v", err)
+		listener, err = net.Listen("tcp", "127.0.0.1:0")
+	}
+	return listener, err
+}
+
+// Check Host before any route or session-cookie handling. Loopback binding alone
+// does not prevent DNS rebinding, even for a same-origin top-level navigation.
+// Use the listener's actual port so a busy fixed port can safely fall back.
+func localUIHostGuard(listener net.Listener, next http.Handler) http.Handler {
+	port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+	ipHost, nameHost := "127.0.0.1:"+port, "localhost:"+port
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != ipHost && r.Host != nameHost {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (a *app) authorized(next http.HandlerFunc) http.HandlerFunc {

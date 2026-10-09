@@ -16,11 +16,11 @@ function extract(name) {
   if (appSource.slice(start - 6, start) === "async ") start -= 6;
   return appSource.slice(start, appSource.indexOf("\n  }", start) + 4);
 }
-function shellHarness() {
+function shellHarness({ isPackaged = false, backendPath } = {}) {
   const app = new EventEmitter(), child = new EventEmitter(), ipcRenderer = new EventEmitter();
-  const handlers = new Map(), messages = [], sent = [], bridges = {};
+  const handlers = new Map(), messages = [], sent = [], bridges = {}, spawns = [];
   let quits = 0, relaunches = 0, url = "http://127.0.0.1:8787/";
-  Object.assign(app, { isPackaged: false, setAppUserModelId() {}, requestSingleInstanceLock: () => true,
+  Object.assign(app, { isPackaged, setAppUserModelId() {}, requestSingleInstanceLock: () => true,
     whenReady: () => ({ then() {} }), getPath: () => "/test", quit() { quits++; }, relaunch() { relaunches++; } });
   child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
   child.stdout.setEncoding = child.stderr.setEncoding = () => {}; child.kill = () => {};
@@ -40,16 +40,30 @@ function shellHarness() {
     contextBridge: { exposeInMainWorld(name, value) { bridges[name] = value; } } };
   const context = vm.createContext({ require(name) {
     if (name === "electron") return electron;
-    if (name === "node:child_process") return { spawn: () => child };
-    if (name === "node:fs") return { mkdirSync() {}, appendFileSync() {} };
+    if (name === "node:child_process") return { spawn(command, args, options) { spawns.push({ command, args: Array.from(args), options }); return child; } };
+    if (name === "node:fs") return { mkdirSync() {}, appendFileSync() {}, existsSync: () => true };
+    if (name === "./backend-integrity.cjs") return { verifyBackend() {} };
+    if (name === "./backend-digest.cjs") return {};
     return require(name);
-  }, __dirname, process: { on() {}, platform: "win32", env: {} }, URL, Buffer, console, setTimeout: () => 1, clearTimeout() {} });
+  }, __dirname, process: { on() {}, platform: "win32", resourcesPath: "/test/resources", env: backendPath ? { LOOT_BACKEND: backendPath } : {} }, URL, Buffer, console, setTimeout: () => 1, clearTimeout() {} });
   vm.runInContext(mainSource + '\nglobalThis.probe={startBackend,attach(window){backendReady={baseUrl:"http://127.0.0.1:8787",token:"secret"};mainWindow=window;setupBackendIPC();}};', context);
   context.probe.startBackend(); context.probe.attach(window);
   vm.runInNewContext(preloadSource, { require: () => electron });
-  return { child, app, hidden, handlers, contents, bridges, messages, sent, ipcRenderer,
+  return { child, app, hidden, handlers, contents, bridges, messages, sent, ipcRenderer, spawns,
     navigate(value) { url = value; }, get quits() { return quits; }, get relaunches() { return relaunches; } };
 }
+
+test("R262 packaged and LOOT_BACKEND launches use the fixed loopback port with fallback", () => {
+  for (const options of [{ isPackaged: true }, { backendPath: "/test/loot-service" }]) {
+    const h = shellHarness(options);
+    assert.equal(h.spawns.length, 1);
+    const launch = h.spawns[0];
+    assert.equal(launch.command, options.isPackaged
+      ? path.join("/test/resources", "app.asar.unpacked", "backend", "loot-service.exe")
+      : options.backendPath);
+    assert.deepEqual(launch.args, ["--desktop", "--no-browser", "--listen", "127.0.0.1:47391", "--listen-fallback"]);
+  }
+});
 function rendererHarness(bridge) {
   const dom = new JSDOM('<div id="connection"><span></span></div><div id="notice" hidden></div><div id="launchpad"></div><main>已有战绩</main>', { url: "http://127.0.0.1:8787", runScripts: "outside-only" });
   const w = dom.window;
