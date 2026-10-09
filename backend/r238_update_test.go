@@ -33,8 +33,9 @@ func TestR238DefaultOnline076To077(t *testing.T) {
 		}
 	}
 	digest := sha256.Sum256(data)
-	name := "Deep-Legends-Setup-0.12.77-public.exe"
-	manifest := updateManifest{Schema: 1, Version: "0.12.77", Fingerprint: "a1b2c3d4e5f6", PublishedAt: time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), MinSupported: "0.9.0", Notes: "R238 candidate fixture", Asset: updateAsset{Name: name, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), URL: "https://github.com/" + updateRepo + "/releases/download/v0.12.77/" + name}}
+	candidate := r238CandidateVersion(t)
+	name := "Deep-Legends-Setup-" + candidate + "-public.exe"
+	manifest := updateManifest{Schema: 1, Version: candidate, Fingerprint: "a1b2c3d4e5f6", PublishedAt: time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), MinSupported: "0.9.0", Notes: "R238 candidate fixture", Asset: updateAsset{Name: name, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), URL: "https://github.com/" + updateRepo + "/releases/download/v" + candidate + "/" + name}}
 	encoded, err := json.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +121,7 @@ func TestR238DefaultOnline076To077(t *testing.T) {
 		t.Fatal("0.12.76 check did not start")
 	}
 	waitUpdateCheck(t, u)
-	if status := u.Status(); status.State != "available" || status.Latest != "0.12.77" {
+	if status := u.Status(); status.State != "available" || status.Latest != candidate {
 		t.Fatal("candidate not available", status)
 	}
 	if err = u.Download(); err != nil {
@@ -159,9 +160,29 @@ func TestR238DefaultOnline076To077(t *testing.T) {
 		if err = os.WriteFile(download, downloaded, 0600); err != nil {
 			t.Fatal(err)
 		}
-		row, _ := json.MarshalIndent(map[string]any{"current": "0.12.76", "latest": "0.12.77", "download": download, "sha256": manifest.Asset.SHA256, "size": len(data), "checks": checks.Load(), "downloads": downloads.Load(), "unsigned_validation": true, "transport": "real loopback HTTP with exact GitHub URL mapping; not anonymous Latest", "install_handoff": true}, "", "  ")
+		row, _ := json.MarshalIndent(map[string]any{"current": "0.12.76", "latest": candidate, "download": download, "sha256": manifest.Asset.SHA256, "size": len(data), "checks": checks.Load(), "downloads": downloads.Load(), "unsigned_validation": true, "transport": "real loopback HTTP with exact GitHub URL mapping; not anonymous Latest", "install_handoff": true}, "", "  ")
 		if err = os.WriteFile(filepath.Join(evidence, "online-076-077.json"), row, 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
+}
+
+// r238CandidateVersion is the version being released, read from the desktop
+// package so that a version bump needs no edits to this upgrade fixture.
+func r238CandidateVersion(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "desktop", "package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pkg struct {
+		Version string `json:"version"`
+	}
+	if err = json.Unmarshal(raw, &pkg); err != nil {
+		t.Fatal(err)
+	}
+	if compareVersions(pkg.Version, "0.12.76") <= 0 {
+		t.Fatalf("candidate %q must be newer than the published 0.12.76 it upgrades", pkg.Version)
+	}
+	return pkg.Version
 }

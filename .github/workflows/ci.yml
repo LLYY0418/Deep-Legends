@@ -205,7 +205,7 @@ jobs:
             $actual = (Get-FileHash -Algorithm SHA256 (Join-Path dist/desktop $parts[1])).Hash.ToLowerInvariant()
             if ($actual -ne $parts[0]) { throw "Checksum mismatch: $($parts[1])" }
           }
-      - name: Real 0.12.65/0.12.68/0.12.76 installation and 0.12.77 upgrade
+      - name: Real 0.12.65/0.12.68/0.12.76 installation and candidate upgrade
         shell: pwsh
         run: |
           $version = node -p "require('./desktop/package.json').version"

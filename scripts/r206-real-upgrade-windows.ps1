@@ -1,6 +1,10 @@
 param([Parameter(Mandatory=$true)][string]$Setup)
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'r252-diagnostic-time.ps1')
+# The candidate is whatever desktop/package.json declares, so a version bump
+# needs no edits here.
+$candidateVersion = (& node -p "require('./desktop/package.json').version").Trim()
+if ($LASTEXITCODE -ne 0 -or $candidateVersion -notmatch '^\d+\.\d+\.\d+$' -or $candidateVersion -eq '0.12.76') { throw "Invalid candidate version: $candidateVersion" }
 $root = Join-Path $env:RUNNER_TEMP "deep-legends-r206-real-upgrade"
 $install = Join-Path $root "installed"
 $data = Join-Path $root "data"
@@ -101,7 +105,7 @@ try {
         $sentinels[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
     }
     # Production updater Check/Download/Apply, using a candidate HTTP fixture:
-    # 0.12.77 is still a draft, so the anonymous Latest endpoint stays 0.12.76.
+    # The candidate is not published, so the anonymous Latest endpoint stays 0.12.76.
     $env:R238_UPGRADE_SETUP=(Resolve-Path $Setup).Path
     $env:R238_UPGRADE_INSTALL=$install
     $env:R238_UPGRADE_DATA=$data
@@ -124,7 +128,7 @@ try {
     Run-Setup $online.download
     # Keep the real installer handoff alive until its once-only buffered timing
     # event is flushed. Killing/relaunching it here can destroy that evidence.
-    Assert-InstalledVersion '0.12.77'
+    Assert-InstalledVersion $candidateVersion
     $stages = @{}
     Get-Content (Join-Path $data "update-install-stages.txt") | ForEach-Object { $pair=$_ -split '=',2; $stages[$pair[0]]=[long]$pair[1] }
     $order = @('installer_start','parent_exited','uninstall_old_start','uninstall_old_done','extract_start','extract_done','copy_done','relaunch')
@@ -165,7 +169,7 @@ try {
     }
     $timing | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'update-install-timing-event.json')
     Copy-Item (Join-Path $data 'update-install-stages.txt'),(Join-Path $data 'update-install-nsis-stages.txt') $evidence
-    @{old_version='0.12.65';intermediate_version='0.12.68';upgrade_from='0.12.76';upgrade_to='0.12.77';candidate_online_transport='real loopback HTTP fixture';anonymous_latest_077='pending publication';persistent_sentinels_retained=$true;key_mode='public';stages=$order.Count;icon_location_stable=$true;created_time_changed=$false;total_ms=$timing.total_ms;uninstall_old_ms=$timing.uninstall_old_ms;copy_ms=$timing.copy_ms} | ConvertTo-Json | Set-Content (Join-Path $evidence 'real-upgrade-summary.json')
+    @{old_version='0.12.65';intermediate_version='0.12.68';upgrade_from='0.12.76';upgrade_to=$candidateVersion;candidate_online_transport='real loopback HTTP fixture';anonymous_latest_candidate='pending publication';persistent_sentinels_retained=$true;key_mode='public';stages=$order.Count;icon_location_stable=$true;created_time_changed=$false;total_ms=$timing.total_ms;uninstall_old_ms=$timing.uninstall_old_ms;copy_ms=$timing.copy_ms} | ConvertTo-Json | Set-Content (Join-Path $evidence 'real-upgrade-summary.json')
     Get-Content (Join-Path $evidence 'real-upgrade-summary.json')
 } finally {
     if ($userData -and (Test-Path $userData)) {
