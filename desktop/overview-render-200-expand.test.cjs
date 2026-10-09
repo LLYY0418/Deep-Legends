@@ -1,11 +1,13 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
 const { bootDemoApp, settled, installWindowCleanup } = require("./overview-render-helpers.cjs");
+const { waitForOverview } = require("./renderer-wait.cjs");
+
 installWindowCleanup(test);
 
 test("总览战绩卡：点击展开按钮只替换目标卡片并可收起", async () => {
   const { window: w, errors } = bootDemoApp();
-  await settled();
+  await waitForOverview(w, 17);
   const d = w.document;
   const list = d.querySelector(".match-list");
   const entries = [...d.querySelectorAll(".match-list .match-entry")];
@@ -37,7 +39,7 @@ test("总览战绩卡：点击展开按钮只替换目标卡片并可收起", as
   w.close();
 
   const large = bootDemoApp({ matchCount: 200 });
-  await settled();
+  await waitForOverview(large.window, 200);
   const largeDocument = large.window.document;
   const largeList = largeDocument.querySelector(".match-list");
   const largeEntries = [...largeDocument.querySelectorAll(".match-list .match-entry")];
@@ -65,7 +67,7 @@ test("总览战绩卡：点击展开按钮只替换目标卡片并可收起", as
       "rerender();",
     ),
   });
-  await settled();
+  await waitForOverview(mutated.window, 17);
   const mutatedList = mutated.window.document.querySelector(".match-list");
   const mutatedButton = mutated.window.document.querySelector(".match-list .match-entry [data-toggle-match]:not([disabled])");
   assert.ok(mutatedList && mutatedButton, "变异副本找不到局部展开测试目标");
