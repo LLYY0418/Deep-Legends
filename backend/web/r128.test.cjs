@@ -157,7 +157,8 @@ test("R128 §2.3-C 状态/错误/数据回退提示保留不动", () => {
 test("R128 §2.1 概览/构筑/表现 tab 改成等分的一级切换", () => {
   const toolbar = sliceBetween(championsScript, "function mayhemDetailToolbar(", "function mayhemDetailPanelMarkup(");
   // tab 组带上真实页签数，CSS 据此等分；图鉴入口仍是独立按钮。
-  assert.ok(toolbar.includes('data-mayhem-detail-tabs style="--tab-count:${specs.length}"'));
+  assert.ok(toolbar.includes('data-mayhem-detail-tabs data-tab-count="${specs.length}"'));
+  assert.match(championsStyles, /\.mayhem-detail-tabs\[data-tab-count="2"\] \{ --tab-count: 2; \}/, "页面 CSP 禁止 style 属性，页签数靠属性选择器生效");
   assert.match(toolbar, /class="mayhem-atlas-entry" data-mayhem-view="atlas"/);
   assert.doesNotMatch(toolbar, /data-tooltip|<small|<p>/, "tab 区不得新增说明文字或提示气泡");
 

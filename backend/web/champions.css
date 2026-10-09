@@ -890,6 +890,10 @@
 /* ---- R128：英雄详情页切换与表现指标 ---- */
 .mayhem-detail-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .mayhem-detail-tabs { --tab-count: 3; display: grid; min-width: 0; flex: 1 1 auto; grid-template-columns: repeat(var(--tab-count),minmax(0,1fr)); padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+/* Tab count arrives as data-tab-count: the page CSP blocks style="" attributes. */
+.mayhem-detail-tabs[data-tab-count="1"] { --tab-count: 1; }
+.mayhem-detail-tabs[data-tab-count="2"] { --tab-count: 2; }
+.mayhem-detail-tabs[data-tab-count="4"] { --tab-count: 4; }
 .mayhem-detail-tabs button { min-height: 42px; padding: 0 10px; color: color-mix(in oklab,var(--ink) 72%,transparent); background: transparent; border: 1px solid transparent; border-radius: 7px; font-size: 13px; font-weight: 750; white-space: nowrap; }
 .mayhem-detail-tabs button:hover { color: var(--ink); background: var(--surface-strong); }
 .mayhem-detail-tabs button.is-active { color: var(--primary); background: var(--primary-soft); border-color: color-mix(in oklab,var(--primary) 44%,var(--line)); box-shadow: inset 0 -2px 0 var(--primary); }

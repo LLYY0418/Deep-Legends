@@ -107,3 +107,12 @@ test("R117 duplicate declaration groups stay within the audited baseline", () =>
   const duplicateGroups = [...groups.values()].filter((count) => count > 1).length;
   assert.ok(duplicateGroups <= 45, `duplicate declaration groups increased: ${duplicateGroups}`);
 });
+
+test("markup never relies on style attributes, which the page CSP (style-src 'self') blocks", () => {
+  const offenders = [];
+  for (const name of [...sourceFiles, "default/index.html"]) {
+    const text = fs.readFileSync(path.join(root, name), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    for (const match of text.matchAll(/\sstyle=["'`$]/g)) offenders.push(`${name}:${text.slice(0, match.index).split("\n").length}`);
+  }
+  assert.deepEqual(offenders.filter((entry) => !entry.startsWith("demo-data.js:")), [], "use data-* attributes plus CSSOM (applyRenderedMetricStyles) or classes instead");
+});

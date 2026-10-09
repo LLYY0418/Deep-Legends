@@ -2969,7 +2969,7 @@
       const multi=["doubleKills","tripleKills","quadraKills","pentaKills"];
       const highlight=key=>!kind && topValues[key]?.has(row[key]) ? "is-top-metric" : "";
       const expandable=!mayhem && !kind && row.championId && row.opponents?.length;
-      return `<tr data-table-row="${kind || "champion"}:${id}" class="${kind ? `is-${kind}` : ""}"${expandable ? ` tabindex="0" data-table-expand="${id}" aria-expanded="${expanded}" aria-label="${escapeHTML(row.championName)}的对位"` : ""}><td>${opponent ? "" : index || ""}</td><th class="champion-table-hero" scope="row">${opponent ? '<span class="champion-table-opponent-arrow" aria-hidden="true">↳</span>' : ""}${row.championId ? iconFigure("champion",row.championId,row.championName,"small") : ""}<span>${escapeHTML(row.championName || "所有英雄")}</span></th>${cell(`${row.games}场 · ${n(row.winRate)}%`,`<span class="champion-table-winbar"><i style="--table-winrate:${Math.max(0,Math.min(100,Number(row.winRate)||0))}%"></i></span>${row.wins}胜 / ${row.losses}负`,row.winRate>=60 ? "is-hot" : "")}${cell(row.kda==null ? "-" : `${n(row.kda,2)}:1`,`${n(row.kills)} / ${n(row.deaths)} / ${n(row.assists)} · ${pct(row.kp)}`,row.kda>=3 ? "is-good" : "")}${cell(n(row.score),row.rank==null ? "-" : `#${n(row.rank)}`,highlight("score"))}${cell(n(row.damagePerMinute),pct(row.damageShare),highlight("damagePerMinute"))}${cell(pct(row.tankShare),"",highlight("tankShare"))}${mayhem ? "" : cell(`${n(row.controlWards)} (${n(row.wardsPlaced)}/${n(row.wardsKilled)})`,"",highlight("controlWards"))+cell(n(row.cs),n(row.csPerMinute),highlight("cs"))}${cell(n(row.gold,0),n(row.goldPerMinute),highlight("gold"))}${multi.map(key=>`<td class="table-multi-single ${highlight(key)}"><b>${n(row[key],0)}</b></td>`).join("")}<td class="table-multi-combined">${multi.map((key,i)=>`<b class="${highlight(key)}">${["双","三","四","五"][i]} ${n(row[key],0)}</b>`).join(" · ")}</td></tr>`;
+      return `<tr data-table-row="${kind || "champion"}:${id}" class="${kind ? `is-${kind}` : ""}"${expandable ? ` tabindex="0" data-table-expand="${id}" aria-expanded="${expanded}" aria-label="${escapeHTML(row.championName)}的对位"` : ""}><td>${opponent ? "" : index || ""}</td><th class="champion-table-hero" scope="row">${opponent ? '<span class="champion-table-opponent-arrow" aria-hidden="true">↳</span>' : ""}${row.championId ? iconFigure("champion",row.championId,row.championName,"small") : ""}<span>${escapeHTML(row.championName || "所有英雄")}</span></th>${cell(`${row.games}场 · ${n(row.winRate)}%`,`<span class="champion-table-winbar"><i data-table-winrate="${Math.max(0,Math.min(100,Number(row.winRate)||0))}"></i></span>${row.wins}胜 / ${row.losses}负`,row.winRate>=60 ? "is-hot" : "")}${cell(row.kda==null ? "-" : `${n(row.kda,2)}:1`,`${n(row.kills)} / ${n(row.deaths)} / ${n(row.assists)} · ${pct(row.kp)}`,row.kda>=3 ? "is-good" : "")}${cell(n(row.score),row.rank==null ? "-" : `#${n(row.rank)}`,highlight("score"))}${cell(n(row.damagePerMinute),pct(row.damageShare),highlight("damagePerMinute"))}${cell(pct(row.tankShare),"",highlight("tankShare"))}${mayhem ? "" : cell(`${n(row.controlWards)} (${n(row.wardsPlaced)}/${n(row.wardsKilled)})`,"",highlight("controlWards"))+cell(n(row.cs),n(row.csPerMinute),highlight("cs"))}${cell(n(row.gold,0),n(row.goldPerMinute),highlight("gold"))}${multi.map(key=>`<td class="table-multi-single ${highlight(key)}"><b>${n(row[key],0)}</b></td>`).join("")}<td class="table-multi-combined">${multi.map((key,i)=>`<b class="${highlight(key)}">${["双","三","四","五"][i]} ${n(row[key],0)}</b>`).join(" · ")}</td></tr>`;
     };
     const body=rowMarkup(data.overall || {championName:"所有英雄",games:0,wins:0,losses:0,winRate:0},0,"overall")+rows.map((row,index)=>{
       let content=rowMarkup(row,index+1);
@@ -3008,7 +3008,7 @@
       // Move existing nodes, preserving queued/loaded images and their listeners.
       body.replaceChildren(...nodes);
       if(anchor && scroll && Number.isFinite(before))scroll.scrollTop+=anchor.getBoundingClientRect().top-before;
-      for(const row of inserted)prepareImages(row);
+      for(const row of inserted){applyRenderedMetricStyles(row);prepareImages(row);}
       for(const button of container.querySelectorAll("[data-table-sort]")) {
         const key=button.dataset.tableSort;
         const fresh=template.content.querySelector(`[data-table-sort="${key}"]`);
@@ -3073,6 +3073,7 @@
     });
     container.querySelector("[data-subpage-retry]")?.addEventListener("click",()=>openOverviewSubpage(tab,tab.overviewSubpage));
     if(tab.overviewSubpage==="champion-table")bindChampionTable(container,tab);else if(current.status==="ready")bindMasteryDetails(container,current.data);
+    applyRenderedMetricStyles(container);
     prepareImages(container);
   }
 
@@ -3725,7 +3726,7 @@
       5:[74,30,"M16 8 21 2 29 7 37 0 45 7 53 2 58 8 63 16 57 27H17L11 16Z","M1 5 13 11 8 2 22 15 16 26 2 21 9 16ZM73 5 61 11 66 2 52 15 58 26 72 21 65 16Z"],
     };
     const [width,height,path,wings]=designs[level],id=`mk-${level}-${Number(gameID)||0}-${++multikillGradientSeq}`;
-    return `<b class="multikill-tag is-mk-${level}" data-af-multikill="${level}"><svg viewBox="0 0 ${width} ${height}" aria-hidden="true"><defs><linearGradient id="${id}" x2="0" y2="1"><stop style="stop-color:var(--mk-${level}-start)"/>${level===5 ? '<stop offset=".5" style="stop-color:var(--mk-5-middle)"/>' : ""}<stop offset="1" style="stop-color:var(--mk-${level}-end)"/></linearGradient>${level===5 ? `<linearGradient id="${id}-flame"><stop style="stop-color:var(--mk-2-start)"/><stop offset="1" style="stop-color:var(--mk-5-flame-end)"/></linearGradient>` : ""}</defs>${wings ? `<path class="mk-wings" d="${wings}"${level===5 ? ` style="fill:url(#${id}-flame)"` : ""}/>` : ""}<path class="mk-plate" d="${path}" fill="url(#${id})"/>${level===2 ? '<path class="mk-highlight" d="M8 4H36"/>' : ""}</svg><b>${["","","双杀","三杀","四杀","五杀"][level]}</b></b>`;
+    return `<b class="multikill-tag is-mk-${level}" data-af-multikill="${level}"><svg viewBox="0 0 ${width} ${height}" aria-hidden="true"><defs><linearGradient id="${id}" x2="0" y2="1"><stop class="mk-stop-start"/>${level===5 ? '<stop offset=".5" class="mk-stop-middle"/>' : ""}<stop offset="1" class="mk-stop-end"/></linearGradient>${level===5 ? `<linearGradient id="${id}-flame"><stop class="mk-flame-start"/><stop offset="1" class="mk-flame-end"/></linearGradient>` : ""}</defs>${wings ? `<path class="mk-wings" d="${wings}"${level===5 ? ` fill="url(#${id}-flame)"` : ""}/>` : ""}<path class="mk-plate" d="${path}" fill="url(#${id})"/>${level===2 ? '<path class="mk-highlight" d="M8 4H36"/>' : ""}</svg><b>${["","","双杀","三杀","四杀","五杀"][level]}</b></b>`;
   }
 
   function arenaPlacementResult(match, placement) {
@@ -4657,7 +4658,7 @@
       const description = entry?.status === "ok" ? plainText(entry.description) : "";
       const loading = !entry || entry.status === "loading";
       const tooltip = [augment.name, description].filter(Boolean).join("\n");
-      return `<article class="aug is-${rarity.key}${!loading && !description ? " is-bare" : ""}" data-augment-id="${Number(id)}" data-tooltip="${escapeHTML(tooltip)}" tabindex="0"><div class="aug-icon">${augmentIconFigure(id, "large")}<span class="aug-order">${index + 1}</span></div><div class="aug-body"><div class="aug-title"><strong>${escapeHTML(augment.name)}</strong><span class="rar">${escapeHTML(rarity.label)}</span></div>${description ? `<p>${escapeHTML(description)}</p>` : loading ? '<div aria-hidden="true"><div class="skel" style="width:92%"></div><div class="skel" style="width:64%"></div></div>' : ""}</div></article>`;
+      return `<article class="aug is-${rarity.key}${!loading && !description ? " is-bare" : ""}" data-augment-id="${Number(id)}" data-tooltip="${escapeHTML(tooltip)}" tabindex="0"><div class="aug-icon">${augmentIconFigure(id, "large")}<span class="aug-order">${index + 1}</span></div><div class="aug-body"><div class="aug-title"><strong>${escapeHTML(augment.name)}</strong><span class="rar">${escapeHTML(rarity.label)}</span></div>${description ? `<p>${escapeHTML(description)}</p>` : loading ? '<div aria-hidden="true"><div class="skel"></div><div class="skel"></div></div>' : ""}</div></article>`;
     }).join("")}</div>`;
   }
 
@@ -8705,11 +8706,12 @@
   // 伤害条都会退化成同样的满宽，蓝红对比也会固定成 50/50。
   function applyRenderedMetricStyles(container) {
     if (!container) return;
-    for (const node of container.querySelectorAll("[data-bar-width], [data-blue-share], [data-win-rate], [data-skill-count]")) {
+    for (const node of container.querySelectorAll("[data-bar-width], [data-blue-share], [data-win-rate], [data-table-winrate], [data-skill-count]")) {
       const percent = value => `${Math.max(0, Math.min(100, Number(value) || 0))}%`;
       if (node.dataset.barWidth !== undefined) node.style.width = percent(node.dataset.barWidth);
       if (node.dataset.blueShare !== undefined) node.style.setProperty("--blue-share", percent(node.dataset.blueShare));
       if (node.dataset.winRate !== undefined) node.style.setProperty("--recent-win-rate", percent(node.dataset.winRate));
+      if (node.dataset.tableWinrate !== undefined) node.style.setProperty("--table-winrate", percent(node.dataset.tableWinrate));
       if (node.dataset.skillCount !== undefined) node.style.setProperty("--skill-count", String(Math.max(1, Math.min(18, Number(node.dataset.skillCount) || 1))));
     }
   }

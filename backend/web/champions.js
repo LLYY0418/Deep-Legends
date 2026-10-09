@@ -1203,7 +1203,7 @@
     const specs = mayhemDetailTabSpecs(detail);
     const tabs = specs.map(([key, label]) => `<button type="button" role="tab" id="mayhem-detail-tab-${key}" aria-controls="mayhem-detail-panel-${key}" aria-selected="${active === key}" tabindex="${active === key ? "0" : "-1"}" class="${active === key ? "is-active" : ""}" data-mayhem-detail-tab="${key}">${label}</button>`).join("");
     // 海克斯图鉴与稀有度分布是跨英雄的全局维度，保留独立入口并复用既有视图状态机。
-    return `<div class="mayhem-detail-toolbar"><div class="mayhem-detail-tabs" role="tablist" aria-label="英雄详情分区" data-mayhem-detail-tabs style="--tab-count:${specs.length}">${tabs}</div><button type="button" class="mayhem-atlas-entry" data-mayhem-view="atlas" aria-label="离开当前英雄，查看全局海克斯图鉴与稀有度分布"><span aria-hidden="true">◈</span>海克斯图鉴</button></div>`;
+    return `<div class="mayhem-detail-toolbar"><div class="mayhem-detail-tabs" role="tablist" aria-label="英雄详情分区" data-mayhem-detail-tabs data-tab-count="${specs.length}">${tabs}</div><button type="button" class="mayhem-atlas-entry" data-mayhem-view="atlas" aria-label="离开当前英雄，查看全局海克斯图鉴与稀有度分布"><span aria-hidden="true">◈</span>海克斯图鉴</button></div>`;
   }
 
   // 只渲染当前 tab 的内容：隐藏 tab 一个节点都不进 DOM，因此不可能占布局高度
