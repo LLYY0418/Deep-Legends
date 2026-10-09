@@ -1,6 +1,8 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
 const { bootDemoApp, settled, installWindowCleanup } = require("./overview-render-helpers.cjs");
+const { waitForOverview } = require("./renderer-wait.cjs");
+
 installWindowCleanup(test);
 
 test('R86 filtering 200 loaded matches hides entries without rebuilding or refetching', async () => {
@@ -8,7 +10,7 @@ test('R86 filtering 200 loaded matches hides entries without rebuilding or refet
   const matchCount = mutate ? 30 : 200;
   const {window:w,errors}=bootDemoApp({matchCount,gameplaySourceTransform:mutate ? source=>source.replace('list.replaceWith(view.list);','view.list.innerHTML = view.list.innerHTML;list.replaceWith(view.list);') : undefined});
   try {
-    await settled();
+    await waitForOverview(w, matchCount);
     const d=w.document, before=[...d.querySelectorAll('.match-list .match-entry')];
     assert.equal(before.length,matchCount);
     let creates=0,requests=0;
