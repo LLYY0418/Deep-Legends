@@ -1934,19 +1934,6 @@
     </tr>`;
   }
 
-  function renderAugmentCard(item) {
-    const champions = objectRows(item.champions).slice(0, 5);
-    const rarity = augmentRarityKey(item.rarity);
-    return `<article class="augment-card is-${rarity}">
-      <header>${assetImage({ source: item.imageSource, path: item.imagePath, fallbackPath: item.imageFallbackPath, name: item.name, description: item.tooltip || item.description }, "augment-icon")}<span><strong>${escapeHTML(item.name)}</strong><small class="rarity-label is-${rarity}">${rarityLabel(rarity)}</small></span></header>
-      <p>${escapeHTML(item.description || item.tooltip || "暂无描述")}</p>
-      <footer><span>适配英雄</span><div>${champions.map((champion) => {
-        const meta = championMeta(champion.id);
-        return assetImage({ source: champion.imageSource || meta?.imageSource, path: champion.imagePath || meta?.imagePath, name: champion.name || meta?.nameZh || meta?.titleZh }, "augment-champion-icon");
-      }).join("") || "<small>暂无样本</small>"}</div></footer>
-    </article>`;
-  }
-
   function renderDetail() {
     const row = state.selected;
     const meta = row.meta || championMeta(row.championId);

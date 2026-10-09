@@ -167,21 +167,12 @@
 .augment-tier-group > header div { display: grid; }
 .augment-tier-group h4 { margin: 0; color: var(--ink); font-size: 13px; }
 .augment-tier-group > header p { margin: 1px 0 0; color: var(--muted); font-size: 10px; }
-.tier-badge.augment-tier-letter { width: 32px; height: 36px; }
 .augment-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap: 8px; padding: 8px 12px 12px; }
-.augment-card { display: grid; min-height: 188px; grid-template-rows: auto 1fr auto; padding: 13px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
-.augment-card header { display: grid; grid-template-columns: 52px minmax(0,1fr); align-items: center; gap: 10px; }
-.augment-card header > span:last-child { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; }
-.augment-card header strong { overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .augment-icon { width: 52px; height: 52px; border-radius: 10px; }
 .rarity-label { flex: 0 0 auto; padding: 3px 7px; color: var(--muted); background: var(--surface-strong); border-radius: 6px; font-size: 9px; font-weight: 750; }
 .rarity-label.is-prismatic { color: oklch(.58 .16 310); background: color-mix(in oklab,oklch(.72 .15 310) 16%,var(--surface)); }
 .rarity-label.is-gold { color: var(--primary-strong); background: var(--primary-soft); }
 .rarity-label.is-silver { color: var(--muted); }
-.augment-card > p { max-width: 68ch; margin: 12px 0; color: var(--ink); font-size: 11px; line-height: 1.6; white-space: pre-line; }
-.augment-card footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
-.augment-card footer > span { color: var(--muted); font-size: 9px; }
-.augment-card footer > div { display: flex; justify-content: flex-end; }
 .augment-champion-icon { width: 25px; height: 25px; margin-left: -4px; border: 2px solid var(--bg); border-radius: 7px; }
 
 /* 海克斯大乱斗：英雄榜 / 图鉴共用的模式内工作区。 */
@@ -660,7 +651,6 @@
   .mayhem-atlas-browser, .mayhem-atlas-detail { min-height: 280px; }
   .aram-champions .champion-table-scroll { max-height: 420px; }
   .augment-grid { grid-template-columns: 1fr; }
-  .augment-card { min-height: 210px; }
   .champion-detail-hero { grid-template-columns: 64px minmax(0,1fr); padding: 14px; }
   .champion-detail-portrait { width: 64px; height: 64px; }
   .champion-detail-title h2 { font-size: 19px; }

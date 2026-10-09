@@ -1289,8 +1289,6 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .game-icon.is-rune-style > span { display: none; }
 .game-icon.is-rune-style img { width: 100%; height: 100%; object-fit: contain; image-rendering: auto; }
 .unified-rune-row { display: flex; width: 100%; min-height: var(--rune-row-height); align-items: center; justify-content: center; gap: 8px; }
-.build-augment-grid { display: flex; min-height: 116px; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; padding: 16px; }
-.build-augment-grid .arena-augment-icon > .game-icon.is-large { width: 62px; height: 62px; flex-basis: 62px; }
 .live-augment-recommendations { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .live-augment-recommendations > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .live-augment-recommendations > header h3 { margin: 0; font-size: 13px; }

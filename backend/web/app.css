@@ -267,7 +267,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .skip-link { position: fixed; top: 8px; left: 8px; z-index: 50; transform: translateY(-160%); padding: 8px 12px; color: white; background: var(--accent); border-radius: var(--radius-sm); }
 .skip-link:focus { transform: translateY(0); }
 .startup-loading { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: color-mix(in oklab,var(--bg) 94%,transparent); opacity: 1; transition: opacity 180ms ease-out; }
-.startup-loading.is-leaving { pointer-events: none; opacity: 0; }
 .license-overlay { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:24px; padding-top:56px; padding-bottom:14px; overflow:hidden; background:var(--bg); }
 .license-overlay::before { content:""; position:fixed; inset:0 0 auto; height:56px; -webkit-app-region:drag; }
 .license-overlay[hidden], .app-frame[hidden] { display:none; }
@@ -423,10 +422,6 @@ html[data-license="pending"] .skip-link, html[data-license="pending"] .startup-l
 .region-server-grid .region-server-wide { grid-column: 1/-1; }
 .region-menu [data-region-option]:hover:not(:disabled), .region-menu [data-region-option]:focus-visible { background: color-mix(in oklab,var(--surface) 78%,transparent); }
 .region-menu [data-region-option][aria-checked="true"] { color: var(--primary-strong); background: var(--primary-soft); }
-.region-menu-kr { display: flex; width: 100%; min-height: 40px; align-items: center; gap: 8px; padding: 0 10px; color: var(--accent); background: transparent; border: 0; border-radius: 7px; text-align: left; }
-.region-menu-kr .region-option-check { margin-left: auto; visibility: hidden; }
-.region-menu-kr[aria-checked="true"] { color: var(--accent) !important; background: color-mix(in oklab,var(--accent) 13%,transparent) !important; }
-.region-menu-kr[aria-checked="true"] .region-option-check { visibility: visible; }
 .connection { min-width: 0; gap: 8px; min-height: 34px; padding: 0 10px; color: var(--muted); background: color-mix(in oklab,var(--surface) 74%,transparent); border-radius: 9px; white-space: nowrap; }
 .connection-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status-dot { width: 8px; height: 8px; background: var(--warning); border-radius: 50%; }

@@ -1675,6 +1675,17 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	// Season history is an incremental state slice. It must never block matches,
 	// ranks or player identity in the core overview response.
 
+	if rankCh == nil || masteryCh == nil || rankedCh == nil {
+		// The request was canceled before the profile loaders started. Their
+		// channels are nil, and receiving from a nil channel would park this
+		// request goroutine (and everything it references) forever.
+		phases.mark("ranks")
+		phases.mark("mastery")
+		phases.mark("recent_ranked")
+		phases.mark("recent_players")
+		a.publicizeOverviewReferences(&response)
+		return response
+	}
 	rankResultValue := <-rankCh
 	phases.markSpan("ranks", rankResultValue.started, rankResultValue.ended)
 	rankEntry := rankResultValue.value
