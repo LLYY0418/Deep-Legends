@@ -126,8 +126,9 @@ func (r *collectionReads) get(path string) ([]byte, error) {
 	entry := &collectionRead{done: make(chan struct{})}
 	r.entries[path] = entry
 	r.mu.Unlock()
+	// Waiters block on done; release them even if the read panics.
+	defer close(entry.done)
 	entry.data, entry.err = r.client.GetBytes(path)
-	close(entry.done)
 	return entry.data, entry.err
 }
 func (r *collectionReads) captured(path string) ([]byte, error) {

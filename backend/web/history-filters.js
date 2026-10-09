@@ -123,7 +123,7 @@
     } finally {if(tab.advancedSearch===search && search.token===token){search.running=false;ctx.render();}}
     return true;
   }
-  function ui(tab) {return tab.advancedMenu ||= {open:false,page:'conditions',category:'',query:'',sort:'count'};}
+  function ui(tab) {return tab.advancedMenu ||= {open:false,page:'conditions',category:'',query:'',sort:'count',renaming:-1};}
   function draft(tab,category) { return conditions(tab)[category] || ui(tab).drafts?.[category] || {values:[],not:false,scope:'team',side:'either',thresholds:{}}; }
   function summary(category,c,ctx) {
     const names=options(ctx.rows(),category,ctx,c);const text=c.values.map(v=>names.find(o=>o.value===v)?.label || labels[v] || v.replace('tag:','')).join(' / ');
@@ -133,7 +133,7 @@
   const button=(text,attribute,selected=false)=>`<button type="button" ${attribute}${selected?' class="is-active" aria-pressed="true"':' aria-pressed="false"'}>${text}</button>`;
   function menuBody(tab,ctx) {
     const m=ui(tab),saved=readPresets(ctx.storage),cs=conditions(tab);
-    if(m.page==='saved')return `<div class="af-saved-list">${saved.map((p,i)=>`<div class="af-saved-row"><button type="button" data-af-apply="${i}"><strong>${escape(p.name)}</strong><small>${Object.keys(p.conditions).map(k=>categories[k]).join(' · ')}</small></button><button type="button" data-af-rename="${i}" aria-label="重命名 ${escape(p.name)}">✎</button><button type="button" data-af-delete="${i}" aria-label="删除 ${escape(p.name)}">×</button></div>`).join('') || '<p class="af-empty">暂无常用筛选</p>'}</div><footer><span>${saved.length} / 12</span><input data-af-name placeholder="名称" aria-label="常用筛选名称" maxlength="60"><button type="button" data-af-save${!active(tab)?' disabled':''}>保存当前条件</button></footer>`;
+    if(m.page==='saved')return `<div class="af-saved-list">${saved.map((p,i)=>m.renaming===i ? `<div class="af-saved-row is-renaming"><input data-af-rename-input="${i}" value="${escape(p.name)}" maxlength="60" aria-label="新名称"><button type="button" data-af-rename-save="${i}" aria-label="保存名称">✓</button><button type="button" data-af-rename-cancel aria-label="取消重命名">×</button></div>` : `<div class="af-saved-row"><button type="button" data-af-apply="${i}"><strong>${escape(p.name)}</strong><small>${Object.keys(p.conditions).map(k=>categories[k]).join(' · ')}</small></button><button type="button" data-af-rename="${i}" aria-label="重命名 ${escape(p.name)}">✎</button><button type="button" data-af-delete="${i}" aria-label="删除 ${escape(p.name)}">×</button></div>`).join('') || '<p class="af-empty">暂无常用筛选</p>'}</div><footer><span>${saved.length} / 12</span><input data-af-name placeholder="名称" aria-label="常用筛选名称" maxlength="60"><button type="button" data-af-save${!active(tab)?' disabled':''}>保存当前条件</button></footer>`;
     const query=m.query.toLowerCase().trim();
     if(!m.category)return `<input class="af-search" data-af-query placeholder="搜索英雄、玩家或条件" aria-label="搜索条件" value="${escape(m.query)}"><div class="af-categories">${Object.entries(categories).filter(([k,label])=>!query || label.includes(query) || options(ctx.rows(),k,ctx,cs[k]).some(o=>searchOption(o,k,query,ctx))).map(([k,label])=>`<button type="button" data-af-category="${k}"><span>${label}</span><small>${options(ctx.rows(),k,ctx,cs[k]).length}</small><span>›</span></button>`).join('')}</div>`;
     const category=m.category,c=draft(tab,category);
@@ -171,9 +171,15 @@
     const current=()=>({tab:container._afBoundTab,ctx:container._afContext()});
     const update=(t,ctx,category,c)=>{const old=container.ownerDocument.activeElement,attr=[...(old?.attributes || [])].find(a=>a.name.startsWith('data-af-'));(ui(t).drafts ||= {})[category]=clone(c);t.advancedConditions=normalize({...conditions(t),[category]:c});ctx.change();const fresh=attr && [...container.querySelectorAll('['+attr.name+']')].find(node=>node.getAttribute(attr.name)===attr.value);(fresh || container.querySelector('[data-af-open]'))?.focus();};
     const redraw=(t,ctx,focus=false)=>{ctx.render();const fresh=ctx.container?.() || container;if(focus)fresh.querySelector('[data-af-query]')?.focus();};
-    const open=(t,ctx,category='',page='conditions')=>{if(category==='hero')ctx.ensureSearch?.();Object.assign(ui(t),{open:true,category,page,query:''});redraw(t,ctx,true);};
+    // Electron does not implement window.prompt, so saved filters are renamed inline.
+    const renamePreset=(t,ctx,i)=>{const m=ui(t),saved=readPresets(ctx.storage),input=(ctx.container?.() || container).querySelector(`[data-af-rename-input="${i}"]`),name=String(input?.value || '').trim().slice(0,60);
+      if(!saved[i]){m.renaming=-1;redraw(t,ctx);return;}
+      if(!name){input?.focus();return;}
+      if(saved.some((p,index)=>index!==i && p.name===name)){ctx.error?.('已有同名常用筛选');input?.focus();return;}
+      saved[i].name=name;if(!writePresets(ctx.storage,saved))ctx.error?.('常用筛选保存失败');m.renaming=-1;redraw(t,ctx);};
+    const open=(t,ctx,category='',page='conditions')=>{if(category==='hero')ctx.ensureSearch?.();Object.assign(ui(t),{open:true,category,page,query:'',renaming:-1});redraw(t,ctx,true);};
     container.addEventListener('click',event=>{
-      const target=event.target.closest('[data-af-open],[data-af-category],[data-af-remove],[data-af-add],[data-af-clear],[data-af-stop],[data-af-continue],[data-af-show-saved],[data-af-page],[data-af-back],[data-af-option],[data-af-not],[data-af-setting],[data-af-sort],[data-af-save],[data-af-apply],[data-af-rename],[data-af-delete]');if(!target)return;
+      const target=event.target.closest('[data-af-open],[data-af-category],[data-af-remove],[data-af-add],[data-af-clear],[data-af-stop],[data-af-continue],[data-af-show-saved],[data-af-page],[data-af-back],[data-af-option],[data-af-not],[data-af-setting],[data-af-sort],[data-af-save],[data-af-apply],[data-af-rename],[data-af-rename-save],[data-af-rename-cancel],[data-af-delete]');if(!target)return;
       const {tab:t,ctx}=current(),m=ui(t),cs=conditions(t),category=m.category,c=clone(draft(t,category)),d=target.dataset;
       if('afOpen'in d){m.open=!m.open;redraw(t,ctx,m.open);}
       else if('afCategory'in d)open(t,ctx,d.afCategory);
@@ -183,18 +189,20 @@
       else if('afClear'in d){t.advancedConditions={};m.open=false;ctx.change();}
       else if('afStop'in d){ctx.stop();redraw(t,ctx);}
       else if('afContinue'in d)ctx.find();
-      else if('afPage'in d){Object.assign(m,{page:d.afPage,category:'',query:''});redraw(t,ctx);}
+      else if('afPage'in d){Object.assign(m,{page:d.afPage,category:'',query:'',renaming:-1});redraw(t,ctx);}
       else if('afBack'in d){Object.assign(m,{category:'',query:''});redraw(t,ctx,true);}
       else if('afSort'in d){m.sort=d.afSort;redraw(t,ctx);}
       else if('afOption'in d){c.values=c.values.includes(d.afOption)?c.values.filter(v=>v!==d.afOption):[...c.values,d.afOption];update(t,ctx,category,c);}
       else if('afNot'in d){c.not=d.afNot==='true';if(cs[category])update(t,ctx,category,c);else{(m.drafts ||= {})[category]=c;redraw(t,ctx);}}
       else if('afSetting'in d){c[d.afSetting]=d.afValue;if(cs[category])update(t,ctx,category,c);else{(m.drafts ||= {})[category]=c;redraw(t,ctx);}}
+      else if('afRenameSave'in d)renamePreset(t,ctx,Number(d.afRenameSave));
+      else if('afRenameCancel'in d){m.renaming=-1;redraw(t,ctx);}
       else if('afSave'in d){const name=container.querySelector('[data-af-name]')?.value;if(!savePreset(ctx.storage,name,cs))ctx.error?.('常用筛选保存失败');else redraw(t,ctx);}
       else {
         const saved=readPresets(ctx.storage),i=Number(d.afApply ?? d.afRename ?? d.afDelete);
         if('afApply'in d){t.advancedConditions=clone(saved[i]?.conditions || {});m.open=false;ctx.change();}
         else if('afDelete'in d){saved.splice(i,1);if(!writePresets(ctx.storage,saved))ctx.error?.('常用筛选保存失败');redraw(t,ctx);}
-        else if('afRename'in d){const name=ctx.rename?.(saved[i]?.name);if(name?.trim()){saved[i].name=name.trim().slice(0,60);if(!writePresets(ctx.storage,saved))ctx.error?.('常用筛选保存失败');redraw(t,ctx);}}
+        else if('afRename'in d){if(!saved[i])return;m.renaming=i;redraw(t,ctx);const input=(ctx.container?.() || container).querySelector('[data-af-rename-input]');input?.focus();input?.select();}
       }
     });
     container.addEventListener('change',event=>{
@@ -205,6 +213,11 @@
     container.addEventListener('input',event=>{if(!event.target.matches('[data-af-query]'))return;const {tab:t,ctx}=current();ui(t).query=event.target.value;if(event.target.value)ctx.ensureSearch?.();const body=event.target.closest('.af-menu-body');const position=event.target.selectionStart;body.innerHTML=menuBody(t,ctx);const input=body.querySelector('[data-af-query]');input?.focus();input?.setSelectionRange(position,position);ctx.prepare?.(body);});
     container.addEventListener('keydown',event=>{
       const {tab:t,ctx}=current(),m=ui(t);
+      if(event.target.matches('[data-af-rename-input]')){
+        if(event.key==='Enter'){event.preventDefault();renamePreset(t,ctx,Number(event.target.dataset.afRenameInput));}
+        else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();m.renaming=-1;redraw(t,ctx);}
+        return;
+      }
       if(event.key==='Escape' && m.open){m.open=false;redraw(t,ctx);container.querySelector('[data-af-open]')?.focus();}
       if(event.key==='Enter' && event.target.matches('[data-af-query]')){event.preventDefault();const category=m.category || Object.keys(categories).find(k=>categories[k].includes(m.query.trim()) && m.query.trim()) || Object.keys(categories).find(k=>options(ctx.rows(),k,ctx,conditions(t)[k]).some(o=>searchOption(o,k,m.query.toLowerCase(),ctx)));if(category){const option=options(ctx.rows(),category,ctx,conditions(t)[category]).find(o=>searchOption(o,category,m.query.toLowerCase(),ctx));if(option){const c=clone(conditions(t)[category] || {values:[],not:false});c.values=[...new Set([...c.values,option.value])];update(t,ctx,category,c);}else open(t,ctx,category);}}
     });

@@ -4997,7 +4997,7 @@
       ensureSearch:()=>{void ensureHistoryFilterSearch(tab);},
       icon:(id,label)=>iconFigure("champion",id,label,"small",false),positionIcon,multiTag:renderMultiKillTag,
       container:()=>overviewContainer(tab),prepare:prepareImages,error:showToast,
-      rename:name=>window.prompt("筛选名称",name),isActive,
+      isActive,
       stop:()=>cancelAdvancedMatchSearch(tab),
       load:count=>loadOverview(tab,false,true,true,false,count),
       find:()=>af.find(tab,advancedFilterContext(tab)),

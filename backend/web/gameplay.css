@@ -2304,6 +2304,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .af-menu .af-saved-row > button:first-child { flex: 1; flex-direction: column; align-items: start; min-width: 0; gap: 3px; }
 .af-menu .af-saved-row > button:not(:first-child) { width: 28px; flex: 0 0 28px; padding: 4px; justify-content: center; }
 .af-saved-row small { font-size: 10px; color: var(--muted); }
+.af-saved-row.is-renaming { gap: 4px; padding: 0 2px; }
+.af-saved-row.is-renaming input { min-width: 0; flex: 1; height: 30px; background: var(--surface); border: 1px solid var(--primary); color: var(--ink); border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 12px; }
 .af-menu footer { flex: 0 0 42px; display: flex; align-items: center; gap: 7px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 11px; }
 .af-menu footer span { white-space: nowrap; }
 .af-menu footer input { min-width: 0; width: 62px; flex: 1; height: 30px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); border-radius: 6px; padding: 4px; }

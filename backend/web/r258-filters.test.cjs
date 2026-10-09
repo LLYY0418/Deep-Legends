@@ -106,3 +106,23 @@ test('R258 P7 shared hero search accepts Chinese, pinyin, initials and aliases',
  for(const query of ['阿狸','狐狸','ali','AL','jwyh','Ahri','九尾'])assert(score(query,103,'阿狸',meta)>0,query);
  assert.equal(score('德玛',103,'阿狸',meta),0);
 });
+
+test('saved filters rename inline because Electron has no window.prompt',()=>{
+ const dom=new JSDOM('<main></main>',{url:'http://fixture'}),root=dom.window.document.querySelector('main');
+ const tab={advancedConditions:{result:condition(['win'])},data:{matches:[match()],pagination:{hasMore:false}}},c=ctx(),errors=[];
+ Object.assign(c,{rows:()=>tab.data.matches,cursor:()=>20,storage:dom.window.localStorage,container:()=>root,error:message=>errors.push(message),render:()=>{root.innerHTML=af.render(tab,()=>c)+af.renderConditions(tab,()=>c);af.bind(root,tab,()=>c)},change:()=>c.render(),stop:()=>af.cancel(tab),find(){}});
+ assert(af.savePreset(c.storage,'常用A',{result:condition(['win'])}));assert(af.savePreset(c.storage,'常用B',{result:condition(['loss'])}));
+ c.render();root.querySelector('[data-af-show-saved]').click();
+ assert.doesNotMatch(fs.readFileSync(__dirname+'/gameplay.js','utf8'),/window\.prompt\(/);
+ root.querySelector('[data-af-rename="0"]').click();
+ const input=root.querySelector('[data-af-rename-input="0"]');assert.equal(dom.window.document.activeElement,input);assert.equal(input.value,'常用A');
+ input.value='常用B';root.querySelector('[data-af-rename-save="0"]').click();
+ assert.deepEqual(errors,['已有同名常用筛选']);assert.equal(af.readPresets(c.storage)[0].name,'常用A');
+ input.value='  排位胜场  ';input.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+ assert.deepEqual(af.readPresets(c.storage).map(p=>p.name),['排位胜场','常用B']);assert(!root.querySelector('[data-af-rename-input]'));
+ assert.equal(root.querySelector('[data-af-menu]').hidden,false);
+ root.querySelector('[data-af-rename="1"]').click();
+ root.querySelector('[data-af-rename-input="1"]').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+ assert(!root.querySelector('[data-af-rename-input]'));assert.equal(root.querySelector('[data-af-menu]').hidden,false);assert.equal(af.readPresets(c.storage)[1].name,'常用B');
+ dom.window.close();
+});
