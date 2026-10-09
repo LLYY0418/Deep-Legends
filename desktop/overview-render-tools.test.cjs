@@ -13,7 +13,7 @@ const { JSDOM } = require("jsdom");
 
 const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, suiteStyles, functionSource, compileFunctions, collapsedBeaconStyles, bootDemoApp, settled, installWindowCleanup, visitTool, bootLiveTab } = require("./overview-render-helpers.cjs");
 
-const { waitForOverview } = require("./renderer-wait.cjs");
+const { waitForOverview, waitForRender, waitForWatch } = require("./renderer-wait.cjs");
 
 installWindowCleanup(test);
 
@@ -21,7 +21,7 @@ test("演示数据下工具五个页签都渲染完成", async () => {
   const { window: w, errors } = bootDemoApp();
   await waitForOverview(w, 17);
   w.document.querySelector('[data-section="suite"]').click();
-  await settled();
+  await waitForWatch(w);
   for (const name of ["watch", "rig", "facade", "sweep", "champselect"]) {
     await visitTool(w, name);
     const root = w.document.getElementById(`suite-${name}-root`);
@@ -41,7 +41,7 @@ test("演示数据下工具五个页签都渲染完成", async () => {
   const hiddenAcceptedPolicy = w.document.querySelector('.watch-invite-more [data-watch-policy-cycle="1700"]');
   assert.ok(hiddenAcceptedPolicy, "邀请详情缺少斗魂竞技场策略");
   hiddenAcceptedPolicy.click();
-  await settled();
+  await waitForRender(w, () => w.document.querySelector('.watch-invite-summary > [data-watch-policy-cycle="1700"]')?.textContent === "斗魂竞技场 · 接受", "accepted invitation policy did not render");
   assert.equal(w.document.querySelector('.watch-invite-summary > [data-watch-policy-cycle="1700"]')?.textContent, "斗魂竞技场 · 接受", "接受策略保存后没有移到卡片外层展示");
   assert.match(w.document.querySelector('[data-watch-card="auto-matchmaking"]')?.textContent || "", /最少人数[\s\S]*延时/, "自动匹配卡缺少设计稿参数");
   assert.ok(w.document.querySelector("#suite-rig-root .rig-layout"), "维护页未渲染");
@@ -86,7 +86,7 @@ test("2351 自定义暂停事件保留真实总开关和卡片高亮", async () 
   try {
     await waitForOverview(w, 17);
     w.document.querySelector('[data-section="suite"]').click();
-    await settled();
+    await waitForWatch(w);
     const root = w.document.getElementById("suite-watch-root");
     const enabled = root.querySelectorAll(".watch-rule.is-enabled").length;
     assert.ok(enabled > 0);
@@ -114,7 +114,8 @@ test("R149 收藏页仍可独立进入头像与旗帜视图", async () => {
       w.document.querySelector('[data-section="favorites"]').click();
       w.document.querySelector('[data-favorites-page="facade-collection"]').click();
       w.document.getElementById(`facade-view-${view}`).click();
-      await settled();
+      await waitForRender(w, () => w.document.getElementById(`facade-view-${view}`).getAttribute("aria-selected") === "true"
+        && !w.document.getElementById("favorites-facade-panel").hidden, "facade collection did not open");
       assert.equal(w.document.querySelector('[data-section="favorites"]').getAttribute("aria-selected"), "true");
       assert.equal(w.document.querySelector('[data-favorites-page="facade-collection"]').getAttribute("aria-selected"), "true");
       assert.equal(w.document.getElementById("favorites-facade-panel").hidden, false);
@@ -268,7 +269,7 @@ test("全部原生下拉都增强为可键盘操作的应用菜单，包含动�
   }
 
   w.document.querySelector('[data-section="champions"]').click();
-  await settled();
+  await waitForRender(w, () => w.document.querySelector('#champions-panel [data-champion-tier]')?.parentElement.querySelector('[data-app-select-trigger]'), "champion tier menu did not render");
   const tierSelect = w.document.querySelector("#champions-panel [data-champion-tier]");
   assert.ok(tierSelect, "英雄页缺少段位下拉");
   const tierRoot = tierSelect.parentElement.querySelector(":scope > .native-select-menu");
