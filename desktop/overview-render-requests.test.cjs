@@ -13,7 +13,7 @@ const { JSDOM } = require("jsdom");
 
 const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, suiteStyles, functionSource, compileFunctions, collapsedBeaconStyles, bootDemoApp, settled, installWindowCleanup, visitTool, bootLiveTab } = require("./overview-render-helpers.cjs");
 
-const { waitForOverview } = require("./renderer-wait.cjs");
+const { waitForOverview, waitForRender, waitForWatch } = require("./renderer-wait.cjs");
 
 installWindowCleanup(test);
 
@@ -22,7 +22,7 @@ test("收藏账户条复用主页背景和圆头像，并只保留两项事实",
   await waitForOverview(w, 17);
   w.document.querySelector('[data-section="favorites"]').click();
   w.document.querySelector('[data-favorites-page="account"]').click();
-  await settled();
+  await waitForRender(w, () => w.document.querySelector('#account-content .account-hero') && w.document.getElementById('account-live-state'), "account panel did not render");
   const hero = w.document.querySelector("#account-content .account-hero");
 	assert.equal(w.document.querySelector("#favorites-account-panel h2"), null, "账户页旧标题仍在");
 	assert.ok(w.document.getElementById("account-live-state"), "账户连接状态被误删");
@@ -133,7 +133,7 @@ test("渲染异常会切到可重试的错误态，而不是永远停在骨架�
     return previousFetch(input, init);
   };
   w.document.getElementById("overview-refresh").click();
-  await settled();
+  await waitForRender(w, () => overview.querySelector('[data-gameplay-retry]') && overview.textContent.includes('总览渲染失败') && !overview.querySelector('.gameplay-skeleton'), "render failure did not reach retry state");
   assert.ok(!overview.querySelector(".gameplay-skeleton"), "渲染失败后不应停在骨架屏");
   assert.match(overview.textContent, /总览渲染失败/, "渲染失败后应展示错误态");
   assert.ok(overview.querySelector("[data-gameplay-retry]"), "错误态应带重试按钮");
@@ -172,7 +172,9 @@ test("客户端退出后清空本人总览，国服空分组显示启动入口",
     return new w.Response(JSON.stringify({ ...status, clientView:{type:"client-view",state:"no-client",generation:status.clientView.generation+1}, connected: false, identityReady: false, snapshotReady: false, clientDiscovery: "process-not-found" }));
   };
   eventSources.at(-1).onmessage({ data: "resync-required" });
-  await settled();
+  await waitForRender(w, () => overview.textContent === '' && !w.document.getElementById('client-launchpad').hidden
+    && /国服纯净入口/.test(w.document.getElementById('client-launchpad').textContent)
+    && /WeGame/.test(w.document.getElementById('client-launchpad').textContent), "client exit did not reach launchpad");
   assert.equal(overview.textContent, "");
   assert.equal(overview.querySelector("[data-gameplay-retry]"), null);
   assert.equal(w.document.getElementById("client-launchpad").hidden, false);
