@@ -13,3 +13,13 @@ test('R230 preload exposes only bounded clipboard write IPC and main rejects oth
  assert.equal(handler({sender,senderFrame:{}},'bad'),false);
  assert.equal(handler({sender,senderFrame:frame},'a'.repeat(257)),false);assert.deepEqual(writes,['召唤师#编号']);
 });
+
+test('trusted main window may write, but not read, the clipboard through navigator.clipboard',()=>{
+ const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');
+ const declared=main.match(/const DESKTOP_RENDERER_PERMISSIONS = (new Set\([^;]+\));/);assert(declared);
+ const permissions=vm.runInNewContext(declared[1]);
+ assert(permissions.has('clipboard-sanitized-write'));assert(permissions.has('fullscreen'));assert(!permissions.has('clipboard-read'));
+ assert.match(main,/DESKTOP_RENDERER_PERMISSIONS\.has\(permission\) && isTrustedRenderer\(webContents\)/);
+ assert.match(main,/setPermissionCheckHandler\(\(webContents, permission\) => allowedPermission\(webContents, permission\)\)/);
+ assert.match(main,/setPermissionRequestHandler\(\(webContents, permission, callback\) => callback\(allowedPermission\(webContents, permission\)\)\)/);
+});

@@ -53,6 +53,7 @@ const APP_ID = "cn.hexcore.lootassistant";
 const READY_PREFIX = "LOOT_READY ";
 const READY_TIMEOUT_MS = 25_000;
 const SHUTDOWN_TIMEOUT_MS = 1_500;
+const DESKTOP_RENDERER_PERMISSIONS = new Set(["fullscreen", "clipboard-sanitized-write"]);
 
 let mainWindow = null;
 let splashWindow = null;
@@ -910,8 +911,12 @@ app.whenReady().then(() => {
   startupMarks.appReady = Date.now();
   recordRelaunchCompletion();
   processMetrics=require("./process-metrics.cjs").startProcessMetrics({app,getBackendPid:()=>backend?.pid,report:row=>appendDesktopLog("进程指标 "+JSON.stringify(row))});
-  session.defaultSession.setPermissionCheckHandler((webContents, permission) => permission === "fullscreen" && isTrustedRenderer(webContents));
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => callback(permission === "fullscreen" && isTrustedRenderer(webContents)));
+  // navigator.clipboard.writeText asks for clipboard-sanitized-write; denying it
+  // made every in-page copy (skin ID, diagnostics, summoner name) fail with
+  // "Write permission denied". Reading the clipboard stays denied.
+  const allowedPermission = (webContents, permission) => DESKTOP_RENDERER_PERMISSIONS.has(permission) && isTrustedRenderer(webContents);
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) => allowedPermission(webContents, permission));
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => callback(allowedPermission(webContents, permission)));
   createSplashWindow();
   startupMarks.splashCreated = Date.now();
   // Normally the splash's did-finish-load starts the backend a few frames from
