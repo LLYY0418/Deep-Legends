@@ -1,6 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$Setup)
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'r252-diagnostic-time.ps1')
+. (Join-Path $PSScriptRoot 'r261-window-bounds.ps1')
 # The candidate is whatever desktop/package.json declares, so a version bump
 # needs no edits here.
 $candidateVersion = (& node -p "require('./desktop/package.json').version").Trim()
@@ -81,18 +82,12 @@ try {
     # 1050x750 rectangle can be clamped by the CI desktop and legitimately saved
     # at another size; that does not measure whether the upgrade retained it.
     $boundsFile = Join-Path $userData 'window-bounds.json'
-    # The installer exits before Electron has necessarily shown its main
-    # window. Force-killing it here bypasses the real close/persistence path.
-    # Use the existing 180s setup deadline; never invent a rectangle or extend
-    # that budget. A normal close records the actual displayed window bounds.
-    while (-not (Test-Path $boundsFile) -and (Get-Date) -lt $script:lastSetupDeadline) {
-        Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $install 'Deep Legends.exe') -and $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -eq 'Deep Legends' } | ForEach-Object { [void]$_.CloseMainWindow() }
-        Start-Sleep -Milliseconds 50
-    }
+    # Wait for a real normal close and for all Electron writers to exit before
+    # reading the final snapshot. Existence alone also matches a truncated file.
+    $publishedBounds = Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline $script:lastSetupDeadline -EvidencePath (Join-Path $evidence '076-window-bounds-wait.json')
     Stop-InstalledApp
     if (-not (Test-Path $userData)) { throw '0.12.76 did not initialize its actual Electron userData directory' }
     if (-not (Test-Path $boundsFile)) { throw '0.12.76 did not persist its actual window bounds' }
-    $publishedBounds = [IO.File]::ReadAllText($boundsFile)
     $publishedBoundsValue = $publishedBounds | ConvertFrom-Json
     if ($publishedBoundsValue.width -le 0 -or $publishedBoundsValue.height -le 0 -or $null -eq $publishedBoundsValue.x -or $null -eq $publishedBoundsValue.y) { throw 'Invalid actual 0.12.76 window bounds' }
     [IO.File]::WriteAllText((Join-Path $evidence '076-window-bounds-before.json'),$publishedBounds,(New-Object Text.UTF8Encoding($false)))
