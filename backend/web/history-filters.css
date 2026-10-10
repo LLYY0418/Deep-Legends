@@ -17,7 +17,7 @@
 .af-hit { outline: 1.5px solid var(--primary-strong); outline-offset: 2px; border-radius: 5px; }
 @media (max-width: 1019px) {.af-conditionbar{flex-direction:column}.af-counts{width:100%}}
 /* Native modal top layer escapes the overview's scrolling/stacking contexts. */
-.af-menu { box-sizing: border-box; width: min(880px,92vw); height: min(640px,86vh); max-width: 92vw; max-height: 86vh; margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--ink); box-shadow: 0 24px 64px color-mix(in oklab,var(--ink) 28%,transparent); overflow: hidden; }
+.af-menu { box-sizing: border-box; width: min(880px,92vw); height: min(640px,86vh); max-width: 92vw; max-height: 86vh; margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--ink); box-shadow: none; overflow: hidden; }
 .af-menu[open] { display: flex; flex-direction: column; }
 .af-menu[hidden] { display: none; }
 .af-menu::backdrop { background: color-mix(in oklab,var(--sidebar-bg,var(--ink)) 62%,transparent); backdrop-filter: blur(1.5px); }
@@ -67,12 +67,18 @@
 .af-thresholds { display: flex; gap: 10px; flex-wrap: wrap; }
 .af-thresholds label { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; height: 36px; color: var(--muted); font-size: 12px; }
 .af-thresholds input { width: 52px; height: 24px; border: 0; background: var(--surface); color: var(--ink); border-radius: 6px; text-align: center; }
-.af-modal-footer { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 10px 14px; border-top: 1px solid var(--line); background: color-mix(in oklab,var(--surface) 55%,var(--bg)); }
-.af-modal-footer .af-capsules { flex: 1; min-width: 0; flex-wrap: nowrap; overflow: auto; }
-.af-modal-footer .af-capsule { flex-shrink: 0; }
-.af-capsules-more { display: none; }
-.af-modal-footer > span { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.af-modal-footer > button { height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; white-space: nowrap; font-size: 13px; }
+.af-modal-footer { position: relative; display: flex; align-items: center; gap: 8px; min-height: 64px; padding: 10px 12px; border-top: 1px solid var(--line); background: color-mix(in oklab,var(--surface) 55%,var(--bg)); }
+.af-capsule-slot { flex: 1; min-width: 0; min-height: 36px; display: flex; align-items: center; }
+.af-modal-footer .af-capsules { width: 100%; min-width: 0; flex-wrap: nowrap; overflow: clip; align-items: center; }
+.af-modal-footer .af-capsule { flex-shrink: 0; max-width: none; }
+.af-modal-footer .af-capsule button:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.af-modal-footer .af-capsule button { padding: 4px 5px; }
+.af-modal-footer .af-capsule button:last-child { flex-shrink: 0; }
+.af-modal-footer .af-capsule[hidden], .af-capsules-more[hidden] { display: none; }
+.af-capsules-more { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; min-width: 40px; height: 30px; padding: 0 8px; border: 1px solid var(--primary) !important; border-radius: 12px; color: var(--primary-strong) !important; font-size: 11px !important; font-variant-numeric: tabular-nums; }
+.af-modal-footer .af-capsules.is-expanded { position: absolute; bottom: calc(100% + 8px); left: 12px; width: calc(100% - 24px); padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); flex-wrap: wrap; }
+.af-modal-footer > span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.af-modal-footer > button { height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; white-space: nowrap; font-size: 12px; }
 .af-modal-footer > .af-done { background: var(--primary); color: var(--on-primary,var(--bg)); font-weight: 700; }
 .af-menu.is-saved { height: fit-content; max-height: min(640px,86vh); }
 .af-menu.is-saved .af-menu-body { flex: 0 1 auto; }
@@ -99,17 +105,9 @@
  .af-categories > button { flex: 0 0 auto; width: auto; min-height: 40px; }
  .af-categories i { display: none; }
  .af-options.is-hero { grid-template-columns: repeat(5,minmax(0,1fr)); }
- .af-modal-footer { position: relative; gap: 8px; }
- .af-modal-footer .af-capsules { overflow: hidden; }
- .af-modal-footer .af-capsule { min-width: 0; flex-shrink: 1; }
- .af-modal-footer .af-capsule button:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
- .af-modal-footer .af-capsule:nth-child(n+2) { display: none; }
- .af-modal-footer .af-capsules-more { display: block; flex-shrink: 0; border: 1px solid var(--primary); border-radius: 12px; color: var(--primary-strong); }
- .af-modal-footer .af-capsules.is-expanded { position: absolute; bottom: 64px; left: 14px; right: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); flex-wrap: wrap; }
- .af-modal-footer .af-capsules.is-expanded .af-capsule { display: inline-flex; }
- .af-modal-footer > span { margin-right: auto; }
 }
 @media (max-width: 500px) { .af-options.is-hero { grid-template-columns: repeat(4,minmax(0,1fr)); } .af-saved-row { flex-wrap: wrap; } }
 
 .af-options:not(.is-hero):not(.is-multikill) { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); }
 .af-options:not(.is-hero):not(.is-multikill) > button { justify-content: center; min-height: 46px; }
+.af-options [data-af-winrate].is-winning { color: var(--success); }

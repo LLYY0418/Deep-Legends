@@ -7,12 +7,9 @@ import math
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-REPORTS = ROOT / "docs/history/reports/r266"
-INPUTS = REPORTS / "user-logs"
 parser = argparse.ArgumentParser()
 parser.add_argument("--input", type=Path)
-parser.add_argument("--output", type=Path, default=REPORTS / "log-coverage.json")
+parser.add_argument("--output", type=Path, required=True)
 args = parser.parse_args()
 total, minutes, score_count = 10_600_000, 37, 694
 composition = {"pro_players": (13, 22_000), "refresh_succeeded": (6, 36_600),
@@ -46,8 +43,8 @@ result = {"target_hours": 3, "simulation_label": "模拟，非实测", "source":
           "模拟估算值": simulations, "实测值": "待用户提供日志", "measured_acceptance_closed": False}
 if args.input:
     file = args.input.resolve()
-    if INPUTS.resolve() not in file.parents or file.suffix != ".gz":
-        raise SystemExit("Use a compressed .gz export inside docs/history/reports/r266/user-logs/.")
+    if file.suffix != ".gz":
+        raise SystemExit("Use a compressed .gz export.")
     timestamps, counts, bytes_read, invalid = [], {}, 0, 0
     with gzip.open(file, "rt", encoding="utf8", errors="replace") as stream:
         for line in stream:

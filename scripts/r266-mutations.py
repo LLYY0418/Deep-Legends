@@ -1,4 +1,5 @@
 """R266 assertion mutations run in temporary copies; production files are never edited."""
+import argparse
 import hashlib
 import json
 import os
@@ -9,7 +10,9 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "docs/history/reports/r266/mutations"
+parser = argparse.ArgumentParser()
+parser.add_argument("--out", type=Path, required=True)
+OUT = parser.parse_args().out
 OUT.mkdir(parents=True, exist_ok=True)
 results = []
 env = dict(os.environ, RIOT_API_KEY="RGAPI-00000000-0000-0000-0000-000000000000")
