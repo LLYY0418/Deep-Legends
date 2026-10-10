@@ -84,6 +84,7 @@ test('R265 partial sample boundaries and all five dependent cards; complete samp
   const data={matches:Array.from({length:k},(_,gameId)=>({gameId})),historyRequested:n,historyLoaded:k,pagination:{count:n,partial},activityHours:Array(24).fill(0)},tab={data};
   assert.equal(f.historyStatsPending(data,tab),weak,`N=${n},k=${k}`);
   const cards=new Map(f.careerSectionEntries(data,tab));
+  if(partial){data.pagination.partial=false;data.capabilities=[{name:'match-history',state:'failed'}];assert.deepEqual(new Map(f.careerSectionEntries(data,tab)),cards,'capability-only failure keeps partial titles and labels');}
   for(const key of ['recent-ranked','ability','positions','recent-players','activity']){
    const html=cards.get(key);
    if(weak){assert.match(html,/战绩未读全/);assert.doesNotMatch(html,/暂无重复同场玩家|activity-cell|基于最近/);}
@@ -97,6 +98,15 @@ test('R265 empty foreign outage describes no matches while compact stays one lin
  assert.match(f.renderHistoryServiceStatus({}),/暂时没有读取到对局，恢复后会自动补齐。/);
  assert.doesNotMatch(f.renderHistoryServiceStatus({}),/已显示能读取到的部分/);
  assert.match(f.renderHistoryServiceStatus({},true),/<span>外服战绩连接较慢<\/span>/);
+});
+test('R265 partial card headers have one sample description and restore complete titles',()=>{
+ const f=compile(source,['renderRecentRanked','renderPositionStats','renderRecentPlayers'],{escapeHTML,number:String,percent:n=>`${n||0}%`,kda:String,isMayhemQueueId:()=>false,rankedQueueNoun:()=> '排位',rankedQueueLabel:()=> '单双排',positionLabel:()=> '上单',positionIcon:()=> '',state:{settings:{maskNames:true}},maskedListName:()=> '同场测试',maskedProfileIcon:()=> '',iconFigure:()=> '',proBadgeAttributes:()=> ''});
+ const stats={games:7,wins:5,losses:2,winRate:71,positions:[]};
+ for(const partial of [true,false]){
+  const recent=f.renderRecentRanked(stats,420,'',partial),positions=f.renderPositionStats([{position:'top',games:7,share:100}],420,'','单双排',7,partial),players=f.renderRecentPlayers([{games:7}],{},false,partial);
+  if(partial){assert.match(recent,/<h3>近期排位<\/h3>/);assert.doesNotMatch(recent,/近 7 场排位/);assert.doesNotMatch(positions,/近 7 场/);assert.doesNotMatch(players,/最近 30 天/);}
+  else{assert.match(recent,/<h3>近 7 场排位<\/h3>/);assert.match(positions,/近 7 场/);assert.match(players,/最近 30 天/);}
+ }
 });
 test('R265 final incremental frame keeps the running marker until completion render finishes',async()=>{
  const h=clock(),tab={};let pending=true,finish;

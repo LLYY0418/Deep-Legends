@@ -1933,7 +1933,7 @@ test("summoner banner and recent ranked summary expose verified profile highligh
 	assert.doesNotMatch(wrapped, /\.summoner-strip-highlights\s*\{[^}]*justify-content:\s*flex-end/s);
 	assert.match(wrapped, /\.summoner-highlight\s*\{[^}]*min-width:\s*0/s);
 	assert.match(gameplayScript, /\["recent-ranked", renderRecentRanked\(recentQueue\.recentRanked, recentQueue\.queueId/);
-	assert.match(gameplayScript, /function renderRecentRanked\(stats, queueId = 0, queueSwitcher = ""\)/);
+	assert.match(gameplayScript, /function renderRecentRanked\(stats, queueId = 0, queueSwitcher = "", partialHistory = false\)/);
 	assert.match(gameplayScript, /data-win-rate="\$\{Number\(stats\.winRate\) \|\| 0\}"/);
 	assert.match(gameplayScript, /killParticipationGames/);
 	assert.match(gameplayScript, /平均 K \/ D \/ A/);

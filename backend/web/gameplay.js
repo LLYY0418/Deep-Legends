@@ -2146,6 +2146,7 @@
 
   function careerSectionEntries(data, tab) {
     const pendingStats=historyStatsPending(data,tab);
+    const partialHistory=Boolean(data.pagination?.partial || tab?.initialPagePending || tab?.initialPageError || tab?.loading || data.capabilities?.some(item=>item.name==="match-history" && item.state==="failed"));
     const recentHistoryCapability = (data.capabilities || []).find((item) => item.name === "seven-day-history");
     const recentQueue = rankedQueueData(data, tab, "recent");
     const abilityQueue = rankedQueueData(data, tab, "ability");
@@ -2159,14 +2160,14 @@
     const championProgress = opggSeason ? { season: opggSeason.season, complete: true, tableSupported:true, foreign:true, scannedGames:opggSeason.overall.games, message: `${tab.opggSeasonStale ? "缓存 · " : ""}${number(opggSeason.overall.games)} 场排位` } : missingKRSeason ? { seasonOnly: true, foreign:true, tableSupported:!data.player?.privateHistory, unavailable: true, message: data.player?.privateHistory ? "该玩家战绩不可公开查询" : tab?.opggSeasonPending || !tab?.opggSeasonAttemptRef ? "正在读取本赛季英雄统计…" : "本赛季英雄统计暂不可用，请刷新重试" } : data.seasonStatsProgress;
     return [
 	  ["ranks", renderRanks(data.ranks || [], data.capabilities || [], data.historicalRanks || [], data.rankMilestones, data.seasonStatsProgress, tab)],
-	  ["recent-ranked", renderRecentRanked(recentQueue.recentRanked, recentQueue.queueId, rankedQueueSwitcher(tab, recentQueue.queueId, "recent", data))],
+	  ["recent-ranked", renderRecentRanked(recentQueue.recentRanked, recentQueue.queueId, rankedQueueSwitcher(tab, recentQueue.queueId, "recent", data),partialHistory)],
 	  ["ability", renderAbility(abilityQueue.ability, abilityQueue.queueLabel, rankedQueueSwitcher(tab, abilityQueue.queueId, "ability"), abilityQueue.abilitySampleGames, abilityQueue.queueGames)],
       ["champions", renderChampionStats(championRows, championOverall, championProgress)],
       ["masteries", renderMasteries(data.masteries || [], (data.capabilities || []).some(item => item.name === "champion-mastery" && item.state === "available"), data.masteryChampionCount)],
-	  ["positions", renderPositionStats(positionQueue.positions, positionQueue.positionQueueId || positionQueue.queueId, rankedQueueSwitcher(tab, positionQueue.queueId, "position"), positionQueue.positionQueueLabel, positionQueue.queueGames)],
-      ["recent-players", renderRecentPlayers(data.recentPlayers || [], recentHistoryCapability,pendingStats)],
+	  ["positions", renderPositionStats(positionQueue.positions, positionQueue.positionQueueId || positionQueue.queueId, rankedQueueSwitcher(tab, positionQueue.queueId, "position"), positionQueue.positionQueueLabel, positionQueue.queueGames,partialHistory)],
+      ["recent-players", renderRecentPlayers(data.recentPlayers || [], recentHistoryCapability,pendingStats,partialHistory)],
       ["activity", `${renderActivity(data.activityHours || [],pendingStats)}${renderOverviewShareButton()}`],
-    ].map(([key,markup])=>[key,!pendingStats && (data.pagination?.partial || tab?.initialPagePending || tab?.initialPageError || tab?.loading) && ['recent-ranked','ability','positions','recent-players','activity'].includes(key)?markup.replace('</h3>',`</h3><small class="history-sample-label">基于最近 ${Number(data.historyLoaded ?? data.matches?.length ?? 0)} 场</small>`):markup]);
+    ].map(([key,markup])=>[key,!pendingStats && partialHistory && ['recent-ranked','ability','positions','recent-players','activity'].includes(key)?markup.replace('</h3>',`</h3><small class="history-sample-label">基于最近 ${Number(data.historyLoaded ?? data.matches?.length ?? 0)} 场</small>`):markup]);
   }
 
   function renderCareerSections(data, tab) {
@@ -2681,12 +2682,11 @@
     return `<section class="career-section ability-section"><header><h3>能力表现</h3><div class="career-section-tools">${tools}</div></header><div class="ability-meta"><div class="ability-legend"><span><i class="is-player"></i>当前玩家</span><span><i class="is-baseline"></i>${escapeHTML(baselineLabel)}</span></div><span data-tooltip="${escapeHTML(sourceDetail)}" data-tooltip-size="compact">${escapeHTML(`${ability.positionLabel ? `${ability.positionLabel} · ` : ""}${number(ability.sampleGames)} 场样本`)}</span></div><div class="ability-radar-wrap"><svg class="ability-radar" viewBox="0 0 320 275" aria-hidden="true" focusable="false"><g class="ability-radar-grid">${rings}${axes}</g>${complete ? `<polygon class="ability-radar-player" points="${radarPoints(metrics, (metric) => metric.playerScore)}"/>` : ""}${complete ? `<polygon class="ability-radar-baseline" points="${radarPoints(metrics, () => 50)}"/>` : ""}<g class="ability-radar-points">${markers}</g></svg><div class="ability-radar-controls" role="group" aria-label="当前玩家与近期同位置对手样本的七维能力数据">${controls}</div></div></section>`;
   }
 
-	function renderRecentRanked(stats, queueId = 0, queueSwitcher = "") {
+	function renderRecentRanked(stats, queueId = 0, queueSwitcher = "", partialHistory = false) {
 	  const games = Number(stats?.games || 0);
-	  // 海克斯大乱斗不是排位。放开队列过滤之后这个页签会真的出现海斗场次，
-	  // 标题必须跟着队列走，否则「近 N 场排位」就是一句假话。
+	  // 海斗与排位分开命名；未读全时，场次只由样本标签说明。
 	  const isMayhem = isMayhemQueueId(queueId);
-	  const heading = stats?.historyPending ? "近期排位" : `近 ${number(Math.min(20, games))} 场${rankedQueueNoun(queueId)}`;
+	  const heading = stats?.historyPending || partialHistory ? (isMayhem ? "近期海斗" : "近期排位") : `近 ${number(Math.min(20, games))} 场${rankedQueueNoun(queueId)}`;
 	const tools = queueSwitcher;
     if (!games) {
       // 队列名一律走 rankedQueueLabel：解析不出来就留空（标题变成
@@ -2894,7 +2894,7 @@
     return `<section class="career-section champion-performance"><header><h3>英雄胜率</h3><span>${label}${progress?.tableSupported && (tableGames>=20 || progress.foreign) ? overviewDetailArrow("champion-table", "查看英雄数据表") : ""}</span></header><div>${overallRow}${rows || '<p class="section-empty">暂无英雄统计</p>'}</div></section>`;
   }
 
-  function renderPositionStats(items, queueId = 0, queueSwitcher = "", sourceLabel = "", queueGames = 0) {
+  function renderPositionStats(items, queueId = 0, queueSwitcher = "", sourceLabel = "", queueGames = 0, partialHistory = false) {
     const aliases = { top: "top", jungle: "jungle", middle: "middle", mid: "middle", bottom: "bottom", adc: "bottom", utility: "utility", support: "utility" };
     const values = new Map((items || []).map((item) => {
       const key = String(item?.position || "").trim().toLowerCase();
@@ -2907,7 +2907,7 @@
       ["bottom", "下路"],
       ["utility", "辅助"],
     ];
-	const sampleLabel = Number(queueGames) > 0 ? `<span class="career-sample-label">近 ${number(Math.min(20, queueGames))} 场</span>` : "";
+	const sampleLabel = !partialHistory && Number(queueGames) > 0 ? `<span class="career-sample-label">近 ${number(Math.min(20, queueGames))} 场</span>` : "";
 	const tools = `${sampleLabel}${queueSwitcher}`;
     const hasSamples = [...values.values()].some((item) => Number(item?.games || 0) > 0 || Number(item?.share || 0) > 0);
     if (!hasSamples) {
@@ -3141,7 +3141,7 @@
     return `<section class="career-section mastery-career-section"><header><h3>英雄熟练度</h3><span>${Number.isFinite(championCount) ? `${number(championCount)} 个英雄` : ""}${supported ? overviewDetailArrow("masteries", "查看全部英雄熟练度") : ""}</span></header><div class="mastery-list">${rows || '<p class="section-empty">客户端未提供熟练度</p>'}</div></section>`;
   }
 
-  function renderRecentPlayers(items, capability,pending=false) {
+  function renderRecentPlayers(items, capability,pending=false,partialHistory=false) {
     if(pending)return '<section class="career-section"><header><h3>最近一起玩</h3></header><div class="ability-unavailable"><strong>战绩未读全</strong></div></section>';
     const rows = items.map((item, index) => {
       const label = maskedListName(item, index);
@@ -3151,7 +3151,7 @@
     const emptyCopy = capability?.state === "failed"
       ? escapeHTML(capability.detail || "最近 30 天的参与者数据不完整，暂时无法生成可靠结果。")
       : "暂无重复同场玩家";
-    return `<section class="career-section"><header><h3>最近一起玩</h3><span>最近 30 天</span></header><div class="recent-player-list">${rows || `<p class="section-empty">${emptyCopy}</p>`}</div></section>`;
+    return `<section class="career-section"><header><h3>最近一起玩</h3>${partialHistory ? "" : "<span>最近 30 天</span>"}</header><div class="recent-player-list">${rows || `<p class="section-empty">${emptyCopy}</p>`}</div></section>`;
   }
 
   function renderActivity(hours,pending=false) {

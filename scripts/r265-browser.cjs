@@ -1,10 +1,18 @@
 'use strict';
 // Real Chromium against a public binary and production CSP. API/image inputs
 // are explicitly synthetic; this does not claim real Windows or LCU evidence.
-const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
+const {spawn,execFileSync}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=process.env.R265_BROWSER_OUT || path.join(os.tmpdir(),'r265-browser'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'r265-browser-'));
 const errors=[],violations=[],results=[],closed=new Set(),canceled=new Set();let backend,chrome,ws;
 const fixture=`
+ const r265LoadedStatistics=window.__r265LoadedStatistics;
+ const r265Sample=(data,k)=>{
+  const loaded=r265LoadedStatistics[String(k)],cards=r265LoadedStatistics[String(k)];
+  data.matches=structuredClone(loaded.matches);
+  for(const key of ['overall','recentRanked','ability','positions','rankedQueues','recentPlayers','activityHours'])data[key]=structuredClone(cards[key]??(key==='ability'?null:[]));
+  window.__r265FixtureLoaded=loaded;
+  return data;
+ };
  if(pathname==='/api/gameplay/season-summary')return Promise.resolve(new Response(JSON.stringify({available:false,champions:[],overall:{}}),{headers:{'Content-Type':'application/json'}}));
  if(pathname==='/api/gameplay/overview' && new URLSearchParams(location.search).has('recovery')){
   let request={};try{request=JSON.parse(init?.body || '{}')}catch{}
@@ -13,13 +21,13 @@ const fixture=`
    (window.__r265RecoveryRequests ||= []).push({at:Date.now(),retryDetails:Boolean(request.retryDetails)});
    const round=window.__r265RecoveryRequests.length,data=structuredClone(overview),k=scenario==='rounds'?1:9;
    data.player={...data.player,region:'kr',playerRef:'player_r265_fixture',gameName:'外服测试',tagLine:'KR1',isCurrent:false};
-   data.matches=data.matches.slice(0,k);data.historyRequested=10;data.historyLoaded=k;data.pagination={count:10,hasMore:false,partial:true};
+   r265Sample(data,k);data.historyRequested=10;data.historyLoaded=k;data.pagination={count:10,hasMore:false,partial:true};
    data.capabilities=data.capabilities.filter(c=>!c.name.startsWith('match'));data.capabilities.push({name:'match-details',state:'failed',count:k,detail:'战绩服务暂时不可用'});
    if(scenario==='quota' && round===1){const frames=[{type:'cards',overview:data},{type:'error',status:429,error:'查询额度恢复中，请稍后重试',kind:'rate-limited',retryAfter:3}];return Promise.resolve(new Response(frames.map(f=>JSON.stringify(f)).join('\\n')+'\\n',{headers:{'Content-Type':'application/x-ndjson'}}));}
    if(round===1 || scenario==='rounds')return Promise.resolve(new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}}));
    const encoder=new TextEncoder();return Promise.resolve(new Response(new ReadableStream({start(controller){
     init?.signal?.addEventListener('abort',()=>{(window.__r265AbortedRequests ||= []).push({at:Date.now(),round});try{controller.error(new DOMException('request canceled','AbortError'))}catch{}},{once:true});
-    for(let i=9;i<=10;i++)setTimeout(()=>{if(init?.signal?.aborted){try{controller.close()}catch{};return;}const d={...data,matches:overview.matches.slice(0,i),historyLoaded:i,pagination:{count:10,hasMore:false,partial:i<10},capabilities:[{name:'match-details',state:i<10?'failed':'available',count:i}]};controller.enqueue(encoder.encode(JSON.stringify({type:i===10?'complete':'cards',overview:d})+'\\n'));if(i===10)controller.close();},(i-8)*(scenario.endsWith('-running')?5000:150));
+    for(let i=9;i<=10;i++)setTimeout(()=>{if(init?.signal?.aborted){try{controller.close()}catch{};return;}const d=r265Sample({...data,historyLoaded:i,pagination:{count:10,hasMore:false,partial:i<10},capabilities:[{name:'match-details',state:i<10?'failed':'available',count:i}]},i);controller.enqueue(encoder.encode(JSON.stringify({type:i===10?'complete':'cards',overview:d})+'\\n'));if(i===10)controller.close();},(i-8)*(scenario.endsWith('-running')?5000:150));
    }}),{headers:{'Content-Type':'application/x-ndjson'}}));
   }
  }
@@ -28,7 +36,7 @@ const fixture=`
   if(request.region==='kr' || request.playerRef==='player_r265_fixture'){
    const k=Number(new URLSearchParams(location.search).get('k')),data=structuredClone(overview);
    data.player={...data.player,region:'kr',playerRef:'player_r265_fixture',gameName:'外服测试',tagLine:'KR1',isCurrent:false};
-   data.matches=data.matches.slice(0,k);data.historyRequested=10;data.historyLoaded=k;data.pagination={begIndex:0,count:10,filter:'all',hasMore:false,partial:k<10};
+   r265Sample(data,k);data.historyRequested=10;data.historyLoaded=k;data.pagination={begIndex:0,count:10,filter:'all',hasMore:false,partial:k<10};
    data.capabilities=data.capabilities.filter(c=>!c.name.startsWith('match'));data.capabilities.push({name:'match-history',state:'available',count:10},{name:'match-details',state:k<10?'failed':'available',count:k,detail:k<10?'战绩服务暂时不可用':''});
    if(!k){const frames=[{type:'cards',overview:data},{type:'error',status:503,error:'战绩服务暂时不可用',kind:'network',retryAfter:120}];return Promise.resolve(new Response(frames.map(f=>JSON.stringify(f)).join('\\n')+'\\n',{headers:{'Content-Type':'application/x-ndjson'}}));}
    return Promise.resolve(new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}}));
@@ -37,6 +45,10 @@ const fixture=`
 `;
 async function main(){
  fs.mkdirSync(out,{recursive:true});
+ const statsPath=path.join(tmp,'loaded-stats.json');
+ execFileSync('go',['test','-count=1','-run','^TestR265BrowserLoadedStatsFixture$','./backend'],{cwd:root,env:{...process.env,R265_STATS_FIXTURE_OUT:statsPath},stdio:'pipe'});
+ const loadedStats=JSON.parse(fs.readFileSync(statsPath,'utf8'));
+ fs.copyFileSync(statsPath,path.join(out,'loaded-stats-fixture.json'));
  backend=spawn(process.env.R265_BACKEND || path.join(os.tmpdir(),'r265-public'),['--desktop'],{cwd:root,env:{...process.env,LOL_LOOT_DATA_DIR:path.join(tmp,'data')},stdio:['ignore','pipe','pipe']});
  const ready=await new Promise((resolve,reject)=>{let data='';const timer=setTimeout(()=>reject(Error('Backend startup timeout')),20000);backend.on('error',reject);backend.stdout.on('data',c=>{data+=c;for(const line of data.split('\n'))try{const v=JSON.parse(line.replace(/^LOOT_READY /,''));if(v.baseUrl){clearTimeout(timer);resolve(v);}}catch{}});});
  const csp=(await fetch(ready.bootstrapUrl)).headers.get('content-security-policy');assert(csp.includes("script-src 'self'") && !csp.includes('unsafe-inline'));
@@ -64,7 +76,7 @@ async function main(){
   const click=s=>evaluate(`document.querySelector(${JSON.stringify(s)}).click()`),frame=()=>evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
   const shot=async name=>{await frame();const v=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(v.data,'base64'));};
   await send('Target.activateTarget',{targetId});for(const m of ['Network.enable','Page.enable','Runtime.enable'])await call(m);await call('Runtime.addBinding',{name:'r265CSP'});
-  await call('Page.addScriptToEvaluateOnNewDocument',{source:"localStorage.clear();window.EventSource=class{addEventListener(){}close(){}};document.addEventListener('securitypolicyviolation',e=>r265CSP(JSON.stringify({directive:e.effectiveDirective,blockedURI:e.blockedURI})))"});
+  await call('Page.addScriptToEvaluateOnNewDocument',{source:"localStorage.clear();window.EventSource=class{addEventListener(){}close(){}};document.addEventListener('securitypolicyviolation',e=>r265CSP(JSON.stringify({directive:e.effectiveDirective,blockedURI:e.blockedURI})));window.__r265LoadedStatistics="+JSON.stringify(loadedStats)});
   await call('Fetch.enable',{patterns:[{urlPattern:'*'}]});await call('Emulation.setDeviceMetricsOverride',{width,height:scenario?1100:1900,deviceScaleFactor:1,mobile:false});
   await call('Network.setCookie',{name:'lol_loot_token',value:ready.token,url:ready.baseUrl,httpOnly:true});await call('Page.navigate',{url:ready.baseUrl+'/?demo&section=overview'+(k==null?'':'&k='+k)+(scenario?'&recovery='+scenario:'')});
   await until("document.querySelector('.match-list .match-entry')");await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
@@ -98,15 +110,28 @@ async function main(){
    }
    assert(heights[0]<heights[1] && heights[1]<heights[2],JSON.stringify(heights));await p.close();
   }
-  if(!process.env.R265_CASE || process.env.R265_CASE==='samples')for(const k of [10,7,6,3,1,0])for(const width of k===0?[1500]:[1500,780]){
+  if(!process.env.R265_CASE || process.env.R265_CASE==='samples')for(const k of [10,7,6,3,1,0])for(const width of [1500,780]){
    const p=await page(theme,k,width);await p.evaluate("window.dispatchEvent(new CustomEvent('deep-legends:open-player',{detail:{gameName:'外服测试',tagLine:'KR1',region:'kr',source:'search'}}))");
    await p.until("document.querySelector('.summoner-strip')?.textContent.includes('外服测试')");await p.until(k===0?"document.querySelector('.service-outage')":"document.querySelectorAll('.match-list .match-entry').length==="+k);
    const samples=await p.evaluate("({weak:(document.querySelector('.career-column').textContent.match(/战绩未读全/g)||[]).length,labels:[...document.querySelectorAll('.career-column .history-sample-label')].map(n=>n.textContent),radar:!!document.querySelector('.career-column .ability-radar')})");
    if(k<6){assert.equal(samples.weak,5);assert.equal(samples.labels.length,0);assert.equal(samples.radar,false);}else if(k<10){assert.equal(samples.weak,0);assert.deepEqual(samples.labels,Array(5).fill(`基于最近 ${k} 场`));}else assert.equal(samples.labels.length,0);
    if(!k)assert(await p.evaluate("document.querySelector('.service-outage p').textContent==='暂时没有读取到对局，恢复后会自动补齐。'"));
    await p.shot(`${theme}-k${k}-${width}`);
-   if(width===780){await p.click('[data-open-career-dialog]');await p.until("document.querySelector('#career-dialog').open");await p.shot(`${theme}-k${k}-${width}-cards-top`);await p.evaluate("document.querySelector('.career-dialog-grid').scrollTop=100000");await p.shot(`${theme}-k${k}-${width}-cards-bottom`);}
-   results.push({case:'samples',theme,k,width,...samples});await p.close();
+   if(width===780){await p.click('[data-open-career-dialog]');await p.until("document.querySelector('#career-dialog').open");await p.shot(`${theme}-k${k}-${width}-cards-top`);}
+   const cards=await p.evaluate(`(()=>{
+    const root=${width===780?"document.querySelector('#career-dialog')":"document.querySelector('.career-column')"},source=window.__r265FixtureLoaded,subject='player_r265_fixture',matches=source.matches;
+    const keys=['recent-ranked','ability','positions','recent-players','activity'],section=key=>key==='recent-ranked'?root.querySelector('.recent-ranked-section'):key==='ability'?root.querySelector('.ability-section'):key==='activity'?root.querySelector('.activity-section'):[...root.querySelectorAll('.career-section')].find(n=>n.querySelector('h3')?.textContent===({positions:'位置偏好','recent-players':'最近一起玩'})[key]),recent=section('recent-ranked'),positions=section('positions'),players=section('recent-players');
+    const expectedWins=matches.filter(m=>m.participants.find(p=>p.playerRef===subject).win).length,positionCounts={};for(const m of matches){const position=m.participants.find(p=>p.playerRef===subject).position;positionCounts[position]=(positionCounts[position]||0)+1;}
+    const headers=keys.map(key=>{const header=section(key).querySelector(':scope > header'),r=header.getBoundingClientRect(),items=[...header.children].map(n=>{const b=n.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(n);return {tag:n.tagName,text:n.textContent.trim(),left:b.left,right:b.right,center:b.top+b.height/2,lines:[...range.getClientRects()].map(v=>v.top)}});return {card:key,text:header.textContent.trim(),width:r.width,clientWidth:header.clientWidth,scrollWidth:header.scrollWidth,left:r.left,right:r.right,items};});
+    return {headers,expectedWins,expectedLosses:matches.length-expectedWins,wins:recent.querySelector('.recent-ranked-record small b')?.textContent,losses:recent.querySelector('.recent-ranked-record small i')?.textContent,common:[...players.querySelectorAll('.recent-player small')].map(n=>Number(n.textContent.match(/共同对局 (\\d+) 场/)[1])),positionRows:[...positions.querySelectorAll('.position-row')].map(n=>({label:n.querySelector('strong').textContent,value:Number(n.querySelector('progress').value),text:n.querySelector('b').textContent})),expectedPositions:source.rankedQueues['420'].positions,positionCounts,activity:[...section('activity').querySelectorAll('.activity-cell')].map(n=>Number(n.dataset.tooltip.match(/· (\\d+) 场/)[1])),loaded:matches.length};
+   })()`);
+   assert.equal(cards.loaded,k);assert.equal(cards.headers.length,5);
+   for(const header of cards.headers){assert(header.scrollWidth<=header.clientWidth,JSON.stringify(header));assert(Math.max(...header.items.map(n=>n.center))-Math.min(...header.items.map(n=>n.center))<=1,JSON.stringify(header));for(const item of header.items){assert(item.left>=header.left && item.right<=header.right,JSON.stringify(header));if(item.tag!=='DIV' && item.lines.length)assert(Math.max(...item.lines)-Math.min(...item.lines)<=1,JSON.stringify(header));}}
+   const byKey=Object.fromEntries(cards.headers.map(h=>[h.card,h.text]));
+   if(k<10){assert(byKey['recent-ranked'].startsWith('近期排位'));assert.doesNotMatch(byKey['recent-ranked'],/近 \d+ 场排位/);assert.doesNotMatch(byKey.positions.replace(/基于最近 \d+ 场/g,''),/近 \d+ 场/);assert.doesNotMatch(byKey['recent-players'],/最近 30 天/);}else{assert(byKey['recent-ranked'].startsWith('近 10 场排位'));assert.match(byKey.positions,/近 10 场/);assert.match(byKey['recent-players'],/最近 30 天/);}
+   if(k>=6){assert.equal(Number(cards.wins.match(/\d+/)[0]),cards.expectedWins);assert.equal(Number(cards.losses.match(/\d+/)[0]),cards.expectedLosses);assert.equal(cards.expectedWins+cards.expectedLosses,k);assert(cards.common.length>0 && cards.common.every(n=>n<=k));for(const row of cards.positionRows){const expected=cards.expectedPositions.find(v=>v.label===row.label)||{position:{上单:'top',打野:'jungle',中单:'middle',下路:'bottom',辅助:'utility'}[row.label],share:0};assert(expected.position);assert.equal(row.value,expected.share);assert.equal(row.value,Math.round((cards.positionCounts[expected.position]||0)*100/k));}assert.equal(cards.activity.reduce((a,b)=>a+b,0),k);}
+   if(width===780){await p.evaluate("document.querySelector('.career-dialog-grid').scrollTop=100000");await p.shot(`${theme}-k${k}-${width}-cards-bottom`);}
+   results.push({case:'samples',theme,k,width,...samples,cards});await p.close();
   }
  }
  if(!process.env.R265_CASE || process.env.R265_CASE==='recovery'){

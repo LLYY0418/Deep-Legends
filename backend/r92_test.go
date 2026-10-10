@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -55,14 +56,17 @@ func TestR92RiotMatchConcreteDiskBudget(t *testing.T) {
 
 func TestR92ProLadderStartsBeforeSupplementsFinish(t *testing.T) {
 	p := newChampionProvider()
-	baseStarted := make(chan struct{}, 1)
+	baseStarted := make(chan struct{})
+	releaseLadder := make(chan struct{})
+	var startedOnce, releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releaseLadder) }) }
+	t.Cleanup(release)
 	var serial atomic.Bool
 	base := opggProTeam{ID: 632, Name: "Bilibili Gaming", Members: []opggProMember{proFixtureMember(632, "Bin", "Chen Ze-Bin (陈泽彬)", proFixtureAccount("fixtureaccount", "fixture", "CHALLENGER", 1, 1200))}}
 	p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Host == proSupplementHost {
 			select {
 			case <-baseStarted:
-				baseStarted <- struct{}{}
 			case <-time.After(500 * time.Millisecond):
 				serial.Store(true)
 			}
@@ -71,7 +75,15 @@ func TestR92ProLadderStartsBeforeSupplementsFinish(t *testing.T) {
 			return proHTTPBody([]byte(fmt.Sprintf("<h1>%s</h1><table><tr><td>Name</td><td>%s</td></tr></table><div><h4>Accounts</h4><table></table></div>", player.Name, player.Names[0]))), nil
 		}
 		if r.URL.Path == proLadderPath {
-			baseStarted <- struct{}{}
+			startedOnce.Do(func() { close(baseStarted) })
+			// Publish the directory before allowing ladder results. Otherwise a
+			// fast background flight can legitimately finish before the caller
+			// wakes up, and its already-complete return is mistaken for mutation.
+			select {
+			case <-releaseLadder:
+			case <-r.Context().Done():
+				return nil, r.Context().Err()
+			}
 			return proHTTPBody([]byte(`<table><tr id="fixtureaccount-KR1"><td>42</td></tr></table>`)), nil
 		}
 		return proHTTPBody(proFixtureHTML("kr", base)), nil
@@ -83,6 +95,17 @@ func TestR92ProLadderStartsBeforeSupplementsFinish(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	select {
+	case <-baseStarted:
+	case <-ctx.Done():
+		t.Fatal("ladder request did not start before the caller deadline")
+	}
+	for _, account := range proRankedLadderAccounts(snapshot) {
+		if account.LadderRankKnown {
+			t.Fatal("directory contains ladder results before fixture release")
+		}
+	}
+	release()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		a.proPlayers.mu.Lock()
