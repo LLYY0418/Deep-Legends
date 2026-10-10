@@ -166,7 +166,7 @@
   }
   function layoutFooter(menu) {
     const slot=menu.querySelector('.af-capsule-slot'),caps=menu.querySelector('[data-af-draft-capsules]');
-    if(!slot || !caps || menu.hidden || !menu.open)return;
+    if(!slot || !caps || !menu.isConnected || menu.hidden || !menu.open)return;
     const view=menu.ownerDocument.defaultView,rect=slot.getBoundingClientRect(),width=parseFloat(view.getComputedStyle(slot).width);
     if(!(width>0 && rect.width>0))return;
     const nodes=[...caps.querySelectorAll(':scope > .af-capsule')],more=caps.querySelector('[data-af-capsules-more]'),scale=rect.width/width;
@@ -186,7 +186,7 @@
     const hidden=nodes.length-visible,expanded=caps.classList.contains('is-expanded') && hidden>0;
     const signature=`${width}:${visible}:${expanded}`;if(caps._afLayout===signature)return;
     // One write pass; the observer watches the stable slot, never the popup.
-    caps._afLayout=signature;caps.classList.toggle('is-expanded',expanded);
+    caps._afLayout=signature;caps.classList.toggle('is-expanded',expanded);menu._afMenuState.capsulesExpanded=expanded;
     nodes.forEach((node,i)=>{node.hidden=!expanded && i>=visible;node.style.maxWidth=expanded?'100%':i===0?`${Math.max(0,width-(hidden?caps._afMoreWidth+gap:0))}px`:'none';});
     more.hidden=!hidden;more.textContent=expanded?'收起':`+${hidden}`;more.setAttribute('aria-expanded',String(expanded));
   }
@@ -216,7 +216,7 @@
     const sort=category==='hero' ? `<span class="af-sort-label">排序</span><div class="af-segment">${[['count','场次'],['winrate','胜率'],['recent','最近']].map(([value,label])=>button(label,`data-af-sort="${value}"`,m.sort===value)).join('')}</div>` : '';
     const cards=opts.map(o=>button(`${category==='hero'?ctx.icon?.(o.value,o.label) || '':category==='position'?ctx.positionIcon?.(o.value) || '':''}<strong>${escape(o.label)}</strong><small data-af-option-count>${optionCount(o,category==='hero')}</small>`,`data-af-option="${escape(o.value)}"`,c.values.includes(o.value))).join('');
     const thresholds=category==='performance' ? `<div class="af-thresholds">${[['kda','KDA',0.5],['score','评分',0.5],['kp','参团率',5]].map(([name,label,step])=>`<label>${label} ≥<input type="number" min="0" ${name==='kp'?'max="100"':''} step="${step}" placeholder="—" value="${c.thresholds?.[name] ?? ''}" data-af-threshold="${name}" aria-label="${label}门槛"><span>${name==='kp'?'%':''}</span></label>`).join('')}</div>` : '';
-    return `<div class="af-columns"><div class="af-categories">${Object.entries(categories).map(([k,label])=>`<button type="button" data-af-category="${k}"${category===k?' class="is-active"':''}><span>${label}<i aria-hidden="true">›</i></span><small data-af-summary="${k}" title="${escape(cs[k] ? (cs[k].not?'不是 · ':'')+summary(k,cs[k],ctx) : '')}">${cs[k]?escape((cs[k].not?'不是 · ':'')+summary(k,cs[k],ctx)):''}</small></button>`).join('')}</div><div class="af-pane"><header><strong>${categories[category]}</strong><div class="af-segment">${button('是','data-af-not="false"',!c.not)}${button('不是','data-af-not="true"',c.not)}</div>${sort}</header><input class="af-search"${['hero','coplayer'].includes(category)?'':' hidden'} data-af-query placeholder="搜索${categories[category]}${category==='hero'?'（支持拼音、简称）':''}" aria-label="搜索${categories[category]}" value="${escape(m.query)}">${controls}${thresholds}<div class="af-options is-${category}">${cards || '<p class="af-empty">暂无可选项</p>'}${more?button('显示更多','data-af-more'):''}</div>${category==='multikill'?`<label class="af-atleast"><input type="checkbox" data-af-atleast${c.atLeast?' checked':''}>及以上</label>`:''}</div></div><footer class="af-modal-footer"><div class="af-capsule-slot"><div class="af-capsules" data-af-draft-capsules>${capsules(cs,ctx)}</div></div><span data-af-preview></span><button type="button" data-af-clear>清除</button><button type="button" data-af-show-saved>保存为常用</button><button class="af-done" type="button" data-af-close>完成</button></footer>`;
+    return `<div class="af-columns"><div class="af-categories">${Object.entries(categories).map(([k,label])=>`<button type="button" data-af-category="${k}"${category===k?' class="is-active"':''}><span>${label}<i aria-hidden="true">›</i></span><small data-af-summary="${k}" title="${escape(cs[k] ? (cs[k].not?'不是 · ':'')+summary(k,cs[k],ctx) : '')}">${cs[k]?escape((cs[k].not?'不是 · ':'')+summary(k,cs[k],ctx)):''}</small></button>`).join('')}</div><div class="af-pane"><header><strong>${categories[category]}</strong><div class="af-segment">${button('是','data-af-not="false"',!c.not)}${button('不是','data-af-not="true"',c.not)}</div>${sort}</header><input class="af-search"${['hero','coplayer'].includes(category)?'':' hidden'} data-af-query placeholder="搜索${categories[category]}${category==='hero'?'（支持拼音、简称）':''}" aria-label="搜索${categories[category]}" value="${escape(m.query)}">${controls}${thresholds}<div class="af-options is-${category}">${cards || '<p class="af-empty">暂无可选项</p>'}${more?button('显示更多','data-af-more'):''}</div>${category==='multikill'?`<label class="af-atleast"><input type="checkbox" data-af-atleast${c.atLeast?' checked':''}>及以上</label>`:''}</div></div><footer class="af-modal-footer"><div class="af-capsule-slot"><div class="af-capsules${m.capsulesExpanded?' is-expanded':''}" data-af-draft-capsules>${capsules(cs,ctx)}</div></div><span data-af-preview></span><button type="button" data-af-clear>清除</button><button type="button" data-af-show-saved>保存为常用</button><button class="af-done" type="button" data-af-close>完成</button></footer>`;
   }
   function searchOption(o,category,query,ctx) {return o.label.toLowerCase().includes(query) || category==='hero' && ctx.heroSearch?.(query,o.value,o.label)>0;}
   function render(tab,context) {
@@ -235,6 +235,7 @@
   function footer(tab,ctx) {return `<span>已查 ${ctx.cursor()} 场</span>${tab.advancedSearch?.running?button('停止','data-af-stop'):tab.data?.pagination?.hasMore?button('继续往前找','data-af-continue'):''}`;}
   function refresh(container,tab,ctx,structure=false) {
     const m=ui(tab),menu=container.querySelector('[data-af-menu]');if(!menu)return;
+    menu._afMenuState=m;
     menu.classList.toggle('is-saved',m.page==='saved');
     for(const node of menu.querySelectorAll('[data-af-page]')){const selected=node.dataset.afPage===m.page;node.classList.toggle('is-active',selected);node.setAttribute('aria-selected',String(selected));}
     if(structure)menu.querySelector('.af-menu-body').innerHTML=menuBody(tab,ctx);
@@ -262,8 +263,8 @@
       container.querySelector('[data-af-open]')?.setAttribute('aria-expanded','true');refresh(container,t,ctx,structure);
       (menu.querySelector('[data-af-query]:not([hidden])') || menu.querySelector('[data-af-page]'))?.focus();
     };
-    const close=(t,ctx)=>{const m=ui(t),next=normalize(editing(t)),changed=JSON.stringify(next)!==JSON.stringify(conditions(t));m.open=false;delete m.conditions;const menu=container.querySelector('[data-af-menu]');if(menu){releaseFooterLayout(menu);menu.close?.();menu.removeAttribute('open');menu.hidden=true;}unlock();container.querySelector('[data-af-open]')?.setAttribute('aria-expanded','false');if(changed){t.advancedConditions=next;ctx.change();}container.querySelector('[data-af-open]')?.focus();doc.defaultView?.requestAnimationFrame?.(()=>container.querySelector('[data-af-open]')?.focus());};
-    const open=(t,ctx,category='result',page='conditions')=>{const m=ui(t);if(!m.open)m.conditions=clone(conditions(t));Object.assign(m,{open:true,category,page,query:'',renaming:-1,limit:300});if(category==='hero')ctx.ensureSearch?.();if(!container.querySelector('[data-af-menu]'))ctx.render?.();show(t,ctx);};
+    const close=(t,ctx)=>{const m=ui(t),next=normalize(editing(t)),changed=JSON.stringify(next)!==JSON.stringify(conditions(t));m.open=false;m.capsulesExpanded=false;delete m.conditions;const menu=container.querySelector('[data-af-menu]');if(menu){releaseFooterLayout(menu);menu.close?.();menu.removeAttribute('open');menu.hidden=true;}unlock();container.querySelector('[data-af-open]')?.setAttribute('aria-expanded','false');if(changed){t.advancedConditions=next;ctx.change();}container.querySelector('[data-af-open]')?.focus();doc.defaultView?.requestAnimationFrame?.(()=>container.querySelector('[data-af-open]')?.focus());};
+    const open=(t,ctx,category='result',page='conditions')=>{const m=ui(t);if(!m.open)m.conditions=clone(conditions(t));Object.assign(m,{open:true,category,page,query:'',renaming:-1,limit:300,capsulesExpanded:false});if(category==='hero')ctx.ensureSearch?.();if(!container.querySelector('[data-af-menu]'))ctx.render?.();show(t,ctx);};
     if(ui(tab).open)show(tab,context(),false);else unlock();
     doc._afTarget={container,tab,context,open,close};
     if(container._afListeners)return;container._afListeners=true;
@@ -287,7 +288,7 @@
       else if('afContinue'in d)ctx.find();
       else if('afSort'in d){m.sort=d.afSort;refresh(container,t,ctx,true);}
       else if('afMore'in d){m.limit=(m.limit || 300)+300;refresh(container,t,ctx,true);}
-      else if('afCapsulesMore'in d){target.parentElement.classList.toggle('is-expanded');queueFooterLayout(container.querySelector('[data-af-menu]'));}
+      else if('afCapsulesMore'in d){m.capsulesExpanded=target.parentElement.classList.toggle('is-expanded');queueFooterLayout(container.querySelector('[data-af-menu]'));}
       else if('afOption'in d){c.values=c.values.includes(d.afOption)?c.values.filter(v=>v!==d.afOption):[...c.values,d.afOption];update(t,ctx,category,c);}
       else if('afNot'in d){c.not=d.afNot==='true';update(t,ctx,category,c);}
       else if('afSetting'in d){c[d.afSetting]=d.afValue;update(t,ctx,category,c);refresh(container,t,ctx,true);}

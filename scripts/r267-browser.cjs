@@ -68,7 +68,7 @@ async function start(){
     assert(value.scrollWidth<=value.clientWidth,'footer scroll overflow '+evidence);
     assert.equal(value.total,count,evidence);assert.equal(value.shadow,'none','modal glow returned');
     for(const cap of value.visible){assert(inside(cap.rect,value.rect),'partially clipped capsule '+evidence);assert(inside(cap.remove,cap.rect),'clipped remove control '+evidence);}
-    let expected=count,used=0;if(value.intrinsic.reduce((a,b)=>a+b,0)+value.gap*Math.max(0,count-1)>value.rect.width+.5){expected=0;for(const n of value.intrinsic){const next=used+n+(expected?value.gap:0);if(next+value.gap+value.moreWidth>value.rect.width+.5)break;used=next;expected++;}expected=Math.max(1,expected)}assert.equal(value.visible.length,expected,'must show the largest complete prefix '+evidence);
+    let expected=count,used=0;if(value.intrinsic.reduce((a,b)=>a+b,0)+value.gap*Math.max(0,count-1)>value.rect.width+.1){expected=0;for(const n of value.intrinsic){const next=used+n+(expected?value.gap:0);if(next+value.gap+value.moreWidth>value.rect.width)break;used=next;expected++;}expected=Math.max(1,expected)}assert.equal(value.visible.length,expected,'must show the largest complete prefix '+evidence);
     const hidden=count-value.visible.length;assert.equal(value.more?.text || null,hidden?'+'+hidden:null,'incorrect hidden count '+evidence);
     if(value.more)assert(inside(value.more.rect,value.rect),'clipped +N '+evidence);
     if(count===1)assert.equal(value.more,null,evidence);
@@ -83,6 +83,7 @@ async function start(){
      if([900,1440].includes(width) && [3,8].includes(count))await shot(`footer-${width}-${count}`);
      if(value.more){
       await click('[data-af-capsules-more]');await frames();const expanded=await inspect();assert.equal(expanded.visible.length,count,'popup must show all conditions '+JSON.stringify(expanded));assert.equal(expanded.scrollWidth,expanded.clientWidth,'popup overflow '+JSON.stringify(expanded));for(const cap of expanded.visible)assert(inside(cap.rect,expanded.rect),'popup clips a capsule');
+      await evaluate("document.getElementById('overview-content')._afContext().render()");await frames();const rebuilt=await inspect();assert.equal(rebuilt.visible.length,count,'expanded conditions must survive a filterbar rebuild '+JSON.stringify(rebuilt));
       if(width===900 && count===8)await shot('footer-900-8-expanded');
       const last=expanded.visible.at(-1).category;await click(`[data-af-draft-capsules] [data-af-remove="${last}"]`);await frames();assert.equal((await inspect()).total,count-1,'hidden condition must be removable');if(count===8){for(let remaining=count-1;remaining>0;remaining--){const cap=(await inspect()).visible.at(-1);await click(`[data-af-draft-capsules] [data-af-remove="${cap.category}"]`);await frames();assert.equal((await inspect()).total,remaining-1,'all popup conditions must be removable')}}else if((await inspect()).expanded){await click('[data-af-capsules-more]');await frames();}
      }
