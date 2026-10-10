@@ -2180,7 +2180,7 @@
   }
 
   function careerSectionEntries(data, tab) {
-    const pendingMatches=matchesPending(tab),pendingStats=!pendingMatches && historyStatsPending(data,tab);
+    const pendingMatches=matchesPending(tab),pendingAggregates=Boolean(tab?.loading && !(Number(data?.historyRequested)>0)),pendingStats=!pendingMatches && !pendingAggregates && historyStatsPending(data,tab);
     const partialHistory=Boolean(data.pagination?.partial || tab?.initialPagePending || tab?.initialPageError || tab?.loading || data.capabilities?.some(item=>item.name==="match-history" && item.state==="failed"));
     const recentHistoryCapability = (data.capabilities || []).find((item) => item.name === "seven-day-history");
     const recentQueue = rankedQueueData(data, tab, "recent");
@@ -2204,7 +2204,7 @@
       ["activity", `${renderActivity(data.activityHours || [],pendingStats)}${renderOverviewShareButton()}`],
     ].map(([key,markup])=> {
       const titles={'recent-ranked':'近期排位',ability:'能力表现',positions:'位置偏好','recent-players':'最近一起玩',activity:'时间分布'};
-      if(pendingMatches && titles[key])return [key,`<section class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="career-pending gameplay-skeleton"><span></span><span></span><span></span></div></section>`];
+      if((pendingMatches || pendingAggregates) && titles[key])return [key,`<section class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="career-pending gameplay-skeleton"><span></span><span></span><span></span></div></section>`];
       return [key,!pendingStats && partialHistory && ['recent-ranked','ability','positions','recent-players','activity'].includes(key)?markup.replace('</h3>',`</h3><small class="history-sample-label">基于最近 ${Number(data.historyLoaded ?? data.matches?.length ?? 0)} 场</small>`):markup];
     });
   }
