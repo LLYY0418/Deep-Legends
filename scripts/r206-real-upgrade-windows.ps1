@@ -1,5 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$Setup)
 $ErrorActionPreference = "Stop"
+# All installed versions inherit the fixed fake key, including published builds.
+$env:RIOT_API_KEY = 'RGAPI-00000000-0000-0000-0000-000000000000'
 . (Join-Path $PSScriptRoot 'r252-diagnostic-time.ps1')
 . (Join-Path $PSScriptRoot 'r261-window-bounds.ps1')
 # The candidate is whatever desktop/package.json declares, so a version bump
