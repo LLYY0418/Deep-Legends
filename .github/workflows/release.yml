@@ -37,8 +37,17 @@ jobs:
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding ascii -Append
       - name: Build and verify public release
         shell: powershell
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
         run: |
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-public-release-windows.ps1 -Version $env:RELEASE_VERSION -SkipTestsInCI
+          if ([string]::IsNullOrWhiteSpace($env:RIOT_API_KEY)) { throw "Repository secret RIOT_API_KEY is required" }
+          Write-Output "::add-mask::$env:RIOT_API_KEY"
+          $riotCipher = (& go run ./backend -encrypt-riot-key env:RIOT_API_KEY).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $riotCipher) { throw "Riot key encryption failed" }
+          Write-Output "::add-mask::$riotCipher"
+          Remove-Item Env:RIOT_API_KEY
+          & .\build-public-release-windows.ps1 -Version $env:RELEASE_VERSION -SkipTestsInCI -RiotAPIKeyCipher $riotCipher
+          $riotCipher = $null
           if ($LASTEXITCODE -ne 0) { throw "Public release build failed" }
       - name: Upload verified release files
         uses: actions/upload-artifact@v4

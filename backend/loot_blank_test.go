@@ -11,7 +11,7 @@ import (
 func TestSettleBlankLootEndsPendingStateWithoutMutatingTheSharedSlice(t *testing.T) {
 	shared := AccountData{Loot: []LootItem{
 		{LootID: "CURRENCY_CHAMPION", Count: 5},
-		{Blank: true, DataPending: true, Kind: "类型未知", Count: 74},
+		{Blank: true, DataPending: true, LootID: "MATERIAL_123", StoreItemID: 123, Kind: "类型未知", Count: 74},
 	}}
 	settled, blanks := settleBlankLoot(shared)
 	if blanks != 1 || settled.Loot[1].DataPending || !settled.Loot[1].Blank || settled.Loot[1].Count != 74 || settled.Loot[0].LootID != "CURRENCY_CHAMPION" {
@@ -27,7 +27,7 @@ func TestSettleBlankLootEndsPendingStateWithoutMutatingTheSharedSlice(t *testing
 
 func TestRetryExhaustionStopsPresentingTheBlankRecordAsNotSyncedYet(t *testing.T) {
 	c := &LCUClient{baseURL: "https://127.0.0.1:2999", token: "fixture", http: &http.Client{}}
-	pending := AccountData{Loot: []LootItem{{Blank: true, DataPending: true, Kind: "类型未知", Count: 74}}}
+	pending := AccountData{Loot: []LootItem{{Blank: true, DataPending: true, LootID: "MATERIAL_123", StoreItemID: 123, Kind: "类型未知", Count: 74}}}
 	a := &app{lcu: c, connected: true, account: cloneAccountData(pending), refreshRequests: make(chan struct{}, 1)}
 	for attempt := 1; attempt <= 3; attempt++ {
 		a.scheduleCollectionDataRetry(c, pending)
@@ -61,7 +61,7 @@ func TestRetryExhaustionStopsPresentingTheBlankRecordAsNotSyncedYet(t *testing.T
 
 func TestRetryBudgetNotSpentYetDoesNotSettle(t *testing.T) {
 	c := &LCUClient{baseURL: "https://127.0.0.1:2999", token: "fixture", http: &http.Client{}}
-	pending := AccountData{Loot: []LootItem{{Blank: true, DataPending: true, Count: 3}}}
+	pending := AccountData{Loot: []LootItem{{Blank: true, DataPending: true, LootID: "MATERIAL_123", StoreItemID: 123, Count: 3}}}
 	a := &app{lcu: c, connected: true, account: cloneAccountData(pending), collectionDataRetryClient: c, collectionDataRetryCount: 3}
 	// The third retry is still waiting on its timer, so the record may yet fill in.
 	a.collectionDataRetry = time.AfterFunc(time.Hour, func() {})

@@ -37,7 +37,7 @@
   --z-toast: 70;
   --z-dialog: 80;
   --z-recovery: 90;
-  /* 确认卡打开时 toast 需要抬高的高度，由 suite.js 按卡片实测高度写入。 */
+
   --suite-confirm-clearance: 0px;
   --primary-strong: oklch(0.54 0.145 56.6);
   --primary-soft: oklch(0.94 0.04 56.6);
@@ -60,15 +60,13 @@
   --space-card: 10px;
   --sidebar-width: 214px;
   --topbar-height: 56px;
-  /* 全局等比缩放标量。由 app.js 按窗口逻辑尺寸选档后写到 :root 上，
-     只有 .app-frame（以及浮层）真正吃 zoom；所有 100vh/100dvh 必须除以它，
-     否则被缩放的容器会比视口高出 zoom 倍并顶出滚动条。 */
+
   --ui-zoom: 1;
   --control-icon-size: 24px;
   --control-hit-size: 42px;
   --sidebar-bg: oklch(0.965 0.008 236);
   --hex-line: color-mix(in oklab, var(--primary) 34%, var(--line));
-  /* 提示框浮层：近黑面板 + 主色细框 + 主色标题。底色不掺主色。 */
+
   --tooltip-surface: #FFFFFF;
   --tooltip-ink: var(--ink);
   --tooltip-muted: color-mix(in oklab, var(--ink) 80%, var(--primary));
@@ -123,9 +121,7 @@
   }
 }
 
-/* ---------- 可选配色主题 ----------
-   设计原则：背景与卡片保持中性深色（只带极轻微的色相倾向），
-   主题色只出现在主色、强调色、选中态与描边上——避免整页被染成一种颜色。 */
+
 
 :root[data-theme="azure"] {
   color-scheme: dark;
@@ -199,7 +195,7 @@
   --tooltip-surface: #000000;
 }
 
-/* 深色系主题共用的提示框前景与投影；面板底色在各主题块内单独给值。 */
+
 :root[data-theme="dark"], :root[data-theme="azure"], :root[data-theme="emerald"],
 :root[data-theme="violet"], :root[data-theme="crimson"], :root[data-theme="aurora"],
 :root[data-theme="oled"] {
@@ -229,7 +225,7 @@ button, select, input[type="file"] { cursor: pointer; }
 button:disabled, select:disabled, [aria-disabled="true"] { cursor: not-allowed; }
 a { color: var(--accent); }
 button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 3px solid color-mix(in oklab, var(--focus) 44%, transparent); outline-offset: 2px; }
-/* 页面级 tabpanel 仅作为跳转/程序化焦点目标，点击面板空白处不显示焦点框 */
+
 [role="tabpanel"]:focus, [role="tabpanel"]:focus-visible { outline: 0; }
 [hidden] { display: none !important; }
 .game-icon.has-loaded-image > span, .champion-asset.has-loaded-image > span { display: none; }
@@ -272,7 +268,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .license-overlay[hidden], .app-frame[hidden] { display:none; }
 html[data-license="disabled"] #license-overlay, html[data-license="disabled"] #setting-license-expiry { display:none; }
 .license-panel { width:min(480px,100%); gap:6px; padding:16px; padding-inline:24px; background:var(--surface); border:1px solid var(--hex-line); border-radius:14px; box-shadow:0 18px 48px rgb(0 0 0/.2); zoom:1; }
-/* Closed dialog visibility must remain owned by the browser's UA rule. */
+
 #license-form, #license-privacy-dialog[open] { display:grid; }
 .license-panel h1 { margin:0; font-size:24px; line-height:30px; text-align:center; }
 #license-form > img { justify-self:center; }
@@ -305,7 +301,7 @@ html[data-license="pending"] .skip-link, html[data-license="pending"] .startup-l
 .tier-badge { display: inline-block; width: 26px; height: 30px; vertical-align: middle; filter: drop-shadow(0 2px 4px rgb(0 0 0 / .35)); }
 .tier-badge.is-metric { width: 24px; height: 27px; }
 .app-main { display: flex; min-width: 0; height: calc(100vh / var(--ui-zoom, 1)); flex-direction: column; overflow: hidden; background: var(--bg); }
-/* scrollbar-gutter 固定滚动条占位：切换页签时内容高度变化不会引起卡片宽度先增后减的抖动。 */
+
 .app-scroll { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: auto; scrollbar-gutter: stable; }
 .sidebar { position: relative; z-index: 31; display: flex; min-width: 0; height: calc(100vh / var(--ui-zoom, 1)); flex-direction: column; padding: 10px; overflow: hidden; background: var(--sidebar-bg); border-right: 1px solid var(--hex-line); }
 .sidebar::after { position: absolute; right: -1px; bottom: 12%; width: 1px; height: 32%; background: linear-gradient(transparent,var(--primary),transparent); content: ""; opacity: .65; }
@@ -314,16 +310,7 @@ html[data-license="pending"] .skip-link, html[data-license="pending"] .startup-l
 .sidebar-brand:hover { background: color-mix(in oklab,var(--surface-strong) 62%,transparent); }
 .sidebar-brand img { flex: 0 0 32px; width: 32px; height: 32px; object-fit: contain; }
 .sidebar-brand-copy { min-width: 0; flex: 1; overflow: hidden; }
-/* 字标第六版：Beaufort for LOL Bold——英雄联盟官方定制字体（Nick Shinn/Shinn Type
-   原版 Beaufort，Monotype 为 Riot Games 定制扩展的版本），随 EXE 内嵌（子集只保留
-   ASCII，见 web/beaufort-for-lol-notice.txt——这不是 OFL 开源字体，notice 里如实
-   转录了字体自带的版权/商标声明和 EULA 链接，本项目是非官方粉丝向工具）。
-   之前内嵌的是 Cinzel（罗马碑刻体，OFL-1.1），效果被认可但用户后来想要更贴近
-   英雄联盟官方视觉的字体；一开始提的 Friz Quadrata Com Bold 是完全独立于 Riot 的
-   商业字体（Linotype/Monotype 零售授权，不含分发权），用户随后换成了英雄联盟
-   本尊在用的这款并直接给了字体文件，授权来源清楚得多。
-   Beaufort 有正常的大小写字形（不像 Cinzel 小写位也是大写），字标沿用之前定的
-   全大写 DEEP LEGENDS 写法，字距沿用 R21 定的 .045em 正字距。 */
+
 @font-face {
   font-family: "Beaufort for LOL";
   font-style: normal;
@@ -348,14 +335,12 @@ html[data-license="pending"] .skip-link, html[data-license="pending"] .startup-l
 :root[data-sidebar="collapsed"] .sidebar-brand-copy,
 :root[data-sidebar="collapsed"] .section-tab > span:not(.live-beacon),
 :root[data-sidebar="collapsed"] .connection span:last-child { display: none; }
-/* 收起时 logo 保持展开态尺寸，避免切换侧栏时品牌和导航发生纵向位移。 */
+
 :root[data-sidebar="collapsed"] .sidebar-brand { justify-content: center; padding-inline: 0; }
 :root[data-sidebar="collapsed"] .section-tab,
 :root[data-sidebar="collapsed"] .connection { justify-content: center; padding-inline: 0; }
 
-/* 右侧留白按窗口控件覆盖层（Windows 最小化/最大化/关闭）实际宽度自适应：
-   --titlebar-inset 由 app.js 通过 windowControlsOverlay API 检测后写入，
-   浏览器或 macOS 壳中没有覆盖层时保持 10px，不再浪费空间。 */
+
 .topbar { position: relative; z-index: 20; display: flex; min-height: var(--topbar-height); flex: 0 0 var(--topbar-height); align-items: center; justify-content: space-between; padding: 0 var(--titlebar-inset, 10px) 0 clamp(16px, 2.4vw, 34px); background: var(--bg); border-bottom: 1px solid var(--line); -webkit-app-region: drag; }
 .window-drag { display: flex; min-width: 0; align-items: baseline; gap: 10px; flex: 1; -webkit-app-region: drag; }
 .window-drag strong { flex: 0 0 auto; font-size: 13px; white-space: nowrap; }
@@ -368,7 +353,7 @@ html[data-license="pending"] .skip-link, html[data-license="pending"] .startup-l
 .topbar-actions { gap: 8px; min-width: 0; -webkit-app-region: no-drag; }
 .topbar .button { min-height: 42px; }
 
-/* 顶部召唤师搜索：服务器选择 + 名称与编号双输入，粘贴“名称#编号”自动拆分 */
+
 .player-search { display: flex; min-width: 0; flex: 0 1 390px; align-items: center; gap: 6px; margin-right: 10px; -webkit-app-region: no-drag; }
 .player-search-fields { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; padding: 0 2px 0 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; }
 .player-search-fields:focus-within { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
@@ -384,7 +369,7 @@ html[data-license="pending"] .skip-link, html[data-license="pending"] .startup-l
 #player-search-go:hover { color: var(--on-primary); background: color-mix(in oklab,var(--primary) 86%,white); }
 #player-search-go:active { transform: translateY(1px); }
 #player-search-go svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
-/* 自定义服务器下拉：一级选择区域，二级选择国服服务器。 */
+
 .player-search-region { position: relative; flex: 0 0 auto; }
 .player-search-region > button { display: inline-flex; min-height: 38px; max-width: 146px; align-items: center; gap: 4px; padding: 0 8px 0 11px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; font-weight: 650; }
 .player-search-region > button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -446,8 +431,7 @@ html[data-license="pending"] .skip-link, html[data-license="pending"] .startup-l
 .text-button { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; padding: 0 10px; color: var(--muted); background: var(--surface); border-radius: 9px; text-decoration: none; white-space: nowrap; }
 .page-quit { display: none; }
 
-/* 内容区上限。缩放档位把逻辑视口稳定在 1960~2100 CSS px 一带（见 app.js 的
-   UI_SCALE_BASE_WIDTH），配合 226px 侧栏，这个上限让两侧留白基本归零。 */
+
 .shell { width: min(1760px, 100%); margin: 0 auto; padding: 34px clamp(18px, 3.2vw, 52px) 28px; }
 .favorites-header { display: flex; flex-wrap: wrap; align-items: stretch; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
 
@@ -478,8 +462,8 @@ h2 { margin: 0; font-size: 20px; letter-spacing: -.015em; }
 .notice summary { cursor: pointer; color: var(--ink); }
 .notice .text-button { margin-top: 9px; }
 
-/* 本地服务不可达时的全局提示卡：与各页面空状态同风格的居中卡片， */
-/* 同时隐藏页面主体，避免出现「红条 + 页面各自报错」的双重提示。 */
+
+
 .notice.is-fatal { flex-direction: column; align-items: center; justify-content: center; gap: 9px; min-height: 380px; padding: 34px 28px; border: 1px solid var(--line); border-radius: var(--radius-lg); text-align: center; }
 .notice.is-fatal .notice-symbol { flex-basis: auto; width: 58px; height: 58px; color: var(--danger); background: var(--danger-soft); font-size: 26px; }
 .notice.is-fatal strong { color: var(--ink); font-size: 16px; }
@@ -492,7 +476,7 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .section-tab { position: relative; display: flex; min-height: 46px; align-items: center; gap: 12px; padding: 0 11px; overflow: hidden; color: var(--muted); background: transparent; border-radius: 10px; font-weight: 650; text-align: left; white-space: nowrap; }
 .section-tab svg { flex: 0 0 25px; width: 25px; height: 25px; fill: currentColor; transition: color 160ms ease-out; }
 .section-tab:hover { color: var(--ink); background: color-mix(in oklab,var(--surface-strong) 62%,transparent); }
-/* 选中态：图标与文字点亮为主题主色，海克斯风格的发光描边 */
+
 .section-tab.is-active { color: var(--primary-strong); background: color-mix(in oklab,var(--primary-soft) 78%,transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab,var(--primary) 30%,transparent); }
 .section-tab.is-active svg { filter: drop-shadow(0 0 6px color-mix(in oklab,var(--primary) 45%,transparent)); }
 .section-tab.is-active::before { position: absolute; top: 8px; bottom: 8px; left: 0; width: 3px; background: var(--primary); border-radius: 0 999px 999px 0; content: ""; }
@@ -570,7 +554,7 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .quality-option.has-submenu:hover .mythic-submenu, .quality-option.has-submenu:focus-within .mythic-submenu { display: block; }
 .list-row { justify-content: space-between; min-height: 44px; }
 .list-meta { padding: 11px 1px 8px; color: var(--muted); font-size: 13px; }
-/* R130 P5：摘要行里的数字用主题色；等宽数字避免筛选时整行左右抖动。 */
+
 .list-meta-number { color: var(--primary); font-weight: 650; font-variant-numeric: tabular-nums; }
 .skin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--card-min)), 1fr)); gap: var(--space-card); }
 .skin-grid.is-grouped { display: block; }
@@ -599,7 +583,7 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .skin-lock svg { width: 23px; height: 23px; fill: currentColor; }
 .skin-card.is-locked .skin-lock { display: grid; }
 .skin-state { position: absolute; top: 9px; right: 9px; padding: 4px 8px; color: white; background: color-mix(in oklab, var(--accent) 88%, black); border-radius: 999px; font-size: 11px; font-weight: 650; }
-/* 设计稿：皮肤信息叠加在原画底部，深色渐变遮罩保证可读性 */
+
 .skin-copy { position: absolute; right: 0; bottom: 0; left: 0; z-index: 2; display: grid; padding: 30px 12px 10px; background: linear-gradient(180deg, transparent, rgb(8 10 15 / .55) 34%, rgb(8 10 15 / .93) 100%); pointer-events: none; }
 .skin-copy strong { overflow: hidden; color: #F4F6FA; font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 4px rgb(0 0 0 / .5); }
 .skin-hero { margin-top: 1px; color: rgb(232 234 240 / .78); font-size: 11.5px; }
@@ -821,9 +805,8 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .launcher-card-copy small { color: var(--muted); }
 .launcher-arrow { color: var(--primary-strong); font-size: 21px; }
 
-/* 设计稿：设置页为左侧锚点导航 + 右侧分区大卡，卡内为行式设置项 */
-/* 显式网格区域：三个设置子页共用同一区域，切换页签时顶部间距完全一致。
-   align-content: start 防止 .panel 的 min-height 剩余空间被平分给各行（否则短内容页签会整体下移）。 */
+
+
 .settings-panel { display: grid; grid-template-columns: 188px minmax(0,1fr); grid-template-areas: "head head" "tabs content"; align-content: start; align-items: start; gap: 22px; padding-top: 16px; }
 .settings-head { grid-area: head; padding-bottom: 4px; }
 .settings-subpanel { grid-area: content; }
@@ -851,7 +834,7 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .setting-network-card { flex-wrap: wrap; }
 .setting-network-controls { display: flex; flex: 1 1 380px; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 
-/* 设计稿：开关样式的布尔设置项 */
+
 .toggle-control { gap: 9px; padding: 0; background: transparent; border: 0; }
 .toggle-control input { position: relative; width: 34px; height: 19px; margin: 0; appearance: none; background: var(--line); border-radius: 999px; cursor: pointer; transition: background-color 160ms ease-out; }
 .toggle-control input::after { position: absolute; top: 2.5px; left: 3px; width: 14px; height: 14px; background: var(--muted); border-radius: 50%; content: ""; transition: left 160ms ease-out, background-color 160ms ease-out; }
@@ -867,8 +850,7 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .settings-diagnostics code { padding: 1px 5px; font-size: 12px; background: var(--surface-strong); border-radius: 4px; }
 .compact-heading { padding-top: 18px; }
 
-/* 弹窗在 .app-frame 之外（顶层），拿不到它的 zoom，所以各自吃一份 --ui-zoom；
-   吃了 zoom 之后 100dvw/100dvh 仍是未缩放的视口值，必须除回去。 */
+
 .skin-dialog { zoom: var(--ui-zoom, 1); width: min(900px, calc((100dvw - 28px) / var(--ui-zoom, 1))); max-width: calc((100dvw - 28px) / var(--ui-zoom, 1)); max-height: min(860px,calc((100dvh - 28px) / var(--ui-zoom, 1))); margin: auto; padding: 0; overflow-x: hidden; overflow-y: auto; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 26px 74px rgb(0 0 0/.34); }
 .skin-dialog::backdrop { background: var(--overlay); }
 .dialog-art { position: relative; width: 100%; min-width: 0; min-height: 0; aspect-ratio: 16/9; overflow: hidden; contain: layout paint; background: var(--surface-strong); user-select: none; -webkit-user-select: none; }
@@ -902,10 +884,7 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .detail-list { display: grid; min-width: 0; grid-template-columns: max-content minmax(0,1fr); gap: 7px 14px; margin: 14px 0; }
 .detail-list dt { color: var(--muted); }
 .detail-list dd { min-width: 0; margin: 0; overflow-wrap: anywhere; word-break: break-word; }
-/* .suite-confirm-card 与 .toast 锚点完全相同（fixed; right/bottom 18px），卡片打开时
-   toast 会被完全遮住——P2-4 的「上一个生涯写入尚未完成」正好在确认流程里弹出。
-   这里按卡片实测高度把 toast 抬到卡片上方，而不是调 z-index：抬 z-index 只会让
-   toast 反过来盖住确认/取消按钮。 */
+
 body[data-suite-confirm-open] .toast { bottom: calc(18px + var(--suite-confirm-clearance)); }
 .toast { position: fixed; right: 18px; bottom: 18px; z-index: var(--z-toast); max-width: min(380px,calc(100vw - 36px)); padding: calc(10px * var(--ui-zoom, 1)) calc(13px * var(--ui-zoom, 1)); font-size: calc(14px * var(--ui-zoom, 1)); color: var(--ink); background: var(--surface-strong); border-radius: 10px; }
 .back-to-top { position: fixed; right: 24px; bottom: 24px; z-index: 29; display: grid; width: 46px; height: 46px; place-items: center; padding: 0; color: var(--on-primary); background: var(--primary); border: 1px solid color-mix(in oklab,var(--primary) 72%,white); border-radius: 13px; box-shadow: 0 10px 30px rgb(0 0 0/.24); opacity: 1; transform: translateY(0); transition: opacity 160ms ease-out,transform 160ms ease-out,background-color 160ms ease-out; }
@@ -1025,20 +1004,14 @@ body.is-demo .app-frame, body.is-demo .app-main, body.is-demo .sidebar { height:
 body.is-demo .back-to-top { bottom: 58px; }
 body.is-demo .toast { bottom: 52px; }
 .demo-flag { position: fixed; right: 0; bottom: 0; left: 0; z-index: var(--z-toast); display: flex; height: 34px; align-items: center; justify-content: flex-end; padding: 0 14px; color: var(--on-primary); background: var(--medal-gold-end); border-top: 1px solid color-mix(in oklab,var(--medal-gold-end) 72%,white); box-shadow: 0 -4px 14px rgb(0 0 0 / .22); font-size: 10px; font-weight: 700; pointer-events: none; }
-/* Semantic rarity coloring is limited to verified neutral augment glyphs. */
+
 .has-colored-glyph > img { opacity: 0; }
 .has-colored-glyph > .augment-colored-glyph { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; pointer-events: none; }
 
 
-/* ===========================================================================
-   R81 应用内更新 · 新增样式（这一段就是要并进 web/app.css 的内容）
-   全部复用既有设计令牌：--primary / --surface / --line / --ink / --muted …
-   =========================================================================== */
 
-/* ---------- 顶部栏升级入口：一个高亮图标，插在 #refresh 之后 ----------
-   规格完全对齐 app.css 既有图标体系（.icon-button 42×42 / .control-icon 24×24 /
-   六边形线宽 1.6 / 箭头 1.8），默认色取 --primary-strong。
-   图标形状与三态细节见 design-mockups/update-icon.html。 */
+
+
 .update-icon-button { position: relative; min-width: 36px; min-height: 36px; color: var(--primary-strong); }
 .update-icon-button .control-icon { width: 24px; height: 24px; }
 .update-icon-button:hover { color: var(--primary-strong); background: var(--primary-soft); }
@@ -1058,7 +1031,7 @@ body.is-demo .toast { bottom: 52px; }
 .update-icon-button.ready { color: var(--primary); }
 
 
-/* ---------- 更新弹窗 ---------- */
+
 .update-dialog {
   zoom: var(--ui-zoom, 1);
   width: min(560px, calc(100vw / var(--ui-zoom, 1) - 48px)); padding: 0; border: 1px solid var(--line);
@@ -1094,7 +1067,7 @@ body.is-demo .toast { bottom: 52px; }
 .update-foot { display: flex; align-items: center; justify-content: flex-end; gap: 9px; padding: 13px 20px; border-top: 1px solid var(--line-soft); }
 .update-foot .grow { flex: 1; min-width: 0; }
 
-/* 下载进度区（下载态时替换掉 .update-meta） */
+
 .update-progress { padding: 0 20px 14px; }
 .update-progress .line { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; font-size: 12.5px; color: var(--muted); }
 .update-progress .line b { font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -1102,7 +1075,7 @@ body.is-demo .toast { bottom: 52px; }
 .update-progress .fill { height: 100%; width: 0; border-radius: 999px; background: var(--primary); transition: width .3s ease; }
 .update-progress .hint { margin-top: 8px; font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
 
-/* 失败提示条 */
+
 .update-alert { display: flex; gap: 9px; margin: 0 20px 14px; padding: 10px 12px; border: 1px solid color-mix(in oklab, var(--danger) 32%, var(--line)); border-left-width: 3px; border-radius: 10px; background: var(--danger-soft); font-size: 12.5px; line-height: 1.7; color: var(--ink); }
 .update-alert svg { flex: 0 0 15px; width: 15px; height: 15px; margin-top: 2px; fill: none; stroke: var(--danger); stroke-width: 2; stroke-linecap: round; }
 .update-alert .src { color: var(--muted); }
@@ -1125,9 +1098,9 @@ body.is-demo .toast { bottom: 52px; }
 
 .local-status-recovery { position: fixed; z-index: var(--z-recovery); top: 8px; left: 50%; transform: translateX(-50%); max-width: 90vw; padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; }
 
-/* Queued images keep their geometry while waiting/retrying, without broken-image glyphs. */
+
 img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
-/* First-paint shared primitives for lazy pages. Keep these in the critical app sheet. */
+
 .mayhem-ranking-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .mayhem-ranking-list article { display: grid; min-height: 70px; grid-template-columns: 22px 46px minmax(92px, 1fr) max-content; align-items: center; gap: 8px; padding: 9px 12px; border-top: 1px solid var(--line); }
 .mayhem-ranking-list article:nth-child(odd) { border-right: 1px solid var(--line); }
@@ -1166,30 +1139,22 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
   .mayhem-ranking-list article dl { grid-column: 3; }
 }
 
-/* ---------- R123 头像与旗帜收藏子页 ---------- */
+
 .facade-quick-groups { display: flex; gap: 6px; margin-left: auto; }
 .facade-quick-groups button { min-height: 32px; padding: 0 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; font-size: 12.5px; font-weight: 650; }
 .facade-quick-groups button:hover { color: var(--ink); }
 .facade-quick-groups button.is-active { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklab, var(--primary) 55%, var(--line)); }
-/* R130 P4：头像/旗帜页去掉「目录总数 / 已拥有 / 当前显示」三格统计条，和其它收藏
-   子页保持一致，只留下面一行摘要。 */
-/* R130 P2 / R141 / 2026-09-24 直接修改：旗帜是细长竖图，使用固定 208px 宽的竖长卡（R141 探测过
-   190–208px 在 1200/960 两个参照宽度下都还是 4/3 列，212px 就会在 960 宽度下掉到 2 列，208 是
-   不掉列的前提下能给到的最大宽度）；宽高比取第一张加载成功的旗帜图片的真实
-   naturalWidth/naturalHeight（favorites-facade.js 写进 --facade-banner-ratio），取样前按 0.38
-   兜底（比旧的 0.3 兜底稍矮一点），object-fit: contain 不裁剪、不拉伸变形。justify-content:
-   space-between 把整行排不满时剩下的空隙摊到列间距里，不再整块留在最右边。未拥有的旗帜只压
-   透明度、不做全灰去色，参考锁图标 + 半透明遮罩的风格，能看清旗帜本来的配色。 */
+
+
 .facade-grid.is-banners { --facade-banner-ratio: 0.38; grid-template-columns: repeat(auto-fill, 208px); justify-content: space-between; gap: 20px 16px; }
 .facade-grid.is-banners .skin-card { contain-intrinsic-size: auto 547px; }
 .facade-grid.is-banners .skin-art { aspect-ratio: var(--facade-banner-ratio); border-radius: 8px; }
 .facade-grid.is-banners .skin-art img { object-fit: contain; }
 .facade-grid.is-banners .skin-card.is-locked .skin-art img.is-loaded { opacity: .68; filter: none; }
 .facade-grid .image-fallback { font-size: 26px; }
-/* R130 P6：详情弹窗按图片自身尺寸显示，宽度跟着内容收缩，不留大片空白。图片区域
-   尺寸由 favorites-facade.js 写进 --facade-art-width/height，加载前按 128px 占位。 */
+
 .facade-detail-dialog { width: fit-content; min-width: min(320px, calc((100dvw - 28px) / var(--ui-zoom, 1))); max-width: calc((100dvw - 28px) / var(--ui-zoom, 1)); max-height: calc((100dvh - 28px) / var(--ui-zoom, 1)); }
-/* 详情文字保留完整高度；视口较矮时只收缩图片，不让弹窗出现滚动条。 */
+
 .facade-detail-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
 .facade-detail-dialog .dialog-art { flex: 0 1 var(--facade-art-height, 128px); width: var(--facade-art-width, 128px); max-width: 100%; height: var(--facade-art-height, 128px); aspect-ratio: auto; margin: 12px auto 0; }
 .facade-detail-dialog .dialog-copy { flex: 0 0 auto; }
@@ -1200,25 +1165,18 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .facade-grid.is-icons .skin-art { width: 92px; aspect-ratio: 1/1; border-radius: 8px; }
 .facade-grid.is-icons .skin-art img { object-fit: contain; }
 .facade-grid.is-icons .skin-card.is-locked .skin-art img.is-loaded { opacity: .68; filter: none; }
-/* 2026-09-24 直接修改：头像格子不再显示「加载中」文字，改成和别处骨架屏一样的波动动画
-   （复用已有的 .skeleton 渐变/@keyframes skeleton，不新起一套动画）；图片一加载完成
-   （img.is-loaded）就停。加载失败时 favorites-facade.js 仍然会把文字改成「无图」，那种情况
-   不受这条影响。 */
+
 .facade-grid.is-icons .skin-art:has(img:not(.is-loaded)) { background: linear-gradient(100deg,var(--surface) 30%,var(--surface-strong) 46%,var(--surface) 62%); background-size: 220% 100%; animation: skeleton 1.2s ease-in-out infinite; }
-/* R130 P3：头像/旗帜卡片不再显示右上角的「已拥有 / 未拥有」标签，未拥有靠置灰 +
-   锁图标表示；拥有状态在详情弹窗里仍然保留一行。 */
+
 .facade-grid .skin-state { display: none; }
 .facade-grid .skin-lock { width: 30px; height: 30px; }
 .facade-grid .skin-lock svg { width: 15px; height: 15px; }
-/* R125 / R130 P2：头像与旗帜格子都只把名称放在图片下方，不再压在原图上。
-   2026-09-24 直接修改：补上左右 4px 内边距（4px 是仓库里已经在用的既有内边距取值，不再新增一种新的 padding 组合）——卡片外层 .skin-card 的圆角是 14px 并且设了
-   overflow: hidden，名字贴着最左边（padding 是 0）时最左边那个字的左下角会被圆角裁掉一点，
-   不是字体本身又单独设置了圆角。 */
+
 .facade-grid .skin-copy { position: static; margin: 6px 0 0; padding: 0 4px; background: none; }
 .facade-grid .skin-copy strong { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .facade-grid .skin-hero, .facade-grid .skin-meta { display: none; }
 
-/* Persistent update completion card, independent of the transient toast. */
+
 .update-ready-toast { position: fixed; right: 20px; bottom: 20px; z-index: 1200; width: min(320px, calc(100vw - 40px)); padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); color: var(--ink); box-shadow: 0 18px 44px rgb(0 0 0 / .22); animation: update-ready-enter .18s ease-out; }
 .update-ready-toast h3 { margin: 0 0 8px; font-size: 15px; }
 .update-ready-toast p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
@@ -1243,3 +1201,8 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .setting-riot-key-reveal:hover, .setting-riot-key-reveal:focus-visible { color: var(--ink); }
 .setting-riot-key-reveal .control-icon { width: 20px; height: 20px; }
 .setting-riot-key-reveal[aria-pressed="false"] .riot-key-eye-closed, .setting-riot-key-reveal[aria-pressed="true"] .riot-key-eye-open { display: none; }
+.setting-cache-card h3 { margin-bottom: 0; }
+.setting-cache-card { min-height: 68px; }
+.setting-cache-card .setting-network-controls { position: relative; }
+.setting-cache-card .inline-status { position: absolute; right: calc(100% + 16px); white-space: nowrap; margin: 0; color: var(--success); transition: opacity .2s; }
+.setting-cache-card .inline-status[hidden] { display: none; }

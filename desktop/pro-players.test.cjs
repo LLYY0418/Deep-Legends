@@ -40,6 +40,7 @@ function boot(t, { full = false, response = async () => fixture(), overviewStatu
       const original = w.fetch;
       w.fetch = async (input, init) => {
         const url = String(input);
+        if (url === "/api/pro-players/visibility") return new w.Response(null,{status:204});
         if (url.startsWith("/api/pro-players")) {
           requests.push({ url, init });
           const data = await response();
@@ -93,7 +94,7 @@ test("职业页懒加载、所有分组/账号、缺失状态、筛选缓存与�
   assert.match(PRO_CSS, /\.pro-ladder-rank\s*\{[^}]*color:\s*var\(--accent\)/s);
   assert.equal(d.querySelector(".pro-account img"), null);
   const supplemental = d.querySelectorAll(".pro-account")[1];
-  assert.match(supplemental.textContent, /缓存.*不活跃.*TTP/);
+  assert.doesNotMatch(supplemental.textContent,/缓存/);assert.match(supplemental.textContent, /不活跃.*TTP/);
   assert.equal(supplemental.closest("tr").querySelector(".pro-lp").textContent, "—");
   const firstRow = d.querySelector(".pro-table tbody tr");
   assert.equal(firstRow.querySelector(".pro-lp-value").textContent, "1,000");
@@ -207,7 +208,7 @@ test("统一总览按国服、韩服、职业分组，同一账号跨组隔离�
  assert.equal(group(),'pro');choose('kr');await tick();assert.equal(root.scrollTop,220);
  d.querySelector('#player-tabs [data-close-player]').click();await tick();assert.equal(d.querySelector('#player-group-menu [data-player-group="kr"]').getAttribute('aria-disabled'),'false');
  choose('pro');await tick();d.querySelector('#player-tabs [data-close-player]').click();await tick();assert.equal(d.querySelector('#player-group-menu [data-player-group="pro"]').getAttribute('aria-disabled'),'false');
- assert.equal(d.querySelector('#overview-panel').hidden,false);assert.deepEqual(errors,[]);
+ assert.equal(d.querySelector('#pro-players-panel').hidden,false);assert.equal(root.scrollTop,123);assert.deepEqual(errors,[]);
 });
 
 

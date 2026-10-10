@@ -8,11 +8,13 @@ test("setup-only release hashes actual renamed bytes and emits exactly three fil
   fs.mkdirSync(path.join(root,"desktop"));fs.mkdirSync(path.join(root,"dist","desktop"),{recursive:true});
   fs.writeFileSync(path.join(root,"desktop","package.json"),JSON.stringify({version:"0.12.0"}));
   fs.writeFileSync(path.join(root,"CHANGELOG.md"),'# 更新日志\n\n## 0.12.0 — 2026-09-11\n\n### 新增\n- 更新\n\n## 0.11.2 — 2026-09-10\n- 旧内容\n');
+  const key=crypto.createHash('sha256').update(['deep','legends','hexcore','loot','kr-riot-channel','v1'].join('\x1f')).digest(),nonce=Buffer.alloc(12,7),cipher=crypto.createCipheriv('aes-256-gcm',key,nonce);
+  const fakeCipher=Buffer.concat([nonce,cipher.update('RGAPI-00000000-0000-0000-0000-000000000000'),cipher.final(),cipher.getAuthTag()]).toString('base64');
   const fingerprint="a1b2c3d4e5f6",bytes=Buffer.from("actual installer bytes");
   fs.writeFileSync(path.join(root,"dist","desktop",`Deep Legends Setup 0.12.0-public.exe`),bytes);
   const backend=path.join(root,"desktop","backend","loot-service.exe");
   const packaged=path.join(root,"dist","desktop","win-unpacked","resources","app.asar.unpacked","backend","loot-service.exe");
-  for(const file of [backend,packaged]){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`MZ-test-backend-${fingerprint}`);}
+  for(const file of [backend,packaged]){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`MZ-test-backend-${fingerprint} ${fakeCipher}`);}
   assert.throws(()=>makeRelease({root,fingerprint}),/缺少构建验证记录/);
   recordReleaseBuild({root,fingerprint,mode:"public"});
   const manifest=makeRelease({root,fingerprint,publishedAt:"2026-09-11T12:00:00Z"});
@@ -30,7 +32,7 @@ test("setup-only release hashes actual renamed bytes and emits exactly three fil
   assert.throws(()=>makeRelease({root,fingerprint}),/发布文件与已验证构建不一致/);
   fs.writeFileSync(path.join(root,"dist","desktop",`Deep Legends Setup 0.12.0-public.exe`),bytes);
   fs.appendFileSync(backend,"changed");assert.throws(()=>makeRelease({root,fingerprint}),/Backend changed/);
-  fs.writeFileSync(backend,`MZ-test-backend-${fingerprint}`);
+  fs.writeFileSync(backend,`MZ-test-backend-${fingerprint} ${fakeCipher}`);
   const receiptPath=path.join(root,"dist","desktop","release-build.json"),receipt=JSON.parse(fs.readFileSync(receiptPath));
   receipt.mode="private";fs.writeFileSync(receiptPath,JSON.stringify(receipt));
   assert.throws(()=>makeRelease({root,fingerprint}),/禁止发布/);

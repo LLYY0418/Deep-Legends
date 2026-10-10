@@ -129,7 +129,7 @@ func TestR241HeadFreshnessSmallRequestNewGamesAndRecentGate(t *testing.T) {
 func TestR241CollectionRetriesSamplesPersistentNegativeTTLAndCatalogInvalidation(t *testing.T) {
 	a := r175App(t)
 	client := &LCUClient{}
-	pending := AccountData{Loot: []LootItem{{Blank: true, DataPending: true, Kind: "类型未知", Count: 74, catalogRevision: "catalog-a", rawFieldKeys: []string{"count", "disenchantValue"}}}}
+	pending := AccountData{Loot: []LootItem{{Blank: true, DataPending: true, LootID: "MATERIAL_123", StoreItemID: 123, Kind: "类型未知", Count: 74, catalogRevision: "catalog-a", rawFieldKeys: []string{"count", "disenchantValue"}}}}
 	a.lcu = client
 	a.connected = true
 	a.account = cloneAccountData(pending)
@@ -157,7 +157,7 @@ func TestR241CollectionRetriesSamplesPersistentNegativeTTLAndCatalogInvalidation
 	event := events[0]
 	kinds := event["blank_kinds"].(map[string]any)
 	samples := event["blank_samples"].([]any)
-	if event["attempts"] != float64(3) || event["last_error_kind"] != "empty_identity" || kinds["类型未知"] != float64(1) || len(samples) != 1 || samples[0].(map[string]any)["id"] != float64(0) {
+	if event["attempts"] != float64(3) || event["last_error_kind"] != "empty_identity" || kinds["类型未知"] != float64(1) || len(samples) != 1 || samples[0].(map[string]any)["id"] != float64(123) {
 		t.Fatal(event)
 	}
 	t.Logf("diagnostic fixture: %v", event)

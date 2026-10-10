@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"math"
 	"sort"
@@ -202,36 +205,45 @@ func applyMatchScores(m *gameplayMatch) {
 	for i := range m.Participants {
 		m.Participants[i].Score = scores[m.Participants[i].ParticipantID]
 	}
+	m.Revision = ""
+	if data, err := json.Marshal(m); err == nil {
+		sum := sha256.Sum256(data)
+		m.Revision = hex.EncodeToString(sum[:8])
+	}
 }
-func (a *app) recordMatchScores(source string, m gameplayMatch) {
+func (a *app) recordMatchScores(source string, m gameplayMatch, contexts ...context.Context) {
 	if a == nil || m.GameID <= 0 {
 		return
 	}
 	a.cacheMatchTagInput(m)
-	rows := []map[string]any{}
-	role := false
+	if len(contexts) == 0 {
+		return
+	}
+	batch, _ := contexts[0].Value(matchScoreBatchKey{}).(*matchScoreBatch)
+	if batch == nil {
+		return
+	}
+	batch.Lock()
+	defer batch.Unlock()
+	if batch.games[m.GameID] {
+		return
+	}
+	batch.games[m.GameID] = true
+	valid := false
 	for _, p := range m.Participants {
-		s := p.Score
-		if s == nil {
-			continue
+		if p.Score != nil {
+			valid = true
+			if p.Score.Badge != "" {
+				batch.badges[p.Score.Badge]++
+			}
 		}
-		role = s.RoleComplete
-		rows = append(rows, map[string]any{"participantId": p.ParticipantID, "championId": p.ChampionID, "position": p.Position, "win": p.Win, "kills": p.Kills, "deaths": p.Deaths, "assists": p.Assists, "parts": s.Parts, "value": s.Value, "rawScore": s.RawScore, "rank": s.Rank, "badge": s.Badge})
 	}
-	if len(rows) == 0 {
-		return
+	if !valid {
+		batch.failed++
+		if batch.failed <= 3 {
+			a.recordDiagnostic(map[string]any{"event": "match_score_failed", "source": source, "reason": "missing_score", "version": matchScoreParamVersion})
+		}
 	}
-	a.matchScoreDiagnosticMu.Lock()
-	if a.matchScoreDiagnosticKeys == nil {
-		a.matchScoreDiagnosticKeys = map[int64]struct{}{}
-	}
-	if _, ok := a.matchScoreDiagnosticKeys[m.GameID]; ok {
-		a.matchScoreDiagnosticMu.Unlock()
-		return
-	}
-	a.matchScoreDiagnosticKeys[m.GameID] = struct{}{}
-	a.matchScoreDiagnosticMu.Unlock()
-	a.recordDiagnostic(allowMatchScoreDiagnostic(map[string]any{"event": "match_score_computed", "source": source, "gameId": m.GameID, "queueId": m.QueueID, "roleComplete": role, "paramVersion": matchScoreParamVersion, "participants": rows}))
 }
 
 // JSON presence must survive conversion and disk round trips. A missing dimension

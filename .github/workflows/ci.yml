@@ -99,9 +99,13 @@ jobs:
           test -n "$chrome"
           version="$(node -p "require('./desktop/package.json').version")"
           fingerprint="$(node desktop/source-fingerprint.cjs)"
-          go build -tags= -buildvcs=false -ldflags="-X main.version=$version -X main.buildFingerprint=$fingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=" -o "$RUNNER_TEMP/r264-public" ./backend
+          fake_cipher="$(go run ./backend -encrypt-riot-key RGAPI-00000000-0000-0000-0000-000000000000)"
+          go build -tags= -buildvcs=false -ldflags="-X main.version=$version -X main.buildFingerprint=$fingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=$fake_cipher" -o "$RUNNER_TEMP/r264-public" ./backend
           CHROME_BIN="$chrome" R264_BACKEND="$RUNNER_TEMP/r264-public" R264_BROWSER_OUT="$RUNNER_TEMP/r264-browser" node scripts/r264-browser.cjs
+          DEEP_LEGENDS_KEY_MODE=public node desktop/verify-embedded-riot-key.cjs --expect-fake --file="$RUNNER_TEMP/r264-public"
           CHROME_BIN="$chrome" R265_BACKEND="$RUNNER_TEMP/r264-public" R265_BROWSER_OUT="$RUNNER_TEMP/r265-browser" node scripts/r265-browser.cjs
+          CHROME_BIN="$chrome" R266_BACKEND="$RUNNER_TEMP/r264-public" R266_BROWSER_OUT="$RUNNER_TEMP/r266-browser" node scripts/r266-browser.cjs
+          CHROME_BIN="$chrome" R266_BACKEND="$RUNNER_TEMP/r264-public" R266_MATRIX=1 R266_BROWSER_OUT="$RUNNER_TEMP/r266-matrix" node scripts/r266-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -111,6 +115,8 @@ jobs:
             ${{ runner.temp }}/r117-browser/**
             ${{ runner.temp }}/r264-browser/**
             ${{ runner.temp }}/r265-browser/**
+            ${{ runner.temp }}/r266-browser/**
+            ${{ runner.temp }}/r266-matrix/**
           if-no-files-found: warn
       - name: Test installer module
         working-directory: installer
@@ -213,8 +219,13 @@ jobs:
         run: |
           $version = node -p "require('./desktop/package.json').version"
           if ($LASTEXITCODE -ne 0) { throw "Unable to read desktop package version" }
-          ./build-desktop-windows.ps1 -Version $version -KeyMode public -SkipTestsInCI
+          $fakeCipher = (& go run ./backend -encrypt-riot-key 'RGAPI-00000000-0000-0000-0000-000000000000').Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $fakeCipher) { throw "Fake key encryption failed" }
+          ./build-desktop-windows.ps1 -Version $version -KeyMode public -SkipTestsInCI -RiotAPIKeyCipher $fakeCipher
           if ($LASTEXITCODE -ne 0) { throw "Desktop build failed" }
+          $env:DEEP_LEGENDS_KEY_MODE='public'
+          node desktop/verify-embedded-riot-key.cjs --expect-fake
+          if ($LASTEXITCODE -ne 0) { throw "Fake embedded key verification failed" }
       - name: Verify checksums
         shell: pwsh
         run: |

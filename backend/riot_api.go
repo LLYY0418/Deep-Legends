@@ -139,6 +139,8 @@ type riotMatchFlight struct {
 }
 
 type riotProvider struct {
+	foreground       *riotForegroundState
+	relayProvider    *riotProvider
 	platform         string
 	platformMu       sync.Mutex
 	platforms        map[string]*riotProvider
@@ -268,7 +270,7 @@ func riotOverviewCostTrackerFromContext(ctx context.Context) *riotOverviewCostTr
 
 func newRiotProvider(champions *championProvider) *riotProvider {
 	return &riotProvider{
-		matchConcurrency: configuredRiotMatchConcurrency(), matchDisk: newRiotMatchDiskCache(champions), identityDisk: newRiotIdentityCache(champions),
+		foreground: &riotForegroundState{}, matchConcurrency: configuredRiotMatchConcurrency(), matchDisk: newRiotMatchDiskCache(champions), identityDisk: newRiotIdentityCache(champions),
 		champions: champions, matchCache: make(map[string]*riotMatch), accountCache: make(map[string]riotAccountCacheEntry), accountFlights: make(map[string]*riotAccountFlight),
 		specialistCache: make(map[string]specialistRuneCacheEntry), specialistFlights: make(map[string]*specialistRuneFlight), specialistRecent: make(map[string]specialistRecentSummaryCacheEntry), specialistSlots: make(chan struct{}, specialistRunePlayerLimit),
 	}
@@ -280,6 +282,9 @@ func riotKeyConfigured() bool { return riotKeySource() != "none" }
 // until the server advertises the key's actual regional and method limits.
 func (p *riotProvider) wait(ctx context.Context) error {
 	if isRiotBackground(ctx) {
+		if err := p.waitForRiotForeground(ctx); err != nil {
+			return err
+		}
 		return p.admitRiotBackground(ctx)
 	}
 	if limit, ok := ctx.Value(riotSingleWaitKey{}).(time.Duration); ok {
@@ -419,20 +424,26 @@ func (p *riotProvider) get(ctx context.Context, host, requestPath string, query 
 
 // getLimited 与 get 相同，但允许调用方指定响应大小上限；对局时间线
 // （timeline）包含逐帧事件，体积可达数 MB，需要比常规接口更大的额度。
-func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string, query url.Values, out any, responseMax int64) error {
+func (p *riotProvider) getLimitedRoute(ctx context.Context, host, requestPath string, query url.Values, out any, responseMax int64) error {
 	if !riotKeyConfigured() {
 		return errRiotKeyMissing
 	}
 	scope := riotRequestRateScope(host, requestPath)
 	ctx = context.WithValue(ctx, riotRateScopeKey{}, scope)
-	if _, source := riotUserKeys.effective(); source == "relay" {
+	if _, source := riotRequestCredential(ctx); source == "relay" {
 		if entries := riotRelays.entries(p.detailConcurrency()); entries != nil {
 			return p.getCandidateRelay(ctx, entries, host, requestPath, query, out, responseMax)
 		}
 	}
 	networkAttempts := 0
-	for attempt := 0; attempt < 3; attempt++ {
-		key, source := riotUserKeys.effective()
+	networkAttemptLimit := 2
+	attemptLimit := 3
+	if fallback, _ := ctx.Value(riotFallbackAttemptKey{}).(bool); fallback {
+		networkAttemptLimit = 1
+		attemptLimit = 1
+	}
+	for attempt := 0; attempt < attemptLimit; attempt++ {
+		key, source := riotRequestCredential(ctx)
 		if source == "none" {
 			return errRiotKeyMissing
 		}
@@ -472,9 +483,11 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		request.Header.Set("User-Agent", "Deep-Legends/"+version)
 		client := riotHTTPClientWithoutRedirects(p.champions.httpClient())
 		// Reserve quota only after building the request, immediately before I/O.
+		queuedAt := time.Now()
 		if err := p.wait(ctx); err != nil {
 			return err
 		}
+		queuedDuration := time.Since(queuedAt)
 		// A different player/provider may have discovered a shared cooldown
 		// while this request was waiting for admission. Recheck before I/O.
 		if source == "relay" {
@@ -493,9 +506,9 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		p.beginRiotRateRequest(scope)
 		requestedAt := time.Now()
 		var responseTTFB atomic.Int64
-		attemptContext, cancelAttempt := context.WithTimeout(ctx, 15*time.Second)
+		attemptContext, cancelAttempt := context.WithTimeout(ctx, riotAttemptBudget(requestPath))
 		request = request.WithContext(attemptContext)
-		if source == "relay" {
+		{
 			request = request.WithContext(httptrace.WithClientTrace(request.Context(), &httptrace.ClientTrace{GotFirstResponseByte: func() {
 				elapsed := time.Since(requestedAt)
 				responseTTFB.Store(int64(elapsed))
@@ -503,11 +516,20 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			}}))
 		}
 		response, err := client.Do(request)
+		entry := "direct"
+		if source == "relay" {
+			entry = "A"
+		}
+		if err != nil {
+			riotRequestEvent(p.champions.diag, attemptContext, map[bool]string{true: "relay", false: "direct"}[source == "relay"], riotRelayRequestCategory(requestPath), entry, 0, time.Duration(responseTTFB.Load()), time.Since(requestedAt), queuedDuration, 0, attempt+1)
+		}
 		if err != nil {
 			cancelAttempt()
 			p.observeRiotRate(scope, nil, 0)
 			if source == "relay" {
 				riotRelays.recordBusinessRequest("network", 0, riotRelayRequestCategory(requestPath), p.champions.diag, "A", requestedAt, time.Duration(responseTTFB.Load()))
+			} else {
+				riotRelays.recordBusinessRequest("network", 0, riotRelayRequestCategory(requestPath), p.champions.diag, "direct", requestedAt, time.Duration(responseTTFB.Load()))
 			}
 			if isDetail {
 				tracker.detailInFlight(-1)
@@ -515,7 +537,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			if source == "relay" && ctx.Err() == nil {
 				riotRelays.failed(relay)
 				networkAttempts++
-				if networkAttempts < 2 {
+				if networkAttempts < networkAttemptLimit {
 					if delayErr := waitRiotDelay(ctx, 500*time.Millisecond); delayErr != nil {
 						return delayErr
 					}
@@ -525,6 +547,12 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			}
 			if source == "relay" {
 				return ctx.Err()
+			}
+			if source != "embedded" && strings.HasSuffix(requestPath, "/ids") && attempt < 1 && ctx.Err() == nil {
+				if delayErr := waitRiotDelay(ctx, 500*time.Millisecond); delayErr != nil {
+					return delayErr
+				}
+				continue
 			}
 			return fmt.Errorf("无法连接 Riot 官方接口（可在设置中调整“英雄数据网络”代理）：%w", err)
 		}
@@ -536,10 +564,17 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			p.observeRiotRate(scope, response.Header, response.StatusCode)
 		}
 		body, readErr := readLimited(response.Body, responseMax)
+		riotRequestEvent(p.champions.diag, attemptContext, map[bool]string{true: "relay", false: "direct"}[source == "relay"], riotRelayRequestCategory(requestPath), entry, response.StatusCode, time.Duration(responseTTFB.Load()), time.Since(requestedAt), queuedDuration, len(body), attempt+1)
+		if source == "embedded" {
+			p.observeEmbeddedQuota(response.Header, response.StatusCode)
+		}
 		response.Body.Close()
 		cancelAttempt()
 		if isDetail {
 			tracker.detailInFlight(-1)
+		}
+		if source != "relay" {
+			riotRelays.recordBusinessRequest("", response.StatusCode, riotRelayRequestCategory(requestPath), p.champions.diag, "direct", requestedAt, time.Duration(responseTTFB.Load()))
 		}
 		if source == "relay" {
 			failure := ""
@@ -579,7 +614,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 				}
 				riotRelays.failed(relay)
 				networkAttempts++
-				if networkAttempts < 2 {
+				if networkAttempts < networkAttemptLimit {
 					if delayErr := waitRiotDelay(ctx, 500*time.Millisecond); delayErr != nil {
 						return delayErr
 					}
@@ -593,7 +628,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		case http.StatusOK:
 			riotUserKeys.observe(request.Header.Get("X-Riot-Token"), response.StatusCode)
 			if readErr != nil {
-				return readErr
+				return fmt.Errorf("无法连接 Riot 官方接口：%w", readErr)
 			}
 			if err := json.Unmarshal(body, out); err != nil {
 				if source == "relay" {
@@ -614,10 +649,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			riotUserKeys.observe(request.Header.Get("X-Riot-Token"), response.StatusCode)
 			return &riotStatusError{message: "Riot Key 无效", status: response.StatusCode}
 		case http.StatusTooManyRequests:
-			retryAfter := time.Duration(3) * time.Second
-			if seconds, parseErr := strconv.Atoi(response.Header.Get("Retry-After")); parseErr == nil && seconds > 0 && seconds <= 86400 {
-				retryAfter = time.Duration(seconds) * time.Second
-			}
+			retryAfter := time.Duration(riotRetryAfter(response.Header.Get("Retry-After"), time.Now(), 3)) * time.Second
 			cooldown := ""
 			if source == "relay" {
 				var seconds int
@@ -634,11 +666,11 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 				})
 			}
 			quotaError := &riotStatusError{message: "Riot 接口限流中（HTTP 429），请稍后重试", status: http.StatusTooManyRequests, retryAfter: int(retryAfter / time.Second), relayCooldown: cooldown}
-			if cooldown == "application" || cooldown == "ip" {
+			if source == "embedded" || cooldown == "application" || cooldown == "ip" {
 				return quotaError
 			}
 			deadline, bounded := ctx.Deadline()
-			if attempt == 2 || retryAfter > 30*time.Second || bounded && time.Until(deadline) <= retryAfter {
+			if attempt == attemptLimit-1 || retryAfter > 30*time.Second || bounded && time.Until(deadline) <= retryAfter {
 				return quotaError
 			}
 			if err := waitRiotDelay(ctx, retryAfter); err != nil {
@@ -1493,11 +1525,23 @@ func (a *app) riotChampionNames(ctx context.Context) map[int64]string {
 }
 
 func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference, begIndex, count int, filters ...string) (gameplayOverview, error) {
+	if batch, _ := ctx.Value(matchScoreBatchKey{}).(*matchScoreBatch); batch == nil {
+		var own *matchScoreBatch
+		ctx, own = newMatchScoreBatch(ctx)
+		defer a.finishMatchScoreBatch(own)
+	}
 	matchFilter := riotOverviewFilter(filters)
 	if a.riot == nil {
 		return gameplayOverview{}, errors.New("Riot 查询通道未初始化")
 	}
+	bounded, cancel := context.WithTimeout(ctx, 24500*time.Millisecond)
+	defer cancel()
+	ctx = bounded
 	provider := a.riot.forPlatform(reference.Region)
+	if !isRiotBackground(ctx) {
+		done := beginRiotForeground(provider)
+		defer done()
+	}
 	ctx = withRiotPlatform(ctx, provider.region())
 	ctx = withRiotSingleWaitLimit(ctx, 5*time.Second)
 	semaphore := make(chan struct{}, provider.detailConcurrency())
@@ -1514,7 +1558,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}
 		matchesFailed, firstErrorKind := tracker.matchFailureSnapshot()
 		provider.champions.diag(map[string]any{
-			"event": "riot_overview_cost", "duration_ms": time.Since(started).Milliseconds(),
+			"event": "riot_overview_cost", "cancel_reason": riotCancelReason(ctx), "duration_ms": time.Since(started).Milliseconds(),
 			"matches_requested": matchesRequested, "matches_loaded": matchesLoaded,
 			"matches_failed": matchesFailed, "first_error_kind": firstErrorKind,
 			"error_kind":         tracker.accountFailureSnapshot(),
@@ -1716,7 +1760,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			if detail != nil {
 				a.checkArenaRiotMatchTruth(detail)
 				match := riotConvertMatch(detail, puuid, names, queueLabels)
-				a.recordMatchScores("riot", match)
+				a.recordMatchScores("riot", match, ctx)
 				if !isCustomGameplayMatch(match) {
 					partial.Matches = append(partial.Matches, match)
 				}
@@ -1823,7 +1867,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}
 		a.checkArenaRiotMatchTruth(detail)
 		match := riotConvertMatch(detail, puuid, names, queueLabels)
-		a.recordMatchScores("riot", match)
+		a.recordMatchScores("riot", match, ctx)
 		a.recordDiagnostic(riotMatchItemsDiagnostic(match))
 		a.recordDiagnostic(map[string]any{"event": "riot_match_mode", "queue_id": detail.Info.QueueID, "game_mode": detail.Info.GameMode, "queue_label": match.QueueLabel})
 		if !isCustomGameplayMatch(match) {

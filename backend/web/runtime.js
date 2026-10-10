@@ -204,7 +204,7 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "overview_dirty_rescan", "summoner_copy", "overview_card_ready", "self_tab_client", "browser_cold_requests_client", "champselect_request_client"].includes(event)) return;
+    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "collection_failure_state_shown", "overview_dirty_rescan", "summoner_copy", "overview_card_ready", "self_tab_client", "browser_cold_requests_client", "champselect_request_client"].includes(event)) return;
     if(event==='browser_cold_requests_client') {
       // Cumulative frames remain unsampled so a late body can amend the count.
       const body={event,reason,startedAt:Math.max(0,Math.min(1e13,Math.floor(fields.startedAt || 0))),count:Math.max(-1,Math.min(1000000,Math.floor(fields.count ?? -1))),resourceCount:Math.max(0,Math.min(1000000,Math.floor(fields.resourceCount || 0))),windowElapsed:fields.windowElapsed===true,timingAvailable:fields.timingAvailable===true};
@@ -224,7 +224,7 @@
       if(["NotAllowedError","SecurityError","NotFoundError","AbortError","TypeError","Error"].includes(fields.error_name))body.error_name=fields.error_name;
     }
     if(event === "overview_card_ready") {
-      body.isSelf=Boolean(fields.isSelf);
+      body.isSelf=Boolean(fields.isSelf);body.overviewVisibleAtReady=fields.overviewVisibleAtReady!==false;
       if(["matches","ranks","champions","masteries","positions"].includes(fields.card))body.card=fields.card;
       if(["snapshot","network","opgg"].includes(fields.source))body.source=fields.source;
       body.durationMs=Math.max(0,Math.min(3600000,Math.floor(Number(fields.durationMs)||0)));
@@ -238,6 +238,7 @@
       body.outcome = fields.outcome;
       body.since_end_ms = Math.max(0, Math.min(86400000, Math.floor(Number(fields.since_end_ms) || 0)));
     }
+    if(event==='collection_failure_state_shown') {body.sessionEpoch=Math.max(0,Math.floor(fields.sessionEpoch || 0));body.failureValue=Math.max(0,Math.min(3600000,Math.floor(fields.failureValue || 0)));body.lastErrorKind=fields.lastErrorKind==='read_failed'?'read_failed':'none';body.previousSession=fields.previousSession===true;}
     if (event === "collection_render_client") {
       if (["owned", "remaining", "all", "chromas"].includes(fields.view)) body.view = fields.view;
       body.force = Boolean(fields.force); body.keptVisible = Boolean(fields.keptVisible);

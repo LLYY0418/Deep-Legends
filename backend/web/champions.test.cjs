@@ -181,7 +181,7 @@ function compileFunctions(source, names, dependencies = {}) {
   const compiledDependencies = { state:{},gradeBadge: sharedGrades.gradeBadge, gradeRank: sharedGrades.gradeRank, isSummonersRiftMatch: data => Number(data?.mapId) === 11, ...dependencies };
   if (source.includes("function loadOverview(")) {
     compiledDependencies.riotTab ||= tab => tab?.region === "kr";
-    for (const name of ["syncOverviewSupplementRefs", "overviewSupplementTarget"]) {
+    for (const name of ["matchesPending", "renderPendingMatches", "reportDeferredMatchesCard", "syncOverviewSupplementRefs", "overviewSupplementTarget"]) {
       if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
     }
   }

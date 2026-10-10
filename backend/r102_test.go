@@ -312,7 +312,11 @@ func TestR102LastMatchErrorsRemainUnknownAndRetry(t *testing.T) {
 			}
 			before := calls
 			p.lastMatchStart(context.Background(), "private")
-			if calls != before+1 {
+			wantAttempts := 1
+			if stage == "ids" {
+				wantAttempts = 2 // P7 permits one additional IDs transport attempt.
+			}
+			if calls != before+wantAttempts {
 				t.Fatal("error cached", calls, before)
 			}
 		})

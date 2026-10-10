@@ -171,6 +171,7 @@ type coldLaunchTimeline struct {
 	milestones                              map[string]int64
 	attempts, sweeps                        int
 	matchesSource                           string
+	overviewVisibleAtReady                  *bool
 	overviewSource                          string
 	overlayShown                            int
 	lcuStarts                               []time.Time
@@ -194,6 +195,7 @@ func (a *app) observeColdLaunchDiscovery(report LCUDiscoveryStatus, now time.Tim
 		event := s.finishLocked()
 		s.seen, s.emitted, s.milestones = false, false, nil
 		s.matchesSource, s.overviewSource, s.overlayShown = "", "", 0
+		s.overviewVisibleAtReady = nil
 		s.lcuStarts = nil
 		s.sgpFirstScreenBytes = 0
 		s.sgpSamples = nil
@@ -279,7 +281,7 @@ func (a *app) observeColdLaunchMilestone(name string, now time.Time) {
 		a.recordDiagnostic(event)
 	}
 }
-func (a *app) observeFirstMatchesCard(source string, now time.Time) {
+func (a *app) observeFirstMatchesCard(source string, now time.Time, visible ...bool) {
 	a.coldLaunch.mu.Lock()
 	if !a.coldLaunch.seen || now.Before(a.coldLaunch.process) {
 		a.coldLaunch.mu.Unlock()
@@ -296,6 +298,10 @@ func (a *app) observeFirstMatchesCard(source string, now time.Time) {
 			}
 		}
 		a.coldLaunch.matchesSource = source
+		if len(visible) > 0 {
+			v := visible[0]
+			a.coldLaunch.overviewVisibleAtReady = &v
+		}
 	}
 	a.coldLaunch.mu.Unlock()
 	a.observeColdLaunchMilestone("matches_card_ms", now)
@@ -348,6 +354,15 @@ func (s *coldLaunchTimeline) eventLocked() map[string]any {
 			value = -1
 		}
 		event[name] = value
+	}
+	if s.overviewVisibleAtReady != nil {
+		event["overview_visible_at_ready"] = *s.overviewVisibleAtReady
+		if !*s.overviewVisibleAtReady {
+			event["matches_card_deferred_ms"] = event["matches_card_ms"]
+			event["matches_card_ms"] = int64(-1)
+		}
+	} else {
+		event["overview_visible_at_ready"] = true
 	}
 	return event
 }

@@ -342,6 +342,7 @@ type statusResponse struct {
 	Connected                  bool                 `json:"connected"`
 	IdentityReady              bool                 `json:"identityReady"`
 	SGPReady                   bool                 `json:"sgpReady"`
+	ClientSessionEpoch         uint64               `json:"clientSessionEpoch"`
 	SnapshotReady              bool                 `json:"snapshotReady"`
 	ConnectionState            string               `json:"connectionState"`
 	ClientRegion               string               `json:"clientRegion"`
@@ -410,7 +411,11 @@ func main() {
 		return
 	}
 	if strings.TrimSpace(*encryptRiotKeyFlag) != "" {
-		cipherText, err := encryptRiotKey(*encryptRiotKeyFlag)
+		plain := *encryptRiotKeyFlag
+		if plain == "env:RIOT_API_KEY" {
+			plain = os.Getenv("RIOT_API_KEY")
+		}
+		cipherText, err := encryptRiotKey(plain)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -635,6 +640,7 @@ func main() {
 	mux.HandleFunc("GET /api/gameplay/replay", a.authorized(a.handleGameplayReplayMetadata))
 	mux.HandleFunc("POST /api/gameplay/replay", a.authorized(a.handleGameplayReplayAction))
 	mux.HandleFunc("GET /api/pro-players", a.authorized(a.handleProPlayers))
+	mux.HandleFunc("POST /api/pro-players/visibility", a.authorized(a.handleProVisibility))
 	mux.HandleFunc("GET /api/champions/catalog", a.authorized(a.handleChampionCatalog))
 	mux.HandleFunc("GET /api/champions/rankings", a.authorized(a.handleChampionRankings))
 	mux.HandleFunc("GET /api/champions/augments", a.authorized(a.handleChampionAugments))
@@ -872,10 +878,10 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 		clientDiscovery = "connected"
 	}
 	response := statusResponse{
-		ClientVersion:   client.cachedGameVersion(),
-		SGPReady:        a.selfReadinessClient == client && a.selfReadinessAccount == identity.PUUID && a.selfSGPReady,
-		ClientDiscovery: clientDiscovery,
-		Version:         version, BuildFingerprint: buildFingerprint, Connected: a.clientSessionConnectedLocked() && a.shutdownClient == nil, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
+		ClientVersion:      client.cachedGameVersion(),
+		SGPReady:           a.selfReadinessClient == client && a.selfReadinessAccount == identity.PUUID && a.selfSGPReady,
+		ClientDiscovery:    clientDiscovery,
+		ClientSessionEpoch: a.clientSessionEpoch, Version: version, BuildFingerprint: buildFingerprint, Connected: a.clientSessionConnectedLocked() && a.shutdownClient == nil, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
 		Syncing: a.syncing, LastSync: a.lastSync, LastAttempt: a.lastAttempt, LastDurationMS: a.lastDuration.Milliseconds(),
 		LastError: a.lastError, Summoner: summoner, OwnedCount: ownedCount, ChromaOwnedCount: ownedChromaCount(a.chromas), PoolTotal: a.poolTotal,
 		PoolMatched: a.poolMatched, Remaining: remainingCount, CalculationOK: a.calculationOKLocked(),
@@ -1395,6 +1401,9 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	a.lastAttempt = time.Now()
 	a.lastDuration = time.Duration(result.LoadPhases["total"]) * time.Millisecond
 	a.lastError = ""
+	a.snapshotRetryCount = 0
+	a.snapshotRetryStarted = time.Time{}
+	a.snapshotRetryExhausted = false
 	if gameplaySummonerChanged(previous, result.Summoner) {
 		a.clearGameplayReferences()
 	}

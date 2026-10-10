@@ -512,7 +512,16 @@ func TestR99SeedQuotaDiagnosticsNeverContainIdentity(t *testing.T) {
 	}
 
 	raw, _ := json.Marshal(events)
-	if len(events) != 2 {
+	limited := 0
+	for _, event := range events {
+		if event["event"] != "riot_rate_limited" && event["event"] != "riot_request" {
+			t.Fatalf("unexpected diagnostic: %v", event["event"])
+		}
+		if event["event"] == "riot_rate_limited" {
+			limited++
+		}
+	}
+	if limited != 2 {
 		t.Fatalf("missing 429 diagnostics: %s", raw)
 	}
 	for _, bad := range []string{"SECRET-STABLE-ID", r102RookieSeed().Accounts[0].GameName, url.PathEscape(r102RookieSeed().Accounts[0].GameName)} {

@@ -53,6 +53,9 @@ run_stage go-vet go vet ./...
   run_stage installer-vet go vet ./...
 )
 cipher=""
+if [[ "$DEEP_LEGENDS_KEY_MODE" == "public" ]]; then
+  cipher="$(go run ./backend -encrypt-riot-key RGAPI-00000000-0000-0000-0000-000000000000)"
+fi
 if [[ "$DEEP_LEGENDS_KEY_MODE" == "private" ]]; then
   key_file="${RIOT_KEY_FILE:-$project_root/riot_key.local.txt}"
   if [[ ! -f "$key_file" ]]; then

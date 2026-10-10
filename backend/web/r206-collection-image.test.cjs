@@ -9,7 +9,7 @@ test('R206 first collection scan skeleton, failure after fifteen seconds and col
   const dom=new JSDOM('<div id="grid"></div><p id="meta"></p>');const doc=dom.window.document,requests=[];
   const state={status:{connected:true,snapshotReady:false,...status},section:'favorites',favoritesPage:'collection',qualitySelections:new Set(),renderGeneration:0};
   const el={grid:doc.querySelector('#grid'),listMeta:doc.querySelector('#meta'),refresh:{click(){throw Error('full refresh forbidden')}}};
-  const f=compile(app,['renderItems','collectionReadFailed','retryCollection'],{state,el,escapeHTML,cancelRenderFrames(){},cancelDeferredImages(){},stopHoverVideo(){},api:async(url)=>requests.push(url),showToast(){}});
+  const f=compile(app,['renderItems','syncCollectionSession','collectionReadFailed','retryCollection'],{state,el,escapeHTML,cancelRenderFrames(){},cancelDeferredImages(){},stopHoverVideo(){},api:async(url)=>requests.push(url),showToast(){}});
   f.renderItems();assert.equal(el.listMeta.textContent,'正在读取收藏');
   if(status.syncing){assert.equal(el.grid.querySelectorAll('.skeleton').length,8);assert.equal(el.grid.querySelector('button'),null);assert(!/重试/.test(el.grid.textContent));}
   else{assert.match(el.grid.textContent,/收藏信息读取失败/);el.grid.querySelector('button').click();await Promise.resolve();assert.deepEqual(requests,['/api/refresh?source=collection_retry']);}

@@ -456,10 +456,11 @@ type gameplayRecentPlayer struct {
 }
 
 type gameplayMatch struct {
-	TagsAvailable bool  `json:"tagsAvailable,omitempty"`
-	GameID        int64 `json:"gameId"`
-	CreatedAt     int64 `json:"createdAt"`
-	Duration      int64 `json:"duration"`
+	Revision      string `json:"revision,omitempty"`
+	TagsAvailable bool   `json:"tagsAvailable,omitempty"`
+	GameID        int64  `json:"gameId"`
+	CreatedAt     int64  `json:"createdAt"`
+	Duration      int64  `json:"duration"`
 	// R127 P1-c.2：真正的开局与结束时间（毫秒，来自 gameStartTimestamp /
 	// gameEndTimestamp）。CreatedAt 是房间创建时间，只用于展示与排序；韩服平均
 	// 段位要用这两个时间去和 OP.GG 的对局记录对齐。
@@ -768,7 +769,9 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	budgetContext, cancelBudget := timeout(r.Context(), budget)
 	budgetContext = context.WithValue(budgetContext, overviewRequestContextKey{}, r.Context())
 	defer cancelBudget()
-	requestContext := context.WithValue(budgetContext, overviewLoadCostContextKey{}, loadCost)
+	requestContext, scoreBatch := newMatchScoreBatch(budgetContext)
+	defer a.finishMatchScoreBatch(scoreBatch)
+	requestContext = context.WithValue(requestContext, overviewLoadCostContextKey{}, loadCost)
 	requestContext = context.WithValue(requestContext, overviewPhasesContextKey{}, phases)
 	r = r.WithContext(requestContext)
 	defer func() {
@@ -922,6 +925,9 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 					emit(map[string]any{"type": "cards", "overview": partial})
 				}))
 			}
+		}
+		if reference.PlayerRef == "" {
+			reference.PlayerRef = a.knownProPUUID(reference)
 		}
 		response, err := a.loadRiotOverviewDeduplicated(r.Context(), reference, request.BegIndex, request.Count, request.Force, request.MatchFilter)
 		phases.mu.Lock()
@@ -1792,7 +1798,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 						continue
 					}
 					match := convertRiotMatchInfo(info, playerRef, names, queueLabels, "", reference.ServerID)
-					a.recordMatchScores("sgp", match)
+					a.recordMatchScores("sgp", match, ctx)
 					if !isCustomGameplayMatch(match) {
 						windowMatches = append(windowMatches, match)
 					}
@@ -1831,7 +1837,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			windowMatches = make([]gameplayMatch, 0, len(windowGames))
 			for _, game := range windowGames {
 				match := normalizeGameplayMatch(game, reference, names, queueLabels)
-				a.recordMatchScores("lcu", match)
+				a.recordMatchScores("lcu", match, ctx)
 				if !isCustomGameplayMatch(match) {
 					windowMatches = append(windowMatches, match)
 				}
@@ -1991,7 +1997,7 @@ func (a *app) loadRecentRankedSampleQueue(ctx context.Context, client *LCUClient
 			continue
 		}
 		match := convertRiotMatchInfo(info, playerRef, names, queueLabels, "", reference.ServerID)
-		a.recordMatchScores("sgp", match)
+		a.recordMatchScores("sgp", match, ctx)
 		if !isCustomGameplayMatch(match) {
 			result = append(result, match)
 		}
@@ -2668,7 +2674,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 				}
 				a.checkArenaGroupTruth(client, serverID, info)
 				match := convertRiotMatchInfo(info, playerRef, names, queueLabels, "", serverID)
-				a.recordMatchScores("sgp", match)
+				a.recordMatchScores("sgp", match, ctx)
 				if !isCustomGameplayMatch(match) {
 					matches = append(matches, match)
 				}
@@ -2818,7 +2824,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 	matches := make([]gameplayMatch, 0, len(rawGames))
 	for _, game := range rawGames {
 		match := normalizeGameplayMatch(game, reference, names, queueLabels)
-		a.recordMatchScores("lcu", match)
+		a.recordMatchScores("lcu", match, ctx)
 		if !isCustomGameplayMatch(match) {
 			matches = append(matches, match)
 		}
@@ -11228,7 +11234,7 @@ func (a *app) enrichCurrentRiotMatches(client *LCUClient, ref gameplayReference,
 					next.Participants[i].reference.ClientIdentity = true
 				}
 			}
-			a.recordMatchScores(dataSourceRiot, next)
+			a.recordMatchScores(dataSourceRiot, next, ctx)
 			enriched = append(enriched, next)
 		}
 		a.mu.RLock()

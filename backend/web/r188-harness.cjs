@@ -19,6 +19,10 @@ function extract(source, name) {
   throw Error(`Unbalanced function ${name}`);
 }
 function compile(source, names, dependencies = {}) {
+  names = [...names];
+  for (const name of ['matchesPending','renderPendingMatches','reportDeferredMatchesCard','syncCollectionSession']) {
+    if (!names.includes(name) && !dependencies[name] && source.includes(`function ${name}(`) && names.some(n => extract(source,n).includes(`${name}(`))) names.push(name);
+  }
   dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
   return Function(...Object.keys(dependencies), require('./r220-harness-support.cjs').prelude(source,{...dependencies,...Object.fromEntries(names.map(name=>[name,true]))}) + names.map(name => extract(source, name)).join('\n') + `\nreturn {${names.join(',')}};`)(...Object.values(dependencies));
 }

@@ -125,6 +125,7 @@ function functionSource(script, name) {
 function compile(names, dependencies = {}, script = source) {
   dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
   names = [...names];
+ for(const name of ["matchesPending","renderPendingMatches","reportDeferredMatchesCard"])if(!names.includes(name)&&!dependencies[name]&&names.some(n=>functionSource(script,n).includes(name+"(")))names.push(name);
   for (const name of ["proBadgeAttributes", "renderProIdentityBadge", "proContextFromButton"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   if (!names.includes("overviewSupplementTarget") && names.some(name => functionSource(script, name).includes("overviewSupplementTarget("))) names.push("overviewSupplementTarget");
   // R116-B 评审整改（清 R116-D 账本 §11.7-1 的技术债）：renderLiveInsights 的七个

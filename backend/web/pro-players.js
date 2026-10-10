@@ -15,7 +15,7 @@
   const tiers = { IRON: "黑铁", BRONZE: "青铜", SILVER: "白银", GOLD: "黄金", PLATINUM: "铂金", EMERALD: "翡翠", DIAMOND: "钻石", MASTER: "超凡大师", GRANDMASTER: "傲世宗师", CHALLENGER: "最强王者" };
   const state = { data: null, team: "all", query: "", loading: false, error: "", loadedAt: 0, returnKey: "", primaryOnly: false, expanded: new Set(), mismatches: new Set() };
   let links = new Map();
-	let visible = false, pollTimer = null;
+	let visible = false, pollTimer = null, activeController = null, disposed = false;
   const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const identityKey = (value) => String(value || "").toLocaleLowerCase();
   const normalize = (value) => String(value || "").toLocaleLowerCase().replace(/\s+/g, "");
@@ -83,7 +83,7 @@
           const name = `${account.gameName}#${account.tagLine}`;
           const lp = account.rankStatus === "ranked" && account.lpKnown !== false && Number.isFinite(Number(account.lp)) ? `<span class="pro-lp-value">${escape(integer(account.lp))}</span>` : '<span class="pro-muted">—</span>';
           const updated = account.lastMatchAtKnown && account.lastMatchAt ? `最近对局 ${stamp(account.lastMatchAt)}` : (data.updating ? "正在读取最近对局…" : "最近对局时间暂不可用");
-          return `<tr class="${accounts.indexOf(account) === 0 ? "pro-primary" : ""}" data-pro-row="${escape(key)}"><td class="pro-account"><button type="button" data-pro-account="${escape(key)}" aria-label="查看 ${escape(player.name)} 的账号 ${escape(name)} 总览"><span class="pro-account-line"><span class="pro-account-name" title="${escape(name)}">${escape(account.gameName)}<small>#${escape(account.tagLine)}</small></span>${account.stale ? '<small class="pro-cached">缓存</small>' : ""}${account.inactive ? '<small class="pro-inactive">不活跃</small>' : ""}${account.source === "TrackingThePros" ? '<small class="pro-ttp">TTP</small>' : ""}${state.mismatches.has(identityKey(name)) ? '<small class="pro-review">待核验</small>' : ""}</span><span class="pro-account-meta">${escape(updated)}</span></button></td><td class="pro-rank-cell">${rank(account)}<span class="pro-ladder-inline">${ladderRank(account)}</span></td><td class="pro-lp">${lp}</td><td class="pro-ladder">${ladderRank(account)}</td></tr>`;
+          return `<tr class="${accounts.indexOf(account) === 0 ? "pro-primary" : ""}" data-pro-row="${escape(key)}"><td class="pro-account"><button type="button" data-pro-account="${escape(key)}" aria-label="查看 ${escape(player.name)} 的账号 ${escape(name)} 总览"><span class="pro-account-line"><span class="pro-account-name" title="${escape(name)}">${escape(account.gameName)}<small>#${escape(account.tagLine)}</small></span>${account.inactive ? '<small class="pro-inactive">不活跃</small>' : ""}${account.source === "TrackingThePros" ? '<small class="pro-ttp">TTP</small>' : ""}${state.mismatches.has(identityKey(name)) ? '<small class="pro-review">待核验</small>' : ""}</span><span class="pro-account-meta">${escape(updated)}</span></button></td><td class="pro-rank-cell">${rank(account)}<span class="pro-ladder-inline">${ladderRank(account)}</span></td><td class="pro-lp">${lp}</td><td class="pro-ladder">${ladderRank(account)}</td></tr>`;
         };
         rows.push(...shown.map(accountRow));
         if (!state.primaryOnly && history.length) {
@@ -104,7 +104,7 @@
   }
 
   async function load(force = false, poll = false) {
-    if (state.loading) return;
+    if (state.loading || disposed) return;
     if (!force && !poll && state.data && Date.now() - state.loadedAt < (state.data.unavailable || state.data.stale || state.data.partial ? 30000 : 300000) && !state.data.updating) return;
     window.reportFlowDiagnostic?.("automatic_read_client", "request", { endpoint: "pro-players", source: poll ? "poll" : force ? "manual" : "direct" });
     clearTimeout(pollTimer);
@@ -113,24 +113,30 @@
     let changed = !poll;
     if (!poll) render();
     const controller = new AbortController();
+    activeController = controller;
     const timeout = setTimeout(() => controller.abort(), 60000);
     try {
       const response = await fetch(`/api/pro-players${force ? "?refresh=1" : ""}`, { credentials: "same-origin", cache: "no-store", signal: controller.signal });
       if (!response.ok) throw new Error("source unavailable");
       const data = await response.json();
+      if (disposed || typeof document==='undefined' || !content.isConnected) return;
       if (!Array.isArray(data.teams) || !data.teams.every((team) => typeof team.code === "string" && team.code && Array.isArray(team.players))) throw new Error("invalid response");
       changed ||= JSON.stringify(state.data) !== JSON.stringify(data);
       state.data = data;
       state.loadedAt = Date.now();
     } catch (error) {
+      if (disposed || typeof document==='undefined' || !content.isConnected) return;
       changed = true;
       state.error = state.data ? "刷新失败，当前显示上次读取的数据，不代表最新账号、段位和排名。" : "账号与排名读取失败，请检查网络后重试。";
       window.reportFlowDiagnostic?.("local_request_client", "failed", { endpoint: "pro-players", httpStatus: Number(error?.status || 0), errorKind: error?.name === "AbortError" ? "timeout" : error?.errorKind || (error?.status ? "http" : "network") });
     } finally {
       clearTimeout(timeout);
       state.loading = false;
-      if (changed) render();
-      if (visible && state.data?.updating && !state.error) pollTimer = setTimeout(() => void load(false, true), 1500);
+      activeController = null;
+      if (!disposed && typeof document!=='undefined' && content.isConnected) {
+        if (changed) render();
+        if (visible && !document.hidden && state.data?.updating && !state.error) pollTimer = setTimeout(() => void load(false, true), 1500);
+      }
     }
   }
   filters.addEventListener("click", (event) => {
@@ -173,11 +179,18 @@
     const previous = [...content.querySelectorAll("[data-pro-account]")].find((button) => button.dataset.proAccount === state.returnKey);
     (previous || document.getElementById("pro-players-title"))?.focus({ preventScroll: true });
   });
+  function syncVisibility() {
+    clearTimeout(pollTimer);return fetch("/api/pro-players/visibility",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({visible:visible && !document.hidden})}).catch(()=>{});
+  }
+  document.addEventListener("visibilitychange",()=>{void syncVisibility();if(visible && !document.hidden)void load(false,true);});
   function handleLazySection(event) {
     visible = event.detail?.name === "pro-players";
     clearTimeout(pollTimer);
-    if (visible) void load();
+    void syncVisibility();if(visible && !document.hidden)void load();
   }
   window.addEventListener("deep-legends:section", handleLazySection);
   window.deepLegendsSections?.register("pro-players", handleLazySection);
+  const dispose=()=>{disposed=true;clearTimeout(pollTimer);activeController?.abort();};
+  window.addEventListener('beforeunload',dispose,{once:true});
+  window.addEventListener('deep-legends:dispose',dispose,{once:true});
 })();

@@ -443,6 +443,7 @@
       const nextStatus = await api("/api/status", {}, "status", 8000);
       if (token !== state.statusRequestToken || state.destroyed || state.backendExited) return;
       statusReceived = true;
+      syncCollectionSession(nextStatus);
       state.status = nextStatus;
       state.statusFailures = 0;
       window.deepLegendsStatusRecovery?.(false);
@@ -607,9 +608,27 @@
     }
   }
 
+  function syncCollectionSession(data) {
+    if(data?.clientSessionEpoch == null)return;
+    if(state.collectionSessionEpoch!==data.clientSessionEpoch) {
+      state.collectionSessionEpoch=data.clientSessionEpoch;
+      state.collectionRequestAt=0;state.collectionRequestAttempt='';
+      state.collectionEnsureInFlight=false;state.collectionRescanInFlight=false;
+      state.collectionFailureSignature='';
+    }
+  }
   function collectionReadFailed(data) {
-    const elapsed = Math.max(Number(data.collectionRefreshElapsedMs || 0), state.collectionRequestAt ? Date.now() - state.collectionRequestAt : 0);
-    return Boolean(data.lastError || Number(data.snapshotRetryCount || 0) > 0 || elapsed >= 15000);
+    syncCollectionSession(data);
+    const elapsed=Math.max(Number(data.collectionRefreshElapsedMs || 0),state.collectionRequestAt?Date.now()-state.collectionRequestAt:0);
+    const reason=data.lastError?'last_error':Number(data.snapshotRetryCount || 0)>0?'retry_count':elapsed>=15000?'elapsed':'';
+    if(reason) {
+      const signature=`${data.clientSessionEpoch || 0}:${reason}`;
+      if(state.collectionFailureSignature!==signature) {
+        state.collectionFailureSignature=signature;
+        if(typeof window!=='undefined')window.reportFlowDiagnostic?.('collection_failure_state_shown',reason,{sessionEpoch:Number(data.clientSessionEpoch || 0),failureValue:reason==='elapsed'?elapsed:reason==='retry_count'?Number(data.snapshotRetryCount):0,lastErrorKind:reason==='last_error'?'read_failed':'none',previousSession:false});
+      }
+    } else state.collectionFailureSignature='';
+    return Boolean(reason);
   }
 
   async function retryCollection() {
@@ -1183,7 +1202,8 @@
     const appendChunk = () => {
       if (generation !== state.renderGeneration) return;
       const fragment = document.createDocumentFragment();
-      for (const end = Math.min(index + 40, visible.length); index < end; index += 1) fragment.append(makeSkinCard(visible[index], { detailItems: visible }));
+      const started=performance.now(),first=index===0;
+      for (const end=Math.min(index+40,visible.length);index<end && (first || performance.now()-started<8);index++)fragment.append(makeSkinCard(visible[index],{detailItems:visible}));
       el.grid.append(fragment);
       if (index < visible.length) queueRenderFrame(appendChunk);
     };

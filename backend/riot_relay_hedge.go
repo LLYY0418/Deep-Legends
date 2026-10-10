@@ -38,6 +38,7 @@ func (p *riotProvider) candidateAttempt(ctx context.Context, m *riotRelayEntryMa
 	if q := query.Encode(); q != "" {
 		endpoint += "?" + q
 	}
+	queuedAt := time.Now()
 	if err = p.wait(ctx); err != nil {
 		r.err = err
 		return r
@@ -61,6 +62,12 @@ func (p *riotProvider) candidateAttempt(ctx context.Context, m *riotRelayEntryMa
 	scope := riotRequestRateScope(host, path)
 	p.beginRiotRateRequest(scope)
 	started := time.Now()
+	queuedDuration := time.Since(queuedAt)
+	attempt, cancel := context.WithTimeout(ctx, riotAttemptBudget(path))
+	defer func() {
+		riotRequestEvent(p.champions.diag, attempt, "relay", riotRelayRequestCategory(path), e.Label, r.status, r.ttfb, time.Since(started), queuedDuration, len(r.body), 1)
+		cancel()
+	}()
 	r.started = true
 	if ticket != nil {
 		if admitted != nil {
@@ -81,8 +88,6 @@ func (p *riotProvider) candidateAttempt(ctx context.Context, m *riotRelayEntryMa
 		tracker.detailInFlight(1)
 		defer tracker.detailInFlight(-1)
 	}
-	attempt, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
 	var ttfb atomic.Int64
 	request = request.WithContext(httptrace.WithClientTrace(attempt, &httptrace.ClientTrace{GotFirstResponseByte: func() {
 		elapsed := time.Since(started)
@@ -180,6 +185,9 @@ func (p *riotProvider) candidateGET(ctx context.Context, m *riotRelayEntryManage
 	timer.Stop()
 	defer timer.Stop()
 	fire := func() bool {
+		if fallback, _ := ctx.Value(riotFallbackAttemptKey{}).(bool); fallback {
+			return false
+		}
 		if m.config.Mode != "auto" || len(m.config.Entries) < 2 || triggered || primaryHeaders.Load() || ctx.Err() != nil || riotRelays.unavailable() || riotRelays.requestErrorFor(host, path, p.region()) != nil {
 			return false
 		}
@@ -274,12 +282,19 @@ func (p *riotProvider) candidateGET(ctx context.Context, m *riotRelayEntryManage
 
 func (p *riotProvider) getCandidateRelay(ctx context.Context, m *riotRelayEntryManager, host, path string, query url.Values, out any, responseMax int64) error {
 	networkAttempts := 0
-	for attempt := 0; attempt < 3; attempt++ {
+	networkAttemptLimit, attemptLimit := 2, 3
+	fallback, _ := ctx.Value(riotFallbackAttemptKey{}).(bool)
+	if fallback {
+		networkAttemptLimit, attemptLimit = 1, 1
+	}
+	for attempt := 0; attempt < attemptLimit; attempt++ {
 		if err := riotRelays.requestErrorFor(host, path, p.region()); err != nil {
 			return err
 		}
 		e := m.choose(p.champions.diag)
-		m.maybeProbe(ctx, p)
+		if !fallback {
+			m.maybeProbe(ctx, p)
+		}
 		m.mu.Lock()
 		cold := time.Now().Before(m.runtime[e.Label].until) || m.runtime[e.Label].probing
 		m.mu.Unlock()
@@ -295,7 +310,7 @@ func (p *riotProvider) getCandidateRelay(ctx context.Context, m *riotRelayEntryM
 				return r.err
 			}
 			networkAttempts++
-			if networkAttempts < 2 {
+			if networkAttempts < networkAttemptLimit {
 				if err := waitRiotDelay(ctx, 500*time.Millisecond); err != nil {
 					return err
 				}
@@ -326,7 +341,7 @@ func (p *riotProvider) getCandidateRelay(ctx context.Context, m *riotRelayEntryM
 			riotOverviewCostTrackerFromContext(ctx).recordRateLimit()
 			err := &riotStatusError{status: 429, retryAfter: seconds, relayCooldown: kind, message: "查询额度恢复中，请稍后重试"}
 			deadline, bounded := ctx.Deadline()
-			if kind == "application" || kind == "ip" || attempt == 2 || seconds > 30 || bounded && time.Until(deadline) <= time.Duration(seconds)*time.Second {
+			if kind == "application" || kind == "ip" || attempt == attemptLimit-1 || seconds > 30 || bounded && time.Until(deadline) <= time.Duration(seconds)*time.Second {
 				return err
 			}
 			if wait := waitRiotDelay(ctx, time.Duration(seconds)*time.Second); wait != nil {

@@ -17,12 +17,17 @@ const riotUserKeyFile = "riot-user-key.dat"
 // Credentials never enter a response, diagnostic, cache key, or error string.
 // An empty file remembers an explicit clear, so upgrade migration cannot undo it.
 type riotKeyStore struct {
-	mu         sync.Mutex
-	store      *localStore
-	key        string
-	invalidKey string
-	rejected   bool
-	exists     bool
+	mu               sync.Mutex
+	store            *localStore
+	key              string
+	invalidKey       string
+	rejected         bool
+	exists           bool
+	embeddedRejected bool
+	networkFailures  int
+	routeUntil       time.Time
+	quotaWindowAt    time.Time
+	probing          bool
 }
 
 var riotUserKeys = &riotKeyStore{}
@@ -65,9 +70,13 @@ func (s *riotKeyStore) effective() (string, string) {
 	}
 	s.mu.Lock()
 	value := s.key
+	rejected := s.embeddedRejected
 	s.mu.Unlock()
 	if value != "" {
 		return value, "user"
+	}
+	if value := riotEmbeddedKey(); value != "" && !rejected {
+		return value, "embedded"
 	}
 	if len(configuredRiotRelays()) > 0 {
 		return "", "relay"

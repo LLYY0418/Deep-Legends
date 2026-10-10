@@ -1,5 +1,6 @@
 param(
     [string]$Version = "",
+    [string]$RiotAPIKeyCipher = "",
     [switch]$SkipTestsInCI
 )
 
@@ -34,7 +35,7 @@ if ($env:GITHUB_ACTIONS -ne "true" -and (-not $env:GOPROXY -or $env:GOPROXY -eq 
 
 Push-Location $projectRoot
 try {
-    & (Join-Path $projectRoot "build-desktop-windows.ps1") -Version $Version -KeyMode public -SkipTestsInCI:$SkipTestsInCI
+    & (Join-Path $projectRoot "build-desktop-windows.ps1") -Version $Version -KeyMode public -SkipTestsInCI:$SkipTestsInCI -RiotAPIKeyCipher $RiotAPIKeyCipher
     if (-not $?) { throw "Windows desktop build failed." }
 
     & node (Join-Path $projectRoot "scripts\make-release.cjs")

@@ -52,6 +52,7 @@ func TestR265BrowserLoadedStatsFixture(t *testing.T) {
 			team.Win = win != (teamID == 200)
 			matches[i].Teams = append(matches[i].Teams, team)
 		}
+		applyMatchScores(&matches[i])
 	}
 	fixtures := make(map[string]gameplayOverview)
 	for _, k := range []int{0, 1, 3, 6, 7, 9, 10} {

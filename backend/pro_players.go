@@ -196,7 +196,15 @@ func (a *app) handleProPlayers(w http.ResponseWriter, r *http.Request) {
 		result.Warnings = append(result.Warnings, "部分韩服天梯排名暂不可用，未返回名次的账号显示“—”。")
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	a.recordDiagnostic(map[string]any{"event": "pro_players", "teams": result.Teams, "playerCount": result.PlayerCount, "accountCount": result.AccountCount})
+	states := map[string]int{}
+	for _, team := range result.Teams {
+		for _, player := range team.Players {
+			for _, account := range player.Accounts {
+				states[account.RankStatus]++
+			}
+		}
+	}
+	a.recordDiagnostic(map[string]any{"event": "pro_players", "states": states, "teamCount": len(result.Teams), "source": "reviewed_directory", "playerCount": result.PlayerCount, "accountCount": result.AccountCount})
 	respondJSON(w, result)
 }
 
@@ -252,7 +260,7 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 			if background == nil {
 				background = context.Background()
 			}
-			loadCtx, cancel := context.WithTimeout(background, 90*time.Second)
+			loadCtx, cancel := context.WithTimeout(a.proBackgroundContext(background), 90*time.Second)
 			defer cancel()
 			directoryCtx, directoryCancel := context.WithTimeout(loadCtx, 12*time.Second)
 			body, err := fetchProDirectory(directoryCtx, provider)

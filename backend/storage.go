@@ -639,15 +639,68 @@ func marshalDiagnosticRecord(event map[string]any, recordedAt time.Time) ([]byte
 		record[key] = value
 	}
 	record["time"] = recordedAt
+	if name, _ := event["event"].(string); name == "refresh_succeeded" || name == "objective_badge_state" || name == "r99_read_probe" {
+		for key, value := range record {
+			data, _ := json.Marshal(value)
+			var decoded any
+			if json.Unmarshal(data, &decoded) == nil {
+				record[key] = compactDiagnosticValue(decoded)
+			}
+		}
+	}
 	// Every JSONL write, including early startup/provider events and the
 	// storage-generated rotation marker, passes through this encoder. Stamp
 	// the running build here rather than trusting individual event producers.
 	record["build_fingerprint"] = buildFingerprint
+	if event["event"] == "riot_request" {
+		// Compact request rows inherit build/run context from app_start and the route summary.
+		delete(record, "run_id")
+		delete(record, "log_seq")
+		delete(record, "build_fingerprint")
+		record["time"] = recordedAt.UnixMilli()
+	}
 	data, err := json.Marshal(record)
 	if err != nil {
 		return nil, err
 	}
-	return append(data, '\n'), nil
+	limit := 4095
+	if name, _ := event["event"].(string); name == "refresh_succeeded" || name == "objective_badge_state" || name == "r99_read_probe" {
+		limit = 2047
+	}
+	if len(data) > limit {
+		originalBytes := len(data)
+		name, ok := record["event"].(string)
+		if !ok {
+			name = "diagnostic_truncated"
+		}
+		if len(name) > 120 {
+			name = name[:120]
+		}
+		summary := map[string]any{"event": name, "time": recordedAt, "build_fingerprint": buildFingerprint, "truncated": true, "original_bytes": originalBytes}
+		for key, value := range record {
+			if _, exists := summary[key]; exists {
+				continue
+			}
+			switch v := value.(type) {
+			case bool, int, int64, uint64, float64:
+				summary[key] = v
+			case string:
+				if len(v) <= 120 {
+					summary[key] = v
+				}
+			default:
+				summary[key+"_summarized"] = true
+			}
+		}
+		data, err = json.Marshal(summary)
+		if err != nil {
+			return nil, err
+		}
+		if len(data) > limit {
+			data, err = json.Marshal(map[string]any{"event": name, "time": recordedAt, "build_fingerprint": buildFingerprint, "truncated": true, "original_bytes": originalBytes})
+		}
+	}
+	return append(data, '\n'), err
 }
 
 // appendDiagnosticLocked serializes only diagnostic-log I/O. Snapshot and LP
@@ -872,4 +925,28 @@ func (s *localStore) readDiagnosticLogForExport() ([]byte, error) {
 	var data bytes.Buffer
 	_, err = snapshot.writeTo(&data)
 	return data.Bytes(), err
+}
+
+func compactDiagnosticValue(value any) any {
+	switch v := value.(type) {
+	case []any:
+		if len(v) > 5 {
+			sample := make([]any, 5)
+			for i := range sample {
+				sample[i] = compactDiagnosticValue(v[i])
+			}
+			return map[string]any{"count": len(v), "sample": sample}
+		}
+		for i := range v {
+			v[i] = compactDiagnosticValue(v[i])
+		}
+		return v
+	case map[string]any:
+		for key, item := range v {
+			v[key] = compactDiagnosticValue(item)
+		}
+		return v
+	default:
+		return value
+	}
 }

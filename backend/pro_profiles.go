@@ -90,6 +90,13 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 			}
 		}
 	}
+	if waitProBackground(ctx) != nil {
+		return old
+	}
+	if _, ok := ctx.Value(proBackgroundGateKey{}).(*riotProvider); ok && !a.admitProAccountRefresh(key, time.Now()) {
+		a.recordDiagnostic(map[string]any{"event": "pro_seed_skipped", "reason": "interval"})
+		return old
+	}
 	ref := gameplayReference{Region: "kr", GameName: old.GameName, TagLine: old.TagLine}
 	requestCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()

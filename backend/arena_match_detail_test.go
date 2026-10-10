@@ -105,6 +105,16 @@ func TestArenaMatchDetailIsMemoryCachedAndPublicizesPlayerReferences(t *testing.
 			t.Fatalf("public player refs = %q / %q", firstRef, secondRef)
 		}
 	}
+	filteredEvents := events[:0]
+	for _, event := range events {
+		if event["event"] != "arena_match_detail" && event["event"] != "riot_request" {
+			t.Fatalf("unexpected diagnostic: %v", event["event"])
+		}
+		if event["event"] == "arena_match_detail" {
+			filteredEvents = append(filteredEvents, event)
+		}
+	}
+	events = filteredEvents
 	if len(events) != 2 {
 		t.Fatalf("diagnostic count = %d", len(events))
 	}

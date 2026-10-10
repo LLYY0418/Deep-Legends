@@ -157,6 +157,15 @@ func (a *app) runProSeedRefresh(ctx context.Context) {
 	}
 }
 func (a *app) refreshNextProSeed(ctx context.Context, now time.Time) {
+	if a.riot.proDirectoryHidden() {
+		a.recordDiagnostic(map[string]any{"event": "pro_seed_skipped", "reason": "hidden"})
+		return
+	}
+	if a.riot != nil {
+		if err := a.riot.waitForRiotForeground(ctx); err != nil {
+			return
+		}
+	}
 	c := &a.proPlayers
 	c.mu.Lock()
 	// A directory flight publishes immutable snapshots. Do not race its final publish.
@@ -206,6 +215,9 @@ func (a *app) refreshNextProSeed(ctx context.Context, now time.Time) {
 					}
 				}
 			}
+			if !at.IsZero() && now.Sub(at) < 10*time.Minute {
+				continue
+			}
 			if selected == "" || at.Before(oldest) {
 				selected, seed, oldest = key, candidate, at
 			}
@@ -213,6 +225,7 @@ func (a *app) refreshNextProSeed(ctx context.Context, now time.Time) {
 	}
 	if selected == "" {
 		c.mu.Unlock()
+		a.recordDiagnostic(map[string]any{"event": "pro_seed_skipped", "reason": "interval"})
 		return
 	}
 	c.refreshAttempted[selected] = now

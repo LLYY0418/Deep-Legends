@@ -132,10 +132,11 @@ func TestR105_ReviewedPageSurvivesOldSnapshotAndWrongOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	var event struct {
-		Event    string    `json:"event"`
-		Teams    []proTeam `json:"teams"`
-		Players  int       `json:"playerCount"`
-		Accounts int       `json:"accountCount"`
+		Event     string    `json:"event"`
+		Teams     []proTeam `json:"teams"`
+		TeamCount int       `json:"teamCount"`
+		Players   int       `json:"playerCount"`
+		Accounts  int       `json:"accountCount"`
 	}
 	for _, line := range strings.Split(string(log), "\n") {
 		var e = event
@@ -143,7 +144,9 @@ func TestR105_ReviewedPageSurvivesOldSnapshotAndWrongOwner(t *testing.T) {
 			event = e
 		}
 	}
-	r105AssertPage(t, proPlayersResponse{Teams: event.Teams, PlayerCount: event.Players, AccountCount: event.Accounts})
+	if event.Players != 33 || event.Accounts != 53 || event.TeamCount != 6 || len(event.Teams) != 0 {
+		t.Fatalf("diagnostic totals/teams: %#v", event)
+	}
 	if strings.Contains(string(log), "old-puuid") {
 		t.Fatal("private upstream PUUID leaked")
 	}

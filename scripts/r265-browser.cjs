@@ -96,16 +96,16 @@ async function main(){
      if(!expanded)await p.click('[data-af-open]');
     }
    }
-   await p.click('[data-af-page="conditions"]');const conditions=await p.evaluate("(()=>{const r=document.querySelector('[data-af-menu]').getBoundingClientRect();return {height:r.height,top:r.top,max:getComputedStyle(document.querySelector('[data-af-menu]')).maxHeight}})()");assert.equal(conditions.height,440);await p.shot(theme+'-filter-conditions');
+   await p.click('[data-af-page="conditions"]');const conditions=await p.evaluate("(()=>{const r=document.querySelector('[data-af-menu]').getBoundingClientRect();return {height:r.height,top:r.top,max:getComputedStyle(document.querySelector('[data-af-menu]')).maxHeight}})()");assert.equal(conditions.height,640);await p.shot(theme+'-filter-conditions');
    const heights=[];
    for(const count of [0,1,12]){
     await p.evaluate(`localStorage.setItem('deep-legends-history-presets-v1',JSON.stringify(Array.from({length:${count}},(_,i)=>({name:'常用 '+(i+1),conditions:{result:{values:['win'],not:false}}}))))`);
     await p.click('[data-af-page="saved"]');
-    const sizes=await p.evaluate("(()=>{const menu=document.querySelector('[data-af-menu]'),list=menu.querySelector('.af-saved-list'),footer=menu.querySelector('footer'),m=menu.getBoundingClientRect(),f=footer.getBoundingClientRect(),controls=[...footer.querySelectorAll('input,button')].map(n=>n.getBoundingClientRect());return {height:m.height,top:m.top,max:getComputedStyle(menu).maxHeight,scroll:list.scrollHeight>list.clientHeight,footerVisible:f.top>=m.top && f.bottom<=m.bottom && controls.every(r=>r.top>=m.top && r.bottom<=m.bottom)}})()");
+    const sizes=await p.evaluate("(()=>{const menu=document.querySelector('[data-af-menu]'),list=menu.querySelector('.af-saved-list'),footer=menu.querySelector('.af-savebar'),m=menu.getBoundingClientRect(),f=footer.getBoundingClientRect(),controls=[...footer.querySelectorAll('input,button')].map(n=>n.getBoundingClientRect());return {height:m.height,top:m.top,max:getComputedStyle(menu).maxHeight,scroll:list.scrollHeight>list.clientHeight,footerVisible:f.top>=m.top && f.bottom<=m.bottom && controls.every(r=>r.top>=m.top && r.bottom<=m.bottom)}})()");
     const frames=await p.evaluate("new Promise(resolve=>{const rows=[];const frame=()=>{const n=document.querySelector('[data-af-menu]'),r=n.getBoundingClientRect();rows.push({top:r.top,height:r.height,visible:!n.hidden && getComputedStyle(n).visibility!=='hidden' && Number(getComputedStyle(n).opacity)>0});if(rows.length<3)requestAnimationFrame(frame);else resolve(rows)};requestAnimationFrame(frame)})");
-    assert(frames.every(f=>f.top===conditions.top && f.height===sizes.height && f.visible),JSON.stringify(frames));
-    assert.equal(sizes.top,conditions.top);assert.equal(sizes.max,conditions.max);assert(sizes.footerVisible);heights.push(sizes.height);
-    if(count<12)assert(sizes.height<440 && !sizes.scroll,JSON.stringify(sizes));else assert(sizes.height===440 && sizes.scroll,JSON.stringify(sizes));
+    assert(frames.every(f=>f.top===sizes.top && f.height===sizes.height && f.visible),JSON.stringify(frames));
+    assert.equal(sizes.top+sizes.height/2,conditions.top+conditions.height/2);assert.equal(sizes.max,"640px");assert(sizes.footerVisible);heights.push(sizes.height);
+    if(count<12)assert(sizes.height<640 && !sizes.scroll,JSON.stringify(sizes));else assert(sizes.height===640 && sizes.scroll,JSON.stringify(sizes));
     results.push({case:'saved',theme,count,...sizes});await p.shot(theme+'-filter-saved-'+count);
    }
    assert(heights[0]<heights[1] && heights[1]<heights[2],JSON.stringify(heights));await p.close();

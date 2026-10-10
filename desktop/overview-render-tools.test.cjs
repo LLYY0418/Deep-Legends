@@ -49,7 +49,7 @@ test("演示数据下工具五个页签都渲染完成", async () => {
   assert.ok(w.document.querySelector("#suite-sweep-root .claim-row"), "领奖清单未渲染");
   assert.equal(w.document.querySelector("#suite-sweep-root > .suite-note.is-info"), null, "领奖页仍显示重新扫描下方的说明条");
   assert.equal(w.document.querySelector("#suite-sweep-root .claim-sub"), null, "领奖标题下仍显示描述文字");
-  assert.deepEqual([...w.document.querySelectorAll(".suite-tab")].map((node) => node.dataset.suiteTab), ["watch", "rig", "champselect", "facade", "sweep"], "征召应紧跟维护");
+  assert.deepEqual([...w.document.querySelectorAll(".suite-tab")].map((node) => node.dataset.suiteTab), ["watch", "champselect", "facade", "sweep", "rig"], "维护应移至领奖后面");
   const suiteIcons = [...w.document.querySelectorAll(".suite-tab-icon svg")];
   assert.equal(suiteIcons.length, 5, "五个工具图标应统一使用 SVG");
   for (const icon of suiteIcons) {

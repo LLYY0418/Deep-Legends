@@ -34,6 +34,8 @@ function makeRelease({ root = path.resolve(__dirname, ".."), fingerprint, publis
   const manifest = { schema:1, version, fingerprint, publishedAt, minSupported, notes, asset:{ name:setup.name, size:setup.bytes.length, sha256:sha256(setup.bytes), url:`https://github.com/${repo}/releases/download/v${version}/${setup.name}` } };
   assets.push({ name:"latest.json", bytes:Buffer.from(JSON.stringify(manifest,null,2)+"\n") });
   const sums = assets.map(({name,bytes})=>`${sha256(bytes)}  ${name}`).join("\n")+"\n";
+  const {verifyNoPlaintext}=require("../desktop/verify-embedded-riot-key.cjs");
+  for(const asset of assets)verifyNoPlaintext(asset.bytes);verifyNoPlaintext(Buffer.from(sums));
   const destination = path.join(root,"dist","release");
   const staging = fs.mkdtempSync(path.join(root,"dist",".release-"));
   try {

@@ -86,7 +86,7 @@ func (a *app) loadClientRiotHistory(ctx context.Context, region, puuid string, b
 				m.Participants[i].reference.ClientIdentity = true
 			}
 		}
-		a.recordMatchScores(dataSourceRiot, m)
+		a.recordMatchScores(dataSourceRiot, m, ctx)
 		if !isCustomGameplayMatch(m) {
 			result = append(result, m)
 		}

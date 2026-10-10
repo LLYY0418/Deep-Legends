@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"os"
@@ -280,14 +281,16 @@ func TestR216V21ScoreDiagnosticDedupPrivacy(t *testing.T) {
 	m.Participants[0].DisplayName = "DO_NOT_LOG_NAME"
 	m.Participants[0].PlayerRef = "DO_NOT_LOG_PUUID"
 	applyMatchScores(&m)
-	a.recordMatchScores("riot", m)
-	a.recordMatchScores("sgp", m)
+	ctx, batch := newMatchScoreBatch(context.Background())
+	a.recordMatchScores("riot", m, ctx)
+	a.recordMatchScores("sgp", m, ctx)
+	a.finishMatchScoreBatch(batch)
 	raw, err := a.storage.readDiagnosticLog()
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(raw)
-	if strings.Count(s, "match_score_computed") != 1 || strings.Contains(s, "DO_NOT_LOG") || !strings.Contains(s, `"paramVersion":"v2.1"`) || !strings.Contains(s, "reference") {
+	if strings.Count(s, "match_score_computed") != 1 || strings.Contains(s, "DO_NOT_LOG") || !strings.Contains(s, `"version":"v2.1"`) || !strings.Contains(s, `"matches":1`) {
 		t.Fatal(s)
 	}
 }

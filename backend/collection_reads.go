@@ -26,9 +26,18 @@ func newCollectionReads(client *LCUClient) *collectionReads {
 	return &collectionReads{client: client, entries: make(map[string]*collectionRead)}
 }
 
+func collectionRetryableLoot(item LootItem) bool {
+	if !item.DataPending {
+		return false
+	}
+	if !item.Blank {
+		return true
+	}
+	return collectionBlankSample(item)["id"].(int64) > 0 && (item.LootID != "" || item.LootName != "")
+}
 func collectionDataPending(account AccountData) bool {
 	for _, item := range account.Loot {
-		if item.DataPending {
+		if collectionRetryableLoot(item) {
 			return true
 		}
 	}
@@ -48,7 +57,7 @@ func settleBlankLoot(account AccountData) (AccountData, int) {
 	settled := 0
 	loot := append([]LootItem(nil), account.Loot...)
 	for index := range loot {
-		if loot[index].DataPending {
+		if collectionRetryableLoot(loot[index]) {
 			loot[index].DataPending = false
 			settled++
 		}

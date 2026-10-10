@@ -51,7 +51,7 @@ test('R230 null atlas is skeleton; loaded directory filtered to zero is empty; r
 });
 test('R230 card ready records each data card once with elapsed time and source',()=>{
  const dom=new JSDOM('<aside class="career-column"></aside>'),events=[],tab={overviewCardLoad:{startedAt:10,ready:new Set()},data:{ranks:[{}],masteries:[{}],seasonStatsProgress:{scanned:90}}};
- const f=functions(['reportOverviewCardReady'],{performance:{now:()=>150},window:{reportFlowDiagnostic:(e,r,f)=>events.push(f)},rankedQueueData:()=>({positions:[{}]})});
+ const f=functions(['reportOverviewCardReady'],{state:{section:'overview'},activeTab:()=>tab,overviewGroupForSection:()=> 'players',document:{visibilityState:'visible'},performance:{now:()=>150},window:{reportFlowDiagnostic:(e,r,f)=>events.push(f)},rankedQueueData:()=>({positions:[{}]})});
  f.reportOverviewCardReady(dom.window.document,tab);f.reportOverviewCardReady(dom.window.document,tab);assert.equal(events.length,4);assert.ok(events.every(e=>e.durationMs===140));assert.equal(events.find(e=>e.card==='champions').source,'snapshot');dom.window.close();
 });
 

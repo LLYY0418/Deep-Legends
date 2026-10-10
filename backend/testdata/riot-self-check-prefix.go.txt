@@ -16,7 +16,9 @@ func main() {
 		return
 	}
 	if strings.TrimSpace(*encryptRiotKeyFlag) != "" {
-		cipherText, err := encryptRiotKey(*encryptRiotKeyFlag)
+		plain := *encryptRiotKeyFlag
+        if plain == "env:RIOT_API_KEY" { plain = os.Getenv("RIOT_API_KEY") }
+        cipherText, err := encryptRiotKey(plain)
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -46,6 +46,8 @@ async function main(){
  assert.ok(Number.isInteger(imageQueueLimit)&&imageQueueLimit>0,'image queue limit must be statically exported');
  const status=appSource.slice(appSource.indexOf('  async function refreshStatus('),appSource.indexOf('function clearDisconnectedClientState('));
  assert.ok(status.includes('scheduleStatus()'));
+ const collectionSession=appSource.slice(appSource.indexOf('  function syncCollectionSession('),appSource.indexOf('  function collectionReadFailed('));
+ assert.ok(collectionSession.includes('state.collectionSessionEpoch'));
  const lifecycle=appSource.slice(appSource.indexOf('  function setupBackendLifecycle('),appSource.indexOf('  window.desktopDiagnostics?.onError'));
  assert.ok(lifecycle.includes('function showFatal('));
  let activeImages=0,peakImages=0,failStatus=false;
@@ -73,6 +75,8 @@ async function main(){
  ${lifecycle}
  setupBackendLifecycle();
  window.api=async()=>{const r=await fetch('/api/status');if(!r.ok)throw Error('fixture HTTP '+r.status);return r.json()};
+ window.__statusRenderFailures=[];window.reportFlowDiagnostic=(event,phase,fields)=>{if(event==='status_render_failed')window.__statusRenderFailures.push(fields)};
+ ${collectionSession}
  ${status}
  window.refreshStatus=refreshStatus;
  for(let i=0;i<12;i++){const img=document.createElement('img');img.width=64;img.height=64;img.setAttribute('data-queued-src','/api/champion-asset?i='+i);document.body.append(img)}
@@ -87,6 +91,7 @@ async function main(){
  assert.equal(await evaluate('document.querySelector("#content").textContent'),'已加载的战绩');
  failStatus=false;await evaluate('refreshStatus()');
  assert.equal(await evaluate('document.querySelector("#local-status-recovery").hidden'),true);
+ assert.deepEqual(await evaluate('window.__statusRenderFailures'),[],'status fixture must execute every production dependency');
  const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(output,'status-with-hung-images.png'),Buffer.from(shot.data,'base64'));
  await evaluate('backendStateChanged({state:"exited",code:1})');
  assert.equal(await evaluate('document.body.classList.contains("is-fatal")'),true,'confirmed process death must show the full-page alert');

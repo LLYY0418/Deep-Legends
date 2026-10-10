@@ -34,7 +34,7 @@ test('R258 legacy connection notifications do not pull status',()=>{
 test('R244 matches card emits readiness from the rendered list and only once for self',()=>{
  const dom=new JSDOM('<main><div class="match-list"></div></main>');try{
  const events=[],diagnostics=[],tab={current:true,data:{matches:[{gameId:1}]},overviewCardLoad:{startedAt:performance.now(),ready:new Set()}};
- const f=compile(gameplay,['reportOverviewCardReady'],{rankedQueueData:()=>({}),window:{dispatchEvent:e=>events.push(e.type),reportFlowDiagnostic:(_e,_r,v)=>diagnostics.push(v)},CustomEvent:dom.window.CustomEvent});
+ const f=compile(gameplay,['reportOverviewCardReady'],{state:{section:'overview'},activeTab:()=>tab,overviewGroupForSection:()=> 'players',document:{visibilityState:'visible'},rankedQueueData:()=>({}),window:{dispatchEvent:e=>events.push(e.type),reportFlowDiagnostic:(_e,_r,v)=>diagnostics.push(v)},CustomEvent:dom.window.CustomEvent});
  f.reportOverviewCardReady(dom.window.document.querySelector('main'),tab);f.reportOverviewCardReady(dom.window.document.querySelector('main'),tab);
  assert.deepEqual(events,['deep-legends:self-tab-ready']);assert.equal(diagnostics[0].card,'matches');assert.equal(diagnostics.length,1);
  }finally{dom.window.close()}

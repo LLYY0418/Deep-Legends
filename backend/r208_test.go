@@ -59,7 +59,12 @@ func TestR208RelayQuotaDaily(t *testing.T) {
 					return response, nil
 				}))
 				var events []map[string]any
-				p.champions.diag = func(e map[string]any) { events = append(events, e) }
+				var eventsMu sync.Mutex
+				p.champions.diag = func(e map[string]any) {
+					eventsMu.Lock()
+					defer eventsMu.Unlock()
+					events = append(events, e)
+				}
 				var out map[string]any
 				var err error
 				if probe {
@@ -91,13 +96,16 @@ func TestR208RelayQuotaDaily(t *testing.T) {
 					t.Fatal("UI must report unavailable")
 				}
 				found := false
-				for _, e := range events {
+				eventsMu.Lock()
+				snapshot := append([]map[string]any(nil), events...)
+				eventsMu.Unlock()
+				for _, e := range snapshot {
 					if e["event"] == "riot_relay_probe" && e["result"] == "quota_exhausted" {
 						found = true
 					}
 				}
 				if !found {
-					t.Fatal("quota diagnostic missing", events)
+					t.Fatal("quota diagnostic missing", snapshot)
 				}
 				store.mu.Lock()
 				err = store.writeLocked(r204FixtureKey)

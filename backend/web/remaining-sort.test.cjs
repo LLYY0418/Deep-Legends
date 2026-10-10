@@ -144,7 +144,7 @@ test("收藏临时筛选会恢复默认值，奖池详情按实际展示顺序�
 });
 
 test("皮肤详情只在英雄分组时按英雄切换，其余视图按当前展示顺序", () => {
-  assert.match(functionSource("renderItems"), /makeSkinCard\(visible\[index\], \{ detailItems: visible \}\)/);
+  assert.match(functionSource("renderItems"), /makeSkinCard\(visible\[index\],\s*\{\s*detailItems:\s*visible\s*\}\)/);
   assert.match(functionSource("renderRarityGroups"), /const displayOrder = groups\.flatMap/);
   assert.match(functionSource("renderRarityGroups"), /detailItems: displayOrder/);
   assert.match(functionSource("renderChampionGroups"), /detailItems: group\.skins/);

@@ -65,7 +65,7 @@ func collectionBlankDiagnostics(account AccountData) (map[string]int, []map[stri
 	samples := []map[string]any{}
 	lastError := "none"
 	for _, item := range account.Loot {
-		if item.Blank && item.DataPending {
+		if item.Blank && collectionRetryableLoot(item) {
 			sample := collectionBlankSample(item)
 			kinds[sample["kind"].(string)]++
 			if len(samples) < 3 {
@@ -106,7 +106,7 @@ func (s *localStore) cacheExhaustedCollectionBlanks(account AccountData, now tim
 	defer collectionRetryCacheMu.Unlock()
 	entries := s.collectionRetryCache(now)
 	for _, item := range account.Loot {
-		if item.Blank && item.DataPending {
+		if item.Blank && collectionRetryableLoot(item) {
 			entries[collectionBlankCacheKey(item)] = now.Add(collectionRetryNegativeTTL)
 		}
 	}
@@ -137,7 +137,7 @@ func (s *localStore) suppressCachedCollectionBlanks(account AccountData, now tim
 	loot := append([]LootItem(nil), account.Loot...)
 	count := 0
 	for i, item := range loot {
-		if item.Blank && item.DataPending && now.Before(entries[collectionBlankCacheKey(item)]) {
+		if item.Blank && collectionRetryableLoot(item) && now.Before(entries[collectionBlankCacheKey(item)]) {
 			loot[i].DataPending = false
 			count++
 		}

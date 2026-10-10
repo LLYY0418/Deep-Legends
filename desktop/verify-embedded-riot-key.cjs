@@ -13,7 +13,7 @@ const cipherKey = crypto.createHash("sha256").update(keySeed).digest();
 const base64Pattern = /[A-Za-z0-9+/]{48,}={0,2}/g;
 const { buildFingerprint } = require("./apply-portable-template.cjs");
 
-function validCiphertext(encoded) {
+function validCiphertext(encoded, expectFake = false) {
   let raw;
   try {
     raw = Buffer.from(encoded, "base64");
@@ -25,25 +25,22 @@ function validCiphertext(encoded) {
     const decipher = crypto.createDecipheriv("aes-256-gcm", cipherKey, raw.subarray(0, 12));
     decipher.setAuthTag(raw.subarray(raw.length - 16));
     const plain = Buffer.concat([decipher.update(raw.subarray(12, raw.length - 16)), decipher.final()]).toString("utf8").trim();
-    return plain.length > 0;
+    return expectFake ? plain === "RGAPI-00000000-0000-0000-0000-000000000000" : plain.length > 0;
   } catch (_) {
     return false;
   }
 }
 
-function verifyRiotKeyPolicy(file = backendPath, mode = process.env.DEEP_LEGENDS_KEY_MODE || "private") {
+function verifyNoPlaintext(bytes) { if (bytes.includes(Buffer.from('RGAPI-'))) throw new Error('Public artifact contains plaintext Riot API key prefix');return true; }
+function verifyRiotKeyPolicy(file = backendPath, mode = process.env.DEEP_LEGENDS_KEY_MODE || "private", expectFake = false) {
   if (!["public", "private"].includes(mode)) throw new Error("Key mode must be public or private");
   if (!fs.existsSync(file)) throw new Error(`embedded backend is missing: ${file}`);
   const binary = fs.readFileSync(file).toString("latin1");
   const candidates = binary.match(base64Pattern) || [];
-  const encrypted = candidates.some(validCiphertext);
-  const plaintext = /RGAPI-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(binary);
-  if (mode === "public" && (encrypted || plaintext)) {
-    throw new Error("Public build contains an embedded Riot API key; rebuild with public key mode");
-  }
-  if (mode === "private" && !encrypted) {
-    throw new Error("embedded Riot API key ciphertext was not found or could not be decrypted");
-  }
+  const encrypted = candidates.some(candidate => validCiphertext(candidate,expectFake));
+  const plaintext = /RGAPI-/.test(binary);
+  if (mode === "public" && plaintext) throw new Error("Public build contains plaintext Riot API key prefix");
+  if (!encrypted) throw new Error(expectFake ? "expected fake embedded Riot API key ciphertext was not found" : "embedded Riot API key ciphertext was not found or could not be decrypted");
   return true;
 }
 
@@ -79,11 +76,12 @@ const beforePack = async function beforePack() {
 };
 beforePack.verifyEmbeddedRiotKey = verifyEmbeddedRiotKey;
 beforePack.verifyRiotKeyPolicy = verifyRiotKeyPolicy;
+beforePack.verifyNoPlaintext=verifyNoPlaintext;
 beforePack.verifyPortableTemplate = verifyPortableTemplate;
 beforePack.configureSetupCompression = configureSetupCompression;
 module.exports = beforePack;
 
 if (require.main === module) {
-  verifyRiotKeyPolicy();
+  verifyRiotKeyPolicy(process.argv.find(arg=>arg.startsWith("--file="))?.slice(7) || backendPath,process.env.DEEP_LEGENDS_KEY_MODE || "private",process.argv.includes("--expect-fake"));
   console.log("Riot API key distribution policy verified");
 }

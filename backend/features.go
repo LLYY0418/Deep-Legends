@@ -76,6 +76,11 @@ type clientDiagnosticRequest struct {
 	WindowElapsed           bool                        `json:"windowElapsed"`
 	TimingAvailable         bool                        `json:"timingAvailable"`
 	LicenseWindow           json.RawMessage             `json:"licenseWindow,omitempty"`
+	SessionEpoch            uint64                      `json:"sessionEpoch"`
+	FailureValue            int64                       `json:"failureValue"`
+	LastErrorKind           string                      `json:"lastErrorKind"`
+	PreviousSession         bool                        `json:"previousSession"`
+	OverviewVisibleAtReady  *bool                       `json:"overviewVisibleAtReady"`
 	IsSelf                  bool                        `json:"isSelf,omitempty"`
 	CopyOK                  bool                        `json:"ok"`
 	CopyMethod              string                      `json:"method"`
@@ -233,45 +238,46 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
-	"browser_error_client":          {"error": true, "unhandledrejection": true, "csp": true},
-	"self_tab_client":               {"ready": true, "removed": true, "overlay-shown": true},
-	"license_window_state":          {"transition": true},
-	"collection_card_image_state":   {"waiting": true},
-	"card_image_slot_reconciled":    {"reconciled": true},
-	"card_image_observer_fallback":  {"visible-pending": true},
-	"live_scope_reset":              {"game_changed": true, "enter_champselect": true, "disconnect": true, "await_game": true, "hard_refresh": true, "resync": true, "left_end_of_game": true},
-	"live_recommendation_render":    {"phase": true, "empty": true},
-	"blocking_state_client":         {"show": true, "hide": true, "timeout": true, "skip": true},
-	"status_render_failed":          {"failed": true},
-	"automatic_read_client":         {"request": true},
-	"overview_dirty_rescan":         {"resolved": true, "retry": true, "gave_up": true, "paused_hidden": true},
-	"collection_render_client":      {"unchanged-suppressed": true, "updated": true},
-	"build_player_selection":        {"select": true, "reset-collapse": true, "reset-filter": true},
-	"summoner_copy":                 {"success": true, "failed": true},
-	"overview_card_ready":           {"ready": true},
-	"renderer_perf":                 {"aggregated": true},
-	"live_render_rebuild":           {"aggregated": true},
-	"live_roster_duplicate_dropped": {"deduplicated": true},
-	"stale_team_two_dropped":        {"dropped": true},
-	"live_progress_apply":           {"aggregated": true},
-	"arena_header_source":           {"rendered": true},
-	"gameflow_phase_client":         {"batch": true},
-	"catalog_client":                {"failed": true, "loaded": true},
-	"item_id_not_in_catalog":        {"missing": true},
-	"champselect_dialog_client":     {"open": true, "rerender-while-open": true, "close": true},
-	"live_refresh_client":           {"load": true, "queue": true, "phase": true},
-	"local_request_client":          {"complete": true, "failed": true},
-	"champselect_request_client":    {"complete": true, "failed": true},
-	"browser_cold_requests_client":  {"sample": true},
-	"image_queue_slow":              {"loaded": true},
-	"card_image_stalled":            {"watchdog": true},
-	"claim_progress_client":         {"begin": true, "heartbeat": true, "end": true, "item-timeout": true},
-	"diagnostic_delivery_client":    {"export": true},
-	"champ_select_filter_client":    {"request": true, "all": true, "cached": true, "received": true, "stale": true, "failed": true},
-	"current_game_client":           {"request": true, "received": true, "rendered": true, "failed": true, "canceled": true, "stale": true, "cached": true, "in-flight": true, "gated": true, "render-failed": true, "render-no-root": true, "render-scope-mismatch": true, "invalid-response": true},
-	"watch_settings_client":         {"save-queued": true, "save-succeeded": true, "save-failed": true, "load-started": true, "load-applied": true, "load-stale": true, "load-failed": true, "load-skipped": true, "custom-event": true, "rendered": true},
-	"match_timeline_client":         {"missing-participant": true, "unavailable": true, "request-failed": true},
-	"specialist_runes_client_skip":  specialistRuneClientReasons,
+	"collection_failure_state_shown": {"last_error": true, "retry_count": true, "elapsed": true},
+	"browser_error_client":           {"error": true, "unhandledrejection": true, "csp": true},
+	"self_tab_client":                {"ready": true, "removed": true, "overlay-shown": true},
+	"license_window_state":           {"transition": true},
+	"collection_card_image_state":    {"waiting": true},
+	"card_image_slot_reconciled":     {"reconciled": true},
+	"card_image_observer_fallback":   {"visible-pending": true},
+	"live_scope_reset":               {"game_changed": true, "enter_champselect": true, "disconnect": true, "await_game": true, "hard_refresh": true, "resync": true, "left_end_of_game": true},
+	"live_recommendation_render":     {"phase": true, "empty": true},
+	"blocking_state_client":          {"show": true, "hide": true, "timeout": true, "skip": true},
+	"status_render_failed":           {"failed": true},
+	"automatic_read_client":          {"request": true},
+	"overview_dirty_rescan":          {"resolved": true, "retry": true, "gave_up": true, "paused_hidden": true},
+	"collection_render_client":       {"unchanged-suppressed": true, "updated": true},
+	"build_player_selection":         {"select": true, "reset-collapse": true, "reset-filter": true},
+	"summoner_copy":                  {"success": true, "failed": true},
+	"overview_card_ready":            {"ready": true},
+	"renderer_perf":                  {"aggregated": true},
+	"live_render_rebuild":            {"aggregated": true},
+	"live_roster_duplicate_dropped":  {"deduplicated": true},
+	"stale_team_two_dropped":         {"dropped": true},
+	"live_progress_apply":            {"aggregated": true},
+	"arena_header_source":            {"rendered": true},
+	"gameflow_phase_client":          {"batch": true},
+	"catalog_client":                 {"failed": true, "loaded": true},
+	"item_id_not_in_catalog":         {"missing": true},
+	"champselect_dialog_client":      {"open": true, "rerender-while-open": true, "close": true},
+	"live_refresh_client":            {"load": true, "queue": true, "phase": true},
+	"local_request_client":           {"complete": true, "failed": true},
+	"champselect_request_client":     {"complete": true, "failed": true},
+	"browser_cold_requests_client":   {"sample": true},
+	"image_queue_slow":               {"loaded": true},
+	"card_image_stalled":             {"watchdog": true},
+	"claim_progress_client":          {"begin": true, "heartbeat": true, "end": true, "item-timeout": true},
+	"diagnostic_delivery_client":     {"export": true},
+	"champ_select_filter_client":     {"request": true, "all": true, "cached": true, "received": true, "stale": true, "failed": true},
+	"current_game_client":            {"request": true, "received": true, "rendered": true, "failed": true, "canceled": true, "stale": true, "cached": true, "in-flight": true, "gated": true, "render-failed": true, "render-no-root": true, "render-scope-mismatch": true, "invalid-response": true},
+	"watch_settings_client":          {"save-queued": true, "save-succeeded": true, "save-failed": true, "load-started": true, "load-applied": true, "load-stale": true, "load-failed": true, "load-skipped": true, "custom-event": true, "rendered": true},
+	"match_timeline_client":          {"missing-participant": true, "unavailable": true, "request-failed": true},
+	"specialist_runes_client_skip":   specialistRuneClientReasons,
 	"live_recommendations_skip": {
 		"no-target": true, "has-payload": true, "cached": true, "in-flight": true, "backoff": true,
 	},
@@ -349,6 +355,18 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	event := map[string]any{"event": request.Event, "reason": request.Reason}
+	if request.Event == "collection_failure_state_shown" {
+		event["session_epoch"] = request.SessionEpoch
+		event["value"] = min(int64(3600000), max(int64(0), request.FailureValue))
+		event["last_error_kind"] = "none"
+		if request.LastErrorKind == "read_failed" {
+			event["last_error_kind"] = "read_failed"
+		}
+		event["previous_session"] = request.PreviousSession
+		a.recordDiagnostic(event)
+		w.WriteHeader(204)
+		return
+	}
 	if request.Event == "browser_error_client" {
 		errorType := "Error"
 		switch request.RenderErrorType {
@@ -548,7 +566,11 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "invalid DOM epoch", http.StatusBadRequest)
 				return
 			}
-			a.observeFirstMatchesCard(request.Source, at)
+			if request.OverviewVisibleAtReady != nil {
+				a.observeFirstMatchesCard(request.Source, at, *request.OverviewVisibleAtReady)
+			} else {
+				a.observeFirstMatchesCard(request.Source, at)
+			}
 		}
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -920,6 +942,7 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) handleDiagnostics(w http.ResponseWriter, _ *http.Request) {
+	riotRelays.flushSummary(a.recordDiagnostic, true)
 	a.flushRankedWinrateDiagnostics()
 	a.mu.RLock()
 	identityReady := a.identityReady || (a.clientSessionConnectedLocked() && a.summoner.SummonerID != 0)

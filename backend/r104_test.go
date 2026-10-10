@@ -334,7 +334,9 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 	}
 	before := background.Load()
 	ticks <- struct{}{}
-	awaitWait() // 120s, background must immediately yield
+	// P7 pauses this worker in its foreground gate until the overview completes;
+	// it no longer returns to the next minute's timer while foreground is active.
+	time.Sleep(20 * time.Millisecond)
 	if background.Load() != before {
 		t.Errorf("background inserted requests ahead of waiting foreground: %d -> %d", before, background.Load())
 	}
@@ -349,7 +351,7 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("foreground search stuck")
 	}
-	if background.Load() > 12 || foreground.Load() != 25 {
+	if background.Load() != before || foreground.Load() != 25 {
 		t.Fatalf("two-minute quota bg=%d fg=%d", background.Load(), foreground.Load())
 	}
 	cancel()

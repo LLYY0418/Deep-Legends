@@ -781,6 +781,16 @@ func TestRiotRateLimitRecordsDiagnosticAndRequestScopedCount(t *testing.T) {
 	if tracker.rateLimitCount() != 1 {
 		t.Fatalf("request rate-limit count = %d", tracker.rateLimitCount())
 	}
+	filteredEvents := events[:0]
+	for _, event := range events {
+		if event["event"] != "riot_rate_limited" && event["event"] != "riot_request" {
+			t.Fatalf("unexpected diagnostic: %v", event["event"])
+		}
+		if event["event"] == "riot_rate_limited" {
+			filteredEvents = append(filteredEvents, event)
+		}
+	}
+	events = filteredEvents
 	if len(events) != 1 || events[0]["event"] != "riot_rate_limited" || events[0]["host"] != "kr.api.riotgames.com" || events[0]["path"] != "/lol/match/v5/matches/KR_123" || events[0]["retry_after_ms"] != int64(3000) || events[0]["attempt"] != 1 {
 		t.Fatalf("rate-limit diagnostic = %#v", events)
 	}

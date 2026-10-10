@@ -6,7 +6,7 @@ test('R264 P5.1 A B C are distinct, official content is safe, and cached matches
  const f=helpers(),a={data:{matches:[],capabilities:[{name:'match-history',historyStatus:'official',retryAfter:60}]}};
  assert.equal(f.historyServiceState(a).kind,'official');const full=f.renderHistoryServiceStatus(a);assert.match(full,/service-outage-icon/);assert.match(full,/role="status"/);assert.match(full,/战绩服务暂时中断/);assert.match(full,/将在 60 秒后自动重试/);assert.doesNotMatch(full,/HTTP|SGP|LCU|网关/);
  a.data.matches=[{gameId:1}];assert.match(f.renderHistoryServiceStatus(a,true),/以下为已保存的对局/);assert.doesNotMatch(f.renderHistoryServiceStatus(a,true),/英雄联盟官方/);
- const b={region:'kr',loading:true,historyWaitStarted:Date.now()-3100,data:{matches:[]}};assert.equal(f.historyServiceState(b).kind,'relay');assert.match(f.renderHistoryServiceStatus(b),/外服战绩连接较慢/);
+ const b={region:'kr',loading:true,historyWaitStarted:Date.now()-3100,data:{matches:[]}};assert.equal(f.historyServiceState(b),null);b.loading=false;b.error='战绩服务暂时不可用';assert.equal(f.historyServiceState(b).kind,'relay');assert.match(f.renderHistoryServiceStatus(b),/外服战绩连接较慢/);
  const c={data:{capabilities:[{name:'match-history',detail:'单局解析失败',state:'failed'}]}};assert.equal(f.historyServiceState(c),null);assert.equal(f.renderHistoryServiceStatus(c),'');
 });
 test('R264 P6 one of ten matches keeps all three incomplete statistics cards away from zero and absence',()=>{

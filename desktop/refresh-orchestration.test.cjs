@@ -476,7 +476,7 @@ function r71RefreshHarness() {
     status: { connected: true, identityReady: false, snapshotReady: false, syncing: true, collectionDirty: true, lastAttempt: "initial", lastSync: "", poolId: "pool" } };
   let next = { ...state.status }, failEnsure = false;
   const requests = [], loads = [];
-  const methods = compileFunctions(appSourceR70, ["refreshStatus", "ensureCollection", "triggerCollectionRescanIfDirty"], {
+  const methods = compileFunctions(appSourceR70, ["syncCollectionSession", "refreshStatus", "ensureCollection", "triggerCollectionRescanIfDirty"], {
     state, STATUS_INTERVAL: 5000, window: {}, document: { hidden: false },
     api: async (url) => { requests.push(url); if (url === "/api/status") return { ...next }; if (failEnsure && url.startsWith("/api/collection/ensure?")) throw Error("offline"); return null; },
     clearDisconnectedClientState() {}, updateReadingOverlay() {}, renderStatus() {}, renderItems() {}, loadClientInstallations() {},

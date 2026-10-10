@@ -49,9 +49,14 @@ function fixture(t) {
       if (args.includes("-list")) process.stdout.write("TestSyntheticOne\\nTestSyntheticTwo\\nok  synthetic\\n");
       return;
     }
+    const crypto = require('node:crypto'), nonce = Buffer.alloc(12,7);
+    const key = crypto.createHash('sha256').update(['deep','legends','hexcore','loot','kr-riot-channel','v1'].join('\\x1f')).digest();
+    const cipher = crypto.createCipheriv('aes-256-gcm',key,nonce);
+    const encoded = Buffer.concat([nonce,cipher.update('RGAPI-00000000-0000-0000-0000-000000000000'),cipher.final(),cipher.getAuthTag()]).toString('base64');
+    if (args[0] === 'run' && args.includes('-encrypt-riot-key')) { process.stdout.write(encoded); return; }
     if (args[0] === "vet") return;
     if (args[0] !== "build") throw new Error("Unexpected synthetic Go command: " + args[0]);
-    record("backend"); fs.writeFileSync(backend, "MZ synthetic backend abcdef012345");
+    record("backend"); fs.writeFileSync(backend, "MZ synthetic backend abcdef012345 " + encoded);
   `);
   writeScript("bin/npm", `
     (async () => {

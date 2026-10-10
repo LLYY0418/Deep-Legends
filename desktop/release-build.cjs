@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { setupArtifactName } = require("./artifact-names.cjs");
-const { verifyRiotKeyPolicy } = require("./verify-embedded-riot-key.cjs");
+const { verifyRiotKeyPolicy, verifyNoPlaintext } = require("./verify-embedded-riot-key.cjs");
 const { verifyBuildFingerprint } = require("./verify-build-fingerprint.cjs");
 const { verifyLicenseRelease } = require("./verify-license-release.cjs");
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -33,6 +33,7 @@ function recordReleaseBuild({ root = path.resolve(__dirname, ".."), fingerprint,
     if (!fs.existsSync(file)) throw new Error(`Setup build is missing: ${name}`);
     const bytes = fs.readFileSync(file);
     if (!bytes.length) throw new Error(`Empty build artifact: ${name}`);
+    if(mode==="public")verifyNoPlaintext(bytes);
     assets[name] = sha256(bytes);
   }
   const receipt = { schema: 1, version, fingerprint, mode, backendSHA256: backendHash, assets };

@@ -20,7 +20,7 @@ function harness(options={}) {
     clearDisconnectedClientState:()=>{},scheduleStatus:()=>{},renderNotice:()=>{},updateWorkspaceAvailability:()=>{},renderUpdateStatus:()=>{},
     launchOfficialLogin:()=>{},loadAccount:()=>{},loadPools:()=>{},loadSkins:()=>{},
   };
-  const names=['refreshStatus','reportStatusRenderFailed','renderStatus','loadClientInstallations','renderLaunchpad','updateReadingOverlay','showReadingOverlay','hideReadingOverlay','snapshotRetryText'];
+  const names=['syncCollectionSession','refreshStatus','reportStatusRenderFailed','renderStatus','loadClientInstallations','renderLaunchpad','updateReadingOverlay','showReadingOverlay','hideReadingOverlay','snapshotRetryText'];
   if(options.throwLaunchpad){names.splice(names.indexOf('renderLaunchpad'),1);deps.renderLaunchpad=function renderLaunchpad(){throw new TypeError('SECRET /private/user/key');};}
   f=compile(source,names,deps);
   return {...f,state,el,doc,requests,events,timers,recoveries,setStatus:s=>next=s,close:()=>dom.window.close()};

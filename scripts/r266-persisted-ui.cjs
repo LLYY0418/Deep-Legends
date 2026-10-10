@@ -1,11 +1,8 @@
 'use strict';
-// CDP controls the actual installed program. Only the separately recorded 079
-// preset-format fixture may supply the exact missing resource from its tag.
+// CDP controls actual installed 080 then 081. No resource substitution is used.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
 const presetKey='deep-legends-history-presets-v1';
 const keys=['lol-loot-default-page','lol-loot-default-match-filter','lol-loot-match-count','lol-loot-mask-names','lol-loot-ui-scale','lol-loot-search-region','lol-loot-search-server-id','lol-loot-search-region-manual'];
-const scriptSHA='74699f9576ccd8686fce0e95c38b718b96718baa46bd68e9068cf947f7ea38f3';
-const tagSHA='049b30cad1ccd13fd8cbe785b25c5a56112f46a5';
 async function waitForInstalledTarget({port,phase,out,now=Date.now,sleep=ms=>new Promise(r=>setTimeout(r,ms)),fetchTargets=async remaining=>{
  const response=await fetch(`http://127.0.0.1:${port}/json/list`,{signal:AbortSignal.timeout(Math.max(1,Math.min(1000,remaining)))});
  assert.equal(response.status,200,'CDP target list HTTP status');return response.json();
@@ -24,7 +21,7 @@ async function waitForInstalledTarget({port,phase,out,now=Date.now,sleep=ms=>new
   }
   assert(target,'installed Electron page did not become ready');return target;
  }finally{
-  fs.writeFileSync(path.join(out,`r265-cdp-${phase}.json`),JSON.stringify({phase,port,limitMs:30000,elapsedMs:now()-started,polls:polls+Number(!!target),ready:!!target,observations},null,2));
+  fs.writeFileSync(path.join(out,`r266-cdp-${phase}.json`),JSON.stringify({phase,port,limitMs:30000,elapsedMs:now()-started,polls:polls+Number(!!target),ready:!!target,observations},null,2));
  }
 }
 async function probe({port,phase,out}){
@@ -33,7 +30,7 @@ async function probe({port,phase,out}){
  if(process.platform==='win32'){
   const expectedPID=Number(process.env.R265_EXPECTED_ELECTRON_PID);assert(Number.isInteger(expectedPID)&&expectedPID>0,'installed Electron PID proof missing');
   const owners=JSON.parse(execFileSync('powershell.exe',['-NoProfile','-Command',`@(Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction Stop | Select-Object -ExpandProperty OwningProcess -Unique) | ConvertTo-Json -Compress`],{encoding:'utf8',timeout:5000}));
-  const processIDs=Array.isArray(owners)?owners:[owners];fs.writeFileSync(path.join(out,`r265-cdp-owner-${phase}.json`),JSON.stringify({port,expectedPID,owners:processIDs},null,2));
+  const processIDs=Array.isArray(owners)?owners:[owners];fs.writeFileSync(path.join(out,`r266-cdp-owner-${phase}.json`),JSON.stringify({port,expectedPID,owners:processIDs},null,2));
   assert(processIDs.length>0&&processIDs.every(pid=>pid===expectedPID),'CDP port belongs to another process');
  }
  const ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{ws.addEventListener('open',resolve,{once:true});ws.addEventListener('error',reject,{once:true})});
@@ -64,35 +61,34 @@ async function probe({port,phase,out}){
    if(!await evaluate("document.querySelector('#setting-mask-names').checked"))await click('#setting-mask-names');
    await click('#player-search-region');await click('#player-search-cn-toggle');await click('[data-region-option="cn"][data-server-id="HN1"]');
    await until("localStorage.getItem('lol-loot-default-page')==='live'&&localStorage.getItem('lol-loot-default-match-filter')==='solo'&&localStorage.getItem('lol-loot-match-count')==='20'&&localStorage.getItem('lol-loot-mask-names')==='true'&&localStorage.getItem('lol-loot-ui-scale')==='1.25'&&localStorage.getItem('lol-loot-search-server-id')==='HN1'");
-   const data=await snapshot();save('079-unmodified-settings-before.json',{phase,resourceFixtureApplied:false,scope:'actual published 079 UI-written settings; demo player data',initial,...data});await shot('079-unmodified-settings.png');
+   const data=await snapshot();save('080-unmodified-settings-before.json',{phase,resourceFixtureApplied:false,scope:'actual published 080 UI-written settings; demo player data',initial,...data});await shot('080-unmodified-settings.png');
   }else if(phase==='write-presets'){
-   const settings=JSON.parse(fs.readFileSync(path.join(out,'079-unmodified-settings-before.json'),'utf8'));
-   assert.equal(execFileSync('git',['rev-parse','v0.12.79^{commit}'],{encoding:'utf8'}).trim(),tagSHA);
-   const body=execFileSync('git',['show','v0.12.79:backend/web/history-filters.js'],{maxBuffer:4*1024*1024});assert.equal(crypto.createHash('sha256').update(body).digest('hex'),scriptSHA);
-   const originalStatus=await evaluate("fetch('/history-filters.js').then(r=>r.status)");assert.equal(originalStatus,404,'published 079 must expose the original missing resource');
-   // The exact bytes stay in harness memory, outside candidate resources/build.
-   intercept=async({requestId,request})=>{assert.equal(new URL(request.url).pathname,'/history-filters.js');const servedSHA=crypto.createHash('sha256').update(body).digest('hex');assert.equal(servedSHA,scriptSHA);resourceProof.push({originalStatus,tag:'v0.12.79',tagSHA,sourceSHA256:scriptSHA,servedSHA256:servedSHA,bytes:body.length});await call('Fetch.fulfillRequest',{requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:'text/javascript'}],body:body.toString('base64')});};
-   await call('Fetch.enable',{patterns:[{urlPattern:'*/history-filters.js',requestStage:'Request'}]});await demo(initial.origin);
+   const settings=JSON.parse(fs.readFileSync(path.join(out,'080-unmodified-settings-before.json'),'utf8'));
+   assert.equal(await evaluate("fetch('/history-filters.js').then(r=>r.status)"),200,'published 080 filter resource must be available');await demo(initial.origin);
+   assert.equal(await evaluate("localStorage.getItem('deep-legends-history-presets-v1')"),null,'prior independent corrupt-preset phase must leave no presets');
    await openFilter();await click('[data-af-category="result"]');await click('[data-af-option="win"]');await click('[data-af-page="saved"]');
-   await evaluate("document.querySelector('[data-af-name]').value='R265 79 格式兼容夹具'");await click('[data-af-save]');await until("JSON.parse(localStorage.getItem('deep-legends-history-presets-v1')||'[]').some(p=>p.name==='R265 79 格式兼容夹具'&&p.conditions.result.values[0]==='win')");
-   await call('Fetch.disable');intercept=null;assert.equal(resourceProof.length,1);assert(!resourceProof.some(p=>p.error));const data=await snapshot();assert.deepEqual(data.preferences,settings.preferences);assert.deepEqual(data.controls,settings.controls);
-   save('079-format-presets-before.json',{phase,resourceFixtureApplied:true,scope:'preset data format compatibility; published 079 cannot save presets without its missing same-tag script',resourceProof,...data});await shot('079-format-preset.png');
+   await evaluate("document.querySelector('[data-af-name]').value='R266 80 实际保存'");await click('[data-af-save]');await until("JSON.parse(localStorage.getItem('deep-legends-history-presets-v1')||'[]').some(p=>p.name==='R266 80 实际保存'&&p.conditions.result.values[0]==='win')");
+   await click('[data-af-page="conditions"]');await click('[data-af-category="result"]');await click('[data-af-option="win"]');await click('[data-af-option="loss"]');await click('[data-af-page="saved"]');
+   await evaluate("document.querySelector('[data-af-name]').value='R266 80 第二个条件'");await click('[data-af-save]');await until("JSON.parse(localStorage.getItem('deep-legends-history-presets-v1')||'[]').length===2");
+   assert.deepEqual(await evaluate("JSON.parse(localStorage.getItem('deep-legends-history-presets-v1')).map(p=>({name:p.name,result:p.conditions.result.values}))"),[{name:'R266 80 实际保存',result:['win']},{name:'R266 80 第二个条件',result:['loss']}]);
+   assert.equal(resourceProof.length,0);const data=await snapshot();assert.deepEqual(data.preferences,settings.preferences);assert.deepEqual(data.controls,settings.controls);
+   save('080-format-presets-before.json',{phase,resourceFixtureApplied:false,scope:'actual published 080 UI-written preset names/content/order; no source interception',resourceProof,...data});await shot('080-format-preset.png');
   }else{
-   const before=JSON.parse(fs.readFileSync(path.join(out,'079-unmodified-settings-before.json'),'utf8')),presets=JSON.parse(fs.readFileSync(path.join(out,'079-format-presets-before.json'),'utf8'));
-   assert.equal(initial.defaultPage,'live');if(phase!=='corrupt')assert(initial.liveVisible,'candidate must start on the UI-written 079 default page');const data=await snapshot();assert.deepEqual(data.preferences,before.preferences);assert.deepEqual(data.controls,before.controls);
+   const before=JSON.parse(fs.readFileSync(path.join(out,'080-unmodified-settings-before.json'),'utf8')),presets=JSON.parse(fs.readFileSync(path.join(out,'080-format-presets-before.json'),'utf8'));
+   assert.equal(initial.defaultPage,'live');if(phase!=='corrupt')assert(initial.liveVisible,'candidate must start on the UI-written 080 default page');const data=await snapshot();assert.deepEqual(data.preferences,before.preferences);assert.deepEqual(data.controls,before.controls);
    if(phase==='read'){
-    assert.equal(data.presets,presets.presets);assert.deepEqual(JSON.parse(data.presets),JSON.parse(presets.presets));save('079-to-080-preferences-comparison.json',{equal:true,resourceFixtureApplied:false,settingsBefore:before.preferences,settingsAfter:data.preferences,presetContentOrderNamesEqual:true,presetScope:presets.scope});await shot('080-actual-default-page.png');
-    await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R265 79 格式兼容夹具')");await click('[data-af-apply="0"]');await until("document.querySelector('[data-af-conditions]')?.textContent.includes('胜利')");
-    await openSaved();await click('[data-af-rename="0"]');await evaluate("document.querySelector('[data-af-rename-input]').value='R265 80 重命名后保存'");await click('[data-af-rename-save="0"]');
-    const renamed=await snapshot(),expected=JSON.parse(presets.presets);expected[0].name='R265 80 重命名后保存';assert.deepEqual(JSON.parse(renamed.presets),expected);assert.deepEqual(renamed.preferences,before.preferences);save('080-preset-renamed-before-restart.json',{resourceFixtureApplied:false,applied:true,renamedAndSaved:true,...renamed});await shot('080-applied-renamed-preset.png');
+    assert.equal(data.presets,presets.presets);assert.deepEqual(JSON.parse(data.presets),JSON.parse(presets.presets));save('080-to-081-preferences-comparison.json',{equal:true,resourceFixtureApplied:false,settingsBefore:before.preferences,settingsAfter:data.preferences,presetContentOrderNamesEqual:true,presetScope:presets.scope});await shot('081-actual-default-page.png');
+    await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R266 80 实际保存')");await click('[data-af-apply="0"]');await until("document.querySelector('[data-af-conditions]')?.textContent.includes('胜利')");
+    await openSaved();await click('[data-af-rename="0"]');await evaluate("document.querySelector('[data-af-rename-input]').value='R266 81 重命名后保存'");await click('[data-af-rename-save="0"]');
+    const renamed=await snapshot(),expected=JSON.parse(presets.presets);expected[0].name='R266 81 重命名后保存';assert.deepEqual(JSON.parse(renamed.presets),expected);assert.deepEqual(renamed.preferences,before.preferences);save('081-preset-renamed-before-restart.json',{resourceFixtureApplied:false,applied:true,renamedAndSaved:true,...renamed});await shot('081-applied-renamed-preset.png');
    }else if(phase==='restart'){
-    const renamed=JSON.parse(fs.readFileSync(path.join(out,'080-preset-renamed-before-restart.json'),'utf8'));assert.equal(data.presets,renamed.presets);await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R265 80 重命名后保存')");save('080-restart-preset-proof.json',{resourceFixtureApplied:false,restartRetained:true,...await snapshot()});await shot('080-restart-preset.png');
+    const renamed=JSON.parse(fs.readFileSync(path.join(out,'081-preset-renamed-before-restart.json'),'utf8'));assert.equal(data.presets,renamed.presets);await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R266 81 重命名后保存')");save('081-restart-preset-proof.json',{resourceFixtureApplied:false,restartRetained:true,...await snapshot()});await shot('081-restart-preset.png');
    }else{
-    await evaluate("localStorage.setItem('deep-legends-history-presets-v1','{corrupt-r265')");await demo(initial.origin);await openSaved();await until("localStorage.getItem('deep-legends-history-presets-v1')===null");const after=await snapshot();assert.deepEqual(after.preferences,before.preferences);assert.deepEqual(after.controls,before.controls);assert(await evaluate("document.querySelector('.af-empty')?.textContent.includes('暂无常用筛选')"));save('080-corrupt-preset-proof.json',{resourceFixtureApplied:false,corruptFixtureDropped:true,otherSettingsUnchanged:true,...after});await shot('080-corrupt-preset.png');
+    await evaluate("localStorage.setItem('deep-legends-history-presets-v1','{corrupt-r265')");await demo(initial.origin);await openSaved();await until("localStorage.getItem('deep-legends-history-presets-v1')===null");const after=await snapshot();assert.deepEqual(after.preferences,before.preferences);assert.deepEqual(after.controls,before.controls);assert(await evaluate("document.querySelector('.af-empty')?.textContent.includes('暂无常用筛选')"));save('081-corrupt-preset-proof.json',{resourceFixtureApplied:false,corruptFixtureDropped:true,otherSettingsUnchanged:true,...after});await shot('081-corrupt-preset.png');
    }
   }
-  console.log(JSON.stringify({phase,passed:true,resourceFixtureApplied:phase==='write-presets'}));
+  console.log(JSON.stringify({phase,passed:true,resourceFixtureApplied:false}));
  }finally{ws.close()}
 }
-module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget};
+module.exports={probe,waitForInstalledTarget};
 if(require.main===module){const [port,phase,out]=process.argv.slice(2);probe({port:Number(port),phase,out}).catch(e=>{console.error(e);process.exitCode=1});}

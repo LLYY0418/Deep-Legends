@@ -28,7 +28,7 @@ test('R210 Riot Key is the third row with help, an embedded reveal button and sh
     assert.equal(help.parentElement.textContent.trim(), '申请：用拳头（Riot）账号登录 Riot 开发者平台 ↗');
     const input = doc.getElementById('setting-riot-key-input'), eye = doc.getElementById('setting-riot-key-reveal');
     assert(input.parentElement.contains(eye));
-    assert.equal(input.placeholder, '粘贴 RGAPI- 开头的 Key');
+    assert.equal(input.placeholder, '粘贴 Riot API Key');
     assert(input.classList.contains('setting-network-field')); assert(doc.getElementById('setting-proxy-mode').classList.contains('setting-network-field'));
     const css = read('app.css');
     assert.match(css, /\.setting-network-controls \.setting-network-field, [^{]+\.app-select-trigger \{[^}]*min-height: var\(--setting-field-height\)[^}]*border: 1px solid var\(--setting-field-border\)[^}]*border-radius: 10px/);

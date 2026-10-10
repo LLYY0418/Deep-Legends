@@ -157,6 +157,13 @@ func fetchOPGGLadderRank(ctx context.Context, provider *championProvider, gameNa
 	}
 	query := url.Values{"type": {"ladder"}, "region": {"kr"}, "summoner": {gameName + "-" + tagLine}, "tier": {"all"}}
 	body, _, err := provider.fetchWithMetadataCacheKeyLoader(ctx, opggPageHost, proLadderPath, query, proLadderMaxBytes, "text/html,application/xhtml+xml", "", func(ctx context.Context) ([]byte, error) {
+		if err := waitProBackground(ctx); err != nil {
+			return nil, err
+		}
+		if owner, _ := ctx.Value(proRefreshOwnerKey{}).(*app); owner != nil && !owner.admitProAccountRefresh("ladder:"+proLadderAccountKey(gameName, tagLine), time.Now()) {
+			owner.recordDiagnostic(map[string]any{"event": "pro_seed_skipped", "reason": "interval", "source": "ladder"})
+			return nil, errThrottled
+		}
 		target := &url.URL{Scheme: "https", Host: opggPageHost, Path: proLadderPath, RawQuery: query.Encode()}
 		requestContext, cancel := context.WithTimeout(ctx, proLadderRequestTTL)
 		defer cancel()

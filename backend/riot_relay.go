@@ -83,6 +83,9 @@ func (s *riotRelayState) recordBusinessRequest(failure string, status int, categ
 // Only fixed route categories reach diagnostics; identity path arguments are
 // never retained. Probe requests are counted as other.
 func riotRelayRequestCategory(path string) string {
+	if strings.HasSuffix(path, "/ids") {
+		return "ids"
+	}
 	for _, route := range []struct{ prefix, category string }{
 		{"/riot/account/v1/", "account"}, {"/lol/summoner/v4/", "summoner"},
 		{"/lol/match/v5/", "match"}, {"/lol/league/v4/", "league"},
@@ -381,6 +384,10 @@ func relayRequestSummaryEvent(summary riotRelayRequestSummary, label string, sta
 		categories = map[string]int{}
 	}
 	entry := map[string]any{"event": "riot_relay_request_summary", "relay_entry": label, "window_start_utc": start.UTC().Format(time.RFC3339Nano), "window_end_utc": end.UTC().Format(time.RFC3339Nano), "window_ms": end.Sub(start).Milliseconds(), "requests": summary.Requests, "rate_limited": summary.RateLimited, "failures": relaySummaryFailures(failures, summary.FailurePaths), "failure_categories": summary.FailurePaths, "not_found": summary.NotFound, "http_statuses": statuses, "categories": categories, "hedge_budget_suppressed": suppressed}
+	entry["route"] = "relay"
+	if label == "direct" {
+		entry["route"] = "direct"
+	}
 	if len(summary.BusinessSamples) > 0 {
 		entry["business_samples"] = summary.BusinessSamples
 		entry["business_samples_truncated"] = summary.BusinessRequests > len(summary.BusinessSamples)
@@ -402,10 +409,11 @@ func relayRequestSummaryEvent(summary riotRelayRequestSummary, label string, sta
 	return entry
 }
 
-func (s *riotRelayState) flushSummary(record func(map[string]any)) {
+func (s *riotRelayState) flushSummary(record func(map[string]any), partial ...bool) {
+	exporting := len(partial) > 0 && partial[0]
 	s.mu.Lock()
 	now := s.nowLocked()
-	if s.summaryAt.IsZero() || now.Sub(s.summaryAt) < 10*time.Minute {
+	if s.summaryAt.IsZero() || !exporting && now.Sub(s.summaryAt) < 10*time.Minute {
 		s.mu.Unlock()
 		return
 	}
@@ -430,6 +438,9 @@ func (s *riotRelayState) flushSummary(record func(map[string]any)) {
 	s.mu.Unlock()
 	if record != nil {
 		for _, entry := range entries {
+			if exporting {
+				entry["partial"] = true
+			}
 			record(entry)
 		}
 	}

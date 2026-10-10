@@ -35,8 +35,8 @@ $checksumArtifact = "SHA256SUMS$artifactSuffix.txt"
 
 # public 构建不读取个人凭据。private 构建保留本地注入方式。
 if ($KeyMode -eq "public") {
-    if ($RiotAPIKeyCipher) { throw "Public builds cannot accept RiotAPIKeyCipher" }
-    Write-Host "Public build: no embedded Riot API key; KR queries require RIOT_API_KEY at runtime."
+    if (-not $RiotAPIKeyCipher) { throw "Public builds require encrypted Riot key injection" }
+    Write-Host "Public build: encrypted Riot key injection configured."
 } else {
     # 真实 Riot API Key 只能通过参数、环境变量或本机专属的 riot_key.local.txt
     # 在构建时临时注入，绝不写入任何会被提交到 git 的文件（riot_key.local.*
@@ -166,7 +166,7 @@ try {
     & node (Join-Path $desktopRoot "verify-build-fingerprint.cjs") $backendOutput $sourceFingerprint
     if ($LASTEXITCODE -ne 0) { throw "Backend build fingerprint verification failed" }
     $selfTestArgs = "--self-test"
-    if ($KeyMode -eq "private") { $selfTestArgs += " --self-check-riot-key" }
+    $selfTestArgs += " --self-check-riot-key"
     $selfTest = Start-Process -FilePath $backendOutput -ArgumentList $selfTestArgs -Wait -PassThru
     if ($selfTest.ExitCode -ne 0) { throw "Windows backend self-test failed with exit code $($selfTest.ExitCode)" }
 

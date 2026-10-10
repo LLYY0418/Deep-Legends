@@ -272,7 +272,7 @@ test("non-match overview rerenders preserve the match-list node", () => {
     window: dom.window, document:dom.window.document,
   };
   const { renderOverviewBodyContent } = compileFunctions(gameplaySource, ["renderOverviewBodyContent", "reconcileFilteredMatchList"], dependencies);
-  const matches = [{ gameId: 1 }];
+  const matches = [{ gameId: 1, revision:"first" }];
   const tab = { key: "current", matchFilter: "all", matchViewRevision: 0, openMatches: new Set(), data: { player: { playerRef: "ref", backgroundSource: "gtimg", backgroundPath: "/skin.jpg" }, matches, pagination: {} } };
   renderOverviewBodyContent(container, tab);
   const firstList = container.querySelector(".match-list");
@@ -281,7 +281,7 @@ test("non-match overview rerenders preserve the match-list node", () => {
 
   const firstEntry = firstList.querySelector(".match-entry");
   const firstStrip = container.querySelector(".summoner-strip");
-  tab.data.matches = [{ gameId: 1 }, { gameId: 2 }];
+  tab.data.matches = [{ gameId: 1, revision:"first" }, { gameId: 2,revision:"second" }];
   tab.data.historicalRanks = [{ season: "S2025", tier: "MASTER" }];
   renderOverviewBodyContent(container, tab);
   assert.equal(container.querySelector(".match-list"), firstList);
@@ -301,7 +301,7 @@ test("non-match overview rerenders preserve the match-list node", () => {
   renderOverviewBodyContent(container, tab);
   assert.notEqual(container.querySelector(".match-list"), firstList, "match UI state changes must rebuild the list");
 
-  const mutated = gameplaySource.replace("container._matchListViewRevision === Number(tab.matchViewRevision || 0)", "true");
+  const mutated = gameplaySource.replaceAll("container._matchListViewRevision === Number(tab.matchViewRevision || 0)", "true");
   assert.notEqual(mutated, gameplaySource);
   const mutatedRender = compileFunctions(mutated, ["renderOverviewBodyContent", "reconcileFilteredMatchList"], dependencies).renderOverviewBodyContent;
   const mutatedContainer = dom.window.document.createElement("div");

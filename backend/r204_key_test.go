@@ -45,8 +45,8 @@ func TestR204KeyPriority(t *testing.T) {
 		t.Fatal("expected no key")
 	}
 	riotEmbeddedKey = func() string { return "fixture-embedded" }
-	if effectiveKey, _ := riotUserKeys.effective(); effectiveKey != "" || riotKeySource() != "none" {
-		t.Fatal("legacy embedded key must not be a runtime fallback after R206")
+	if effectiveKey, _ := riotUserKeys.effective(); effectiveKey != "fixture-embedded" || riotKeySource() != "embedded" {
+		t.Fatal("R266 embedded fallback missing")
 	}
 	s.mu.Lock()
 	err := s.writeLocked(r204FixtureKey)
@@ -107,8 +107,8 @@ func TestR204KeySaveAndClear(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if effectiveKey, _ := riotUserKeys.effective(); effectiveKey != "" || riotKeySource() != "none" {
-		t.Fatal("clear unexpectedly reactivated legacy embedded key")
+	if effectiveKey, _ := riotUserKeys.effective(); effectiveKey != "fixture-embedded" || riotKeySource() != "embedded" {
+		t.Fatal("clear must restore embedded service")
 	}
 	riotEmbeddedKey = func() string { return "" }
 	if riotKeyState() != "unconfigured" || riotKeyConfigured() {
