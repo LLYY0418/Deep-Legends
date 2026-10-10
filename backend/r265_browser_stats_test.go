@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -56,6 +57,53 @@ func TestR265BrowserLoadedStatsFixture(t *testing.T) {
 	for _, k := range []int{0, 1, 3, 6, 7, 9, 10} {
 		response := gameplayOverview{Matches: matches[:k]}
 		deriveRiotOverviewStats(&response, subject, map[int64]string{164: "卡蜜尔", 64: "李青", 103: "阿狸"}, "kr")
+		if _, err := json.Marshal(response); err != nil {
+			t.Fatalf("k=%d production statistics are not finite JSON: %v", k, err)
+		}
+		if k == 0 {
+			if len(response.Matches) != 0 || response.Overall != (gameplayAggregate{}) || response.Ability != nil || len(response.ChampionStats) != 0 || len(response.RecentPlayers) != 0 {
+				t.Fatalf("empty sample contains statistics: %+v", response)
+			}
+			assertEmptyRanked := func(label string, stats gameplayRecentRankedSummary) {
+				t.Helper()
+				// Queue identity is metadata; every statistic must remain empty.
+				stats.QueueID, stats.QueueLabel = 0, ""
+				if !reflect.DeepEqual(stats, gameplayRecentRankedSummary{}) {
+					t.Fatalf("empty %s ranked sample contains statistics: %+v", label, stats)
+				}
+			}
+			assertEmptyRanked("overall", response.RecentRanked)
+			positionGroups := [][]gameplayPositionStat{response.Positions}
+			if len(response.RankedQueues) != 2 {
+				t.Fatalf("empty sample queue count=%d", len(response.RankedQueues))
+			}
+			for _, key := range []string{"420", "440"} {
+				queue, ok := response.RankedQueues[key]
+				if !ok || queue.RecentRanked == nil || queue.Ability != nil || queue.AbilitySampleGames != 0 || queue.SeasonGames != 0 {
+					t.Fatalf("empty queue %s contains samples: %+v", key, queue)
+				}
+				assertEmptyRanked(key, *queue.RecentRanked)
+				positionGroups = append(positionGroups, queue.Positions)
+			}
+			for _, positions := range positionGroups {
+				if len(positions) != 5 {
+					t.Fatalf("empty sample position count=%d", len(positions))
+				}
+				for _, stat := range positions {
+					if stat.Games != 0 || stat.Share != 0 {
+						t.Fatalf("empty sample position must be zero: %+v", stat)
+					}
+				}
+			}
+			if len(response.ActivityHours) != 24 {
+				t.Fatalf("empty sample activity hours=%d", len(response.ActivityHours))
+			}
+			for hour, games := range response.ActivityHours {
+				if games != 0 {
+					t.Fatalf("empty sample hour=%d games=%d", hour, games)
+				}
+			}
+		}
 		if response.RecentRanked.Wins+response.RecentRanked.Losses != k {
 			t.Fatalf("k=%d wins+losses=%d", k, response.RecentRanked.Wins+response.RecentRanked.Losses)
 		}
@@ -71,8 +119,12 @@ func TestR265BrowserLoadedStatsFixture(t *testing.T) {
 					count++
 				}
 			}
-			if stat.Games != count || stat.Share != int(math.Round(float64(count)*100/float64(k))) {
-				t.Fatalf("k=%d position=%+v count=%d", k, stat, count)
+			expectedShare := 0
+			if k > 0 {
+				expectedShare = int(math.Round(float64(count) * 100 / float64(k)))
+			}
+			if stat.Games != count || stat.Share != expectedShare {
+				t.Fatalf("k=%d position=%+v count=%d expectedShare=%d", k, stat, count, expectedShare)
 			}
 		}
 		fixtures[strconv.Itoa(k)] = response
