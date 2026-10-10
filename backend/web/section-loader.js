@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const modules = { champions: ["champions"], "pro-players": ["pro-players"], suite: ["champions", "suite"], settings: ["champions"], live: ["live-arena"] };
+  const modules = { champions: ["champions"], "pro-players": ["pro-players"], suite: ["champions", "suite"], settings: ["champions", "cache-controls"], live: ["live-arena"] };
   const styles = { champions: ["champions"], "pro-players": ["pro-players"], suite: ["champions", "suite"], settings: ["champions"], "live-arena": ["live-arena"] };
   const flights = new Map(), ready = new Set(), callbacks = new Map(), snapshots = new Map();
   const styleFlights = new Map(), styleReady = new Set();
@@ -95,6 +95,8 @@
 
   window.deepLegendsSections = Object.freeze({
     activate,
+    load,
+    loadStyle,
     register: (name, callback) => callbacks.set(name, callback),
     listen: (type, callback) => {
       window.addEventListener(type, callback);

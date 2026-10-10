@@ -12,10 +12,10 @@ function harness(responses){
  const dom=new JSDOM('<main></main>'),root=dom.window.document.querySelector('main');
  const render=tab=>{root.innerHTML=`<div>${(tab.data?.matches||[]).map(m=>`<article>${m.gameId}</article>`).join('')}</div>`+(tab.error?`<div class="notice is-warning">${tab.error}</div>`:'')+(tab.initialPageError?`<div class="notice is-warning">${tab.initialPageError}</div>`:'')+(tab.data?.pagination?.moreError?`<div class="notice is-warning">${tab.data.pagination.moreError}</div>`:'');};
  const noop=()=>{};
- const context={state,Headers,AbortController,TextDecoder,Uint8Array,Date,MAX_BROWSE_MATCHES:1000,AUTO_PAGE_DELAY_MS:400,AUTO_PAGE_MAX_BACKOFF_MS:8000,
+ const context={globalThis:{deepLegendsHistoryRecovery:require('./history-recovery.js')},state,Headers,AbortController,TextDecoder,Uint8Array,Date,MAX_BROWSE_MATCHES:1000,AUTO_PAGE_DELAY_MS:400,AUTO_PAGE_MAX_BACKOFF_MS:8000,
   setTimeout:(fn,ms)=>{jobs.set(++sequence,{fn,ms,at:now+ms});return sequence;},clearTimeout:id=>jobs.delete(id),
   fetch:async(url,options)=>{requests.push({url,options});const next=responses.shift();assert.ok(next,'unexpected request');return typeof next==='function'?next(options):next;},
-  tabReady:()=>true,riotTab:()=>true,tabGroup:()=> 'kr',rerenderTab:render,appendOverviewMatches:render,showLoadingMoreState:noop,
+  tabReady:()=>true,riotTab:()=>true,historyRecoveryActive:()=>true,tabGroup:()=> 'kr',rerenderTab:render,appendOverviewMatches:render,showLoadingMoreState:noop,
   showToast:x=>toasts.push(x),loadOPGGSeasonSummary:noop,loadOverviewCurrentGame:noop,syncOverviewSupplementRefs:noop,rememberTabPlayerRef:noop,playerLabel:()=> 'Fixture',renderCapabilitySettings:noop,
   normalizedPagination:(p,beg)=>({...p.pagination,nextBegIndex:beg+p.pagination.count}),
  };

@@ -70,7 +70,7 @@ test('R258 P7 forward search stops at ten and caps scanned at 300, single flight
 test('R258 P7 switching the actual player tab cancels outstanding search',()=>{
  const a={key:'a',advancedSearch:{running:true,token:1},data:{}},b={key:'b',data:{}};let aborted=0;
  const state={tabs:[a,b],activeTabs:{players:'a'},activeGroup:'players',tabHistories:{players:[]}};
- const context={globalThis:{deepLegendsHistoryFilters:af},state,activeTab:()=>a,tabGroup:()=> 'players',savePlayerScroll(){},renderPlayerTabs(){},renderOverview(){},cancelAdvancedMatchSearch:tab=>af.cancel(tab,()=>aborted++)};
+ const context={globalThis:{deepLegendsHistoryFilters:af},state,activeTab:()=>a,tabGroup:()=> 'players',savePlayerScroll(){},renderPlayerTabs(){},renderOverview(){},cancelHistoryRecovery:()=>{},cancelAdvancedMatchSearch:tab=>af.cancel(tab,()=>aborted++)};
  const select=vm.runInNewContext('('+extract(source,'selectPlayerTab')+')',context);select('b');assert.equal(aborted,1);assert.equal(a.advancedSearch.running,false);assert.equal(state.activeTabs.players,'b');
 });
 

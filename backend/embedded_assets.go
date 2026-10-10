@@ -13,8 +13,8 @@ import (
 // Beaufort is the official, non-open-source font; its original copyright/EULA
 // notice accompanies the font in every build, as required by the R14 boundary.
 //
-//go:embed web/app.js web/augment-artwork.js web/champions.js web/demo-data.js
-//go:embed web/favorites-facade.js web/friends.js web/gameplay.js web/history-filters.js web/image-queue.js web/live-arena.js
+//go:embed web/app.js web/augment-artwork.js web/cache-controls.js web/champions.js web/demo-data.js
+//go:embed web/favorites-facade.js web/friends.js web/gameplay.js web/history-filters.js web/history-recovery.js web/image-queue.js web/live-arena.js
 //go:embed web/overview-art.js web/pro-players.js web/runtime.js web/section-loader.js web/suite.js
 //go:embed web/*.css web/*.png web/*.svg
 //go:embed web/arena-team-icons/*.svg web/position-icons/*.svg web/tier-icons/*.svg

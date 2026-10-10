@@ -155,7 +155,7 @@
   function searchOption(o,category,query,ctx) {return o.label.toLowerCase().includes(query) || category==='hero' && ctx.heroSearch?.(query,o.value,o.label)>0;}
   function render(tab,context) {
     const ctx=context(),m=ui(tab),cs=conditions(tab),n=Object.keys(cs).length,saved=readPresets(ctx.storage);
-    return `<div class="af-select app-select${n?' is-active':''}" data-af-root><button class="app-select-trigger" type="button" data-af-open aria-haspopup="dialog" aria-expanded="${m.open}"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14l-5.5 6v5l-3 1v-6z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>筛选${n?`<b>${n}</b>`:''}</button><div class="app-select-menu af-menu is-${escape(m.category || 'categories')}" data-af-menu role="dialog" aria-label="战绩筛选"${m.open?'':' hidden'}><nav role="tablist">${button('条件',`data-af-page="conditions" role="tab" aria-selected="${m.page==='conditions'}"`,m.page==='conditions')}${button(`常用 ${saved.length}`,`data-af-page="saved" role="tab" aria-selected="${m.page==='saved'}"`,m.page==='saved')}</nav><div class="af-menu-body">${m.open?menuBody(tab,ctx):''}</div></div></div>`;
+    return `<div class="af-select app-select${n?' is-active':''}" data-af-root><button class="app-select-trigger" type="button" data-af-open aria-haspopup="dialog" aria-expanded="${m.open}"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14l-5.5 6v5l-3 1v-6z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>筛选</span>${n?`<b>${n}</b>`:''}</button><div class="app-select-menu af-menu is-${escape(m.category || 'categories')}${m.page==='saved'?' is-saved':''}" data-af-menu role="dialog" aria-label="战绩筛选"${m.open?'':' hidden'}><nav role="tablist">${button('条件',`data-af-page="conditions" role="tab" aria-selected="${m.page==='conditions'}"`,m.page==='conditions')}${button(`常用 ${saved.length}`,`data-af-page="saved" role="tab" aria-selected="${m.page==='saved'}"`,m.page==='saved')}</nav><div class="af-menu-body">${m.open?menuBody(tab,ctx):''}</div></div></div>`;
   }
   function counts(tab,ctx) {
     const search=tab.advancedSearch,count=filter(ctx.rows(),tab,ctx).length,scanned=search?.running ? search.scanned : Number(ctx.cursor() || ctx.rows().length);
@@ -187,6 +187,10 @@
     container.addEventListener('click',event=>{
       const target=event.target.closest('[data-af-open],[data-af-category],[data-af-remove],[data-af-add],[data-af-clear],[data-af-stop],[data-af-continue],[data-af-show-saved],[data-af-page],[data-af-back],[data-af-option],[data-af-not],[data-af-setting],[data-af-sort],[data-af-save],[data-af-apply],[data-af-rename],[data-af-rename-save],[data-af-rename-cancel],[data-af-delete]');if(!target)return;
       const {tab:t,ctx}=current(),m=ui(t),cs=conditions(t),category=m.category,c=clone(draft(t,category)),d=target.dataset;
+      if(ctx.ensureStyles && !ctx.stylesReady() && ['afOpen','afAdd','afShowSaved','afCategory','afPage'].some(key=>key in d)){
+        const action=[...target.attributes].find(a=>a.name.startsWith('data-af-'));
+        void ctx.ensureStyles().then(()=>{if(container._afBoundTab!==t)return;const fresh=target.isConnected?target:[...container.querySelectorAll('['+action.name+']')].find(n=>n.getAttribute(action.name)===action.value);fresh?.click();}).catch(()=>ctx.error?.('筛选加载失败，请重试'));return;
+      }
       if('afOpen'in d){m.open=!m.open;redraw(t,ctx,m.open);}
       else if('afCategory'in d)open(t,ctx,d.afCategory);
       else if('afRemove'in d){const next={...cs};delete next[d.afRemove];t.advancedConditions=next;ctx.change();}

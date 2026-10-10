@@ -27,6 +27,8 @@ var errRiotRelayQuotaExhausted = fmt.Errorf("%w", errRiotRelayUnavailable)
 
 type riotRelayState struct {
 	mu              sync.Mutex
+	entriesKey      string
+	entryManager    *riotRelayEntryManager
 	failures        int
 	lastSuccess     time.Time
 	networkFailures int
@@ -39,6 +41,7 @@ type riotRelayState struct {
 	now             func() time.Time
 	summaryAt       time.Time
 	summary         riotRelayRequestSummary
+	entrySummaries  map[string]*riotRelayRequestSummary
 	summaryTimer    *time.Timer
 	paths           map[string]riotRelayPathCooldown
 	applications    map[string]time.Time
@@ -50,14 +53,31 @@ type riotRelayPathCooldown struct {
 }
 
 type riotRelayRequestSummary struct {
-	Requests     int `json:"requests"`
-	TTFBMillis   []float64
-	RateLimited  int `json:"rate_limited"`
-	NotFound     int `json:"not_found"`
-	FailurePaths map[string]map[string]int
-	Failures     map[string]int `json:"failures"`
-	HTTPStatuses map[string]int `json:"http_statuses"`
-	Categories   map[string]int `json:"categories"`
+	Requests         int `json:"requests"`
+	TTFBMillis       []float64
+	RateLimited      int `json:"rate_limited"`
+	NotFound         int `json:"not_found"`
+	FailurePaths     map[string]map[string]int
+	Failures         map[string]int `json:"failures"`
+	HTTPStatuses     map[string]int `json:"http_statuses"`
+	Categories       map[string]int `json:"categories"`
+	BusinessSamples  []relayDiagnosticSample
+	BusinessRequests int
+	HedgeTriggered   int
+	HedgeWon         int
+	HedgeSuppressed  int
+}
+
+type relayDiagnosticSample struct {
+	At         time.Time `json:"at"`
+	Failure    string    `json:"failure,omitempty"`
+	Status     int       `json:"status,omitempty"`
+	TTFBMillis float64   `json:"ttfb_ms,omitempty"`
+}
+
+func (s *riotRelayState) recordBusinessRequest(failure string, status int, category string, record func(map[string]any), label string, started time.Time, ttfb time.Duration) {
+	sample := relayDiagnosticSample{At: started.UTC(), Failure: failure, Status: status, TTFBMillis: float64(ttfb) / float64(time.Millisecond)}
+	s.recordRequestSample(failure, status, category, record, label, &sample)
 }
 
 // Only fixed route categories reach diagnostics; identity path arguments are
@@ -193,7 +213,20 @@ func (s *riotRelayState) quotaExhausted(origin string) {
 
 // Aggregate actual outbound Worker requests (including probes), never page
 // retries blocked locally. Flush an active window even if quota stops traffic.
-func (s *riotRelayState) recordRequest(failure string, status int, category string, record func(map[string]any)) {
+func (s *riotRelayState) recordRequest(failure string, status int, category string, record func(map[string]any), labels ...string) {
+	label := "A"
+	if len(labels) > 0 {
+		label = labels[0]
+	}
+	s.recordRequestSample(failure, status, category, record, label, nil)
+}
+
+func (s *riotRelayState) recordRequestSample(failure string, status int, category string, record func(map[string]any), label string, sample *relayDiagnosticSample) {
+	switch category {
+	case "account", "summoner", "match", "league", "spectator", "mastery":
+	default:
+		category = "other"
+	}
 	s.mu.Lock()
 	now := s.nowLocked()
 	if s.summaryAt.IsZero() {
@@ -206,6 +239,50 @@ func (s *riotRelayState) recordRequest(failure string, status int, category stri
 		})
 	}
 	s.summary.Requests++
+	if s.entrySummaries == nil {
+		s.entrySummaries = map[string]*riotRelayRequestSummary{}
+	}
+	if s.entrySummaries[label] == nil {
+		s.entrySummaries[label] = &riotRelayRequestSummary{}
+	}
+	per := s.entrySummaries[label]
+	per.Requests++
+	if sample != nil {
+		per.BusinessRequests++
+		if len(per.BusinessSamples) < 10000 {
+			per.BusinessSamples = append(per.BusinessSamples, *sample)
+		}
+	}
+	if per.Categories == nil {
+		per.Categories = map[string]int{}
+	}
+	per.Categories[category]++
+	if status > 0 {
+		if per.HTTPStatuses == nil {
+			per.HTTPStatuses = map[string]int{}
+		}
+		per.HTTPStatuses[fmt.Sprint(status)]++
+	}
+	if status == 429 {
+		per.RateLimited++
+	}
+	if failure == "not_found" {
+		per.NotFound++
+	} else if failure != "" {
+		if per.Failures == nil {
+			per.Failures = map[string]int{}
+		}
+		per.Failures[failure]++
+		if failure != "canceled" {
+			if per.FailurePaths == nil {
+				per.FailurePaths = map[string]map[string]int{}
+			}
+			if per.FailurePaths[failure] == nil {
+				per.FailurePaths[failure] = map[string]int{}
+			}
+			per.FailurePaths[failure][category]++
+		}
+	}
 	if s.summary.Categories == nil {
 		s.summary.Categories = make(map[string]int)
 	}
@@ -245,34 +322,72 @@ func (s *riotRelayState) recordRequest(failure string, status int, category stri
 }
 
 // Business latency samples contain only timing; never account/path arguments.
-func (s *riotRelayState) recordTTFB(elapsed time.Duration) {
+func (s *riotRelayState) recordTTFB(elapsed time.Duration, labels ...string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.summary.TTFBMillis) < 10000 {
 		s.summary.TTFBMillis = append(s.summary.TTFBMillis, float64(elapsed)/float64(time.Millisecond))
 	}
+	label := "A"
+	if len(labels) > 0 {
+		label = labels[0]
+	}
+	if s.entrySummaries == nil {
+		s.entrySummaries = map[string]*riotRelayRequestSummary{}
+	}
+	if s.entrySummaries[label] == nil {
+		s.entrySummaries[label] = &riotRelayRequestSummary{}
+	}
+	per := s.entrySummaries[label]
+	if len(per.TTFBMillis) < 10000 {
+		per.TTFBMillis = append(per.TTFBMillis, float64(elapsed)/float64(time.Millisecond))
+	}
 }
 
-func (s *riotRelayState) flushSummary(record func(map[string]any)) {
+func (s *riotRelayState) hedgeSummaryLocked(label string) *riotRelayRequestSummary {
+	if s.entrySummaries == nil {
+		s.entrySummaries = map[string]*riotRelayRequestSummary{}
+	}
+	if s.entrySummaries[label] == nil {
+		s.entrySummaries[label] = &riotRelayRequestSummary{}
+	}
+	return s.entrySummaries[label]
+}
+func (s *riotRelayState) recordHedgeSuppressed(label string) {
 	s.mu.Lock()
-	now := s.nowLocked()
-	if s.summaryAt.IsZero() || now.Sub(s.summaryAt) < 10*time.Minute {
-		s.mu.Unlock()
+	defer s.mu.Unlock()
+	s.hedgeSummaryLocked(label).HedgeSuppressed++
+}
+func (s *riotRelayState) recordHedge(primary, winner string, triggered bool) {
+	if !triggered {
 		return
 	}
-	failures := s.summary.Failures
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.hedgeSummaryLocked(primary).HedgeTriggered++
+	s.hedgeSummaryLocked(winner).HedgeWon++
+}
+
+func relayRequestSummaryEvent(summary riotRelayRequestSummary, label string, start, end time.Time, suppressed int) map[string]any {
+	failures := summary.Failures
 	if failures == nil {
 		failures = map[string]int{}
 	}
-	statuses, categories := s.summary.HTTPStatuses, s.summary.Categories
+	statuses, categories := summary.HTTPStatuses, summary.Categories
 	if statuses == nil {
 		statuses = map[string]int{}
 	}
 	if categories == nil {
 		categories = map[string]int{}
 	}
-	entry := map[string]any{"event": "riot_relay_request_summary", "window_ms": now.Sub(s.summaryAt).Milliseconds(), "requests": s.summary.Requests, "rate_limited": s.summary.RateLimited, "failures": relaySummaryFailures(failures, s.summary.FailurePaths), "not_found": s.summary.NotFound, "http_statuses": statuses, "categories": categories}
-	samples := append([]float64(nil), s.summary.TTFBMillis...)
+	entry := map[string]any{"event": "riot_relay_request_summary", "relay_entry": label, "window_start_utc": start.UTC().Format(time.RFC3339Nano), "window_end_utc": end.UTC().Format(time.RFC3339Nano), "window_ms": end.Sub(start).Milliseconds(), "requests": summary.Requests, "rate_limited": summary.RateLimited, "failures": relaySummaryFailures(failures, summary.FailurePaths), "failure_categories": summary.FailurePaths, "not_found": summary.NotFound, "http_statuses": statuses, "categories": categories, "hedge_budget_suppressed": suppressed}
+	if len(summary.BusinessSamples) > 0 {
+		entry["business_samples"] = summary.BusinessSamples
+		entry["business_samples_truncated"] = summary.BusinessRequests > len(summary.BusinessSamples)
+	}
+	entry["hedge_triggered"] = summary.HedgeTriggered
+	entry["hedge_won"] = summary.HedgeWon
+	samples := append([]float64(nil), summary.TTFBMillis...)
 	if len(samples) > 0 {
 		sort.Float64s(samples)
 		entry["ttfb_samples"] = len(samples)
@@ -282,14 +397,41 @@ func (s *riotRelayState) flushSummary(record func(map[string]any)) {
 		}
 		entry["ttfb_median_ms"] = median
 		entry["ttfb_p90_ms"] = samples[int(math.Ceil(float64(len(samples))*.9))-1]
+		entry["ttfb_values_ms"] = samples
+	}
+	return entry
+}
+
+func (s *riotRelayState) flushSummary(record func(map[string]any)) {
+	s.mu.Lock()
+	now := s.nowLocked()
+	if s.summaryAt.IsZero() || now.Sub(s.summaryAt) < 10*time.Minute {
+		s.mu.Unlock()
+		return
+	}
+	entries := []map[string]any{}
+	if len(s.entrySummaries) == 0 {
+		entries = append(entries, relayRequestSummaryEvent(s.summary, "A", s.summaryAt, now, s.summary.HedgeSuppressed))
+	} else {
+		labels := []string{}
+		for label := range s.entrySummaries {
+			labels = append(labels, label)
+		}
+		sort.Strings(labels)
+		for _, label := range labels {
+			entries = append(entries, relayRequestSummaryEvent(*s.entrySummaries[label], label, s.summaryAt, now, s.entrySummaries[label].HedgeSuppressed))
+		}
 	}
 	if s.summaryTimer != nil {
 		s.summaryTimer.Stop()
 	}
 	s.summary, s.summaryAt, s.summaryTimer = riotRelayRequestSummary{}, time.Time{}, nil
+	s.entrySummaries = nil
 	s.mu.Unlock()
 	if record != nil {
-		record(entry)
+		for _, entry := range entries {
+			record(entry)
+		}
 	}
 }
 
@@ -388,6 +530,7 @@ func (s *riotRelayState) probe(origins []string, config string, flight chan stru
 		connectMS, ttfbMS := int64(0), int64(0)
 		stage := "headers"
 		status := 0
+		probeTimeout := false
 		bytesReceived := 0
 		var traceMu sync.Mutex
 		var connectStart time.Time
@@ -413,6 +556,8 @@ func (s *riotRelayState) probe(origins []string, config string, flight chan stru
 			response, err := riotHTTPClientWithoutRedirects(client).Do(req)
 			if err != nil {
 				s.recordRequest("network", 0, "other", record)
+				var timeout net.Error
+				probeTimeout = errors.As(err, &timeout) && timeout.Timeout()
 				var dns *net.DNSError
 				if errors.As(err, &dns) {
 					traceMu.Lock()
@@ -475,7 +620,7 @@ func (s *riotRelayState) probe(origins []string, config string, flight chan stru
 			if active != "" {
 				result = "ok"
 			}
-			record(map[string]any{"event": "riot_relay_probe", "result": result, "duration_ms": time.Since(started).Milliseconds(), "http_status": status, "failure_stage": failureStage, "connect_ms": cm, "ttfb_ms": tm, "bytes": bytesReceived, "backoff_s": int(backoff.Seconds())})
+			record(map[string]any{"event": "riot_relay_probe", "result": result, "duration_ms": time.Since(started).Milliseconds(), "http_status": status, "failure_stage": failureStage, "timeout": probeTimeout, "connect_ms": cm, "ttfb_ms": tm, "bytes": bytesReceived, "backoff_s": int(backoff.Seconds())})
 		}
 		if active != "" {
 			break

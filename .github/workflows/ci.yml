@@ -43,6 +43,8 @@ jobs:
           node desktop/verify-license-release.cjs "$RUNNER_TEMP/r233-release-public.exe"
       - name: R252 compile shelved license code and verify corrected fixtures
         run: node scripts/r252-license-check.cjs
+      - name: R265 actual license embedded asset inventory guard
+        run: go test ./backend -tags=license -run '^TestR265AllReleaseEmbeddedAssets$' -count=1
       - name: Verify CI test filters
         run: node scripts/verify-ci-test-filters.cjs
       - name: Test with race detector
@@ -99,6 +101,7 @@ jobs:
           fingerprint="$(node desktop/source-fingerprint.cjs)"
           go build -tags= -buildvcs=false -ldflags="-X main.version=$version -X main.buildFingerprint=$fingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=" -o "$RUNNER_TEMP/r264-public" ./backend
           CHROME_BIN="$chrome" R264_BACKEND="$RUNNER_TEMP/r264-public" R264_BROWSER_OUT="$RUNNER_TEMP/r264-browser" node scripts/r264-browser.cjs
+          CHROME_BIN="$chrome" R265_BACKEND="$RUNNER_TEMP/r264-public" R265_BROWSER_OUT="$RUNNER_TEMP/r265-browser" node scripts/r265-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -107,6 +110,7 @@ jobs:
             ${{ runner.temp }}/r100-browser/**
             ${{ runner.temp }}/r117-browser/**
             ${{ runner.temp }}/r264-browser/**
+            ${{ runner.temp }}/r265-browser/**
           if-no-files-found: warn
       - name: Test installer module
         working-directory: installer
@@ -119,6 +123,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # R265 verifies the exact published 079 tag resource in memory.
       - name: R261 normal-close window bounds regression and assertion mutation
         shell: pwsh
         run: ./scripts/r261-window-bounds.test.ps1

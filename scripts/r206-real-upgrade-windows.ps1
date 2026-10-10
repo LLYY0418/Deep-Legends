@@ -166,6 +166,64 @@ try {
     Copy-Item (Join-Path $data 'update-install-stages.txt'),(Join-Path $data 'update-install-nsis-stages.txt') $evidence
     @{old_version='0.12.65';intermediate_version='0.12.68';upgrade_from='0.12.76';upgrade_to=$candidateVersion;candidate_online_transport='real loopback HTTP fixture';anonymous_latest_candidate='pending publication';persistent_sentinels_retained=$true;key_mode='public';stages=$order.Count;icon_location_stable=$true;created_time_changed=$false;total_ms=$timing.total_ms;uninstall_old_ms=$timing.uninstall_old_ms;copy_ms=$timing.copy_ms} | ConvertTo-Json | Set-Content (Join-Path $evidence 'real-upgrade-summary.json')
     Get-Content (Join-Path $evidence 'real-upgrade-summary.json')
+    # Additional, independent published 0.12.79 -> candidate chain. Preferences
+    # are written through actual installed 079 UI handlers, never injected as
+    # sentinel files or restored into candidate localStorage by this harness.
+    Stop-InstalledApp
+    $install = Join-Path $root 'installed-079'
+    New-Item -ItemType Directory -Force $install | Out-Null
+    $published079 = Join-Path $root 'Deep-Legends-Setup-0.12.79-public.exe'
+    Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.79/Deep-Legends-Setup-0.12.79-public.exe' -OutFile $published079
+    if ((Get-FileHash $published079 -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'cabacc1b4e8bc8dcf51469e1d1e84f0ef6ff8f82090084bf0c3fd6b0bb794d96') { throw 'Published 0.12.79 setup checksum mismatch' }
+    Run-Setup $published079
+    Assert-InstalledVersion '0.12.79'
+    Stop-InstalledApp
+    function Start-R265DebugApp {
+        $listener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,0)
+        $listener.Start(); $debugPort=$listener.LocalEndpoint.Port; $listener.Stop()
+        Start-Process -FilePath (Join-Path $install 'Deep Legends.exe') -ArgumentList "--remote-debugging-port=$debugPort" | Out-Null
+        return $debugPort
+    }
+    $debugPort=Start-R265DebugApp
+    node scripts/r265-persisted-ui.cjs $debugPort write-settings $evidence *> (Join-Path $evidence '079-unmodified-settings-write.log')
+    if ($LASTEXITCODE -ne 0) { throw 'Unmodified published 079 UI did not write settings' }
+    node scripts/r265-persisted-ui.cjs $debugPort write-presets $evidence *> (Join-Path $evidence '079-format-presets-write.log')
+    if ($LASTEXITCODE -ne 0) { throw 'Same-tag missing-resource fixture did not save preset format' }
+    $actual079Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '079-normal-close.json')
+    Stop-InstalledApp
+    $actual079Files=@{}
+    foreach ($name in @('window-bounds.json','ui-scale.json')) {
+        $file=Join-Path $userData $name
+        if (-not (Test-Path $file)) { throw "Actual 079 persistent file missing: $name" }
+        Copy-Item $file (Join-Path $evidence ("079-actual-before-"+$name)) -Force
+        $actual079Files[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
+    }
+    $candidateSetupPath=(Resolve-Path $Setup).Path
+    Run-Setup $candidateSetupPath
+    Assert-InstalledVersion $candidateVersion
+    Stop-InstalledApp
+    $debugPort=Start-R265DebugApp
+    node scripts/r265-persisted-ui.cjs $debugPort read $evidence *> (Join-Path $evidence '080-actual-ui-read.log')
+    if ($LASTEXITCODE -ne 0) { throw 'Actual 079 UI-written preferences changed after candidate upgrade' }
+    $actual080Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '080-normal-close.json')
+    Stop-InstalledApp
+    $debugPort=Start-R265DebugApp
+    node scripts/r265-persisted-ui.cjs $debugPort restart $evidence *> (Join-Path $evidence '080-preset-restart.log')
+    if ($LASTEXITCODE -ne 0) { throw 'Renamed preset was not retained after candidate restart' }
+    node scripts/r265-persisted-ui.cjs $debugPort corrupt $evidence *> (Join-Path $evidence '080-corrupt-preset.log')
+    if ($LASTEXITCODE -ne 0) { throw 'Corrupt preset damaged other settings or was not discarded' }
+    Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '080-second-normal-close.json') | Out-Null
+    Stop-InstalledApp
+    $actual079Comparisons=@()
+    foreach ($file in $actual079Files.Keys) {
+        $after=(Get-FileHash $file -Algorithm SHA256).Hash
+        $actual079Comparisons+=@{name=(Split-Path $file -Leaf);before_sha256=$actual079Files[$file];after_sha256=$after}
+        if ($after -ne $actual079Files[$file]) { throw "Actual 079 persisted file changed after upgrade: $file" }
+        Copy-Item $file (Join-Path $evidence ("080-actual-after-"+(Split-Path $file -Leaf))) -Force
+    }
+    $actual079Comparisons | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $evidence '079-to-080-persistent-files.json')
+    @{upgrade_from='0.12.79';upgrade_to=$candidateVersion;key_mode='public';setup079_sha256='cabacc1b4e8bc8dcf51469e1d1e84f0ef6ff8f82090084bf0c3fd6b0bb794d96';settings_written_by='unmodified published 079 renderer UI';preset_scope='format compatibility only: published 079 cannot save presets; exact same-tag missing-script fixture used only before upgrade';preset_script_sha256='74699f9576ccd8686fce0e95c38b718b96718baa46bd68e9068cf947f7ea38f3';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;persisted_files_equal=$true;preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
+    Get-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
 } finally {
     if ($userData -and (Test-Path $userData)) {
         foreach ($name in @('window-bounds.json','ui-scale.json','r238-settings-sentinel.json')) {

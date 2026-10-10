@@ -364,7 +364,8 @@ func TestR89ActualConcurrencyPhasesAndQueue(t *testing.T) {
 			}
 			time.Sleep(80 * time.Millisecond)
 			inFlight.Add(-1)
-			body = `{"metadata":{"matchId":"fixture"},"info":{"gameId":1,"queueId":420,"gameDuration":1800,"participants":[{"puuid":"subject","participantId":1,"teamId":100,"championId":1,"win":true}]}}`
+			matchID := request.URL.Path[strings.LastIndex(request.URL.Path, "/")+1:]
+			body = fmt.Sprintf(`{"metadata":{"matchId":%q},"info":{"gameId":%s,"queueId":420,"gameDuration":1800,"participants":[{"puuid":"subject","participantId":1,"teamId":100,"championId":1,"win":true}]}}`, matchID, strings.TrimPrefix(matchID, "KR_"))
 		default:
 			t.Fatalf("unexpected Riot request: %s", request.URL.String())
 		}

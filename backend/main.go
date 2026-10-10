@@ -585,6 +585,7 @@ func main() {
 	mux.HandleFunc("GET /api/account", a.authorized(a.handleAccount))
 	mux.HandleFunc("GET /api/gameplay/overview", a.authorized(a.handleGameplayOverview))
 	mux.HandleFunc("POST /api/gameplay/overview", a.authorized(a.handleGameplayOverview))
+	mux.HandleFunc("POST /api/gameplay/cache/clear", a.authorized(a.handleClearRiotMatchCache))
 	mux.HandleFunc("POST /api/client-launch-overview-ready", a.authorized(a.handleClientLaunchOverviewReady))
 	mux.HandleFunc("GET /api/gameplay/masteries", a.authorized(a.handleGameplayMasteries))
 	mux.HandleFunc("GET /api/gameplay/champion-table", a.authorized(a.handleGameplayChampionTable))

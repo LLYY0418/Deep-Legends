@@ -17,10 +17,10 @@ function harness(responses) {
   const dom = new JSDOM('<main></main>'), root = dom.window.document.querySelector('main');
   const render = tab => { root.innerHTML = (tab.data?.matches || []).map(m => `<article>${m.gameId}</article>`).join('') + ((tab.initialPageError || tab.error) ? `<div class="notice">${tab.initialPageError || tab.error}</div>` : ''); };
   const noop = () => {};
-  const context = {state, Headers, AbortController, TextDecoder, Uint8Array, Date, MAX_BROWSE_MATCHES: 1000, AUTO_PAGE_DELAY_MS: 400, AUTO_PAGE_MAX_BACKOFF_MS: 8000,
+  const context = {globalThis:{deepLegendsHistoryRecovery:require('./history-recovery.js')},state, Headers, AbortController, TextDecoder, Uint8Array, Date, MAX_BROWSE_MATCHES: 1000, AUTO_PAGE_DELAY_MS: 400, AUTO_PAGE_MAX_BACKOFF_MS: 8000,
     setTimeout: (fn, ms) => {jobs.set(++sequence, {fn, ms, at: now + ms}); return sequence;}, clearTimeout: id => jobs.delete(id),
     fetch: async (url, options) => {requests.push({url, options}); assert.ok(responses.length, 'unexpected request'); return responses.shift();},
-    tabReady: () => true, riotTab: () => true, tabGroup: () => 'kr', rerenderTab: render, appendOverviewMatches: render, showLoadingMoreState: noop,
+    tabReady: () => true, riotTab: () => true, historyRecoveryActive: () => true, tabGroup: () => 'kr', rerenderTab: render, appendOverviewMatches: render, showLoadingMoreState: noop,
     showToast: text => toasts.push(text), loadOPGGSeasonSummary: noop, loadOverviewCurrentGame: noop, syncOverviewSupplementRefs: noop, rememberTabPlayerRef: noop, playerLabel: () => 'Fixture', renderCapabilitySettings: noop,
     normalizedPagination: (p, beg) => ({...p.pagination, nextBegIndex: beg + p.pagination.count}),
   };

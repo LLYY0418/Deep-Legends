@@ -18,10 +18,11 @@ func TestR92RiotMatchConcreteDiskBudget(t *testing.T) {
 	p := newChampionProvider()
 	p.cache = newChampionDataCache(&localStore{root: t.TempDir()})
 	c := newRiotMatchDiskCache(p)
-	if c.diskMaxEntries != 600 || c.diskMaxBytes != 128<<20 || !c.strictDisk {
+	// R265 immutable details use the same strict accounting with 2000/50MiB.
+	if c.diskMaxEntries != 2000 || c.diskMaxBytes != 50<<20 || !c.strictDisk {
 		t.Fatalf("riot-matches instance budget: entries=%d bytes=%d strict=%v", c.diskMaxEntries, c.diskMaxBytes, c.strictDisk)
 	}
-	for i := 0; i < 605; i++ {
+	for i := 0; i < 2005; i++ {
 		if err := c.writeDisk(championCacheEnvelope{Key: fmt.Sprintf("riot-match-v1|KR_%d", i+1), Data: []byte(`{"info":{"participants":[]}}`)}); err != nil {
 			t.Fatal(err)
 		}
@@ -38,16 +39,16 @@ func TestR92RiotMatchConcreteDiskBudget(t *testing.T) {
 		}
 		bytes += info.Size()
 	}
-	if len(files) != 600 || bytes > 128<<20 {
+	if len(files) != 2000 || bytes > 50<<20 {
 		t.Fatalf("concrete disk occupancy: entries=%d bytes=%d", len(files), bytes)
 	}
 	// Restart must rebuild the bounded disk index, not reset its accounting.
 	c = newRiotMatchDiskCache(p)
-	if err := c.writeDisk(championCacheEnvelope{Key: "riot-match-v1|KR_606", Data: []byte(`{}`)}); err != nil {
+	if err := c.writeDisk(championCacheEnvelope{Key: "riot-match-v1|KR_2006", Data: []byte(`{}`)}); err != nil {
 		t.Fatal(err)
 	}
 	files, _ = os.ReadDir(c.dir)
-	if len(files) != 600 {
+	if len(files) != 2000 {
 		t.Fatalf("restart budget: %d", len(files))
 	}
 }

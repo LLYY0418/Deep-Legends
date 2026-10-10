@@ -80,6 +80,7 @@ type gameplayOverviewRequest struct {
 	Count        int    `json:"count"`
 	BegIndex     int    `json:"begIndex"`
 	Force        bool   `json:"force,omitempty"`
+	RetryDetails bool   `json:"retryDetails,omitempty"`
 	FreshHistory *bool  `json:"freshHistory,omitempty"`
 	ExpectGameID string `json:"expectGameId,omitempty"`
 	// MatchFilter is normalized server-side and mapped to the documented SGP
@@ -226,6 +227,8 @@ type participantCompletenessSummary struct {
 type gameplayOverview struct {
 	SeasonStart         time.Time                `json:"seasonStart"`
 	HistoryGeneration   uint64                   `json:"historyGeneration,omitempty"`
+	HistoryRequested    int                      `json:"historyRequested,omitempty"`
+	HistoryLoaded       int                      `json:"historyLoaded,omitempty"`
 	ExpectedGamePresent *bool                    `json:"expectedGamePresent,omitempty"`
 	LatestAllGameID     string                   `json:"latestAllGameId,omitempty"`
 	ProfilePending      bool                     `json:"profilePending,omitempty"`
@@ -804,7 +807,10 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	if request.FreshHistory != nil {
 		r = r.WithContext(context.WithValue(r.Context(), overviewFreshHistoryKey{}, *request.FreshHistory))
 	}
-	if (request.Force || r.URL.Query().Get("force") == "1") && a.champions != nil {
+	if request.RetryDetails {
+		r = r.WithContext(context.WithValue(r.Context(), overviewRetryDetailsKey{}, true))
+	}
+	if !request.RetryDetails && (request.Force || r.URL.Query().Get("force") == "1") && a.champions != nil {
 		if _, source := riotUserKeys.effective(); source == "relay" && (isRiotRegion(request.Region) && (request.PlayerRef != "" || request.GameName != "")) {
 			a.goSafe("overview.force-probe", func() {
 				_, _ = riotRelays.ensureForce(context.Background(), a.champions.httpClient(), func(event map[string]any) {

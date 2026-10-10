@@ -26,6 +26,7 @@ type overviewQueryCacheItem struct {
 }
 
 type localOverviewProgressKey struct{}
+type overviewRetryDetailsKey struct{}
 
 type overviewQueryFlight struct {
 	progressMu    sync.Mutex
@@ -48,7 +49,7 @@ func riotOverviewQuerySnapshotKey(reference gameplayReference, begIndex, count i
 }
 
 func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gameplayReference, begIndex, count int, force bool, filters ...string) (gameplayOverview, error) {
-	if force {
+	if retry, _ := ctx.Value(overviewRetryDetailsKey{}).(bool); force && !retry {
 		ctx = context.WithValue(ctx, overviewFreshHistoryKey{}, true)
 	}
 	if a.overviewQueries == nil {

@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -131,9 +132,10 @@ type riotAccountFlight struct {
 }
 
 type riotMatchFlight struct {
-	done  chan struct{}
-	match *riotMatch
-	err   error
+	done       chan struct{}
+	match      *riotMatch
+	err        error
+	generation uint64
 }
 
 type riotProvider struct {
@@ -158,6 +160,7 @@ type riotProvider struct {
 	matchCache       map[string]*riotMatch
 	matchOrder       []string
 	matchFlights     map[string]*riotMatchFlight
+	matchGeneration  uint64
 	accountRefreshes sync.Map
 	accountMu        sync.Mutex
 	accountCache     map[string]riotAccountCacheEntry
@@ -422,6 +425,11 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 	}
 	scope := riotRequestRateScope(host, requestPath)
 	ctx = context.WithValue(ctx, riotRateScopeKey{}, scope)
+	if _, source := riotUserKeys.effective(); source == "relay" {
+		if entries := riotRelays.entries(p.detailConcurrency()); entries != nil {
+			return p.getCandidateRelay(ctx, entries, host, requestPath, query, out, responseMax)
+		}
+	}
 	networkAttempts := 0
 	for attempt := 0; attempt < 3; attempt++ {
 		key, source := riotUserKeys.effective()
@@ -484,17 +492,22 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 		}
 		p.beginRiotRateRequest(scope)
 		requestedAt := time.Now()
+		var responseTTFB atomic.Int64
 		attemptContext, cancelAttempt := context.WithTimeout(ctx, 15*time.Second)
 		request = request.WithContext(attemptContext)
 		if source == "relay" {
-			request = request.WithContext(httptrace.WithClientTrace(request.Context(), &httptrace.ClientTrace{GotFirstResponseByte: func() { riotRelays.recordTTFB(time.Since(requestedAt)) }}))
+			request = request.WithContext(httptrace.WithClientTrace(request.Context(), &httptrace.ClientTrace{GotFirstResponseByte: func() {
+				elapsed := time.Since(requestedAt)
+				responseTTFB.Store(int64(elapsed))
+				riotRelays.recordTTFB(elapsed)
+			}}))
 		}
 		response, err := client.Do(request)
 		if err != nil {
 			cancelAttempt()
 			p.observeRiotRate(scope, nil, 0)
 			if source == "relay" {
-				riotRelays.recordRequest("network", 0, riotRelayRequestCategory(requestPath), p.champions.diag)
+				riotRelays.recordBusinessRequest("network", 0, riotRelayRequestCategory(requestPath), p.champions.diag, "A", requestedAt, time.Duration(responseTTFB.Load()))
 			}
 			if isDetail {
 				tracker.detailInFlight(-1)
@@ -548,7 +561,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, requestPath string,
 			case response.StatusCode >= 400 && response.StatusCode != http.StatusTooManyRequests:
 				failure = "http"
 			}
-			riotRelays.recordRequest(failure, response.StatusCode, riotRelayRequestCategory(requestPath), p.champions.diag)
+			riotRelays.recordBusinessRequest(failure, response.StatusCode, riotRelayRequestCategory(requestPath), p.champions.diag, "A", requestedAt, time.Duration(responseTTFB.Load()))
 			if failure == "quota_exhausted" {
 				riotRelays.quotaExhausted(relay)
 				if p.champions.diag != nil {
@@ -1020,15 +1033,23 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 	}()
 	p.cacheMu.Lock()
 	if cached, ok := p.matchCache[matchID]; ok && (!refresh || !cached.Info.PerkStatsStale) {
+		p.touchMatchLocked(matchID)
+		p.touchRiotMatchDisk("riot-match-v4|" + matchID)
 		p.cacheMu.Unlock()
 		return cached, "hit", nil
 	}
-	if flight := p.matchFlights[matchID]; flight != nil {
+	if flight := p.matchFlights[matchID]; flight != nil && flight.generation == p.matchGeneration {
 		p.cacheMu.Unlock()
 		select {
 		case <-ctx.Done():
 			return nil, "miss", ctx.Err()
 		case <-flight.done:
+			p.cacheMu.Lock()
+			cleared := flight.generation != p.matchGeneration
+			p.cacheMu.Unlock()
+			if cleared && ctx.Err() == nil {
+				return p.matchByIDWithCacheMode(ctx, matchID, refresh)
+			}
 			// A departing leader must not poison another caller's live request.
 			if ctx.Err() == nil && (errors.Is(flight.err, context.Canceled) || errors.Is(flight.err, context.DeadlineExceeded)) {
 				return p.matchByIDWithCacheMode(ctx, matchID, refresh)
@@ -1042,13 +1063,15 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 	if p.matchFlights == nil {
 		p.matchFlights = make(map[string]*riotMatchFlight)
 	}
-	flight := &riotMatchFlight{done: make(chan struct{})}
+	flight := &riotMatchFlight{done: make(chan struct{}), generation: p.matchGeneration}
 	p.matchFlights[matchID] = flight
 	p.cacheMu.Unlock()
 	defer func() {
 		p.cacheMu.Lock()
 		flight.match, flight.err = result, resultErr
-		delete(p.matchFlights, matchID)
+		if p.matchFlights[matchID] == flight {
+			delete(p.matchFlights, matchID)
+		}
 		close(flight.done)
 		p.cacheMu.Unlock()
 	}()
@@ -1056,8 +1079,12 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 	status = "miss"
 	key := "riot-match-v4|" + matchID
 	if p.matchDisk != nil && validRiotMatchID(matchID) {
-		if entry, err := p.matchDisk.readDisk(key); err == nil && time.Now().Before(entry.ExpiresAt) && json.Unmarshal(entry.Data, &match) == nil && match.Metadata.MatchID == matchID && len(match.Info.Participants) > 0 {
-			status = "disk"
+		if entry, err := p.matchDisk.readDisk(key); err == nil {
+			if json.Unmarshal(entry.Data, &match) == nil && validRiotMatchContents(&match, matchID) {
+				status = "disk"
+			} else {
+				p.discardRiotMatchDisk(key)
+			}
 		}
 	}
 	if status != "disk" {
@@ -1065,15 +1092,19 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 		if err := p.get(ctx, p.clusterHost(), "/lol/match/v5/matches/"+url.PathEscape(matchID), nil, &match); err != nil {
 			return nil, "miss", err
 		}
-		if match.Metadata.MatchID == "" || len(match.Info.Participants) == 0 {
+		if !validRiotMatchContents(&match, matchID) {
 			return nil, "miss", errors.New("Riot 战绩详情缺少必要字段，可能接口已变更")
-		}
-		if p.matchDisk != nil && validRiotMatchID(matchID) && match.Metadata.MatchID == matchID {
-			p.persistRiotMatch(key, &match)
 		}
 	}
 	p.cacheMu.Lock()
-	p.storeMatchLocked(matchID, &match)
+	if flight.generation == p.matchGeneration {
+		if status == "disk" {
+			p.touchRiotMatchDisk(key)
+		} else if p.matchDisk != nil && validRiotMatchID(matchID) {
+			p.persistRiotMatch(key, &match)
+		}
+		p.storeMatchLocked(matchID, &match)
+	}
 	p.cacheMu.Unlock()
 	return &match, status, nil
 }
@@ -1469,6 +1500,8 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	provider := a.riot.forPlatform(reference.Region)
 	ctx = withRiotPlatform(ctx, provider.region())
 	ctx = withRiotSingleWaitLimit(ctx, 5*time.Second)
+	semaphore := make(chan struct{}, provider.detailConcurrency())
+	ctx = context.WithValue(ctx, riotDetailSlotsKey{}, semaphore)
 	started := time.Now()
 	tracker := &riotOverviewCostTracker{}
 	ctx = context.WithValue(ctx, riotOverviewCostTrackerKey{}, tracker)
@@ -1636,12 +1669,16 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	loadedDetails := 0
 	var loadMu sync.Mutex
 	var wait sync.WaitGroup
-	semaphore := make(chan struct{}, provider.detailConcurrency())
 	detailsStarted := time.Now()
 	details := make([]*riotMatch, len(ids))
 	progress, _ := ctx.Value(riotOverviewProgressKey{}).(func(gameplayOverview))
 	cardProgress, _ := ctx.Value(localOverviewCardsProgressKey{}).(func(gameplayOverview))
-	completedDetails := make(chan struct{}, len(ids))
+	type detailResult struct {
+		index  int
+		detail *riotMatch
+		err    error
+	}
+	completedDetails := make(chan detailResult, len(ids))
 	var detailLoadErr error
 	publishPartial := func(cardOnly ...bool) {
 		if progress == nil && cardProgress == nil {
@@ -1685,6 +1722,9 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 				}
 			}
 		}
+		partial.HistoryRequested, partial.HistoryLoaded = len(ids), len(partial.Matches)
+		partial.Pagination.Partial = partial.HistoryLoaded < len(ids)
+		deriveRiotOverviewStats(&partial, puuid, names, provider.region())
 		a.completeOverviewBackground(&partial, puuid)
 		a.publicizeOverviewReferences(&partial)
 		if len(cardOnly) > 0 && cardOnly[0] {
@@ -1706,7 +1746,8 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		go func(index int) {
 			defer a.recoverPanic("riot_api.loadRiotOverview.6")
 			defer wait.Done()
-			defer func() { completedDetails <- struct{}{} }()
+			result := detailResult{index: index}
+			defer func() { completedDetails <- result }()
 			select {
 			case <-admission[index]:
 			case <-ctx.Done():
@@ -1719,32 +1760,34 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 				return
 			}
 			defer func() { <-semaphore }()
-			detail, _, detailErr := provider.matchByIDWithCache(ctx, ids[index])
-			if detailErr != nil {
-				tracker.recordMatchFailure(detailErr)
-				loadMu.Lock()
-				if detailLoadErr == nil || riotErrorStatus(detailLoadErr) == http.StatusTooManyRequests {
-					detailLoadErr = detailErr
-				}
-				loadMu.Unlock()
-				return
-			}
-			loadMu.Lock()
-			details[index] = detail
-			loadedDetails++
-			loadMu.Unlock()
+			result.detail, _, result.err = provider.matchByIDWithCache(ctx, ids[index])
 		}(index)
 	}
 	previewLoaded := 0
 	firstMatchSent := false
+	cardLoaded := 0
 	for range ids {
-		<-completedDetails
+		result := <-completedDetails
 		loadMu.Lock()
+		if result.err != nil {
+			tracker.recordMatchFailure(result.err)
+			if detailLoadErr == nil || riotErrorStatus(detailLoadErr) == http.StatusTooManyRequests {
+				detailLoadErr = result.err
+			}
+		} else if result.detail != nil {
+			details[result.index] = result.detail
+			loadedDetails++
+		}
 		loaded := loadedDetails
 		loadMu.Unlock()
 		if loaded > 0 && !firstMatchSent {
 			publishPartial(true)
 			firstMatchSent = true
+			cardLoaded = loaded
+		}
+		if loaded > cardLoaded {
+			publishPartial(true)
+			cardLoaded = loaded
 		}
 		if loaded > previewLoaded && (loaded >= 5 && (previewLoaded == 0 || loaded-previewLoaded >= 2) || loaded == len(ids)) {
 			publishPartial()
@@ -1854,22 +1897,13 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	// 韩服拿不到客户端个人主页背景（Riot API 无此字段），退回最高熟练度英雄原画。
 	a.completeOverviewBackground(&response, puuid)
 	response.Capabilities = capabilities
-	response.Overall = aggregateMatches(matches, puuid, nil)
-	recentWindowAfter := time.Now().Add(-recentWindowDays * 24 * time.Hour).UnixMilli()
-	response.RecentRanked = recentRankedSummary(matches, puuid, nil)
-	response.ChampionStats = championStats(matches, puuid, names)
+	response.HistoryRequested, response.HistoryLoaded = len(ids), len(matches)
+	response.Pagination.Partial = loadedDetails < len(ids)
+	deriveRiotOverviewStats(&response, puuid, names, provider.region())
 	// Never crawl a KR season in the background: it shares the foreground Riot budget.
 	response.SeasonStatsProgress = seasonStatsProgress{Unavailable: true, Message: "近期战绩样本（非本赛季汇总）"}
-	response.Positions = positionStats(matches, puuid)
-	response.Ability = buildGameplayAbilityProfile(matches, puuid, ranks, provider.region())
 	// 韩服路径没有海克斯大乱斗队列（ARAMKit 只收录国服），所以只产出
 	// 单双排 / 灵活组排两个页签，行为与 R116-E 之前一致。
-	response.RankedQueues = buildGameplayRankedQueues([]gameplayRankedQueueTab{
-		{Key: "420", Label: rankedQueueLabel(seasonQueueSoloDuo), QueueIDs: []int64{seasonQueueSoloDuo}, Matches: recentRankedMatchesForQueue(matches, 420, defaultMatchCount)},
-		{Key: "440", Label: rankedQueueLabel(seasonQueueFlex), QueueIDs: []int64{seasonQueueFlex}, Matches: recentRankedMatchesForQueue(matches, 440, defaultMatchCount)},
-	}, puuid, ranks, provider.region())
-	response.ActivityHours = activityHours(matches)
-	response.RecentPlayers = recentPlayers(matches, puuid, recentWindowAfter)
 	a.publicizeOverviewReferences(&response)
 	if progress != nil {
 		return response, detailLoadErr
@@ -2132,12 +2166,20 @@ func (p *riotProvider) storeMatchLocked(matchID string, match *riotMatch) {
 	if p.matchCache == nil {
 		p.matchCache = make(map[string]*riotMatch)
 	}
-	if _, exists := p.matchCache[matchID]; !exists {
-		p.matchOrder = append(p.matchOrder, matchID)
-	}
+	p.touchMatchLocked(matchID)
 	p.matchCache[matchID] = match
 	for len(p.matchOrder) > riotMatchCacheMax {
 		delete(p.matchCache, p.matchOrder[0])
 		p.matchOrder = p.matchOrder[1:]
 	}
+}
+
+func (p *riotProvider) touchMatchLocked(matchID string) {
+	for i, id := range p.matchOrder {
+		if id == matchID {
+			p.matchOrder = append(p.matchOrder[:i], p.matchOrder[i+1:]...)
+			break
+		}
+	}
+	p.matchOrder = append(p.matchOrder, matchID)
 }

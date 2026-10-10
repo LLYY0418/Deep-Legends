@@ -29,7 +29,7 @@ test('R113 selecting an exhausted dirty tab immediately replaces the old player 
   try {
     const old = { key:'shy', region:'kr' }, next = { key:'rookie', region:'kr', dirty:true, dirtyAttempts:3, data:{name:'Rookie'} };
     const state = { tabs:[old,next], activeTabs:{pro:'shy'}, tabHistories:{} }, calls=[];
-    const {selectPlayerTab} = compile('gameplay.js',['selectPlayerTab'],{state, tabGroup:()=> 'pro', savePlayerScroll:()=>{}, renderPlayerTabs:()=>{},
+    const {selectPlayerTab} = compile('gameplay.js',['selectPlayerTab'],{state, activeTab:()=>state.tabs.find(t=>t.key===state.activeTabs.pro), cancelHistoryRecovery:()=>{}, tabGroup:()=> 'pro', savePlayerScroll:()=>{}, renderPlayerTabs:()=>{},
       renderOverview:()=>{ dom.window.document.querySelector('main').textContent = state.tabs.find(t=>t.key===state.activeTabs.pro).data.name; calls.push('render'); },
       scheduleDirtyOverview:()=>calls.push('refresh'), loadOverview:()=>assert.fail('cached tab refetched')});
     selectPlayerTab('rookie');

@@ -27,6 +27,13 @@ func (flight *overviewQueryFlight) publishOverviewCards(partial gameplayOverview
 		}
 		if len(partial.Matches) == 0 {
 			partial.Matches = previous.Matches
+			if previous.HistoryRequested > 0 {
+				partial.HistoryRequested, partial.HistoryLoaded = previous.HistoryRequested, previous.HistoryLoaded
+				partial.Pagination = previous.Pagination
+				partial.Overall, partial.RecentRanked, partial.Ability = previous.Overall, previous.RecentRanked, previous.Ability
+				partial.ChampionStats, partial.Positions, partial.RankedQueues = previous.ChampionStats, previous.Positions, previous.RankedQueues
+				partial.ActivityHours, partial.RecentPlayers = previous.ActivityHours, previous.RecentPlayers
+			}
 		}
 		if len(partial.Ranks) == 0 {
 			partial.Ranks = previous.Ranks
