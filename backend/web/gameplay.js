@@ -1389,6 +1389,8 @@
     return `<div class="service-outage" role="status"><div class="service-outage-disc">${serviceOutageIcon()}</div><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-gameplay-retry${disabled}>${waiting?"读取中":"立即重试"}</button><small data-history-countdown${status.seconds?"":" hidden"}>将在 ${status.seconds} 秒后自动重试</small></div>`;
   }
   function historyStatsPending(data,tab) {
+    // 本服原始战绩可能先于聚合到达；historyRequested 随派生统计一起填充。
+    if(tab?.loading && !(Number(data?.historyRequested)>0))return true;
     const partial=Boolean(data?.pagination?.partial || tab?.initialPagePending || tab?.initialPageError || tab?.loading || data?.capabilities?.some(item=>item.name==="match-history" && item.state==="failed"));
     const k=Number(data?.historyLoaded ?? data?.matches?.length ?? 0),n=Number(data?.historyRequested || data?.pagination?.count || k);
     return partial && !(k>=6 && k>=Math.ceil(.6*n));
@@ -1398,7 +1400,7 @@
     if(progress?.foreign || historyServiceState(tab))return false;
     if(Number(overall?.games)>0 || (items || []).some(item=>Number(item.games)>0))return false;
     if(progress && !progress.unavailable)return Boolean(progress.collecting && !progress.complete && !Number(progress.scanned));
-    return matchesPending(tab);
+    return Boolean(tab?.loading && !(Number(tab.data?.historyRequested)>0));
   }
 
   function historyRecoveryActive(tab) {
@@ -2326,7 +2328,7 @@
       data.masteries, data.activityHours, data.recentPlayers, data.positions,
       data.recentRanked, data.ability, data.rankedQueues, tab?.opggSeason?.data,
       tab?.opggSeasonStale, tab?.opggSeasonPending, tab?.rankedQueueRecent,
-      tab?.rankedQueueAbility, tab?.rankedQueuePosition, tab?.mayhemRating,historyStatsPending(data,tab),matchesPending(tab),
+      tab?.rankedQueueAbility, tab?.rankedQueuePosition, tab?.mayhemRating,tab?.loading,historyStatsPending(data,tab),matchesPending(tab),
     ].map((value) => {
       if (value && typeof value === "object") {
         if (!container._careerObjectTokens.has(value)) { container._careerObjectCounter = (container._careerObjectCounter || 0) + 1; container._careerObjectTokens.set(value, container._careerObjectCounter); }

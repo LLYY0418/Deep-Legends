@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const {compile,escapeHTML}=require('./r188-harness.cjs');
 const source=fs.readFileSync(process.env.R268_GAMEPLAY_SOURCE || __dirname+'/gameplay.js','utf8');
-const functions=compile(source,['championStatsPending','renderChampionStats'],{
+const functions=compile(source,['historyStatsPending','championStatsPending','renderChampionStats'],{
  historyServiceState:tab=>tab.service || null,matchesPending:tab=>Boolean(tab.loading && !tab.matchesReceived),
  escapeHTML,number:value=>String(value ?? '—'),percent:value=>String(value ?? '—'),kda:value=>String(value ?? '—'),
  overviewDetailArrow:()=>'<button>详情</button>',iconFigure:()=>'<i></i>'
@@ -40,4 +40,13 @@ test('R268 foreign season unavailable messages and official/relay interruption s
  assert.equal(functions.championStatsPending([],{},foreign,{loading:true}),false);
  assert.match(render([],{},foreign),/本赛季英雄统计暂不可用/);assert.doesNotMatch(render([],{},foreign),/career-pending|暂无英雄统计/);
  for(const service of [{kind:'official'},{kind:'relay'}])assert.equal(functions.championStatsPending([],{},waiting,{loading:true,service}),false);
+});
+test('R268 raw recent matches arriving before aggregates keep all dependent statistics pending',()=>{
+ const data={matches:Array.from({length:20},()=>({})),historyRequested:0,overall:{games:0},championStats:[]};
+ const tab={loading:true,matchesReceived:true,data};
+ assert.equal(functions.championStatsPending([],data.overall,undefined,tab),true);
+ assert.equal(functions.historyStatsPending(data,tab),true);
+ assert.match(render([],data.overall,undefined,tab),/career-pending gameplay-skeleton/);
+ assert.equal(functions.championStatsPending([],{games:0},undefined,{...tab,data:{...data,historyRequested:20}}),false,'an arrived zero aggregate is confirmed even before loading finishes');
+ assert.equal(functions.historyStatsPending({...data,historyRequested:20,historyLoaded:20},tab),false);
 });
