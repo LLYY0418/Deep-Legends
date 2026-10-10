@@ -312,6 +312,7 @@ func arenaGroupTruthFromRiot(info *riotMatchInfo, source string) *arenaGroupTrut
 // SGP already decodes its payload into riotMatchInfo. The source is determined
 // by the caller, not by a Tencent region-name heuristic.
 func (a *app) checkArenaGroupTruth(client *LCUClient, serverID string, info *riotMatchInfo) {
+	a.recordArenaPremadeTruth(info)
 	a.checkArenaGroupTruthInput(client, serverID, arenaGroupTruthFromRiot(info, "sgp"))
 }
 

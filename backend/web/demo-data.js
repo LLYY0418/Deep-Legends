@@ -15,6 +15,8 @@
   const arenaLiveDemo = query.get("demo") === "arena" || query.has("demoArena") || location.hash.includes("arena");
   const arenaFullDemo = query.get("demo") === "arena-full" || query.has("demoArenaFull") || location.hash.includes("arena-full");
   const hextechLiveDemo = query.get("demo") === "hextech" || query.has("demoHextech") || location.hash.includes("hextech");
+  // R263：斗魂按预组队分卡片、等级名望、30 局胜率与吃鸡率、名次小卡。
+  const arenaSquadsDemo = query.get("demo") === "arena-squads";
   const currentGameDemo = query.get("demo") === "current-game" || query.has("demoCurrentGame") || location.hash.includes("current-game");
   try { if (query.has("demo") || location.hash.includes("demo")) localStorage.setItem("lol-loot-demo", "1"); } catch (_) {}
 
@@ -492,6 +494,7 @@
         championId: useMain ? championId : alt[0], championName: useMain ? championName : alt[1],
         win, kills: 3 + ((seed + index * 5) % 10), deaths: 1 + ((seed * 3 + index) % 7), assists: 4 + ((seed + index * 2) % 11),
         cs: 128 + ((seed * 11 + index * 23) % 120), queueLabel: "单排/双排", createdAt: now - (index + 1) * 3_600_000 * 5,
+        gameId: [90001, 90002, 90003, 90005][index % 4],
       };
     });
   };
@@ -502,6 +505,8 @@
       championId, championName, position, teamId, isCurrent,
       playerRef: "", gameName: isCurrent ? summoner.gameName : `演示玩家`, tagLine: "DEMO",
       rank: { tier, division: "II", leaguePoints: 45 },
+      soloRank: { queueType: "RANKED_SOLO_5x5", tier, division: "II", leaguePoints: 45 },
+      flexRank: seed % 4 === 3 ? undefined : { queueType: "RANKED_FLEX_SR", tier: seed % 2 ? "platinum" : "gold", division: "I", leaguePoints: 12 + seed * 7 },
       modeStats: { games: wins + losses, wins, losses, winRate: Number((wins * 100 / (wins + losses)).toFixed(1)), kda: kdaValue },
       recentPositions: [{ position, games: Math.max(1, recentGames.length) }],
       recentGames, recentRankedRecord: { games: recentGames.length, wins: recentWins, losses: recentGames.length - recentWins },
@@ -717,6 +722,35 @@
     players: structuredClone(arenaLivePlayers),
     arenaGrouped: true,
     arenaMascotMapping: true,
+  };
+
+  const arenaSquadKeys = ["mine", "mine", "mine", "premade:A", "premade:A", "premade:B", "premade:B", ...Array(11).fill("")];
+  const arenaFameFor = (index) => {
+    if (index % 6 === 5) return undefined;
+    const level = [12, 9, 6, 4, 2, 12, 11, 7, 3, 12, 10, 5][index % 12];
+    const fame = [87_510, 28_430, 13_020, 6_480, 1_720, 52_300, 39_900, 18_250, 4_100, 61_880, 33_010, 9_900][index % 12];
+    const tier = level >= 12 ? "GLADIATOR" : level >= 9 ? "GOLD" : level >= 6 ? "SILVER" : level >= 3 ? "BRONZE" : "WOOD";
+    return { level, fame, tier };
+  };
+  const arenaSquadsLive = {
+    ...structuredClone(arenaFullLive),
+    queueId: 1750,
+    gameId: 97002,
+    arenaGrouped: false,
+    arenaMascotMapping: false,
+    arenaSquadSize: 3,
+    players: structuredClone(arenaLivePlayers).map((player, index) => {
+      const games = 30 - (index % 4) * 4;
+      const topHalf = Math.round(games * (0.38 + (index % 5) * 0.06));
+      return {
+        ...player, playerRef: `demo-arena-player-${String(index).padStart(2, "0")}`, isAlly: index < 3, mySquad: index < 3, arenaSquadKey: arenaSquadKeys[index],
+        arenaFame: arenaFameFor(index), arenaRecord: { games, topHalf, top1: Math.round(topHalf * 0.35) },
+        recentGames: [...player.recentGames, ...player.recentGames.slice(0, 2)].slice(0, 10).map((game, gameIndex) => {
+          const placement = ((index + gameIndex * 2) % 6) + 1;
+          return { ...game, gameId: 90004, placement, win: placement <= 3 };
+        }),
+      };
+    }),
   };
 
   const hextechLiveAugments = arenaLiveAugments.map((augment, index) => ({
@@ -999,7 +1033,7 @@
     ["/api/gameplay/overview", () => overview],
     ["/api/gameplay/phase", () => ({ phase: "None" })],
     ["/api/gameplay/current-game", () => currentGame],
-    ["/api/gameplay/live", () => hextechLiveDemo ? hextechLive : arenaFullDemo ? arenaFullLive : arenaLiveDemo ? arenaLive : live],
+    ["/api/gameplay/live", () => hextechLiveDemo ? hextechLive : arenaSquadsDemo ? arenaSquadsLive : arenaFullDemo ? arenaFullLive : arenaLiveDemo ? arenaLive : live],
     ["/api/gameplay/perks", () => perksCatalog],
     ["/api/gameplay/augments", () => ({ augments: perksCatalog.augments || [] })],
     ["/api/gameplay/items", () => demoItemsCatalog],
@@ -1020,6 +1054,11 @@
     const url = typeof input === "string" ? input : input?.url || "";
     const pathname = url.startsWith("/") ? url.split("?")[0] : "";
     const params = new URLSearchParams(url.split("?")[1] || "");
+    if (pathname === "/api/gameplay/live/match") {
+      const match = overview.matches.find((item) => String(item.gameId) === params.get("gameId"));
+      if (!match) return Promise.resolve(new Response("这场对局的详情暂不可用", { status: 404, headers: { "Content-Type": "text/plain" } }));
+      return Promise.resolve(new Response(JSON.stringify(structuredClone(match)), { status: 200, headers: { "Content-Type": "application/json" } }));
+    }
     if (pathname === "/api/champions/catalog" && demoCatalogFailure) {
       return Promise.resolve(new Response("demo catalog failure", { status: 503, headers: { "Content-Type": "text/plain" } }));
     }

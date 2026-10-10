@@ -1,0 +1,66 @@
+/* R263：对局页按需样式，随 live-arena.js 一起在首次渲染对局详情时加载。 */
+/* R263 P4：战绩小卡是按钮，点击打开对局详情弹窗。 */
+button.insight-match { color: inherit; font: inherit; cursor: pointer; transition: filter 120ms ease, border-color 120ms ease, background-color 120ms ease; }
+button.insight-match:not(:disabled):hover { background: color-mix(in oklab,var(--surface-strong) 70%,transparent); filter: brightness(1.08); }
+button.insight-match:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* R263 P2.3：斗魂小卡右侧的名次。 */
+.insight-placement { min-width: 34px; padding: 1px 5px; border-radius: 5px; font-size: 10px; font-style: normal; font-weight: 800; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.insight-placement.is-first { color: var(--on-primary); background: var(--primary); }
+.insight-placement.is-top { color: var(--success); background: color-mix(in oklab,var(--success) 16%,transparent); }
+.insight-placement.is-bottom { color: var(--danger); background: color-mix(in oklab,var(--danger) 14%,transparent); }
+.insight-placement.is-unknown { color: var(--faint); background: var(--surface-strong); }
+/* R263 P2：斗魂等级与名望（名称下方，取代段位）。 */
+:root {
+  --arena-tier-wood: #7a5a3c; --arena-tier-bronze: #9a5a24; --arena-tier-silver: #5f6f84; --arena-tier-gold: #9a6d07; --arena-tier-gladiator: #a23fb8;
+  --arena-tier-wood-dark: #b48c66; --arena-tier-bronze-dark: #d89058; --arena-tier-silver-dark: #b9c4d3; --arena-tier-gold-dark: #f0c75a; --arena-tier-gladiator-dark: #e08cf2;
+}
+:root[data-theme="dark"], :root[data-theme="azure"], :root[data-theme="emerald"],
+:root[data-theme="violet"], :root[data-theme="crimson"], :root[data-theme="aurora"],
+:root[data-theme="oled"] { --arena-tier-wood: var(--arena-tier-wood-dark); --arena-tier-bronze: var(--arena-tier-bronze-dark); --arena-tier-silver: var(--arena-tier-silver-dark); --arena-tier-gold: var(--arena-tier-gold-dark); --arena-tier-gladiator: var(--arena-tier-gladiator-dark); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --arena-tier-wood: var(--arena-tier-wood-dark); --arena-tier-bronze: var(--arena-tier-bronze-dark); --arena-tier-silver: var(--arena-tier-silver-dark); --arena-tier-gold: var(--arena-tier-gold-dark); --arena-tier-gladiator: var(--arena-tier-gladiator-dark); }
+}
+.live-player-copy > .arena-fame { display: inline-flex; width: max-content; max-width: 100%; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.arena-fame { --arena-tier: var(--muted); }
+.arena-fame.is-wood { --arena-tier: var(--arena-tier-wood); }
+.arena-fame.is-bronze { --arena-tier: var(--arena-tier-bronze); }
+.arena-fame.is-silver { --arena-tier: var(--arena-tier-silver); }
+.arena-fame.is-gold { --arena-tier: var(--arena-tier-gold); }
+.arena-fame.is-gladiator { --arena-tier: var(--arena-tier-gladiator); }
+.arena-fame-icon { width: 14px; height: 14px; flex: 0 0 14px; color: var(--arena-tier); }
+.arena-fame-icon path:first-child { fill: currentColor; fill-opacity: .18; stroke: currentColor; stroke-width: 1.2; stroke-linejoin: round; }
+.arena-fame-icon .arena-fame-blades { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; }
+.arena-fame.is-gladiator .arena-fame-icon { filter: drop-shadow(0 0 1px var(--arena-tier)); }
+.arena-fame > b { color: var(--arena-tier); font-weight: 800; }
+.arena-fame-divider { color: var(--faint); }
+.live-player dd.arena-top1-value { color: var(--primary-strong); }
+/* R263 P1：斗魂按小队出卡片，两张一行；每张固定 squadSize 个槽，用 subgrid 让同一行
+   两张卡共享行轨道：玩家行、战绩小卡行与卡片底边都按两张里较高的一张对齐。 */
+.live-teams.is-insight.is-arena.is-squads { grid-template-columns: repeat(2,minmax(0,1fr)); grid-auto-rows: auto; row-gap: 0; column-gap: 10px; }
+.live-teams.is-arena.is-squads > .live-team.is-squad { display: grid; grid-row: span 7; grid-template-rows: subgrid; margin-bottom: 10px; }
+.live-teams.is-arena.is-squads.is-squad-size-2 > .live-team.is-squad { grid-row: span 5; }
+.live-teams.is-arena.is-squads.is-squad-size-4 > .live-team.is-squad { grid-row: span 9; }
+.live-teams.is-arena.is-squads .live-player-list.is-insight { display: contents; }
+.live-team.is-squad > header { min-height: 34px; }
+.live-team.is-squad-premade { box-shadow: inset 3px 0 0 var(--accent); }
+.live-team.is-squad-unknown { box-shadow: inset 3px 0 0 var(--line); }
+.live-team.is-squad-unknown > header h3 { color: var(--muted); }
+.live-team > header .live-squad-tag { min-height: 20px; padding: 2px 7px; color: var(--premade-color,#fff); font-size: 12px; cursor: default; }
+.live-squad-slot.is-empty { grid-row: span 2; margin: 8px 11px 11px; border: 1px dashed var(--line); border-radius: 8px; }
+.live-teams.is-arena.is-squads .live-squad-slot.is-empty:first-child { margin-top: 0; }
+/* R263 P4：对局页战绩详情弹窗，沿用生涯弹窗的外框，内容是总览同款战绩卡。 */
+.live-match-dialog { --career-dialog-width: 1080px; height: min(820px,calc((100dvh - 28px) / var(--ui-zoom, 1))); }
+.live-match-dialog-content { min-height: 0; flex: 1 1 0; padding: 12px 14px 16px; overflow-y: auto; overscroll-behavior: contain; container: matches-column / inline-size; }
+.live-match-dialog-list > .match-entry { content-visibility: visible; }
+.live-match-dialog-loading { display: grid; gap: 10px; padding: 10px 0; }
+.live-match-dialog-loading .live-history-skeleton { width: 100%; height: 18px; }
+.live-match-dialog-loading .live-history-skeleton:nth-child(2) { width: 82%; }
+.live-match-dialog-loading .live-history-skeleton:nth-child(3) { width: 64%; }
+.live-match-dialog-error { display: flex; align-items: center; gap: 10px; padding: 10px 0; color: var(--danger); font-size: 12px; }
+
+/* 与 gameplay.css 的经典排位窄屏规则同一断点：容器 ≤840px 时小队卡片单列。 */
+@container recommendation-area (max-width: 840px) {
+  .live-teams.is-insight.is-arena.is-squads { grid-template-columns: minmax(0,1fr); }
+  .live-teams.is-arena.is-squads > .live-team.is-squad { display: block; grid-row: auto; }
+  .live-teams.is-arena.is-squads .live-player-list.is-insight { display: grid; }
+}

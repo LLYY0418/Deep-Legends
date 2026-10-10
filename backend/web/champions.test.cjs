@@ -1583,7 +1583,7 @@ test("demo mode exposes a dedicated Hextech ARAM live session", () => {
 	assert.match(demoScript, /resolvedMode: "hextech",[\s\S]*hasRunes: false,[\s\S]*hasAugments: true,[\s\S]*hasTopPlayers: false/);
 	assert.match(demoScript, /hero: \{ tier: 1, winRate: 54\.72, pickRate: 7\.83 \}/);
 	assert.match(demoScript, /const hextechLiveAugments = arenaLiveAugments\.map[\s\S]*score: Number\(\(92\.4 - index \* 3\.1\)\.toFixed\(1\)\)/);
-	assert.match(demoScript, /"\/api\/gameplay\/live", \(\) => hextechLiveDemo \? hextechLive : arenaFullDemo \? arenaFullLive : arenaLiveDemo \? arenaLive : live/);
+	assert.match(demoScript, /"\/api\/gameplay\/live", \(\) => hextechLiveDemo \? hextechLive : arenaSquadsDemo \? arenaSquadsLive : arenaFullDemo \? arenaFullLive : arenaLiveDemo \? arenaLive : live/);
 });
 
 test("demo mode exposes a complete six-team Arena live session", () => {

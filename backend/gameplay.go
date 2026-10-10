@@ -4574,6 +4574,7 @@ type gameplayLiveResponse struct {
 	RawCount                 int                       `json:"-"`
 	DuplicatesDropped        int                       `json:"-"`
 	MergeAppended            int                       `json:"-"`
+	liveR263ResponseFields
 }
 
 type gameplayRecommendationsResponse struct {
@@ -7434,6 +7435,7 @@ type gameplayLivePlayer struct {
 	RecentGames         []gameplayRecentGame   `json:"recentGames,omitempty"`
 	RecentRankedRecord  *gameplayRecentRecord  `json:"recentRankedRecord,omitempty"`
 	RecentPositions     []gameplayPositionStat `json:"recentPositions,omitempty"`
+	liveR263PlayerFields
 }
 
 func livePlayerIdentityFlags(visibility, gameName, displayName string) (hidden, unresolved bool) {
@@ -7455,6 +7457,7 @@ type gameplayRecentGame struct {
 	CS           int    `json:"cs,omitempty"`
 	QueueLabel   string `json:"queueLabel,omitempty"`
 	CreatedAt    int64  `json:"createdAt,omitempty"`
+	liveR263RecentGameFields
 }
 
 type gameplayRecentRecord struct {
@@ -7525,7 +7528,8 @@ func recentGamesFromSelectedMatches(matches []gameplayMatch, playerRef string) [
 			continue
 		}
 		result = append(result, gameplayRecentGame{
-			ChampionID: subject.ChampionID, ChampionName: subject.ChampionName,
+			liveR263RecentGameFields: liveR263RecentGameFields{GameID: match.GameID, QueueID: match.QueueID, Placement: subject.Placement},
+			ChampionID:               subject.ChampionID, ChampionName: subject.ChampionName,
 			Win: match.Result == "win", Kills: subject.Kills, Deaths: subject.Deaths, Assists: subject.Assists,
 			CS: subject.CS, QueueLabel: match.QueueLabel, CreatedAt: match.CreatedAt,
 		})
@@ -7875,6 +7879,11 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 				response.QueueLabel = queueLabel(response.QueueID, response.GameMode, nil)
 			}
 			if isArenaChampSelectMode(response.GameMode) {
+				if sessionErr == nil && session.GameData.GameID > 0 && session.GameData.GameID == champSelect.GameID {
+					// R263 P1：同一局的 gameflow 组队编号，进入对局后优先使用。
+					rows, _, _ := gameflowLiveRoster(session)
+					a.rememberArenaChampSelectSignals(champSelect.GameID, rows)
+				}
 				a.rememberArenaChampOrder(client, champSelect)
 				rawPlayers, _ = filterArenaChampSelectPlayers(rawPlayers)
 				response.ChampSelectNotice = arenaChampSelectNotice
@@ -8050,6 +8059,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			}
 			isAlly := isCurrent || (arenaMode && (phase == "ChampSelect" || a.isRememberedArenaAlly(raw.player)))
 			var ranks []gameplayRank
+			var arenaFame *gameplayArenaFame
 			var matches []gameplayMatch
 			historyResult := livePlayerMatchesResult{}
 			if validRef {
@@ -8063,6 +8073,12 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 					defer enrichment.Done()
 					if aramMode {
 						return // ARAM details do not display ranked tiers.
+					}
+					if arenaMode {
+						// R263 P2.1：斗魂不展示召唤师峡谷段位，改读斗魂等级与名望。
+						arenaFame = a.loadLiveArenaFame(ctx, client, reference, playerRef, isCurrent, summoner.Privacy)
+						ranksFinishedAt[index] = time.Now()
+						return
 					}
 					ranks = append([]gameplayRank(nil), a.playerRankScore(ctx, client, playerRef, isCurrent, reference.ServerID, summoner.Privacy).ranks...)
 					ranksFinishedAt[index] = time.Now()
@@ -8083,12 +8099,32 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 					if response.QueueID == 420 || response.QueueID == 440 {
 						early.RecentRankedRecord = recentRankedRecord(early.RecentGames)
 					}
+					if arenaMode {
+						early.ArenaRecord = liveArenaRecord(matches, playerRef, response.QueueID)
+					}
 					progress.Players[index] = early
 					playersPublishedAt[index] = time.Now()
 					publishLiveProgress(ctx, progress)
 					progressMu.Unlock()
+					if arenaMode {
+						// R263 P2.2：首屏 10 局已推送，再补到 30 局。
+						matches = a.extendLiveArenaHistory(ctx, client, reference, playerRef, names, response.GameID, response.QueueID, historyResult)
+					}
 				}()
 				enrichment.Wait()
+			}
+			var soloRank, flexRank *gameplayRank
+			for rankIndex := range ranks {
+				switch ranks[rankIndex].QueueType {
+				case "RANKED_SOLO_5x5":
+					if soloRank == nil {
+						soloRank = &ranks[rankIndex]
+					}
+				case "RANKED_FLEX_SR":
+					if flexRank == nil {
+						flexRank = &ranks[rankIndex]
+					}
+				}
 			}
 			var rank *gameplayRank
 			for rankIndex := range ranks {
@@ -8116,6 +8152,12 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			}
 			hidden, identityUnresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
 			response.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(summoner.Privacy), "PRIVATE"), Autofill: raw.player.IsAutofilled, IsCurrent: isCurrent, reference: reference}, IdentityUnresolved: identityUnresolved, TeamID: raw.team, IsAlly: isAlly, ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
+			response.Players[index].SoloRank, response.Players[index].FlexRank = soloRank, flexRank
+			if arenaMode {
+				response.Players[index].ArenaFame = arenaFame
+				response.Players[index].ArenaRecord = liveArenaRecord(matches, playerRef, response.QueueID)
+			}
+			a.rememberLiveMatches(response.GameID, playerRef, matches)
 			if aramMode || arenaMode {
 				// Unknown non-lane modes have historically rendered "other".
 				if response.Players[index].Position == "" && normalizePosition(raw.player.SelectedPosition, raw.player.SelectedRole) == "other" {
@@ -8143,6 +8185,14 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		}(index)
 	}
 	wait.Wait()
+	arenaInputs := map[string]arenaPremadeInput{}
+	if arenaMode {
+		for index, raw := range rawPlayers {
+			if ref := response.Players[index].reference.PlayerRef; validPlayerReference(ref) {
+				arenaInputs[ref] = arenaPremadeInput{TeamParticipantID: raw.player.TeamParticipantID, Matches: premadeInputs[index].Matches}
+			}
+		}
+	}
 	historyByRef := make(map[string]livePlayerMatchesResult, len(historyResults))
 	for index, player := range response.Players {
 		historyByRef[player.reference.PlayerRef] = historyResults[index]
@@ -8188,7 +8238,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	if arenaMode {
 		a.recordArenaMissingSession(current, &response, liveClientSnapshotValue)
 		a.recoverArenaPlayerList(ctx, client, current, &response, liveClientSnapshotValue, names)
-		response.ArenaMySquadNotice = arenaChampSelectNotice
+		// R263 P1：小队卡片本身已表达归属，不再在卡片下方重复说明横幅。
 		a.markRememberedArenaSquad(&response)
 	}
 	a.applyLivePremades(response.GameID, response.Players, premadeInputs, phase, arenaMode, lobbyMembers)
@@ -8205,6 +8255,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	deduplicateLiveResponse(&response)
 	if arenaMode {
 		a.markRememberedArenaSquad(&response)
+		a.applyArenaPremadeSquads(&response, arenaInputs)
 	}
 	// R116-探测（一次性侦察，工单 P1 第 1 条）：海斗（KIWI/ARAM_MAYHEM）此前不满足上面的
 	// arenaMode 条件，live_client_allgamedata_shape 在海斗下从未被观测过。这里只把既有诊断

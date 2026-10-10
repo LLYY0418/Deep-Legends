@@ -589,6 +589,7 @@ func main() {
 	mux.HandleFunc("GET /api/gameplay/masteries", a.authorized(a.handleGameplayMasteries))
 	mux.HandleFunc("GET /api/gameplay/champion-table", a.authorized(a.handleGameplayChampionTable))
 	mux.HandleFunc("GET /api/gameplay/live", a.authorized(a.handleGameplayLive))
+	mux.HandleFunc("GET /api/gameplay/live/match", a.authorized(a.handleGameplayLiveMatch))
 	mux.HandleFunc("GET /api/gameplay/mayhem-rating", a.authorized(a.handleGameplayMayhemRating))
 	// R116-E P2-6：本人海克斯大乱斗「选了某个海克斯之后通常出什么」静态查询。
 	mux.HandleFunc("GET /api/gameplay/season-mayhem-builds", a.authorized(a.handleGameplaySeasonMayhemBuilds))

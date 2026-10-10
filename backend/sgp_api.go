@@ -1109,6 +1109,10 @@ type sgpRankedQueue struct {
 	PreviousSeasonEndRank      string `json:"previousSeasonEndRank"`
 	PreviousSeasonHighestTier  string `json:"previousSeasonHighestTier"`
 	PreviousSeasonHighestRank  string `json:"previousSeasonHighestRank"`
+	// R263：斗魂（CHERRY）条目的档位与评分。名望制下 ratedRating 预期是名望，
+	// 由 arena_fame.go 按档位交叉校验后才展示。
+	RatedTier   string  `json:"ratedTier"`
+	RatedRating float64 `json:"ratedRating"`
 }
 
 type sgpRankedStats struct {
@@ -1117,6 +1121,8 @@ type sgpRankedStats struct {
 	HighestPreviousSeasonEndRank      string           `json:"highestPreviousSeasonEndRank"`
 	HighestPreviousSeasonAchievedTier string           `json:"highestPreviousSeasonAchievedTier"`
 	HighestPreviousSeasonAchievedRank string           `json:"highestPreviousSeasonAchievedRank"`
+	// cherryRaw keeps the raw CHERRY entry for the R263 shape diagnostic.
+	cherryRaw json.RawMessage
 }
 
 // rankedStatsOn 在当前登录的国服子服务器读取排位。接口路径虽然接受
@@ -1161,6 +1167,9 @@ func (p *sgpProvider) rankedStatsOn(ctx context.Context, client *LCUClient, serv
 		var queue sgpRankedQueue
 		if json.Unmarshal(entry, &queue) == nil {
 			stats.Queues = append(stats.Queues, queue)
+			if queue.QueueType == "CHERRY" && stats.cherryRaw == nil {
+				stats.cherryRaw = append(json.RawMessage(nil), entry...)
+			}
 		}
 	}
 	return stats, nil

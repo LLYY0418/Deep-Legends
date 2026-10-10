@@ -6859,7 +6859,7 @@
     return phase === "ChampSelect" && !player.isAlly && !player.isCurrent && selfTeam > 0 && Number(player.teamId) > 0 && Number(player.teamId) !== selfTeam;
   }
 
-  function renderLivePlayer(player, index, arenaMode = false, currentChampionId = 0, premadePlayers = [], recentPositions = "", aramMode = false, hextechMode = false, phase = "", displayPosition = "") {
+  function renderLivePlayer(player, index, arenaMode = false, currentChampionId = 0, premadePlayers = [], recentPositions = "", aramMode = false, hextechMode = false, phase = "", displayPosition = "", identityKind = "") {
     if (champSelectEnemyPlaceholder(player, phase, premadePlayers)) {
       return `<article class="live-player">${iconFigure("champion", liveDisplayedChampionId(player, currentChampionId), player.championName, "live")}<div class="live-player-copy live-player-placeholder">暂无玩家信息，进入游戏后显示</div></article>`;
     }
@@ -6876,6 +6876,7 @@
 	const historyPending = !liveHistorySettled(player);
     const rankCopy = rank?.tier ? rankTitle(rank) : "未定级";
     const contextCopy = player.hidden === true ? (player.position ? positionLabel(player.position) : "") : arenaMode || aramMode ? "" : `${positionLabel(displayPosition || player.position)} · ${rankCopy}`;
+    const liveArena = identityKind ? globalThis.deepLegendsLiveArena : null;
     const rowTone = (player.isCurrent ? " is-self" : player.isAlly ? " is-ally" : "") + (player.hidden === true ? " is-hidden" : "");
     const hiddenChip = `${player.privateHistory === true ? '<span class="player-tab-hidden">隐藏战绩</span>' : ""}${player.hidden === true ? '<span class="player-tab-hidden">隐藏身份</span>' : player.identityUnresolved === true ? '<span class="player-tab-hidden">身份待公开</span>' : ""}`;
     const liveAutofillChip = player.autofill === true ? '<span class="match-autofill-chip">补位</span>' : "";
@@ -6883,8 +6884,8 @@
 	const emptySummary = historyState === "unavailable" ? player.identityUnresolved === true ? "身份尚未公开" : "客户端未公开该玩家" : historyState === "failed" ? "读取失败" : "本模式暂无战绩";
 	const historySummary = historyPending
 	  ? '<dl class="is-history-pending" aria-label="战绩读取中"><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div></dl>'
-	  : `<dl><div><dt>${recordGames ? `近 ${number(recordGames)} 局` : "当前模式"}</dt><dd class="live-record-value">${displayStats.games ? `${number(displayStats.wins)}胜 ${number(displayStats.losses)}负` : emptySummary}</dd></div>${player.hidden === true && !displayStats.games ? "" : `<div><dt>胜率</dt><dd class="win-rate-value">${displayStats.games ? percent(displayStats.winRate) : "—"}</dd></div><div><dt>KDA</dt><dd class="live-kda-value">${displayStats.games ? `${kda(displayStats.kda)}:1` : "—"}</dd></div>`}</dl>`;
-	return `<article class="live-player${rowTone}">${iconFigure("champion", championId, player.championName, "live")}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}" ${proBadgeAttributes(player)}` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${hiddenChip}${liveAutofillChip}${premadeTag}${player.mySquad ? '<span class="my-squad-chip">我的小队</span>' : ""}${renderProIdentityBadge(player)}</div>${contextCopy ? `<span>${escapeHTML(contextCopy)}</span>` : ""}${recentPositions}</div>${historySummary}</article>`;
+	  : liveArena?.arenaSummary(player, identityKind, emptySummary) || `<dl><div><dt>${recordGames ? `近 ${number(recordGames)} 局` : "当前模式"}</dt><dd class="live-record-value">${displayStats.games ? `${number(displayStats.wins)}胜 ${number(displayStats.losses)}负` : emptySummary}</dd></div>${player.hidden === true && !displayStats.games ? "" : `<div><dt>胜率</dt><dd class="win-rate-value">${displayStats.games ? percent(displayStats.winRate) : "—"}</dd></div><div><dt>KDA</dt><dd class="live-kda-value">${displayStats.games ? `${kda(displayStats.kda)}:1` : "—"}</dd></div>`}</dl>`;
+	return `<article class="live-player${rowTone}">${iconFigure("champion", championId, player.championName, "live")}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}" ${proBadgeAttributes(player)}` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${hiddenChip}${liveAutofillChip}${premadeTag}${player.mySquad && !(identityKind === "arena" && liveArena) ? '<span class="my-squad-chip">我的小队</span>' : ""}${renderProIdentityBadge(player)}</div>${liveArena ? liveArena.identityLine(player, identityKind, contextCopy) : contextCopy ? `<span>${escapeHTML(contextCopy)}</span>` : ""}${recentPositions}</div>${historySummary}</article>`;
   }
 
 	  function orderLivePlayers(players, groupByTeam = true) {
@@ -7403,7 +7404,8 @@
 	  if (historyState === "failed") return '<div class="insight-match-row"><small class="insight-none">读取失败</small><button class="text-button insight-retry" type="button" data-live-history-retry>重试</button></div>';
 	  return '<div class="insight-match-row"><small class="insight-none">该玩家当前模式暂无最近战绩</small></div>';
 	}
-    const cells = games.map((game) => `<span class="insight-match is-${game.win ? "win" : "loss"}" data-tooltip="${escapeHTML(`${game.championName || "英雄"} · ${number(game.kills)}/${number(game.deaths)}/${number(game.assists)}${Number(game.cs) > 0 ? ` · CS ${number(game.cs)}` : ""} · ${game.win ? "胜利" : "失败"}`)}" data-tooltip-size="compact">${iconFigure("champion", game.championId, game.championName, "tiny")}<b>${number(game.kills)}/${number(game.deaths)}/${number(game.assists)}</b>${insightScore(game)}</span>`).join("");
+    const cells = globalThis.deepLegendsLiveArena?.chips(games, player) ??
+      games.map((game) => `<span class="insight-match is-${game.win ? "win" : "loss"}" data-tooltip="${escapeHTML(`${game.championName || "英雄"} · ${number(game.kills)}/${number(game.deaths)}/${number(game.assists)}${Number(game.cs) > 0 ? ` · CS ${number(game.cs)}` : ""} · ${game.win ? "胜利" : "失败"}`)}" data-tooltip-size="compact">${iconFigure("champion", game.championId, game.championName, "tiny")}<b>${number(game.kills)}/${number(game.deaths)}/${number(game.assists)}</b>${insightScore(game)}</span>`).join("");
     return `<div class="insight-match-row" aria-label="当前模式最近战绩，从左到右由新到旧">${cells}</div>`;
   }
 
@@ -7598,14 +7600,17 @@
     const portraitTags = renderLiveTeamPortraitTags(payload);
     // R128 §2.3：队伍画像的口径披露不再进 UI；缺口标签本身保留。
     const supplement = bars ? `<div class="live-roster-supplement">${bars}</div>` : "";
-    const team = (teamID, label, tone, source = orderedPlayers, extra = "") => {
-      const rows = source.filter((player) => teamID === null || player.teamId === teamID).map((player, index) => {
+    const liveGameMode = String(data.gameMode || "").toUpperCase();
+    const identityKind = arenaMode ? "arena" : isSummonersRiftMatch(data) && ["", "CLASSIC", "PRACTICETOOL"].includes(liveGameMode) ? "rift" : "none";
+    const playerRows = (source) => source.map((player, index) => {
         const key = escapeHTML(String(player.playerRef || `${player.teamId}:${player.cellId ?? index}`));
-        const card = renderLivePlayer(player, index, arenaMode, data.currentChampionId, orderedPlayers, renderLiveRecentPositions(player, data.queueId), isARAMRelatedMatch(data), liveAugmentRecommendationSource(data) === "hextech", data.phase, String(data.gameMode || "").toUpperCase() === "PRACTICETOOL" ? practicePlayerPosition(player, data) : "")
+        const card = renderLivePlayer(player, index, arenaMode, data.currentChampionId, orderedPlayers, renderLiveRecentPositions(player, data.queueId), isARAMRelatedMatch(data), liveAugmentRecommendationSource(data) === "hextech", data.phase, liveGameMode === "PRACTICETOOL" ? practicePlayerPosition(player, data) : "", identityKind)
           .replace('<article ', `<article data-live-player-row="card:${key}" `);
         const history = champSelectEnemyPlaceholder(player, data.phase, orderedPlayers) ? '<div class="insight-match-row"></div>' : renderInsightMatches(player);
         return card + history.replace('<div ', `<div data-live-player-row="history:${key}" `);
       }).join("");
+    const team = (teamID, label, tone, source = orderedPlayers, extra = "") => {
+      const rows = playerRows(source.filter((player) => teamID === null || player.teamId === teamID));
       return `<section class="live-team is-${tone}"><header><h3>${escapeHTML(label)}</h3><span>${escapeHTML(headerNotice || "当前模式最新战绩")}</span>${extra}</header><div class="live-player-list is-insight">${rows || '<p class="section-empty">客户端暂未公开这一队的玩家</p>'}</div></section>`;
     };
 		if (arenaMode) {
@@ -7614,7 +7619,7 @@
 		    return `<div class="live-teams is-insight is-arena is-grouped">${groups.map((group) => team(null, group.label, "arena", group.players)).join("")}</div>`;
 		  }
 		  const title = data.phase === "ChampSelect" ? "己方小队" : "全部玩家";
-		  return `<div class="live-teams is-insight is-arena">${team(null, title, "arena")}</div>`;
+		  return globalThis.deepLegendsLiveArena?.squadsMarkup(orderedPlayers, data.arenaSquadSize, playerRows) || `<div class="live-teams is-insight is-arena">${team(null, title, "arena")}</div>`;
 		}
     if (!relativeTeamsKnown) return `${supplement}<div class="live-teams is-insight">${team(100, "蓝方", "blue", alignment.teams.get(100))}${team(200, "红方", "red", alignment.teams.get(200))}</div>`;
     return `${supplement}<div class="live-teams is-insight">${team(selfTeam, "我方", "blue", alignment.teams.get(selfTeam), portraitTags)}${team(foeTeam, "对方", "red", alignment.teams.get(foeTeam))}</div>`;
@@ -8879,6 +8884,7 @@
     externalMatchViews.get(container)?.destroy?.();
     tab.externalRender = (id = "") => view.render(id);
     externalMatchViews.set(container, view);
+    if (options.openMatchId) tab.openMatches.add(options.openMatchId);
     view.render();
     ensurePerks();
     ensureItems();
@@ -9565,6 +9571,7 @@
   window.deepLegendsMatchCards = Object.freeze({
     mount: mountExternalMatchCards,
     currentArenaFirstPlaces,
+    live: { state, api, clientRegion, rankTitle, iconFigure, insightScore, render: renderLive },
   });
 
   bindSettings();
