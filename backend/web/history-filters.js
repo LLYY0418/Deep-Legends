@@ -84,6 +84,8 @@
   function filter(rows,tab,ctx) { const cs=conditions(tab);return rows.filter(match=>Object.entries(cs).every(([category,c])=>matchesCategory(category,c,match,ctx))); }
   function options(rows,category,ctx,c={values:[]}) {
     const map=new Map();
+    const fixed={result:['win','loss'],position:['top','jungle','middle','bottom','utility'],time:['today','d3','d7','d30','season'],multikill:['3','4','5'],performance:['mvp','svp','top3','zero'],duration:['short','medium','long','verylong']}[category] || [];
+    for(const value of fixed)map.set(value,{value,label:labels[value],count:0,wins:0,recent:0});
     const add=(value,label,match,subject,extra={})=>{
       if(!value)return;const id=String(value),entry=map.get(id) || {value:id,label:label || id,count:0,wins:0,recent:0,...extra};
       entry.count++;entry.wins+=match.result==='win'?1:0;entry.recent=Math.max(entry.recent,timeValue(match.createdAt)||0);map.set(id,entry);
@@ -111,23 +113,45 @@
   }
   function savePreset(storage,name,cs) { const saved=readPresets(storage),n=String(name || '').trim().slice(0,60);if(!n || !Object.keys(normalize(cs)).length)return false;const index=saved.findIndex(p=>p.name===n);if(index<0 && saved.length>=12)return false;const item={name:n,conditions:normalize(cs)};if(index<0)saved.push(item);else saved[index]=item;try{storage.setItem(key,JSON.stringify(saved));return true;}catch(_){return false;} }
   function writePresets(storage,saved) {try{storage.setItem(key,JSON.stringify(saved.slice(0,12)));return true;}catch(_){return false;} }
-  function cancel(tab, abort) { const search=tab.advancedSearch;if(search?.running){search.running=false;search.cancelled=true;search.token++;abort?.();} }
+  function blocked(tab,ctx) {
+    if(!tab.data?.pagination?.hasMore)return {reason:'no_more',copy:'已查完全部可查询的对局'};
+    if(ctx.outage?.())return {reason:'outage',copy:'战绩服务暂时中断，恢复后可继续'};
+    const seconds=Math.ceil(((ctx.quotaUntil?.() || tab.advancedSearch?.quotaUntil || 0)-Date.now())/1000);
+    if(seconds>0)return {reason:'quota',copy:`查询额度恢复中，约 ${seconds} 秒后可继续`};
+    return null;
+  }
+  function cancel(tab, abort) {const search=tab.advancedSearch;if(search?.running && !search.stopping){search.stopping=true;search.cancelled=true;abort?.();search.progress?.();}}
   async function find(tab,ctx) {
-    if(!active(tab) || tab.advancedSearch?.running || !ctx.isActive())return false;
-    const token=(tab.advancedSearch?.token || 0)+1;
-    const search={token,running:true,cancelled:false,scanned:0};tab.advancedSearch=search;(ctx.progress || ctx.render)();
+    if(!active(tab) || tab.advancedSearch?.running || !ctx.isActive() || blocked(tab,ctx))return false;
+    const token=(tab.advancedSearch?.token || 0)+1,limit=ctx.foreign?.()?100:300,started=Date.now();
+    const search={token,running:true,stopping:false,cancelled:false,scanned:0,pages:0,bytes:0,stopReason:'done',progress:ctx.progress || ctx.render};tab.advancedSearch=search;search.progress();
     try {
-      while(search.running && search.token===token && ctx.isActive() && !tab.closed) {
-        if(filter(ctx.rows(),tab,ctx).length>=10 || !tab.data?.pagination?.hasMore || search.scanned>=300)break;
-        const before=ctx.cursor(),count=Math.min(20,300-search.scanned);
-        const loaded=await ctx.load(count);
-        if(!search.running || search.token!==token || !ctx.isActive() || tab.closed)break;
-        const consumed=Math.max(0,ctx.cursor()-before);
-        search.scanned+=Math.min(count,consumed);(ctx.progress || ctx.render)();
-        if(!loaded || consumed<=0 || tab.data?.pagination?.moreError)break;
+      while(!search.stopping && ctx.isActive() && !tab.closed && tab.advancedSearch===search) {
+        const block=blocked(tab,ctx);if(block){search.stopReason=block.reason;break;}
+        if(filter(ctx.rows(),tab,ctx).length>=10 || search.scanned>=limit)break;
+        const before=ctx.cursor(),count=Math.min(20,limit-search.scanned);
+        const loaded=await ctx.load(count);search.pages++;search.bytes+=Number(ctx.pageBytes?.() || 0);
+        const consumed=Math.max(0,ctx.cursor()-before);search.scanned+=Math.min(count,consumed);
+        if(search.stopping){search.stopReason='user_stop';break;}
+        const failure=blocked(tab,ctx);if(failure){search.stopReason=failure.reason;break;}
+        search.progress();
+        if(!loaded || consumed<=0 || tab.data?.pagination?.moreError){search.stopReason='error';break;}
       }
-    } finally {if(tab.advancedSearch===search && search.token===token){search.running=false;(ctx.progress || ctx.render)();}}
+    } catch(error) {search.stopReason=search.stopping?'user_stop':'error';}
+    finally {
+      if(search.cancelled)search.stopReason='user_stop';
+      search.running=false;search.stopping=false;
+      ctx.diagnostic?.('history_search_client',{scanned:search.scanned,hits:filter(ctx.rows(),tab,ctx).length,pages:search.pages,stop_reason:search.stopReason,durationMs:Date.now()-started,averagePageBytes:search.pages?Math.round(search.bytes/search.pages):0});
+      if(tab.advancedSearch===search)search.progress();
+    }
     return true;
+  }
+  function serverTimeRange(tab,ctx) {
+    const c=conditions(tab).time;if(!c || c.not || !c.values.length)return {};
+    const now=Date.now(),today=new Date(now);today.setHours(0,0,0,0);
+    const starts={today:today.getTime(),d3:now-3*86400000,d7:now-7*86400000,d30:now-30*86400000,season:timeValue(ctx.seasonStart)};
+    const values=c.values.map(v=>starts[v]);if(values.some(v=>!Number.isFinite(v)))return {};
+    return {startTime:Math.floor(Math.min(...values)/1000),endTime:Math.floor(now/1000)};
   }
   function ui(tab) {return tab.advancedMenu ||= {open:false,page:'conditions',category:'result',query:'',sort:'count',renaming:-1};}
   const optionCache = new WeakMap();
@@ -139,7 +163,8 @@
     return cached.get(cacheKey);
   }
   function editing(tab) {const m=ui(tab);return m.open ? (m.conditions ||= clone(conditions(tab))) : conditions(tab);}
-  function draft(tab,category) {return editing(tab)[category] || ui(tab).drafts?.[category] || {values:[],not:false,scope:'team',side:'either',thresholds:{}};}
+  function normalizedEditing(tab) {const m=ui(tab),source=editing(tab);if(m._normalizedSource!==source){m._normalizedSource=source;const next=normalize(source);m._normalized=Object.fromEntries(Object.keys(source).filter(k=>next[k]).map(k=>[k,next[k]]));}return m._normalized;}
+  function draft(tab,category) {return editing(tab)[category] || {values:[],not:false,scope:'team',side:'either',thresholds:{}};}
   function summary(category,c,ctx) {
     const names=new Map();
     if(['hero','coplayer'].includes(category) && c.values.length)for(const match of ctx.rows()) {
@@ -203,7 +228,7 @@
     else layoutFooter(menu);
   }
   function menuBody(tab,ctx) {
-    const m=ui(tab),saved=readPresets(ctx.storage),cs=editing(tab);
+    const m=ui(tab),saved=readPresets(ctx.storage),cs=normalizedEditing(tab);
     if(m.page==='saved')return `<div class="af-saved"><div class="af-saved-heading">已保存 ${saved.length} / 12</div><div class="af-saved-list">${saved.map((p,i)=>`<div class="af-saved-row"><div class="af-saved-copy">${m.renaming===i?`<div class="af-rename"><input data-af-rename-input="${i}" value="${escape(p.name)}" maxlength="60" aria-label="新名称"><button type="button" data-af-rename-save="${i}" aria-label="保存名称">✓</button><button type="button" data-af-rename-cancel aria-label="取消重命名">×</button></div>`:`<strong>${escape(p.name)}</strong>`}<div class="af-capsules">${capsules(p.conditions,ctx,true)}</div></div><div class="af-saved-actions"><button type="button" data-af-apply="${i}">套用</button><button type="button" data-af-rename="${i}">改名</button><button type="button" data-af-delete="${i}">删除</button></div></div>`).join('') || '<p class="af-empty">暂无常用筛选</p>'}</div><footer class="af-savebar"><input data-af-name placeholder="给当前条件起个名字" aria-label="常用筛选名称" maxlength="60"><button type="button" data-af-save${!Object.keys(cs).length || saved.length>=12?' disabled':''}>保存当前条件</button>${saved.length>=12?'<span>最多保存 12 个</span>':''}</footer></div>`;
     const category=m.category || 'result',c=draft(tab,category),query=m.query.toLowerCase().trim();m.category=category;
     let opts=cachedOptions(tab,category,ctx,c).filter(o=>!query || searchOption(o,category,query,ctx));
@@ -214,33 +239,47 @@
     const segment=category==='coplayer' ? [['team','队友'],['opponent','对手'],['either','都行']] : category==='performance' ? [['team','队内最高'],['all','全场最高']] : [];
     const controls=segment.length ? `<div class="af-segment">${segment.map(([value,label])=>button(label,`data-af-setting="${category==='coplayer'?'side':'scope'}" data-af-value="${value}"`,c[category==='coplayer'?'side':'scope']===value)).join('')}</div>` : '';
     const sort=category==='hero' ? `<span class="af-sort-label">排序</span><div class="af-segment">${[['count','场次'],['winrate','胜率'],['recent','最近']].map(([value,label])=>button(label,`data-af-sort="${value}"`,m.sort===value)).join('')}</div>` : '';
-    const cards=opts.map(o=>button(`${category==='hero'?ctx.icon?.(o.value,o.label) || '':category==='position'?ctx.positionIcon?.(o.value) || '':''}<strong>${escape(o.label)}</strong><small data-af-option-count>${optionCount(o,category==='hero')}</small>`,`data-af-option="${escape(o.value)}"`,c.values.includes(o.value))).join('');
+    const cards=opts.map(o=>button(`${category==='hero'?ctx.icon?.(o.value,o.label) || '':category==='position'?ctx.positionIcon?.(o.value) || '':''}<strong>${escape(o.label)}</strong><small data-af-option-count>${optionCount(o,category==='hero')}</small>`,`data-af-option="${escape(o.value)}"`,c.values.includes(o.value)).replace('data-af-option=',`${o.count===0?'data-af-zero="true" ':''}data-af-option=`)).join('');
     const thresholds=category==='performance' ? `<div class="af-thresholds">${[['kda','KDA',0.5],['score','评分',0.5],['kp','参团率',5]].map(([name,label,step])=>`<label>${label} ≥<input type="number" min="0" ${name==='kp'?'max="100"':''} step="${step}" placeholder="—" value="${c.thresholds?.[name] ?? ''}" data-af-threshold="${name}" aria-label="${label}门槛"><span>${name==='kp'?'%':''}</span></label>`).join('')}</div>` : '';
     return `<div class="af-columns"><div class="af-categories">${Object.entries(categories).map(([k,label])=>`<button type="button" data-af-category="${k}"${category===k?' class="is-active"':''}><span>${label}<i aria-hidden="true">›</i></span><small data-af-summary="${k}" title="${escape(cs[k] ? (cs[k].not?'不是 · ':'')+summary(k,cs[k],ctx) : '')}">${cs[k]?escape((cs[k].not?'不是 · ':'')+summary(k,cs[k],ctx)):''}</small></button>`).join('')}</div><div class="af-pane"><header><strong>${categories[category]}</strong><div class="af-segment">${button('是','data-af-not="false"',!c.not)}${button('不是','data-af-not="true"',c.not)}</div>${sort}</header><input class="af-search"${['hero','coplayer'].includes(category)?'':' hidden'} data-af-query placeholder="搜索${categories[category]}${category==='hero'?'（支持拼音、简称）':''}" aria-label="搜索${categories[category]}" value="${escape(m.query)}">${controls}${thresholds}<div class="af-options is-${category}">${cards || '<p class="af-empty">暂无可选项</p>'}${more?button('显示更多','data-af-more'):''}</div>${category==='multikill'?`<label class="af-atleast"><input type="checkbox" data-af-atleast${c.atLeast?' checked':''}>及以上</label>`:''}</div></div><footer class="af-modal-footer"><div class="af-capsule-slot"><div class="af-capsules${m.capsulesExpanded?' is-expanded':''}" data-af-draft-capsules>${capsules(cs,ctx)}</div></div><span data-af-preview></span><button type="button" data-af-clear>清除</button><button type="button" data-af-show-saved>保存为常用</button><button class="af-done" type="button" data-af-close>完成</button></footer>`;
   }
   function searchOption(o,category,query,ctx) {return o.label.toLowerCase().includes(query) || category==='hero' && ctx.heroSearch?.(query,o.value,o.label)>0;}
   function render(tab,context) {
     const ctx=context(),m=ui(tab),n=Object.keys(conditions(tab)).length;
-    return `<div class="af-select app-select${n?' is-active':''}" data-af-root><button class="app-select-trigger" type="button" data-af-open aria-haspopup="dialog" aria-expanded="${m.open}"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14l-5.5 6v5l-3 1v-6z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>筛选</span>${n?`<b>${n}</b>`:''}</button><dialog class="af-menu${m.page==='saved'?' is-saved':''}" data-af-menu aria-label="战绩筛选" aria-modal="true" hidden><nav><strong>筛选战绩</strong><div role="tablist">${button('条件',`data-af-page="conditions" role="tab" aria-selected="${m.page==='conditions'}"`,m.page==='conditions')}${button('常用',`data-af-page="saved" role="tab" aria-selected="${m.page==='saved'}"`,m.page==='saved')}</div><button type="button" data-af-close aria-label="关闭筛选">×</button></nav><div class="af-menu-body">${m.open?menuBody(tab,ctx):''}</div></dialog></div>`;
+    return `<div class="af-select app-select${n?' is-active':''}" data-af-root><button class="app-select-trigger" type="button" data-af-open aria-haspopup="dialog" aria-expanded="${m.open}"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14l-5.5 6v5l-3 1v-6z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>筛选</span>${n?`<b>${n}</b>`:''}</button></div>`;
+  }
+  function menuFor(container) {return container?._afDialog || null;}
+  function ensureMenu(container,tab,ctx) {
+    const doc=container.ownerDocument,slot=container.closest('.player-overlay-scroll')?'overlay':'main';
+    doc._afDialogs ||= {};
+    let menu=doc._afDialogs[slot];
+    if(!menu){const template=doc.createElement('template'),m=ui(tab);template.innerHTML=`<dialog class="af-menu${m.page==='saved'?' is-saved':''}" data-af-menu aria-label="战绩筛选" aria-modal="true" hidden><nav><strong>筛选战绩</strong><div role="tablist">${button('条件',`data-af-page="conditions" role="tab" aria-selected="${m.page==='conditions'}"`,m.page==='conditions')}${button('常用',`data-af-page="saved" role="tab" aria-selected="${m.page==='saved'}"`,m.page==='saved')}</div><button type="button" data-af-close aria-label="关闭筛选">×</button></nav><div class="af-menu-body">${m.open?menuBody(tab,ctx):''}</div></dialog>`;menu=template.content.firstElementChild;doc.body.append(menu);doc._afDialogs[slot]=menu;
+      for(const type of ['click','change','input','cancel','keydown'])menu.addEventListener(type,event=>menu._afOwner?._afHandlers?.[type]?.(event),type==='cancel');
+    }
+    container._afDialog=menu;return menu;
   }
   function counts(tab,ctx) {
     const search=tab.advancedSearch,count=filter(ctx.rows(),tab,ctx).length,scanned=Number(ctx.cursor() || ctx.rows().length);
-    return `<span class="af-count"><b>${count}</b> 场</span><span>已查 ${scanned} 场</span>${search?.running?`<progress max="300" value="${search.scanned}" aria-label="查找进度"></progress>${button('停止','data-af-stop')}`:`${button('常用','data-af-show-saved')}${button('清除','data-af-clear')}`}`;
+    return `<span class="af-count">符合 ${count} 场</span><span>已查 ${scanned} 场</span>${search?.running?`<progress max="${ctx.foreign?.()?100:300}" value="${search.scanned}" aria-label="查找进度"></progress>${button(search.stopping?'正在停止…':'停止',`data-af-stop${search.stopping?' disabled':''}`)}`:`${button('常用','data-af-show-saved')}${button('清除','data-af-clear')}`}`;
   }
   function renderConditions(tab,context) {
     if(!active(tab))return '';const ctx=context();
     return `<div class="af-conditionbar" data-af-conditions><div class="af-capsules">${capsules(conditions(tab),ctx)}${button('+ 条件','data-af-add class="af-add"')}</div><div class="af-counts" data-af-counts>${counts(tab,ctx)}</div></div>`;
   }
-  function empty(tab,ctx) {return `<div class="af-empty"><strong>没有符合的对局 · 已查 ${ctx.cursor()} 场</strong><div>${button('修改条件','data-af-add')}${button('再往前查 300 场','data-af-continue')}${tab.data?.pagination?.moreError?`<p>${escape(tab.data.pagination.moreError)}</p>`:''}</div></div>`;}
-  function footer(tab,ctx) {return `<span>已查 ${ctx.cursor()} 场</span>${tab.advancedSearch?.running?button('停止','data-af-stop'):tab.data?.pagination?.hasMore?button('继续往前找','data-af-continue'):''}`;}
+  function empty(tab,ctx) {
+    if(tab.advancedSearch?.running)return '<div class="af-empty" role="status"><strong>正在查找…</strong></div>';
+    const block=blocked(tab,ctx),error=tab.data?.pagination?.moreError;
+    return `<div class="af-empty"><strong>没有符合的对局</strong>${block?`<p data-af-blocked>${escape(block.copy)}</p>`:error?`<p>${escape(error)}</p>`:''}${button('继续往前查找',`data-af-continue${block?' disabled':''}`)}</div>`;
+  }
+  function footer() {return '';}
   function refresh(container,tab,ctx,structure=false) {
-    const m=ui(tab),menu=container.querySelector('[data-af-menu]');if(!menu)return;
+    const m=ui(tab),menu=menuFor(container);if(!menu || menu._afOwner!==container)return;
     menu._afMenuState=m;
     menu.classList.toggle('is-saved',m.page==='saved');
     for(const node of menu.querySelectorAll('[data-af-page]')){const selected=node.dataset.afPage===m.page;node.classList.toggle('is-active',selected);node.setAttribute('aria-selected',String(selected));}
     if(structure)menu.querySelector('.af-menu-body').innerHTML=menuBody(tab,ctx);
     if(!m.open)return;
-    const cs=editing(tab),c=draft(tab,m.category),opts=new Map(cachedOptions(tab,m.category || 'result',ctx,c).map(o=>[o.value,o]));
+    const cs=normalizedEditing(tab),c=draft(tab,m.category),opts=new Map(cachedOptions(tab,m.category || 'result',ctx,c).map(o=>[o.value,o]));
     for(const node of menu.querySelectorAll('[data-af-option]')) {
       const selected=c.values.includes(node.dataset.afOption);node.classList.toggle('is-active',selected);node.setAttribute('aria-pressed',String(selected));
       const o=opts.get(node.dataset.afOption),count=node.querySelector('[data-af-option-count]');if(o && count){const html=optionCount(o,m.category==='hero');if(count.innerHTML!==html)count.innerHTML=html;}
@@ -253,29 +292,31 @@
     if(structure)ctx.prepare?.(menu);
   }
   function bind(container,tab,context) {
-    if(!container)return;container._afBoundTab=tab;container._afContext=context;
-    const doc=container.ownerDocument;
+    if(!container)return;if(container._afBoundTab && container._afBoundTab!==tab)container._afClose?.();container._afBoundTab=tab;container._afContext=context;
+    const doc=container.ownerDocument;ensureMenu(container,tab,context());
     const unlock=()=>{for(const [node,value] of container._afScrollLocks || [])node.style.overflow=value;container._afScrollLocks=null;};
     const show=(t,ctx,structure=true)=>{
-      const menu=container.querySelector('[data-af-menu]');if(!menu)return;menu.hidden=false;
-      if(!menu.open){if(menu.showModal)menu.showModal();else menu.setAttribute('open','');}
+      const menu=menuFor(container);if(!menu)return;if(menu._afOwner!==container && menu.open)menu._afOwner?._afClose?.();menu._afOwner=container;menu.hidden=false;
+      try {if(!menu.matches(':modal')){if(menu.open)menu.close();menu.showModal();}}catch(error){menu.close?.();menu.removeAttribute('open');menu.hidden=true;ui(t).open=false;delete ui(t).conditions;unlock();ctx.diagnostic?.('filter_modal_error',{reason:'showModal',errorType:error.name});ctx.error?.('筛选暂不可用，请重试');return;}
       if(!container._afScrollLocks){const nodes=[doc.body,doc.getElementById('app-scroll'),container.closest('.player-overlay-scroll')].filter(Boolean);container._afScrollLocks=nodes.map(node=>[node,node.style.overflow]);nodes.forEach(node=>node.style.overflow='hidden');}
       container.querySelector('[data-af-open]')?.setAttribute('aria-expanded','true');refresh(container,t,ctx,structure);
       (menu.querySelector('[data-af-query]:not([hidden])') || menu.querySelector('[data-af-page]'))?.focus();
     };
-    const close=(t,ctx)=>{const m=ui(t),next=normalize(editing(t)),changed=JSON.stringify(next)!==JSON.stringify(conditions(t));m.open=false;m.capsulesExpanded=false;delete m.conditions;const menu=container.querySelector('[data-af-menu]');if(menu){releaseFooterLayout(menu);menu.close?.();menu.removeAttribute('open');menu.hidden=true;}unlock();container.querySelector('[data-af-open]')?.setAttribute('aria-expanded','false');if(changed){t.advancedConditions=next;ctx.change();}container.querySelector('[data-af-open]')?.focus();doc.defaultView?.requestAnimationFrame?.(()=>container.querySelector('[data-af-open]')?.focus());};
-    const open=(t,ctx,category='result',page='conditions')=>{const m=ui(t);if(!m.open)m.conditions=clone(conditions(t));Object.assign(m,{open:true,category,page,query:'',renaming:-1,limit:300,capsulesExpanded:false});if(category==='hero')ctx.ensureSearch?.();if(!container.querySelector('[data-af-menu]'))ctx.render?.();show(t,ctx);};
+    const close=(t,ctx)=>{const m=ui(t),next=normalize(editing(t)),changed=JSON.stringify(next)!==JSON.stringify(conditions(t));m.open=false;m.capsulesExpanded=false;delete m.conditions;const menu=menuFor(container);if(menu?._afOwner===container){releaseFooterLayout(menu);menu.close?.();menu.removeAttribute('open');menu.hidden=true;}unlock();container.querySelector('[data-af-open]')?.setAttribute('aria-expanded','false');if(changed){t.advancedConditions=next;ctx.change();}else ctx.flush?.();container.querySelector('[data-af-open]')?.focus();doc.defaultView?.requestAnimationFrame?.(()=>container.querySelector('[data-af-open]')?.focus());};
+    const open=(t,ctx,category='result',page='conditions')=>{const m=ui(t);if(!m.open)m.conditions=clone(conditions(t));Object.assign(m,{open:true,category,page,query:'',renaming:-1,limit:300,capsulesExpanded:false});if(category==='hero')ctx.ensureSearch?.();if(!container.querySelector('[data-af-root]')){ctx.render?.();if(!container.querySelector('[data-af-root]'))return;}show(t,ctx);};
+    container._afClose=()=>close(container._afBoundTab,container._afContext());
     if(ui(tab).open)show(tab,context(),false);else unlock();
-    doc._afTarget={container,tab,context,open,close};
+    if(context().isActive?.()!==false)doc._afTarget={container,tab,context,open,close};
     if(container._afListeners)return;container._afListeners=true;
+    const on=(type,handler,capture=false)=>{(container._afHandlers ||= {})[type]=handler;container.addEventListener(type,handler,capture);};
     const current=()=>({t:container._afBoundTab,ctx:container._afContext()});
-    const update=(t,ctx,category,c)=>{const m=ui(t);(m.drafts ||= {})[category]=clone(c);m.conditions=normalize({...editing(t),[category]:c});refresh(container,t,ctx);};
-    const rename=(t,ctx,i)=>{const saved=readPresets(ctx.storage),input=container.querySelector(`[data-af-rename-input="${i}"]`),name=String(input?.value || '').trim().slice(0,60);if(!name){input?.focus();return;}if(saved.some((p,index)=>index!==i && p.name===name)){ctx.error?.('已有同名常用筛选');return;}if(saved[i]){saved[i].name=name;if(!writePresets(ctx.storage,saved))ctx.error?.('常用筛选保存失败');}ui(t).renaming=-1;refresh(container,t,ctx,true);};
-    container.addEventListener('click',event=>{
+    const update=(t,ctx,category,c)=>{const m=ui(t);m.conditions={...editing(t),[category]:c};refresh(container,t,ctx);};
+    const rename=(t,ctx,i)=>{const saved=readPresets(ctx.storage),input=menuFor(container).querySelector(`[data-af-rename-input="${i}"]`),name=String(input?.value || '').trim().slice(0,60);if(!name){input?.focus();return;}if(saved.some((p,index)=>index!==i && p.name===name)){ctx.error?.('已有同名常用筛选');return;}if(saved[i]){saved[i].name=name;if(!writePresets(ctx.storage,saved))ctx.error?.('常用筛选保存失败');}ui(t).renaming=-1;refresh(container,t,ctx,true);};
+    on('click',event=>{
       const {t,ctx}=current(),m=ui(t),target=event.target.closest('[data-af-open],[data-af-close],[data-af-category],[data-af-remove],[data-af-add],[data-af-clear],[data-af-stop],[data-af-continue],[data-af-show-saved],[data-af-page],[data-af-option],[data-af-not],[data-af-setting],[data-af-sort],[data-af-more],[data-af-save],[data-af-apply],[data-af-rename],[data-af-rename-save],[data-af-rename-cancel],[data-af-delete],[data-af-capsules-more]');
-      if(!target){const menu=container.querySelector('[data-af-menu]');if(event.target===menu){const r=menu.getBoundingClientRect();if(event.clientX<r.left || event.clientX>r.right || event.clientY<r.top || event.clientY>r.bottom)close(t,ctx);}return;}
+      if(!target){const menu=menuFor(container);if(event.target===menu){const r=menu.getBoundingClientRect();if(event.clientX<r.left || event.clientX>r.right || event.clientY<r.top || event.clientY>r.bottom)close(t,ctx);}return;}
       const d=target.dataset,category=m.category,c=clone(draft(t,category));
-      if(ctx.ensureStyles && !ctx.stylesReady() && ['afOpen','afAdd','afShowSaved','afCategory'].some(k=>k in d)){void ctx.ensureStyles().then(()=>{if(container._afBoundTab===t){const action=[...target.attributes].find(a=>a.name.startsWith("data-af-")),fresh=target.isConnected?target:[...container.querySelectorAll("["+action.name+"]")].find(n=>n.getAttribute(action.name)===action.value);fresh?.click();}}).catch(()=>ctx.error?.('筛选加载失败，请重试'));return;}
+      if(ctx.ensureStyles && !ctx.stylesReady() && ['afOpen','afAdd','afShowSaved','afCategory'].some(k=>k in d)){void ctx.ensureStyles().then(()=>{if(container._afBoundTab===t){const action=[...target.attributes].find(a=>a.name.startsWith("data-af-")),fresh=target.isConnected?target:[...container.querySelectorAll("["+action.name+"]"),...menuFor(container).querySelectorAll("["+action.name+"]")].find(n=>n.getAttribute(action.name)===action.value);fresh?.click();}}).catch(()=>ctx.error?.('筛选加载失败，请重试'));return;}
       if('afOpen'in d){if(m.open)close(t,ctx);else open(t,ctx);}
       else if('afClose'in d)close(t,ctx);
       else if('afCategory'in d)open(t,ctx,d.afCategory);
@@ -283,24 +324,24 @@
       else if('afShowSaved'in d)open(t,ctx,m.category,'saved');
       else if('afPage'in d){m.page=d.afPage;m.renaming=-1;refresh(container,t,ctx,true);}
       else if('afRemove'in d){const next={...editing(t)};delete next[d.afRemove];if(m.open){m.conditions=next;refresh(container,t,ctx);}else{t.advancedConditions=next;ctx.change();}}
-      else if('afClear'in d){if(m.open){m.conditions={};m.drafts={};refresh(container,t,ctx);}else{t.advancedConditions={};ctx.change();}}
+      else if('afClear'in d){if(m.open){m.conditions={};refresh(container,t,ctx);}else{t.advancedConditions={};ctx.change();}}
       else if('afStop'in d){ctx.stop();refresh(container,t,ctx);}
       else if('afContinue'in d)ctx.find();
       else if('afSort'in d){m.sort=d.afSort;refresh(container,t,ctx,true);}
       else if('afMore'in d){m.limit=(m.limit || 300)+300;refresh(container,t,ctx,true);}
-      else if('afCapsulesMore'in d){m.capsulesExpanded=target.parentElement.classList.toggle('is-expanded');queueFooterLayout(container.querySelector('[data-af-menu]'));}
+      else if('afCapsulesMore'in d){m.capsulesExpanded=target.parentElement.classList.toggle('is-expanded');queueFooterLayout(menuFor(container));}
       else if('afOption'in d){c.values=c.values.includes(d.afOption)?c.values.filter(v=>v!==d.afOption):[...c.values,d.afOption];update(t,ctx,category,c);}
       else if('afNot'in d){c.not=d.afNot==='true';update(t,ctx,category,c);}
       else if('afSetting'in d){c[d.afSetting]=d.afValue;update(t,ctx,category,c);refresh(container,t,ctx,true);}
       else if('afRenameSave'in d)rename(t,ctx,Number(d.afRenameSave));
       else if('afRenameCancel'in d){m.renaming=-1;refresh(container,t,ctx,true);}
-      else if('afSave'in d){if(!savePreset(ctx.storage,container.querySelector('[data-af-name]')?.value,editing(t)))ctx.error?.('常用筛选保存失败');else refresh(container,t,ctx,true);}
-      else {const saved=readPresets(ctx.storage),i=Number(d.afApply ?? d.afRename ?? d.afDelete);if('afApply'in d){m.conditions=clone(saved[i]?.conditions || {});close(t,ctx);}else if('afDelete'in d){saved.splice(i,1);if(!writePresets(ctx.storage,saved))ctx.error?.('常用筛选保存失败');refresh(container,t,ctx,true);}else if('afRename'in d){m.renaming=i;refresh(container,t,ctx,true);const input=container.querySelector('[data-af-rename-input]');input?.focus();input?.select();}}
+      else if('afSave'in d){if(!savePreset(ctx.storage,menuFor(container).querySelector('[data-af-name]')?.value,editing(t)))ctx.error?.('常用筛选保存失败');else refresh(container,t,ctx,true);}
+      else {const saved=readPresets(ctx.storage),i=Number(d.afApply ?? d.afRename ?? d.afDelete);if('afApply'in d){m.conditions=clone(saved[i]?.conditions || {});close(t,ctx);}else if('afDelete'in d){saved.splice(i,1);if(!writePresets(ctx.storage,saved))ctx.error?.('常用筛选保存失败');refresh(container,t,ctx,true);}else if('afRename'in d){m.renaming=i;refresh(container,t,ctx,true);const input=menuFor(container).querySelector('[data-af-rename-input]');input?.focus();input?.select();}}
     });
-    container.addEventListener('change',event=>{const {t,ctx}=current(),m=ui(t),c=clone(draft(t,m.category)),d=event.target.dataset;if('afAtleast'in d){c.atLeast=event.target.checked;update(t,ctx,m.category,c);}if('afThreshold'in d){c.thresholds ||= {};if(event.target.value==='')delete c.thresholds[d.afThreshold];else c.thresholds[d.afThreshold]=Number(event.target.value);update(t,ctx,'performance',c);}});
-    container.addEventListener('input',event=>{if(!event.target.matches('[data-af-query]'))return;const {t,ctx}=current(),position=event.target.selectionStart;ui(t).query=event.target.value;ui(t).limit=300;refresh(container,t,ctx,true);const input=container.querySelector('[data-af-query]');input?.focus();input?.setSelectionRange(position,position);});
-    container.addEventListener('cancel',event=>{if(event.target.matches('[data-af-menu]')){event.preventDefault();const {t,ctx}=current();close(t,ctx);}},true);
-    container.addEventListener('keydown',event=>{const {t,ctx}=current(),m=ui(t);if(event.target.matches('[data-af-rename-input]')){if(event.key==='Enter'){event.preventDefault();rename(t,ctx,Number(event.target.dataset.afRenameInput));}else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();m.renaming=-1;refresh(container,t,ctx,true);}return;}if(event.key==='Escape' && m.open){event.preventDefault();close(t,ctx);}if(event.key==='Tab' && m.open){const nodes=[...container.querySelector('[data-af-menu]').querySelectorAll('button:not(:disabled):not([hidden]),input:not(:disabled):not([hidden]),[tabindex="0"]')],first=nodes[0],last=nodes.at(-1);if(event.shiftKey && event.target===first){event.preventDefault();last?.focus();}else if(!event.shiftKey && event.target===last){event.preventDefault();first?.focus();}}});
+    on('change',event=>{const {t,ctx}=current(),m=ui(t),c=clone(draft(t,m.category)),d=event.target.dataset;if('afAtleast'in d){c.atLeast=event.target.checked;update(t,ctx,m.category,c);}if('afThreshold'in d){c.thresholds ||= {};if(event.target.value==='')delete c.thresholds[d.afThreshold];else c.thresholds[d.afThreshold]=Number(event.target.value);update(t,ctx,'performance',c);}});
+    on('input',event=>{if(!event.target.matches('[data-af-query]'))return;const {t,ctx}=current(),position=event.target.selectionStart;ui(t).query=event.target.value;ui(t).limit=300;refresh(container,t,ctx,true);const input=menuFor(container).querySelector('[data-af-query]');input?.focus();input?.setSelectionRange(position,position);});
+    on('cancel',event=>{if(event.target.matches('[data-af-menu]')){event.preventDefault();const {t,ctx}=current();close(t,ctx);}},true);
+    on('keydown',event=>{const {t,ctx}=current(),m=ui(t);if(event.target.matches('[data-af-rename-input]')){if(event.key==='Enter'){event.preventDefault();rename(t,ctx,Number(event.target.dataset.afRenameInput));}else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();m.renaming=-1;refresh(container,t,ctx,true);}return;}if(event.key==='Escape' && m.open){event.preventDefault();close(t,ctx);}if(event.key==='Tab' && m.open){const nodes=[...menuFor(container).querySelectorAll('button:not(:disabled):not([hidden]),input:not(:disabled):not([hidden]),[tabindex="0"]')],first=nodes[0],last=nodes.at(-1);if(event.shiftKey && event.target===first){event.preventDefault();last?.focus();}else if(!event.shiftKey && event.target===last){event.preventDefault();first?.focus();}}});
     if(!doc._afGlobal){doc._afGlobal=true;doc.addEventListener('keydown',event=>{const target=doc._afTarget;if(event.key!=='/' || event.ctrlKey || event.metaKey || event.altKey || /INPUT|TEXTAREA|SELECT/.test(event.target.tagName) || event.target.isContentEditable || !target?.container.isConnected)return;event.preventDefault();target.open(target.tab,target.context());});}
   }
   function decorate(container,tab,ctx) {
@@ -333,5 +374,5 @@
       }
     }
   }
-  return Object.freeze({categories,normalize,active,filter,options,multikill,participation,readPresets,savePreset,cancel,find,render,renderConditions,bind,refresh,decorate,empty,footer,counts});
+  return Object.freeze({blocked,serverTimeRange,categories,normalize,active,filter,options,multikill,participation,readPresets,savePreset,cancel,find,render,renderConditions,bind,refresh,decorate,empty,footer,counts});
 });

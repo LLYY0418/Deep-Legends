@@ -393,7 +393,7 @@ func TestRiotAccountCacheStoresSuccessAndBacksOffFailures(t *testing.T) {
 		if requests.Load() != 1 {
 			t.Fatalf("negative account cache requests = %d", requests.Load())
 		}
-		key := strings.ToLower("Broken") + "\x1f" + strings.ToLower("KR1")
+		key := riotAccountMemoryKey(riotPinnedIdentityContext(context.Background()), "Broken", "KR1")
 		provider.accountMu.Lock()
 		entry := provider.accountCache[key]
 		entry.expiresAt = time.Now().Add(-time.Second)

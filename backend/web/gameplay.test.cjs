@@ -443,7 +443,7 @@ test('OPGG season query is tab-scoped, single-flight and never reloads Riot hist
  const state={destroyed:false};const calls=[];const rendered=[];
  let resolve;
  const pending=new Promise(r=>{resolve=r;});
- const helpers=compile(['loadOPGGSeasonSummary'],{state,api:async(...args)=>{calls.push(args);return pending;},rerenderTab:t=>rendered.push(t.key)});
+ const helpers=compile(['loadOPGGSeasonSummary'],{state,api:async(...args)=>{calls.push(args);return pending;},updateCareerCards:t=>rendered.push(t.key),rerenderTab:t=>rendered.push(t.key)});
  const tab={key:'pro:A',data:{player:{region:'kr',playerRef:'player_A'}}};
  const load=helpers.loadOPGGSeasonSummary(tab);
  assert.equal(await helpers.loadOPGGSeasonSummary(tab),false);
@@ -463,12 +463,12 @@ test('OPGG season query is tab-scoped, single-flight and never reloads Riot hist
 test('OPGG late response cannot overwrite another account and failure has no crawl fallback',async()=>{
  const state={destroyed:false};let resolve,calls=0;
  const tab={key:'A',data:{player:{region:'kr',playerRef:'player_A'}}};
- const helpers=compile(['loadOPGGSeasonSummary'],{state,api:()=>{calls++;return new Promise(r=>{resolve=r;});},rerenderTab:()=>assert.fail('stale result rendered')});
+ const helpers=compile(['loadOPGGSeasonSummary'],{state,api:()=>{calls++;return new Promise(r=>{resolve=r;});},updateCareerCards:()=>assert.fail('stale result rendered'),rerenderTab:()=>assert.fail('stale result rendered')});
  const load=helpers.loadOPGGSeasonSummary(tab);
  tab.data={player:{region:'kr',playerRef:'player_B'}};
  resolve({source:'OP.GG',queue:'RANKED',season:'S2026',overall:{games:573},champions:[]});
  assert.equal(await load,false);assert.equal(tab.opggSeason,undefined);
- const failed=compile(['loadOPGGSeasonSummary'],{state,api:async()=>{calls++;throw Error('upstream unavailable');},rerenderTab:()=>{}});
+ const failed=compile(['loadOPGGSeasonSummary'],{state,api:async()=>{calls++;throw Error('upstream unavailable');},updateCareerCards:()=>{},rerenderTab:()=>{}});
  await failed.loadOPGGSeasonSummary(tab);await failed.loadOPGGSeasonSummary(tab);
  assert.equal(calls,2,'failure must not cause retries or match-by-match backfill');
 });

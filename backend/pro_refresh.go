@@ -95,8 +95,9 @@ func (a *app) rememberProSeedAnchor(ctx context.Context, key, puuid string) {
 		return
 	}
 	anchor := struct {
-		PUUID string `json:"puuid"`
-	}{PUUID: puuid}
+		PUUID           string `json:"puuid"`
+		CredentialScope string `json:"credentialScope"`
+	}{PUUID: puuid, CredentialScope: "opgg"}
 	// The loader only returns the directory's identity; renewing an anchor costs no HTTP.
 	_ = a.riot.cachedPublicIdentity(ctx, key, 30*24*time.Hour, &anchor, func(context.Context) error { return nil })
 }

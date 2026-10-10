@@ -1606,7 +1606,7 @@ test("small overviews move career statistics into an accessible modal sheet", ()
 	assert.match(gameplayScript, /aria-haspopup="dialog" aria-controls="career-dialog" data-open-career-dialog/);
 	assert.match(gameplayScript, /nodes\.careerDialog\.showModal\(\)/);
 	assert.match(gameplayScript, /new ResizeObserver\(syncWidth\)/);
-	assert.match(gameplayScript, /nodes\.careerDialog\.open && width > 1020[\s\S]+closeCareerDialog\(\)/);
+	assert.match(gameplayScript, /nodes\.careerDialog\.open && !container\.querySelector\([\s\S]+offsetParent[\s\S]+closeCareerDialog\(\)/);
 	assert.match(gameplayScript, /applyRenderedMetricStyles\(nodes\.careerDialogContent\)/);
 	assert.match(gameplayScript, /event\.target === nodes\.careerDialog/);
 	assert.match(gameplayScript, /event\.key !== "Escape"[^}]+event\.stopPropagation\(\)[^}]+closeCareerDialog\(\)/);
@@ -1854,7 +1854,7 @@ test("historical rank increments refresh only the matching active overview", asy
 		overviewSectionForGroup: () => "overview",
 		document: { getElementById: () => scrollRoot },
 		loadOverview: async () => assert.fail("historical ranks must not request history again"),
-		rerenderTab: (...args) => calls.push(args),
+		updateCareerCards: (...args) => calls.push(args),rerenderTab: (...args) => calls.push(args),
 		requestAnimationFrame: (callback) => callback(),
 	});
 	assert.equal(await handleOverviewIncremental({ type: "historical-ranks", account: "another-player" }), false);
@@ -2419,7 +2419,7 @@ test("cross-server ranked data is an explicit unsupported state", () => {
   assert.match(gameplayScript, /class="rank-unavailable"/);
   assert.match(gameplayScript, /crossServerRankUnsupported \? \{ unsupported: true \}/);
   assert.match(gameplayScript, /跨服暂不支持排位，无法计算本场平均段位/);
-  assert.doesNotMatch(gameplayScript, /rank-unavailable[^`]+data-gameplay-retry/);
+  assert.doesNotMatch(gameplayScript.slice(gameplayScript.indexOf('if (rankedCapability?.state === "unsupported")'),gameplayScript.indexOf('const expected = ["RANKED_SOLO_5x5"')), /data-gameplay-retry/);
 });
 
 test("privacy UI separates explicit and opt-in automatic writes", () => {

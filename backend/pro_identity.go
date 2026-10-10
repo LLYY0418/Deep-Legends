@@ -181,32 +181,3 @@ func (a *app) claimProIdentityDiagnostic(reference gameplayReference, gameID int
 	a.proIdentityDiagnosticOrder = append(a.proIdentityDiagnosticOrder, key)
 	return true
 }
-
-// Use a reviewed directory's known identity without exposing raw PUUIDs to the renderer.
-func (a *app) knownProPUUID(reference gameplayReference) string {
-	if !strings.EqualFold(reference.Region, "kr") {
-		return ""
-	}
-	a.proPlayers.mu.Lock()
-	defer a.proPlayers.mu.Unlock()
-	found := ""
-	for _, team := range a.proPlayers.teams {
-		for _, member := range team.Members {
-			if _, ok := proReviewedMemberBadge(team, member); !ok {
-				continue
-			}
-			for _, account := range member.Summoners {
-				if _, ok := normalizeProAccount(account); !ok {
-					continue
-				}
-				if account.PUUID != "" && strings.EqualFold(strings.TrimSpace(account.GameName), reference.GameName) && strings.EqualFold(strings.TrimSpace(account.TagLine), reference.TagLine) {
-					if found != "" && found != account.PUUID {
-						return ""
-					}
-					found = account.PUUID
-				}
-			}
-		}
-	}
-	return found
-}

@@ -594,6 +594,7 @@ function createMainWindow() {
       if (stored.defaultAuto === 1) {
         scaleMigrated = true;
         uiScalePreference = stored.mode === "fixed" ? normalizeScale(stored.value) : "auto";
+        if(stored.mode === "fixed" && [2.25,2.5].includes(Number(stored.value)))persistUiScalePreference();
       }
     }
   } catch (_) { /* Missing or invalid preferences use auto. */ }

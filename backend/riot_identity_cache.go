@@ -42,7 +42,8 @@ func (p *riotProvider) cachedPublicIdentityTTL(ctx context.Context, identity str
 	if p.identityDisk == nil {
 		return loader(ctx)
 	}
-	key := p.identityKey(identity)
+	key := p.identityContextKey(ctx, identity)
+
 	result, err := p.identityDisk.loadWithResultTTL(ctx, key, ttl, 0, true, resultTTL, func(ctx context.Context) ([]byte, error) {
 		if err := loader(ctx); err != nil {
 			return nil, err
@@ -56,18 +57,18 @@ func (p *riotProvider) cachedPublicIdentityTTL(ctx context.Context, identity str
 }
 
 func (p *riotProvider) identityKey(identity string) string {
-	return riotIdentityKey(identity + "|platform:" + p.region())
+	return p.identityContextKey(context.Background(), identity)
 }
 
 // A disk hit serves the overview immediately; one refresh per identity/session
 // updates the disk and memory snapshot after the account lookup completes.
-func (p *riotProvider) refreshPersistedAccount(identity, path string) {
-	if _, loaded := p.accountRefreshes.LoadOrStore(identity, true); loaded {
+func (p *riotProvider) refreshPersistedAccount(requestCtx context.Context, identity, path string) {
+	if _, loaded := p.accountRefreshes.LoadOrStore(p.identityContextKey(requestCtx, identity), true); loaded {
 		return
 	}
 	go func() {
 		defer recoverPanic("riot.accountRefresh")
-		ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(requestCtx), 35*time.Second)
 		defer cancel()
 		var account riotAccount
 		if p.get(ctx, p.accountHost(), path, nil, &account) != nil || account.PUUID == "" {
@@ -79,7 +80,7 @@ func (p *riotProvider) refreshPersistedAccount(identity, path string) {
 		}
 		sum := sha256.Sum256(data)
 		now := time.Now()
-		key := p.identityKey(identity)
+		key := p.identityContextKey(ctx, identity)
 		entry := championCacheEnvelope{Schema: championCacheSchema, Key: key, FetchedAt: now, ExpiresAt: now.Add(24 * time.Hour), StaleUntil: now.Add(24 * time.Hour), Hash: hex.EncodeToString(sum[:]), Data: data}
 		if p.identityDisk.writeDisk(entry) != nil {
 			return
@@ -89,7 +90,7 @@ func (p *riotProvider) refreshPersistedAccount(identity, path string) {
 		p.identityDisk.mu.Unlock()
 		p.accountMu.Lock()
 		cacheKey := strings.TrimPrefix(identity, "account:")
-		cacheKey = strings.ReplaceAll(cacheKey, "#", "\x1f")
+		cacheKey = strings.ReplaceAll(cacheKey, "#", "\x1f") + "|credential:" + riotCredentialScope(ctx)
 		if existing, ok := p.accountCache[cacheKey]; ok {
 			existing.account = account
 			existing.expiresAt = entry.ExpiresAt

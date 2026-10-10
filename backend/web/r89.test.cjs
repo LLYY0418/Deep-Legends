@@ -18,7 +18,7 @@ test('R258 supplements follow the first history card and survive ref adoption wi
   const noop=()=>{};
   const helpers=compile(['loadOverview','overviewSupplementTarget','syncOverviewSupplementRefs','loadOPGGSeasonSummary','loadOverviewCurrentGame'],{
     state,window:{},document:{hidden:false,hasFocus:()=>true},activeTab:()=>tab,riotTab:t=>t?.region==='kr',tabReady:()=>true,tabGroup:()=> 'kr',
-    rerenderTab:noop,renderCapabilitySettings:noop,rememberTabPlayerRef:noop,playerLabel:()=> 'Fixture',
+    updateCareerCards:noop,rerenderTab:noop,renderCapabilitySettings:noop,rememberTabPlayerRef:noop,playerLabel:()=> 'Fixture',
     updateCurrentGameCard:noop,ensurePerks:noop,ensureSummonerSpells:noop,
     normalizedPagination:(p,beg)=>({...p.pagination,nextBegIndex:beg+p.pagination.count}),
     AUTO_PAGE_DELAY_MS:1200,MAX_BROWSE_MATCHES:200,markProMismatch:noop,
@@ -66,7 +66,7 @@ test('R89 completion failure preserves first five and exposes a retry that compl
  const tab={key:'kr:fixture',region:'kr',playerRef:'public-ref',initialPagePending:true,data:{player:{playerRef:'public-ref',region:'kr'},matches:Array.from({length:5},(_,gameId)=>({gameId})),pagination:{count:5,hasMore:true}}};
  const state={section:"overview",settings:{matchCount:20},controllers:new Map()};let fail=true;
  const noop=()=>{};
- const {loadOverview}=compile(['loadOverview'],{state,tabReady:()=>true,tabGroup:()=> 'kr',riotTab:()=>true,rerenderTab:noop,loadOPGGSeasonSummary:noop,loadOverviewCurrentGame:noop,syncOverviewSupplementRefs:noop,rememberTabPlayerRef:noop,playerLabel:()=> 'Fixture',renderCapabilitySettings:noop,AUTO_PAGE_DELAY_MS:1200,MAX_BROWSE_MATCHES:200,
+ const {loadOverview}=compile(['loadOverview'],{state,tabReady:()=>true,tabGroup:()=> 'kr',riotTab:()=>true,updateCareerCards:noop,rerenderTab:noop,loadOPGGSeasonSummary:noop,loadOverviewCurrentGame:noop,syncOverviewSupplementRefs:noop,rememberTabPlayerRef:noop,playerLabel:()=> 'Fixture',renderCapabilitySettings:noop,AUTO_PAGE_DELAY_MS:1200,MAX_BROWSE_MATCHES:200,
   normalizedPagination:p=>({...p.pagination,nextBegIndex:p.pagination.count}),
   api:async()=>{if(fail)throw Object.assign(new Error('upstream timeout'),{status:504});return {player:{playerRef:'public-ref',region:'kr'},matches:Array.from({length:20},(_,gameId)=>({gameId})),pagination:{count:20,hasMore:true}};}});
  assert.equal(await loadOverview(tab,true,false,false,true),false);assert.equal(tab.data.matches.length,5);assert.equal(tab.initialPageError,'upstream timeout');assert.equal(tab.error,'');

@@ -77,6 +77,8 @@ func TestR91AddendumOneRequestStreamsFiveThenTwenty(t *testing.T) {
 	c.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		body := "[]"
 		switch {
+		case strings.Contains(r.URL.Path, "/accounts/by-riot-id/"):
+			body = `{"puuid":"r91-subject-identity","gameName":"Fixture","tagLine":"KR1"}`
 		case strings.Contains(r.URL.Path, "/summoner/"):
 			body = `{"puuid":"r91-subject-identity","summonerLevel":100}`
 		case strings.HasSuffix(r.URL.Path, "/ids"):

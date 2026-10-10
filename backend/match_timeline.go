@@ -390,7 +390,7 @@ func (a *app) loadMatchTimelineCNDecision(ctx context.Context, client *LCUClient
 					return frames, dataSourceLCU, attempts, fallbackReason, nil
 				}
 				eventCount, eventTypes := summarizeTimelineEventTypes(frames)
-				a.recordDiagnostic(map[string]any{
+				a.recordTimelineDiagnostic(ctx, map[string]any{
 					"event": "match_timeline_lcu_incomplete", "source": "lcu",
 					"frames": len(frames), "events": eventCount,
 					"event_types": eventTypes, "event_key_samples": sampleTimelineEventKeys(frames, 3),
@@ -475,11 +475,12 @@ func (c *matchTimelineCache) put(key string, value matchTimelineResponse) {
 }
 
 type matchTimelineRequest struct {
-	GameID        int64  `json:"gameId"`
-	ParticipantID int64  `json:"participantId"`
-	Region        string `json:"region"`
-	ServerID      string `json:"serverId"`
-	PlayerRef     string `json:"playerRef"`
+	GameID          int64  `json:"gameId"`
+	ParticipantID   int64  `json:"participantId"`
+	Region          string `json:"region"`
+	ServerID        string `json:"serverId"`
+	PlayerRef       string `json:"playerRef"`
+	DiagnosticBatch string `json:"diagnosticBatch,omitempty"`
 }
 
 func (a *app) handleGameplayMatchTimeline(w http.ResponseWriter, r *http.Request) {
@@ -576,6 +577,9 @@ func (a *app) handleGameplayMatchTimeline(w http.ResponseWriter, r *http.Request
 			return
 		}
 	}
+	if len(request.DiagnosticBatch) <= 64 && request.DiagnosticBatch != "" {
+		r = r.WithContext(context.WithValue(r.Context(), timelineDiagnosticBatchKey{}, request.DiagnosticBatch))
+	}
 	var frames []timelineFrame
 	var source string
 	var attempts []DataSourceAttempt
@@ -610,7 +614,7 @@ func (a *app) handleGameplayMatchTimeline(w http.ResponseWriter, r *http.Request
 		if historyServerError(err) {
 			detail = historyServerUnavailableMessage
 		}
-		a.recordDiagnostic(map[string]any{"event": "match_timeline_failed", "region": diagnosticRegion, "source": source, "reason": safeDiagnosticReason(err), "attempts": attempts, "fallback_reason": fallbackReason})
+		a.recordTimelineDiagnostic(r.Context(), map[string]any{"event": "match_timeline_failed", "region": diagnosticRegion, "source": source, "reason": safeDiagnosticReason(err), "attempts": attempts, "fallback_reason": fallbackReason})
 		outage := ""
 		if !isKR && historyOfficialOutage(attempts, a.sgp.historyRetryAfter(request.ServerID)) {
 			outage = "official"

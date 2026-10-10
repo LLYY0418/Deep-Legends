@@ -137,3 +137,13 @@ func riotGameID(id string) int64 {
 func riotDirectMatchFilter(filter string) bool {
 	return filter != "more:hextech-classic" && filter != "more:hextech-qualifier" && filter != "more:special"
 }
+
+// Only official time/queue constraints are pushed upstream.
+type riotHistoryTimeRangeKey struct{}
+type riotHistoryTimeRange struct{ Start, End int64 }
+type riotOverviewPage struct {
+	Player       gameplayPlayer       `json:"player"`
+	Matches      []gameplayMatch      `json:"matches"`
+	Pagination   gameplayPagination   `json:"pagination"`
+	Capabilities []EndpointCapability `json:"capabilities"`
+}

@@ -1,3 +1,4 @@
+const {install:installDialog,q,qa}=require('./filter-dialog-fixture.cjs');
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const af=require(process.env.R258_FILTER_SOURCE || './history-filters.js');
@@ -71,7 +72,7 @@ test('R258 P7 switching the actual player tab cancels outstanding search',()=>{
  const a={key:'a',advancedSearch:{running:true,token:1},data:{}},b={key:'b',data:{}};let aborted=0;
  const state={tabs:[a,b],activeTabs:{players:'a'},activeGroup:'players',tabHistories:{players:[]}};
  const context={globalThis:{deepLegendsHistoryFilters:af},state,activeTab:()=>a,tabGroup:()=> 'players',savePlayerScroll(){},renderPlayerTabs(){},renderOverview(){},cancelHistoryRecovery:()=>{},cancelAdvancedMatchSearch:tab=>af.cancel(tab,()=>aborted++)};
- const select=vm.runInNewContext('('+extract(source,'selectPlayerTab')+')',context);select('b');assert.equal(aborted,1);assert.equal(a.advancedSearch.running,false);assert.equal(state.activeTabs.players,'b');
+ const select=vm.runInNewContext('('+extract(source,'selectPlayerTab')+')',context);select('b');assert.equal(aborted,1);assert.equal(a.advancedSearch.stopping,true);assert.equal(state.activeTabs.players,'b');
 });
 
 test('R258 P7 common presets capped at 12, replacing names, safe reads/writes',()=>{
@@ -83,20 +84,20 @@ test('R258 P7 common presets capped at 12, replacing names, safe reads/writes',(
 });
 
 test('R258 P7 keyboard capsules and add, category menu, saved replacement and highlight cleanup',()=>{
- const dom=new JSDOM('<main></main>',{url:'http://fixture'}),root=dom.window.document.querySelector('main');
+ const dom=new JSDOM('<main></main>',{url:'http://fixture'}),root=dom.window.document.querySelector('main');installDialog(dom);
  const tab={advancedConditions:{multikill:condition(['5'])},data:{matches:[match()],pagination:{hasMore:false}}},c=ctx();
  let changed=0;
  Object.assign(c,{rows:()=>tab.data.matches,cursor:()=>20,storage:dom.window.localStorage,container:()=>root,render:()=>{root.innerHTML=af.render(tab,()=>c)+af.renderConditions(tab,()=>c)+'<article class="match-entry" data-match-id="1"><b data-af-multikill="5">五杀</b></article>';af.bind(root,tab,()=>c)},change:()=>{changed++;c.render()},stop:()=>af.cancel(tab),find(){}});
- c.render();assert.equal(root.querySelector('[data-af-add]').tagName,'BUTTON');const remove=root.querySelector('[data-af-remove]');remove.focus();remove.click();assert.equal(changed,1);assert.equal(af.active(tab),false);
- root.querySelector('[data-af-add]')?.click();root.querySelector('[data-af-open]').click();assert.equal(root.querySelector('[data-af-menu]').hidden,false);
- root.querySelector('[data-af-category="hero"]').click();assert(root.querySelector('[data-af-option="103"]'));root.querySelector('[data-af-option="103"]').click();assert.equal(tab.advancedConditions.hero,undefined);root.querySelector('[data-af-close]').click();assert.deepEqual(tab.advancedConditions.hero.values,['103']);
- tab.advancedConditions={multikill:condition(['5'])};c.render();af.decorate(root,tab,c);assert(root.querySelector('.af-hit'));tab.advancedConditions={};af.decorate(root,tab,c);assert(!root.querySelector('.af-hit'));
+ c.render();assert.equal(q(root,'[data-af-add]').tagName,'BUTTON');const remove=q(root,'[data-af-remove]');remove.focus();remove.click();assert.equal(changed,1);assert.equal(af.active(tab),false);
+ q(root,'[data-af-add]')?.click();q(root,'[data-af-open]').click();assert.equal(q(root,'[data-af-menu]').hidden,false);
+ q(root,'[data-af-category="hero"]').click();assert(q(root,'[data-af-option="103"]'));q(root,'[data-af-option="103"]').click();assert.equal(tab.advancedConditions.hero,undefined);q(root,'[data-af-close]').click();assert.deepEqual(tab.advancedConditions.hero.values,['103']);
+ tab.advancedConditions={multikill:condition(['5'])};c.render();af.decorate(root,tab,c);assert(q(root,'.af-hit'));tab.advancedConditions={};af.decorate(root,tab,c);assert(!q(root,'.af-hit'));
  tab.data.matches[0].participants[0]={...tab.data.matches[0].participants[0],tripleKills:undefined,quadraKills:undefined,pentaKills:undefined,doubleKills:0,multiKill:3};
  tab.advancedConditions={multikill:condition(['3'])};
  c.multiTag=vm.runInNewContext('let multikillGradientSeq=0;('+extract(source,'renderMultiKillTag')+')');
  root.innerHTML='<article class="match-entry" data-match-id="1"><div class="match-badges"></div></article>';
- af.decorate(root,tab,c);assert.equal(root.querySelector('[data-af-multikill="3"]').textContent,'三杀');assert(root.querySelector('.af-hit'));
- tab.advancedConditions={};af.decorate(root,tab,c);assert(!root.querySelector('[data-af-created]'));
+ af.decorate(root,tab,c);assert.equal(q(root,'[data-af-multikill="3"]').textContent,'三杀');assert(q(root,'.af-hit'));
+ tab.advancedConditions={};af.decorate(root,tab,c);assert(!q(root,'[data-af-created]'));
  dom.window.close();
 });
 
@@ -108,21 +109,21 @@ test('R258 P7 shared hero search accepts Chinese, pinyin, initials and aliases',
 });
 
 test('saved filters rename inline because Electron has no window.prompt',()=>{
- const dom=new JSDOM('<main></main>',{url:'http://fixture'}),root=dom.window.document.querySelector('main');
+ const dom=new JSDOM('<main></main>',{url:'http://fixture'}),root=dom.window.document.querySelector('main');installDialog(dom);
  const tab={advancedConditions:{result:condition(['win'])},data:{matches:[match()],pagination:{hasMore:false}}},c=ctx(),errors=[];
  Object.assign(c,{rows:()=>tab.data.matches,cursor:()=>20,storage:dom.window.localStorage,container:()=>root,error:message=>errors.push(message),render:()=>{root.innerHTML=af.render(tab,()=>c)+af.renderConditions(tab,()=>c);af.bind(root,tab,()=>c)},change:()=>c.render(),stop:()=>af.cancel(tab),find(){}});
  assert(af.savePreset(c.storage,'常用A',{result:condition(['win'])}));assert(af.savePreset(c.storage,'常用B',{result:condition(['loss'])}));
- c.render();root.querySelector('[data-af-show-saved]').click();
+ c.render();q(root,'[data-af-show-saved]').click();
  assert.doesNotMatch(fs.readFileSync(__dirname+'/gameplay.js','utf8'),/window\.prompt\(/);
- root.querySelector('[data-af-rename="0"]').click();
- const input=root.querySelector('[data-af-rename-input="0"]');assert.equal(dom.window.document.activeElement,input);assert.equal(input.value,'常用A');
- input.value='常用B';root.querySelector('[data-af-rename-save="0"]').click();
+ q(root,'[data-af-rename="0"]').click();
+ const input=q(root,'[data-af-rename-input="0"]');assert.equal(dom.window.document.activeElement,input);assert.equal(input.value,'常用A');
+ input.value='常用B';q(root,'[data-af-rename-save="0"]').click();
  assert.deepEqual(errors,['已有同名常用筛选']);assert.equal(af.readPresets(c.storage)[0].name,'常用A');
  input.value='  排位胜场  ';input.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
- assert.deepEqual(af.readPresets(c.storage).map(p=>p.name),['排位胜场','常用B']);assert(!root.querySelector('[data-af-rename-input]'));
- assert.equal(root.querySelector('[data-af-menu]').hidden,false);
- root.querySelector('[data-af-rename="1"]').click();
- root.querySelector('[data-af-rename-input="1"]').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
- assert(!root.querySelector('[data-af-rename-input]'));assert.equal(root.querySelector('[data-af-menu]').hidden,false);assert.equal(af.readPresets(c.storage)[1].name,'常用B');
+ assert.deepEqual(af.readPresets(c.storage).map(p=>p.name),['排位胜场','常用B']);assert(!q(root,'[data-af-rename-input]'));
+ assert.equal(q(root,'[data-af-menu]').hidden,false);
+ q(root,'[data-af-rename="1"]').click();
+ q(root,'[data-af-rename-input="1"]').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+ assert(!q(root,'[data-af-rename-input]'));assert.equal(q(root,'[data-af-menu]').hidden,false);assert.equal(af.readPresets(c.storage)[1].name,'常用B');
  dom.window.close();
 });

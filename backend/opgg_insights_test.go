@@ -685,6 +685,8 @@ func TestLoadRiotOverviewLoadsOPGGHistoryWithoutMatchTierRequests(t *testing.T) 
 				r112ProfilePage("Fast", "KR1", providerPUUID)+`{"season":"S2025 S3","rank_entries":{"rank_info":{"tier":"diamond","value":"DIAMOND","division":1,"lp":"70"}}}`), nil
 		}
 		switch {
+		case strings.Contains(request.URL.Path, "/accounts/by-riot-id/"):
+			return testHTTPResponse(request, http.StatusOK, fmt.Sprintf(`{"puuid":%q,"gameName":"Fast","tagLine":"KR1"}`, puuid)), nil
 		case strings.Contains(request.URL.Path, "/lol/summoner/v4/summoners/by-puuid/"):
 			return testHTTPResponse(request, http.StatusOK, fmt.Sprintf(`{"puuid":%q,"profileIconId":7,"summonerLevel":99}`, puuid)), nil
 		case strings.Contains(request.URL.Path, "/lol/match/v5/matches/by-puuid/"):

@@ -9,13 +9,13 @@ test("R252 visible tag hydration indexes the tree once without losing or admitti
  matches.push({gameId:252999,queueId:420,result:"win"});
  let treeReads=0;for(const method of ['querySelector','querySelectorAll']){const original=container[method].bind(container);container[method]=(...args)=>{treeReads++;return original(...args)}}
  const source=process.env.R252_GAMEPLAY_SOURCE ? require('node:fs').readFileSync(process.env.R252_GAMEPLAY_SOURCE,'utf8') : read('gameplay.js');
- const seen=[];const {hydrateVisibleMatchTags}=compile(source,['hydrateVisibleMatchTags'],{
-  state:{controllers:new Map()},matchTagsBackgroundAllowed:()=>true,matchTierScrollRoot:()=>null,
+ const seen=[],batches=[];const {hydrateVisibleMatchTags}=compile(source,['hydrateVisibleMatchTags'],{
+  recordTimelineClient:(reason,batch)=>batches.push([reason,batch]),state:{controllers:new Map()},matchTagsBackgroundAllowed:()=>true,matchTierScrollRoot:()=>null,
   matchTierNodeIsVisible:node=>!!node,matchSubject:match=>match.participants?.[0],matchTimelineKey:match=>String(match.gameId),ensureMatchTimeline:async match=>{seen.push(match.gameId)},
  });
  const tab={data:{matches,player:{playerRef:'synthetic'}}};hydrateVisibleMatchTags(container,tab);
  await new Promise(setImmediate);
- assert.deepEqual(seen,matches.slice(5,200).map(m=>m.gameId));assert.equal(tab.matchTagsHydrating,false);
+ assert.deepEqual(seen,matches.slice(5,200).map(m=>m.gameId));assert.equal(tab.matchTagsHydrating,false);assert.equal(batches.length,1);assert.equal(batches[0][0],"complete");assert.match(batches[0][1],/^timeline-/);
  assert.ok(treeReads<=1,`full-tree reads=${treeReads} for 200 cards`);dom.window.close();
 });
 

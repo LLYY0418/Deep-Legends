@@ -27,7 +27,7 @@ func (c *r108WaitingContext) Done() <-chan struct{} {
 func TestR108RefreshDoesNotInheritCanceledFlight(t *testing.T) {
 	cache := newOverviewQueryCache()
 	ref := gameplayReference{PlayerRef: "fixture", Region: "kr"}
-	key := riotOverviewQuerySnapshotKey(ref, 0, 20, "solo")
+	key := riotOverviewRequestKey(context.Background(), ref, 0, 20, "solo")
 	flight := &overviewQueryFlight{done: make(chan struct{})}
 	cache.flights[key] = flight
 	ctx := &r108WaitingContext{Context: context.Background(), waiting: make(chan struct{})}

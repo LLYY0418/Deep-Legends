@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -23,12 +24,12 @@ const (
 	aramkitRatingPath          = "/rating"
 	aramkitRatingResponseMax   = 2 << 20
 	aramkitRatingCacheLimit    = 128
-	aramkitRatingSuccessTTL    = 10 * time.Minute
-	aramkitRatingFailureTTL    = 5 * time.Minute
+	aramkitRatingSuccessTTL    = 6 * time.Hour
+	aramkitRatingFailureTTL    = time.Hour
 	aramkitRatingRequestDelay  = 300 * time.Millisecond
 	aramkitRatingRequestJitter = 100 * time.Millisecond
-	aramkitRatingTimeout       = 10 * time.Second
-	aramkitRatingBodyTimeout   = 25 * time.Second
+	aramkitRatingTimeout       = 15 * time.Second
+	aramkitRatingBodyTimeout   = 15 * time.Second
 	aramkitDiagnosticDomain    = "aramkit-rating-player-v1"
 )
 
@@ -127,7 +128,10 @@ type aramkitRatingFlight struct {
 	outcome aramkitRatingOutcome
 }
 
+type aramkitRatingPrefetchKey struct{}
 type aramkitRatingClient struct {
+	disk        *championDataCache
+	refreshes   map[string]bool
 	mu          sync.Mutex
 	cache       map[string]aramkitRatingCacheEntry
 	flights     map[string]*aramkitRatingFlight
@@ -151,6 +155,7 @@ type aramkitRatingClient struct {
 func newAramkitRatingClient(provider *championProvider, observe func(map[string]any), identityHash func(string) string) *aramkitRatingClient {
 	client := &aramkitRatingClient{
 		cache:         make(map[string]aramkitRatingCacheEntry),
+		refreshes:     make(map[string]bool),
 		flights:       make(map[string]*aramkitRatingFlight),
 		featureGates:  provider.featureGates,
 		httpClient:    provider.httpClient,
@@ -164,6 +169,9 @@ func newAramkitRatingClient(provider *championProvider, observe func(map[string]
 		bodyTimeout:   aramkitRatingBodyTimeout,
 		minimumDelay:  aramkitRatingRequestDelay,
 		maximumJitter: aramkitRatingRequestJitter,
+	}
+	if provider.cache != nil && provider.cache.dir != "" {
+		client.disk = newPublicBinaryCache(&localStore{root: filepath.Dir(provider.cache.dir)}, "mayhem-ratings", 128, 4<<20)
 	}
 	return client
 }
@@ -215,15 +223,44 @@ func (c *aramkitRatingClient) lookup(ctx context.Context, gameName, tagLine stri
 	}
 	if c == nil || c.featureGates == nil || !c.featureGates.enabled(featureGateAramkit) {
 		response := unavailableMayhemRating("功能暂不可用", dataSourceDisabled)
-		c.record(key, false, false, 0, aramkitRatingOutcome{response: response, result: "disabled", reason: "feature-disabled"})
+		c.recordContext(ctx, key, false, false, 0, aramkitRatingOutcome{response: response, result: "disabled", reason: "feature-disabled"})
 		return response
 	}
 
 	started := c.now()
+	diskKey := riotIdentityKey("mayhem:" + key)
+	source := "memory"
 	c.mu.Lock()
-	if cached, ok := c.cache[key]; ok && started.Before(cached.expiresAt) {
+	_, present := c.cache[key]
+	c.mu.Unlock()
+	if !present && c.disk != nil {
+		if entry, e := c.disk.readDisk(diskKey); e == nil && started.Before(entry.ExpiresAt) {
+			var response mayhemRatingResponse
+			if json.Unmarshal(entry.Data, &response) == nil && (response.Available || response.UnavailableReason == "未收录") {
+				c.mu.Lock()
+				c.cache[key] = aramkitRatingCacheEntry{aramkitRatingOutcome{response: response, result: "disk"}, entry.ExpiresAt}
+				c.mu.Unlock()
+				source = "disk"
+			}
+		}
+	}
+	ctx = context.WithValue(ctx, aramkitRatingCacheSourceKey{}, source)
+	c.mu.Lock()
+	if cached, ok := c.cache[key]; ok && started.Before(cached.expiresAt) && ctx.Value(aramkitRatingRefreshKey{}) != true {
+		refresh := cached.outcome.response.Available && c.refreshes != nil && !c.refreshes[key] && len(c.refreshes) < 128
+		if refresh {
+			c.refreshes[key] = true
+		}
 		c.mu.Unlock()
-		c.record(key, true, false, c.now().Sub(started), cached.outcome)
+		c.recordContext(ctx, key, true, false, c.now().Sub(started), cached.outcome)
+		if refresh {
+			go func() {
+				defer recoverPanic("aramkit.refresh")
+				background, cancel := context.WithTimeout(context.WithoutCancel(ctx), aramkitRatingTimeout)
+				defer cancel()
+				c.lookup(context.WithValue(background, aramkitRatingRefreshKey{}, true), gameName, tagLine)
+			}()
+		}
 		return cached.outcome.response
 	}
 	if flight := c.flights[key]; flight != nil {
@@ -232,7 +269,7 @@ func (c *aramkitRatingClient) lookup(ctx context.Context, gameName, tagLine stri
 		case <-ctx.Done():
 			return unavailableMayhemRating("查询已取消", dataSourceFailed)
 		case <-flight.done:
-			c.record(key, true, true, c.now().Sub(started), flight.outcome)
+			c.recordContext(ctx, key, true, true, c.now().Sub(started), flight.outcome)
 			return flight.outcome.response
 		}
 	}
@@ -257,7 +294,13 @@ func (c *aramkitRatingClient) lookup(ctx context.Context, gameName, tagLine stri
 	}
 	close(flight.done)
 	c.mu.Unlock()
-	c.record(key, false, false, c.now().Sub(started), outcome)
+	if ttl > 0 && c.disk != nil {
+		data, _ := json.Marshal(outcome.response)
+		sum := sha256.Sum256(data)
+		now := c.now()
+		_ = c.disk.writeDisk(championCacheEnvelope{Schema: championCacheSchema, Key: diskKey, FetchedAt: now, ExpiresAt: now.Add(ttl), StaleUntil: now.Add(ttl), Hash: hex.EncodeToString(sum[:]), Data: data})
+	}
+	c.recordContext(ctx, key, false, false, c.now().Sub(started), outcome)
 	return outcome.response
 }
 
@@ -393,7 +436,10 @@ func unavailableMayhemRating(message, outcome string) mayhemRatingResponse {
 	}
 }
 
-func (c *aramkitRatingClient) record(key string, cacheHit, coalesced bool, duration time.Duration, outcome aramkitRatingOutcome) {
+type aramkitRatingCacheSourceKey struct{}
+type aramkitRatingRefreshKey struct{}
+
+func (c *aramkitRatingClient) recordContext(ctx context.Context, key string, cacheHit, coalesced bool, duration time.Duration, outcome aramkitRatingOutcome) {
 	if c == nil || c.observe == nil || outcome.reason == "cancelled" {
 		return
 	}
@@ -403,7 +449,7 @@ func (c *aramkitRatingClient) record(key string, cacheHit, coalesced bool, durat
 	}
 	c.observe(map[string]any{
 		"event": "mayhem_rating_lookup", "source": dataSourceARAMKit, "player_hash": identity,
-		"cache_hit": cacheHit, "coalesced": coalesced, "duration_ms": duration.Milliseconds(),
+		"cache_hit": cacheHit, "cache_source": ctx.Value(aramkitRatingCacheSourceKey{}), "prefetch": ctx.Value(aramkitRatingPrefetchKey{}) == true, "coalesced": coalesced, "duration_ms": duration.Milliseconds(),
 		"ttfb_ms": outcome.ttfb.Milliseconds(), "bytes": outcome.bytes,
 		"code": outcome.code, "http_status": outcome.httpStatus, "result": outcome.result, "reason": outcome.reason,
 	})
@@ -466,5 +512,5 @@ func (a *app) handleGameplayMayhemRating(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "rating service unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	respondJSON(w, a.mayhemRatings.lookup(r.Context(), gameName, tagLine))
+	respondJSON(w, a.mayhemRatings.lookup(context.WithValue(r.Context(), aramkitRatingPrefetchKey{}, query.Get("prefetch") == "1"), gameName, tagLine))
 }

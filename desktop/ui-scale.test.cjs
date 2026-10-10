@@ -9,7 +9,7 @@ const scale = require("./ui-scale.cjs");
 const scaleSource = fs.readFileSync(path.join(__dirname, "ui-scale.cjs"), "utf8");
 const mainSource = fs.readFileSync(path.join(__dirname, "main.cjs"), "utf8");
 const storedScalePath = path.join("/user-data", "ui-scale.json");
-const cases = [[1366,768,1],[1600,900,1],[1920,1080,1],[2304,1318,1.2],[2560,1440,1.33],[2560,1600,1.33],[3440,1440,1.6],[3840,2160,2],[3840,1600,1.78],[5120,2880,2.5],[7680,4320,2.5],[1024,600,1]];
+const cases = [[1366,768,1],[1600,900,1],[1920,1080,1],[2304,1318,1.2],[2560,1440,1.33],[2560,1600,1.33],[3440,1440,1.6],[3840,2160,2],[3840,1600,1.78],[5120,2880,2],[7680,4320,2],[1024,600,1]];
 for (const [width,height,expected] of cases) test(`auto ${width}x${height} = ${expected}`, () => {
   assert.equal(scale.autoScaleFor({width,height}), expected);
 });
@@ -19,20 +19,20 @@ function loadScale(source) {
   return module.exports;
 }
 test("continuous scale, quantization, clamps and manual-step normalization", () => {
-  assert.deepEqual(scale.UI_SCALE_STEPS, [0.9,1,1.1,1.25,1.4,1.5,1.75,2,2.25,2.5]);
+  assert.deepEqual(scale.UI_SCALE_STEPS, [0.9,1,1.1,1.25,1.4,1.5,1.75,2]);
   assert.equal(scale.UI_SCALE_BASE_WIDTH, 1920);
   assert.equal(scale.UI_SCALE_BASE_HEIGHT, 900);
   assert.equal(scale.UI_SCALE_MIN, 1);
-  assert.equal(scale.UI_SCALE_MAX, 2.5);
+  assert.equal(scale.UI_SCALE_MAX, 2);
   // ★真正执行缩放的是 backend/web/app.js，两边的常量必须逐字一致。
   const appSource = fs.readFileSync(path.join(__dirname, "..", "backend", "web", "app.js"), "utf8");
-  assert.match(appSource, /const UI_SCALE_STEPS = \[0\.9, 1, 1\.1, 1\.25, 1\.4, 1\.5, 1\.75, 2, 2\.25, 2\.5\];/);
+  assert.match(appSource, /const UI_SCALE_STEPS = \[0\.9, 1, 1\.1, 1\.25, 1\.4, 1\.5, 1\.75, 2\];/);
   assert.match(appSource, /const UI_SCALE_BASE_WIDTH = 1920;/);
   assert.match(appSource, /const UI_SCALE_BASE_HEIGHT = 900;/);
   assert.match(appSource, /const UI_SCALE_MIN = 1;/);
-  assert.match(appSource, /const UI_SCALE_MAX = 2\.5;/);
+  assert.match(appSource, /const UI_SCALE_MAX = 2;/);
   // 连续：等比放大的窗口拿到等比的倍率，没有档位台阶。
-  for (const k of [1, 1.1, 1.25, 1.5, 2, 2.5]) assert.equal(scale.autoScaleFor({width:1920*k,height:900*k}), k);
+  for (const k of [1, 1.1, 1.25, 1.5, 2]) assert.equal(scale.autoScaleFor({width:1920*k,height:900*k}), k);
   // 设置页可选的手动档位，凡是 >= 下限的都必须是自动模式能自然到达的值；
   // 0.9 是只给手动锁档用的，自动模式到不了。
   for (const step of scale.UI_SCALE_STEPS) assert.equal(scale.autoScaleFor({width:1920*step,height:900*step}), Math.max(step, scale.UI_SCALE_MIN));
@@ -45,14 +45,14 @@ test("continuous scale, quantization, clamps and manual-step normalization", () 
   assert.equal(scale.autoScaleFor({width:1939,height:10000}), 1.01);
   // 上下限。
   assert.equal(scale.autoScaleFor({width:100,height:100}), 1);
-  assert.equal(scale.autoScaleFor({width:99999,height:99999}), 2.5);
+  assert.equal(scale.autoScaleFor({width:99999,height:99999}), 2);
   assert.equal(scale.autoScaleFor(), 1);
   for (const step of scale.UI_SCALE_STEPS) {
     assert.equal(scale.normalizeScale(step), step);
     assert.equal(scale.normalizeScale(String(step)), step);
   }
   for (const value of ["auto", "", "bad", null, undefined, {}, NaN, Infinity]) assert.equal(scale.normalizeScale(value), "auto");
-  for (const [value,expected] of [[-1,0.9],[0,0.9],[99,2.5],[1.04,1],[1.2,1.25],[1.32,1.25]]) assert.equal(scale.normalizeScale(value),expected);
+  for (const [value,expected] of [[-1,0.9],[0,0.9],[99,2],[1.04,1],[1.2,1.25],[1.32,1.25]]) assert.equal(scale.normalizeScale(value),expected);
   // 手动档位仍然允许 90%（把界面调小换更多内容），只是自动模式不会选它。
   assert.equal(scale.normalizeScale(0.9), 0.9);
 });
@@ -65,7 +65,7 @@ test("scale mutants turn the corresponding geometry guards red", () => {
   const noFloor = loadScale(scaleSource.replace("Math.max(UI_SCALE_MIN, Math.round(raw * 100) / 100)", "Math.round(raw * 100) / 100"));
   assert.throws(()=>assert.equal(noFloor.autoScaleFor({width:1766,height:1010}),1));
   const noCeiling = loadScale(scaleSource.replace("Math.min(UI_SCALE_MAX, ", "((x)=>x)("));
-  assert.throws(()=>assert.equal(noCeiling.autoScaleFor({width:99999,height:99999}),2.5));
+  assert.throws(()=>assert.equal(noCeiling.autoScaleFor({width:99999,height:99999}),2));
   const noQuantize = loadScale(scaleSource.replace("Math.round(raw * 100) / 100", "raw"));
   assert.throws(()=>assert.equal(noQuantize.autoScaleFor({width:3840,height:1600}),1.78));
 });

@@ -653,11 +653,20 @@ func marshalDiagnosticRecord(event map[string]any, recordedAt time.Time) ([]byte
 	// the running build here rather than trusting individual event producers.
 	record["build_fingerprint"] = buildFingerprint
 	if event["event"] == "riot_request" {
-		// Compact request rows inherit build/run context from app_start and the route summary.
-		delete(record, "run_id")
-		delete(record, "log_seq")
-		delete(record, "build_fingerprint")
-		record["time"] = recordedAt.UnixMilli()
+		record["time"] = recordedAt.UTC().Format("2006-01-02T15:04:05.000Z")
+		delete(record, "entry")
+		delete(record, "foreground")
+		if record["cancelled"] == false {
+			delete(record, "cancelled")
+			delete(record, "cancel_reason")
+		}
+		for _, key := range []string{"queued_ms", "ttfb_ms", "attempt", "cancel_reason", "cancelled"} {
+			raw, _ := json.Marshal(record)
+			if len(raw) <= 300 {
+				break
+			}
+			delete(record, key)
+		}
 	}
 	data, err := json.Marshal(record)
 	if err != nil {

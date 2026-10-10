@@ -303,7 +303,7 @@ func TestR99SeedAnchorSurvivesLRUAndHasOnlyStableField(t *testing.T) {
 	json.Unmarshal(raw, &envelope)
 	var body map[string]any
 	json.Unmarshal(envelope.Data, &body)
-	if len(body) != 1 || body["puuid"] != "fixture-stable" {
+	if len(body) != 2 || body["puuid"] != "fixture-stable" || body["credentialScope"] != riotCredentialScope(riotPinnedIdentityContext(context.Background())) {
 		t.Fatal(body)
 	}
 	for i := 0; i < 1030; i++ {

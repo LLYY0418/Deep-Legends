@@ -593,8 +593,11 @@ func mergeDiagnosticFields(event map[string]any, fields map[string]any) map[stri
 	return event
 }
 
-func (p *sgpProvider) waitSGPRetry(ctx context.Context, retry int) error {
+func (p *sgpProvider) waitSGPRetry(ctx context.Context, retry int, slow ...bool) error {
 	delays := [...]time.Duration{250 * time.Millisecond, 750 * time.Millisecond}
+	if len(slow) > 0 && slow[0] {
+		delays = [2]time.Duration{1500 * time.Millisecond, 3 * time.Second}
+	}
 	if retry <= 0 || retry > len(delays) {
 		return nil
 	}
@@ -621,7 +624,12 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 		p.recordObservation(map[string]any{"event": "sgp_history_circuit", "server_id": serverID, "route": route, "state": "cooldown"})
 		return circuitErr
 	}
-	defer p.releaseHistoryProbe(serverID, probe)
+	defer func() {
+		p.releaseHistoryProbe(serverID, probe)
+		if resultErr != nil {
+			p.scheduleHistoryProbe(ctx, client, kind, serverID, route, requestPath, endpoint)
+		}
+	}()
 	requestNumber := 0
 	truncatedJSONRetried := false
 	credentialID := ""
@@ -667,6 +675,7 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 			return err
 		}
 		authRejected := false
+		lastStatus := 0
 		for retry := 0; retry <= 2; retry++ {
 			if retry > retryLimit {
 				break
@@ -674,7 +683,7 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 			if p.historyCircuitCooling(serverID, route, probe) {
 				return errSGPHistoryCooling
 			}
-			if err := p.waitSGPRetry(ctx, retry); err != nil {
+			if err := p.waitSGPRetry(ctx, retry, sgpHistoryRoute(route) && lastStatus == 503); err != nil {
 				return err
 			}
 			request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
@@ -706,6 +715,7 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 				}
 				continue
 			}
+			lastStatus = response.StatusCode
 			body, readErr := readLimited(response.Body, sgpResponseMax)
 			response.Body.Close()
 			if response.StatusCode != http.StatusOK {

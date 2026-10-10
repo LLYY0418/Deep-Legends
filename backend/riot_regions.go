@@ -79,6 +79,7 @@ func (p *riotProvider) forPlatform(region string) *riotProvider {
 	}
 	scoped := newRiotProvider(p.champions)
 	scoped.foreground = p.foreground
+	scoped.puuidState = p.puuidState
 	scoped.platform, scoped.matchDisk, scoped.identityDisk = region, p.matchDisk, p.identityDisk
 	scoped.limitNow, scoped.limitSleep = p.limitNow, p.limitSleep
 	p.platforms[region] = scoped

@@ -57,7 +57,7 @@ test('R265 a filter click survives a same-player toolbar redraw while its CSS lo
  for(const switched of [false,true]){
   const dom=new JSDOM('<main><button data-af-open>筛选</button></main>');
   try{
-   const container=dom.window.document.querySelector('main'),tab={advancedConditions:{}};let finish,ready=false,renders=0;
+   require('./filter-dialog-fixture.cjs').install(dom);const container=dom.window.document.querySelector('main'),tab={advancedConditions:{}};let finish,ready=false,renders=0;
    const ctx={stylesReady:()=>ready,ensureStyles:()=>new Promise(r=>finish=r),render:()=>renders++,container:()=>container};
    af.bind(container,tab,()=>ctx);container.querySelector('button').click();assert.equal(renders,0);
    container.innerHTML='<button data-af-open>筛选</button>';

@@ -2439,7 +2439,7 @@
   }
 
   function renderRiotKeySettings(data) {
-    if (el.settingRiotKeyState) el.settingRiotKeyState.textContent = data.source === "relay" && data.status !== "invalid" ? "使用内置服务" : { configured: "已配置", unconfigured: "未配置", invalid: "无效" }[data.status] || "未配置";
+    if (el.settingRiotKeyState) el.settingRiotKeyState.textContent = ["embedded", "relay"].includes(data.source) && data.status !== "invalid" ? "使用内置服务" : { configured: "已配置", unconfigured: "未配置", invalid: "无效" }[data.status] || "未配置";
   }
   async function loadRiotKeySettings() {
     if (!el.settingRiotKeyState || state.riotKeyPending) return;
@@ -2812,11 +2812,11 @@
   //
   // ★UI_SCALE_STEPS 只是设置页里手动锁档的可选值；自动模式不受它约束。
   // 档位表与基准必须与 desktop/ui-scale.cjs 一致，desktop/ui-scale.test.cjs 有断言。
-  const UI_SCALE_STEPS = [0.9, 1, 1.1, 1.25, 1.4, 1.5, 1.75, 2, 2.25, 2.5];
+  const UI_SCALE_STEPS = [0.9, 1, 1.1, 1.25, 1.4, 1.5, 1.75, 2];
   const UI_SCALE_BASE_WIDTH = 1920;
   const UI_SCALE_BASE_HEIGHT = 900;
   const UI_SCALE_MIN = 1;
-  const UI_SCALE_MAX = 2.5;
+  const UI_SCALE_MAX = 2;
   let uiScaleReady = false;
   let uiScaleRevision = 0;
   let appliedUiScale = 0;
@@ -2830,7 +2830,8 @@
   }
 
   function preferredUiScale() {
-    const stored = preference("ui-scale", "auto");
+    let stored = preference("ui-scale", "auto");
+    if(["2.25","2.5"].includes(stored)){stored="2";savePreference("ui-scale",stored);}
     const fixed = Number(stored);
     return stored !== "auto" && UI_SCALE_STEPS.includes(fixed) ? fixed : 0;
   }
@@ -2865,7 +2866,8 @@
   function renderUiScaleSetting() {
     const select = el.settingUiScale;
     if (!select) return;
-    const stored = preference("ui-scale", "auto");
+    let stored = preference("ui-scale", "auto");
+    if(["2.25","2.5"].includes(stored)){stored="2";savePreference("ui-scale",stored);}
     select.value = [...select.options].some((option) => option.value === stored) ? stored : "auto";
     applyUiScale();
     renderUiScaleAutoLabel();
@@ -2878,7 +2880,7 @@
   function receiveUiScale(payload) {
     const select = el.settingUiScale;
     if (!select || !payload || !["auto", "fixed"].includes(payload.mode)) return;
-    const value = payload.mode === "auto" ? "auto" : String(payload.value);
+    const value = payload.mode === "auto" ? "auto" : String([2.25,2.5].includes(Number(payload.value)) ? 2 : payload.value);
     if (![...select.options].some((option) => option.value === value)) return;
     savePreference("ui-scale", value);
     select.value = value;

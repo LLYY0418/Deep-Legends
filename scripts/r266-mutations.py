@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix="r266-mutations-") as temporary:
     temp = Path(temporary)
     node_cases = [
         ("p1-sort-redraw", "backend/web/history-filters.js", "if(structure)menu.querySelector", "if(true)menu.querySelector", "R266_FILTER_SOURCE", "backend/web/r266-filters.test.cjs"),
-        ("p2-find-redraw", "backend/web/history-filters.js", "(ctx.progress || ctx.render)()", "ctx.render()", "R266_FILTER_SOURCE", "backend/web/r266-filters.test.cjs"),
+        ("p2-find-redraw", "backend/web/history-filters.js", "search.progress();", "ctx.render();", "R266_FILTER_SOURCE", "backend/web/r266-filters.test.cjs"),
         ("p2-no-options-cache", "backend/web/history-filters.js", "if(!cached.has(cacheKey))", "if(true)", "R266_FILTER_SOURCE", "backend/web/r266-filters.test.cjs"),
         ("p3-no-pending", "backend/web/gameplay.js", "return Boolean(tab?.loading && !tab.matchesReceived && !tab.overviewCardLoad?.ready?.has('matches') && !(tab.data?.matches?.length));", "return false;", "R266_GAMEPLAY_SOURCE", "backend/web/r266-loading.test.cjs"),
         ("p4-no-session-reset", "backend/web/app.js", "function syncCollectionSession(data) {", "function syncCollectionSession(data) { return;", "R266_APP_SOURCE", "backend/web/r266-loading.test.cjs"),
@@ -65,7 +65,7 @@ with tempfile.TemporaryDirectory(prefix="r266-mutations-") as temporary:
     for file in ("go.mod", "go.sum"):
         shutil.copy2(ROOT / file, go_root / file)
     go_cases = [
-        ("p7-ignore-puuid", "gameplay.go", "reference.PlayerRef = a.knownProPUUID(reference)", "reference.PlayerRef = \"\"", "TestR266ProPUUIDSkipsAccountAndRetriesJoinFlight"),
+        ("p7-ignore-puuid", "riot_api.go", "ctx = riotPinnedIdentityContext(ctx)\n\taccount, err := p.accountByRiotIDPinned", "return riotAccount{PUUID: \"opgg-encrypted-subject\",GameName:gameName,TagLine:tagLine},nil\n\tctx = riotPinnedIdentityContext(ctx)\n\taccount, err := p.accountByRiotIDPinned", "TestR266ProRiotIDResolutionAndRetriesJoinFlight"),
         ("p7-no-foreground-pause", "riot_routing.go", "if p.foreground == nil {\n\t\treturn nil", "if true {\n\t\treturn nil", "TestR266ForegroundResumesAfterFiveSeconds"),
         ("p7-no-account-interval", "pro_background.go", "now.Sub(at) < 10*time.Minute", "now.Sub(at) < 0", "TestR266ProVisibilityAndAccountInterval"),
         ("p74-background-direct", "riot_routing.go", "if isRiotBackground(ctx) {", "if false {", "TestR266EmbeddedSourceAndBackgroundRelay"),

@@ -59,6 +59,9 @@ func runR264ForeignPartial(t *testing.T, failedCount int) {
 	champs := newChampionProvider()
 	champs.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		route := r.URL.Path
+		if strings.Contains(route, "/accounts/by-riot-id/") {
+			return proHTTPBody([]byte(fmt.Sprintf(`{"puuid":%q,"gameName":"Fixture","tagLine":"KR1"}`, puuid))), nil
+		}
 		if strings.HasSuffix(route, "/ids") {
 			return proHTTPBody([]byte(`["KR_2640","KR_2641","KR_2642","KR_2643","KR_2644","KR_2645","KR_2646","KR_2647","KR_2648","KR_2649"]`)), nil
 		}
@@ -192,6 +195,9 @@ func TestR264ForeignProfilePrecedesSevenSecondHistoryIDs(t *testing.T) {
 	champs := newChampionProvider()
 	champs.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		route := r.URL.Path
+		if strings.Contains(route, "/accounts/by-riot-id/") {
+			return proHTTPBody([]byte(fmt.Sprintf(`{"puuid":%q,"gameName":"Fixture","tagLine":"KR1"}`, puuid))), nil
+		}
 		if strings.HasSuffix(route, "/ids") {
 			select {
 			case <-time.After(7 * time.Second):

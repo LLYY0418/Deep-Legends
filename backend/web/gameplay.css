@@ -2290,12 +2290,4 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .career-pending.gameplay-skeleton span { height: 18px; min-height: 18px; max-width: 80%; }
 .career-pending.gameplay-skeleton span:nth-child(2) { max-width: 60%; }
 @media(max-width:900px) { .match-skeleton.gameplay-skeleton { grid-template-columns: 50px 48px minmax(80px,1fr); } .match-skeleton span:nth-child(n+4) { display: none; } }
-/* R266: the two icon tracks have an intrinsic width; never shrink below it. */
-[data-match-layout], [data-match-layout].is-arena { grid-template-columns: 124px minmax(88px,1fr) minmax(0,188px); column-gap: 12px; }
-.match-champion { grid-template-columns: 58px 59px; width: 124px; }
-[data-match-metrics] { width: 100%; max-width: 188px; }
-.match-stat { grid-template-columns: minmax(0,72px) minmax(0,1fr); gap: 4px; overflow: hidden; }
-.match-stat > em { overflow: hidden; text-overflow: ellipsis; }
-@container matches-column (max-width: 900px) { [data-match-layout], [data-match-layout].is-arena { grid-template-columns: 124px minmax(88px,1fr) minmax(0,100px); gap: 8px; } }
-@container matches-column (max-width: 840px) { [data-match-layout], [data-match-layout].is-arena { grid-template-columns: 124px minmax(88px,1fr); } [data-match-metrics] { display: none; } }
-@container matches-column (max-width: 420px) { .match-summary, .match-summary.is-arena { grid-template-columns: 74px minmax(0,1fr) 30px; padding-inline: 6px; gap: 6px; } [data-match-layout], [data-match-layout].is-arena { grid-template-columns: 124px minmax(70px,1fr); gap: 6px; } }
+[data-match-layout][data-icon-overlap] { grid-template-columns: 124px minmax(0,96px) minmax(0,1fr); }

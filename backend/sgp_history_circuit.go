@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"errors"
+	"net/url"
 	"time"
 )
 
@@ -13,6 +15,8 @@ type sgpHistoryCircuit struct {
 	failures      int
 	window, until time.Time
 	probing       bool
+	probeTimer    *time.Timer
+	nextProbe     time.Time
 }
 
 func sgpHistoryRoute(route string) bool { return route == "SUMMARY" || route == "DETAILS" }
@@ -45,7 +49,7 @@ func (p *sgpProvider) acquireHistoryCircuit(server, route string) (bool, error) 
 	if c.until.IsZero() {
 		return false, nil
 	}
-	if p.historyCircuitTime().Before(c.until) || c.probing {
+	if (p.historyCircuitTime().Before(c.until) && (route != "SUMMARY" || p.historyCircuitTime().Before(c.nextProbe))) || c.probing {
 		return false, errSGPHistoryCooling
 	}
 	c.probing = true
@@ -82,9 +86,13 @@ func (p *sgpProvider) observeHistoryCircuit(server, route string, status int, pr
 		c.failures++
 		if probe || c.failures >= 3 {
 			c.until = now.Add(60 * time.Second)
+			c.nextProbe = now.Add(15 * time.Second)
 			c.probing = false
 		}
 	} else if probe || c.until.IsZero() {
+		if c.probeTimer != nil {
+			c.probeTimer.Stop()
+		}
 		*c = sgpHistoryCircuit{}
 	}
 }
@@ -97,6 +105,7 @@ func (p *sgpProvider) releaseHistoryProbe(server string, probe bool) {
 	if c := p.historyCircuits[server]; c != nil && c.probing {
 		c.probing = false
 		c.until = p.historyCircuitTime().Add(60 * time.Second)
+		c.nextProbe = p.historyCircuitTime().Add(15 * time.Second)
 	}
 }
 
@@ -132,7 +141,45 @@ func (p *sgpProvider) historyRetryAfter(server string) int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if c := p.historyCircuits[server]; c != nil && !c.until.IsZero() {
-		return max(0, int(c.until.Sub(p.historyCircuitTime()).Seconds()+0.999))
+		next := c.nextProbe
+		if next.IsZero() {
+			next = c.until
+		}
+		return max(0, int(next.Sub(p.historyCircuitTime()).Seconds()+0.999))
 	}
 	return 0
+}
+
+// Cooldown probes use the same official source with a one-match history page.
+func (p *sgpProvider) scheduleHistoryProbe(ctx context.Context, client *LCUClient, kind sgpTokenKind, server, route, path, endpoint string) {
+	if route != "SUMMARY" || p.historyClock != nil {
+		return
+	}
+	p.mu.Lock()
+	c := p.historyCircuits[server]
+	if c == nil || c.until.IsZero() || c.probeTimer != nil {
+		p.mu.Unlock()
+		return
+	}
+	c.probeTimer = time.AfterFunc(15*time.Second, func() {
+		p.mu.Lock()
+		c.probeTimer = nil
+		p.mu.Unlock()
+		if _, active := client.credentials(); !active {
+			return
+		}
+		probeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 8*time.Second)
+		defer cancel()
+		target, err := url.Parse(endpoint)
+		if err != nil {
+			return
+		}
+		q := target.Query()
+		q.Set("startIndex", "0")
+		q.Set("count", "1")
+		target.RawQuery = q.Encode()
+		var data map[string]any
+		_ = p.getJSONWithToken(probeCtx, client, kind, server, route, path, target.String(), &data)
+	})
+	p.mu.Unlock()
 }

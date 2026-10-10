@@ -75,7 +75,7 @@ test('R258 removing the top local overlay restores a retained foreign overlay wi
 
 test('R258 cold overview starts before catalogs and optional summaries, capped at twenty',()=>{
  const calls=[],tab={key:'current',current:true,matchFilter:'all'},state={status:{connected:true,clientRegion:'TENCENT'},settings:{matchCount:50},controllers:new Map()};
- const f=compile(gameplay,['loadOverview'],{state,tabGroup:()=> 'players',tabReady:()=>true,connected:()=>true,riotTab:()=>false,clearTimeout:()=>{},performance,rerenderTab:()=>{},loadOPGGSeasonSummary:()=>calls.push('opgg'),loadOverviewCurrentGame:()=>calls.push('current-game'),loadMayhemRating:()=>calls.push('rating'),api:url=>{calls.push(url);return new Promise(()=>{});}});
+ const f=compile(gameplay,['loadOverview'],{state,tabGroup:()=> 'players',tabReady:()=>true,connected:()=>true,riotTab:()=>false,clearTimeout:()=>{},performance,updateCareerCards:()=>{},rerenderTab:()=>{},loadOPGGSeasonSummary:()=>calls.push('opgg'),loadOverviewCurrentGame:()=>calls.push('current-game'),loadMayhemRating:()=>calls.push('rating'),api:url=>{calls.push(url);return new Promise(()=>{});}});
  void f.loadOverview(tab,true);
  assert.equal(calls.length,1);assert.match(calls[0],/^\/api\/gameplay\/overview\?count=20&/);
  assert.doesNotMatch(gameplay.slice(gameplay.lastIndexOf('  bindSettings();')),/ensurePerks\(\)/);
@@ -84,7 +84,7 @@ test('R258 cold overview starts before catalogs and optional summaries, capped a
 test('R258 ranked supplements require the same account and history head and wait behind a refresh',async()=>{
  const tab={key:'current',data:{player:{playerRef:'player_self'},matches:[{gameId:100}],recentRanked:{games:5},rankedQueues:{420:{seasonGames:20}}}};
  const state={tabs:[tab],destroyed:false};let renders=0;
- const f=compile(gameplay,['handleOverviewIncremental'],{state,connected:()=>true,rerenderTab:()=>renders++});
+ const f=compile(gameplay,['handleOverviewIncremental'],{state,connected:()=>true,updateCareerCards:()=>renders++,rerenderTab:()=>renders++});
  const detail={type:'overview-incremental',account:'player_self',headGameId:100,recentRanked:{games:12},rankedQueues:{420:{recentRanked:{games:12}}}};
  assert.equal(await f.handleOverviewIncremental({...detail,account:'other'}),false);
  assert.equal(await f.handleOverviewIncremental({...detail,headGameId:99}),false);

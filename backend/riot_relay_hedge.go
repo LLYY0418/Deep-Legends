@@ -331,6 +331,8 @@ func (p *riotProvider) getCandidateRelay(ctx context.Context, m *riotRelayEntryM
 				return errRiotRelayUnavailable
 			}
 			return nil
+		case 400:
+			return &riotStatusError{status: 400, message: "Riot 接口返回 HTTP 400", puuidMismatch: strings.Contains(strings.ToLower(string(r.body)), "decrypt")}
 		case 404:
 			return errRiotNotFound
 		case 401, 403:

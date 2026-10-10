@@ -28,7 +28,7 @@ test('R100 progress updates ready profile fields but null and empty never wipe c
 test('R100 historical enrichment defers while foreground overview is in flight',async()=>{
  const start=gameplay.indexOf('async function handleOverviewIncremental('),end=gameplay.indexOf('  function renderPlayerTabs()',start);
  const tab={key:'a',loading:true,data:{player:{playerRef:'account'}}},calls=[];
- const context={state:{section:'overview'},overviewGroupForSection:()=> 'kr',activeTab:()=>tab,document:{getElementById:()=>null},loadOverview:async()=>assert.fail('history queried again'),rerenderTab:(...args)=>calls.push(args),overviewSectionForGroup:()=> 'overview',requestAnimationFrame:fn=>fn()};
+ const context={state:{section:'overview'},overviewGroupForSection:()=> 'kr',activeTab:()=>tab,document:{getElementById:()=>null},loadOverview:async()=>assert.fail('history queried again'),updateCareerCards:(...args)=>calls.push(args),rerenderTab:(...args)=>calls.push(args),overviewSectionForGroup:()=> 'overview',requestAnimationFrame:fn=>fn()};
  vm.runInNewContext(gameplay.slice(start,end),context);
  const detail={type:'historical-ranks',account:'account',historicalRanks:[{season:'2025',tier:'MASTER'}]};
  assert.equal(await context.handleOverviewIncremental(detail),false);assert.equal(calls.length,0);assert.equal(tab.pendingHistoricalRanks,detail);

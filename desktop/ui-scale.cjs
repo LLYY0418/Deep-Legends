@@ -7,11 +7,11 @@
 //
 // 自动缩放是连续的（不取档位）：1920×1080 恰好是设计基准 → 1.00，只放大不自动缩小。
 // UI_SCALE_STEPS 只是设置页里手动锁档的可选值（含一个手动 90% 档，自动模式到不了）。
-const UI_SCALE_STEPS = Object.freeze([0.9, 1, 1.1, 1.25, 1.4, 1.5, 1.75, 2, 2.25, 2.5]);
+const UI_SCALE_STEPS = Object.freeze([0.9, 1, 1.1, 1.25, 1.4, 1.5, 1.75, 2]);
 const UI_SCALE_BASE_WIDTH = 1920;
 const UI_SCALE_BASE_HEIGHT = 900;
 const UI_SCALE_MIN = 1;
-const UI_SCALE_MAX = 2.5;
+const UI_SCALE_MAX = 2;
 
 // Content bounds are DIP before page zoom. Electron already accounts for DPI.
 function autoScaleFor({ width, height } = {}) {

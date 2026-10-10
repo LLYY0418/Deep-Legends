@@ -93,7 +93,8 @@ func (p *riotProvider) resolveProSeed(ctx context.Context, seed proSeedAccount, 
 	}
 	ref := seed.Accounts[index]
 	var anchor struct {
-		PUUID string `json:"puuid"`
+		PUUID           string `json:"puuid"`
+		CredentialScope string `json:"credentialScope"`
 	}
 	var initial riotAccount
 	ctx = withRiotSingleWaitLimit(ctx, 100*time.Millisecond)
@@ -103,6 +104,7 @@ func (p *riotProvider) resolveProSeed(ctx context.Context, seed proSeedAccount, 
 			return err
 		}
 		anchor.PUUID, initial = account.PUUID, account
+		anchor.CredentialScope = riotCredentialScope(riotPinnedIdentityContext(ctx))
 		return nil
 	})
 	if err != nil {
@@ -113,6 +115,9 @@ func (p *riotProvider) resolveProSeed(ctx context.Context, seed proSeedAccount, 
 	}
 	if anchor.PUUID == "" {
 		return riotAccount{}, errRiotNotFound
+	}
+	if anchor.CredentialScope != riotCredentialScope(riotPinnedIdentityContext(ctx)) {
+		return p.accountByRiotID(ctx, ref.GameName, ref.TagLine)
 	}
 	return p.fetchAccountByPUUID(ctx, anchor.PUUID)
 }

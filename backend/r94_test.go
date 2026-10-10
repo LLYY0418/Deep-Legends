@@ -159,8 +159,8 @@ func TestR94DiagnosticBatchPersistsRawPhaseSourceAndIdentityComparisons(t *testi
 	}
 	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	body := clientDiagnosticRequest{Event: "gameflow_phase_client", Reason: "batch", TransportDropped: 3, TransportFailed: 1}
-	for _, id := range []int64{8980574903, 8980593274, 0} {
-		body.Observations = append(body.Observations, gameflowClientObservation{Reason: "received", Phase: "InProgress", PreviousPhase: "InProgress", Source: "poll", GameID: id, CachedGameID: 8980574903, GameIDComparison: "deliberately incorrect", ReceivedAt: 1789370200123})
+	for i, id := range []int64{8980574903, 8980593274, 0} {
+		body.Observations = append(body.Observations, gameflowClientObservation{Reason: "received", Phase: []string{"ChampSelect", "InProgress", "WaitingForStats"}[i], PreviousPhase: "InProgress", Source: "poll", GameID: id, CachedGameID: 8980574903, GameIDComparison: "deliberately incorrect", ReceivedAt: 1789370200123})
 	}
 	body.Observations = append(body.Observations, gameflowClientObservation{Reason: "invalidate", Phase: "Reconnect", PreviousPhase: "InProgress", Source: "sse", GameID: 8980593274, Invalidated: true, PhaseChanged: true})
 	encoded, err := json.Marshal(body)

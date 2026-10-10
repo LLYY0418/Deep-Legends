@@ -685,7 +685,8 @@
     window.dispatchEvent(new CustomEvent("deep-legends:overview-tab", {detail:{current:!activeTab() || Boolean(activeTab()?.current),group:state.activeGroup}}));
   }
 
-  function rerenderTab(tab) {
+  function rerenderTab(tab, reason = "unspecified") {
+    if(tab)tab.overviewRenderReason=reason;
     if (typeof tab?.externalRender === "function") { tab.externalRender(); return; }
     if (tab.overlay) { renderOverlay(); return; }
     renderPlayerTabs();
@@ -731,7 +732,7 @@
 	tab.label = label;
 	tab.icon = identity.profileIconId;
 	renderPlayerTabs();
-	rerenderTab(tab);
+	rerenderTab(tab,"applyOverviewPlayerIdentity");
 	return true;
   }
 
@@ -767,7 +768,7 @@
   }
 
   function paginationCopyFor(tab) {
-    if(matchesPending(tab))return "";
+    if(matchesPending(tab) || globalThis.deepLegendsHistoryFilters?.active(tab) || !(tab.data?.matches?.length) && (tab.initialPageError || tab.error))return "";
 	const data = tab.data || {};
 	const pagination = data.pagination || { hasMore: false };
 	if (tab.quotaRetry) return `<span>外服查询额度恢复中，约 ${Math.max(1, Math.ceil((tab.quotaRetry.retryAt - Date.now()) / 1000))} 秒后自动继续；已加载战绩仍可查看</span>`;
@@ -799,6 +800,7 @@
   function matchListEmptyContent(tab, historyCapability, specialModeEmpty) {
     if (matchesPending(tab)) return renderPendingMatches();
     if (historyServiceState(tab)) return renderHistoryServiceStatus(tab);
+    if(!(tab.data?.matches?.length) && (tab.initialPageError || tab.error))return `<div class="af-empty" role="alert"><strong>战绩暂不可用</strong><p>${escapeHTML(tab.initialPageError || tab.error)}</p><button type="button" data-gameplay-retry>重试</button></div>`;
     if (globalThis.deepLegendsHistoryFilters?.active(tab)) return globalThis.deepLegendsHistoryFilters.empty(tab,advancedFilterContext(tab));
 	if (historyCapability && historyCapability.state !== "available") {
 	  if (historyCapability.detail === "战绩服务器暂时不可用，稍后自动重试") return emptyState(historyCapability.detail,"",true);
@@ -945,7 +947,7 @@
       force = !append;
     }
     if (append && tab.initialPagePending && !tab.quotaRetry) { append = false; force = true; }
-	if (!tabReady(tab)) { rerenderTab(tab); return false; }
+	if (!tabReady(tab)) { rerenderTab(tab,"loadOverview"); return false; }
 	if (force) {
       if(!quiet){clearTimeout(tab.historyServerRetryTimer);clearTimeout(tab.historyCountdownTimer);tab.historyServerRetryTimer=0;tab.historyRetryAt=0;}
       for (const match of tab.data?.matches || []) {
@@ -980,10 +982,10 @@
 	  }
 	  if (tab.data && !force) {
         tab.overviewCardLoad = {startedAt:(typeof performance !== "undefined" ? performance.now() : Date.now()),ready:new Set(),cached:true};
-        rerenderTab(tab);
+        rerenderTab(tab,"loadOverview");
         void loadOPGGSeasonSummary(tab);
         void loadOverviewCurrentGame(tab);
-        void loadMayhemRating(tab);
+        void loadMayhemRating(tab,true);
         return false;
       }
       tab.loading = true;
@@ -997,7 +999,7 @@
     tab.overviewRequestToken = requestToken;
     tab.detailRetryRunning=retryDetails;
     tab.error = "";
-    if(!append && riotTab(tab) && typeof document!=="undefined") {tab.historyFailureClass="";tab.historyWaitStarted=Date.now();clearTimeout(tab.historyWaitTimer);tab.historyWaitTimer=setTimeout(()=>{if(tab.loading && tab.overviewRequestToken===requestToken && !tab.closed && !state.destroyed)rerenderTab(tab);},3000);}
+    if(!append && riotTab(tab) && typeof document!=="undefined") {tab.historyFailureClass="";tab.historyWaitStarted=Date.now();clearTimeout(tab.historyWaitTimer);tab.historyWaitTimer=setTimeout(()=>{if(tab.loading && tab.overviewRequestToken===requestToken && !tab.closed && !state.destroyed)rerenderTab(tab,"loadOverview");},3000);}
     if (!append) tab.initialPageError = "";
 	let appendAdditions = [];
 	let loaded = false;
@@ -1010,13 +1012,15 @@
     let sawPreview = false;
     const baseMatches = [...(tab.data?.matches || [])];
     if (append) showLoadingMoreState(tab);
-    else if (!quiet) rerenderTab(tab);
+    else if (!quiet) rerenderTab(tab,"loadOverview");
     const initialKRPage = !append && !tab.data && riotTab(tab) && Number(state.settings.matchCount) > 5;
     const requestCount = retryDetails ? Number(tab.data?.historyRequested || tab.data?.pagination?.count || 10) : scanCount > 0 ? Math.min(20, scanCount) : !append && (!tab.data || tab.initialPagePending) ? Math.min(riotTab(tab) ? 10 : 20, state.settings.matchCount) : state.settings.matchCount;
     if (initialKRPage) tab.initialPagePending = true;
     try {
-      const begIndex = append ? Math.max(0, Number(tab.nextBegIndex ?? (Number(tab.data?.pagination?.begIndex || 0) + Number(tab.data?.pagination?.count || 0)))) : 0;
-      const verification = { ...(tabGroup(tab) === "pro" && !append ? { expectedTier: tab.expectedTier || "" } : {}), ...(!append && tab.dirty ? { expectGameId: String(tab.dirtyGameId || "0") } : {}) };
+      let begIndex = append ? Math.max(0, Number(tab.nextBegIndex ?? (Number(tab.data?.pagination?.begIndex || 0) + Number(tab.data?.pagination?.count || 0)))) : 0;
+      const searchTime=scanCount>0 && riotTab(tab)?globalThis.deepLegendsHistoryFilters?.serverTimeRange(tab,advancedFilterContext(tab)) || {}:{};
+      if(searchTime.startTime){if(tab.historyTimeStart!==searchTime.startTime){tab.historyTimeStart=searchTime.startTime;tab.historyTimeCursor=0;}begIndex=Number(tab.historyTimeCursor || 0);}
+      const verification = { ...searchTime, ...(tabGroup(tab) === "pro" && !append ? { expectedTier: tab.expectedTier || "" } : {}), ...(!append && tab.dirty ? { expectGameId: String(tab.dirtyGameId || "0") } : {}) };
       const body = tab.current && connected() ? null : JSON.stringify(tab.riotId && !tab.playerRef
 		? { ...verification, gameName: tab.riotId.gameName, tagLine: tab.riotId.tagLine, region: tab.region || "", serverId: tab.serverId || "", count: requestCount, begIndex, force, freshHistory:manual, ...(retryDetails?{retryDetails:true}:{}), matchFilter: tab.matchFilter }
 		: { ...verification, playerRef: tab.playerRef, serverId: tab.serverId || "", count: requestCount, begIndex, force, freshHistory:manual, ...(retryDetails?{retryDetails:true}:{}), matchFilter: tab.matchFilter });
@@ -1057,13 +1061,14 @@
         const ref = partial.player.playerRef;
         if (ref) { rememberTabPlayerRef(tab, ref); tab.playerRef = ref; }
         tab.label = playerLabel(partial.player);
-        rerenderTab(tab);reportDeferredMatchesCard(tab);
+        rerenderTab(tab,"loadOverview");reportDeferredMatchesCard(tab);
       };
       const requestKey = `${append ? "overview-more" : "overview"}:${tab.key}`;
       const payload = tab.current && connected()
 		? await api(`/api/gameplay/overview?count=${requestCount}&begIndex=${begIndex}&force=${force ? 1 : 0}&freshHistory=${manual ? 1 : 0}&matchFilter=${encodeURIComponent(tab.matchFilter || "all")}${verification.expectGameId ? `&expectGameId=${encodeURIComponent(verification.expectGameId)}` : ""}`, {onProgress}, requestKey, timeout)
         : await api("/api/gameplay/overview", { method: "POST", body, onProgress }, requestKey, timeout);
       if (tab.overviewRequestToken !== requestToken) return false;
+      tab.lastOverviewPageBytes=typeof TextEncoder==='function'?new TextEncoder().encode(JSON.stringify(payload)).length:encodeURIComponent(JSON.stringify(payload)).replace(/%[A-F0-9]{2}/g,'x').length;
       tab.matchesReceived=true;tab.recentStatsReceived=true;
       if (payload.proMismatch) markProMismatch(tab);
       if (append) {
@@ -1081,7 +1086,7 @@
 		  pagination.autoPaused = true;
 		  pagination.pauseReason = "上游连续无响应，已暂停自动查找";
         }
-        tab.nextBegIndex = pagination.nextBegIndex;
+        if(searchTime.startTime)tab.historyTimeCursor=pagination.nextBegIndex;else tab.nextBegIndex = pagination.nextBegIndex;
         delete pagination.nextBegIndex;
         tab.data = { ...tab.data, matches: [...baseMatches, ...additions], pagination: { ...pagination, moreError: "" } };
         appendAdditions = additions;
@@ -1175,6 +1180,7 @@
         const delay=Math.max(1000,Number(error.retryAfter || 5)*1000);
         const retry = { timer: 0, append, retryAt: Date.now() + delay, scheduleDelay:delay };
         tab.quotaRetry = retry;
+        if(tab.advancedSearch?.running)tab.searchQuotaUntil=retry.retryAt;
         retry.requestToken=requestToken;retry.filter=filter;retry.count=count;
         scheduleQuotaRetry(tab);
         return false;
@@ -1191,6 +1197,7 @@
         }
         if (!append && error.status === 404 && !/引用/.test(error.message)) markProMismatch(tab);
         if (append) {
+          if(error.status===503 && !riotTab(tab)){tab.historyFailureClass="official";if(tab.advancedSearch)tab.advancedSearch.stopReason="outage";}
           if (error.status === 503) {
             tab.paginationBackoffMs = Math.min(AUTO_PAGE_MAX_BACKOFF_MS, Math.max(AUTO_PAGE_DELAY_MS * 2, Number(tab.paginationBackoffMs || 0) * 2));
             tab.nextAutoAppendAt = Date.now() + tab.paginationBackoffMs;
@@ -1216,7 +1223,7 @@
           setTimeout(() => { if (!tab.closed && !state.destroyed) void handleOverviewIncremental(pending); }, 0);
         }
         if (append) appendOverviewMatches(tab, appendAdditions);
-        else rerenderTab(tab);
+        else rerenderTab(tab,"loadOverview");
         delete tab.detailRetryRunning;
 	  }
 	  if (reloadAfterAppend) {
@@ -1280,7 +1287,7 @@
       return false;
     } finally {
       if (tab.opggSeasonPending === ref) tab.opggSeasonPending = "";
-      if (!state.destroyed && overviewSupplementTarget(tab)?.key === ref) rerenderTab(tab);
+      if (!state.destroyed && overviewSupplementTarget(tab)?.key === ref) updateCareerCards(tab,"opgg_season");
     }
   }
 
@@ -1398,8 +1405,9 @@
   }
 
   function championStatsPending(items,overall,progress,tab) {
-    if(progress?.foreign || historyServiceState(tab))return false;
+    if(progress?.foreign)return false;
     if(Number(overall?.games)>0 || (items || []).some(item=>Number(item.games)>0))return false;
+    if(historyServiceState(tab))return true;
     if(progress && !progress.unavailable)return Boolean(progress.collecting && !progress.complete && !Number(progress.scanned));
     return Boolean(tab?.loading && !tab.recentStatsReceived && !(Number(tab.data?.historyRequested)>0));
   }
@@ -1505,7 +1513,7 @@
         if (detail.rankedQueues[key] && Number(detail.rankedQueues[key].recentRanked?.games || 0) >= Number(queues[key]?.recentRanked?.games || 0)) queues[key] = {...queues[key], ...detail.rankedQueues[key], seasonGames: queues[key]?.seasonGames};
       }
       tab.data = {...tab.data, rankedQueues: queues, recentRanked: Number(detail.recentRanked.games) >= Number(tab.data.recentRanked?.games || 0) ? detail.recentRanked : tab.data.recentRanked};
-      rerenderTab(tab);
+      updateCareerCards(tab,"overview_incremental");
       return true;
     }
 
@@ -1518,7 +1526,7 @@
     if (tab.loading || tab.loadingMore) { tab.pendingHistoricalRanks = detail; return false; }
     if (JSON.stringify(tab.data.historicalRanks) === JSON.stringify(detail.historicalRanks)) return false;
     tab.data = { ...tab.data, historicalRanks: detail.historicalRanks };
-    rerenderTab(tab);
+    updateCareerCards(tab,"overview_incremental");
     return true;
   }
 
@@ -2205,6 +2213,7 @@
       ["activity", `${renderActivity(data.activityHours || [],pendingStats)}${renderOverviewShareButton()}`],
     ].map(([key,markup])=> {
       const titles={'recent-ranked':'近期排位',ability:'能力表现',positions:'位置偏好','recent-players':'最近一起玩',activity:'时间分布'};
+      if(!(data.matches?.length) && (tab.initialPageError || tab.error || historyServiceState(tab)) && !tab.loading && titles[key])return [key,`<section class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="ability-unavailable"><strong>暂不可用</strong></div></section>`];
       if((pendingMatches || pendingAggregates) && titles[key])return [key,`<section class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="career-pending gameplay-skeleton"><span></span><span></span><span></span></div></section>`];
       return [key,!pendingStats && partialHistory && ['recent-ranked','ability','positions','recent-players','activity'].includes(key)?markup.replace('</h3>',`</h3><small class="history-sample-label">基于最近 ${Number(data.historyLoaded ?? data.matches?.length ?? 0)} 场</small>`):markup];
     });
@@ -2227,6 +2236,8 @@
   // 骨架屏上，用户只能看到“一直在加载”。这里兜住异常并切到可重试的错误态，
   // 保证任何单点渲染故障都不会把整页锁死。
   function renderOverviewBody(container, tab) {
+    window.reportFlowDiagnostic?.('overview_rerender_client','render',{reason:tab.overviewRenderReason || 'renderOverview',tabType:tab.current?'self':tabGroup(tab)==='pro' || tab.data?.player?.proPlayer?'pro':riotTab(tab)?'riot':'cn',filterRetained:Boolean(container.querySelector('.match-filterbar')),modalOpen:Boolean(tab.advancedMenu?.open)});
+    if(tab.advancedMenu?.open && container._afBoundTab===tab){tab.overviewRenderDeferred=true;globalThis.deepLegendsHistoryFilters?.refresh(container,tab,advancedFilterContext(tab));return;}
     try {
       activateOverviewView(container, tab);
       renderOverviewBodyContent(container, tab);
@@ -2819,6 +2830,9 @@
   function renderRanks(ranks, capabilities, historicalRanks, rankMilestones, seasonProgress = null, tab = null) {
     const rankedCapability = capabilities.find((item) => item.name === "ranked-stats");
     const mmr = renderRankMMRPopover(tab);
+    if (!ranks.length && (['failed','error','canceled'].includes(rankedCapability?.state) || (tab?.initialPageError || tab?.error) && !tab?.loading)) {
+      return `<section class="career-section rank-career-section"><header><h3>排位</h3></header><div class="rank-unavailable"><strong>暂不可用</strong><button type="button" data-gameplay-retry>重试</button></div></section>`;
+    }
     if (rankedCapability?.state === "unsupported") {
       return `<section class="career-section rank-career-section"><header><h3>排位</h3><div class="rank-header-tools"><span>能力边界</span>${mmr}</div></header><div class="rank-unavailable"><strong>${escapeHTML(rankedCapability.detail || "跨服暂不支持排位")}</strong><small>当前客户端的排位接口只能读取登录服务器。</small></div></section>`;
     }
@@ -2838,14 +2852,14 @@
 
   async function loadMayhemRating(tab, quietStart = false) {
     const current = mayhemRatingStatus(tab);
-    const permanent = current.status === "ready" && (current.data?.available || current.data?.unavailableReason === "未收录" && Date.now()-Number(current.at || 0)<300_000);
+    const permanent = current.status === "ready" && (current.data?.available && Date.now()-Number(current.at || 0)<6*3600_000 || current.data?.unavailableReason === "未收录" && Date.now()-Number(current.at || 0)<3600_000);
     if (!current.playerRef || current.status === "loading" || permanent || riotTab(tab) || !tabServerID(tab)) return;
     const requestToken = Number(tab.mayhemRatingRequestToken || 0) + 1;
     tab.mayhemRatingRequestToken = requestToken;
     tab.mayhemRating = { status: "loading", playerRef: current.playerRef, data: null, error: "" };
-    if (!quietStart) updateMayhemRatingPopover(tab);
+    updateMayhemRatingPopover(tab);
     try {
-      const params = new URLSearchParams({ playerRef: current.playerRef });
+      const params = new URLSearchParams({ playerRef: current.playerRef, ...(quietStart?{prefetch:"1"}:{}) });
       const data = await api(`/api/gameplay/mayhem-rating?${params}`, {}, `mayhem-rating:${tab.key}`, 40000);
       if (tab.closed || tab.mayhemRatingRequestToken !== requestToken || mayhemRatingStatus(tab).playerRef !== current.playerRef) return;
       tab.mayhemRating = { status: data.available || data.unavailableReason === "未收录" ? "ready" : "error", playerRef: current.playerRef, data, error: "", at: Date.now() };
@@ -2871,7 +2885,7 @@
   }
 
   function updateMayhemRatingPopover(tab) {
-    if(typeof document==="undefined") {rerenderTab(tab);return;}
+    if(typeof document==="undefined") {rerenderTab(tab,"updateMayhemRatingPopover");return;}
     const template=document.createElement("template");template.innerHTML=renderRankMMRPopover(tab);
     const fresh=template.content.querySelector(".rank-mmr-popover");
     for(const control of document.querySelectorAll(".rank-mmr-control")) {
@@ -2881,6 +2895,14 @@
     }
   }
 
+  function updateCareerCards(tab, reason) {
+    const container=overviewContainer(tab),root=container?.querySelector('.career-column');if(!root || !tab.data){rerenderTab(tab,reason);return;}
+    if(tab.advancedMenu?.open){tab.overviewRenderDeferred=true;globalThis.deepLegendsHistoryFilters?.refresh(container,tab,advancedFilterContext(tab));return;}
+    root.innerHTML=renderCareerSections(tab.data,tab);container._careerSignature=null;
+    bindPlayerLinks(root,tab);bindRankHistoryControls(root);bindRankedQueueControls(root,tab);bindMayhemRatingControls(root,tab);bindOverviewShareControls(root,container,tab);
+    root.querySelectorAll('[data-overview-subpage]').forEach(button=>button.addEventListener('click',()=>openOverviewSubpage(tab,button.dataset.overviewSubpage)));
+    root.querySelector('[data-gameplay-retry]')?.addEventListener('click',()=>loadOverview(tab,true));applyRenderedMetricStyles(root);prepareImages(root);
+  }
   function renderSeasonDataNote(progress, queue, games, ranks = []) {
     // R257: explicitly requested copy; keep it here when cleaning old UI notes.
     const copy = {title:"数据说明", limit:"受官方接口限制，仅能查询到 {date} 之后的对局。", counted:"已统计 {games} 场", official:" · 官方总场次 {games} 场", future:"此后的新对局会自动累计。"};
@@ -3148,7 +3170,7 @@
     }
     tab.overviewSubpage=page;
     const token=Number(tab.overviewSubpageRequestToken||0)+1;tab.overviewSubpageRequestToken=token;
-    tab.overviewSubpageState={status:"loading",page};rerenderTab(tab);if (scroll) scroll.scrollTop=0;
+    tab.overviewSubpageState={status:"loading",page};rerenderTab(tab,"openOverviewSubpage");if (scroll) scroll.scrollTop=0;
     try {
       const data=await api(`/api/gameplay/${page}?playerRef=${encodeURIComponent(tab.data?.player?.playerRef || tab.playerRef || "")}${page==="champion-table" ? `&queue=${encodeURIComponent(tab.championTableQueue || "420")}` : ""}`,{},`overview-subpage:${tab.key}`,30000);
       if (tab.closed || tab.overviewSubpage!==page || tab.overviewSubpageRequestToken!==token) return;
@@ -3158,7 +3180,7 @@
       if (error.name==="RequestCancelled") { tab.overviewSubpageState={status:"idle",page}; return; }
       tab.overviewSubpageState={status:"failed",page,error:error.message};
     }
-    rerenderTab(tab);
+    rerenderTab(tab,"openOverviewSubpage");
   }
 
   function renderOverviewSubpage(container, tab) {
@@ -3174,7 +3196,7 @@
     container.innerHTML=`<section class="overview-detail-page"><header><button type="button" class="text-button" data-overview-return><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 3-5 5 5 5"/></svg><span>返回总览</span></button>${heading}</header>${tab.overviewSubpage==="champion-table" && !(current.status==="ready" && current.data?.available) ? championTableQueueTabs(tab.championTableQueue || "420") : ""}${current.status==="ready" && current.data?.available ? (tab.overviewSubpage==="masteries" ? renderMasteryDetails(current.data) : renderChampionTable(current.data,tab)) : current.status==="loading" ? '<p class="muted">正在读取…</p>' : `<p class="section-empty">${escapeHTML(current.error || current.data?.detail || "详情读取失败")} <button type="button" class="text-button" data-subpage-retry>重试</button></p>`}</section>`;
     if(note)bindSeasonDataNotes(container);
     container.querySelector("[data-overview-return]")?.addEventListener("click",()=>{
-      tab.overviewSubpage="";rerenderTab(tab);
+      tab.overviewSubpage="";rerenderTab(tab,"renderOverviewSubpage");
       const scroll=container.closest(".player-overlay-scroll")||document.getElementById("app-scroll");if(scroll)scroll.scrollTop=Number(tab.overviewReturnScroll||0);
       document.querySelectorAll(".mastery-details-popover").forEach(node=>node.remove());
     });
@@ -3359,15 +3381,15 @@
     nodes.careerDialogContent.dataset.careerLayout = "";
 
     const syncWidth = () => {
-      const width = container.querySelector(".overview-layout")?.getBoundingClientRect().width || container.getBoundingClientRect().width;
+      const width = container.querySelector(".overview-layout")?.clientWidth || container.clientWidth;
       if (width <= 0) return;
-      if (nodes.careerDialog.open && width > 1020) {
+      if (nodes.careerDialog.open && !container.querySelector("[data-open-career-dialog]")?.offsetParent) {
         closeCareerDialog();
         return;
       }
       const roundedWidth = Math.round(width);
       nodes.careerDialog.style.setProperty("--career-dialog-width", `${roundedWidth}px`);
-      const dialogWidth = Math.min(roundedWidth, Math.max(0, window.innerWidth - 24));
+      const dialogWidth = Math.min(roundedWidth, Math.max(0, (window.innerWidth - 24) / (Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom")) || 1)));
       renderCareerDialogContent(data, tab, dialogWidth <= 640 ? "single" : "masonry");
     };
     state.careerDialogObserver?.disconnect();
@@ -3963,6 +3985,15 @@
         if(typeof collection.checkVisibility==="function" && !collection.checkVisibility({contentVisibilityAuto:true}))return;
         // Hidden or unchanged rows need no descendant scan or layout work.
         const width=collection.clientWidth;if(!width || collection._tagFitWidth===width)return;
+        const main=collection.closest?.('.match-entry')?.querySelector('.match-main');
+        if(main){
+          const rowWidth=main.parentElement.clientWidth;
+          if(main._iconFitWidth!==rowWidth){
+            main._iconFitWidth=rowWidth;main.removeAttribute('data-icon-overlap');
+            const icons=main.querySelector('.match-loadout-mini'),kda=main.querySelector('.match-kda');
+            if(icons && kda){const a=icons.getBoundingClientRect(),b=kda.getBoundingClientRect();if(a.width && b.width && a.right>b.left+.5 && a.left<b.right-.5 && a.bottom>b.top+.5 && a.top<b.bottom-.5)main.setAttribute('data-icon-overlap','');}
+          }
+        }
         const items=[...collection.querySelectorAll("[data-match-tag]")],more=collection.querySelector("[data-match-tags-more]");
         if(!more)return;
         collection._tagFitWidth=width;
@@ -3995,14 +4026,15 @@
     const nodes=new Map();
     for(const node of container.querySelectorAll("[data-match-id]")){const id=node.getAttribute("data-match-id");if(!nodes.has(id))nodes.set(id,node);}
     const matches=(tab.data?.matches || []).filter(match=>!match.tagsAvailable && match.result!=="remake" && match.result!=="unknown" && ![1700,1710].includes(Number(match.queueId)) && matchTierNodeIsVisible(nodes.get(String(match.gameId)),root));
+    const diagnosticBatch=`timeline-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
     tab.matchTagsHydrating=true;let next=0;
     const keys=new Set(),monitor=setInterval(()=>{if(!matchTagsBackgroundAllowed(tab) || !container.isConnected)for(const key of keys)state.controllers?.get(key)?.abort();},200);
     const worker=async()=>{while(next<matches.length && matchTagsBackgroundAllowed(tab) && container.isConnected) {
       const match=matches[next++],subject=matchSubject(match,tab.data?.player?.playerRef);if(!subject)continue;
       const key=`match-timeline:${matchTimelineKey(match,subject,tab)}`;keys.add(key);
-      try {await ensureMatchTimeline(match,subject,tab);}finally{keys.delete(key);}
+      try {await ensureMatchTimeline(match,subject,tab,diagnosticBatch);}finally{keys.delete(key);}
     }};
-    void Promise.all([worker(),worker()]).finally(()=>{clearInterval(monitor);tab.matchTagsHydrating=false;});
+    void Promise.all([worker(),worker()]).finally(()=>{clearInterval(monitor);tab.matchTagsHydrating=false;recordTimelineClient("complete",diagnosticBatch);});
   }
 
   function renderMatch(match, playerRef, tab) {
@@ -4587,17 +4619,17 @@
     return `${riotTab(tab) ? "kr" : `cn:${tabServerID(tab) || "current"}`}:${match.gameId}`;
   }
 
-  function recordTimelineClient(reason) {
+  function recordTimelineClient(reason, diagnosticBatch = "") {
     void fetch("/api/diagnostics/client", {
       method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({event: "match_timeline_client", reason}),
+      body: JSON.stringify({event: "match_timeline_client", reason,diagnosticBatch}),
     }).catch(() => {});
   }
 
-  async function ensureMatchTimeline(match, subject, tab) {
+  async function ensureMatchTimeline(match, subject, tab, diagnosticBatch = "") {
     const participantId = Number(subject?.participantId);
-    if (!match || !participantId) { recordTimelineClient("missing-participant"); return; }
+    if (!match || !participantId) { recordTimelineClient("missing-participant",diagnosticBatch); return; }
     // 国服时间线需要本机客户端（或 SGP 令牌）；未连接时不请求。
     if (!riotTab(tab) && !connected()) return;
     const key = matchTimelineKey(match, subject, tab);
@@ -4609,17 +4641,17 @@
       const result = await api("/api/gameplay/match-timeline", {
         method: "POST",
         body: JSON.stringify({
-          gameId: Number(match.gameId), region: riotTab(tab) ? tab.region : "",
+          diagnosticBatch,gameId: Number(match.gameId), region: riotTab(tab) ? tab.region : "",
           serverId: tabServerID(tab), playerRef: tab.data?.player?.playerRef || tab.playerRef || "",
         }),
       }, `match-timeline:${key}`, 25000);
       state.matchTimelines.set(key, result && typeof result === "object" ? result : { available: false });
       if(Array.isArray(result?.tags) && result.tags.length>0)match.tagsAvailable=true;
-      if (!result?.available) recordTimelineClient("unavailable");
+      if (!result?.available) recordTimelineClient("unavailable",diagnosticBatch);
       settled = true;
     } catch (error) {
       if (error.name !== "RequestCancelled") {
-        recordTimelineClient("request-failed");
+        recordTimelineClient("request-failed",diagnosticBatch);
         state.matchTimelines.set(key, { available: false, detail: error.message });
         settled = true;
       }
@@ -5079,13 +5111,15 @@
     tab.nextBegIndex=0;tab.matchViewRevision=Number(tab.matchViewRevision || 0)+1;
   }
 
-  function cancelAdvancedMatchSearch(tab) {
+  function cancelAdvancedMatchSearch(tab, waitForSettle = false) {
     if(!tab)return;
+    const search=tab.advancedSearch;
     globalThis.deepLegendsHistoryFilters?.cancel(tab,()=>{
       state.controllers.get(`overview-more:${tab.key}`)?.abort();
       tab.overviewRequestToken=Number(tab.overviewRequestToken || 0)+1;
       tab.loadingMore=false;
     });
+    if(search && !waitForSettle)search.running=false;
   }
 
   async function ensureHistoryFilterSearch(tab) {
@@ -5107,20 +5141,25 @@
     const isActive=()=>!state.destroyed && !tab.closed && (tab.overlay ? state.overlay.at(-1)===tab : activeTab(overviewGroupForSection())===tab) && (!tab.current || connected());
     return {rows,version:()=>tab.data?.matches || tab,subject:match=>matchSubject(match,tab.data?.player?.playerRef || tab.playerRef),tags:matchDataTags,
       seasonStart:tab.data?.seasonStart,storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)},
-      cursor:()=>Number(tab.nextBegIndex || Number(tab.data?.pagination?.begIndex || 0)+Number(tab.data?.pagination?.count || 0)),
+      cursor:()=>af?.serverTimeRange(tab,{seasonStart:tab.data?.seasonStart}).startTime ? Number(tab.historyTimeCursor || 0) : Number(tab.nextBegIndex || Number(tab.data?.pagination?.begIndex || 0)+Number(tab.data?.pagination?.count || 0)),
       heroSearch:(query,id,label)=>window.deepLegendsChampionSearch?.scoreOption(query,id,label) || window.deepLegendsRuntime.scoreChampionSearchOption(query,id,label,state.historyFilterCatalog?.champions?.find(row=>Number(row.id)===Number(id))),
       ensureSearch:()=>{void ensureHistoryFilterSearch(tab);},
       stylesReady:()=>Boolean(state.historyFilterStylesReady),ensureStyles:ensureHistoryFilterStyles,
       icon:(id,label)=>iconFigure("champion",id,label,"small",false),positionIcon,multiTag:renderMultiKillTag,
       container:()=>overviewContainer(tab),prepare:prepareImages,error:showToast,
+      diagnostic:(reason,fields)=>window.reportFlowDiagnostic?.(reason==='history_search_client'?reason:'overview_rerender_client',reason==='history_search_client'?fields.stop_reason:reason,fields),
+      flush:()=>{if(tab.overviewRenderDeferred){tab.overviewRenderDeferred=false;rerenderTab(tab,'filter_closed');}},
       isActive,
-      stop:()=>cancelAdvancedMatchSearch(tab),
+      stop:()=>cancelAdvancedMatchSearch(tab,true),foreign:()=>riotTab(tab),outage:()=>Boolean(historyServiceState(tab)),quotaUntil:()=>tab.quotaRetry?.retryAt || tab.searchQuotaUntil || 0,pageBytes:()=>tab.lastOverviewPageBytes || 0,
       load:count=>loadOverview(tab,false,true,true,false,count),
       find:()=>af.find(tab,advancedFilterContext(tab)),
       render:()=>{if(isActive()) {renderFilteredMatchView(tab);prepareImages(overviewContainer(tab));}},
-      progress:()=>{if(isActive())appendOverviewMatches(tab,[]);},
-      change:()=>{cancelAdvancedMatchSearch(tab);tab.filteredVisibleCount=20;tab.matchViewRevision=Number(tab.matchViewRevision || 0)+1;
-        renderFilteredMatchView(tab);prepareImages(overviewContainer(tab));
+      progress:()=>{if(isActive()){appendOverviewMatches(tab,[]);clearTimeout(tab.searchCountdownTimer);const seconds=Math.ceil((tab.searchQuotaUntil-Date.now())/1000);if(seconds>0)tab.searchCountdownTimer=setTimeout(()=>{if(!tab.closed && isActive())advancedFilterContext(tab).progress();},1000);}},
+      change:()=>{cancelAdvancedMatchSearch(tab);
+        const container=overviewContainer(tab),bar=container?.querySelector('.match-filterbar');
+        if(bar){const template=document.createElement('template');template.innerHTML=af.renderConditions(tab,()=>advancedFilterContext(tab));const old=bar.querySelector('[data-af-conditions]');if(old)old.remove();if(template.content.firstElementChild)bar.append(template.content.firstElementChild);}
+        tab.filteredVisibleCount=20;tab.matchViewRevision=Number(tab.matchViewRevision || 0)+1;
+        tab.overviewRenderDeferred=false;rerenderTab(tab,'filter_commit');prepareImages(overviewContainer(tab));
         if(af.active(tab))void af.find(tab,advancedFilterContext(tab));},
     };
   }
@@ -5132,7 +5171,7 @@
       await ensureAdvancedFilters();
     });
     for (const button of container.querySelectorAll("[data-match-filter]")) button.addEventListener("click", () => updateMatchFilter(tab, button.dataset.matchFilter));
-    if (globalThis.deepLegendsHistoryFilters) {globalThis.deepLegendsHistoryFilters.bind(container,tab,()=>advancedFilterContext(tab));globalThis.deepLegendsHistoryFilters.decorate(container,tab,advancedFilterContext(tab));}
+    if (globalThis.deepLegendsHistoryFilters && container.querySelector('[data-af-root]')) {globalThis.deepLegendsHistoryFilters.bind(container,tab,()=>advancedFilterContext(tab));globalThis.deepLegendsHistoryFilters.decorate(container,tab,advancedFilterContext(tab));}
     bindAppSelect(container.querySelector("[data-match-more-select]"), (value) => {
       if (value) updateMatchFilter(tab, value);
     });
@@ -5148,6 +5187,7 @@
   }
 
   function restoreMatchFilterDOM(tab, view) {
+    if(tab.advancedMenu?.open){tab.overviewRenderDeferred=true;globalThis.deepLegendsHistoryFilters?.refresh(overviewContainer(tab),tab,advancedFilterContext(tab));return false;}
     const container=overviewContainer(tab),list=container?.querySelector(".match-list");
     if(!list || !view.list)return false;
     list.replaceWith(view.list);view.fragment?.appendChild(list);
@@ -5316,6 +5356,7 @@
   }
 
   function renderFilteredMatchView(tab, restoreScroll = false) {
+    if(tab.advancedMenu?.open){tab.overviewRenderDeferred=true;globalThis.deepLegendsHistoryFilters?.refresh(overviewContainer(tab),tab,advancedFilterContext(tab));return;}
     const container = overviewContainer(tab);
     const data = tab.data;
     if (!container || !data) return;
@@ -5385,7 +5426,7 @@
     const cached = workspace?._overviewViews?.get(tab)?.content;
     const scope = tab.overlay && state.overlay[state.overlay.length - 1] !== tab ? cached : container || cached;
     const entry = [...(scope?.querySelectorAll(".match-entry") || [])].find(item => item.dataset.matchId === String(id));
-    if (entry) {replaceMatchEntry(entry,tab,()=>rerenderTab(tab),scope===cached);return;}
+    if (entry) {replaceMatchEntry(entry,tab,()=>rerenderTab(tab,"rerenderMatch"),scope===cached);return;}
     for(const [filter,view] of tab.matchViews || []) {
       const retainedEntry=view.list?.querySelector(`[data-match-id="${id}"]`);
       if(!retainedEntry)continue;
@@ -5565,7 +5606,7 @@
     bindSummonerCopy(container);
     for (const button of container.querySelectorAll("[data-overview-subpage]")) button.addEventListener("click",()=>openOverviewSubpage(tab,button.dataset.overviewSubpage));
     container.querySelector("[data-complete-overview]")?.addEventListener("click", () => loadOverview(tab, true, false, true, true));
-    const rerender = () => rerenderTab(tab);
+    const rerender = () => rerenderTab(tab,"bindOverviewContent");
     bindPlayerLinks(container, tab);
     bindOverviewShareControls(container, container, tab);
     container.querySelector("[data-open-career-dialog]")?.addEventListener("click", (event) => openCareerDialog(container, tab, event.currentTarget));
@@ -5596,10 +5637,10 @@
       const allowed = scope === "recent" ? ["420", "440", MAYHEM_QUEUE_TAB_KEY] : ["420", "440"];
       if (!allowed.includes(queue) || tab[stateKey] === queue) return;
       tab[stateKey] = queue;
-      rerenderTab(tab);
+      updateCareerCards(tab,"ranked_queue");
       if (nodes.careerDialog?.open && tab.data && nodes.careerDialogContent) {
         nodes.careerDialogContent.dataset.careerLayout = "";
-        const width = nodes.careerDialogContent.getBoundingClientRect().width || nodes.careerDialog.getBoundingClientRect().width || window.innerWidth;
+        const width = nodes.careerDialogContent.clientWidth || nodes.careerDialog.clientWidth || window.innerWidth;
         renderCareerDialogContent(tab.data, tab, width <= 640 ? "single" : "masonry");
       }
     });
@@ -9311,7 +9352,7 @@
   function handleSelfOverviewTimeout() {
     for (const tab of state.tabs || []) if (tab.current && !tab.overviewCardLoad?.selfReady) {
       tab.error = "总览读取超时，请重试";
-      rerenderTab(tab);
+      rerenderTab(tab,"handleSelfOverviewTimeout");
     }
   }
   window.addEventListener("deep-legends:self-overview-timeout", handleSelfOverviewTimeout);

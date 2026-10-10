@@ -289,6 +289,9 @@ type app struct {
 	unknownQueueDiagnosticIDs           map[int64]struct{}
 	perkDiagnosticMu                    sync.Mutex
 	perkDiagnosticCounts                map[string]int
+	compactDiagnosticMu                 sync.Mutex
+	compactDiagnosticWindows            map[string]compactDiagnosticWindow
+	timelineDiagnosticBatches           map[string]*timelineDiagnosticBatch
 	diagnosticDedupMu                   sync.Mutex
 	diagnosticDedupCounts               map[string]int
 	proIdentityDiagnosticMu             sync.Mutex
@@ -1851,6 +1854,11 @@ func (a *app) clearAssetCache() {
 }
 
 func (a *app) recordDiagnostic(event map[string]any) {
+	var keep bool
+	event, keep = a.compactDiagnostic(event, time.Now())
+	if !keep {
+		return
+	}
 	if event["event"] == "client_launch_to_connected" {
 		event = allowClientLaunchTimingDiagnostic(event)
 	}

@@ -12,6 +12,8 @@ import (
 )
 
 type riotRouteKey struct{}
+type riotPinnedCredentialKey struct{}
+type riotPinnedCredential struct{ key, source string }
 type riotFallbackAttemptKey struct{}
 type riotForegroundState struct {
 	sync.Mutex
@@ -64,6 +66,9 @@ func riotRequestCredential(ctx context.Context) (string, string) {
 	if route, _ := ctx.Value(riotRouteKey{}).(string); route == "relay" {
 		return "", "relay"
 	}
+	if credential, ok := ctx.Value(riotPinnedCredentialKey{}).(riotPinnedCredential); ok {
+		return credential.key, credential.source
+	}
 	return riotUserKeys.effective()
 }
 func riotCancelReason(ctx context.Context) string {
@@ -99,18 +104,22 @@ func (p *riotProvider) relayFallback(ctx context.Context, host, path string, que
 		p.relayProvider = newRiotProvider(p.champions)
 		p.relayProvider.platform = p.platform
 		p.relayProvider.foreground = p.foreground
+		p.relayProvider.puuidState = p.puuidState
 	}
 	relay := p.relayProvider
 	p.platformMu.Unlock()
 	ctx = context.WithValue(ctx, riotRouteKey{}, "relay")
 	ctx = context.WithValue(ctx, riotFallbackAttemptKey{}, true)
-	return relay.getLimitedRoute(ctx, host, path, query, out, max)
+	return relay.getScopedPUUID(ctx, host, path, query, out, max)
 }
 
 func (p *riotProvider) getLimited(ctx context.Context, host, path string, query url.Values, out any, max int64) error {
+	if route, _ := ctx.Value(riotRouteKey{}).(string); route != "" {
+		return p.getScopedPUUID(ctx, host, path, query, out, max)
+	}
 	_, source := riotUserKeys.effective()
 	if source != "embedded" {
-		return p.getLimitedRoute(ctx, host, path, query, out, max)
+		return p.getScopedPUUID(ctx, host, path, query, out, max)
 	}
 	if isRiotBackground(ctx) {
 		return p.relayFallback(ctx, host, path, query, out, max)
@@ -149,9 +158,12 @@ func (p *riotProvider) getLimited(ctx context.Context, host, path string, query 
 		}
 		p.routeRecord(map[string]any{"event": "riot_route_switch", "from": "relay", "to": "direct", "reason": "probe_recovered"})
 	}
-	err := p.getLimitedRoute(ctx, host, path, query, out, max)
+	err := p.getScopedPUUID(ctx, host, path, query, out, max)
 	var status *riotStatusError
 	if errors.As(err, &status) {
+		if status.puuidMismatch {
+			return p.relayFallback(ctx, host, path, query, out, max)
+		}
 		if status.status == 401 || status.status == 403 {
 			s.mu.Lock()
 			s.embeddedRejected = true

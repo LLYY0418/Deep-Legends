@@ -68,6 +68,8 @@ var (
 var hiddenPlayerUUIDMask = [16]byte{0x81, 0x70, 0x76, 0xa9, 0xf4, 0x51, 0x50, 0x9b, 0x95, 0x98, 0x68, 0x13, 0xce, 0x91, 0x17, 0xe7}
 
 type gameplayOverviewRequest struct {
+	StartTime    int64  `json:"startTime,omitempty"`
+	EndTime      int64  `json:"endTime,omitempty"`
 	ExpectedTier string `json:"expectedTier,omitempty"`
 	PlayerRef    string `json:"playerRef"`
 	GameName     string `json:"gameName"`
@@ -807,6 +809,9 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		fresh := value == "1" || strings.EqualFold(value, "true")
 		request.FreshHistory = &fresh
 	}
+	if request.StartTime > 0 && request.EndTime >= request.StartTime {
+		r = r.WithContext(context.WithValue(r.Context(), riotHistoryTimeRangeKey{}, riotHistoryTimeRange{request.StartTime, request.EndTime}))
+	}
 	if request.FreshHistory != nil {
 		r = r.WithContext(context.WithValue(r.Context(), overviewFreshHistoryKey{}, *request.FreshHistory))
 	}
@@ -898,7 +903,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 			reference = gameplayReference{GameName: request.GameName, TagLine: request.TagLine, Region: riotPlatform(request.Region)}
 		}
 		phases.mark("identity")
-		stream = strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
+		stream = request.BegIndex == 0 && strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
 		streamStarted := false
 		var emitMu sync.Mutex
 		emit := func(value any) {
@@ -926,9 +931,6 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 				}))
 			}
 		}
-		if reference.PlayerRef == "" {
-			reference.PlayerRef = a.knownProPUUID(reference)
-		}
 		response, err := a.loadRiotOverviewDeduplicated(r.Context(), reference, request.BegIndex, request.Count, request.Force, request.MatchFilter)
 		phases.mu.Lock()
 		phases.last = time.Now()
@@ -946,6 +948,11 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response.Pagination.Filter = request.MatchFilter
+		if request.BegIndex > 0 {
+			respondJSON(w, riotOverviewPage{response.Player, response.Matches, response.Pagination, response.Capabilities})
+			phases.mark("serialize")
+			return
+		}
 		a.verifyExpectedOverviewGame(r.Context(), nil, reference, request, &response)
 		// Comparison is request-local: never mutate the shared overview cache.
 		payload := struct {

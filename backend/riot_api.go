@@ -139,6 +139,7 @@ type riotMatchFlight struct {
 }
 
 type riotProvider struct {
+	puuidState       *riotPUUIDState
 	foreground       *riotForegroundState
 	relayProvider    *riotProvider
 	platform         string
@@ -270,7 +271,7 @@ func riotOverviewCostTrackerFromContext(ctx context.Context) *riotOverviewCostTr
 
 func newRiotProvider(champions *championProvider) *riotProvider {
 	return &riotProvider{
-		foreground: &riotForegroundState{}, matchConcurrency: configuredRiotMatchConcurrency(), matchDisk: newRiotMatchDiskCache(champions), identityDisk: newRiotIdentityCache(champions),
+		puuidState: &riotPUUIDState{recoveries: make(map[string]*riotPUUIDRecovery)}, foreground: &riotForegroundState{}, matchConcurrency: configuredRiotMatchConcurrency(), matchDisk: newRiotMatchDiskCache(champions), identityDisk: newRiotIdentityCache(champions),
 		champions: champions, matchCache: make(map[string]*riotMatch), accountCache: make(map[string]riotAccountCacheEntry), accountFlights: make(map[string]*riotAccountFlight),
 		specialistCache: make(map[string]specialistRuneCacheEntry), specialistFlights: make(map[string]*specialistRuneFlight), specialistRecent: make(map[string]specialistRecentSummaryCacheEntry), specialistSlots: make(chan struct{}, specialistRunePlayerLimit),
 	}
@@ -736,6 +737,7 @@ func riotErrorStatus(err error) int {
 /* ---------- Riot API 数据结构（只保留项目需要的字段） ---------- */
 
 type riotAccount struct {
+	scope    string
 	PUUID    string `json:"puuid"`
 	GameName string `json:"gameName"`
 	TagLine  string `json:"tagLine"`
@@ -890,7 +892,33 @@ type riotMatch struct {
 /* ---------- 端点封装 ---------- */
 
 func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine string) (riotAccount, error) {
-	key := strings.ToLower(strings.TrimSpace(gameName)) + "\x1f" + strings.ToLower(strings.TrimSpace(tagLine))
+	ctx = riotPinnedIdentityContext(ctx)
+	account, err := p.accountByRiotIDPinned(ctx, gameName, tagLine)
+	if err != nil && riotCredentialScope(ctx) == "embedded" && ctx.Err() == nil {
+		var status *riotStatusError
+		fallback := !errors.As(err, &status)
+		if status != nil {
+			fallback = status.status == 401 || status.status == 403 || status.status == 429
+			riotUserKeys.mu.Lock()
+			if status.status == 401 || status.status == 403 {
+				riotUserKeys.embeddedRejected = true
+			}
+			if status.status == 429 {
+				riotUserKeys.routeUntil = time.Now().Add(time.Duration(status.retryAfter) * time.Second)
+			}
+			riotUserKeys.mu.Unlock()
+		}
+		if fallback {
+			ctx = context.WithValue(ctx, riotRouteKey{}, "relay")
+			account, err = p.accountByRiotIDPinned(ctx, gameName, tagLine)
+		}
+	}
+	account.scope = riotCredentialScope(ctx)
+	return account, err
+}
+func (p *riotProvider) accountByRiotIDPinned(ctx context.Context, gameName, tagLine string) (riotAccount, error) {
+	ctx = riotPinnedIdentityContext(ctx)
+	key := riotAccountMemoryKey(ctx, gameName, tagLine)
 	now := time.Now()
 	p.accountMu.Lock()
 	previousFailures := p.accountCache[key].failures
@@ -947,7 +975,7 @@ func (p *riotProvider) fetchAccountByRiotID(ctx context.Context, gameName, tagLi
 	identity := "account:" + strings.ToLower(gameName+"#"+tagLine)
 	diskHit := false
 	if p.identityDisk != nil {
-		if entry, err := p.identityDisk.readDisk(p.identityKey(identity)); err == nil && time.Now().Before(entry.ExpiresAt) {
+		if entry, err := p.identityDisk.readDisk(p.identityContextKey(ctx, identity)); err == nil && time.Now().Before(entry.ExpiresAt) {
 			diskHit = true
 		}
 	}
@@ -962,7 +990,7 @@ func (p *riotProvider) fetchAccountByRiotID(ctx context.Context, gameName, tagLi
 		return nil
 	})
 	if err == nil && diskHit {
-		p.refreshPersistedAccount(identity, path)
+		p.refreshPersistedAccount(ctx, identity, path)
 	}
 	return account, err
 }
@@ -1018,6 +1046,12 @@ func (p *riotProvider) matchIDs(ctx context.Context, puuid string, start, count 
 func (p *riotProvider) matchIDsFiltered(ctx context.Context, puuid string, start, count int, queueID int64, matchType string) ([]string, error) {
 	var ids []string
 	query := url.Values{"start": {strconv.Itoa(start)}, "count": {strconv.Itoa(count)}}
+	if span, ok := ctx.Value(riotHistoryTimeRangeKey{}).(riotHistoryTimeRange); ok && span.Start > 0 {
+		query.Set("startTime", strconv.FormatInt(span.Start, 10))
+		if span.End > 0 {
+			query.Set("endTime", strconv.FormatInt(span.End, 10))
+		}
+	}
 	if queueID > 0 {
 		query.Set("queue", strconv.FormatInt(queueID, 10))
 	}
@@ -1578,18 +1612,21 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	}
 	gameName := strings.TrimSpace(reference.GameName)
 	tagLine := strings.TrimSpace(reference.TagLine)
+	resolvedScope := ""
 	if puuid == "" {
+		lookupCtx := riotPinnedIdentityContext(ctx)
+		resolvedScope = riotCredentialScope(lookupCtx)
 		var account riotAccount
 		err := errRiotNotFound
 		if tagLine != "" {
-			account, err = provider.accountByRiotID(ctx, gameName, tagLine)
+			account, err = provider.accountByRiotID(lookupCtx, gameName, tagLine)
 		}
 		if errors.Is(err, errRiotNotFound) {
 			// 编号错误或玩家改过名时，Riot 的精确查询会直接 404，而 OP.GG
 			// 按名称模糊搜索仍能找到人。这里用 OP.GG 自动补全接口纠正
 			// 编号后重查一次，让搜索体验与 OP.GG 一致。
 			if corrected, ok := a.opggResolveRiotID(ctx, gameName); ok && !strings.EqualFold(corrected.TagLine, tagLine) {
-				account, err = provider.accountByRiotID(ctx, corrected.GameName, corrected.TagLine)
+				account, err = provider.accountByRiotID(lookupCtx, corrected.GameName, corrected.TagLine)
 			}
 		}
 		if errors.Is(err, errRiotNotFound) {
@@ -1605,9 +1642,11 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			return gameplayOverview{}, err
 		}
 		puuid = account.PUUID
+		resolvedScope = account.scope
 		gameName = account.GameName
 		tagLine = account.TagLine
 	}
+	ctx = context.WithValue(ctx, riotLookupIdentityKey{}, riotLookupIdentity{gameName, tagLine, puuid, resolvedScope})
 	phases.markSpan("account", phaseStarted, time.Now())
 	cardReference := mergeGameplayReferences(gameplayReference{PlayerRef: puuid, GameName: gameName, TagLine: tagLine, Region: provider.region()}, reference)
 	cardPlayer := Summoner{PUUID: puuid, GameName: gameName, TagLine: tagLine, ProfileIconID: reference.ProfileIconID, SummonerLevel: reference.SummonerLevel}
@@ -1759,7 +1798,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		for _, detail := range ready {
 			if detail != nil {
 				a.checkArenaRiotMatchTruth(detail)
-				match := riotConvertMatch(detail, puuid, names, queueLabels)
+				match := riotConvertMatch(detail, riotMatchSubjectPUUID(detail, puuid, gameName, tagLine), names, queueLabels)
 				a.recordMatchScores("riot", match, ctx)
 				if !isCustomGameplayMatch(match) {
 					partial.Matches = append(partial.Matches, match)
@@ -1866,10 +1905,9 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			continue
 		}
 		a.checkArenaRiotMatchTruth(detail)
-		match := riotConvertMatch(detail, puuid, names, queueLabels)
+		match := riotConvertMatch(detail, riotMatchSubjectPUUID(detail, puuid, gameName, tagLine), names, queueLabels)
 		a.recordMatchScores("riot", match, ctx)
-		a.recordDiagnostic(riotMatchItemsDiagnostic(match))
-		a.recordDiagnostic(map[string]any{"event": "riot_match_mode", "queue_id": detail.Info.QueueID, "game_mode": detail.Info.GameMode, "queue_label": match.QueueLabel})
+
 		if !isCustomGameplayMatch(match) {
 			matches = append(matches, match)
 		}
@@ -1881,6 +1919,21 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}
 	}
 	a.recordRiotPerkDiagnostics("riot", perkInfos, puuid, 0)
+	modes := map[string]int{}
+	maxItems := 0
+	for _, match := range matches {
+		modes[match.ModeGroup]++
+		for _, player := range match.Participants {
+			n := 0
+			for _, id := range player.ItemIDs {
+				if id > 0 {
+					n++
+				}
+			}
+			maxItems = max(maxItems, n)
+		}
+	}
+	a.recordDiagnostic(map[string]any{"event": "riot_matches_summary", "matches": len(matches), "modes": modes, "max_items": maxItems})
 	historyCapability := EndpointCapability{Name: "match-history", Path: "riot: /lol/match/v5/matches/by-puuid", State: capabilityAvailable, Count: len(ids)}
 	if err != nil {
 		historyCapability.State = capabilityUnsupported

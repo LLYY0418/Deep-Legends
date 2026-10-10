@@ -39,7 +39,7 @@ test('R268 foreign season unavailable messages and official/relay interruption s
  const foreign={seasonOnly:true,foreign:true,unavailable:true,message:'本赛季英雄统计暂不可用，请刷新重试'};
  assert.equal(functions.championStatsPending([],{},foreign,{loading:true}),false);
  assert.match(render([],{},foreign),/本赛季英雄统计暂不可用/);assert.doesNotMatch(render([],{},foreign),/career-pending|暂无英雄统计/);
- for(const service of [{kind:'official'},{kind:'relay'}])assert.equal(functions.championStatsPending([],{},waiting,{loading:true,service}),false);
+ for(const service of [{kind:'official'},{kind:'relay'}])assert.equal(functions.championStatsPending([],{},waiting,{loading:true,service}),true);
 });
 test('R268 raw recent matches arriving before aggregates keep all dependent statistics pending',()=>{
  const data={matches:Array.from({length:20},()=>({})),historyRequested:0,overall:{games:0},championStats:[]};

@@ -651,3 +651,25 @@ func publicRiotMatchCacheKey(key string) bool {
 	}
 	return false
 }
+
+func (c *championDataCache) invalidate(key string) {
+	c.mu.Lock()
+	if entry, ok := c.entries[key]; ok {
+		c.bytes -= len(entry.Data)
+		delete(c.entries, key)
+	}
+	for i, value := range c.order {
+		if value == key {
+			c.order = append(c.order[:i], c.order[i+1:]...)
+			break
+		}
+	}
+	c.mu.Unlock()
+	c.diskMu.Lock()
+	path := c.pathFor(key)
+	if err := os.Remove(path); err == nil {
+		c.strictBytes -= c.strictEntries[path].size
+		delete(c.strictEntries, path)
+	}
+	c.diskMu.Unlock()
+}

@@ -130,11 +130,12 @@
   };
   // Error budget: retain counts.
   const be = { error:0, unhandledrejection:0, csp:0 }, eq = new Map();
-  let busy=false, deferred=0;
+  let busy=false, deferred=0;const errorSeen=new Map();
   const flushErrors = async () => {
     if(busy || !eq.size)return;
     const [kind,details]=eq.entries().next().value;eq.delete(kind);busy=true;
-    const body={event:"browser_error_client",reason:kind,...details,counts:{...be},total:be.error+be.unhandledrejection+be.csp,errorDeferred:deferred};
+    const {errorKind,...fields}=details;
+    const body={event:"browser_error_client",reason:errorKind || kind,...fields,counts:{...be},total:be.error+be.unhandledrejection+be.csp,errorDeferred:deferred};
     const encoded=JSON.stringify(body);flowPending.add(encoded);
     try{await sendFlowDiagnostic(body,encoded,0);}finally{setTimeout(()=>{busy=false;void flushErrors();},2000)?.unref?.();}
   };
@@ -145,10 +146,16 @@
     if(eq.has(kind) || busy)deferred=Math.min(1000000,deferred+1);
     const errorType=["Error","TypeError","ReferenceError","RangeError","SyntaxError","URIError","EvalError","AggregateError"].includes(fields.errorType)?fields.errorType:"Error";
     let scriptName="other";try{const name=new URL(fields.filename,location.origin).pathname.split('/').pop();if(/^[a-z][a-z0-9-]{0,60}\.(?:js|cjs)$/.test(name))scriptName=name;}catch{}
-    eq.set(kind,{errorType,scriptName,line:clampError(fields.line),column:clampError(fields.column),cspDirective:String(fields.directive || "").slice(0,40)});
+    let message=String(fields.message || '').replace(/(https?:\/\/[^\s?"']+)\?[^\s"']*/g,'$1?[redacted]').replace(/(\/Users\/|\/home\/|[A-Za-z]:\\Users\\)[^/\\\s]+/g,'$1[redacted]').replace(/[^\s"'<>]+#[^\s"'<>]+/g,'[player]');
+    for(const n of (typeof document==='undefined'?[]:document.querySelectorAll?.('.summoner-strip h2,[data-copy-riot-id],[data-player-label]') || [])) {const value=n.dataset?.copyRiotId || n.dataset?.playerLabel || n.textContent?.trim();if(value && value.length>=2)message=message.split(value).join('[player]');}
+    message=[...message].slice(0,160).join('');
+    const stack=String(fields.stack || '').split('\n').map(row=>row.match(/([A-Za-z0-9_-]+\.(?:js|cjs))(?:\?[^)\s]*?)?:(\d+):(\d+)/)?.slice(1).join(':')).filter(Boolean).slice(0,3);
+    const signature=JSON.stringify([kind,errorType,scriptName,message,stack]),now=Date.now(),prior=errorSeen.get(signature);
+    if(prior && now-prior.at<60000){prior.count++;deferred++;const queued=eq.get(signature);if(queued)queued.repeatCount=prior.count;return;}errorSeen.set(signature,{at:now,count:1});if(errorSeen.size>128)errorSeen.delete(errorSeen.keys().next().value);
+    eq.set(signature,{errorKind:kind,errorType,scriptName,message,stack,line:clampError(fields.line),column:clampError(fields.column),cspDirective:String(fields.directive || "").slice(0,40),repeatCount:prior?.count || 1});
     void flushErrors();
   };
-  for(const [name,kind] of [["error","error"],["unhandledrejection","unhandledrejection"],["securitypolicyviolation","csp"]])window.addEventListener?.(name,e=>window.reportBrowserErrorDiagnostic(kind,{errorType:(e.error || e.reason)?.name,filename:e.filename || e.sourceFile,line:e.lineno || e.lineNumber,column:e.colno || e.columnNumber,directive:e.effectiveDirective}));
+  for(const [name,kind] of [["error","error"],["unhandledrejection","unhandledrejection"],["securitypolicyviolation","csp"]])window.addEventListener?.(name,e=>window.reportBrowserErrorDiagnostic(kind,{message:e.message || (e.error || e.reason)?.message,stack:(e.error || e.reason)?.stack,errorType:(e.error || e.reason)?.name,filename:e.filename || e.sourceFile,line:e.lineno || e.lineNumber,column:e.colno || e.columnNumber,directive:e.effectiveDirective}));
   // Keep individual phase observations (including identical polls), but send
   // bounded batches through one slot so telemetry cannot crowd out live reads.
   const gameflowQueue = [];
@@ -204,7 +211,7 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "collection_failure_state_shown", "overview_dirty_rescan", "summoner_copy", "overview_card_ready", "self_tab_client", "browser_cold_requests_client", "champselect_request_client"].includes(event)) return;
+    if (!["overview_rerender_client", "history_search_client", "current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "collection_failure_state_shown", "overview_dirty_rescan", "summoner_copy", "overview_card_ready", "self_tab_client", "browser_cold_requests_client", "champselect_request_client"].includes(event)) return;
     if(event==='browser_cold_requests_client') {
       // Cumulative frames remain unsampled so a late body can amend the count.
       const body={event,reason,startedAt:Math.max(0,Math.min(1e13,Math.floor(fields.startedAt || 0))),count:Math.max(-1,Math.min(1000000,Math.floor(fields.count ?? -1))),resourceCount:Math.max(0,Math.min(1000000,Math.floor(fields.resourceCount || 0))),windowElapsed:fields.windowElapsed===true,timingAvailable:fields.timingAvailable===true};
@@ -218,6 +225,8 @@
     const now = Date.now();
     if (sampled && (sampledPending.size && event !== "local_request_client" || now - (sampledAt.get(sampleKey) ?? -Infinity) < (event === "local_request_client" ? 10000 : 1000))) { increment("transportSuppressed"); return; }
     const body = { event, reason };
+    if(event==='overview_rerender_client'){body.renderReason=String(fields.reason || reason).slice(0,80);body.tabType=['self','cn','riot','pro'].includes(fields.tabType)?fields.tabType:'cn';body.filterRetained=fields.filterRetained===true;body.modalOpen=fields.modalOpen===true;}
+    if(event==='history_search_client'){for(const k of ['scanned','hits','pages','averagePageBytes'])body[k]=Math.max(0,Math.min(16*1024*1024,Number(fields[k])||0));body.stop_reason=reason;}
     if(event === "summoner_copy") {
       body.ok=Boolean(fields.ok);
       if(["browser","electron","execCommand"].includes(fields.method))body.method=fields.method;

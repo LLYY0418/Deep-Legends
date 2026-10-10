@@ -106,7 +106,11 @@ jobs:
           CHROME_BIN="$chrome" R265_BACKEND="$RUNNER_TEMP/r264-public" R265_BROWSER_OUT="$RUNNER_TEMP/r265-browser" node scripts/r265-browser.cjs
           CHROME_BIN="$chrome" R266_BACKEND="$RUNNER_TEMP/r264-public" R266_BROWSER_OUT="$RUNNER_TEMP/r266-browser" node scripts/r266-browser.cjs
           CHROME_BIN="$chrome" R266_BACKEND="$RUNNER_TEMP/r264-public" R266_MATRIX=1 R266_BROWSER_OUT="$RUNNER_TEMP/r266-matrix" node scripts/r266-browser.cjs
+          git fetch --no-tags --depth=1 origin c725ba27d69289a43c20cf5198bb96f4b3af49e4
+          CHROME_BIN="$chrome" R269_BACKEND="$RUNNER_TEMP/r264-public" R269_GEOMETRY_CURRENT="$RUNNER_TEMP/r266-matrix" R269_GEOMETRY_OUT="$RUNNER_TEMP/r269-geometry" node scripts/r269-geometry.cjs
+          CHROME_BIN="$chrome" R269_BACKEND="$RUNNER_TEMP/r264-public" R269_BROWSER_OUT="$RUNNER_TEMP/r269-browser" node scripts/r269-browser.cjs
           CHROME_BIN="$chrome" R267_BACKEND="$RUNNER_TEMP/r264-public" R267_BROWSER_OUT="$RUNNER_TEMP/r267-browser" node scripts/r267-browser.cjs
+          python3 scripts/r269-mutations.py --out "$RUNNER_TEMP/r269-mutations"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -119,6 +123,9 @@ jobs:
             ${{ runner.temp }}/r266-browser/**
             ${{ runner.temp }}/r266-matrix/**
             ${{ runner.temp }}/r267-browser/**
+            ${{ runner.temp }}/r269-browser/**
+            ${{ runner.temp }}/r269-geometry/**
+            ${{ runner.temp }}/r269-mutations/**
           if-no-files-found: warn
       - name: Test installer module
         working-directory: installer

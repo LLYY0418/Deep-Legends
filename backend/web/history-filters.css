@@ -111,3 +111,7 @@
 .af-options:not(.is-hero):not(.is-multikill) { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); }
 .af-options:not(.is-hero):not(.is-multikill) > button { justify-content: center; min-height: 46px; }
 .af-options [data-af-winrate].is-winning { color: var(--success); }
+/* Fixed choices stay available while earlier matches are still searchable. */
+.af-options button[data-af-zero]:not(.is-active) { opacity: .55; }
+.af-counts, .af-count { display: inline-flex; align-items: center; font-size: 12px; line-height: 1; }
+.af-counts > span, .af-counts > button { font-size: 12px; }

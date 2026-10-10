@@ -112,7 +112,7 @@ func TestR73LazyTierComparison(t *testing.T) {
 func TestR73OverviewComparisonDoesNotPolluteSnapshot(t *testing.T) {
 	a := &app{overviewQueries: newOverviewQueryCache()}
 	ref := gameplayReference{GameName: "Fixture", TagLine: "KR1", Region: "kr"}
-	key := riotOverviewQuerySnapshotKey(ref, 0, defaultMatchCount)
+	key := riotOverviewRequestKey(context.Background(), ref, 0, defaultMatchCount)
 	snapshot := gameplayOverview{Ranks: []gameplayRank{{QueueType: "RANKED_SOLO_5x5", Tier: "DIAMOND"}}}
 	a.overviewQueries.putLocked(key, overviewQueryCacheEntry{at: time.Now(), response: snapshot})
 	for _, tc := range []struct {

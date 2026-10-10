@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -365,10 +366,26 @@ func TestR266ProVisibilityAndAccountInterval(t *testing.T) {
 		t.Fatal("10 minute admission")
 	}
 }
-func TestR266ProPUUIDSkipsAccountAndRetriesJoinFlight(t *testing.T) {
+func TestR266ProRiotIDResolutionAndRetriesJoinFlight(t *testing.T) {
 	f := r98OverviewFixture(t, false)
 	f.a.overviewQueries = newOverviewQueryCache()
-	f.a.proPlayers.teams = []opggProTeam{{ID: 371, Members: []opggProMember{{TeamID: 371, Nickname: "Rookie", RealName: "Song Eui-jin", Position: "middle", Authority: "PROGAMER", Summoners: []opggProAccount{{PUUID: "r98-subject", GameName: "Fixture", TagLine: "KR1", Region: "kr"}}}}}}
+	var foreignRequests atomic.Int32
+	var accountLookupNanos atomic.Int64
+	originalTransport := f.a.riot.champions.client.Transport
+	f.a.riot.champions.client.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if strings.Contains(r.URL.Path, "/by-riot-id/") {
+			started := time.Now()
+			response, err := originalTransport.RoundTrip(r)
+			accountLookupNanos.Add(time.Since(started).Nanoseconds())
+			return response, err
+		}
+		if strings.Contains(r.URL.Path, "/by-puuid/opgg-encrypted-subject") {
+			foreignRequests.Add(1)
+			return &http.Response{StatusCode: 400, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"message":"Exception decrypting"}`))}, nil
+		}
+		return originalTransport.RoundTrip(r)
+	})
+	f.a.proPlayers.teams = []opggProTeam{{ID: 371, Members: []opggProMember{{TeamID: 371, Nickname: "Rookie", RealName: "Song Eui-jin", Position: "middle", Authority: "PROGAMER", Summoners: []opggProAccount{{PUUID: "opgg-encrypted-subject", GameName: "Fixture", TagLine: "KR1", Region: "kr"}}}}}}
 	ref := gameplayReference{GameName: "Fixture", TagLine: "KR1", Region: "kr", Privacy: "PRIVATE"}
 	recorder := httptest.NewRecorder()
 	f.a.handleGameplayOverview(recorder, httptest.NewRequest("POST", "/api/gameplay/overview", strings.NewReader(`{"gameName":"Fixture","tagLine":"KR1","region":"kr","count":5}`)))
@@ -378,13 +395,11 @@ func TestR266ProPUUIDSkipsAccountAndRetriesJoinFlight(t *testing.T) {
 	f.mu.Lock()
 	accountCalls := f.calls["account"]
 	f.mu.Unlock()
-	if accountCalls != 0 {
-		t.Fatal("pro endpoint repeated Riot ID lookup")
+	if accountCalls != 1 || foreignRequests.Load() != 0 {
+		t.Fatal("pro endpoint must resolve using this key")
 	}
-	ref.PlayerRef = f.a.knownProPUUID(ref)
-	if ref.PlayerRef != "r98-subject" {
-		t.Fatal("directory identity missed")
-	}
+	t.Logf("official_account_requests_before=0 after=%d additional_lookup_ms=%.3f (synthetic server, not real Riot latency)", accountCalls, float64(accountLookupNanos.Load())/float64(time.Millisecond))
+	ref.PlayerRef = "r98-subject"
 	started, release := make(chan struct{}), make(chan struct{})
 	old := f.a.riot.champions.client.Transport
 	var once sync.Once
@@ -412,7 +427,7 @@ func TestR266ProPUUIDSkipsAccountAndRetriesJoinFlight(t *testing.T) {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.calls["account"] != 0 || f.calls["matchIDs"] != 2 || f.calls["detail"] != 5 {
+	if f.calls["account"] != 1 || f.calls["matchIDs"] != 2 || f.calls["detail"] != 5 {
 		t.Fatal(f.calls)
 	}
 }

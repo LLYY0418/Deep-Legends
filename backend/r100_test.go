@@ -349,13 +349,11 @@ func TestR100ProgressPublishesReadyMetadataAndQueueDiagnostic(t *testing.T) {
 	if err != nil || len(result.Matches) != 20 || previews == 0 {
 		t.Fatalf("missing ready metadata preview: %d err=%v", previews, err)
 	}
-	events := r90Events(t, f.a, "riot_match_mode")
-	for _, event := range events {
-		if event["queue_id"] == nil || event["game_mode"] == nil || event["queue_label"] == nil {
-			t.Fatal(event)
-		}
+	events := r90Events(t, f.a, "riot_matches_summary")
+	if len(events) != 1 || events[0]["matches"] != float64(20) {
+		t.Fatalf("overview summary=%v", events)
 	}
-	if len(events) != 20 {
-		t.Fatalf("queue diagnostic count=%d", len(events))
+	if events[0]["modes"] == nil {
+		t.Fatal("queue mode counts absent", events)
 	}
 }

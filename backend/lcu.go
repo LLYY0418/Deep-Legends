@@ -224,7 +224,7 @@ func (c *LCUClient) recordRequestDiagnostic(method, path string, trace *lcuReque
 	method = strings.ToUpper(strings.TrimSpace(method))
 	normalizedPath := lcuDiagnosticPath(path)
 	key := method + "\x00" + normalizedPath
-	var completed map[string]any
+	var completed []map[string]any
 	c.diagnosticMu.Lock()
 	if c.diagnosticObserve == nil {
 		c.diagnosticMu.Unlock()
@@ -233,11 +233,13 @@ func (c *LCUClient) recordRequestDiagnostic(method, path string, trace *lcuReque
 	if c.requestDiagnostics == nil {
 		c.requestDiagnostics = make(map[string]*lcuRequestDiagnosticBucket)
 	}
-	bucket := c.requestDiagnostics[key]
-	if bucket != nil && !bucket.windowStart.Equal(windowStart) {
-		completed = lcuRequestDiagnosticEvent(bucket)
-		bucket = nil
+	for oldKey, old := range c.requestDiagnostics {
+		if !old.windowStart.Equal(windowStart) {
+			completed = append(completed, lcuRequestDiagnosticEvent(old))
+			delete(c.requestDiagnostics, oldKey)
+		}
 	}
+	bucket := c.requestDiagnostics[key]
 	if bucket == nil {
 		bucket = &lcuRequestDiagnosticBucket{windowStart: windowStart, method: method, path: normalizedPath}
 		c.requestDiagnostics[key] = bucket
@@ -245,8 +247,10 @@ func (c *LCUClient) recordRequestDiagnostic(method, path string, trace *lcuReque
 	bucket.samples = append(bucket.samples, trace.sample(status))
 	observe := c.diagnosticObserve
 	c.diagnosticMu.Unlock()
-	if completed != nil {
-		observe(completed)
+	if len(completed) > 0 {
+		for _, event := range lcuRequestDiagnosticWindows(completed) {
+			observe(event)
+		}
 	}
 }
 
@@ -265,7 +269,7 @@ func (c *LCUClient) flushRequestDiagnostics() {
 	c.requestDiagnostics = make(map[string]*lcuRequestDiagnosticBucket)
 	c.diagnosticMu.Unlock()
 	if observe != nil {
-		for _, event := range events {
+		for _, event := range lcuRequestDiagnosticWindows(events) {
 			observe(event)
 		}
 	}
@@ -289,7 +293,7 @@ func (c *LCUClient) flushExpiredRequestDiagnostics(now time.Time) {
 	}
 	c.diagnosticMu.Unlock()
 	if observe != nil {
-		for _, event := range events {
+		for _, event := range lcuRequestDiagnosticWindows(events) {
 			observe(event)
 		}
 	}
@@ -1170,3 +1174,43 @@ func (c *LCUClient) Close() {
 
 // Optional status sink includes successful HTTP responses with invalid JSON.
 type lcuResponseStatusKey struct{}
+
+// One bounded row per ten-second window across every normalized LCU path.
+func lcuRequestDiagnosticWindows(events []map[string]any) []map[string]any {
+	groups := map[string][]map[string]any{}
+	order := []string{}
+	for _, event := range events {
+		key := fmt.Sprint(event["window_start"])
+		if _, exists := groups[key]; !exists {
+			order = append(order, key)
+		}
+		groups[key] = append(groups[key], event)
+	}
+	result := []map[string]any{}
+	for _, key := range order {
+		rows := groups[key]
+		if len(rows) == 1 {
+			result = append(result, rows[0])
+			continue
+		}
+		paths := []map[string]any{}
+		count := 0
+		for _, row := range rows {
+			count += row["count"].(int)
+			paths = append(paths, map[string]any{"path": row["path"], "method": row["method"], "count": row["count"], "max_ms": row["duration_ms"].(map[string]int64)["max"], "http_status": row["http_status"]})
+		}
+		sort.Slice(paths, func(i, j int) bool { return fmt.Sprint(paths[i]["path"]) < fmt.Sprint(paths[j]["path"]) })
+		merged := map[string]any{"event": "lcu_request", "window_start": key, "count": count, "paths": paths, "omitted_paths": 0}
+		for {
+			raw, _ := json.Marshal(merged)
+			if len(raw) <= 1800 || len(paths) == 0 {
+				break
+			}
+			paths = paths[:len(paths)-1]
+			merged["paths"] = paths
+			merged["omitted_paths"] = len(rows) - len(paths)
+		}
+		result = append(result, merged)
+	}
+	return result
+}

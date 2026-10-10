@@ -48,6 +48,14 @@ func riotOverviewQuerySnapshotKey(reference gameplayReference, begIndex, count i
 	return sourceScopedKey(dataSourceRiot, strings.Join([]string{identity, strconv.Itoa(begIndex), strconv.Itoa(count), riotOverviewFilter(filters), strings.ToUpper(strings.TrimSpace(reference.Privacy))}, "|"))
 }
 
+func riotOverviewRequestKey(ctx context.Context, reference gameplayReference, begIndex, count int, filters ...string) string {
+	key := riotOverviewQuerySnapshotKey(reference, begIndex, count, filters...) + "|credential:" + riotCredentialScope(riotPinnedIdentityContext(ctx))
+	if span, ok := ctx.Value(riotHistoryTimeRangeKey{}).(riotHistoryTimeRange); ok {
+		key += "|time:" + strconv.FormatInt(span.Start, 10) + ":" + strconv.FormatInt(span.End, 10)
+	}
+	return key
+}
+
 func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gameplayReference, begIndex, count int, force bool, filters ...string) (gameplayOverview, error) {
 	if retry, _ := ctx.Value(overviewRetryDetailsKey{}).(bool); force && !retry {
 		ctx = context.WithValue(ctx, overviewFreshHistoryKey{}, true)
@@ -55,7 +63,7 @@ func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gamepl
 	if a.overviewQueries == nil {
 		return a.loadRiotOverview(ctx, reference, begIndex, count, filters...)
 	}
-	key := riotOverviewQuerySnapshotKey(reference, begIndex, count, filters...)
+	key := riotOverviewRequestKey(ctx, reference, begIndex, count, filters...)
 	for {
 		a.overviewQueries.mu.Lock()
 		if cached, ok := a.overviewQueries.getLocked(key, time.Now()); ok && !force {

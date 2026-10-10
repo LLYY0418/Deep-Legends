@@ -443,7 +443,7 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 			t.Fatalf("specialist external-read statement is missing %q: %s", expected, externalReads)
 		}
 	}
-	for _, expected := range []string{"ARAMKit", "国服玩家总览", "昵称与 Tag", "第三方估算分", "10 分钟", "未收录缓存 5 分钟", "韩服不发送"} {
+	for _, expected := range []string{"ARAMKit", "国服玩家总览", "昵称与 Tag", "第三方估算分", "6 小时", "未收录缓存 1 小时", "韩服不发送"} {
 		if !strings.Contains(externalReads, expected) {
 			t.Fatalf("ARAMKit external-read statement is missing %q: %s", expected, externalReads)
 		}
@@ -474,6 +474,7 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 // 必须出现的关键词。声明写的是存了什么内容而不是目录名，所以这里用内容关键词对齐，
 // 一个目录的全部关键词都命中才算被声明覆盖。
 var privacyStoreDirectoryCoverage = map[string][]string{
+	"mayhem-ratings": {"mayhem-ratings", "6 小时", "1 小时", "4 MiB"},
 	"client-catalog": {"client-catalog", "装备", "符文", "召唤师技能", "不含账号标识"},
 	// storage.go openLocalStore 启动期创建
 	"updates":          {"自动更新", "安装包"},

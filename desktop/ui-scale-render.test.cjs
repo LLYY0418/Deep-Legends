@@ -93,9 +93,9 @@ test("a delayed get cannot undo a user selection made during startup",async()=>{
   let resolve;const sent=[];
   const h=boot({bridge:{get:()=>new Promise(r=>resolve=r),set:(...args)=>sent.push(args),onChanged(){}}});
   try{
-    h.select.value="2.25";h.select.dispatchEvent(new h.w.Event("change"));
+    h.select.value="1.75";h.select.dispatchEvent(new h.w.Event("change"));
     resolve({mode:"fixed",value:1,auto:1});await settle();
-    assert.equal(h.select.value,"2.25");assert.deepEqual(sent.at(-1),["fixed",2.25]);
+    assert.equal(h.select.value,"1.75");assert.deepEqual(sent.at(-1),["fixed",1.75]);
   }finally{h.close();}
 });
 
@@ -123,4 +123,8 @@ test("R238 shell auto overrides a stale fixed browser preference",async()=>{
     assert.equal(h.select.value,"auto");
     assert.equal(h.w.localStorage.getItem("lol-loot-ui-scale"),"auto");
   }finally{h.close();}
+});
+
+test("R269 published 225/250 preferences migrate to 200 and retain the migration after restart",async()=>{
+ for(const legacy of ["2.25","2.5"]){const h=boot({preference:legacy,migrated:"1"});try{await settle();assert.equal(h.select.value,"2");assert.equal(h.w.localStorage.getItem("lol-loot-ui-scale"),"2");assert.equal(h.w.document.documentElement.style.getPropertyValue("--ui-zoom"),"2");assert(![...h.select.options].some(o=>["2.25","2.5"].includes(o.value)));}finally{h.close()}}
 });
