@@ -106,7 +106,13 @@ test("R86 Windows release stops on a real failing Go test and rejects an indepen
       fs.copyFileSync(path.join(root,"scripts/normalize-source-line-endings.cjs"),path.join(directory,"scripts/normalize-source-line-endings.cjs"));
       fs.writeFileSync(path.join(directory,"bin/npm.cmd"),"@echo off\r\nexit /b 0\r\n");
       fs.writeFileSync(path.join(directory,"bin/go.cmd"),`@echo off\r\necho %* >> "${path.join(directory,"go-calls")}"\r\n"${go}" %*\r\nexit /b %errorlevel%\r\n`);
-      const result=spawnSync("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-File","build-desktop-windows.ps1","-KeyMode","public"],{cwd:directory,encoding:"utf8",timeout:60000,env:{...process.env,GITHUB_ACTIONS:"false",PATH:`${path.join(directory,"bin")};${process.env.PATH}`}});
+      const run=extra=>spawnSync("powershell.exe",["-NoProfile","-ExecutionPolicy","Bypass","-File","build-desktop-windows.ps1","-KeyMode","public",...extra],{cwd:directory,encoding:"utf8",timeout:60000,env:{...process.env,GITHUB_ACTIONS:"false",PATH:`${path.join(directory,"bin")};${process.env.PATH}`}});
+      const missingCipher=run([]);
+      if (missingCipher.error) throw missingCipher.error;
+      assert.notEqual(missingCipher.status,0);
+      assert.match(missingCipher.stdout+missingCipher.stderr,/Public builds require encrypted Riot key injection/);
+      assert.equal(fs.existsSync(path.join(directory,"go-calls")),false,"missing public cipher must stop before any Go invocation");
+      const result=run(["-RiotAPIKeyCipher","R86_FIXED_FAKE_CIPHER"]);
       if (result.error) throw new Error(`Windows PowerShell failed to start: ${result.error.message}`);
       const output = `${result.stdout || ""}${result.stderr || ""}`;
       assert.notEqual(result.status,0);
@@ -117,6 +123,16 @@ test("R86 Windows release stops on a real failing Go test and rejects an indepen
   }
   check(source);
   assert.throws(()=>check(source.replace("go test ./...","go build ./...\n    go test ./...")),{name:"AssertionError"});
+});
+
+test("R268 R86 Windows fixture covers injected fake cipher and rejection before Go",()=>{
+  const source=fs.readFileSync(__filename,"utf8");
+  const fixture=source.slice(source.indexOf('test("R86 Windows release'),source.indexOf('test("R268 R86 Windows fixture'));
+  assert.match(fixture,/run\(\["-RiotAPIKeyCipher","R86_FIXED_FAKE_CIPHER"\]\)/);
+  assert.match(fixture,/missingCipher=run\(\[\]\)/);
+  assert.match(fixture,/assert\.notEqual\(missingCipher\.status,0\)/);
+  assert.match(fixture,/assert\.match\(missingCipher\.stdout\+missingCipher\.stderr,\/Public builds require encrypted Riot key injection\//);
+  assert.match(fixture,/assert\.equal\(fs\.existsSync\(path\.join\(directory,"go-calls"\)\),false/);
 });
 
 test("format gates exclude local toolchains and GOPATH modules while retaining untracked project source", { skip: process.platform === "win32" }, () => {

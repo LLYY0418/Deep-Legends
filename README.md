@@ -130,7 +130,8 @@
 
 ```powershell
 npm ci --prefix desktop
-./build-desktop-windows.ps1 -KeyMode public
+$riotKeyCipher = (& go run ./backend -encrypt-riot-key '<RIOT_API_KEY>').Trim()
+./build-desktop-windows.ps1 -KeyMode public -RiotAPIKeyCipher $riotKeyCipher
 ```
 
 产物在 `dist/desktop/`。只调试后端时：

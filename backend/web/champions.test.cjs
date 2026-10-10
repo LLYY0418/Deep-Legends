@@ -1768,7 +1768,7 @@ test("career ranked queue switches use one recent sample and ignore season scan 
 	assert.doesNotMatch(gameplayScript, /function renderSeasonProgressBadge/);
 	const entries = functionSource(gameplayScript, "careerSectionEntries");
 	assert.doesNotMatch(entries, /render(?:RecentRanked|Ability|PositionStats)\([^\n]*seasonStatsProgress/);
-	assert.match(entries, /renderChampionStats\(championRows, championOverall, championProgress\)/);
+	assert.match(entries, /renderChampionStats\(championRows, championOverall, championProgress,championStatsPending\(championRows,championOverall,championProgress,tab\)\)/);
 	assert.match(entries, /const championProgress = opggSeason[\s\S]*: data\.seasonStatsProgress/);
 });
 

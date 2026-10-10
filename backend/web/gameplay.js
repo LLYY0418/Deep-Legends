@@ -1394,6 +1394,13 @@
     return partial && !(k>=6 && k>=Math.ceil(.6*n));
   }
 
+  function championStatsPending(items,overall,progress,tab) {
+    if(progress?.foreign || historyServiceState(tab))return false;
+    if(Number(overall?.games)>0 || (items || []).some(item=>Number(item.games)>0))return false;
+    if(progress && !progress.unavailable)return Boolean(progress.collecting && !progress.complete && !Number(progress.scanned));
+    return matchesPending(tab);
+  }
+
   function historyRecoveryActive(tab) {
     return !tab.closed && !state.destroyed && !document.hidden && (tab.overlay ? state.overlay.at(-1)===tab && !nodes.playerOverlay.hidden : state.section==='overview' && !state.overlay.length) && Boolean(overviewContainer(tab));
   }
@@ -2188,7 +2195,7 @@
 	  ["ranks", renderRanks(data.ranks || [], data.capabilities || [], data.historicalRanks || [], data.rankMilestones, data.seasonStatsProgress, tab)],
 	  ["recent-ranked", renderRecentRanked(recentQueue.recentRanked, recentQueue.queueId, rankedQueueSwitcher(tab, recentQueue.queueId, "recent", data),partialHistory)],
 	  ["ability", renderAbility(abilityQueue.ability, abilityQueue.queueLabel, rankedQueueSwitcher(tab, abilityQueue.queueId, "ability"), abilityQueue.abilitySampleGames, abilityQueue.queueGames)],
-      ["champions", renderChampionStats(championRows, championOverall, championProgress)],
+      ["champions", renderChampionStats(championRows, championOverall, championProgress,championStatsPending(championRows,championOverall,championProgress,tab))],
       ["masteries", renderMasteries(data.masteries || [], (data.capabilities || []).some(item => item.name === "champion-mastery" && item.state === "available"), data.masteryChampionCount)],
 	  ["positions", renderPositionStats(positionQueue.positions, positionQueue.positionQueueId || positionQueue.queueId, rankedQueueSwitcher(tab, positionQueue.queueId, "position"), positionQueue.positionQueueLabel, positionQueue.queueGames,partialHistory)],
       ["recent-players", renderRecentPlayers(data.recentPlayers || [], recentHistoryCapability,pendingStats,partialHistory)],
@@ -2922,8 +2929,9 @@
     doc._seasonDataNotes={close};
   }
 
-  function renderChampionStats(items, overall, progress) {
+  function renderChampionStats(items, overall, progress, pending=false) {
     if (progress?.seasonOnly && progress.unavailable) return `<section class="career-section champion-performance"><header><h3>英雄胜率</h3><span>本赛季${progress.tableSupported ? overviewDetailArrow("champion-table", "查看英雄数据表") : ""}</span></header>${progress.message && progress.message !== "当前数据源不提供赛季统计" ? `<p class="section-empty">${escapeHTML(progress.message)}</p>` : ""}</section>`;
+    if(pending)return '<section class="career-section champion-performance"><header><h3>英雄胜率</h3></header><div class="career-pending gameplay-skeleton"><span></span><span></span><span></span></div></section>';
     const rankedGames = (items || []).reduce((total, item) => total + Number(item.games || 0), 0);
     const tableGames = Number(overall?.games) || rankedGames;
     const overallRow = `<div class="champion-stat-row is-overall"><span class="overall-champion-mark" aria-hidden="true">全</span><div><strong>全部英雄</strong><small>CS ${number(overall.cs)} (${number(overall.csPerMinute)})</small></div><div><b>${kda(overall.kda)}:1 KDA</b><small>${number(overall.kills)} / ${number(overall.deaths)} / ${number(overall.assists)}</small></div><div><b class="win-rate-value">${percent(overall.winRate)}</b><small>${number(overall.games)} 场</small></div></div>`;
