@@ -50,3 +50,11 @@ test('R268 raw recent matches arriving before aggregates keep all dependent stat
  assert.equal(functions.championStatsPending([],{games:0},undefined,{...tab,data:{...data,historyRequested:20}}),false,'an arrived zero aggregate is confirmed even before loading finishes');
  assert.equal(functions.historyStatsPending({...data,historyRequested:20,historyLoaded:20},tab),false);
 });
+test('R268 confirmed recent aggregates, including zero games, remain visible during refresh',()=>{
+ const tab={loading:true,matchesReceived:true,recentStatsReceived:true,data:{historyRequested:0,matches:[]}};
+ assert.equal(functions.championStatsPending([],{games:0},undefined,tab),false);
+ assert.match(render([],{games:0},undefined,tab),/暂无英雄统计/);
+ assert.doesNotMatch(render([],{games:0},undefined,tab),/career-pending/);
+ const data={historyRequested:0,matches:Array.from({length:20},()=>({}))};
+ assert.equal(functions.historyStatsPending(data,tab),false,'confirmed aggregates retain the original sufficient-sample behavior');
+});

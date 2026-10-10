@@ -989,6 +989,7 @@
       tab.loading = true;
 	}
     if (!append) tab.matchesReceived=Boolean(tab.data?.matches?.length);
+    if (!append && !tab.data) tab.recentStatsReceived=false;
     if (!append) tab.overviewCardLoad = {startedAt:(typeof performance !== "undefined" ? performance.now() : Date.now()),ready:new Set(),cached:false};
     clearTimeout(tab.quotaRetry?.timer);
     tab.quotaRetry = null;
@@ -1047,7 +1048,7 @@
         for (const key of ["ranks", "masteries"]) {
           if (Array.isArray(partial[key]) && partial[key].length > 0) tab.data[key] = partial[key];
         }
-        if(partial.historyRequested>0){for(const key of ['historyRequested','historyLoaded','recentRanked','ability','positions','rankedQueues','activityHours','recentPlayers','overall','championStats'])tab.data[key]=partial[key];tab.data.pagination={...tab.data.pagination,...partial.pagination};}
+        if(partial.historyRequested>0){tab.recentStatsReceived=true;for(const key of ['historyRequested','historyLoaded','recentRanked','ability','positions','rankedQueues','activityHours','recentPlayers','overall','championStats'])tab.data[key]=partial[key];tab.data.pagination={...tab.data.pagination,...partial.pagination};}
         if (partial.capabilities?.length) {
           const readyNames = new Set(partial.capabilities.map(item => item.name));
           tab.data.capabilities = [...(previous?.capabilities || []).filter(item => !readyNames.has(item.name)), ...partial.capabilities];
@@ -1063,7 +1064,7 @@
 		? await api(`/api/gameplay/overview?count=${requestCount}&begIndex=${begIndex}&force=${force ? 1 : 0}&freshHistory=${manual ? 1 : 0}&matchFilter=${encodeURIComponent(tab.matchFilter || "all")}${verification.expectGameId ? `&expectGameId=${encodeURIComponent(verification.expectGameId)}` : ""}`, {onProgress}, requestKey, timeout)
         : await api("/api/gameplay/overview", { method: "POST", body, onProgress }, requestKey, timeout);
       if (tab.overviewRequestToken !== requestToken) return false;
-      tab.matchesReceived=true;
+      tab.matchesReceived=true;tab.recentStatsReceived=true;
       if (payload.proMismatch) markProMismatch(tab);
       if (append) {
         const seen = new Set(baseMatches.map((match) => String(match.gameId)));
@@ -1389,8 +1390,8 @@
     return `<div class="service-outage" role="status"><div class="service-outage-disc">${serviceOutageIcon()}</div><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-gameplay-retry${disabled}>${waiting?"读取中":"立即重试"}</button><small data-history-countdown${status.seconds?"":" hidden"}>将在 ${status.seconds} 秒后自动重试</small></div>`;
   }
   function historyStatsPending(data,tab) {
-    // 本服原始战绩可能先于聚合到达；historyRequested 随派生统计一起填充。
-    if(tab?.loading && !(Number(data?.historyRequested)>0))return true;
+    // 本服原始战绩可能先于聚合到达；保留此前 complete 已确认的统计。
+    if(tab?.loading && !tab.recentStatsReceived && !(Number(data?.historyRequested)>0))return true;
     const partial=Boolean(data?.pagination?.partial || tab?.initialPagePending || tab?.initialPageError || tab?.loading || data?.capabilities?.some(item=>item.name==="match-history" && item.state==="failed"));
     const k=Number(data?.historyLoaded ?? data?.matches?.length ?? 0),n=Number(data?.historyRequested || data?.pagination?.count || k);
     return partial && !(k>=6 && k>=Math.ceil(.6*n));
@@ -1400,7 +1401,7 @@
     if(progress?.foreign || historyServiceState(tab))return false;
     if(Number(overall?.games)>0 || (items || []).some(item=>Number(item.games)>0))return false;
     if(progress && !progress.unavailable)return Boolean(progress.collecting && !progress.complete && !Number(progress.scanned));
-    return Boolean(tab?.loading && !(Number(tab.data?.historyRequested)>0));
+    return Boolean(tab?.loading && !tab.recentStatsReceived && !(Number(tab.data?.historyRequested)>0));
   }
 
   function historyRecoveryActive(tab) {
@@ -2180,7 +2181,7 @@
   }
 
   function careerSectionEntries(data, tab) {
-    const pendingMatches=matchesPending(tab),pendingAggregates=Boolean(tab?.loading && !(Number(data?.historyRequested)>0)),pendingStats=!pendingMatches && !pendingAggregates && historyStatsPending(data,tab);
+    const pendingMatches=matchesPending(tab),pendingAggregates=Boolean(tab?.loading && !tab.recentStatsReceived && !(Number(data?.historyRequested)>0)),pendingStats=!pendingMatches && !pendingAggregates && historyStatsPending(data,tab);
     const partialHistory=Boolean(data.pagination?.partial || tab?.initialPagePending || tab?.initialPageError || tab?.loading || data.capabilities?.some(item=>item.name==="match-history" && item.state==="failed"));
     const recentHistoryCapability = (data.capabilities || []).find((item) => item.name === "seven-day-history");
     const recentQueue = rankedQueueData(data, tab, "recent");
