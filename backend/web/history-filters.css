@@ -72,7 +72,7 @@
 .af-modal-footer .af-capsules { width: 100%; min-width: 0; flex-wrap: nowrap; overflow: clip; align-items: center; }
 .af-modal-footer .af-capsule { flex-shrink: 0; max-width: none; }
 .af-modal-footer .af-capsule button:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.af-modal-footer .af-capsule button { padding: 4px 5px; }
+.af-modal-footer .af-capsule button { padding: 4px 6px; }
 .af-modal-footer .af-capsule button:last-child { flex-shrink: 0; }
 .af-modal-footer .af-capsule[hidden], .af-capsules-more[hidden] { display: none; }
 .af-capsules-more { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; min-width: 40px; height: 30px; padding: 0 8px; border: 1px solid var(--primary) !important; border-radius: 12px; color: var(--primary-strong) !important; font-size: 11px !important; font-variant-numeric: tabular-nums; }
