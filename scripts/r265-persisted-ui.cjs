@@ -6,9 +6,36 @@ const presetKey='deep-legends-history-presets-v1';
 const keys=['lol-loot-default-page','lol-loot-default-match-filter','lol-loot-match-count','lol-loot-mask-names','lol-loot-ui-scale','lol-loot-search-region','lol-loot-search-server-id','lol-loot-search-region-manual'];
 const scriptSHA='74699f9576ccd8686fce0e95c38b718b96718baa46bd68e9068cf947f7ea38f3';
 const tagSHA='049b30cad1ccd13fd8cbe785b25c5a56112f46a5';
+async function waitForInstalledTarget({port,phase,out,now=Date.now,sleep=ms=>new Promise(r=>setTimeout(r,ms)),fetchTargets=async remaining=>{
+ const response=await fetch(`http://127.0.0.1:${port}/json/list`,{signal:AbortSignal.timeout(Math.max(1,Math.min(1000,remaining)))});
+ assert.equal(response.status,200,'CDP target list HTTP status');return response.json();
+}}){
+ const started=now(),deadline=started+30000,observations=[];let target,previous='',polls=0;
+ const redactURL=value=>{try{const url=new URL(value);for(const key of url.searchParams.keys())if(/token|secret|password|credential/i.test(key))url.searchParams.set(key,'[redacted]');return url.toString();}catch{return value;}};
+ try{
+  for(;polls<150&&now()<deadline;polls++){
+   let observation;try{
+    const targets=await fetchTargets(deadline-now());assert(Array.isArray(targets),'CDP target list must be an array');
+    observation={targets:targets.map(t=>({...t,url:redactURL(t.url)}))};
+    target=targets.find(t=>t.type==='page'&&/^http:\/\/(127\.0\.0\.1|localhost):/.test(t.url));
+   }catch(error){observation={error:error.message,cause:error.cause?.code};}
+   const key=JSON.stringify(observation);if(key!==previous){observations.push({elapsedMs:now()-started,...observation});previous=key;}
+   if(target)break;await sleep(Math.min(200,Math.max(0,deadline-now())));
+  }
+  assert(target,'installed Electron page did not become ready');return target;
+ }finally{
+  fs.writeFileSync(path.join(out,`r265-cdp-${phase}.json`),JSON.stringify({phase,port,limitMs:30000,elapsedMs:now()-started,polls:polls+Number(!!target),ready:!!target,observations},null,2));
+ }
+}
 async function probe({port,phase,out}){
  assert(Number.isInteger(port)&&port>0&&port<65536);assert(['write-settings','write-presets','read','restart','corrupt'].includes(phase));fs.mkdirSync(out,{recursive:true});
- let target;for(let n=0;n<150;n++){try{target=(await(await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(t=>t.type==='page'&&/^http:\/\/(127\.0\.0\.1|localhost):/.test(t.url));if(target)break;}catch{}await new Promise(r=>setTimeout(r,200));}assert(target,'installed Electron page did not become ready');
+ const target=await waitForInstalledTarget({port,phase,out});
+ if(process.platform==='win32'){
+  const expectedPID=Number(process.env.R265_EXPECTED_ELECTRON_PID);assert(Number.isInteger(expectedPID)&&expectedPID>0,'installed Electron PID proof missing');
+  const owners=JSON.parse(execFileSync('powershell.exe',['-NoProfile','-Command',`@(Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction Stop | Select-Object -ExpandProperty OwningProcess -Unique) | ConvertTo-Json -Compress`],{encoding:'utf8',timeout:5000}));
+  const processIDs=Array.isArray(owners)?owners:[owners];fs.writeFileSync(path.join(out,`r265-cdp-owner-${phase}.json`),JSON.stringify({port,expectedPID,owners:processIDs},null,2));
+  assert(processIDs.length>0&&processIDs.every(pid=>pid===expectedPID),'CDP port belongs to another process');
+ }
  const ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{ws.addEventListener('open',resolve,{once:true});ws.addEventListener('error',reject,{once:true})});
  let sequence=0,intercept=null;const pending=new Map(),resourceProof=[];
  ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(pending.has(m.id)){const [ok,no]=pending.get(m.id);pending.delete(m.id);m.error?no(Error(JSON.stringify(m.error))):ok(m.result);}else if(m.method==='Fetch.requestPaused')void intercept?.(m.params).catch(e=>resourceProof.push({error:e.message}));});
@@ -67,5 +94,5 @@ async function probe({port,phase,out}){
   console.log(JSON.stringify({phase,passed:true,resourceFixtureApplied:phase==='write-presets'}));
  }finally{ws.close()}
 }
-module.exports={probe,scriptSHA,tagSHA};
+module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget};
 if(require.main===module){const [port,phase,out]=process.argv.slice(2);probe({port:Number(port),phase,out}).catch(e=>{console.error(e);process.exitCode=1});}

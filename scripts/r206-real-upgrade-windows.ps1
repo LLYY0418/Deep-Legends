@@ -11,6 +11,10 @@ $install = Join-Path $root "installed"
 $data = Join-Path $root "data"
 $evidence = Join-Path $root "evidence"
 New-Item -ItemType Directory -Force $install,$data,$evidence | Out-Null
+$appDirectories = @($install, (Join-Path $root 'installed-079'))
+$debugPorts = @()
+$cleanupSequence = 0
+$launchSequence = 0
 $env:LOL_LOOT_DATA_DIR = $data
 $old = Join-Path $root "Deep-Legends-Setup-0.12.65-public.exe"
 Invoke-WebRequest "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.65/Deep-Legends-Setup-0.12.65-public.exe" -OutFile $old
@@ -38,9 +42,76 @@ function Run-Setup([string]$File, [switch]$MonitorLegacy) {
     if ($process.ExitCode -ne 0) { throw "Real installer failed: $($process.ExitCode)" }
     if (-not (Test-Path (Join-Path $install "Deep Legends.exe"))) { throw "Installed executable missing" }
 }
-function Stop-InstalledApp {
-    Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($install, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-    Start-Sleep -Milliseconds 500
+function Get-R265AppState {
+    $all = @(Get-CimInstance Win32_Process)
+    $owned = @($all | Where-Object {
+        $executable = $_.ExecutablePath
+        $inside = $false
+        foreach ($directory in $appDirectories) {
+            if ($executable -and $executable.StartsWith($directory.TrimEnd('\')+'\', [StringComparison]::OrdinalIgnoreCase)) { $inside = $true }
+        }
+        $inside -and $_.Name -in @('Deep Legends.exe','loot-service.exe')
+    })
+    $ports = @(47391) + @($debugPorts)
+    $listeners = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in $ports -or $_.OwningProcess -in @($owned.ProcessId) })
+    $locks = @()
+    if ($userData -and (Test-Path $userData)) {
+        foreach ($relative in @('SingletonLock','SingletonCookie','SingletonSocket','Local Storage/leveldb/LOCK')) {
+            $lockPath = Join-Path $userData $relative
+            if (Test-Path -LiteralPath $lockPath) { $item=Get-Item -LiteralPath $lockPath -Force; $locks+=@{path=$item.FullName;last_write_utc=$item.LastWriteTimeUtc.ToString('o');bytes=$item.Length} }
+        }
+    }
+    # Include other installs by name and every port owner, but never kill an
+    # unrelated installation. Its presence must fail the isolated fixture.
+    $related = @($all | Where-Object { $_.Name -in @('Deep Legends.exe','loot-service.exe') -or $_.ProcessId -in @($listeners.OwningProcess) })
+    return @{at=(Get-Date).ToUniversalTime().ToString('o');install=$install;user_data=$userData;owned=@($owned | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CreationDate);processes=@($related | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CreationDate);listeners=@($listeners | Select-Object LocalAddress,LocalPort,OwningProcess);lock_files=$locks}
+}
+function Save-R265State([string]$Name) {
+    $state = Get-R265AppState
+    $state | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $evidence $Name) -Encoding utf8
+    return $state
+}
+function Stop-InstalledApp([switch]$ObserveOnly) {
+    $script:cleanupSequence++
+    $started=Get-Date; $deadline=$started.AddSeconds(5)
+    $observations=@(); $previous=''; $outcome='failure'
+    try {
+        do {
+            $state=Get-R265AppState
+            $key=($state.processes | ConvertTo-Json -Compress -Depth 4)+'|'+($state.listeners | ConvertTo-Json -Compress -Depth 4)
+            if ($key -ne $previous) { $observations+=@($state); $previous=$key }
+            if ($state.processes.Count -eq 0 -and $state.listeners.Count -eq 0) { $outcome='success'; return }
+            if (-not $ObserveOnly) {
+                # Re-snapshot after killing: a renderer/backend can be spawned
+                # while the old main process is being terminated.
+                foreach ($process in $state.owned) { Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue }
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        if ($ObserveOnly) { throw 'Product processes or ports remain after normal close; no cleanup retry permitted' }
+        throw 'Installed fixture did not stop completely, or a foreign instance owns its ports'
+    } finally {
+        @{started_at=$started.ToUniversalTime().ToString('o');ended_at=(Get-Date).ToUniversalTime().ToString('o');elapsed_ms=[int]((Get-Date)-$started).TotalMilliseconds;observe_only=[bool]$ObserveOnly;outcome=$outcome;observations=$observations} | ConvertTo-Json -Depth 12 | Set-Content (Join-Path $evidence ("r265-stop-"+$cleanupSequence+".json")) -Encoding utf8
+    }
+}
+function Wait-R265InstallerLaunch {
+    # The installer hands off asynchronously. Do not mistake a pre-launch empty
+    # process snapshot for a completed stop, then race its auto-start for the
+    # shared Electron single-instance lock. Keep the existing installer deadline.
+    $started=Get-Date; $observations=@(); $outcome='failure'
+    try {
+        do {
+            $state=Get-R265AppState
+            $main=@($state.owned | Where-Object { $_.ExecutablePath -eq (Join-Path $install 'Deep Legends.exe') })
+            $backendPids=@($state.owned | Where-Object { $_.Name -eq 'loot-service.exe' -and $_.ExecutablePath.StartsWith($install.TrimEnd('\')+'\', [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { $_.ProcessId })
+            $observations+=@(@{at=$state.at;main_pids=@($main.ProcessId);backend_pids=$backendPids;listeners=$state.listeners})
+            if ($main.Count -gt 0 -and @($state.listeners | Where-Object { $_.OwningProcess -in $backendPids }).Count -gt 0) { $outcome='success'; return }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $script:lastSetupDeadline)
+        throw 'Installer auto-start did not acquire its own backend within the original installer deadline'
+    } finally {
+        @{started_at=$started.ToUniversalTime().ToString('o');ended_at=(Get-Date).ToUniversalTime().ToString('o');installer_deadline=$script:lastSetupDeadline.ToUniversalTime().ToString('o');install=$install;outcome=$outcome;observations=$observations} | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $evidence ("r265-installer-launch-"+$cleanupSequence+".json")) -Encoding utf8
+    }
 }
 function Assert-InstalledVersion([string]$Version) {
     $exe = Get-Item (Join-Path $install 'Deep Legends.exe')
@@ -85,7 +156,7 @@ try {
     # Wait for a real normal close and for all Electron writers to exit before
     # reading the final snapshot. Existence alone also matches a truncated file.
     $publishedBounds = Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline $script:lastSetupDeadline -EvidencePath (Join-Path $evidence '076-window-bounds-wait.json')
-    Stop-InstalledApp
+    Stop-InstalledApp -ObserveOnly
     if (-not (Test-Path $userData)) { throw '0.12.76 did not initialize its actual Electron userData directory' }
     if (-not (Test-Path $boundsFile)) { throw '0.12.76 did not persist its actual window bounds' }
     $publishedBoundsValue = $publishedBounds | ConvertFrom-Json
@@ -177,11 +248,19 @@ try {
     if ((Get-FileHash $published079 -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'cabacc1b4e8bc8dcf51469e1d1e84f0ef6ff8f82090084bf0c3fd6b0bb794d96') { throw 'Published 0.12.79 setup checksum mismatch' }
     Run-Setup $published079
     Assert-InstalledVersion '0.12.79'
+    Wait-R265InstallerLaunch
     Stop-InstalledApp
     function Start-R265DebugApp {
+        Stop-InstalledApp -ObserveOnly
+        $script:launchSequence++
+        Save-R265State ("r265-before-launch-"+$launchSequence+".json") | Out-Null
         $listener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,0)
         $listener.Start(); $debugPort=$listener.LocalEndpoint.Port; $listener.Stop()
-        Start-Process -FilePath (Join-Path $install 'Deep Legends.exe') -ArgumentList "--remote-debugging-port=$debugPort" | Out-Null
+        if ($debugPort -eq 47391) { throw 'CDP port conflicts with the stable backend origin' }
+        $script:debugPorts+=@($debugPort)
+        $launched=Start-Process -FilePath (Join-Path $install 'Deep Legends.exe') -ArgumentList "--remote-debugging-port=$debugPort" -PassThru
+        $env:R265_EXPECTED_ELECTRON_PID=[string]$launched.Id
+        @{at=(Get-Date).ToUniversalTime().ToString('o');pid=$launched.Id;install=$install;debug_port=$debugPort;backend_port=47391;user_data=$userData} | ConvertTo-Json | Set-Content (Join-Path $evidence ("r265-launch-"+$launchSequence+".json")) -Encoding utf8
         return $debugPort
     }
     $debugPort=Start-R265DebugApp
@@ -190,7 +269,7 @@ try {
     node scripts/r265-persisted-ui.cjs $debugPort write-presets $evidence *> (Join-Path $evidence '079-format-presets-write.log')
     if ($LASTEXITCODE -ne 0) { throw 'Same-tag missing-resource fixture did not save preset format' }
     $actual079Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '079-normal-close.json')
-    Stop-InstalledApp
+    Stop-InstalledApp -ObserveOnly
     $actual079Files=@{}
     foreach ($name in @('window-bounds.json','ui-scale.json')) {
         $file=Join-Path $userData $name
@@ -201,19 +280,20 @@ try {
     $candidateSetupPath=(Resolve-Path $Setup).Path
     Run-Setup $candidateSetupPath
     Assert-InstalledVersion $candidateVersion
+    Wait-R265InstallerLaunch
     Stop-InstalledApp
     $debugPort=Start-R265DebugApp
     node scripts/r265-persisted-ui.cjs $debugPort read $evidence *> (Join-Path $evidence '080-actual-ui-read.log')
     if ($LASTEXITCODE -ne 0) { throw 'Actual 079 UI-written preferences changed after candidate upgrade' }
     $actual080Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '080-normal-close.json')
-    Stop-InstalledApp
+    Stop-InstalledApp -ObserveOnly
     $debugPort=Start-R265DebugApp
     node scripts/r265-persisted-ui.cjs $debugPort restart $evidence *> (Join-Path $evidence '080-preset-restart.log')
     if ($LASTEXITCODE -ne 0) { throw 'Renamed preset was not retained after candidate restart' }
     node scripts/r265-persisted-ui.cjs $debugPort corrupt $evidence *> (Join-Path $evidence '080-corrupt-preset.log')
     if ($LASTEXITCODE -ne 0) { throw 'Corrupt preset damaged other settings or was not discarded' }
     Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '080-second-normal-close.json') | Out-Null
-    Stop-InstalledApp
+    Stop-InstalledApp -ObserveOnly
     $actual079Comparisons=@()
     foreach ($file in $actual079Files.Keys) {
         $after=(Get-FileHash $file -Algorithm SHA256).Hash
@@ -224,6 +304,10 @@ try {
     $actual079Comparisons | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $evidence '079-to-080-persistent-files.json')
     @{upgrade_from='0.12.79';upgrade_to=$candidateVersion;key_mode='public';setup079_sha256='cabacc1b4e8bc8dcf51469e1d1e84f0ef6ff8f82090084bf0c3fd6b0bb794d96';settings_written_by='unmodified published 079 renderer UI';preset_scope='format compatibility only: published 079 cannot save presets; exact same-tag missing-script fixture used only before upgrade';preset_script_sha256='74699f9576ccd8686fce0e95c38b718b96718baa46bd68e9068cf947f7ea38f3';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;persisted_files_equal=$true;preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
     Get-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
+} catch {
+    # Capture before final cleanup, including foreign install paths/port owners.
+    Save-R265State 'r265-failure-processes-and-ports.json' | Out-Null
+    throw
 } finally {
     if ($userData -and (Test-Path $userData)) {
         foreach ($name in @('window-bounds.json','ui-scale.json','r238-settings-sentinel.json')) {
