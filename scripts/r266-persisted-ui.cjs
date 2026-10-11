@@ -46,9 +46,9 @@ async function probe({port,phase,out}){
  const shot=async name=>{const png=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,name),Buffer.from(png.data,'base64'));};
  const demo=async origin=>{const marker=Date.now();await call('Page.addScriptToEvaluateOnNewDocument',{source:`window.__r265ProbeLoad=${marker};window.EventSource=class{addEventListener(){}close(){}};`});await call('Page.navigate',{url:origin+'/?demo&section=overview'});await until(`window.__r265ProbeLoad===${marker} && !!document.querySelector('#setting-default-page + .app-select')`);await click('#section-overview');await until("document.querySelector('.match-list .match-entry')");};
  const openFilter=async()=>{
-  await click('[data-history-filter-load],[data-af-open]');await until("!!document.querySelector('[data-af-open]')");
-  if(!await evaluate("document.querySelector('[data-af-menu]')?.hidden===false"))await click('[data-af-open]');
-  await until(phase.startsWith('write-') ? "document.querySelector('[data-af-menu]')?.hidden===false" : "document.querySelector('dialog[data-af-menu]:modal')?.hidden===false");
+  const visible=phase.startsWith('write-') ? "document.querySelector('[data-af-menu]')?.hidden===false" : "document.querySelector('dialog[data-af-menu]:modal')?.hidden===false";
+  if(!await evaluate(visible))await click('[data-history-filter-load],[data-af-open]');
+  await until("!!document.querySelector('[data-af-open]')");await until(visible);
  };
  const openSaved=async()=>{await openFilter();await click('[data-af-page="saved"]');};
  try{

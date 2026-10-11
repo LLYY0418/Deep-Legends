@@ -4,6 +4,7 @@ $ErrorActionPreference = "Stop"
 $env:RIOT_API_KEY = 'RGAPI-00000000-0000-0000-0000-000000000000'
 . (Join-Path $PSScriptRoot 'r252-diagnostic-time.ps1')
 . (Join-Path $PSScriptRoot 'r261-window-bounds.ps1')
+. (Join-Path $PSScriptRoot 'r271-installer-diagnostics.ps1')
 # The candidate is whatever desktop/package.json declares, so a version bump
 # needs no edits here.
 $candidateVersion = (& node -p "require('./desktop/package.json').version").Trim()
@@ -13,6 +14,8 @@ $install = Join-Path $root "installed"
 $data = Join-Path $root "data"
 $evidence = Join-Path $root "evidence"
 New-Item -ItemType Directory -Force $install,$data,$evidence | Out-Null
+Save-R271RunnerHost $evidence
+$setupSequence = 0
 $appDirectories = @($install, (Join-Path $root 'installed-079'), (Join-Path $root 'installed-080'), (Join-Path $root 'installed-081-2.25'), (Join-Path $root 'installed-081-2.5'))
 $debugPorts = @()
 $cleanupSequence = 0
@@ -26,10 +29,16 @@ function Show-PersistedFailure([string]$Log) {
         ($_ -replace 'RGAPI-[A-Za-z0-9-]+', '[riot-key]' -replace '(?i)([A-Z]:\\Users\\|/Users/|/home/)[^\\/\s]+', '$1[user]')
     }
 }
-function Run-Setup([string]$File, [switch]$MonitorLegacy) {
+function Run-Setup([string]$File, [Parameter(Mandatory=$true)][string]$Version, [switch]$MonitorLegacy) {
     # These are the actual Go installer shells. --update auto-starts their
     # existing progress flow; /S alone would leave the Go setup page waiting.
-    $process = Start-Process -FilePath $File -ArgumentList "--update --dest `"$install`"" -PassThru
+    $script:setupSequence++
+    $prefix = Join-Path $evidence ("r271-setup-" + $Version + '-' + $script:setupSequence)
+    $started = Get-Date
+    $tempDirectory = if ($env:TMP) { $env:TMP } elseif ($env:TEMP) { $env:TEMP } else { [IO.Path]::GetTempPath() }
+    $startupLog = Join-Path $tempDirectory 'DeepLegendsSetup-startup.log'
+    $process = Start-Process -FilePath $File -ArgumentList "--update --dest `"$install`"" -PassThru -RedirectStandardError ($prefix + '-stderr.log') -RedirectStandardOutput ($prefix + '-stdout.log')
+    [ordered]@{ version = $Version; installer = $File; process_id = $process.Id; started_at = $started.ToUniversalTime().ToString('o'); stderr = $prefix + '-stderr.log'; stdout = $prefix + '-stdout.log'; startup_log = $startupLog } | ConvertTo-Json | ForEach-Object { ConvertTo-R271SafeText $_ } | Set-Content -LiteralPath ($prefix + '-launch.json') -Encoding utf8
     $deadline=(Get-Date).AddSeconds(180)
     $script:lastSetupDeadline=$deadline
     $snapshots=@(); $last=""
@@ -45,8 +54,18 @@ function Run-Setup([string]$File, [switch]$MonitorLegacy) {
             }
         }
     }
+    $process.WaitForExit() # Flush the redirected readers after the original bounded wait.
     if ($MonitorLegacy) { ConvertTo-Json -InputObject @($snapshots) -Depth 8 | Set-Content (Join-Path $evidence 'legacy-0.12.68-nsis-snapshots.json') }
-    if ($process.ExitCode -ne 0) { throw "Real installer failed: $($process.ExitCode)" }
+    $exitCode = $process.ExitCode
+    $result = [ordered]@{ version = $Version; installer = $File; process_id = $process.Id; exit_code = $exitCode; completed_at = [DateTime]::UtcNow.ToString('o'); stderr_bytes = (Get-Item -LiteralPath ($prefix + '-stderr.log')).Length; stdout_bytes = (Get-Item -LiteralPath ($prefix + '-stdout.log')).Length }
+    $result | ConvertTo-Json | ForEach-Object { ConvertTo-R271SafeText $_ } | Set-Content -LiteralPath ($prefix + '-result.json') -Encoding utf8
+    Write-Output ('R271_SETUP_RESULT ' + (ConvertTo-R271SafeText ($result | ConvertTo-Json -Compress)))
+    if (Test-Path -LiteralPath $startupLog) { Copy-Item -LiteralPath $startupLog -Destination ($prefix + '-startup.log') }
+    if ($exitCode -ne 0) {
+        try { Save-R271SetupFailure -File $File -Version $Version -Process $process -StartedAt $started -Prefix $prefix -StartupLog $startupLog }
+        catch { Write-Output ('Installer diagnostic collection failed: ' + (ConvertTo-R271SafeText $_.Exception.Message)) }
+        throw "Real installer failed: $exitCode"
+    }
     if (-not (Test-Path (Join-Path $install "Deep Legends.exe"))) { throw "Installed executable missing" }
 }
 function Get-R265AppState {
@@ -131,7 +150,7 @@ function Assert-InstalledVersion([string]$Version) {
     if ($record.product_version -ne "$Version.0" -or $record.file_version -ne $Version -or $record.asar_version -ne $Version) { throw ("Unexpected installed version: "+($record | ConvertTo-Json -Compress)) }
 }
 try {
-    Run-Setup $old
+    Run-Setup $old -Version '0.12.65'
     Stop-InstalledApp
     # Reproduce the reported 0.12.65 -> 0.12.68 path before upgrading to R206.
     # Capture its private TEMP stage file while the real installer is running;
@@ -142,7 +161,7 @@ try {
     $originalTemp=$env:TEMP; $originalTmp=$env:TMP
     $env:TEMP=Join-Path $root 'legacy-temp'; $env:TMP=$env:TEMP
     New-Item -ItemType Directory -Force $env:TEMP | Out-Null
-    try { Run-Setup $legacy -MonitorLegacy } finally { $env:TEMP=$originalTemp; $env:TMP=$originalTmp }
+    try { Run-Setup $legacy -Version '0.12.68' -MonitorLegacy } finally { $env:TEMP=$originalTemp; $env:TMP=$originalTmp }
     Start-Sleep -Seconds 2
     $legacyDiagnostics=Join-Path $data 'logs/diagnostics.jsonl'
     if (Test-Path $legacyDiagnostics) { Get-Content $legacyDiagnostics | ForEach-Object {try {$row=$_ | ConvertFrom-Json; if ($row.event -eq 'update_install_timing') {$_}} catch {}} | Set-Content (Join-Path $evidence 'legacy-install-timing.jsonl') }
@@ -151,19 +170,19 @@ try {
     $published076 = Join-Path $root 'Deep-Legends-Setup-0.12.76-public.exe'
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.76/Deep-Legends-Setup-0.12.76-public.exe' -OutFile $published076
     if ((Get-FileHash $published076 -Algorithm SHA256).Hash.ToLowerInvariant() -ne '01014312b60e591a05bfc87f86e098adf6c5fc5e59520db5aedac5b5dba02ff3') { throw 'Published 0.12.76 setup checksum mismatch' }
-    Run-Setup $published076
+    Run-Setup $published076 -Version '0.12.76'
     Assert-InstalledVersion '0.12.76'
     Stop-InstalledApp
     $published080 = Join-Path $root 'Deep-Legends-Setup-0.12.80-public.exe'
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.80/Deep-Legends-Setup-0.12.80-public.exe' -OutFile $published080
     if ((Get-FileHash $published080 -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'e62a12f286cef2a5b8dabaaf99dcd8de50557ba34f5c1b84cde3fa0c86744aaf') { throw 'Published 0.12.80 setup checksum mismatch' }
-    Run-Setup $published080
+    Run-Setup $published080 -Version '0.12.80'
     Assert-InstalledVersion '0.12.80'
     Stop-InstalledApp
     $published081 = Join-Path $root 'Deep-Legends-Setup-0.12.81-public.exe'
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.81/Deep-Legends-Setup-0.12.81-public.exe' -OutFile $published081
     if ((Get-FileHash $published081 -Algorithm SHA256).Hash.ToLowerInvariant() -ne '7dd3e6eb22aeb75c9e62deddd090231f8c93fa62e92de90bfc1baa174085862d') { throw 'Published 0.12.81 setup checksum mismatch' }
-    Run-Setup $published081
+    Run-Setup $published081 -Version '0.12.81'
     Assert-InstalledVersion '0.12.81'
     $userDataName = (& node -e "const p=JSON.parse(require('./desktop/node_modules/@electron/asar').extractFile(process.argv[1],'package.json'));console.log(p.productName||p.name)" (Join-Path $install 'resources/app.asar')).Trim()
     if ($LASTEXITCODE -ne 0 -or -not $userDataName) { throw 'Cannot determine installed Electron userData name' }
@@ -210,7 +229,7 @@ try {
         $stagePath=Join-Path $data $stageFile
         if (Test-Path $stagePath) { Copy-Item $stagePath (Join-Path $evidence ("076-before-"+$stageFile)); Remove-Item $stagePath }
     }
-    Run-Setup $online.download
+    Run-Setup $online.download -Version $candidateVersion
     # Keep the real installer handoff alive until its once-only buffered timing
     # event is flushed. Killing/relaunching it here can destroy that evidence.
     Assert-InstalledVersion $candidateVersion
@@ -265,7 +284,7 @@ try {
     $published079 = Join-Path $root 'Deep-Legends-Setup-0.12.79-public.exe'
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.79/Deep-Legends-Setup-0.12.79-public.exe' -OutFile $published079
     if ((Get-FileHash $published079 -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'cabacc1b4e8bc8dcf51469e1d1e84f0ef6ff8f82090084bf0c3fd6b0bb794d96') { throw 'Published 0.12.79 setup checksum mismatch' }
-    Run-Setup $published079
+    Run-Setup $published079 -Version '0.12.79'
     Assert-InstalledVersion '0.12.79'
     Wait-R265InstallerLaunch
     Stop-InstalledApp
@@ -297,7 +316,7 @@ try {
         $actual079Files[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
     }
     $candidateSetupPath=(Resolve-Path $Setup).Path
-    Run-Setup $candidateSetupPath
+    Run-Setup $candidateSetupPath -Version $candidateVersion
     Assert-InstalledVersion $candidateVersion
     Wait-R265InstallerLaunch
     Stop-InstalledApp
@@ -334,7 +353,7 @@ try {
     $published080 = Join-Path $root 'Deep-Legends-Setup-0.12.80-public.exe'
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.80/Deep-Legends-Setup-0.12.80-public.exe' -OutFile $published080
     if ((Get-FileHash $published080 -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'e62a12f286cef2a5b8dabaaf99dcd8de50557ba34f5c1b84cde3fa0c86744aaf') { throw 'Published 0.12.80 setup checksum mismatch' }
-    Run-Setup $published080
+    Run-Setup $published080 -Version '0.12.80'
     Assert-InstalledVersion '0.12.80'
     Wait-R265InstallerLaunch
     Stop-InstalledApp
@@ -353,7 +372,7 @@ try {
         $actual080Files[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
     }
     $candidateSetupPath=(Resolve-Path $Setup).Path
-    Run-Setup $candidateSetupPath
+    Run-Setup $candidateSetupPath -Version $candidateVersion
     Assert-InstalledVersion $candidateVersion
     Wait-R265InstallerLaunch
     Stop-InstalledApp
@@ -392,7 +411,7 @@ try {
     $published081 = Join-Path $root 'Deep-Legends-Setup-0.12.81-public.exe'
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.81/Deep-Legends-Setup-0.12.81-public.exe' -OutFile $published081
     if ((Get-FileHash $published081 -Algorithm SHA256).Hash.ToLowerInvariant() -ne '7dd3e6eb22aeb75c9e62deddd090231f8c93fa62e92de90bfc1baa174085862d') { throw 'Published 0.12.81 setup checksum mismatch' }
-    Run-Setup $published081
+    Run-Setup $published081 -Version '0.12.81'
     Assert-InstalledVersion '0.12.81'
     Wait-R265InstallerLaunch
     Stop-InstalledApp
@@ -411,7 +430,7 @@ try {
         $actual081Files[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
     }
     $candidateSetupPath=(Resolve-Path $Setup).Path
-    Run-Setup $candidateSetupPath
+    Run-Setup $candidateSetupPath -Version $candidateVersion
     Assert-InstalledVersion $candidateVersion
     Wait-R265InstallerLaunch
     Stop-InstalledApp

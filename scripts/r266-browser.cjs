@@ -94,8 +94,9 @@ async function start(){
   const metrics=await evaluate("({nodes:document.querySelectorAll('*').length,images:document.querySelectorAll('img').length,tasks:__r266Tasks.filter(t=>t.start>=__r266CloseStart)})");const total=metrics.tasks.reduce((n,t)=>n+t.duration,0),max=Math.max(0,...metrics.tasks.map(t=>t.duration));assert(metrics.nodes<=15000 && metrics.images<=1500,JSON.stringify(metrics));assert(total<=300 && max<=200,JSON.stringify(metrics));assert.equal(await evaluate("document.querySelectorAll('.match-list > .match-entry').length"),20);
   await click('[data-af-open]');await evaluate("document.querySelector('[data-af-menu]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");assert(await evaluate("!document.querySelector('[data-af-menu]').open && document.activeElement===document.querySelector('[data-af-open]')"));
   await click('[data-af-open]');await call('Input.dispatchMouseEvent',{type:'mousePressed',x:4,y:4,button:'left',clickCount:1});await call('Input.dispatchMouseEvent',{type:'mouseReleased',x:4,y:4,button:'left',clickCount:1});assert(await evaluate("!document.querySelector('[data-af-menu]').open"),'backdrop did not close');
-  await evaluate('window.__r266CycleStart=performance.now()');
+  await evaluate("window.__r271FilterShell=['.summoner-strip','.career-column','.overview-layout'].map(s=>document.querySelector(s));window.__r266CycleStart=performance.now()");
   for(const id of [103,238,157,875,145]) {await click('[data-af-open]');await click('[data-af-clear]');await click('[data-af-category="hero"]');await click('[data-af-option="'+id+'"]');await click('[data-af-close]');await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');}
+  const filterCommitShellRetained=await evaluate("__r271FilterShell.every((n,i)=>n && n===document.querySelector(['.summoner-strip','.career-column','.overview-layout'][i]))");assert(filterCommitShellRetained,'filter commits must retain the overview shell');
   const cycleTasks=await evaluate('__r266Tasks.filter(t=>t.start>=__r266CycleStart).reduce((n,t)=>n+t.duration,0)');assert(cycleTasks<=1000,'five filter cycles long tasks '+cycleTasks);
   if(width===1440 && (!process.env.R266_CASE_ONE || process.env.R266_EXTRAS)){
     await click('#section-settings');await click('#settings-tab-privacy');await until("document.querySelector('[data-riot-cache-clear]')?.getBoundingClientRect().height>0");
@@ -112,7 +113,7 @@ async function start(){
     }
     results.push({theme,width,settings,collectionFirst:firstCount.count,collectionFirstMs:firstCount.ms,collectionCards:1192,collectionLongestMs:collectionMax,pendingSamples:samples});
   }
-  results.push({theme,width,dialog,cycleLongTasksMs:cycleTasks,clickLongTasksMs:clickTasks,applyLongTasksMs:total,applyLongestMs:max,...metrics});
+  results.push({theme,width,dialog,filterCommitShellRetained,cycleLongTasksMs:cycleTasks,clickLongTasksMs:clickTasks,applyLongTasksMs:total,applyLongestMs:max,...metrics});
   closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});
  }
  assert.equal(violations.length,0,JSON.stringify(violations));assert.equal(errors.length,0,JSON.stringify(errors));

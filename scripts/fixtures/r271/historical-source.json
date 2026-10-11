@@ -1,0 +1,16 @@
+[
+  {
+    "tag": "v0.12.80",
+    "commit": "663d97343a391f2ff0e3f22186335118217ecd6e",
+    "source": "backend/web/history-filters.js",
+    "sha256": "7759c6a15551e688b79e809574db85303029fefd2b3527cc81bc87721fa3ea29",
+    "fixture": "history-filters-0.12.80.cjs"
+  },
+  {
+    "tag": "v0.12.81",
+    "commit": "2949963f50e7877e9dc84a8655012b2cf53b8b1b",
+    "source": "backend/web/history-filters.js",
+    "sha256": "e7e2aab8ee38ef902c75780eee16fbe23ebbb60837d4ebdf32bca822b1f8c6c7",
+    "fixture": "history-filters-0.12.81.cjs"
+  }
+]

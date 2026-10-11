@@ -112,6 +112,7 @@ jobs:
           CHROME_BIN="$chrome" R267_BACKEND="$RUNNER_TEMP/r264-public" R267_BROWSER_OUT="$RUNNER_TEMP/r267-browser" node scripts/r267-browser.cjs
           python3 scripts/r269-mutations.py --out "$RUNNER_TEMP/r269-mutations"
           CHROME_BIN="$chrome" R269_BACKEND="$RUNNER_TEMP/r264-public" python3 scripts/r270-mutations.py --out "$RUNNER_TEMP/r270-mutations"
+          CHROME_BIN="$chrome" R269_BACKEND="$RUNNER_TEMP/r264-public" python3 scripts/r271-mutations.py --browser --out "$RUNNER_TEMP/r271-mutations"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -128,6 +129,7 @@ jobs:
             ${{ runner.temp }}/r269-geometry/**
             ${{ runner.temp }}/r269-mutations/**
             ${{ runner.temp }}/r270-mutations/**
+            ${{ runner.temp }}/r271-mutations/**
           if-no-files-found: warn
       - name: Test installer module
         working-directory: installer

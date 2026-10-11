@@ -5156,10 +5156,12 @@
       render:()=>{if(isActive()) {renderFilteredMatchView(tab);prepareImages(overviewContainer(tab));}},
       progress:()=>{if(isActive()){appendOverviewMatches(tab,[]);clearTimeout(tab.searchCountdownTimer);const seconds=Math.ceil((tab.searchQuotaUntil-Date.now())/1000);if(seconds>0)tab.searchCountdownTimer=setTimeout(()=>{if(!tab.closed && isActive())advancedFilterContext(tab).progress();},1000);}},
       change:()=>{cancelAdvancedMatchSearch(tab);
-        const container=overviewContainer(tab),bar=container?.querySelector('.match-filterbar');
-        if(bar){const template=document.createElement('template');template.innerHTML=af.renderConditions(tab,()=>advancedFilterContext(tab));const old=bar.querySelector('[data-af-conditions]');if(old)old.remove();if(template.content.firstElementChild)bar.append(template.content.firstElementChild);}
+        const container=overviewContainer(tab),deferred=tab.overviewRenderDeferred;
         tab.filteredVisibleCount=20;tab.matchViewRevision=Number(tab.matchViewRevision || 0)+1;
-        tab.overviewRenderDeferred=false;rerenderTab(tab,'filter_commit');prepareImages(overviewContainer(tab));
+        tab.overviewRenderDeferred=false;
+        if(!deferred && isActive() && container?._overviewViewTab===tab && container._afBoundTab===tab && !tab.overviewSubpage)renderFilteredMatchView(tab);
+        else rerenderTab(tab,'filter_commit');
+        prepareImages(overviewContainer(tab));
         if(af.active(tab))void af.find(tab,advancedFilterContext(tab));},
     };
   }
