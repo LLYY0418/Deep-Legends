@@ -58,7 +58,8 @@ func TestR93TwentyMatchDetailsFromDiskAfterRestart(t *testing.T) {
 		return hits
 	}
 	coldCalls := make(map[string]int)
-	if misses := readBatch(newProvider(coldCalls), "miss"); misses != matchCount {
+	coldProvider := newProvider(coldCalls)
+	if misses := readBatch(coldProvider, "miss"); misses != matchCount {
 		t.Fatalf("cold network results=%d, want %d", misses, matchCount)
 	}
 	if len(coldCalls) != matchCount {
@@ -69,6 +70,7 @@ func TestR93TwentyMatchDetailsFromDiskAfterRestart(t *testing.T) {
 			t.Fatalf("cold requests for %s=%d, want 1", path, calls)
 		}
 	}
+	r274Flush(t, coldProvider.matchDisk)
 	// Rebuild both providers and their in-memory caches; only the directory is shared.
 	restartCalls := make(map[string]int)
 	diskHits := readBatch(newProvider(restartCalls), "disk")

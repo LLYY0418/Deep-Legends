@@ -147,6 +147,7 @@ func TestR106AllReviewedAccountsBatchAndPersistentCache(t *testing.T) {
 			}
 		}
 	}
+	r274Flush(t, app1.proProfiles.disk)
 	app2 := &app{storage: store, champions: &championProvider{client: client}}
 	app2.enrichProProfiles(context.Background(), seeds)
 	if requests.Load() != 53 {
@@ -203,6 +204,7 @@ func TestR106ProfileIconPersistsOnlySuccessfulImage(t *testing.T) {
 		if _, err := a.loadClientIcon(context.Background(), client, "/lol-game-data/assets/v1/profile-icons/123.jpg"); err != nil {
 			t.Fatal(err)
 		}
+		r274Flush(t, a.profileIconImages)
 	}
 	if calls.Load() != 1 {
 		t.Fatal("restart fetched public image again")

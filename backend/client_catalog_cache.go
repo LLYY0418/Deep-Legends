@@ -78,12 +78,18 @@ func (a *app) clientCatalogBytes(ctx context.Context, client *LCUClient, path st
 		return client.GetBytesContext(ctx, path)
 	}
 	a.perkCatalogMu.Lock()
-	if a.clientCatalogCache == nil {
-		a.clientCatalogCache = newPublicBinaryCache(a.storage, "client-catalog", 24, 16<<20)
-		a.clientCatalogCache.memoryMaxEntries, a.clientCatalogCache.memoryMaxBytes = 24, 16<<20
-	}
 	cache := a.clientCatalogCache
 	a.perkCatalogMu.Unlock()
+	if cache == nil {
+		prepared := newPublicBinaryCache(a.storage, "client-catalog", 24, 16<<20)
+		prepared.memoryMaxEntries, prepared.memoryMaxBytes = 24, 16<<20
+		a.perkCatalogMu.Lock()
+		if a.clientCatalogCache == nil {
+			a.clientCatalogCache = prepared
+		}
+		cache = a.clientCatalogCache
+		a.perkCatalogMu.Unlock()
+	}
 	return cache.load(ctx, "client-catalog-v1|"+key+"|"+path, 365*24*time.Hour, 0, true, func(ctx context.Context) ([]byte, error) {
 		raw, err := client.GetBytesContext(ctx, path)
 		if err == nil {

@@ -9,8 +9,8 @@ import (
 // enrich immutable snapshots in the background; unknown fields stay unknown.
 func (a *app) proPlayersFirstScreen(force bool) ([]opggProTeam, time.Time, error) {
 	c := &a.proPlayers
+	a.restoreProSnapshot()
 	c.mu.Lock()
-	a.restoreProSnapshotLocked()
 	if len(c.teams) == 0 {
 		c.teams = new(app).loadProSeeds(context.Background(), nil)
 	}

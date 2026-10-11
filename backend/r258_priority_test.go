@@ -304,7 +304,9 @@ func TestR258VersionedCatalogSurvivesReconnectAndRestart(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		r274Flush(t, appInstance.clientCatalogCache)
 	}
+	t.Cleanup(func() { r274Flush(t, a.clientCatalogCache) })
 	if reads.Load() != 4 {
 		t.Fatal("reconnect reread directories", reads.Load())
 	}

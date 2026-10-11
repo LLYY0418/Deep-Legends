@@ -231,7 +231,9 @@ func r99SeedProvider(t *testing.T, root string, handler func(*http.Request) (*ht
 	cp := newChampionProvider()
 	cp.cache = newChampionDataCache(&localStore{root: root})
 	cp.client = &http.Client{Transport: gameplayRoundTripFunc(handler)}
-	return newRiotProvider(cp)
+	p := newRiotProvider(cp)
+	t.Cleanup(func() { r274Flush(t, p.matchDisk); r274Flush(t, p.identityDisk); r274Flush(t, cp.cache) })
+	return p
 }
 func r99Response(body string) *http.Response {
 	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}
@@ -268,6 +270,7 @@ func TestR99SeedRenameSurvivesRestartAndTTL(t *testing.T) {
 	if err != nil || account.PUUID != "fixture-stable" {
 		t.Fatal(err)
 	}
+	r274Flush(t, p.identityDisk)
 	p = r99SeedProvider(t, root, handler)
 	clock := time.Now().Add(29 * 24 * time.Hour)
 	p.identityDisk.now = func() time.Time { return clock }
@@ -294,6 +297,7 @@ func TestR99SeedAnchorSurvivesLRUAndHasOnlyStableField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	r274Flush(t, p.identityDisk)
 	paths, _ := filepath.Glob(filepath.Join(root, "riot-identities", "proseed-*.json"))
 	if len(paths) != 1 {
 		t.Fatal(paths)
@@ -311,6 +315,7 @@ func TestR99SeedAnchorSurvivesLRUAndHasOnlyStableField(t *testing.T) {
 		if err := p.cachedPublicIdentity(context.Background(), fmt.Sprintf("other:%d", i), time.Hour, &value, func(context.Context) error { return nil }); err != nil {
 			t.Fatal(err)
 		}
+		r274Flush(t, p.identityDisk)
 	}
 	if _, err := os.Stat(paths[0]); err != nil {
 		t.Fatal("anchor evicted", err)

@@ -124,6 +124,7 @@ type championProvider struct {
 	observedAugmentMu   sync.Mutex
 	observedAugments    map[int64]gameplayAugment
 	observedLoaded      bool
+	observedLoadDone    chan struct{}
 	observedWriteActive bool
 	observedWriteDirty  bool
 	remoteAugmentMu     sync.RWMutex

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -92,6 +93,7 @@ type localStore struct {
 	root                 string
 	salt                 []byte
 	mu                   sync.Mutex
+	auxiliaryDisk        *championDataCache
 	diagnosticMu         sync.Mutex
 	onDiagnosticRotation func()
 	diagnosticRunID      string
@@ -887,6 +889,12 @@ func (s *localStore) Close() error {
 	if s == nil {
 		return nil
 	}
+	s.mu.Lock()
+	cache := s.auxiliaryDisk
+	s.mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	_ = cache.closeDisk(ctx)
+	cancel()
 	s.diagnosticMu.Lock()
 	defer s.diagnosticMu.Unlock()
 	s.diagnosticClosed = true

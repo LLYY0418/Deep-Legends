@@ -10,24 +10,33 @@ import (
 
 const proSnapshotKey = "public-pro-snapshot-v1|kr"
 
-// Caller holds proPlayers.mu. The disk contains public directory data only,
-// never LCU credentials. The original publication time is not refreshed on read.
-func (a *app) restoreProSnapshotLocked() bool {
+// Disk preparation is outside proPlayers.mu. Publish only if another loader
+// has not already supplied a newer immutable snapshot in the meantime.
+func (a *app) restoreProSnapshot() bool {
 	c := &a.proPlayers
+	c.mu.Lock()
+	if c.diskChecked {
+		c.mu.Unlock()
+		return false
+	}
+	existing := len(c.teams) > 0
+	c.mu.Unlock()
+	disk := newPublicBinaryCache(a.storage, "pro-directory", 2, 16<<20)
+	var entry championCacheEnvelope
+	var snapshot proDiskSnapshot
+	valid := false
+	if !existing && a.storage != nil {
+		var err error
+		entry, err = disk.readDisk(proSnapshotKey)
+		valid = err == nil && !time.Now().After(entry.ExpiresAt) && time.Since(entry.FetchedAt) <= proPlayersMaxStale && json.Unmarshal(entry.Data, &snapshot) == nil && len(snapshot.Teams) > 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.diskChecked {
 		return false
 	}
-	c.diskChecked = true
-	c.disk = newPublicBinaryCache(a.storage, "pro-directory", 2, 16<<20)
-	if len(c.teams) > 0 || a.storage == nil {
-		return false
-	}
-	entry, err := c.disk.readDisk(proSnapshotKey)
-	if err != nil || time.Now().After(entry.ExpiresAt) || time.Since(entry.FetchedAt) > proPlayersMaxStale {
-		return false
-	}
-	var snapshot proDiskSnapshot
-	if json.Unmarshal(entry.Data, &snapshot) != nil || len(snapshot.Teams) == 0 {
+	c.diskChecked, c.disk = true, disk
+	if len(c.teams) > 0 || !valid {
 		return false
 	}
 	teams := snapshot.restore()
@@ -45,7 +54,7 @@ func (a *app) persistProSnapshotLocked() {
 		return
 	}
 	hash := sha256.Sum256(data)
-	_ = c.disk.writeDisk(championCacheEnvelope{Schema: championCacheSchema, Key: proSnapshotKey, FetchedAt: c.fetchedAt, ExpiresAt: c.fetchedAt.Add(proPlayersMaxStale), StaleUntil: c.fetchedAt.Add(proPlayersMaxStale), Hash: hex.EncodeToString(hash[:]), Data: data})
+	c.disk.enqueueDiskWrite(championCacheEnvelope{Schema: championCacheSchema, Key: proSnapshotKey, FetchedAt: c.fetchedAt, ExpiresAt: c.fetchedAt.Add(proPlayersMaxStale), StaleUntil: c.fetchedAt.Add(proPlayersMaxStale), Hash: hex.EncodeToString(hash[:]), Data: data})
 }
 
 // Upstream structs intentionally omit enrichment fields from JSON. Keep them

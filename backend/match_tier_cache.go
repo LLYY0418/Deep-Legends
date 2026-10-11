@@ -11,7 +11,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"os"
 	"strconv"
 	"time"
 )
@@ -36,10 +35,19 @@ func matchTierCacheKey(gameID int64, regions ...string) string {
 }
 
 func (a *app) matchTierDiskCache() *championDataCache {
-	a.matchTierCacheOnce.Do(func() {
-		a.matchTierCache = newPublicBinaryCache(a.storage, "match-tiers", matchTierCacheEntries, matchTierCacheBytes)
-	})
-	return a.matchTierCache
+	a.mu.Lock()
+	cache := a.matchTierCache
+	a.mu.Unlock()
+	if cache == nil {
+		prepared := newPublicBinaryCache(a.storage, "match-tiers", matchTierCacheEntries, matchTierCacheBytes)
+		a.mu.Lock()
+		if a.matchTierCache == nil {
+			a.matchTierCache = prepared
+		}
+		cache = a.matchTierCache
+		a.mu.Unlock()
+	}
+	return cache
 }
 
 func (a *app) readMatchTierCache(gameID int64, regions ...string) (*matchTiersResponse, bool) {
@@ -50,14 +58,21 @@ func (a *app) readMatchTierCache(gameID int64, regions ...string) (*matchTiersRe
 	if cache == nil {
 		return nil, false
 	}
-	entry, err := cache.readDisk(matchTierCacheKey(gameID, regions...))
+	key := matchTierCacheKey(gameID, regions...)
+	cache.mu.Lock()
+	entry, hit := cache.entries[key]
+	cache.mu.Unlock()
+	var err error
+	if !hit {
+		entry, err = cache.readDisk(key)
+	}
 	if err != nil || len(entry.Data) == 0 {
 		return nil, false
 	}
 	if !entry.ExpiresAt.IsZero() && time.Now().After(entry.ExpiresAt) {
 		// 过期就删掉：隐私声明写的是「保留 7 天」，不能只是读的时候装作没有，
 		// 让文件在目录里一直躺着（目录未满时淘汰逻辑不会碰它）。
-		_ = os.Remove(cache.pathFor(matchTierCacheKey(gameID, regions...)))
+		cache.invalidate(key)
 		return nil, false
 	}
 	var value matchTiersResponse
@@ -81,9 +96,13 @@ func (a *app) writeMatchTierCache(gameID int64, value *matchTiersResponse, regio
 	}
 	hash := sha256.Sum256(data)
 	now := time.Now()
-	_ = cache.writeDisk(championCacheEnvelope{Schema: championCacheSchema, Key: matchTierCacheKey(gameID, regions...),
+	entry := championCacheEnvelope{Schema: championCacheSchema, Key: matchTierCacheKey(gameID, regions...),
 		FetchedAt: now, ExpiresAt: now.Add(matchTierCacheTTL), StaleUntil: now.Add(matchTierCacheTTL),
-		Hash: hex.EncodeToString(hash[:]), Data: data})
+		Hash: hex.EncodeToString(hash[:]), Data: data}
+	cache.mu.Lock()
+	cache.storeMemoryLocked(entry.Key, entry)
+	cache.mu.Unlock()
+	cache.enqueueDiskWrite(entry)
 }
 
 // splitCachedMatchTiers 先把长期缓存命中的对局挑出来，剩下的才需要去查 OP.GG。

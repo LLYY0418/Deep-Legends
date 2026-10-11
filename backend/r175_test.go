@@ -25,7 +25,13 @@ func r175App(t *testing.T) *app {
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	return &app{storage: trackTestStore(t, &localStore{root: root})}
+	a := &app{storage: trackTestStore(t, &localStore{root: root})}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		a.closePublicCacheDisks(ctx)
+	})
+	return a
 }
 func r175Events(t *testing.T, a *app, event string) []map[string]any {
 	t.Helper()

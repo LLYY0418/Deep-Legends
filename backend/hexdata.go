@@ -193,6 +193,7 @@ type hexdataClient struct {
 	mu            sync.Mutex
 	state         hexdataState
 	statePath     string
+	stateDisk     *championDataCache
 	minInterval   time.Duration
 	maximumJitter time.Duration
 	retryDelay    time.Duration
@@ -782,6 +783,7 @@ func newHexdataClient(provider *championProvider, store *localStore) *hexdataCli
 		},
 	}
 	if store != nil {
+		client.stateDisk = store.auxiliaryCacheDisk()
 		client.statePath = filepath.Join(store.root, championDataCacheDirectory, "hexdata-state.json")
 		client.loadState()
 	}
@@ -835,7 +837,18 @@ func (h *hexdataClient) saveStateLocked() {
 	}
 	data, err := json.Marshal(h.state)
 	if err == nil {
-		_ = atomicWriteFile(h.statePath, data, 0o600)
+		cache, path := h.stateDisk, h.statePath
+		ticket := cache.diskQueue.ticket(path)
+		cache.diskQueue.submit(cacheDiskTask{id: "hexdata-state", ticket: ticket, run: func(valid func() bool) {
+			if cache.beforeDiskIO != nil {
+				cache.beforeDiskIO("hexdata-state")
+			}
+			cache.diskMu.Lock()
+			defer cache.diskMu.Unlock()
+			if valid() {
+				_ = atomicWriteFile(path, data, 0o600)
+			}
+		}}, true)
 	}
 }
 
@@ -1167,7 +1180,7 @@ func (h *hexdataClient) promote(kind, id, buildID string, data []byte, fetchedAt
 	h.provider.cache.mu.Lock()
 	h.provider.cache.storeMemoryLocked(key, entry)
 	h.provider.cache.mu.Unlock()
-	_ = h.provider.cache.writeDisk(entry)
+	h.provider.cache.enqueueDiskWrite(entry)
 }
 
 func sha256Bytes(data []byte) string {

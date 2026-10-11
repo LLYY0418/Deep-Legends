@@ -848,6 +848,7 @@ func TestLoadMayhemDetailRequestsHeroJSONMetaAndTokenPage(t *testing.T) {
 		t.Fatalf("delta/wilson were not preserved: %#v", response.RecommendedAugments[0])
 	}
 	// 落盘走 hexdata- 前缀通道，key 用 meta 快照的 buildID。
+	r274Flush(t, provider.cache)
 	if entry, err := provider.cache.readDisk(hexdataTestBuild + "|hero-json|157"); err != nil || len(entry.Data) == 0 {
 		t.Fatalf("hero-json was not promoted to disk: %v", err)
 	}
@@ -1060,6 +1061,7 @@ func TestHexdataJSONKindsSurviveSoftTTLBecauseTheyArePromoted(t *testing.T) {
 	if _, err := provider.loadMayhemDetail(context.Background(), "157"); err != nil {
 		t.Fatal(err)
 	}
+	r274Flush(t, provider.cache)
 	for _, key := range []string{
 		hexdataTestBuild + "|meta|site",
 		hexdataTestBuild + "|postmatch|all",

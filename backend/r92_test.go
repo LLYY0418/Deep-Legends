@@ -190,6 +190,7 @@ func TestR92CommunityImageIndependentDiskRestart(t *testing.T) {
 	if calls.Load() != 3 {
 		t.Fatalf("memory/singleflight cache: %d", calls.Load())
 	}
+	r274Flush(t, a.champions.communityImageCache)
 	load(makeApp())
 	if calls.Load() != 3 {
 		t.Fatalf("restart missed CommunityDragon disk: %d", calls.Load())

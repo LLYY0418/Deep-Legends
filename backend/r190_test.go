@@ -75,6 +75,7 @@ func TestR190RiotOldCacheInvalidationV4AndHTTP(t *testing.T) {
 	if fresh.PerkStatsStale || fresh.SubjectParticipantID != 4 || fresh.Participants[0].PerkStats[0].Vars != [3]int64{804, 300, 0} || calls.Load() != 1 {
 		t.Fatalf("fresh=%#v calls=%d", fresh, calls.Load())
 	}
+	r274Flush(t, riot.matchDisk)
 	restart := newRiotProvider(p)
 	disk, err := restart.matchByID(context.Background(), "KR_190")
 	if err != nil || disk.Info.PerkStatsStale || calls.Load() != 1 {

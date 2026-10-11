@@ -84,6 +84,7 @@ func newHexdataBudgetProvider(t *testing.T, root string, transport http.RoundTri
 	provider.hexdata.maximumJitter = 0
 	provider.hexdata.retryDelay = 0
 	provider.client = &http.Client{Transport: transport}
+	t.Cleanup(func() { r274Flush(t, provider.cache) })
 	return provider
 }
 
@@ -496,6 +497,7 @@ func TestHexdataColdRankingBudgetAndDiskRestart(t *testing.T) {
 		}
 	}
 
+	r274Flush(t, provider.cache)
 	restarted := newHexdataBudgetProvider(t, root, transport)
 	ranking, err = restarted.loadHexdataRankings(context.Background())
 	restarted.hexdata.prefetchWait.Wait()
@@ -599,6 +601,7 @@ func TestHexdataSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNone(t *tes
 		t.Fatalf("ten same-hero loads made %d Hexdata requests, want 1", got)
 	}
 
+	r274Flush(t, provider.cache)
 	restarted := newHexdataBudgetProvider(t, root, transport)
 	page, err := restarted.hexdata.load(context.Background(), "hero", "67", "/hero/67-vayne", "text/html,application/xhtml+xml", false)
 	if err != nil || len(page.Data) == 0 {
@@ -653,6 +656,7 @@ func TestHexdataCircuitStatePersistsAcrossRestart(t *testing.T) {
 	for range hexdataCircuitFailureLimit {
 		client.recordFailure("heroes", 429, true)
 	}
+	r274Flush(t, client.stateDisk)
 	restarted := newHexdataClient(provider, trackTestStore(t, &localStore{root: root}))
 	restarted.now = func() time.Time { return now.Add(30 * time.Second) }
 	circuit := restarted.snapshot().Circuits["heroes"]
@@ -725,6 +729,7 @@ func TestHexdataRestartClearsLongLivedPersistedCircuit(t *testing.T) {
 	provider := newChampionProvider()
 	client := newHexdataClient(provider, trackTestStore(t, &localStore{root: root}))
 	client.now = func() time.Time { return now }
+	r274Flush(t, client.stateDisk)
 	client.loadState()
 	got := client.snapshot()
 	if !got.CircuitUntil.IsZero() || !got.CircuitProbeAt.IsZero() || got.Failures != 0 {
@@ -828,6 +833,7 @@ func TestHexdataHTTP429OpensPersistentCircuitBeforeNextRequest(t *testing.T) {
 		t.Fatalf("HTTP 429 circuit = %#v", circuit)
 	}
 
+	r274Flush(t, provider.hexdata.stateDisk)
 	restarted := newHexdataBudgetProvider(t, root, transport)
 	restarted.hexdata.now = func() time.Time { return now.Add(30 * time.Second) }
 	if _, err := restarted.hexdata.load(context.Background(), "heroes", "all", "/heroes", "text/html,application/xhtml+xml", false); err == nil || !strings.Contains(err.Error(), "circuit") {

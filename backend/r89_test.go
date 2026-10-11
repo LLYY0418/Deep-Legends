@@ -66,6 +66,7 @@ func TestR89ImagePolicyMemoryDiskAndSingleFlight(t *testing.T) {
 	if err != nil || calls.Load() != 1 {
 		t.Fatalf("image policy bypassed cache: calls=%d err=%v", calls.Load(), err)
 	}
+	r274Flush(t, a.champions.imageCache)
 	load(r89ImageApp(t, root, &calls))
 	if calls.Load() != 1 {
 		t.Fatalf("restart missed disk: %d", calls.Load())
@@ -195,6 +196,7 @@ func TestR89RiotMatchDiskAndImmutableData(t *testing.T) {
 	if _, _, err := p.matchByIDWithCache(context.Background(), "KR_123"); err != nil {
 		t.Fatal(err)
 	}
+	r274Flush(t, p.matchDisk)
 	p = newRiotProvider(c)
 	match, status, err := p.matchByIDWithCache(context.Background(), "KR_123")
 	if err != nil || status != "disk" || calls.Load() != 1 || match.Info.Participants[0].Item0 != 3006 {
@@ -309,6 +311,7 @@ func TestR89IdentityRestartAndExpiry(t *testing.T) {
 		if _, err := p.summonerByPUUID(t.Context(), "public-player"); err != nil {
 			t.Fatal(err)
 		}
+		r274Flush(t, p.identityDisk)
 	}
 	deadline := time.Now().Add(time.Second)
 	for calls.Load() < 3 && time.Now().Before(deadline) {
@@ -318,6 +321,7 @@ func TestR89IdentityRestartAndExpiry(t *testing.T) {
 		t.Fatalf("restart lookup plus background account refresh requests=%d", calls.Load())
 	}
 	p := newRiotProvider(c)
+	t.Cleanup(func() { r274Flush(t, p.identityDisk) })
 	var result map[string]any
 	if err := p.cachedPublicIdentity(t.Context(), "expired", -time.Second, &result, func(context.Context) error { result = map[string]any{"old": true}; return nil }); err != nil {
 		t.Fatal(err)

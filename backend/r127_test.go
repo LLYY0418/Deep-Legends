@@ -628,6 +628,7 @@ func TestR127MatchTierLongTermCacheRoundTrip(t *testing.T) {
 		t.Fatal("未命中的对局不该出现在缓存响应里")
 	}
 	// 跨重启（新的 app 实例、同一个存储目录）仍然命中。
+	r274Flush(t, instance.matchTierDiskCache())
 	restarted := &app{storage: instance.storage}
 	if _, ok := restarted.readMatchTierCache(7001); !ok {
 		t.Fatal("重启后长期缓存丢失")

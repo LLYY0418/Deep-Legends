@@ -272,8 +272,14 @@ func riotOverviewCostTrackerFromContext(ctx context.Context) *riotOverviewCostTr
 }
 
 func newRiotProvider(champions *championProvider) *riotProvider {
+	return newRiotProviderWithCaches(champions, newRiotMatchDiskCache(champions), newRiotIdentityCache(champions))
+}
+
+// Scoped/relay providers reuse disk owners; their creation under platformMu
+// must only allocate memory, never recreate or inspect cache directories.
+func newRiotProviderWithCaches(champions *championProvider, matchDisk, identityDisk *championDataCache) *riotProvider {
 	return &riotProvider{
-		puuidState: &riotPUUIDState{recoveries: make(map[string]*riotPUUIDRecovery)}, foreground: &riotForegroundState{}, matchConcurrency: configuredRiotMatchConcurrency(), matchDisk: newRiotMatchDiskCache(champions), identityDisk: newRiotIdentityCache(champions),
+		puuidState: &riotPUUIDState{recoveries: make(map[string]*riotPUUIDRecovery)}, foreground: &riotForegroundState{}, matchConcurrency: configuredRiotMatchConcurrency(), matchDisk: matchDisk, identityDisk: identityDisk,
 		champions: champions, matchCache: make(map[string]*riotMatch), accountCache: make(map[string]riotAccountCacheEntry), accountFlights: make(map[string]*riotAccountFlight),
 		specialistCache: make(map[string]specialistRuneCacheEntry), specialistFlights: make(map[string]*specialistRuneFlight), specialistRecent: make(map[string]specialistRecentSummaryCacheEntry), specialistSlots: make(chan struct{}, specialistRunePlayerLimit),
 	}
@@ -1154,8 +1160,10 @@ func (p *riotProvider) loadRiotMatchFlight(ctx context.Context, matchID string, 
 	cacheLockDone()
 	if cached, ok := p.matchCache[matchID]; ok && (!refresh || !cached.Info.PerkStatsStale) {
 		p.touchMatchLocked(matchID)
-		p.touchRiotMatchDisk("riot-match-v4|" + matchID)
+		generation := p.matchGeneration
+		ticket := p.matchDiskTicket("riot-match-v4|" + matchID)
 		p.cacheMu.Unlock()
+		p.enqueueRiotMatchDisk(ctx, ticket, generation, nil, nil, nil)
 		return cached, "hit", nil
 	}
 	if flight := p.matchFlights[matchID]; flight != nil && flight.generation == p.matchGeneration {
@@ -1227,17 +1235,21 @@ func (p *riotProvider) loadRiotMatchFlight(ctx context.Context, matchID string, 
 	storeLockDone()
 	// Successful details survive ordinary caller cancellation (R100). Only a
 	// promoted background leader yields its result to the foreground flight.
+	var diskTicket cacheDiskTicket
+	store := false
 	if flight.generation == p.matchGeneration && (flight.priority == nil || !flight.priority.promoted) {
-		if status == "disk" {
-			p.touchRiotMatchDisk(key)
-		} else if p.matchDisk != nil && validRiotMatchID(matchID) {
-			persistDone := startRiotTimingProbe(ctx, "detail_disk_write")
-			p.persistRiotMatch(key, &match)
-			persistDone()
-		}
 		p.storeMatchLocked(matchID, &match)
+		diskTicket = p.matchDiskTicket(key)
+		store = true
 	}
 	p.cacheMu.Unlock()
+	if store && validRiotMatchID(matchID) {
+		var write *riotMatch
+		if status != "disk" {
+			write = &match
+		}
+		p.enqueueRiotMatchDisk(ctx, diskTicket, flight.generation, flight.priority, flight.done, write)
+	}
 	return &match, status, nil
 }
 

@@ -14,6 +14,7 @@ func TestPrestigeArtworkDiskCacheSurvivesStoreRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	instanceID := "11914b2b-f986-474e-b3f7-1e8cc41b72c9"
+	t.Cleanup(func() { r274Flush(t, store.auxiliaryCacheDisk()) })
 	jpeg := []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 0x01}
 	if err := store.storePrestigeArtwork(instanceID, jpeg); err != nil {
 		t.Fatal(err)
@@ -22,6 +23,7 @@ func TestPrestigeArtworkDiskCacheSurvivesStoreRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { r274Flush(t, reopened.auxiliaryCacheDisk()) })
 	got, ok := reopened.loadPrestigeArtwork(instanceID)
 	if !ok || !bytes.Equal(got, jpeg) {
 		t.Fatalf("disk cache hit = %v, data = %x", ok, got)
@@ -42,10 +44,12 @@ func TestPrestigeArtworkDiskCacheRejectsExpiredAndCorruptFiles(t *testing.T) {
 	if _, ok := store.loadPrestigeArtwork(instanceID); ok {
 		t.Fatal("corrupt prestige artwork was accepted")
 	}
+	t.Cleanup(func() { r274Flush(t, store.auxiliaryCacheDisk()) })
 	jpeg := []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 0x01}
 	if err := store.storePrestigeArtwork(instanceID, jpeg); err != nil {
 		t.Fatal(err)
 	}
+	r274Flush(t, store.auxiliaryCacheDisk())
 	expired := time.Now().Add(-prestigeArtworkCacheMaxAge - time.Hour)
 	if err := os.Chtimes(path, expired, expired); err != nil {
 		t.Fatal(err)

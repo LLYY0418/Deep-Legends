@@ -228,6 +228,7 @@ func TestR208IPPartialResumeWithoutRepeatedSuccessfulDetails(t *testing.T) {
 	p.champions.cache = newChampionDataCache(&localStore{root: t.TempDir()})
 	p.identityDisk = newRiotIdentityCache(p.champions)
 	p.matchDisk = newRiotMatchDiskCache(p.champions)
+	t.Cleanup(func() { r274Flush(t, p.matchDisk); r274Flush(t, p.identityDisk); r274Flush(t, p.champions.cache) })
 	a := &app{riot: p}
 	preview := 0
 	ctx := context.WithValue(t.Context(), riotOverviewProgressKey{}, func(page gameplayOverview) { preview = max(preview, len(page.Matches)) })

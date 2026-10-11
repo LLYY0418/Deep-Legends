@@ -278,5 +278,5 @@ func (p *riotProvider) observeProSeedRank(puuid string, entries []riotLeagueEntr
 	c.mu.Lock()
 	c.storeMemoryLocked(key, entry)
 	c.mu.Unlock()
-	_ = c.writeDisk(entry)
+	c.enqueueDiskWrite(entry)
 }

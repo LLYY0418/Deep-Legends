@@ -147,6 +147,8 @@ func TestR269MayhemDiskTTLAndNoRecordCache(t *testing.T) {
 		if !first.Available && first.UnavailableReason != "未收录" {
 			t.Fatal(first)
 		}
+		r274Flush(t, c.disk)
+		t.Cleanup(func() { r274Flush(t, c.disk) })
 		entry, err := c.disk.readDisk(riotIdentityKey("mayhem:fixture|cn"))
 		expectedTTL := 10 * time.Minute
 		if first.Available {

@@ -179,6 +179,7 @@ func TestR177StarterBatchMixedCountsAndPrivacy(t *testing.T) {
 func TestR177ChampionLanesExistingProviderCacheAndValidation(t *testing.T) {
 	cp := newChampionProvider()
 	cp.cache = newChampionDataCache(trackTestStore(t, &localStore{root: t.TempDir()}))
+	t.Cleanup(func() { r274Flush(t, cp.cache) })
 	var calls atomic.Int32
 	cp.client = &http.Client{Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		calls.Add(1)

@@ -27,6 +27,7 @@ func TestR272DetailDiskCrossCredential(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	r274Flush(t, p.matchDisk)
 	t.Setenv("RIOT_API_KEY", "anonymous-key-b")
 	p = newRiotProvider(cp)
 	_, status, err := p.matchByIDWithCache(context.Background(), "KR_272")

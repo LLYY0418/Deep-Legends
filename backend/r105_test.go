@@ -103,14 +103,15 @@ func TestR105_ReviewedPageSurvivesOldSnapshotAndWrongOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := &app{storage: store}
+	a.restoreProSnapshot()
 	a.proPlayers.mu.Lock()
-	a.restoreProSnapshotLocked()
 	// Historical index and PUUID claim must not steal Wei or remove Rookie.
 	wrong := opggProAccount{GameName: "dyjkbysb", TagLine: "KR1", PUUID: "old-puuid", Source: "seed", SeedKey: "proseed:v1:IG/rookie/0", UpdatedAt: time.Now().UTC().Format(time.RFC3339)}
 	a.proPlayers.teams = []opggProTeam{{ID: 28, Members: []opggProMember{{Nickname: "Rookie", Authority: "PROGAMER", Summoners: []opggProAccount{wrong}}}}}
 	a.proPlayers.fetchedAt = time.Now().Add(-time.Hour)
 	a.persistProSnapshotLocked()
 	a.proPlayers.mu.Unlock()
+	r274Flush(t, a.proPlayers.disk)
 	reboot := &app{storage: store}
 	w := httptest.NewRecorder()
 	reboot.handleProPlayers(w, httptest.NewRequest("GET", "/api/pro-players", nil))

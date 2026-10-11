@@ -189,15 +189,23 @@ func (p *riotProvider) specialistMatchStarters(ctx context.Context, matchID stri
 		return nil, errors.New("invalid starter match")
 	}
 	p.specialistMu.Lock()
-	if p.starterCache == nil {
+	cache := p.starterCache
+	p.specialistMu.Unlock()
+	if cache == nil {
 		var store *localStore
 		if p.champions != nil && p.champions.cache != nil && p.champions.cache.dir != "" {
 			store = &localStore{root: filepath.Dir(p.champions.cache.dir)}
 		}
-		p.starterCache = newPublicBinaryCache(store, "rune-starters", riotMatchCacheMax, 128<<20)
-		p.starterFailures = map[string]time.Time{}
+		prepared := newPublicBinaryCache(store, "rune-starters", riotMatchCacheMax, 128<<20)
+		p.specialistMu.Lock()
+		if p.starterCache == nil {
+			p.starterCache = prepared
+			p.starterFailures = map[string]time.Time{}
+		}
+		cache = p.starterCache
+		p.specialistMu.Unlock()
 	}
-	cache := p.starterCache
+	p.specialistMu.Lock()
 	failedAt := p.starterFailures[matchID]
 	p.specialistMu.Unlock()
 	if !failedAt.IsZero() && time.Since(failedAt) < 90*time.Second {

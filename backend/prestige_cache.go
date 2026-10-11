@@ -43,27 +43,64 @@ func (s *localStore) prestigeArtworkPath(instanceID string) string {
 	return filepath.Join(s.root, prestigeArtworkCacheDirectory, prestigeArtworkCacheName(instanceID))
 }
 
+// The owner is initialized with memory operations only. Its worker handles
+// advisory artwork touches and coalesced Hexdata state snapshots, never under
+// localStore.mu. Artwork writes already run off the request path.
+func (s *localStore) auxiliaryCacheDisk() *championDataCache {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.auxiliaryDisk == nil {
+		s.auxiliaryDisk = &championDataCache{}
+	}
+	return s.auxiliaryDisk
+}
+
+func (s *localStore) queuePrestigeArtworkMaintenance(cache *championDataCache, path string, observed os.FileInfo, remove bool) {
+	ticket := cache.diskQueue.ticket(path)
+	cache.diskQueue.submit(cacheDiskTask{id: "artwork-maintenance|" + path, ticket: ticket, run: func(valid func() bool) {
+		if cache.beforeDiskIO != nil {
+			cache.beforeDiskIO("prestige-touch")
+		}
+		cache.diskMu.Lock()
+		defer cache.diskMu.Unlock()
+		if !valid() {
+			return
+		}
+		current, err := os.Lstat(path)
+		if err != nil || !os.SameFile(observed, current) || observed.Size() != current.Size() || !observed.ModTime().Equal(current.ModTime()) {
+			return
+		}
+		if remove {
+			_ = os.Remove(path)
+		} else {
+			now := time.Now()
+			_ = os.Chtimes(path, now, now)
+		}
+	}}, false)
+}
+
 func (s *localStore) loadPrestigeArtwork(instanceID string) ([]byte, bool) {
 	if s == nil || !prestigeUUID.MatchString(strings.ToLower(strings.TrimSpace(instanceID))) {
 		return nil, false
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	cache := s.auxiliaryCacheDisk()
+	if cache.beforeDiskIO != nil {
+		cache.beforeDiskIO("prestige-read")
+	}
 	path := s.prestigeArtworkPath(instanceID)
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() <= 0 || info.Size() > prestigeArtworkMaxEntryBytes || time.Since(info.ModTime()) > prestigeArtworkCacheMaxAge {
 		if err == nil {
-			_ = os.Remove(path)
+			s.queuePrestigeArtworkMaintenance(cache, path, info, true)
 		}
 		return nil, false
 	}
 	data, err := os.ReadFile(path)
 	if err != nil || !validPrestigeArtwork(data) {
-		_ = os.Remove(path)
+		s.queuePrestigeArtworkMaintenance(cache, path, info, true)
 		return nil, false
 	}
-	now := time.Now()
-	_ = os.Chtimes(path, now, now)
+	s.queuePrestigeArtworkMaintenance(cache, path, info, false)
 	return data, true
 }
 
@@ -71,8 +108,12 @@ func (s *localStore) storePrestigeArtwork(instanceID string, data []byte) error 
 	if s == nil || !prestigeUUID.MatchString(strings.ToLower(strings.TrimSpace(instanceID))) || !validPrestigeArtwork(data) {
 		return errors.New("invalid prestige artwork cache entry")
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	cache := s.auxiliaryCacheDisk()
+	if cache.beforeDiskIO != nil {
+		cache.beforeDiskIO("prestige-write")
+	}
+	cache.diskMu.Lock()
+	defer cache.diskMu.Unlock()
 	if err := atomicWriteFile(s.prestigeArtworkPath(instanceID), data, 0o600); err != nil {
 		return err
 	}

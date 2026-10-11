@@ -356,6 +356,7 @@ func TestChampionDataCacheReportsLoadState(t *testing.T) {
 	if !result.fetchedAt.Equal(initialFetchedAt) {
 		t.Fatalf("memory cache fetchedAt = %v, want %v", result.fetchedAt, initialFetchedAt)
 	}
+	r274Flush(t, first)
 	second := newChampionDataCache(store)
 	result, err = second.loadWithStatus(context.Background(), key, time.Hour, time.Hour, true, func(context.Context) ([]byte, error) {
 		return nil, errors.New("disk cache missed")
@@ -697,6 +698,7 @@ func TestChampionDataCachePersistsAcrossInstances(t *testing.T) {
 	if err != nil || len(data) == 0 {
 		t.Fatalf("initial cache write failed: %v", err)
 	}
+	r274Flush(t, first)
 	second := newChampionDataCache(store)
 	var calls atomic.Int32
 	data, err = second.load(context.Background(), key, time.Hour, time.Hour, true, func(context.Context) ([]byte, error) { calls.Add(1); return nil, errors.New("should not load") })

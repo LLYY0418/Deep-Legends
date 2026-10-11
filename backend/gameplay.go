@@ -10335,11 +10335,17 @@ func (a *app) cachedGameplayPerkCatalog(ctx context.Context, key string, loader 
 		a.perkCatalogMu.Unlock()
 		return entry.payload, nil
 	}
-	if a.perkCatalogDisk == nil {
-		a.perkCatalogDisk = newPublicBinaryCache(a.storage, "perk-catalog", 8, 4<<20)
-	}
 	cache := a.perkCatalogDisk
 	a.perkCatalogMu.Unlock()
+	if cache == nil {
+		prepared := newPublicBinaryCache(a.storage, "perk-catalog", 8, 4<<20)
+		a.perkCatalogMu.Lock()
+		if a.perkCatalogDisk == nil {
+			a.perkCatalogDisk = prepared
+		}
+		cache = a.perkCatalogDisk
+		a.perkCatalogMu.Unlock()
+	}
 	var fallback *gameplayPerkCatalogFallback
 	data, err := cache.load(ctx, "normalized-perks-v2|"+key, gameplayPerkCatalogTTL, 24*time.Hour, !strings.HasPrefix(key, "lcu-unversioned:"), func(context.Context) ([]byte, error) {
 		payload, err := loader()

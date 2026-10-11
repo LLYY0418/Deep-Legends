@@ -17,11 +17,17 @@ func (a *app) loadClientIcon(ctx context.Context, client *LCUClient, assetPath s
 		return client.GetBytesContext(ctx, assetPath)
 	}
 	a.mu.Lock()
-	if a.profileIconImages == nil {
-		a.profileIconImages = newPublicBinaryCache(a.storage, "profile-icons", 2048, 64<<20)
-	}
 	cache := a.profileIconImages
 	a.mu.Unlock()
+	if cache == nil {
+		prepared := newPublicBinaryCache(a.storage, "profile-icons", 2048, 64<<20)
+		a.mu.Lock()
+		if a.profileIconImages == nil {
+			a.profileIconImages = prepared
+		}
+		cache = a.profileIconImages
+		a.mu.Unlock()
+	}
 	result, err := cache.loadWithStatus(ctx, "public-profile-icon|"+id, 7*24*time.Hour, 30*24*time.Hour, true, func(ctx context.Context) ([]byte, error) {
 		data, err := client.GetBytesContext(ctx, assetPath)
 		if err == nil && !strings.HasPrefix(http.DetectContentType(data), "image/") {

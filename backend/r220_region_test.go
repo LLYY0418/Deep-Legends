@@ -251,6 +251,7 @@ func TestR220MatchTierDiskCacheIsPlatformScoped(t *testing.T) {
 	a := &app{storage: &localStore{root: t.TempDir()}}
 	a.writeMatchTierCache(220, &matchTiersResponse{Tier: "GOLD"}, "kr")
 	a.writeMatchTierCache(220, &matchTiersResponse{Tier: "DIAMOND"}, "jp1")
+	r274Flush(t, a.matchTierDiskCache())
 	restarted := &app{storage: a.storage}
 	for region, want := range map[string]string{"kr": "GOLD", "jp1": "DIAMOND"} {
 		value, ok := restarted.readMatchTierCache(220, region)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -112,6 +113,12 @@ func (a *app) scheduleQuit(delay time.Duration, reason string) {
 			if client != nil {
 				client.Close()
 			}
+			// Persist completed public details before the shell terminates us.
+			// A slow disk gets a bounded grace period; atomic writes keep older
+			// valid files intact if pending cache work cannot finish in time.
+			flushCtx, flushCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			a.closePublicCacheDisks(flushCtx)
+			flushCancel()
 			// Flush before announcing quit: the shell may terminate the backend
 			// as soon as it receives the stdout protocol message.
 			closeDiagnosticStore(a.storage)
@@ -120,4 +127,53 @@ func (a *app) scheduleQuit(delay time.Duration, reason string) {
 			os.Exit(0)
 		}()
 	})
+}
+
+// Capture initialized owners only; shutdown must not create directories or
+// hold application/cache locks while draining a slow filesystem.
+func (a *app) closePublicCacheDisks(ctx context.Context) {
+	owners := map[*championDataCache]bool{}
+	add := func(caches ...*championDataCache) {
+		for _, cache := range caches {
+			if cache != nil {
+				owners[cache] = true
+			}
+		}
+	}
+	if a.storage != nil {
+		a.storage.mu.Lock()
+		add(a.storage.auxiliaryDisk)
+		a.storage.mu.Unlock()
+	}
+	a.mu.Lock()
+	add(a.matchTierCache, a.profileIconImages)
+	a.mu.Unlock()
+	a.perkCatalogMu.Lock()
+	add(a.perkCatalogDisk, a.clientCatalogCache)
+	a.perkCatalogMu.Unlock()
+	a.proProfiles.mu.Lock()
+	add(a.proProfiles.disk)
+	a.proProfiles.mu.Unlock()
+	a.proPlayers.mu.Lock()
+	add(a.proPlayers.disk)
+	a.proPlayers.mu.Unlock()
+	if a.champions != nil {
+		add(a.champions.cache, a.champions.imageCache, a.champions.communityImageCache)
+	}
+	if a.mayhemRatings != nil {
+		add(a.mayhemRatings.disk)
+	}
+	if a.riot != nil {
+		providers, unlock := a.riot.lockCacheProviders()
+		for _, p := range providers {
+			add(p.matchDisk, p.identityDisk)
+			p.specialistMu.Lock()
+			add(p.starterCache)
+			p.specialistMu.Unlock()
+		}
+		unlock()
+	}
+	for cache := range owners {
+		_ = cache.closeDisk(ctx)
+	}
 }

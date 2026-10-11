@@ -44,8 +44,10 @@ func TestR91AddendumCacheThreeStates(t *testing.T) {
 	tracker := &riotOverviewCostTracker{}
 	ctx := context.WithValue(context.Background(), riotOverviewCostTrackerKey{}, tracker)
 	p := newRiotProvider(c)
+	t.Cleanup(func() { r274Flush(t, p.matchDisk) })
 	for _, want := range []string{"miss", "hit", "disk"} {
 		if want == "disk" {
+			r274Flush(t, p.matchDisk)
 			p = newRiotProvider(c)
 		}
 		_, status, err := p.matchByIDWithCache(ctx, "KR_123")

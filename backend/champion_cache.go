@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -68,6 +69,7 @@ type championDataCache struct {
 	strictEntries     map[string]binaryDiskEntry
 	strictBytes       int64
 	readFile          func(string) ([]byte, error)
+	beforeDiskIO      func(string)
 	dir               string
 	mu                sync.Mutex
 	entries           map[string]championCacheEnvelope
@@ -75,6 +77,7 @@ type championDataCache struct {
 	bytes             int
 	flights           map[string]*championCacheFlight
 	diskMu            sync.Mutex
+	diskQueue         cacheDiskQueue
 	pruneMu           sync.Mutex
 	pruneDone         chan struct{}
 	lastPrune         time.Time
@@ -215,7 +218,7 @@ func (c *championDataCache) loadCacheFlight(ctx context.Context, key string, ttl
 		close(flight.done)
 		c.mu.Unlock()
 		if persistDisk {
-			_ = c.writeDisk(entry)
+			c.enqueueDiskWrite(entry)
 		}
 		return championCacheLoadResult{data: data, fetchedAt: entry.FetchedAt, state: championCacheStateMiss}, nil
 	}
@@ -289,8 +292,17 @@ func (c *championDataCache) pathFor(key string) string {
 }
 
 func (c *championDataCache) readDisk(key string) (championCacheEnvelope, error) {
-	if c.dir == "" {
+	return c.readDiskMode(key, true)
+}
+
+// Only the one-time unpublished cache migration uses synchronous cleanup.
+// Foreground readers always queue corrupt-file cleanup outside global locks.
+func (c *championDataCache) readDiskMode(key string, asyncCleanup bool) (championCacheEnvelope, error) {
+	if c.dir == "" || c.diskQueue.unreadable(key) {
 		return championCacheEnvelope{}, os.ErrNotExist
+	}
+	if c.beforeDiskIO != nil {
+		c.beforeDiskIO("read")
 	}
 	path := c.pathFor(key)
 	info, err := os.Lstat(path)
@@ -308,18 +320,30 @@ func (c *championDataCache) readDisk(key string) (championCacheEnvelope, error) 
 	}
 	var entry championCacheEnvelope
 	if json.Unmarshal(data, &entry) != nil || entry.Schema != championCacheSchema || entry.Key != key || len(entry.Data) == 0 || len(entry.Data) > championCacheMaxEntry {
-		_ = os.Remove(path)
+		if asyncCleanup {
+			c.discardCorruptDisk(key, path, data)
+		} else {
+			_ = os.Remove(path)
+		}
 		return championCacheEnvelope{}, errors.New("invalid cache entry")
 	}
 	hash := sha256.Sum256(entry.Data)
 	if entry.Hash != hex.EncodeToString(hash[:]) {
-		_ = os.Remove(path)
+		if asyncCleanup {
+			c.discardCorruptDisk(key, path, data)
+		} else {
+			_ = os.Remove(path)
+		}
 		return championCacheEnvelope{}, errors.New("invalid cache hash")
 	}
 	return entry, nil
 }
 
 func (c *championDataCache) writeDisk(entry championCacheEnvelope) error {
+	return c.writeDiskChecked(entry, nil)
+}
+
+func (c *championDataCache) writeDiskChecked(entry championCacheEnvelope, valid func() bool) error {
 	// Do not grow a cache whose recovery data could not be classified safely.
 	if c.migrationErr != nil {
 		return c.migrationErr
@@ -327,17 +351,28 @@ func (c *championDataCache) writeDisk(entry championCacheEnvelope) error {
 	if c.dir == "" || len(entry.Data) > championCacheMaxEntry || !championCacheDiskAllowed(entry.Key) {
 		return nil
 	}
+	writeTicket := c.diskQueue.ticket(entry.Key)
+	if c.beforeDiskIO != nil {
+		c.beforeDiskIO("write")
+	}
 	data, err := json.Marshal(entry)
 	if err != nil {
 		return err
 	}
 	c.diskMu.Lock()
+	if valid != nil && !valid() {
+		c.diskMu.Unlock()
+		return nil
+	}
 	if c.strictDisk {
 		c.initBinaryDiskIndexLocked()
 	}
 	err = atomicWriteFile(c.pathFor(entry.Key), data, 0o600)
 	if err == nil && c.strictDisk {
 		err = c.accountBinaryDiskWriteLocked(c.pathFor(entry.Key), int64(len(data)))
+	}
+	if err == nil {
+		c.diskQueue.readable(writeTicket)
 	}
 	c.diskMu.Unlock()
 	if err != nil {
@@ -433,14 +468,14 @@ func (c *championDataCache) purgeDiskHost(host string) error {
 			}
 			target := c.pathFor(header.Key)
 			if _, err := os.Lstat(target); err == nil {
-				if _, validErr := c.readDisk(header.Key); validErr == nil {
+				if _, validErr := c.readDiskMode(header.Key, false); validErr == nil {
 					// A validated current-format value supersedes its duplicate.
 					if err := os.Remove(path); err != nil {
 						return err
 					}
 					continue
 				}
-				// readDisk removes malformed regular files; never replace an
+				// Startup cleanup removes malformed regular files; never replace an
 				// untrusted target (e.g. a symlink) or discard the valid legacy copy.
 				if _, err := os.Lstat(target); !errors.Is(err, os.ErrNotExist) {
 					return errors.New("hexdata migration target is not replaceable")
@@ -691,11 +726,52 @@ func (c *championDataCache) invalidate(key string) {
 		}
 	}
 	c.mu.Unlock()
-	c.diskMu.Lock()
-	path := c.pathFor(key)
-	if err := os.Remove(path); err == nil {
-		c.strictBytes -= c.strictEntries[path].size
-		delete(c.strictEntries, path)
-	}
-	c.diskMu.Unlock()
+	c.diskQueue.invalidate(key)
+	// All pending tombstones share one required queue slot. Optional writes can
+	// drop at capacity, while invalidations remain bounded and cannot be evicted.
+	ticket := c.diskQueue.ticket("")
+	c.diskQueue.submit(cacheDiskTask{id: "delete-invalidated", ticket: ticket, run: func(valid func() bool) {
+		c.diskMu.Lock()
+		defer c.diskMu.Unlock()
+		if !valid() {
+			return
+		}
+		c.diskQueue.mu.Lock()
+		tickets := make([]cacheDiskTicket, 0, len(c.diskQueue.invalid))
+		for key := range c.diskQueue.invalid {
+			tickets = append(tickets, cacheDiskTicket{c.diskQueue.epoch, c.diskQueue.versions[key], key})
+		}
+		c.diskQueue.mu.Unlock()
+		for _, ticket := range tickets {
+			if !c.diskQueue.valid(ticket) {
+				continue
+			}
+			path := c.pathFor(ticket.key)
+			if err := os.Remove(path); err == nil || os.IsNotExist(err) {
+				c.strictBytes -= c.strictEntries[path].size
+				delete(c.strictEntries, path)
+				c.diskQueue.readable(ticket)
+			}
+		}
+	}}, true)
+}
+
+// A corrupt read may overlap a newer atomic write. Cleanup runs in the disk
+// queue and removes only the exact corrupt bytes originally observed.
+func (c *championDataCache) discardCorruptDisk(key, path string, observed []byte) {
+	ticket := c.diskQueue.ticket(key)
+	c.diskQueue.submit(cacheDiskTask{id: "corrupt|" + key, ticket: ticket, run: func(valid func() bool) {
+		c.diskMu.Lock()
+		defer c.diskMu.Unlock()
+		if !valid() {
+			return
+		}
+		current, err := c.readCacheFile(path)
+		if err == nil && bytes.Equal(current, observed) {
+			if err := os.Remove(path); err == nil {
+				c.strictBytes -= c.strictEntries[path].size
+				delete(c.strictEntries, path)
+			}
+		}
+	}}, false)
 }

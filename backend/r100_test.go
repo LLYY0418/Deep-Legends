@@ -235,6 +235,8 @@ func TestR100PerksNeverWaitForOptionalAugmentsAndPersist(t *testing.T) {
 	}
 	key, _ := clientCatalogKey(client)
 	waitR100PerkEnrichment(t, a, key)
+	r274Flush(t, a.perkCatalogDisk)
+	r274Flush(t, a.clientCatalogCache)
 	reboot := &app{storage: store}
 	cached, err := reboot.cachedGameplayPerkCatalog(context.Background(), key, func() (gameplayPerkCatalogResponse, error) {
 		t.Error("restart fetched normalized catalog again")
@@ -248,8 +250,8 @@ func TestR100PerksNeverWaitForOptionalAugmentsAndPersist(t *testing.T) {
 func TestR100ProSnapshotAndLadderSurviveRestart(t *testing.T) {
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	a := &app{storage: store}
+	a.restoreProSnapshot()
 	a.proPlayers.mu.Lock()
-	a.restoreProSnapshotLocked()
 	account := proFixtureAccount("fixtureaccount", "fixture-puuid", "CHALLENGER", 1, 1200)
 	account.LadderRank = 42
 	account.LadderRankKnown = true
@@ -257,9 +259,10 @@ func TestR100ProSnapshotAndLadderSurviveRestart(t *testing.T) {
 	a.proPlayers.fetchedAt = time.Now().Add(-time.Hour)
 	a.persistProSnapshotLocked()
 	a.proPlayers.mu.Unlock()
+	r274Flush(t, a.proPlayers.disk)
 	reboot := &app{storage: store}
+	restored := reboot.restoreProSnapshot()
 	reboot.proPlayers.mu.Lock()
-	restored := reboot.restoreProSnapshotLocked()
 	rows := reboot.proPlayers.teams
 	reboot.proPlayers.mu.Unlock()
 	if !restored || len(rows) != 1 || rows[0].Members[0].Summoners[0].LadderRank != 42 {
@@ -279,10 +282,12 @@ func TestR100ProSnapshotAndLadderSurviveRestart(t *testing.T) {
 		return p
 	}
 	for i := 0; i < 2; i++ {
-		rank, err := fetchOPGGLadderRank(context.Background(), makeProvider(), "fixtureaccount", "KR1")
+		provider := makeProvider()
+		rank, err := fetchOPGGLadderRank(context.Background(), provider, "fixtureaccount", "KR1")
 		if err != nil || rank != 42 {
 			t.Fatal(rank, err)
 		}
+		r274Flush(t, provider.cache)
 	}
 	if calls != 1 {
 		t.Fatal("ladder refetched after restart", calls)

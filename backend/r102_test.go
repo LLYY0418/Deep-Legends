@@ -267,6 +267,7 @@ func TestR102LastMatchStartCachedSevenDays(t *testing.T) {
 	if calls != 2 {
 		t.Fatal("early expiry", calls)
 	}
+	r274Flush(t, p.identityDisk)
 	p = r99SeedProvider(t, root, handler)
 	p.identityDisk.now = func() time.Time { return now }
 	read()
@@ -499,6 +500,7 @@ func TestR102UnrankedAccountBacksOffRankQuery(t *testing.T) {
 			t.Fatalf("hour %d: requests %d want %d", hour, calls, want)
 		}
 		if hour == 1 {
+			r274Flush(t, p.identityDisk)
 			p = r99SeedProvider(t, root, handler)
 			p.identityDisk.now = func() time.Time { return now }
 		}
@@ -566,6 +568,7 @@ func TestR102NewlyRankedAccountResetsToNormalTTL(t *testing.T) {
 	if _, err := p.leagueEntries(context.Background(), "private"); err != nil {
 		t.Fatal(err)
 	}
+	r274Flush(t, p.identityDisk)
 	// A restart must see the early observation too.
 	p = r99SeedProvider(t, root, handler)
 	p.identityDisk.now = func() time.Time { return now }
@@ -622,12 +625,13 @@ func TestR102UpstreamActivityAndSnapshotRemainPrivate(t *testing.T) {
 		t.Fatalf("projection leaked identity or queried HTTP: %s", raw)
 	}
 	rows[0].Members[0].Summoners[2].SeedKey = "proseed:v1:fixture/2"
-	a.restoreProSnapshotLocked()
+	a.restoreProSnapshot()
 	a.proPlayers.teams = rows
 	a.proPlayers.fetchedAt = time.Now()
 	a.persistProSnapshotLocked()
+	r274Flush(t, a.proPlayers.disk)
 	restarted := &app{storage: a.storage}
-	if !restarted.restoreProSnapshotLocked() {
+	if !restarted.restoreProSnapshot() {
 		t.Fatal("snapshot not restored")
 	}
 	wantDisk, _ := json.Marshal(newProDiskSnapshot(rows))

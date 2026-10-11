@@ -44,16 +44,32 @@ func augmentMetadataImage(iconPath string) (string, string) {
 	return "", ""
 }
 
-func (p *championProvider) loadObservedHexdataAugmentsLocked() {
+func (p *championProvider) loadObservedHexdataAugments(wait bool) {
+	p.observedAugmentMu.Lock()
 	if p.observedLoaded {
+		done := p.observedLoadDone
+		p.observedAugmentMu.Unlock()
+		if wait && done != nil {
+			<-done
+		}
 		return
 	}
 	p.observedLoaded = true
+	done := make(chan struct{})
+	p.observedLoadDone = done
 	p.observedAugments = make(map[int64]gameplayAugment)
-	if p.cache == nil {
+	cache := p.cache
+	p.observedAugmentMu.Unlock()
+	defer func() {
+		p.observedAugmentMu.Lock()
+		p.observedLoadDone = nil
+		close(done)
+		p.observedAugmentMu.Unlock()
+	}()
+	if cache == nil {
 		return
 	}
-	entry, err := p.cache.readDisk(observedHexdataAugmentsKey)
+	entry, err := cache.readDisk(observedHexdataAugmentsKey)
 	if err != nil || !time.Now().Before(entry.StaleUntil) {
 		return
 	}
@@ -61,7 +77,12 @@ func (p *championProvider) loadObservedHexdataAugmentsLocked() {
 	if json.Unmarshal(entry.Data, &saved) != nil {
 		return
 	}
+	p.observedAugmentMu.Lock()
+	defer p.observedAugmentMu.Unlock()
 	for _, item := range saved {
+		if _, newer := p.observedAugments[item.ID]; newer {
+			continue
+		}
 		if item.ID > 0 && strings.HasPrefix(item.IconPath, "hexdata:") && hexdataAugmentIconPath(strings.TrimPrefix(item.IconPath, "hexdata:")) != "" {
 			p.observedAugments[item.ID] = item
 		}
@@ -69,9 +90,9 @@ func (p *championProvider) loadObservedHexdataAugmentsLocked() {
 }
 
 func (p *championProvider) observedHexdataAugments() []gameplayAugment {
+	p.loadObservedHexdataAugments(true)
 	p.observedAugmentMu.Lock()
 	defer p.observedAugmentMu.Unlock()
-	p.loadObservedHexdataAugmentsLocked()
 	return p.observedHexdataAugmentsLocked()
 }
 
@@ -91,8 +112,8 @@ func (p *championProvider) observedHexdataAugmentsLocked() []gameplayAugment {
 // Hero JSON is the only observed source; the public Hexdata bulk endpoint does
 // not provide data. Persist an ID index without adding a network request.
 func (p *championProvider) observeHexdataAugments(rows []hexdataAugmentRowV2) {
+	p.loadObservedHexdataAugments(false)
 	p.observedAugmentMu.Lock()
-	p.loadObservedHexdataAugmentsLocked()
 	changed := false
 	for _, row := range rows {
 		path := hexdataAugmentIconPath(row.AugmentIconURL)

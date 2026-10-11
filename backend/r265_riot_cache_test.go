@@ -19,7 +19,7 @@ import (
 func r265CacheProvider(t *testing.T, root string, calls *atomic.Int32) *riotProvider {
 	t.Helper()
 	t.Setenv("RIOT_API_KEY", "synthetic-r265-key")
-	return newRiotProvider(&championProvider{
+	p := newRiotProvider(&championProvider{
 		cache: newChampionDataCache(&localStore{root: root}),
 		client: &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 			calls.Add(1)
@@ -27,6 +27,8 @@ func r265CacheProvider(t *testing.T, root string, calls *atomic.Int32) *riotProv
 			return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(fmt.Sprintf("{\"metadata\":{\"matchId\":%q},\"info\":{\"participants\":[{\"participantId\":1,\"puuid\":\"fixture\"}]}}", id)))}, nil
 		})},
 	})
+	t.Cleanup(func() { r274Flush(t, p.matchDisk); r274Flush(t, p.identityDisk); r274Flush(t, p.champions.cache) })
+	return p
 }
 
 func r265CachedMatch(t *testing.T, id string) *riotMatch {
@@ -76,6 +78,7 @@ func TestR265RiotDiskLRUAndCorruption(t *testing.T) {
 	if _, _, err := p.matchByIDWithCache(context.Background(), "KR_1"); err != nil {
 		t.Fatal(err)
 	}
+	r274Flush(t, p.matchDisk)
 	p.persistRiotMatch("riot-match-v4|KR_4", r265CachedMatch(t, "KR_4"))
 	if _, err := os.Stat(p.matchDisk.pathFor("riot-match-v4|KR_1")); err != nil {
 		t.Fatal("recently used match was evicted", err)
@@ -92,6 +95,7 @@ func TestR265RiotDiskLRUAndCorruption(t *testing.T) {
 	if err != nil || got == nil || source != "miss" || calls.Load() != 1 {
 		t.Fatal("corrupt match did not silently reload", source, err, calls.Load())
 	}
+	r274Flush(t, restarted.matchDisk)
 	restarted.matchDisk.diskMaxEntries, restarted.matchDisk.diskMaxBytes = 100, 1200
 	for i := 10; i < 20; i++ {
 		id := fmt.Sprintf("KR_%d", i)

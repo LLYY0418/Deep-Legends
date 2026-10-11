@@ -43,7 +43,9 @@ func TestR107ProfileCacheRestoresActivityAfterRestart(t *testing.T) {
 	client := &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) { calls++; return proHTTPBody(data), nil })}
 	store := &localStore{root: t.TempDir()}
 	old := opggProAccount{GameName: "Kimman", TagLine: "zxfkk"}
-	first := (&app{storage: store, champions: &championProvider{client: client}}).readProProfile(context.Background(), old)
+	firstApp := &app{storage: store, champions: &championProvider{client: client}}
+	first := firstApp.readProProfile(context.Background(), old)
+	r274Flush(t, firstApp.proProfiles.disk)
 	second := (&app{storage: store, champions: &championProvider{client: client}}).readProProfile(context.Background(), old)
 	if !first.LastMatchAtKnown || second.LastMatchAt != first.LastMatchAt || !second.LastMatchAtKnown || calls != 1 {
 		t.Fatalf("activity lost across restart: %s %s calls=%d", first.LastMatchAt, second.LastMatchAt, calls)

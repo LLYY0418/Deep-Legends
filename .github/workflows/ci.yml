@@ -118,6 +118,7 @@ jobs:
           CHROME_BIN="$chrome" R266_BACKEND="$RUNNER_TEMP/r264-public" R266_BROWSER_OUT="$RUNNER_TEMP/r272-browser" R272_OVERVIEW_FIXTURE="$RUNNER_TEMP/r272-overview.json" node scripts/r272-browser.cjs
           python3 scripts/r272-mutations.py --out "$RUNNER_TEMP/r272-mutations"
           python3 scripts/r273-mutations.py --out "$RUNNER_TEMP/r273-mutations"
+          python3 scripts/r274-mutations.py --out "$RUNNER_TEMP/r274-mutations"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -139,6 +140,7 @@ jobs:
             ${{ runner.temp }}/r272-shape/**
             ${{ runner.temp }}/r272-mutations/**
             ${{ runner.temp }}/r273-mutations/**
+            ${{ runner.temp }}/r274-mutations/**
           if-no-files-found: warn
       - name: Test installer module
         working-directory: installer
@@ -222,9 +224,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Windows setup-only guards failed" }
           node scripts/run-ci-tests.cjs node --expected-tests=2 scripts/r82-startup-ab-script.test.cjs
           if ($LASTEXITCODE -ne 0) { throw "PowerShell script guards failed" }
-      # Opt-in acceptance only; routine tag/build runs rely on Linux's full suite.
+      # R274 requires a measured push and two measured dispatches on this
+      # release branch. Other branches and tag runs retain the opt-in policy.
       - name: Measure full desktop renderer tests on Windows
-        if: github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/codex/release-0.12.83') || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers)
         shell: pwsh
         env:
           R222_NODE_TIMING_OUTPUT: ${{ runner.temp }}/renderer-timings-windows.json
@@ -232,7 +235,7 @@ jobs:
           node scripts/test-renderers.cjs desktop
           if ($LASTEXITCODE -ne 0) { throw "Windows renderer test or time budget failed" }
       - uses: actions/upload-artifact@v4
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers
+        if: always() && ((github.event_name == 'push' && github.ref == 'refs/heads/codex/release-0.12.83') || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers))
         with:
           name: renderer-timings-windows
           path: ${{ runner.temp }}/renderer-timings-windows.json

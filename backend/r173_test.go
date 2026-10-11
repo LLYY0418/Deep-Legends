@@ -161,6 +161,7 @@ func TestR173SpecialistListNeverWaitsForStarterTimeline(t *testing.T) {
 		}
 		time.Sleep(time.Millisecond)
 	}
+	r274Flush(t, p.starterCache)
 	reloaded := newRiotProvider(p.champions)
 	if items, err := reloaded.specialistMatchStarters(context.Background(), "KR_1", 1); err != nil || !reflect.DeepEqual(items, []int64{1055}) {
 		t.Fatal("immutable disk cache lost", items, err)
@@ -320,6 +321,7 @@ func TestR173StartupUsesOnlyDiskProfilesThenPageRefreshes(t *testing.T) {
 	if _, err := disk.load(context.Background(), key, 15*time.Minute, 7*24*time.Hour, true, func(context.Context) ([]byte, error) { return data, nil }); err != nil {
 		t.Fatal(err)
 	}
+	r274Flush(t, disk)
 	var requests atomic.Int32
 	profiles := make(chan struct{}, 64)
 	cp := proTestProvider()

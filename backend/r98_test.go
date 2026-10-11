@@ -99,6 +99,7 @@ func r98OverviewFixture(t *testing.T, delay bool) *r98Fixture {
 	})}
 	cp.diag = func(e map[string]any) { f.mu.Lock(); defer f.mu.Unlock(); f.events = append(f.events, e) }
 	f.a = &app{riot: newRiotProvider(cp)}
+	t.Cleanup(func() { r274Flush(t, f.a.riot.matchDisk); r274Flush(t, f.a.riot.identityDisk); r274Flush(t, cp.cache) })
 	return f
 }
 func TestR98Timing(t *testing.T) {
@@ -171,6 +172,7 @@ func TestR98OverviewEndpointCachesAndKeys(t *testing.T) {
 	if f.calls["matchIDs"] != 6 || f.calls["mastery"] != 3 || f.calls["ranks"] != 2 {
 		t.Fatal("cache keys aliased pages/count/queue/type/players", f.calls)
 	}
+	r274Flush(t, p.identityDisk)
 	// Validate actual envelopes and expire both layers; TTL is not just a constant.
 	expected := map[string]time.Duration{"matchIDs": time.Minute, "ranks": 10 * time.Minute, "mastery": 30 * time.Minute}
 	for identity, want := range map[string]time.Duration{"matchIDs:subject|count=20&start=0": expected["matchIDs"], "ranks:subject": expected["ranks"], "mastery:subject|count=5": expected["mastery"]} {

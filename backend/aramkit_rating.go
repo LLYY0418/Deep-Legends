@@ -311,7 +311,7 @@ func (c *aramkitRatingClient) lookup(ctx context.Context, gameName, tagLine stri
 		data, _ := json.Marshal(outcome.response)
 		sum := sha256.Sum256(data)
 		now := c.now()
-		_ = c.disk.writeDisk(championCacheEnvelope{Schema: championCacheSchema, Key: diskKey, FetchedAt: now, ExpiresAt: now.Add(ttl), StaleUntil: now.Add(ttl), Hash: hex.EncodeToString(sum[:]), Data: data})
+		c.disk.enqueueDiskWrite(championCacheEnvelope{Schema: championCacheSchema, Key: diskKey, FetchedAt: now, ExpiresAt: now.Add(ttl), StaleUntil: now.Add(ttl), Hash: hex.EncodeToString(sum[:]), Data: data})
 	}
 	c.recordContext(ctx, key, false, false, c.now().Sub(started), outcome)
 	return outcome.response

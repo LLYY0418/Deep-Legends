@@ -211,8 +211,8 @@ func (a *app) handleProPlayers(w http.ResponseWriter, r *http.Request) {
 func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, time.Time, error) {
 	provider := a.championDataProvider()
 	c := &a.proPlayers
+	restored := a.restoreProSnapshot()
 	c.mu.Lock()
-	restored := a.restoreProSnapshotLocked()
 	if restored && force {
 		c.attemptedAt = time.Time{}
 	}

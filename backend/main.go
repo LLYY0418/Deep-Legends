@@ -155,7 +155,6 @@ type app struct {
 	assetHostTimeouts               map[string]int
 	assetHostBackoffUntil           map[string]time.Time
 	imageCosts                      imageProxyCosts
-	matchTierCacheOnce              sync.Once
 	matchTierCache                  *championDataCache
 	mediaSlots                      chan struct{}
 	collectionRefreshPending        bool

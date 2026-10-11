@@ -116,7 +116,7 @@ func (p *riotProvider) routeRecord(event map[string]any) {
 func (p *riotProvider) relayFallback(ctx context.Context, host, path string, query url.Values, out any, max int64) error {
 	p.platformMu.Lock()
 	if p.relayProvider == nil {
-		p.relayProvider = newRiotProvider(p.champions)
+		p.relayProvider = newRiotProviderWithCaches(p.champions, p.matchDisk, p.identityDisk)
 		p.relayProvider.platform = p.platform
 		p.relayProvider.foreground = p.foreground
 		p.relayProvider.puuidState = p.puuidState

@@ -77,7 +77,7 @@ func (p *riotProvider) forPlatform(region string) *riotProvider {
 	if scoped := p.platforms[region]; scoped != nil {
 		return scoped
 	}
-	scoped := newRiotProvider(p.champions)
+	scoped := newRiotProviderWithCaches(p.champions, p.matchDisk, p.identityDisk)
 	scoped.foreground = p.foreground
 	scoped.puuidState = p.puuidState
 	scoped.platform, scoped.matchDisk, scoped.identityDisk = region, p.matchDisk, p.identityDisk

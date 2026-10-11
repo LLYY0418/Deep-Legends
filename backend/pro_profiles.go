@@ -54,21 +54,31 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 	}
 	c := &a.proProfiles
 	c.mu.Lock()
+	initialize := c.entries == nil
+	c.mu.Unlock()
+	var disk *championDataCache
+	if initialize {
+		disk = newPublicBinaryCache(a.storage, "pro-profiles", 64, 4<<20)
+	}
+	c.mu.Lock()
 	if c.entries == nil {
 		c.entries = map[string]opggProAccount{}
-		c.disk = newPublicBinaryCache(a.storage, "pro-profiles", 64, 4<<20)
+		c.disk = disk
 	}
 	pruneProProfilesLocked(c, time.Now())
 	cached, found := c.entries[key]
+	disk = c.disk
+	c.mu.Unlock()
 	directoryRevision := proDirectoryRevisionAt(old)
 	directoryRevisionLegacy := old.RevisionAt
-	if !found && c.disk != nil {
-		if entry, err := c.disk.readDisk(key); err == nil {
+	if !found && disk != nil {
+		if entry, err := disk.readDisk(key); err == nil {
 			cached, found = decodeProProfileSnapshot(entry.Data)
 		}
 	}
 	at, _ := time.Parse(time.RFC3339Nano, cached.CheckedAt)
 	if found && !at.IsZero() && time.Since(at) >= 0 && time.Since(at) < proProfileTTL(cached) {
+		c.mu.Lock()
 		c.entries[key] = cached
 		c.mu.Unlock()
 		cached.SeedKey, cached.Source, cached.PUUID = old.SeedKey, old.Source, old.PUUID
@@ -80,7 +90,6 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 		}
 		return cached
 	}
-	c.mu.Unlock()
 	if found && cached.CheckedAt > old.CheckedAt {
 		old = cached
 		if directoryRevision != "" {
@@ -161,7 +170,7 @@ func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAcc
 		body, _ := json.Marshal(proProfileSnapshot{Account: safe, LastMatchAt: safe.LastMatchAt, LastMatchAtKnown: safe.LastMatchAtKnown, DirectoryRevisionAt: safe.DirectoryRevisionAt, RevisionAt: safe.RevisionAt})
 		hash := sha256.Sum256(body)
 		now := time.Now()
-		_ = c.disk.writeDisk(championCacheEnvelope{Schema: championCacheSchema, Key: key, FetchedAt: now, ExpiresAt: now.Add(proProfileTTL(old)), StaleUntil: now.Add(7 * 24 * time.Hour), Hash: hex.EncodeToString(hash[:]), Data: body})
+		c.disk.enqueueDiskWrite(championCacheEnvelope{Schema: championCacheSchema, Key: key, FetchedAt: now, ExpiresAt: now.Add(proProfileTTL(old)), StaleUntil: now.Add(7 * 24 * time.Hour), Hash: hex.EncodeToString(hash[:]), Data: body})
 	}
 	c.mu.Unlock()
 	return old

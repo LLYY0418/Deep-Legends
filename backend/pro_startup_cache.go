@@ -31,24 +31,30 @@ func decodeProProfileSnapshot(data []byte) (opggProAccount, bool) {
 // or the background Riot seed refresher. Manual identities remain available
 // to live pro_identity_match without downloading 53 public profile pages.
 func (a *app) warmProPlayersCaches() {
+	a.restoreProSnapshot()
 	a.proPlayers.mu.Lock()
-	a.restoreProSnapshotLocked()
+	previous := a.proPlayers.teams
+	fetchedAt, attemptedAt := a.proPlayers.fetchedAt, a.proPlayers.attemptedAt
 	teams := cloneProTeams(a.proPlayers.teams)
+	a.proPlayers.mu.Unlock()
 	if len(teams) == 0 {
 		teams = new(app).loadProSeeds(context.Background(), nil)
 	}
+	disk := newPublicBinaryCache(a.storage, "pro-profiles", 64, 4<<20)
 	a.proProfiles.mu.Lock()
 	if a.proProfiles.entries == nil {
 		a.proProfiles.entries = map[string]opggProAccount{}
-		a.proProfiles.disk = newPublicBinaryCache(a.storage, "pro-profiles", 64, 4<<20)
+		a.proProfiles.disk = disk
 	}
+	disk = a.proProfiles.disk
+	a.proProfiles.mu.Unlock()
 	profiles := 0
 	for ti := range teams {
 		for mi := range teams[ti].Members {
 			for ai := range teams[ti].Members[mi].Summoners {
 				old := &teams[ti].Members[mi].Summoners[ai]
 				key := "pro-profile-v2|" + proLadderAccountKey(old.GameName, old.TagLine)
-				entry, err := a.proProfiles.disk.readDisk(key)
+				entry, err := disk.readDisk(key)
 				if err != nil || time.Now().After(entry.StaleUntil) {
 					continue
 				}
@@ -62,18 +68,31 @@ func (a *app) warmProPlayersCaches() {
 				}
 				at, _ := time.Parse(time.RFC3339Nano, cached.CheckedAt)
 				cached.Stale = at.IsZero() || time.Since(at) >= proProfileTTL(cached)
-				a.proProfiles.entries[key] = cached
+				a.proProfiles.mu.Lock()
+				if current, ok := a.proProfiles.entries[key]; ok && current.CheckedAt > cached.CheckedAt {
+					cached = current
+				} else {
+					a.proProfiles.entries[key] = cached
+				}
+				a.proProfiles.mu.Unlock()
 				*old = cached
 				profiles++
 			}
 		}
 	}
+	a.proProfiles.mu.Lock()
 	pruneProProfilesLocked(&a.proProfiles, time.Now())
 	a.proProfiles.mu.Unlock()
-	a.proPlayers.teams = teams
+	a.proPlayers.mu.Lock()
+	unchanged := len(previous) == len(a.proPlayers.teams) && (len(previous) == 0 || &previous[0] == &a.proPlayers.teams[0]) && a.proPlayers.fetchedAt.Equal(fetchedAt) && a.proPlayers.attemptedAt.Equal(attemptedAt) && !a.proPlayers.updating && a.proPlayers.flight == nil
+	if unchanged {
+		a.proPlayers.teams = teams
+	}
 	// Disk prewarming is not a network attempt; the first page request must
 	// still evaluate its unchanged directory and per-account TTLs immediately.
-	a.proPlayers.attemptedAt = time.Time{}
+	if unchanged {
+		a.proPlayers.attemptedAt = time.Time{}
+	}
 	a.proPlayers.mu.Unlock()
 	a.recordDiagnostic(map[string]any{"event": "pro_startup_cache", "profiles_restored": profiles, "network_requests": 0})
 }
