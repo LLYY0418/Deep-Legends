@@ -5166,7 +5166,6 @@
 
   function bindMatchFilterControls(container, tab) {
     container.querySelector("[data-history-filter-load]")?.addEventListener("click",async()=>{
-      // Keep the first click.
       tab.advancedMenu = { ...tab.advancedMenu, open:true, page:"conditions", category:"", query:"", renaming:-1 };
       await ensureAdvancedFilters();
     });
@@ -5356,10 +5355,10 @@
   }
 
   function renderFilteredMatchView(tab, restoreScroll = false) {
-    if(tab.advancedMenu?.open){tab.overviewRenderDeferred=true;globalThis.deepLegendsHistoryFilters?.refresh(overviewContainer(tab),tab,advancedFilterContext(tab));return;}
     const container = overviewContainer(tab);
     const data = tab.data;
     if (!container || !data) return;
+    if(tab.advancedMenu?.open && container._afBoundTab===tab){tab.overviewRenderDeferred=true;globalThis.deepLegendsHistoryFilters?.refresh(container,tab,advancedFilterContext(tab));return;}
     const filterbar = container.querySelector(".match-filterbar");
     if (filterbar) filterbar.outerHTML = renderMatchFilters(tab);
     bindMatchFilterControls(container, tab);

@@ -49,7 +49,7 @@ async function probe({port,phase,out}){
  const openFilter=async()=>{
   await click('[data-history-filter-load],[data-af-open]');await until("!!document.querySelector('[data-af-open]')");
   if(!await evaluate("document.querySelector('[data-af-menu]')?.hidden===false"))await click('[data-af-open]');
-  await until("document.querySelector('[data-af-menu]')?.hidden===false");
+  await until(phase.startsWith('write-') ? "document.querySelector('[data-af-menu]')?.hidden===false" : "document.querySelector('dialog[data-af-menu]:modal')?.hidden===false");
  };
  const openSaved=async()=>{await openFilter();await click('[data-af-page="saved"]');};
  try{
@@ -87,7 +87,7 @@ async function probe({port,phase,out}){
    }else if(phase==='restart'){
     const renamed=JSON.parse(fs.readFileSync(path.join(out,'082-preset-renamed-before-restart.json'),'utf8'));assert.equal(data.presets,renamed.presets);await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R269 82 重命名后保存')");save('082-restart-preset-proof.json',{resourceFixtureApplied:false,restartRetained:true,...await snapshot()});await shot('082-restart-preset.png');
    }else{
-    await evaluate("localStorage.setItem('deep-legends-history-presets-v1','{corrupt-r265')");await demo(initial.origin);await openSaved();await until("localStorage.getItem('deep-legends-history-presets-v1')===null");const after=await snapshot();assert.deepEqual(after.preferences,before.preferences);assert.deepEqual(after.controls,before.controls);assert(await evaluate("document.querySelector('.af-empty')?.textContent.includes('暂无常用筛选')"));save('082-corrupt-preset-proof.json',{resourceFixtureApplied:false,corruptFixtureDropped:true,otherSettingsUnchanged:true,...after});await shot('082-corrupt-preset.png');
+    await evaluate("localStorage.setItem('deep-legends-history-presets-v1','{corrupt-r265')");await demo(initial.origin);await openSaved();await until("localStorage.getItem('deep-legends-history-presets-v1')===null");const after=await snapshot();assert.deepEqual(after.preferences,before.preferences);assert.deepEqual(after.controls,before.controls);assert(await evaluate("document.querySelector('dialog[data-af-menu]:modal .af-saved .af-empty')?.textContent.includes('暂无常用筛选')"));save('082-corrupt-preset-proof.json',{resourceFixtureApplied:false,corruptFixtureDropped:true,otherSettingsUnchanged:true,...after});await shot('082-corrupt-preset.png');
    }
   }
   console.log(JSON.stringify({phase,passed:true,resourceFixtureApplied:false}));

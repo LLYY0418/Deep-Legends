@@ -21,6 +21,11 @@ $env:LOL_LOOT_DATA_DIR = $data
 $old = Join-Path $root "Deep-Legends-Setup-0.12.65-public.exe"
 Invoke-WebRequest "https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.65/Deep-Legends-Setup-0.12.65-public.exe" -OutFile $old
 if ((Get-FileHash $old -Algorithm SHA256).Hash.ToLowerInvariant() -ne "bf97221a0c8465b78d57bf32f15c746eeec72deb7f3ec4923323b095c16c70ac") { throw "Old public setup checksum mismatch" }
+function Show-PersistedFailure([string]$Log) {
+    Get-Content -LiteralPath $Log -Tail 80 | ForEach-Object {
+        ($_ -replace 'RGAPI-[A-Za-z0-9-]+', '[riot-key]' -replace '(?i)([A-Z]:\\Users\\|/Users/|/home/)[^\\/\s]+', '$1[user]')
+    }
+}
 function Run-Setup([string]$File, [switch]$MonitorLegacy) {
     # These are the actual Go installer shells. --update auto-starts their
     # existing progress flow; /S alone would leave the Go setup page waiting.
@@ -279,9 +284,9 @@ try {
     }
     $debugPort=Start-R265DebugApp
     node scripts/r265-persisted-ui.cjs $debugPort write-settings $evidence *> (Join-Path $evidence '079-unmodified-settings-write.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Unmodified published 079 UI did not write settings' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '079-unmodified-settings-write.log'); throw 'Unmodified published 079 UI did not write settings' }
     node scripts/r265-persisted-ui.cjs $debugPort write-presets $evidence *> (Join-Path $evidence '079-format-presets-write.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Same-tag missing-resource fixture did not save preset format' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '079-format-presets-write.log'); throw 'Same-tag missing-resource fixture did not save preset format' }
     $actual079Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '079-normal-close.json')
     Stop-InstalledApp -ObserveOnly
     $actual079Files=@{}
@@ -298,14 +303,14 @@ try {
     Stop-InstalledApp
     $debugPort=Start-R265DebugApp
     node scripts/r265-persisted-ui.cjs $debugPort read $evidence *> (Join-Path $evidence '080-actual-ui-read.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Actual 079 UI-written preferences changed after candidate upgrade' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '080-actual-ui-read.log'); throw 'Actual 079 UI-written preferences changed after candidate upgrade' }
     $actual080Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '080-normal-close.json')
     Stop-InstalledApp -ObserveOnly
     $debugPort=Start-R265DebugApp
     node scripts/r265-persisted-ui.cjs $debugPort restart $evidence *> (Join-Path $evidence '080-preset-restart.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Renamed preset was not retained after candidate restart' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '080-preset-restart.log'); throw 'Renamed preset was not retained after candidate restart' }
     node scripts/r265-persisted-ui.cjs $debugPort corrupt $evidence *> (Join-Path $evidence '080-corrupt-preset.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Corrupt preset damaged other settings or was not discarded' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '080-corrupt-preset.log'); throw 'Corrupt preset damaged other settings or was not discarded' }
     Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '080-second-normal-close.json') | Out-Null
     Stop-InstalledApp -ObserveOnly
     $actual079Comparisons=@()
@@ -335,9 +340,9 @@ try {
     Stop-InstalledApp
     $debugPort=Start-R265DebugApp
     node scripts/r266-persisted-ui.cjs $debugPort write-settings $r266Evidence *> (Join-Path $r266Evidence '080-unmodified-settings-write.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Unmodified published 080 UI did not write settings' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r266Evidence '080-unmodified-settings-write.log'); throw 'Unmodified published 080 UI did not write settings' }
     node scripts/r266-persisted-ui.cjs $debugPort write-presets $r266Evidence *> (Join-Path $r266Evidence '080-format-presets-write.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Published 080 UI did not save presets' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r266Evidence '080-format-presets-write.log'); throw 'Published 080 UI did not save presets' }
     $actual080Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r266Evidence '080-normal-close.json')
     Stop-InstalledApp -ObserveOnly
     $actual080Files=@{}
@@ -354,14 +359,14 @@ try {
     Stop-InstalledApp
     $debugPort=Start-R265DebugApp
     node scripts/r266-persisted-ui.cjs $debugPort read $r266Evidence *> (Join-Path $r266Evidence '081-actual-ui-read.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Actual 080 UI-written preferences changed after candidate upgrade' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r266Evidence '081-actual-ui-read.log'); throw 'Actual 080 UI-written preferences changed after candidate upgrade' }
     $actual081Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r266Evidence '081-normal-close.json')
     Stop-InstalledApp -ObserveOnly
     $debugPort=Start-R265DebugApp
     node scripts/r266-persisted-ui.cjs $debugPort restart $r266Evidence *> (Join-Path $r266Evidence '081-preset-restart.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Renamed preset was not retained after candidate restart' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r266Evidence '081-preset-restart.log'); throw 'Renamed preset was not retained after candidate restart' }
     node scripts/r266-persisted-ui.cjs $debugPort corrupt $r266Evidence *> (Join-Path $r266Evidence '081-corrupt-preset.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Corrupt preset damaged other settings or was not discarded' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r266Evidence '081-corrupt-preset.log'); throw 'Corrupt preset damaged other settings or was not discarded' }
     Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r266Evidence '081-second-normal-close.json') | Out-Null
     Stop-InstalledApp -ObserveOnly
     $actual080Comparisons=@()
@@ -393,9 +398,9 @@ try {
     Stop-InstalledApp
     $debugPort=Start-R265DebugApp
     node scripts/r269-persisted-ui.cjs $debugPort write-settings $r269Evidence *> (Join-Path $r269Evidence '081-unmodified-settings-write.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Unmodified published 081 UI did not write settings' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '081-unmodified-settings-write.log'); throw 'Unmodified published 081 UI did not write settings' }
     node scripts/r269-persisted-ui.cjs $debugPort write-presets $r269Evidence *> (Join-Path $r269Evidence '081-format-presets-write.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Published 081 UI did not save presets' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '081-format-presets-write.log'); throw 'Published 081 UI did not save presets' }
     $actual081Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r269Evidence '081-normal-close.json')
     Stop-InstalledApp -ObserveOnly
     $actual081Files=@{}
@@ -412,14 +417,14 @@ try {
     Stop-InstalledApp
     $debugPort=Start-R265DebugApp
     node scripts/r269-persisted-ui.cjs $debugPort read $r269Evidence *> (Join-Path $r269Evidence '082-actual-ui-read.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Actual 081 UI-written preferences changed after candidate upgrade' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '082-actual-ui-read.log'); throw 'Actual 081 UI-written preferences changed after candidate upgrade' }
     $actual082Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r269Evidence '082-normal-close.json')
     Stop-InstalledApp -ObserveOnly
     $debugPort=Start-R265DebugApp
     node scripts/r269-persisted-ui.cjs $debugPort restart $r269Evidence *> (Join-Path $r269Evidence '082-preset-restart.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Renamed preset was not retained after candidate restart' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '082-preset-restart.log'); throw 'Renamed preset was not retained after candidate restart' }
     node scripts/r269-persisted-ui.cjs $debugPort corrupt $r269Evidence *> (Join-Path $r269Evidence '082-corrupt-preset.log')
-    if ($LASTEXITCODE -ne 0) { throw 'Corrupt preset damaged other settings or was not discarded' }
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '082-corrupt-preset.log'); throw 'Corrupt preset damaged other settings or was not discarded' }
     Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r269Evidence '082-second-normal-close.json') | Out-Null
     Stop-InstalledApp -ObserveOnly
     $actual081Comparisons=@()

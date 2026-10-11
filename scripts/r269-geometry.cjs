@@ -1,10 +1,16 @@
 'use strict';
 // Compare the protected 0.12.80 tracks against the candidate in one Chromium/font environment.
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),{execFileSync,spawn}=require('node:child_process');
+function chromeClosed(chrome){return new Promise(resolve=>chrome.once('close',resolve));}
+async function stopChrome(chrome,closed){
+ if(chrome.exitCode===null && chrome.signalCode===null)chrome.kill('SIGTERM');
+ let timer;try{await Promise.race([closed,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('comparison Chrome did not exit before cleanup')),5000);})]);}finally{clearTimeout(timer);}
+}
 async function capture(file,png,profile){
  const chrome=spawn(process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',['--headless=new','--no-sandbox','--disable-background-networking','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{stdio:['ignore','ignore','pipe']});let ws;
+ const closed=chromeClosed(chrome);
  try{const url=await new Promise((resolve,reject)=>{let log='';const timer=setTimeout(()=>reject(Error('comparison Chrome startup timeout')),20000);chrome.once('error',reject);chrome.stderr.on('data',data=>{log+=data;const match=log.match(/DevTools listening on (ws:\/\/[^\s]+)/);if(match){clearTimeout(timer);resolve(match[1])}})});ws=new WebSocket(url);await new Promise((resolve,reject)=>{ws.addEventListener('open',resolve,{once:true});ws.addEventListener('error',reject,{once:true})});let sequence=0;const pending=new Map();ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(pending.has(m.id)){const [ok,no]=pending.get(m.id);pending.delete(m.id);m.error?no(Error(JSON.stringify(m.error))):ok(m.result)}});const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{const id=++sequence,timer=setTimeout(()=>reject(Error('comparison CDP timeout '+method)),15000);pending.set(id,[r=>{clearTimeout(timer);resolve(r)},e=>{clearTimeout(timer);reject(e)}]);ws.send(JSON.stringify({id,method,params,sessionId}))});const {targetId}=await send('Target.createTarget',{url:'file://'+file}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});await send('Emulation.setDeviceMetricsOverride',{width:2880,height:960,deviceScaleFactor:1,mobile:false},sessionId);let ready=false;for(let i=0;i<100;i++){const r=await send('Runtime.evaluate',{expression:"document.readyState==='complete' && document.images.length===2 && [...document.images].every(n=>n.complete && n.naturalWidth)",returnByValue:true},sessionId);if(r.result.value){ready=true;break};await new Promise(r=>setTimeout(r,50))};assert(ready,'comparison images failed to load');const image=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false},sessionId);fs.writeFileSync(png,Buffer.from(image.data,'base64'));await send('Browser.close');
- }finally{ws?.close();chrome.kill('SIGTERM')}
+ }finally{ws?.close();await stopChrome(chrome,closed);}
 }
 async function main(){
 const root=path.resolve(__dirname,'..'),out=process.env.R269_GEOMETRY_OUT || path.join(os.tmpdir(),'r269-geometry'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'r269-geometry-'));
@@ -25,4 +31,5 @@ try{
 }finally{fs.rmSync(temp,{recursive:true,force:true});}
 
 }
-main().catch(e=>{console.error(e);process.exitCode=1});
+module.exports={chromeClosed,stopChrome};
+if(require.main===module)main().catch(e=>{console.error(e);process.exitCode=1});

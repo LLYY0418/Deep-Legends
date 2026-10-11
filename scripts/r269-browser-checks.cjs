@@ -1,7 +1,8 @@
 'use strict';
 const assert=require('node:assert/strict');
-module.exports=async({evaluate,until,click,call,shot,ready,results,errors})=>{
+module.exports=async({evaluate,until,click,call,shot,ready,results,errors,releaseFilters})=>{
  const rating=await evaluate("({calls:window.__r269Ratings || [],status:document.querySelector('#overview-content')._overviewViewTab.mayhemRating?.status})");assert.equal(rating.calls.length,1);assert.equal(rating.calls[0].prefetch,'1');assert.equal(rating.status,'ready');const ratingTiming=await evaluate("(async()=>{const at=performance.now(),n=document.querySelector('[data-rank-mmr-trigger]');n.focus();await new Promise(requestAnimationFrame);return {ms:performance.now()-at,text:n.closest('.rank-mmr-control').textContent}})()");assert(/2[,]?054/.test(ratingTiming.text));assert(ratingTiming.ms<=200,JSON.stringify(ratingTiming));results.push({r269:'mayhem-prefetched',...rating});
+ await require('./r270-browser-checks.cjs')({evaluate,until,click,call,shot,ready,results,releaseFilters});
  console.log('R269 modal start');
  await click('[data-history-filter-load],[data-af-open]');await until("document.querySelector('[data-af-menu]')?.matches(':modal')");
  await evaluate("window.__r269Root=document.querySelector('#overview-content');window.__r269Tab=__r269Root._afBoundTab;window.__r269Bar=__r269Root.querySelector('.match-filterbar');window.__r269Dialog=document.querySelector('[data-af-menu]');true");
