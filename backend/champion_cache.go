@@ -42,6 +42,7 @@ type championCacheEnvelope struct {
 }
 
 type championCacheFlight struct {
+	priority    *riotFlightPriority
 	done        chan struct{}
 	data        []byte
 	fetchedAt   time.Time
@@ -108,6 +109,19 @@ func (c *championDataCache) loadWithStatus(ctx context.Context, key string, ttl,
 }
 
 func (c *championDataCache) loadWithResultTTL(ctx context.Context, key string, ttl, staleFor time.Duration, persistDisk bool, resultTTL func([]byte) time.Duration, loader func(context.Context) ([]byte, error)) (championCacheLoadResult, error) {
+	for {
+		result, err := c.loadCacheFlight(ctx, key, ttl, staleFor, persistDisk, resultTTL, loader)
+		if retry, waitErr := awaitRiotFlightHandoff(ctx, err); retry {
+			if waitErr != nil {
+				return championCacheLoadResult{state: championCacheStateError}, waitErr
+			}
+			continue
+		}
+		return result, err
+	}
+}
+
+func (c *championDataCache) loadCacheFlight(ctx context.Context, key string, ttl, staleFor time.Duration, persistDisk bool, resultTTL func([]byte) time.Duration, loader func(context.Context) ([]byte, error)) (championCacheLoadResult, error) {
 	now := c.cacheNow()
 	c.mu.Lock()
 	if entry, ok := c.entries[key]; ok {
@@ -119,6 +133,9 @@ func (c *championDataCache) loadWithResultTTL(ctx context.Context, key string, t
 		}
 	}
 	if flight := c.flights[key]; flight != nil {
+		if promoteRiotFlight(ctx, flight.priority) {
+			defer close(flight.priority.done)
+		}
 		done := flight.done
 		c.mu.Unlock()
 		select {
@@ -145,6 +162,9 @@ func (c *championDataCache) loadWithResultTTL(ctx context.Context, key string, t
 		return championCacheLoadResult{data: data, fetchedAt: entry.FetchedAt, state: championCacheStateMemory}, nil
 	}
 	if existing := c.flights[key]; existing != nil {
+		if promoteRiotFlight(ctx, existing.priority) {
+			defer close(existing.priority.done)
+		}
 		done := existing.done
 		c.mu.Unlock()
 		select {
@@ -166,11 +186,17 @@ func (c *championDataCache) loadWithResultTTL(ctx context.Context, key string, t
 		}
 	}
 	stale := c.entries[key]
-	flight := &championCacheFlight{done: make(chan struct{})}
+	var priority *riotFlightPriority
+	if enabled, _ := ctx.Value(riotIdentityFlightPriorityKey{}).(bool); enabled {
+		ctx, priority = newRiotFlightPriority(ctx)
+	}
+	defer finishRiotFlight(priority)
+	flight := &championCacheFlight{done: make(chan struct{}), priority: priority}
 	c.flights[key] = flight
 	c.mu.Unlock()
 
 	data, err := loader(ctx)
+	err = riotFlightResultError(ctx, err)
 	if err == nil && len(data) > 0 {
 		if resultTTL != nil {
 			ttl = resultTTL(data)

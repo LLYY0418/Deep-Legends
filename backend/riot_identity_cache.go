@@ -43,6 +43,7 @@ func (p *riotProvider) cachedPublicIdentityTTL(ctx context.Context, identity str
 		return loader(ctx)
 	}
 	key := p.identityContextKey(ctx, identity)
+	ctx = context.WithValue(ctx, riotIdentityFlightPriorityKey{}, true)
 
 	result, err := p.identityDisk.loadWithResultTTL(ctx, key, ttl, 0, true, resultTTL, func(ctx context.Context) ([]byte, error) {
 		if err := loader(ctx); err != nil {

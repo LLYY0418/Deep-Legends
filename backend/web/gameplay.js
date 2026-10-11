@@ -3657,9 +3657,9 @@
   }
 
   function scorePlacementChip(record, card = false) {
-    if(card && (!Number.isInteger(Number(record?.rank)) || Number(record?.rank)<1 || !Number.isInteger(Number(record?.total)) || Number(record?.total)<Number(record.rank)))return "";
     const badge = scoreBadgeChip(record);
     if (badge) return badge;
+    if(card && (!Number.isInteger(Number(record?.rank)) || Number(record?.rank)<1 || !Number.isInteger(Number(record?.total)) || Number(record?.total)<Number(record.rank)))return "";
     return !card && Number(record?.rank) === 1 ? "" : scoreRankChip(record?.rank, record?.total);
   }
 

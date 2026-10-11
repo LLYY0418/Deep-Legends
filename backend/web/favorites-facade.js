@@ -387,9 +387,10 @@
     let index = 0;
     const chunk = () => {
       if (generation !== state.renderGeneration || !panelVisible()) return;
-      const started = performance.now();
+      const started = performance.now(), first = index === 0;
+      let completed = 0;
       // 已有卡片直接移动到新顺序；仅新增卡片要进入图片队列。
-      while (index < rows.length && performance.now() - started < 7) {
+      while (index < rows.length && (first ? completed < 40 : completed < 1 || performance.now() - started < 7)) {
         const item = rows[index++];
         const fields = state.view === "icons" ? facadeCollectionIconFields(item, unavailable) : facadeCollectionBannerFields(item, unavailable);
         const key = `${state.view}:${item.id}`;
@@ -397,6 +398,7 @@
         if (card) {refreshCard(card, fields, item);window.deepLegendsCollectionNewItems?.decorate(card,state.view,item.id);}
         else card = createCard(fields, item);
         if (el.grid.children[index - 1] !== card) el.grid.insertBefore(card, el.grid.children[index - 1] || null);
+        completed++;
       }
       if (index < rows.length) requestAnimationFrame(chunk);
     };

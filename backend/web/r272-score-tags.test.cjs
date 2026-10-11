@@ -14,3 +14,7 @@ test('remake, absent score, absent rank or total produce no score placement',()=
 test('crowded narrow row preserves the score label before multikill and all data tags',()=>{
  const d=fixture({rank:2,total:10,score:7}),doc=d.window.document,row=doc.querySelector('.match-tags-collection');try{Object.defineProperty(row,'clientWidth',{value:35});for(const n of row.querySelectorAll('[data-match-tag]'))n.getBoundingClientRect=()=>({width:55});api.fitMatchTags(doc);assert.equal(row.querySelector('[data-match-tag]').textContent,'2nd');assert.equal(row.querySelector('[data-match-tag]').hidden,false);assert.equal([...row.querySelectorAll('[data-match-tag]')].filter(n=>!n.hidden).length,1);assert.equal(row.querySelector('[data-match-tags-more]').hidden,false);}finally{d.window.close();}
 });
+
+test('MVP and SVP do not depend on complete rank or total fields',()=>{
+ for(const badge of ['MVP','SVP'])for(const record of [{badge,rank:2,score:8},{badge,total:10,score:8},{badge,score:8}]){const d=fixture(record);try{assert.equal(d.window.document.querySelector('[data-match-tag]').textContent,badge);assert.equal(d.window.document.querySelector('.match-rank-chip'),null);}finally{d.window.close();}}
+});

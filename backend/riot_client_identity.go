@@ -16,9 +16,10 @@ type clientRiotIdentityEntry struct {
 	until time.Time
 }
 type clientRiotIdentityFlight struct {
-	done  chan struct{}
-	puuid string
-	err   error
+	priority *riotFlightPriority
+	done     chan struct{}
+	puuid    string
+	err      error
 }
 type clientRiotIdentityState struct {
 	mu         sync.Mutex
@@ -30,6 +31,19 @@ type clientRiotIdentityState struct {
 // LCU and public API PUUIDs belong to different encryption scopes. Never send
 // an unconverted client identity to a public by-puuid endpoint.
 func (a *app) resolveClientRiotPUUID(ctx context.Context, client *LCUClient, region, puuid string, ref gameplayReference) (string, error) {
+	for {
+		public, err := a.loadClientRiotIdentityFlight(ctx, client, region, puuid, ref)
+		if retry, waitErr := awaitRiotFlightHandoff(ctx, err); retry {
+			if waitErr != nil {
+				return "", waitErr
+			}
+			continue
+		}
+		return public, err
+	}
+}
+
+func (a *app) loadClientRiotIdentityFlight(ctx context.Context, client *LCUClient, region, puuid string, ref gameplayReference) (string, error) {
 	if a.riot == nil {
 		return "", errRiotKeyMissing
 	}
@@ -41,11 +55,17 @@ func (a *app) resolveClientRiotPUUID(ctx context.Context, client *LCUClient, reg
 		return entry.puuid, nil
 	}
 	if f := c.flights[key]; f != nil {
+		if promoteRiotFlight(ctx, f.priority) {
+			defer close(f.priority.done)
+		}
 		c.mu.Unlock()
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
 		case <-f.done:
+			if ctx.Err() == nil && (errors.Is(f.err, context.Canceled) || errors.Is(f.err, context.DeadlineExceeded)) {
+				return a.resolveClientRiotPUUID(ctx, client, region, puuid, ref)
+			}
 			return f.puuid, f.err
 		}
 	}
@@ -53,7 +73,9 @@ func (a *app) resolveClientRiotPUUID(ctx context.Context, client *LCUClient, reg
 		c.entries = map[string]clientRiotIdentityEntry{}
 		c.flights = map[string]*clientRiotIdentityFlight{}
 	}
-	f := &clientRiotIdentityFlight{done: make(chan struct{})}
+	ctx, priority := newRiotFlightPriority(ctx)
+	defer finishRiotFlight(priority)
+	f := &clientRiotIdentityFlight{done: make(chan struct{}), priority: priority}
 	generation := c.generation
 	c.flights[key] = f
 	c.mu.Unlock()
@@ -77,6 +99,7 @@ func (a *app) resolveClientRiotPUUID(ctx context.Context, client *LCUClient, reg
 		account, loadErr := a.riot.forPlatform(region).accountByRiotID(ctx, ref.GameName, ref.TagLine)
 		public, err = account.PUUID, loadErr
 	}
+	err = riotFlightResultError(ctx, err)
 	c.mu.Lock()
 	if generation != c.generation {
 		public, err = "", context.Canceled

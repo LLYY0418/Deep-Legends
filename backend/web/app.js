@@ -1239,8 +1239,8 @@
     let index=0;
     const chunk=()=>{
       if(generation!==state.renderGeneration)return;
-      const start=performance.now();
-      for(const end=Math.min(index+40,visible.length);index<end && performance.now()-start<8;index++){
+      const start=performance.now(),first=index===0;
+      for(const end=Math.min(index+40,visible.length);index<end && (first || performance.now()-start<8);index++){
         const skin=visible[index],id=String(skin.id);let card=mounted.get(id);
         if(card){card._collectionSkin=skin;window.deepLegendsCollectionNewItems?.decorate(card,'skins',id);}
         else{card=makeSkinCard(skin,{detailItems:visible});mounted.set(id,card);}
@@ -1274,9 +1274,10 @@
         if(!card){card=makeSkinCard(skin,{detailItems:group.skins});mounted.set(String(skin.id),card);}
         else {card._collectionSkin=skin;card._collectionCandidates=group.skins;card.classList.toggle('is-locked',state.view==='all' && !skin.owned);window.deepLegendsCollectionNewItems?.decorate(card,'skins',skin.id);}
         if(grid.children[index]!==card)grid.insertBefore(card,grid.children[index] || null);
+        return 1;
       }));
     }
-    runRenderTasks(tasks,generation,'renderGeneration');
+    runRenderTasks(tasks,generation,'renderGeneration',40);
   }
 
   function renderRarityGroups(items, generation) {
@@ -1302,10 +1303,11 @@
         group.grid = section.querySelector(".champion-skins");
         configureSparseGrid(group.grid, group.skins.length);
         el.grid.append(section);
+        return 0;
       });
-      for (const skin of group.skins) tasks.push(() => group.grid?.append(makeSkinCard(skin, { detailItems: displayOrder })));
+      for (const skin of group.skins) tasks.push(() => {group.grid?.append(makeSkinCard(skin, { detailItems: displayOrder }));return 1;});
     }
-    runRenderTasks(tasks, generation, "renderGeneration");
+    runRenderTasks(tasks, generation, "renderGeneration",40);
   }
 
   function renderChampionGroups(items, generation) {
@@ -1326,10 +1328,11 @@
         group.grid = section.querySelector(".champion-skins");
         configureSparseGrid(group.grid, group.skins.length);
         el.grid.append(section);
+        return 0;
       });
-      for (const skin of group.skins) tasks.push(() => group.grid?.append(makeSkinCard(skin, { detailItems: group.skins })));
+      for (const skin of group.skins) tasks.push(() => {group.grid?.append(makeSkinCard(skin, { detailItems: group.skins }));return 1;});
     }
-    runRenderTasks(tasks, generation, "renderGeneration");
+    runRenderTasks(tasks, generation, "renderGeneration",40);
   }
 
   function renderChromaCatalog(items, generation) {
@@ -1364,13 +1367,10 @@
     const championList = [...champions.values()];
     const prestigeTasks = [];
     if (prestigeGrid) {
-      for (let start = 0; start < prestige.length; start += 8) {
-        prestigeTasks.push(() => {
-          const chunk = document.createDocumentFragment();
-          for (let index = start; index < Math.min(start + 8, prestige.length); index += 1) chunk.append(makeChromaCard(prestige[index], prestige));
-          prestigeGrid.append(chunk);
-        });
-      }
+      for (const item of prestige) prestigeTasks.push(() => {
+        prestigeGrid.append(makeChromaCard(item, prestige));
+        return 1;
+      });
     }
     const tasks = [];
     let prestigeTaskIndex = 0;
@@ -1385,11 +1385,16 @@
         section.innerHTML = `<header class="champion-heading"><div><h2>${escapeHTML(champion.name)}</h2><span class="chroma-section-summary" ${chromaSummaryAttributes(champion.items, "款炫彩")}></span></div><span class="mastery-summary">${champion.points ? `熟练度 ${formatNumber(champion.points)}` : "尚无熟练度记录"}</span></header><div class="chroma-stack-grid"></div>`;
         champion.grid = section.querySelector(".chroma-stack-grid");
         el.grid.append(section);
+        return 0;
       });
-      for (const [key,parent] of champion.parents) tasks.push(() => {const stack=makeChromaStack(parent);stack.dataset.collectionParent=key;champion.grid?.append(stack);});
+      for (const [key,parent] of champion.parents) {
+        let stack;
+        tasks.push(() => {stack=makeChromaStack(parent,true);stack.dataset.collectionParent=key;champion.grid?.append(stack);return 0;});
+        for (const item of parent.items) tasks.push(() => {stack.querySelector('.chroma-stack-cards').append(makeChromaMiniCard(item,parent.items));return 1;});
+      }
     }
     while (prestigeTaskIndex < prestigeTasks.length) tasks.push(prestigeTasks[prestigeTaskIndex++]);
-    runRenderTasks(tasks, generation, "renderGeneration");
+    runRenderTasks(tasks, generation, "renderGeneration",40);
   }
 
   function cancelRenderFrames() {
@@ -1418,14 +1423,16 @@
     state.poolRenderFrames.add(frame);
   }
 
-  function runRenderTasks(tasks, generation, generationKey) {
+  function runRenderTasks(tasks, generation, generationKey, firstCards = 0) {
     let index = 0;
     const run = () => {
       if (generation !== state[generationKey]) return;
       const started = performance.now();
-      let completed = 0;
-      while (index < tasks.length && (completed < 1 || performance.now() - started < 7)) {
-        tasks[index++]();
+      let completed = 0, cards = 0;
+      const first = index === 0 && firstCards > 0;
+      // Count cards, not group headings or empty stack containers.
+      while (index < tasks.length && (first ? cards < firstCards : completed < 1 || performance.now() - started < 7)) {
+        cards += Number(tasks[index++]()) || 0;
         completed += 1;
       }
       if (index < tasks.length) (generationKey === "poolRenderGeneration" ? queuePoolRenderFrame : queueRenderFrame)(run);
@@ -1487,13 +1494,13 @@
     return card;
   }
 
-  function makeChromaStack(parent) {
+  function makeChromaStack(parent, deferCards = false) {
     const section = document.createElement("section");
     section.className = "chroma-stack";
     applyChromaGroupClasses(section, parent.items);
     section.innerHTML = `<header><div><strong>${escapeHTML(parent.name)}</strong><span class="chroma-stack-summary" ${chromaSummaryAttributes(parent.items)}></span></div><div class="chroma-row-controls" aria-label="横向浏览${escapeHTML(parent.name)}炫彩"><button class="control-icon-button" type="button" data-direction="previous" aria-label="向左查看更多炫彩">${navigationIcon("previous")}</button><button class="control-icon-button" type="button" data-direction="next" aria-label="向右查看更多炫彩">${navigationIcon("next")}</button></div></header><div class="chroma-stack-cards" role="group" aria-label="${escapeHTML(parent.name)}的炫彩列表"></div>`;
     const cards = section.querySelector(".chroma-stack-cards");
-    for (const chroma of parent.items) {
+    for (const chroma of deferCards ? [] : parent.items) {
       const button=makeChromaMiniCard(chroma,parent.items);
       cards.append(button);
     }
@@ -3366,7 +3373,7 @@
       for(const [id,card] of mounted)if(!wanted.has(id))card.remove();
       group.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.lootId)),markup=lootCard(item);if(!card || card._lootMarkup!==markup){const template=document.createElement('template');template.innerHTML=markup;const fresh=template.content.firstElementChild;fresh._lootMarkup=markup;if(card)card.replaceWith(fresh);card=fresh;mounted.set(String(item.lootId),card);for(const image of card.querySelectorAll('.loot-art img'))loadNextLootImage(image,true);}window.deepLegendsCollectionNewItems?.decorate(card,'loot-'+slug,item.lootId);if(grid.children[index]!==card)grid.insertBefore(card,grid.children[index] || null);}));
     }
-    let index=0;const run=()=>{if(state.accountRequestSeq!==generation || state.destroyed)return;const started=performance.now();while(index<tasks.length && (index===0 || performance.now()-started<7))tasks[index++]();if(index<tasks.length)requestAnimationFrame(run);};run();
+    let index=0;const run=()=>{if(state.accountRequestSeq!==generation || state.destroyed)return;const started=performance.now(),first=index===0;let completed=0;while(index<tasks.length && (first ? completed<40 : completed<1 || performance.now()-started<7)){tasks[index++]();completed++;}if(index<tasks.length)requestAnimationFrame(run);};run();
     const rewardSection=content.querySelector('.account-section:not(.loot-category)');if(rewardSection){const count=rewardSection.querySelector('.section-count');if(count)count.textContent=`${formatNumber(rewardKinds)} 组`;const old=rewardSection.querySelector('.reward-grid,.empty-state');if(old){const template=document.createElement('template');template.innerHTML=rewardCards?`<div class="reward-grid">${rewardCards}</div>`:'<div class="empty-state compact"><strong>没有待领取奖励</strong><p>工具会扫描奖励账本、任务与事件中心。</p></div>';old.replaceWith(template.content.firstElementChild);}}
     const capabilities=content.querySelector('.capability-list');if(capabilities)capabilities.innerHTML=capabilityRows || '<p class="muted">尚无能力状态</p>';
   }
@@ -3384,7 +3391,7 @@
       prestigeSection.querySelector('header span').textContent=`${formatNumber(prestige.length)} 款 · 独立原画`;prestigeSection.classList.toggle('has-owned',prestige.some(item=>item.owned));
       const grid=prestigeSection.querySelector('.chroma-prestige-grid');const mounted=new Map([...grid.children].map(card=>[card.dataset.collectionId,card]));const ids=new Set(prestige.map(item=>String(item.id)));
       for(const [id,card] of mounted)if(!ids.has(id)){cancelDeferredImages(card);card.remove();}
-      prestige.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.id));if(!card){card=makeChromaCard(item,prestige);mounted.set(String(item.id),card);}else{card._collectionSkin=item;card._collectionCandidates=prestige;card.classList.toggle('is-locked',!item.owned);window.deepLegendsCollectionNewItems?.decorate(card,'chromas',item.id);}if(grid.children[index]!==card)grid.insertBefore(card,grid.children[index] || null);}));
+      prestige.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.id));if(!card){card=makeChromaCard(item,prestige);mounted.set(String(item.id),card);}else{card._collectionSkin=item;card._collectionCandidates=prestige;card.classList.toggle('is-locked',!item.owned);window.deepLegendsCollectionNewItems?.decorate(card,'chromas',item.id);}if(grid.children[index]!==card)grid.insertBefore(card,grid.children[index] || null);return 1;}));
     }else prestigeSection?.remove();
     for(const [key,group] of groups){
       let section=sections.get(key);if(!section){section=document.createElement('section');section.className='chroma-section champion-group';section.dataset.collectionGroup=key;section.innerHTML='<header class="champion-heading"><div><h2></h2><span class="chroma-section-summary"></span></div><span class="mastery-summary"></span></header><div class="chroma-stack-grid"></div>';el.grid.append(section);}
@@ -3398,10 +3405,10 @@
         applyChromaGroupClasses(stack,parent.items);updateChromaSummary(stack.querySelector('.chroma-stack-summary'),parent.items);stack.querySelector('header strong').textContent=parent.name;
         const cards=stack.querySelector('.chroma-stack-cards'),mounted=new Map([...cards.children].map(card=>[card.dataset.collectionId,card])),ids=new Set(parent.items.map(item=>String(item.id)));
         for(const [cardID,card] of mounted)if(!ids.has(cardID)){cancelDeferredImages(card);card.remove();}
-        parent.items.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.id));if(!card){card=makeChromaMiniCard(item,parent.items);mounted.set(String(item.id),card);}card._collectionSkin=item;card._collectionCandidates=parent.items;card.classList.toggle('is-owned',Boolean(item.owned));card.classList.toggle('is-locked',!item.owned);card.setAttribute('aria-label',`${item.owned?'已拥有':'未获取'}，查看 ${item.name}`);card.querySelector('.chroma-mini-lock')?.remove();if(!item.owned)card.querySelector('.chroma-mini-art').insertAdjacentHTML('beforeend','<span class="chroma-mini-lock" aria-hidden="true">🔒</span>');window.deepLegendsCollectionNewItems?.decorate(card,'chromas',item.id);if(cards.children[index]!==card)cards.insertBefore(card,cards.children[index] || null);cards.dispatchEvent(new Event('scroll'));}));
+        parent.items.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.id));if(!card){card=makeChromaMiniCard(item,parent.items);mounted.set(String(item.id),card);}card._collectionSkin=item;card._collectionCandidates=parent.items;card.classList.toggle('is-owned',Boolean(item.owned));card.classList.toggle('is-locked',!item.owned);card.setAttribute('aria-label',`${item.owned?'已拥有':'未获取'}，查看 ${item.name}`);card.querySelector('.chroma-mini-lock')?.remove();if(!item.owned)card.querySelector('.chroma-mini-art').insertAdjacentHTML('beforeend','<span class="chroma-mini-lock" aria-hidden="true">🔒</span>');window.deepLegendsCollectionNewItems?.decorate(card,'chromas',item.id);if(cards.children[index]!==card)cards.insertBefore(card,cards.children[index] || null);cards.dispatchEvent(new Event('scroll'));return 1;}));
       }
     }
-    runRenderTasks(tasks,generation,'renderGeneration');
+    runRenderTasks(tasks,generation,'renderGeneration',40);
   }
   function updateChromaSummary(node,items,noun='款') { const scratch=document.createElement('span');scratch.innerHTML=`<span ${chromaSummaryAttributes(items,noun)}></span>`;for(const [key,value] of Object.entries(scratch.firstChild.dataset))node.dataset[key]=value; }
   function lootCard(item) {

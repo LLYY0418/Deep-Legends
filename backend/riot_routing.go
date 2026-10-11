@@ -20,8 +20,16 @@ type riotForegroundState struct {
 	sync.Mutex
 	active           int
 	resumeAt         time.Time
+	now              func() time.Time
 	visibilityKnown  bool
 	directoryVisible bool
+}
+
+func (s *riotForegroundState) nowLocked() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
 }
 
 func beginRiotForeground(p *riotProvider) func() {
@@ -36,12 +44,13 @@ func beginRiotForeground(p *riotProvider) func() {
 		riotForeground.Lock()
 		riotForeground.active--
 		if riotForeground.active == 0 {
-			riotForeground.resumeAt = time.Now().Add(5 * time.Second)
+			riotForeground.resumeAt = riotForeground.nowLocked().Add(5 * time.Second)
 		}
 		riotForeground.Unlock()
 	}
 }
 func (p *riotProvider) waitForRiotForeground(ctx context.Context) error {
+	defer startRiotTimingProbe(ctx, "foreground_wait")()
 	if p.foreground == nil {
 		return nil
 	}
@@ -49,16 +58,21 @@ func (p *riotProvider) waitForRiotForeground(ctx context.Context) error {
 	for {
 		riotForeground.Lock()
 		active, until := riotForeground.active, riotForeground.resumeAt
+		now := riotForeground.nowLocked()
 		hidden := riotForeground.visibilityKnown && !riotForeground.directoryVisible
 		riotForeground.Unlock()
-		if !hidden && active == 0 && !time.Now().Before(until) {
+		if !hidden && active == 0 && !now.Before(until) {
 			return nil
 		}
 		delay := 100 * time.Millisecond
 		if !hidden && active == 0 {
-			delay = time.Until(until)
+			delay = until.Sub(now)
 		}
-		if err := waitRiotDelay(ctx, delay); err != nil {
+		wait := waitRiotDelay
+		if controlled, ok := ctx.Value(riotForegroundWaitKey{}).(func(context.Context, time.Duration) error); ok {
+			wait = controlled
+		}
+		if err := wait(ctx, delay); err != nil {
 			return err
 		}
 	}

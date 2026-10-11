@@ -126,12 +126,14 @@ type riotAccountCacheEntry struct {
 }
 
 type riotAccountFlight struct {
-	done    chan struct{}
-	account riotAccount
-	err     error
+	priority *riotFlightPriority
+	done     chan struct{}
+	account  riotAccount
+	err      error
 }
 
 type riotMatchFlight struct {
+	priority   *riotFlightPriority
 	done       chan struct{}
 	match      *riotMatch
 	err        error
@@ -282,6 +284,7 @@ func riotKeyConfigured() bool { return riotKeySource() != "none" }
 // wait uses Riot response quotas when available, retaining conservative defaults
 // until the server advertises the key's actual regional and method limits.
 func (p *riotProvider) wait(ctx context.Context) error {
+	defer startRiotTimingProbe(ctx, "limiter_admission")()
 	if isRiotBackground(ctx) {
 		if err := p.waitForRiotForeground(ctx); err != nil {
 			return err
@@ -291,7 +294,9 @@ func (p *riotProvider) wait(ctx context.Context) error {
 	if limit, ok := ctx.Value(riotSingleWaitKey{}).(time.Duration); ok {
 		ctx = withRiotQueueLimit(ctx, limit)
 	}
+	queueDone := startRiotTimingProbe(ctx, "limiter_queue")
 	release, err := p.enterRiotLimitQueue(ctx)
+	queueDone()
 	if err != nil {
 		return err
 	}
@@ -362,7 +367,9 @@ func (p *riotProvider) wait(ctx context.Context) error {
 		if sleepFn == nil {
 			sleepFn = waitRiotDelay
 		}
+		rateDone := startRiotTimingProbe(ctx, "rate_wait")
 		err := sleepFn(ctx, sleep)
+		rateDone()
 		if tracker := riotOverviewCostTrackerFromContext(ctx); tracker != nil {
 			tracker.mu.Lock()
 			tracker.queueWait += time.Since(queuedAt)
@@ -926,6 +933,19 @@ func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine st
 	return account, err
 }
 func (p *riotProvider) accountByRiotIDPinned(ctx context.Context, gameName, tagLine string) (riotAccount, error) {
+	for {
+		account, err := p.loadRiotAccountFlight(ctx, gameName, tagLine)
+		if retry, waitErr := awaitRiotFlightHandoff(ctx, err); retry {
+			if waitErr != nil {
+				return riotAccount{}, waitErr
+			}
+			continue
+		}
+		return account, err
+	}
+}
+
+func (p *riotProvider) loadRiotAccountFlight(ctx context.Context, gameName, tagLine string) (riotAccount, error) {
 	ctx = riotPinnedIdentityContext(ctx)
 	key := riotAccountMemoryKey(ctx, gameName, tagLine)
 	now := time.Now()
@@ -937,20 +957,29 @@ func (p *riotProvider) accountByRiotIDPinned(ctx context.Context, gameName, tagL
 		return cached.account, cached.err
 	}
 	if flight := p.accountFlights[key]; flight != nil {
+		if promoteRiotFlight(ctx, flight.priority) {
+			defer close(flight.priority.done)
+		}
 		done := flight.done
 		p.accountMu.Unlock()
 		select {
 		case <-done:
+			if ctx.Err() == nil && (errors.Is(flight.err, context.Canceled) || errors.Is(flight.err, context.DeadlineExceeded)) {
+				return p.accountByRiotIDPinned(ctx, gameName, tagLine)
+			}
 			return flight.account, flight.err
 		case <-ctx.Done():
 			return riotAccount{}, ctx.Err()
 		}
 	}
-	flight := &riotAccountFlight{done: make(chan struct{})}
+	ctx, priority := newRiotFlightPriority(ctx)
+	defer finishRiotFlight(priority)
+	flight := &riotAccountFlight{done: make(chan struct{}), priority: priority}
 	p.accountFlights[key] = flight
 	p.accountMu.Unlock()
 
 	account, err := p.fetchAccountByRiotID(ctx, gameName, tagLine)
+	err = riotFlightResultError(ctx, err)
 	entry := riotAccountCacheEntry{account: account, err: err}
 	completedAt := time.Now()
 	if err == nil {
@@ -1089,7 +1118,21 @@ func (p *riotProvider) matchByIDWithCache(ctx context.Context, matchID string) (
 	return p.matchByIDWithCacheMode(ctx, matchID, false)
 }
 
-func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID string, refresh bool) (result *riotMatch, status string, resultErr error) {
+func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID string, refresh bool) (*riotMatch, string, error) {
+	for {
+		result, status, err := p.loadRiotMatchFlight(ctx, matchID, refresh)
+		if retry, waitErr := awaitRiotFlightHandoff(ctx, err); retry {
+			if waitErr != nil {
+				return nil, status, waitErr
+			}
+			continue
+		}
+		return result, status, err
+	}
+}
+
+func (p *riotProvider) loadRiotMatchFlight(ctx context.Context, matchID string, refresh bool) (result *riotMatch, status string, resultErr error) {
+	defer startRiotTimingProbe(ctx, "detail_cache")()
 	defer func() {
 		tracker, _ := ctx.Value(riotOverviewCostTrackerKey{}).(*riotOverviewCostTracker)
 		if tracker == nil || resultErr != nil {
@@ -1106,7 +1149,9 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 			tracker.matchesFromNetwork++
 		}
 	}()
+	cacheLockDone := startRiotTimingProbe(ctx, "detail_cache_lock")
 	p.cacheMu.Lock()
+	cacheLockDone()
 	if cached, ok := p.matchCache[matchID]; ok && (!refresh || !cached.Info.PerkStatsStale) {
 		p.touchMatchLocked(matchID)
 		p.touchRiotMatchDisk("riot-match-v4|" + matchID)
@@ -1114,6 +1159,9 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 		return cached, "hit", nil
 	}
 	if flight := p.matchFlights[matchID]; flight != nil && flight.generation == p.matchGeneration {
+		if promoteRiotFlight(ctx, flight.priority) {
+			defer close(flight.priority.done)
+		}
 		p.cacheMu.Unlock()
 		select {
 		case <-ctx.Done():
@@ -1138,11 +1186,14 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 	if p.matchFlights == nil {
 		p.matchFlights = make(map[string]*riotMatchFlight)
 	}
-	flight := &riotMatchFlight{done: make(chan struct{}), generation: p.matchGeneration}
+	ctx, priority := newRiotFlightPriority(ctx)
+	defer finishRiotFlight(priority)
+	flight := &riotMatchFlight{done: make(chan struct{}), generation: p.matchGeneration, priority: priority}
 	p.matchFlights[matchID] = flight
 	p.cacheMu.Unlock()
 	defer func() {
 		p.cacheMu.Lock()
+		resultErr = riotFlightResultError(ctx, resultErr)
 		flight.match, flight.err = result, resultErr
 		if p.matchFlights[matchID] == flight {
 			delete(p.matchFlights, matchID)
@@ -1171,12 +1222,18 @@ func (p *riotProvider) matchByIDWithCacheMode(ctx context.Context, matchID strin
 			return nil, "miss", errors.New("Riot 战绩详情缺少必要字段，可能接口已变更")
 		}
 	}
+	storeLockDone := startRiotTimingProbe(ctx, "detail_store_lock")
 	p.cacheMu.Lock()
-	if flight.generation == p.matchGeneration {
+	storeLockDone()
+	// Successful details survive ordinary caller cancellation (R100). Only a
+	// promoted background leader yields its result to the foreground flight.
+	if flight.generation == p.matchGeneration && (flight.priority == nil || !flight.priority.promoted) {
 		if status == "disk" {
 			p.touchRiotMatchDisk(key)
 		} else if p.matchDisk != nil && validRiotMatchID(matchID) {
+			persistDone := startRiotTimingProbe(ctx, "detail_disk_write")
 			p.persistRiotMatch(key, &match)
+			persistDone()
 		}
 		p.storeMatchLocked(matchID, &match)
 	}
@@ -1595,7 +1652,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	matchesRequested, matchesLoaded := 0, 0
 	var profileWait sync.WaitGroup
 	defer func() {
-		profileWait.Wait()
+		waitRiotProfile(ctx, &profileWait)
 		if provider.champions == nil || provider.champions.diag == nil {
 			return
 		}
@@ -1853,7 +1910,9 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 				return
 			}
 			defer func() { <-semaphore }()
+			detailDone := startRiotTimingProbe(ctx, "detail_worker")
 			result.detail, _, result.err = provider.matchByIDWithCache(ctx, ids[index])
+			detailDone()
 		}(index)
 	}
 	previewLoaded := 0
@@ -1899,7 +1958,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}
 		return gameplayOverview{}, ctx.Err()
 	}
-	profileWait.Wait()
+	waitRiotProfile(ctx, &profileWait)
 	publishPartial() // Flush metadata even when the final frame becomes an error.
 	if errors.Is(summonerErr, errRiotNotFound) {
 		return gameplayOverview{}, riotNotFoundError("「%s#%s」不在%s（该 Riot ID 属于其他大区）", gameName, tagLine, riotRegionLabel(provider.region()))
@@ -1983,7 +2042,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		}
 		return response, nil
 	}
-	profileWait.Wait()
+	waitRiotProfile(ctx, &profileWait)
 	if progress != nil && tracker.profileQuotaError != nil {
 		publishPartial()
 		if detailLoadErr != nil && riotErrorStatus(detailLoadErr) != http.StatusTooManyRequests {

@@ -40,12 +40,18 @@ func TestR272FiveColdKROverviewFirstTen(t *testing.T) {
 			f := r98OverviewFixture(t, true)
 			ref := gameplayReference{GameName: "Fixture", TagLine: "KR1", Region: "kr"}
 			started := time.Now()
-			first, err := f.a.loadRiotOverview(context.Background(), ref, 0, 10)
-			if err != nil || len(first.Matches) != 10 || time.Since(started) > 3*time.Second {
-				t.Fatal("cold first10 budget", len(first.Matches), time.Since(started), err)
+			firstCtx, firstProbe := r273TimingContext(f.a.riot)
+			first, err := f.a.loadRiotOverview(firstCtx, ref, 0, 10)
+			firstElapsed := time.Since(started)
+			r273LogTimings(t, f, firstProbe, "cold-first-ten", started)
+			if err != nil || len(first.Matches) != 10 || firstElapsed > 3*time.Second {
+				t.Fatal("cold first10 budget", len(first.Matches), firstElapsed, err)
 			}
-			firstMS := time.Since(started).Milliseconds()
-			next, err := f.a.loadRiotOverview(withRiotBackground(context.Background()), ref, 10, 10)
+			firstMS := firstElapsed.Milliseconds()
+			nextCtx, nextProbe := r273TimingContext(f.a.riot)
+			nextStarted := time.Now()
+			next, err := f.a.loadRiotOverview(withRiotBackground(nextCtx), ref, 10, 10)
+			r273LogTimings(t, f, nextProbe, "background-next-ten", nextStarted)
 			if err != nil || len(next.Matches) != 10 {
 				t.Fatal("background next10", err)
 			}
