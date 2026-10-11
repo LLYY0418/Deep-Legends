@@ -52,10 +52,11 @@
       return `<span class="arena-fame${tier}" data-tooltip="${h.escapeHTML(`斗魂等级 ${h.number(fame.level)} · 名望 ${h.number(fame.fame)}`)}" data-tooltip-size="compact"><svg class="arena-fame-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 13.5 4.6v6.8L8 14.5 2.5 11.4V4.6Z"/><path class="arena-fame-blades" d="m5.4 5.4 5.2 5.2M10.6 5.4 5.4 10.6"/></svg><b>${h.number(fame.level)}级</b><span class="arena-fame-divider" aria-hidden="true">·</span><span>${h.number(fame.fame)} 名望</span></span>`;
     }
     if (!player.soloRank && !player.flexRank) return span(legacyCopy, true);
-    const queue = (label, value) => `${label} ${value?.tier ? `${h.rankTitle(value)} ${h.number(value.leaguePoints)} LP` : '未定级'}`;
+    const queue = (label, value) => `${h.escapeHTML(label)} ${value?.tier ? `<b class="live-rank-title">${h.escapeHTML(h.rankTitle(value))}</b> ${h.escapeHTML(h.number(value.leaguePoints))} LP` : '未定级'}`;
     const ranks = [queue('单双', player.soloRank), queue('灵活', player.flexRank)];
     if (player.rank?.queueType === 'RANKED_FLEX_SR') ranks.reverse();
-    return span([String(legacyCopy).split(' · ')[0], ...ranks].join(' · '), true);
+    const copy=[String(legacyCopy).split(' · ')[0],...ranks.map(value=>value.replace(/<[^>]*>/g,''))].join(' · ');
+    return `<span data-tooltip="${h.escapeHTML(copy)}" data-tooltip-overflow="self" data-tooltip-size="compact">${h.escapeHTML(String(legacyCopy).split(' · ')[0])} · ${ranks.join(' · ')}</span>`;
   }
 
   // 斗魂右侧三格：近 N 局「X胜 Y负」（胜 = 名次在前一半，对齐 Akari isCherryPlacementWin）、

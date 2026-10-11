@@ -96,7 +96,7 @@ func nativeAcceptWindowDetails() map[string]any {
 				row["rect"] = []int32{rect.Left, rect.Top, rect.Right, rect.Bottom}
 			}
 			rows = append(rows, row)
-			if len(rows) >= 16 {
+			if len(rows) >= 10 {
 				result["window_limit_reached"] = true
 				break
 			}

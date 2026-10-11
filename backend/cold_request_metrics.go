@@ -42,9 +42,7 @@ func (a *app) recordColdLCURequest(at time.Time) {
 	var event map[string]any
 	if !s.seen || !at.Before(s.process) && at.Before(s.process.Add(3*time.Second)) {
 		s.lcuStarts = append(s.lcuStarts, at)
-		if s.seen && s.emitted {
-			event = s.eventLocked()
-		}
+
 	}
 	s.mu.Unlock()
 	if event != nil {
@@ -74,12 +72,13 @@ func (a *app) recordBrowserColdRequests(processAt int64, queued, resources int, 
 		s.mu.Unlock()
 		return false
 	}
+	wasElapsed := s.browserWindowElapsed
 	s.browserMeasured = true
 	s.browserQueued = max(s.browserQueued, queued)
 	s.browserResources = resources
 	s.browserWindowElapsed = s.browserWindowElapsed || elapsed
 	var event map[string]any
-	if s.emitted {
+	if s.emitted && elapsed && !wasElapsed {
 		event = s.eventLocked()
 	}
 	s.mu.Unlock()

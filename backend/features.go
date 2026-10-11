@@ -73,6 +73,20 @@ type rendererPerfGroup struct {
 	MaxMS   float64 `json:"maxMs"`
 }
 type clientDiagnosticRequest struct {
+	RankedMatches   int `json:"ranked_matches,omitempty"`
+	WithDelta       int `json:"with_delta,omitempty"`
+	Chips           int `json:"chips,omitempty"`
+	RevisionSkipped int `json:"revision_skipped,omitempty"`
+
+	BegIndex     int    `json:"beg_index,omitempty"`
+	TimeRange    string `json:"time_range,omitempty"`
+	NewUnique    int    `json:"new_unique,omitempty"`
+	Exhausted    bool   `json:"exhausted,omitempty"`
+	ScrollBefore int    `json:"scroll_before,omitempty"`
+	ScrollAfter  int    `json:"scroll_after,omitempty"`
+	Append       bool   `json:"append,omitempty"`
+	KeyChangeMS  int    `json:"key_change_ms,omitempty"`
+
 	DiagnosticBatch         string                      `json:"diagnosticBatch,omitempty"`
 	ErrorRepeatCount        int                         `json:"repeatCount,omitempty"`
 	ErrorMessage            string                      `json:"message,omitempty"`
@@ -252,6 +266,9 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"lp_chip_render":                 {"render": true},
+	"overview_scroll_reset":          {"restored": true},
+	"overview_reference_expired":     {"retry": true},
 	"overview_rerender_client":       {"render": true, "filter_modal_error": true},
 	"history_search_client":          {"done": true, "user_stop": true, "no_more": true, "outage": true, "quota": true, "error": true},
 	"collection_failure_state_shown": {"last_error": true, "retry_count": true, "elapsed": true},
@@ -400,9 +417,36 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(204)
 		return
 	}
+	if request.Event == "overview_scroll_reset" || request.Event == "overview_reference_expired" {
+		switch request.TabType {
+		case "self", "cn", "riot", "pro":
+			event["tab_type"] = request.TabType
+		default:
+			event["tab_type"] = "other"
+		}
+		if request.Event == "overview_scroll_reset" {
+			event["render_reason"] = truncateClientDiagnosticText(request.RenderReason)
+			event["scroll_before"], event["scroll_after"] = min(1000000, max(0, request.ScrollBefore)), min(1000000, max(0, request.ScrollAfter))
+		} else {
+			event["endpoint"], event["append"], event["key_change_ms"] = "overview", request.Append, min(86400000, max(-1, request.KeyChangeMS))
+		}
+		a.recordDiagnostic(event)
+		w.WriteHeader(204)
+		return
+	}
+	if request.Event == "lp_chip_render" {
+		event["ranked_matches"], event["with_delta"], event["chips"], event["revision_skipped"] = min(1000, max(0, request.RankedMatches)), min(1000, max(0, request.WithDelta)), min(1000, max(0, request.Chips)), min(1000, max(0, request.RevisionSkipped))
+		a.recordDiagnostic(event)
+		w.WriteHeader(204)
+		return
+	}
 	if request.Event == "history_search_client" {
 		event["scanned"], event["hits"], event["pages"], event["average_page_bytes"], event["stop_reason"] = min(1000, max(0, request.Scanned)), min(1000, max(0, request.Hits)), min(50, max(0, request.Pages)), min(16<<20, max(0, request.AveragePageBytes)), request.Reason
-		event["duration_ms"] = request.DurationMS
+		event["duration_ms"] = min(3600000, max(0, request.DurationMS))
+		event["beg_index"], event["new_unique"], event["exhausted"] = min(10000, max(0, request.BegIndex)), min(1000, max(0, request.NewUnique)), request.Exhausted
+		if date, err := time.Parse("2006-01-02", request.TimeRange); err == nil {
+			event["time_range"] = date.Format("2006-01-02")
+		}
 		a.recordDiagnostic(event)
 		w.WriteHeader(204)
 		return
@@ -986,6 +1030,7 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 func (a *app) handleDiagnostics(w http.ResponseWriter, _ *http.Request) {
 	riotRelays.flushSummary(a.recordDiagnostic, true)
 	a.flushRankedWinrateDiagnostics()
+	a.flushSuccessfulRequestDiagnostics()
 	a.mu.RLock()
 	identityReady := a.identityReady || (a.clientSessionConnectedLocked() && a.summoner.SummonerID != 0)
 	response := diagnosticsResponse{
@@ -1039,6 +1084,7 @@ func (a *app) handleDiagnosticLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.flushRankedWinrateDiagnostics()
+	a.flushSuccessfulRequestDiagnostics()
 	if runner := a.activeWatch(); runner != nil {
 		runner.recordFlowExportSnapshot()
 	}

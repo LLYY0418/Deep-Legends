@@ -107,7 +107,7 @@ func TestArenaMatchDetailIsMemoryCachedAndPublicizesPlayerReferences(t *testing.
 	}
 	filteredEvents := events[:0]
 	for _, event := range events {
-		if event["event"] != "arena_match_detail" && event["event"] != "riot_request" {
+		if event["event"] != "arena_match_detail" && event["event"] != "riot_request" && event["event"] != "riot_match_disk_write" && event["event"] != "same_credential" {
 			t.Fatalf("unexpected diagnostic: %v", event["event"])
 		}
 		if event["event"] == "arena_match_detail" {

@@ -76,6 +76,8 @@ type app struct {
 	snapshotFallbackAt              time.Time
 	collectionDirty                 bool
 	collectionDirtyAt               time.Time
+	collectionEventTimer            *time.Timer
+	collectionEventGeneration       uint64
 	collectionRefreshFinishedAt     time.Time
 	collectionRefreshStartedAt      time.Time
 	collectionEventAt               map[string]time.Time
@@ -289,6 +291,8 @@ type app struct {
 	unknownQueueDiagnosticIDs           map[int64]struct{}
 	perkDiagnosticMu                    sync.Mutex
 	perkDiagnosticCounts                map[string]int
+	successRequestDiagnosticMu          sync.Mutex
+	successRequestDiagnostics           map[string]*successRequestDiagnostic
 	compactDiagnosticMu                 sync.Mutex
 	compactDiagnosticWindows            map[string]compactDiagnosticWindow
 	timelineDiagnosticBatches           map[string]*timelineDiagnosticBatch
@@ -338,6 +342,7 @@ type app struct {
 }
 
 type statusResponse struct {
+	CollectionAccount          string               `json:"collectionAccount,omitempty"`
 	ClientView                 clientView           `json:"clientView"`
 	Update                     updateStatus         `json:"update"`
 	Version                    string               `json:"version"`
@@ -541,6 +546,7 @@ func main() {
 	a.lpTracker = newLPTracker(store)
 	a.lpTracker.observeEvent = a.recordDiagnostic
 	a.lpTracker.invalidateRanks = a.invalidateRankPlayer
+	a.lpTracker.onRecorded = a.onLPRecorded
 	a.rankScores = newRankScoreCache()
 	a.riot.opponentRankScore = func(ctx context.Context, puuid string) rankScoreEntry {
 		return a.playerRankScore(ctx, nil, puuid, false, "KR", "")
@@ -895,6 +901,10 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 		CollectionDirty: a.collectionDirty,
 		QueueGroups:     queueGroupsForClient(),
 	}
+	if response.Connected && a.storage != nil {
+		response.CollectionAccount = a.storage.accountHash(identity)
+	}
+
 	if !a.snapshotRetryStarted.IsZero() {
 		response.SnapshotRetryElapsedMS = time.Since(a.snapshotRetryStarted).Milliseconds()
 	}
@@ -1426,6 +1436,7 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	a.refreshSelfReadinessAsync(client)
 	a.publishClientView()
 	a.broadcastEvent("summoner-updated")
+	a.prefetchSelfMayhemRating(client)
 	if seed != nil {
 		a.goSafe("identity.discovery-enrichment", func() {
 			snapshot, loadErr := loadIdentitySnapshot(client)
@@ -1694,6 +1705,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	}
 	a.scheduleCollectionDataRetry(client, result.Account)
 	a.broadcastEvent("snapshot-updated")
+	a.scheduleCollectionEventRefresh(collectionEventRefreshDelay)
 	return true
 }
 
@@ -1854,6 +1866,13 @@ func (a *app) clearAssetCache() {
 }
 
 func (a *app) recordDiagnostic(event map[string]any) {
+	summaries, handled := a.successfulRequestDiagnostics(event, time.Now(), false)
+	for _, summary := range summaries {
+		a.appendDiagnosticEvent(summary)
+	}
+	if handled {
+		return
+	}
 	var keep bool
 	event, keep = a.compactDiagnostic(event, time.Now())
 	if !keep {
@@ -1885,7 +1904,8 @@ func (a *app) recordDiagnostic(event map[string]any) {
 	if eventName, ok := event["event"].(string); ok && isNoisyDiagnosticEvent(eventName) {
 		evicted := 0
 		raw, _ := json.Marshal(event)
-		key := eventName + "|" + string(raw)
+		sum := sha256.Sum256(raw)
+		key := fmt.Sprintf("%s|%x", eventName, sum)
 		a.diagnosticDedupMu.Lock()
 		if a.diagnosticDedupCounts == nil {
 			a.diagnosticDedupCounts = make(map[string]int)
@@ -1908,6 +1928,12 @@ func (a *app) recordDiagnostic(event map[string]any) {
 			a.appendDiagnosticEvent(summary)
 			return
 		}
+		copy := make(map[string]any, len(event)+1)
+		for k, v := range event {
+			copy[k] = v
+		}
+		copy["repeat_count"] = count
+		event = copy
 	}
 	a.appendDiagnosticEvent(event)
 }
@@ -2017,7 +2043,7 @@ func (a *app) appendDiagnosticEvent(event map[string]any) {
 
 func isNoisyDiagnosticEvent(event string) bool {
 	switch event {
-	case "pro_identity_match", "ranked_winrate_resolved", "ranked_data_source_decision", "specialist_runes_client_skip", "client_installations_scan", "lcu_discovery", "live_position_shape", "social_presence_resolved":
+	case "same_credential", "champselect_source", "champselect_trace", "sgp_ranked_stats_incomplete", "riot_match_disk_write", "lp_annotate", "lp_chip_render", "sgp_participant_keys", "champselect_ban_probe", "pro_identity_match", "ranked_winrate_resolved", "ranked_data_source_decision", "specialist_runes_client_skip", "client_installations_scan", "lcu_discovery", "live_position_shape", "social_presence_resolved":
 		return true
 	default:
 		return false

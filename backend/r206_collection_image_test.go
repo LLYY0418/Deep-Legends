@@ -53,8 +53,8 @@ func TestR206CollectionEventsLogEveryEventAndThrottle(t *testing.T) {
 		t.Fatal("event diagnostics/throttle", string(data))
 	}
 	a.collectionRefreshFinishedAt = now.Add(30 * time.Second)
-	if a.markCollectionDirtyAt(now.Add(32*time.Second), "champions") {
-		t.Fatal("post-refresh suppression missing")
+	if !a.markCollectionDirtyAt(now.Add(32*time.Second), "champions") {
+		t.Fatal("R272 inventory/champion event must not be suppressed after refresh")
 	}
 }
 

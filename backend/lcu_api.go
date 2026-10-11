@@ -207,7 +207,7 @@ func enrichLootItemsWithMetadata(items []LootItem, skins []Skin, metadata map[st
 		}
 		item.Category = lootCategory(*item)
 		item.Owned, item.OwnedKnown = false, false
-		if item.Category == "表情" || item.Category == "守卫" || item.Category == "图标" {
+		if item.Category == "英雄" || item.Category == "表情" || item.Category == "守卫" || item.Category == "图标" {
 			switch normalizeLootToken(item.ItemStatus) {
 			case "OWNED":
 				item.OwnedKnown, item.Owned = true, true

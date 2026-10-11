@@ -68,7 +68,9 @@ func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gamepl
 		a.overviewQueries.mu.Lock()
 		if cached, ok := a.overviewQueries.getLocked(key, time.Now()); ok && !force {
 			response := cached.response
+			response.Matches = cloneClientHistoryMatches(response.Matches)
 			a.overviewQueries.mu.Unlock()
+			a.annotateOverviewLP(&response, "cache")
 			return response, nil
 		}
 		if flight := a.overviewQueries.flights[key]; flight != nil {
@@ -83,7 +85,12 @@ func (a *app) loadRiotOverviewDeduplicated(ctx context.Context, reference gamepl
 				if ctx.Err() == nil && (errors.Is(flight.err, context.Canceled) || errors.Is(flight.err, context.DeadlineExceeded)) {
 					continue
 				}
-				return flight.response, flight.err
+				response := flight.response
+				response.Matches = cloneClientHistoryMatches(response.Matches)
+				if flight.err == nil {
+					a.annotateOverviewLP(&response, "cache")
+				}
+				return response, flight.err
 			case <-ctx.Done():
 				return gameplayOverview{}, ctx.Err()
 			}
@@ -210,7 +217,12 @@ func (a *app) loadGameplayOverviewDeduplicated(ctx context.Context, client *LCUC
 	a.overviewQueries.mu.Lock()
 	if cached, ok := a.overviewQueries.getLocked(key, time.Now()); ok {
 		response := cached.response
+		response.Matches = cloneClientHistoryMatches(response.Matches)
 		a.overviewQueries.mu.Unlock()
+		if isCurrent {
+			canonical := current.PUUID
+			a.annotateLP(response.Matches, canonical, "cache", true)
+		}
 		return response
 	}
 	if flight := a.overviewQueries.flights[key]; flight != nil {
@@ -226,7 +238,10 @@ func (a *app) loadGameplayOverviewDeduplicated(ctx context.Context, client *LCUC
 				}
 				return a.loadGameplayOverviewDeduplicated(ctx, client, current, reference, begIndex, count, matchFilter, false)
 			}
-			return flight.response
+			response := flight.response
+			response.Matches = cloneClientHistoryMatches(response.Matches)
+			a.annotateOverviewLP(&response, "cache")
+			return response
 		case <-ctx.Done():
 			return gameplayOverview{}
 		}

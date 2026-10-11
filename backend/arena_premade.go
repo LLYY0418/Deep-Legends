@@ -290,6 +290,11 @@ func (a *app) applyArenaPremadeSquads(response *gameplayLiveResponse, inputsByRe
 
 	inputs := make([]arenaPremadeInput, len(response.Players))
 	preferredChampSelect := 0
+	for _, p := range response.Players {
+		if p.champSelectSquad {
+			preferredChampSelect++
+		}
+	}
 	// An in-game id shared with anyone whose champ-select id is known has been
 	// observed to merge lobbies (R95: one id over six players). Members without
 	// a champ-select id cannot be trusted under such an id.

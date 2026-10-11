@@ -59,6 +59,9 @@ func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase
 	}
 	f.mu.Unlock()
 	a.signalGameplayPhase(client)
+	if changed && phase != "GameStart" && phase != "InProgress" && phase != "Reconnect" {
+		a.scheduleCollectionEventRefresh(0)
+	}
 	if ended || changed && phase == "EndOfGame" {
 		a.invalidateRankPlayer(a.currentPlayerRef())
 	}

@@ -26,7 +26,7 @@
 	  "friends-updated": ["friends"],
 	  "season-progress": ["overview-season"],
  "riot-relay-recovered": ["riot-relay-recovered"],
- "overview-matches": ["overview-matches"],
+ "lp-recorded": ["lp-recorded"], "overview-matches": ["overview-matches"],
 	  "historical-ranks": ["overview-ranks"],
       "overview-incremental": ["overview-ranks"],
 	  "summoner-updated": [],
@@ -457,7 +457,7 @@
       }
 	  if (!state.status.connected) clearDisconnectedClientState();
       state.statusDelay = STATUS_INTERVAL;
-	  const changed = !previous || previous.lastSync !== state.status.lastSync || previous.lastAttempt !== state.status.lastAttempt || previous.calculationOK !== state.status.calculationOK || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.clientRegion !== state.status.clientRegion || previous.serverId !== state.status.serverId || previous.identityReady !== state.status.identityReady || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotRetryCount !== state.status.snapshotRetryCount || previous.snapshotRetryExhausted !== state.status.snapshotRetryExhausted || previous.snapshotFallback !== state.status.snapshotFallback || previous.collectionDirty !== state.status.collectionDirty;
+	  const changed = !previous || previous.lastSync !== state.status.lastSync || previous.collectionAccount !== state.status.collectionAccount || previous.lastAttempt !== state.status.lastAttempt || previous.calculationOK !== state.status.calculationOK || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.clientRegion !== state.status.clientRegion || previous.serverId !== state.status.serverId || previous.identityReady !== state.status.identityReady || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotRetryCount !== state.status.snapshotRetryCount || previous.snapshotRetryExhausted !== state.status.snapshotRetryExhausted || previous.snapshotFallback !== state.status.snapshotFallback || previous.collectionDirty !== state.status.collectionDirty;
       if (changed) {
         if (!(state.section === "favorites" && state.favoritesPage === "account")) state.accountLoaded = false;
         if (!(state.section === "favorites" && state.favoritesPage === "pools")) {
@@ -474,7 +474,7 @@
         else triggerCollectionRescanIfDirty();
       }
       // Scan start/dirty/status messages do not change the collection payload.
-      const snapshotChanged = !previous || previous.lastSync !== state.status.lastSync || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.clientRegion !== state.status.clientRegion || previous.serverId !== state.status.serverId || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotFallback !== state.status.snapshotFallback;
+      const snapshotChanged = !previous || previous.lastSync !== state.status.lastSync || previous.collectionAccount !== state.status.collectionAccount || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.clientRegion !== state.status.clientRegion || previous.serverId !== state.status.serverId || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotFallback !== state.status.snapshotFallback;
       if (loadItems || snapshotChanged) {
         state.skinsCache?.clear();
         if (state.section === "favorites" && state.favoritesPage === "collection") await loadSkins(true);
@@ -567,6 +567,8 @@
 
   function applySkinsPayload(items, capability, stale = false, capturedAt = "") {
     state.items = items;
+    const fresh=window.deepLegendsCollectionNewItems;
+    fresh?.setAccount(state.status);if(!stale && state.status?.snapshotReady)fresh?.update(state.view==='chromas'?'chromas':'skins',items);
     state.staleSnapshot = Boolean(stale);
     state.staleSnapshotAt = capturedAt || "";
     state.chromaCapability = state.view === "chromas" ? capability || null : state.chromaCapability;
@@ -609,6 +611,17 @@
   }
 
   function syncCollectionSession(data) {
+    if(typeof window!=="undefined")window.deepLegendsCollectionNewItems?.setAccount(data);
+    const scope=[data?.clientRegion,data?.serverId,data?.collectionAccount].join("|");
+    if(data?.collectionAccount != null && (state.collectionAccount!==data.collectionAccount || state.collectionScope!==scope)) {
+      state.collectionScope=scope;
+      state.collectionAccount=data.collectionAccount;
+      state.skinLoadGeneration=Number(state.skinLoadGeneration || 0)+1;
+      state.accountRequestSeq=Number(state.accountRequestSeq || 0)+1;
+      state.renderGeneration=Number(state.renderGeneration || 0)+1;
+      state.skinsCache?.clear();state.items=[];state.accountLoaded=false;state.collectionRenderPending=true;
+      if(typeof el!=='undefined'){if(el.grid)delete el.grid._collectionRenderKey;if(el.accountContent)delete el.accountContent._accountMarkup;}
+    }
     if(data?.clientSessionEpoch == null)return;
     if(state.collectionSessionEpoch!==data.clientSessionEpoch) {
       state.collectionSessionEpoch=data.clientSessionEpoch;
@@ -649,6 +662,7 @@
 
   async function loadSkins(force = false) {
     const generation = ++state.skinLoadGeneration;
+    const collectionAccount=[state.status?.clientRegion,state.status?.serverId,state.status?.collectionAccount].join("|");
     state.listError = "";
     el.retryList.hidden = true;
 	  const fallbackAvailable = state.status?.connected && state.status?.snapshotFallback && (state.view === "owned" || state.view === "remaining");
@@ -684,7 +698,7 @@
     try {
       const endpoint = state.view === "chromas" ? "/api/chromas" : `/api/skins?view=${encodeURIComponent(state.view)}`;
       const payload = await api(endpoint, {}, "skins", 15000);
-      if (generation !== state.skinLoadGeneration || state.destroyed) return;
+      if (generation !== state.skinLoadGeneration || collectionAccount!==[state.status?.clientRegion,state.status?.serverId,state.status?.collectionAccount].join("|") || state.destroyed) return;
       const items = Array.isArray(payload.items) ? payload.items : [];
       const sameStaleContext = Boolean(state.staleSnapshot) === Boolean(payload.stale)
         && (!payload.stale || String(state.staleSnapshotAt || "") === String(payload.capturedAt || ""));
@@ -696,7 +710,7 @@
       state.skinsCache.set(state.view, { items, capability: payload.capability || null, stale: Boolean(payload.stale), capturedAt: payload.capturedAt || "", at: Date.now() });
       shouldRender ||= !unchanged;
     } catch (error) {
-      if (generation !== state.skinLoadGeneration || error.name === "RequestCancelled" || state.destroyed) return;
+      if (generation !== state.skinLoadGeneration || collectionAccount!==[state.status?.clientRegion,state.status?.serverId,state.status?.collectionAccount].join("|") || error.name === "RequestCancelled" || state.destroyed) return;
       // 保留已经渲染的实时/历史列表，避免一次瞬时请求失败把可用内容清空。
       // 只有没有任何旧内容时才进入空态错误页。
       const hadItems = state.items.length > 0;
@@ -711,7 +725,7 @@
       }
       el.retryList.hidden = false;
     } finally {
-      if (generation !== state.skinLoadGeneration || state.destroyed) return;
+      if (generation !== state.skinLoadGeneration || collectionAccount!==[state.status?.clientRegion,state.status?.serverId,state.status?.collectionAccount].join("|") || state.destroyed) return;
       state.loading = false;
       if (shouldRender) { renderItems(); if(!state.collectionWaitingForConnection)state.collectionRenderPending=false; }
     }
@@ -1127,11 +1141,10 @@
 
   function renderItems() {
     cancelRenderFrames();
-    cancelDeferredImages(el.grid);
-    stopHoverVideo();
     const generation = ++state.renderGeneration;
     if (state.section !== "favorites" || state.favoritesPage !== "collection") return;
     if (state.collectionWaitingForConnection) {
+      cancelDeferredImages(el.grid);stopHoverVideo();
       state.collectionRenderPending = true;
       el.listMeta.textContent = "客户端连接中";
       el.grid.innerHTML = '<div class="empty-state"><strong>客户端连接中</strong></div>';
@@ -1146,6 +1159,7 @@
     const qualityGrouping = state.qualitySelections.size > 0 || state.sort === "rarity";
     el.grid.classList.toggle("is-grouped", (state.view === "all" || state.view === "chromas" || qualityGrouping) && !state.loading && !state.listError);
     if (state.loading && !(state.status?.connected && !state.status?.snapshotReady && collectionReadFailed(state.status))) {
+      cancelDeferredImages(el.grid);stopHoverVideo();
       el.grid.innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton"></div>').join("");
       el.listMeta.textContent = state.status?.connected && !state.status?.snapshotReady ? "正在读取收藏" : "正在整理皮肤…";
       return;
@@ -1161,6 +1175,7 @@
 	  return;
 	}
     if (state.listError) {
+      cancelDeferredImages(el.grid);stopHoverVideo();
       el.listMeta.textContent = "读取列表失败";
       el.grid.innerHTML = `<div class="empty-state"><strong>列表读取失败</strong><p>${escapeHTML(state.listError)}</p><button class="text-button retry-inline" type="button">重新读取列表</button></div>`;
       el.grid.querySelector(".retry-inline")?.addEventListener("click", () => loadSkins(true));
@@ -1173,6 +1188,13 @@
     const acquisitionHint = state.acquisitionFallback ? " · 客户端未提供获取时间，已改按名称排列" : state.view === "all" && state.sort === "acquired" ? " · 英雄按最近获得的皮肤排列" : "";
     const staleHint = state.staleSnapshot ? ` · 历史快照${state.staleSnapshotAt ? `（${formatDateTime(state.staleSnapshotAt)}）` : ""}` : "";
     renderListMeta(label, " ", visible.length, " 款", heroCount ? [" · ", heroCount, " 位英雄"] : "", visible.length !== state.items.length ? [" · 共 ", state.items.length, " 款"] : "", acquisitionHint, staleHint);
+    const renderKey=[state.view,state.sort,state.descending,state.query,[...state.qualitySelections].join(','),state.status?.clientRegion,state.status?.serverId,state.status?.collectionAccount].join('|');
+    if(visible.length && el.grid._collectionRenderKey===renderKey && el.grid.querySelector('[data-collection-id]')){
+      if(state.view==='chromas'){reconcileChromaCatalog(visible,generation);applyChromaVisibility();return;}
+      if(state.view==='all' || qualityGrouping)reconcileGroupedSkinCards(visible,generation,qualityGrouping);else reconcileCollectionCards(visible,generation);return;
+    }
+    cancelDeferredImages(el.grid);stopHoverVideo();
+    el.grid._collectionRenderKey=renderKey;
     el.grid.replaceChildren();
     if (!visible.length) {
       if (!state.status?.connected) {
@@ -1208,6 +1230,53 @@
       if (index < visible.length) queueRenderFrame(appendChunk);
     };
     appendChunk();
+  }
+
+  function reconcileCollectionCards(visible,generation) {
+    const mounted=new Map([...el.grid.querySelectorAll('[data-collection-id]')].map(card=>[card.dataset.collectionId,card]));
+    const wanted=new Set(visible.map(skin=>String(skin.id)));
+    for(const [id,card] of mounted)if(!wanted.has(id)){cancelDeferredImages(card);card.remove();}
+    let index=0;
+    const chunk=()=>{
+      if(generation!==state.renderGeneration)return;
+      const start=performance.now();
+      for(const end=Math.min(index+40,visible.length);index<end && performance.now()-start<8;index++){
+        const skin=visible[index],id=String(skin.id);let card=mounted.get(id);
+        if(card){card._collectionSkin=skin;window.deepLegendsCollectionNewItems?.decorate(card,'skins',id);}
+        else{card=makeSkinCard(skin,{detailItems:visible});mounted.set(id,card);}
+        const old=el.grid.children[index];if(old!==card)el.grid.insertBefore(card,old || null);
+      }
+      if(index<visible.length)queueRenderFrame(chunk);
+    };chunk();
+  }
+
+  function reconcileGroupedSkinCards(items,generation,rarity) {
+    const groups=new Map(),mounted=new Map([...el.grid.querySelectorAll('[data-collection-id]')].map(n=>[n.dataset.collectionId,n]));
+    const keyFor=skin=>rarity?`${readableRarity(skin)}/${skin.raritySubtier || ''}`:String(skin.championId || skin.championName || 'unknown');
+    for(const skin of items){const key=keyFor(skin);if(!groups.has(key))groups.set(key,{key,skins:[]});groups.get(key).skins.push(skin);}
+    const sections=new Map([...el.grid.children].map(section=>[section.dataset.collectionGroup || keyFor(section.querySelector('[data-collection-id]')?._collectionSkin || {}),section]));
+    for(const [key,section] of sections)if(!groups.has(key)){cancelDeferredImages(section);section.remove();}
+    const tasks=[];let position=0;
+    for(const group of groups.values()) {
+      const first=group.skins[0],name=rarity?(first.raritySubtier?`${readableRarity(first)} · ${first.raritySubtier}`:readableRarity(first)):(first.championName || `英雄 ID ${first.championId || '—'}`);
+      let section=sections.get(group.key);
+      if(!section){section=document.createElement('section');section.className='champion-group'+(rarity?' rarity-group':'');section.innerHTML='<header class="champion-heading"></header><div class="champion-skins"></div>';}
+      section.dataset.collectionGroup=group.key;
+      const heading=section.querySelector('.champion-heading'),owned=group.skins.filter(skin=>skin.owned).length;
+      const html=`<div><h2>${escapeHTML(name)}</h2><span>${formatNumber(group.skins.length)} 款${rarity?'':` · 已拥有 ${formatNumber(owned)}`}</span></div>${rarity?'':`<span class="mastery-summary">${first.championMasteryPoints?`熟练度 ${formatNumber(first.championMasteryPoints)}${first.championMasteryLevel?` · 等级 ${formatNumber(first.championMasteryLevel)}`:''}`:'尚无熟练度记录'}</span>`}`;
+      if(heading.innerHTML!==html)heading.innerHTML=html;
+      const grid=section.querySelector('.champion-skins'),wanted=new Set(group.skins.map(skin=>String(skin.id)));
+      for(const card of [...grid.children])if(!wanted.has(card.dataset.collectionId)){cancelDeferredImages(card);card.remove();}
+      configureSparseGrid(grid,group.skins.length);
+      if(el.grid.children[position]!==section)el.grid.insertBefore(section,el.grid.children[position] || null);position++;
+      group.skins.forEach((skin,index)=>tasks.push(()=>{
+        let card=mounted.get(String(skin.id));
+        if(!card){card=makeSkinCard(skin,{detailItems:group.skins});mounted.set(String(skin.id),card);}
+        else {card._collectionSkin=skin;card._collectionCandidates=group.skins;card.classList.toggle('is-locked',state.view==='all' && !skin.owned);window.deepLegendsCollectionNewItems?.decorate(card,'skins',skin.id);}
+        if(grid.children[index]!==card)grid.insertBefore(card,grid.children[index] || null);
+      }));
+    }
+    runRenderTasks(tasks,generation,'renderGeneration');
   }
 
   function renderRarityGroups(items, generation) {
@@ -1270,6 +1339,7 @@
     if (prestige.length) {
       const section = document.createElement("section");
       section.className = "chroma-section prestige-section";
+      section.dataset.collectionGroup="prestige";
       if (prestige.some((item) => item.owned)) section.classList.add("has-owned");
       section.innerHTML = `<header class="champion-heading"><div><h2>臻彩</h2><span>${formatNumber(prestige.length)} 款 · 独立原画</span></div></header><div class="chroma-prestige-grid"></div>`;
       prestigeGrid = section.querySelector(".chroma-prestige-grid");
@@ -1283,7 +1353,7 @@
     const champions = new Map();
     for (const chroma of items) {
       const key = String(chroma.championId || chroma.championName || "unknown");
-      if (!champions.has(key)) champions.set(key, { name: chroma.championName || `英雄 ID ${chroma.championId || "—"}`, points: Number(chroma.championMasteryPoints || 0), items: [], parents: new Map(), grid: null });
+      if (!champions.has(key)) champions.set(key, { key, name: chroma.championName || `英雄 ID ${chroma.championId || "—"}`, points: Number(chroma.championMasteryPoints || 0), items: [], parents: new Map(), grid: null });
       const champion = champions.get(key);
       champion.items.push(chroma);
       const parentKey = String(chroma.parentSkinId || chroma.id);
@@ -1310,12 +1380,13 @@
       tasks.push(() => {
         const section = document.createElement("section");
         section.className = "chroma-section champion-group";
+        section.dataset.collectionGroup=champion.key;
         applyChromaGroupClasses(section, champion.items);
         section.innerHTML = `<header class="champion-heading"><div><h2>${escapeHTML(champion.name)}</h2><span class="chroma-section-summary" ${chromaSummaryAttributes(champion.items, "款炫彩")}></span></div><span class="mastery-summary">${champion.points ? `熟练度 ${formatNumber(champion.points)}` : "尚无熟练度记录"}</span></header><div class="chroma-stack-grid"></div>`;
         champion.grid = section.querySelector(".chroma-stack-grid");
         el.grid.append(section);
       });
-      for (const parent of champion.parents.values()) tasks.push(() => champion.grid?.append(makeChromaStack(parent)));
+      for (const [key,parent] of champion.parents) tasks.push(() => {const stack=makeChromaStack(parent);stack.dataset.collectionParent=key;champion.grid?.append(stack);});
     }
     while (prestigeTaskIndex < prestigeTasks.length) tasks.push(prestigeTasks[prestigeTaskIndex++]);
     runRenderTasks(tasks, generation, "renderGeneration");
@@ -1393,6 +1464,8 @@
   function makeChromaCard(chroma, candidates) {
     const card = el.template.content.firstElementChild.cloneNode(true);
     const image = card.querySelector("img");
+    card.dataset.collectionId=String(chroma.id);card._collectionSkin=chroma;
+    window.deepLegendsCollectionNewItems?.decorate(card,'chromas',chroma.id);
     const video = card.querySelector("video");
     const fallback = card.querySelector(".image-fallback");
     video.remove();
@@ -1421,23 +1494,32 @@
     section.innerHTML = `<header><div><strong>${escapeHTML(parent.name)}</strong><span class="chroma-stack-summary" ${chromaSummaryAttributes(parent.items)}></span></div><div class="chroma-row-controls" aria-label="横向浏览${escapeHTML(parent.name)}炫彩"><button class="control-icon-button" type="button" data-direction="previous" aria-label="向左查看更多炫彩">${navigationIcon("previous")}</button><button class="control-icon-button" type="button" data-direction="next" aria-label="向右查看更多炫彩">${navigationIcon("next")}</button></div></header><div class="chroma-stack-cards" role="group" aria-label="${escapeHTML(parent.name)}的炫彩列表"></div>`;
     const cards = section.querySelector(".chroma-stack-cards");
     for (const chroma of parent.items) {
-      const button = document.createElement("button");
-      button.className = `chroma-mini-card${chroma.owned ? " is-owned" : " is-locked"}${chroma.isPrestige ? " is-prestige-chroma" : ""}`;
-      button.type = "button";
-      button.setAttribute("aria-label", `${chroma.owned ? "已拥有" : "未获取"}，查看 ${chroma.name}`);
-      button.innerHTML = `<span class="chroma-mini-art"><img alt="" loading="lazy" decoding="async">${chroma.isPrestige ? '<span class="chroma-prestige-badge">臻彩</span>' : ""}${chroma.owned ? "" : '<span class="chroma-mini-lock" aria-hidden="true">🔒</span>'}</span><span class="chroma-mini-name">${escapeHTML(chromaDisplayName(chroma))}</span>`;
-      const image = button.querySelector("img");
-      const fallback = document.createElement("span");
-      fallback.className = "image-fallback";
-      fallback.textContent = "加载中";
-      fallback.hidden = true;
-      button.querySelector(".chroma-mini-art").append(fallback);
-      deferCardImageSources(image, fallback, chromaImageSources(chroma, "ordinary"));
-      button.addEventListener("click", () => openChromaDetails(chroma, parent.items, { artworkMode: "ordinary" }));
+      const button=makeChromaMiniCard(chroma,parent.items);
       cards.append(button);
     }
     enableHorizontalNavigation(cards, section.querySelector('[data-direction="previous"]'), section.querySelector('[data-direction="next"]'), parent.items.length);
     return section;
+  }
+
+  function makeChromaMiniCard(chroma,candidates) {
+    const button = document.createElement("button");
+    button.dataset.collectionId=String(chroma.id);
+    button._collectionSkin=chroma;
+    button.className = `chroma-mini-card${chroma.owned ? " is-owned" : " is-locked"}${chroma.isPrestige ? " is-prestige-chroma" : ""}`;
+    button.type = "button";
+    window.deepLegendsCollectionNewItems?.decorate(button,'chromas',chroma.id);
+    button.setAttribute("aria-label", `${chroma.owned ? "已拥有" : "未获取"}，查看 ${chroma.name}`);
+    button.innerHTML = `<span class="chroma-mini-art"><img alt="" loading="lazy" decoding="async">${chroma.isPrestige ? '<span class="chroma-prestige-badge">臻彩</span>' : ""}${chroma.owned ? "" : '<span class="chroma-mini-lock" aria-hidden="true">🔒</span>'}</span><span class="chroma-mini-name">${escapeHTML(chromaDisplayName(chroma))}</span>`;
+    const image = button.querySelector("img");
+    const fallback = document.createElement("span");
+    fallback.className = "image-fallback";
+    fallback.textContent = "加载中";
+    fallback.hidden = true;
+    button.querySelector(".chroma-mini-art").append(fallback);
+    deferCardImageSources(image, fallback, chromaImageSources(chroma, "ordinary"));
+    button._collectionCandidates=candidates;
+    button.addEventListener("click", () => openChromaDetails(button._collectionSkin, button._collectionCandidates, { artworkMode: "ordinary" }));
+    return button;
   }
 
   function chromaDisplayName(chroma) {
@@ -1609,6 +1691,8 @@
 
   function makeSkinCard(skin, options = {}) {
     const card = el.template.content.firstElementChild.cloneNode(true);
+    card.dataset.collectionId=String(skin.id);card._collectionSkin=skin;
+    window.deepLegendsCollectionNewItems?.decorate(card,'skins',skin.id);
     const video = card.querySelector("video");
     const image = card.querySelector("img");
     const fallback = card.querySelector(".image-fallback");
@@ -1626,7 +1710,7 @@
     card.querySelector(".skin-hero").textContent = skin.championName || `英雄 ID ${skin.championId || "—"}`;
     card.querySelector(".skin-meta").textContent = `${readableRarity(skin)}${skin.raritySubtier ? ` · ${skin.raritySubtier}` : ""} · ID ${skin.id}`;
     card.setAttribute("aria-label", `${locked ? "未拥有，" : ""}查看 ${skin.name} 详情`);
-    card.addEventListener("click", () => openSkinDetails(skin, options.detailItems));
+    card.addEventListener("click", () => openSkinDetails(card._collectionSkin, card._collectionCandidates || options.detailItems || state.items));
     return card;
   }
 
@@ -2152,6 +2236,7 @@
   }
 
   async function loadAccount() {
+    const collectionAccount=[state.status?.clientRegion,state.status?.serverId,state.status?.collectionAccount].join("|");
     const requestSeq = (state.accountRequestSeq || 0) + 1;
     state.accountRequestSeq = requestSeq;
     if (!state.status?.connected) {
@@ -2168,7 +2253,7 @@
     if (!el.accountContent._accountMarkup) el.accountContent.innerHTML = '<div class="account-loading"><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line"></div></div>';
     try {
       const payload = await api("/api/account", {}, "account", 15000);
-      if (requestSeq !== state.accountRequestSeq || state.destroyed || !state.status?.connected) return;
+      if (requestSeq !== state.accountRequestSeq || collectionAccount!==[state.status?.clientRegion,state.status?.serverId,state.status?.collectionAccount].join("|") || state.destroyed || !state.status?.connected) return;
       state.account = payload;
       state.accountLoaded = true;
       const summoner = payload.summoner || {};
@@ -2177,6 +2262,11 @@
       // 也不因它显示“暂未同步”提示；它一旦拿到身份就不再带 blank 标记，会正常出现。
       const loot = (Array.isArray(account.loot) ? account.loot : []).filter(item => !item?.blank);
       const displayLoot = [...loot];
+      for(const category of ['英雄','皮肤','表情','守卫','图标']) {
+        const items=loot.filter(item=>item.category===category && !item.dataPending);
+        if(!items.length && lootPendingAccount(account))continue;
+        window.deepLegendsCollectionNewItems?.update('loot-'+lootCategorySlug(category),items.map(item=>({id:item.lootId,owned:item.category==='皮肤'?item.skinOwnedKnown && item.skinOwned:item.ownedKnown && item.owned})));
+      }
       const lootPending = loot.some(item => item.dataPending) || (account.capabilities || []).some(item => item.name === "player-loot" && item.state === "pending");
       if (account.sanctumSparksKnown) displayLoot.push({
         lootId: "CURRENCY_ANCIENT_SPARK",
@@ -2212,12 +2302,19 @@
 		? `<img class="summoner-strip-art account-hero-art" data-queued-src="/api/champion-asset?source=${encodeURIComponent(summoner.backgroundSource)}&path=${encodeURIComponent(summoner.backgroundPath)}" alt="" aria-hidden="true" decoding="async" data-game-image>`
 		: "");
 	  const markup = `<section class="account-hero">${backgroundArt}${profileIcon}<div class="account-identity"><p class="eyebrow">当前召唤师</p><h3>${escapeHTML(profileName)}</h3><p>等级 ${formatNumber(summoner.summonerLevel)} · 本机只读连接</p></div><dl class="account-facts"><div><dt>皮肤物品</dt><dd>${formatNumber(skinLoot.length)} 种 · ${formatNumber(skinLootQuantity)} 件</dd></div><div><dt>待领取</dt><dd>${formatNumber(rewards.length)} 组 · ${formatNumber(rewardQuantity)} 件</dd></div></dl></section>${lootPending ? '<div class="notice" role="status">客户端数据暂未同步，可稍后重试</div>' : ""}${categorySections || '<div class="empty-state"><strong>仓库当前没有可展示物品</strong></div>'}<section class="account-section"><div class="section-copy"><h3>待领取奖励</h3><span class="section-count">${formatNumber(rewards.length)} 组</span><button class="text-button" type="button" data-navigate-suite="sweep">去领奖</button></div>${rewardCards ? `<div class="reward-grid">${rewardCards}</div>` : '<div class="empty-state compact"><strong>没有待领取奖励</strong><p>工具会扫描奖励账本、任务与事件中心。</p></div>'}</section><details class="capability-details"><summary>数据来源状态</summary><p>只读接口单独降级，不影响皮肤库存核验。</p><div class="capability-list">${capabilityRows || '<p class="muted">尚无能力状态</p>'}</div></details>`;
-      if (markup !== el.accountContent._accountMarkup) {
+      if (markup !== el.accountContent._accountMarkup && el.accountContent._accountMarkup && el.accountContent._collectionAccount===state.status?.collectionAccount && el.accountContent.querySelector('.account-hero')) {
+        reconcileAccountLoot(displayLoot,categoryOrder,rewardCards,capabilityRows,skinLoot.length,skinLootQuantity,rewards.length,rewardQuantity,requestSeq);
+        el.accountContent._accountMarkup=markup;
+      } else if (markup !== el.accountContent._accountMarkup) {
+        el.accountContent._collectionAccount=state.status?.collectionAccount;
         el.accountContent.innerHTML = markup;
         el.accountContent._accountMarkup = markup;
+        const lootByID=new Map(displayLoot.map(item=>[String(item.lootId),item]));
+        for(const card of el.accountContent.querySelectorAll('[data-loot-collection-id]')){const item=lootByID.get(card.dataset.lootCollectionId);if(item)card._lootMarkup=lootCard(item);}
         for (const image of el.accountContent.querySelectorAll(".loot-art img")) loadNextLootImage(image, true);
 	    window.deepLegendsGameIcons?.prepareImages?.(el.accountContent);
       }
+      for(const card of el.accountContent.querySelectorAll('[data-loot-collection-id]'))window.deepLegendsCollectionNewItems?.decorate(card,'loot-'+card.dataset.lootCollectionKind,card.dataset.lootCollectionId);
     } catch (error) {
       if (error.name === "RequestCancelled" || state.destroyed || requestSeq !== state.accountRequestSeq) return;
       if (!el.accountContent._accountMarkup) state.accountLoaded = false;
@@ -3258,6 +3355,55 @@
     image.dataset.index = String(index + 1);
     image.setAttribute("data-queued-src", paths[index].startsWith("/loot-icons/") ? paths[index] : `/api/image?path=${encodeURIComponent(paths[index])}`);
   }
+  function reconcileAccountLoot(items,categories,rewardCards,capabilityRows,skinKinds,skinCount,rewardKinds,rewardCount,generation) {
+    const content=el.accountContent,tasks=[];
+    const facts=content.querySelectorAll('.account-facts dd');if(facts[0])facts[0].textContent=`${formatNumber(skinKinds)} 种 · ${formatNumber(skinCount)} 件`;if(facts[1])facts[1].textContent=`${formatNumber(rewardKinds)} 组 · ${formatNumber(rewardCount)} 件`;
+    for(const category of categories){
+      const group=items.filter(item=>item.category===category),slug=lootCategorySlug(category);let section=content.querySelector('.loot-category.category-'+slug);
+      if(!group.length){section?.remove();continue;}
+      if(!section){section=document.createElement('section');section.className=`account-section loot-section loot-category category-${slug}`;section.innerHTML=`<div class="loot-category-heading"><span class="loot-category-icon" aria-hidden="true">${lootCategoryIcon(category)}</span><h3>${escapeHTML(category)}</h3></div><div class="loot-card-grid"></div>`;content.querySelector('.account-section:not(.loot-category)')?.before(section);}
+      const grid=section.querySelector('.loot-card-grid'),mounted=new Map([...grid.children].map(card=>[card.dataset.lootCollectionId,card])),wanted=new Set(group.map(item=>String(item.lootId)));
+      for(const [id,card] of mounted)if(!wanted.has(id))card.remove();
+      group.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.lootId)),markup=lootCard(item);if(!card || card._lootMarkup!==markup){const template=document.createElement('template');template.innerHTML=markup;const fresh=template.content.firstElementChild;fresh._lootMarkup=markup;if(card)card.replaceWith(fresh);card=fresh;mounted.set(String(item.lootId),card);for(const image of card.querySelectorAll('.loot-art img'))loadNextLootImage(image,true);}window.deepLegendsCollectionNewItems?.decorate(card,'loot-'+slug,item.lootId);if(grid.children[index]!==card)grid.insertBefore(card,grid.children[index] || null);}));
+    }
+    let index=0;const run=()=>{if(state.accountRequestSeq!==generation || state.destroyed)return;const started=performance.now();while(index<tasks.length && (index===0 || performance.now()-started<7))tasks[index++]();if(index<tasks.length)requestAnimationFrame(run);};run();
+    const rewardSection=content.querySelector('.account-section:not(.loot-category)');if(rewardSection){const count=rewardSection.querySelector('.section-count');if(count)count.textContent=`${formatNumber(rewardKinds)} 组`;const old=rewardSection.querySelector('.reward-grid,.empty-state');if(old){const template=document.createElement('template');template.innerHTML=rewardCards?`<div class="reward-grid">${rewardCards}</div>`:'<div class="empty-state compact"><strong>没有待领取奖励</strong><p>工具会扫描奖励账本、任务与事件中心。</p></div>';old.replaceWith(template.content.firstElementChild);}}
+    const capabilities=content.querySelector('.capability-list');if(capabilities)capabilities.innerHTML=capabilityRows || '<p class="muted">尚无能力状态</p>';
+  }
+  function lootPendingAccount(account) { return (account.capabilities || []).some(item=>item.name==='player-loot' && item.state==='pending'); }
+  function reconcileChromaCatalog(items,generation) {
+    const sections=new Map([...el.grid.querySelectorAll('.chroma-section')].map(section=>[section.dataset.collectionGroup,section]));
+    const groups=new Map();
+    for(const item of items){const key=String(item.championId || item.championName || 'unknown');if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
+    const tasks=[],wanted=new Set(['prestige',...groups.keys()]);
+    for(const [key,section] of sections)if(!wanted.has(key)){cancelDeferredImages(section);section.remove();}
+    const prestige=items.filter(item=>item.isPrestige);let prestigeSection=sections.get('prestige');
+    el.grid.querySelector('.chroma-prestige-status')?.remove();
+    if(prestige.length){
+      if(!prestigeSection){prestigeSection=document.createElement('section');prestigeSection.className='chroma-section prestige-section';prestigeSection.dataset.collectionGroup='prestige';prestigeSection.innerHTML='<header class="champion-heading"><div><h2>臻彩</h2><span></span></div></header><div class="chroma-prestige-grid"></div>';el.grid.prepend(prestigeSection);}
+      prestigeSection.querySelector('header span').textContent=`${formatNumber(prestige.length)} 款 · 独立原画`;prestigeSection.classList.toggle('has-owned',prestige.some(item=>item.owned));
+      const grid=prestigeSection.querySelector('.chroma-prestige-grid');const mounted=new Map([...grid.children].map(card=>[card.dataset.collectionId,card]));const ids=new Set(prestige.map(item=>String(item.id)));
+      for(const [id,card] of mounted)if(!ids.has(id)){cancelDeferredImages(card);card.remove();}
+      prestige.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.id));if(!card){card=makeChromaCard(item,prestige);mounted.set(String(item.id),card);}else{card._collectionSkin=item;card._collectionCandidates=prestige;card.classList.toggle('is-locked',!item.owned);window.deepLegendsCollectionNewItems?.decorate(card,'chromas',item.id);}if(grid.children[index]!==card)grid.insertBefore(card,grid.children[index] || null);}));
+    }else prestigeSection?.remove();
+    for(const [key,group] of groups){
+      let section=sections.get(key);if(!section){section=document.createElement('section');section.className='chroma-section champion-group';section.dataset.collectionGroup=key;section.innerHTML='<header class="champion-heading"><div><h2></h2><span class="chroma-section-summary"></span></div><span class="mastery-summary"></span></header><div class="chroma-stack-grid"></div>';el.grid.append(section);}
+      applyChromaGroupClasses(section,group);section.querySelector('h2').textContent=group[0].championName || `英雄 ID ${key}`;
+      updateChromaSummary(section.querySelector('.chroma-section-summary'),group,'款炫彩');section.querySelector('.mastery-summary').textContent=group[0].championMasteryPoints?`熟练度 ${formatNumber(group[0].championMasteryPoints)}`:'尚无熟练度记录';
+      const parents=new Map();for(const item of group){const id=String(item.parentSkinId || item.id);if(!parents.has(id))parents.set(id,{name:item.parentSkinName || item.name,items:[]});parents.get(id).items.push(item);}
+      const grid=section.querySelector('.chroma-stack-grid'),stacks=new Map([...grid.children].map(stack=>[stack.dataset.collectionParent,stack]));
+      for(const [id,stack] of stacks)if(!parents.has(id)){cancelDeferredImages(stack);stack.remove();}
+      for(const [id,parent] of parents){
+        let stack=stacks.get(id);if(!stack){stack=makeChromaStack({...parent,items:[]});stack.dataset.collectionParent=id;grid.append(stack);}
+        applyChromaGroupClasses(stack,parent.items);updateChromaSummary(stack.querySelector('.chroma-stack-summary'),parent.items);stack.querySelector('header strong').textContent=parent.name;
+        const cards=stack.querySelector('.chroma-stack-cards'),mounted=new Map([...cards.children].map(card=>[card.dataset.collectionId,card])),ids=new Set(parent.items.map(item=>String(item.id)));
+        for(const [cardID,card] of mounted)if(!ids.has(cardID)){cancelDeferredImages(card);card.remove();}
+        parent.items.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.id));if(!card){card=makeChromaMiniCard(item,parent.items);mounted.set(String(item.id),card);}card._collectionSkin=item;card._collectionCandidates=parent.items;card.classList.toggle('is-owned',Boolean(item.owned));card.classList.toggle('is-locked',!item.owned);card.setAttribute('aria-label',`${item.owned?'已拥有':'未获取'}，查看 ${item.name}`);card.querySelector('.chroma-mini-lock')?.remove();if(!item.owned)card.querySelector('.chroma-mini-art').insertAdjacentHTML('beforeend','<span class="chroma-mini-lock" aria-hidden="true">🔒</span>');window.deepLegendsCollectionNewItems?.decorate(card,'chromas',item.id);if(cards.children[index]!==card)cards.insertBefore(card,cards.children[index] || null);cards.dispatchEvent(new Event('scroll'));}));
+      }
+    }
+    runRenderTasks(tasks,generation,'renderGeneration');
+  }
+  function updateChromaSummary(node,items,noun='款') { const scratch=document.createElement('span');scratch.innerHTML=`<span ${chromaSummaryAttributes(items,noun)}></span>`;for(const [key,value] of Object.entries(scratch.firstChild.dataset))node.dataset[key]=value; }
   function lootCard(item) {
     const category = item.category || "材料";
     const slug = lootCategorySlug(category);
@@ -3275,7 +3421,7 @@
 	const essence = category === "皮肤" && (Number(item.disenchantValue) > 0 || (canUpgrade && Number(item.upgradeEssenceValue) > 0))
 	  ? `<div class="loot-essence-values">${Number(item.disenchantValue) > 0 ? `<span>分解 <b>+ ${formatNumber(item.disenchantValue)}</b>${essenceIcon}</span>` : ""}${canUpgrade && Number(item.upgradeEssenceValue) > 0 ? `<span>升级 <b>− ${formatNumber(item.upgradeEssenceValue)}</b>${essenceIcon}</span>` : ""}</div>`
 	  : "";
-    return `<article class="loot-card category-${slug}${tokenClass ? ` loot-${tokenClass}` : ""}${namePending ? " is-name-pending" : ""}"><span class="loot-art" aria-hidden="true"><span>${lootCategoryIcon(category)}</span>${art}</span><div class="loot-card-copy"><span>${escapeHTML(lootTypeLabel(item))}</span><strong>${escapeHTML(lootName(item))}</strong>${namePending ? '<small class="loot-name-pending">客户端数据暂未同步，可稍后重试</small>' : ""}${ownership}${essence}</div><div class="loot-card-end"><b>× ${formatNumber(item.count)}</b></div></article>`;
+    return `<article data-loot-collection-id="${escapeHTML(item.lootId || '')}" data-loot-collection-kind="${slug}" class="loot-card category-${slug}${tokenClass ? ` loot-${tokenClass}` : ""}${namePending ? " is-name-pending" : ""}"><span class="loot-art" aria-hidden="true"><span>${lootCategoryIcon(category)}</span>${art}</span><div class="loot-card-copy"><span>${escapeHTML(lootTypeLabel(item))}</span><strong>${escapeHTML(lootName(item))}</strong>${namePending ? '<small class="loot-name-pending">客户端数据暂未同步，可稍后重试</small>' : ""}${ownership}${essence}</div><div class="loot-card-end"><b>× ${formatNumber(item.count)}</b></div></article>`;
   }
   function lootCategorySlug(category) { return ({ "材料": "material", "宝箱": "chest", "英雄": "champion", "皮肤": "skin", "小小英雄": "companion", "永恒星碑": "eternal", "表情": "emote", "守卫": "ward", "图标": "icon" })[category] || "material"; }
   function lootCategoryIcon(category) {
@@ -3922,6 +4068,7 @@
 		  if (detail?.type === "live-player-progress") { window.dispatchEvent(new CustomEvent("deep-legends:live-player-progress", { detail })); return; }
 		  const slices = LIVE_UPDATE_STATE_SLICES[detail?.type] || [];
 		  if (slices.includes("riot-relay-recovered")) window.dispatchEvent(new CustomEvent("deep-legends:riot-relay-recovered", {detail}));
+          if (slices.includes("lp-recorded")) window.dispatchEvent(new CustomEvent("deep-legends:lp-recorded", {detail}));
           if (slices.includes("overview-matches")) window.dispatchEvent(new CustomEvent("deep-legends:overview-matches", {detail}));
           if (slices.includes("overview-season")) window.dispatchEvent(new CustomEvent("deep-legends:season-progress", { detail }));
 		  if (slices.includes("overview-ranks")) window.dispatchEvent(new CustomEvent("deep-legends:overview-incremental", { detail }));

@@ -237,10 +237,7 @@ func TestR231RatingTemporaryAndNotRecordedTTL(t *testing.T) {
 			client.lookup(t.Context(), "玩家", "1")
 			now = now.Add(31 * time.Second)
 			client.lookup(t.Context(), "玩家", "1")
-			want := 2
-			if permanent {
-				want = 1
-			}
+			want := 1 // R272: all failures, including unrecorded, cool down for10minutes.
 			if calls != want {
 				t.Fatal(calls, want)
 			}

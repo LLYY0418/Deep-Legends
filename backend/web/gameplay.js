@@ -161,7 +161,7 @@
   function liveSnapshotComplete(data) {
     if (liveClientPositionsPending(data)) return false;
     if (!data?.available || !Array.isArray(data.players) || !data.players.length) return false;
-    // R194: mirror registered 5v5 PvP queues in queue_groups.go; bots/Arena stay excluded.
+    // Mirror the 5v5 queues in queue_groups.go.
     if ([400, 420, 430, 440, 450, 480, 490, 700, 720, 900, 930, 1900, 2300, 2400, 3220, 3270].includes(Number(data.queueId))) {
       const blue = data.players.filter((player) => Number(player.teamId) === 100).length;
       const red = data.players.filter((player) => Number(player.teamId) === 200).length;
@@ -504,7 +504,6 @@
         renderOverview(group);
       } else if (tabReady(tab)) {
         if (shouldReloadOverview(tab) && tab.loadingMore) {
-          tab.reloadAfterAppend = true;
           renderOverview(group);
         } else if (tab.dirty) { renderOverview(group); scheduleDirtyOverview(tab); }
         else if (shouldReloadOverview(tab)) loadOverview(tab, true);
@@ -788,7 +787,7 @@
   }
 
   function matchesPending(tab) {
-    return Boolean(tab?.loading && !tab.matchesReceived && !tab.overviewCardLoad?.ready?.has('matches') && !(tab.data?.matches?.length));
+    return Boolean(tab?.loading && (!tab.matchesReceived || tab.data?.pagination?.partial) && !tab.overviewCardLoad?.ready?.has('matches') && !(tab.data?.matches?.length));
   }
   function renderPendingMatches() {
     return '<div class="match-skeleton-list" role="status" aria-label="正在读取战绩">'+Array.from({length:5},()=>'<div class="match-skeleton gameplay-skeleton"><span></span><span></span><span></span><span></span><span></span></div>').join('')+'</div>';
@@ -880,7 +879,7 @@
     state[observerKey] = { disconnect: cleanup };
   }
 
-  function appendOverviewMatches(tab, additions) {
+  function appendOverviewMatches(tab, additions, reconciled = false) {
     const container = overviewContainer(tab);
     if (!container) return;
     const list = container.querySelector(".match-list");
@@ -919,7 +918,7 @@
     bindMatchSentinel(container, tab);
     if (globalThis.deepLegendsHistoryFilters?.active(tab)) {
       const ctx=advancedFilterContext(tab),af=globalThis.deepLegendsHistoryFilters;
-      if(list)reconcileFilteredMatchList(list,tab);
+      if(list && !reconciled)reconcileFilteredMatchList(list,tab);
       af.refresh(container,tab,ctx);
       const counts=container.querySelector("[data-af-counts]");if(counts)counts.innerHTML=af.counts(tab,ctx);
       if(sentinel){sentinel.hidden=false;sentinel.innerHTML=af.footer(tab,ctx);}
@@ -933,7 +932,17 @@
   }
 
   // Preserve committed rows and headers; previews never advance the cursor.
-  async function loadOverview(tab, force = false, append = false, manual = false, quiet = false, scanCount = 0, retryDetails = false) {
+  async function requestOverviewWithReferenceRetry(tab,body,request) {
+    try { return await request(body); } catch(error) {
+      const identity=tab.riotId || (tab.data?.player?.gameName && tab.data?.player?.tagLine?{gameName:tab.data.player.gameName,tagLine:tab.data.player.tagLine}:null);
+      if(error.status!==404 || !/引用|reference/i.test(error.message) || !identity || !body)throw error;
+      window.reportFlowDiagnostic?.('overview_reference_expired','retry',{endpoint:'overview',append:Number(JSON.parse(body).begIndex)>0,tab_type:tabGroup(tab),key_change_ms:state.lastRiotKeyChangeAt?Date.now()-state.lastRiotKeyChangeAt:-1});
+      const input=JSON.parse(body);delete input.playerRef;
+      return await request(JSON.stringify({...input,gameName:identity.gameName,tagLine:identity.tagLine,region:tab.region || tab.data?.player?.region || ''}));
+    }
+  }
+
+  async function loadOverview(tab, force = false, append = false, manual = false, quiet = false, scanCount = 0, retryDetails = false, background = false) {
     if (tab.closed || state.destroyed || tab.current && !connected()) return false;
     if(riotTab(tab) && (tab.loading || tab.loadingMore))return false;
     if(manual || !tab.data)globalThis.deepLegendsHistoryRecovery?.reset(tab);
@@ -959,6 +968,7 @@
 	  state.controllers.get(`overview:${tab.key}`)?.abort();
 	  state.controllers.get(`overview-more:${tab.key}`)?.abort();
 	  tab.loading = false;
+
 	  tab.loadingMore = false;
 	}
 	if (append) {
@@ -1018,9 +1028,9 @@
     if (initialKRPage) tab.initialPagePending = true;
     try {
       let begIndex = append ? Math.max(0, Number(tab.nextBegIndex ?? (Number(tab.data?.pagination?.begIndex || 0) + Number(tab.data?.pagination?.count || 0)))) : 0;
-      const searchTime=scanCount>0 && riotTab(tab)?globalThis.deepLegendsHistoryFilters?.serverTimeRange(tab,advancedFilterContext(tab)) || {}:{};
-      if(searchTime.startTime){if(tab.historyTimeStart!==searchTime.startTime){tab.historyTimeStart=searchTime.startTime;tab.historyTimeCursor=0;}begIndex=Number(tab.historyTimeCursor || 0);}
-      const verification = { ...searchTime, ...(tabGroup(tab) === "pro" && !append ? { expectedTier: tab.expectedTier || "" } : {}), ...(!append && tab.dirty ? { expectGameId: String(tab.dirtyGameId || "0") } : {}) };
+      // Continue the unbounded history cursor; local dates stop the scan at the range boundary.
+      const verificationTime={};
+      const verification = { ...verificationTime, ...(background?{background:true}:{}), ...(tabGroup(tab) === "pro" && !append ? { expectedTier: tab.expectedTier || "" } : {}), ...(!append && tab.dirty ? { expectGameId: String(tab.dirtyGameId || "0") } : {}) };
       const body = tab.current && connected() ? null : JSON.stringify(tab.riotId && !tab.playerRef
 		? { ...verification, gameName: tab.riotId.gameName, tagLine: tab.riotId.tagLine, region: tab.region || "", serverId: tab.serverId || "", count: requestCount, begIndex, force, freshHistory:manual, ...(retryDetails?{retryDetails:true}:{}), matchFilter: tab.matchFilter }
 		: { ...verification, playerRef: tab.playerRef, serverId: tab.serverId || "", count: requestCount, begIndex, force, freshHistory:manual, ...(retryDetails?{retryDetails:true}:{}), matchFilter: tab.matchFilter });
@@ -1029,13 +1039,13 @@
       const onProgress = (partial,kind="progress") => {
         if (tab.overviewRequestToken !== requestToken || tab.closed || state.destroyed) return;
         if (!partial?.player) return;
-        if(kind!=='cards' || partial.matches?.length || partial.historyRequested>0)tab.matchesReceived=true;
+        if(partial.matches?.length)tab.matchesReceived=true;
         partial={...partial,matches:partial.matches || []};
         if (append || (tab.data && (tab.data.pagination?.filter || "all") !== (tab.matchFilter || "all"))) return;
         const previous = tab.data;
         const incoming = new Set(partial.matches.map(match => String(match.gameId)));
         const updates = new Map(partial.matches.map(match => [String(match.gameId), match]));
-        const matches = kind === "cards" && !partial.matches.length ? [...(previous?.matches || [])] : append
+        const matches = partial.matchesDelta ? [...(previous?.matches || []).filter(match=>!incoming.has(String(match.gameId))),...partial.matches].sort((a,b)=>Number(b.createdAt)-Number(a.createdAt)) : kind === "cards" && !partial.matches.length ? [...(previous?.matches || [])] : append
           ? [...baseMatches.filter(match => !incoming.has(String(match.gameId))), ...partial.matches]
           : refreshSnapshot?.matches.length
             ? [...partial.matches,...(previous?.matches || []).filter(match=>!incoming.has(String(match.gameId)))]
@@ -1047,7 +1057,7 @@
         }
         tab.data = previous
           ? { ...previous, player: { ...previous.player, ...playerProgress }, matches,
-              pagination: previous.pagination || partial.pagination }
+              pagination: {...previous.pagination,...partial.pagination} }
           : { ...partial, player: playerProgress, matches };
         for (const key of ["ranks", "masteries"]) {
           if (Array.isArray(partial[key]) && partial[key].length > 0) tab.data[key] = partial[key];
@@ -1064,9 +1074,10 @@
         rerenderTab(tab,"loadOverview");reportDeferredMatchesCard(tab);
       };
       const requestKey = `${append ? "overview-more" : "overview"}:${tab.key}`;
-      const payload = tab.current && connected()
+      const requestOverview=async(requestBody)=>tab.current && connected()
 		? await api(`/api/gameplay/overview?count=${requestCount}&begIndex=${begIndex}&force=${force ? 1 : 0}&freshHistory=${manual ? 1 : 0}&matchFilter=${encodeURIComponent(tab.matchFilter || "all")}${verification.expectGameId ? `&expectGameId=${encodeURIComponent(verification.expectGameId)}` : ""}`, {onProgress}, requestKey, timeout)
-        : await api("/api/gameplay/overview", { method: "POST", body, onProgress }, requestKey, timeout);
+        : await api("/api/gameplay/overview", { method: "POST", body:requestBody, onProgress }, requestKey, timeout);
+      const payload=await requestOverviewWithReferenceRetry(tab,body,requestOverview);
       if (tab.overviewRequestToken !== requestToken) return false;
       tab.lastOverviewPageBytes=typeof TextEncoder==='function'?new TextEncoder().encode(JSON.stringify(payload)).length:encodeURIComponent(JSON.stringify(payload)).replace(/%[A-F0-9]{2}/g,'x').length;
       tab.matchesReceived=true;tab.recentStatsReceived=true;
@@ -1086,7 +1097,8 @@
 		  pagination.autoPaused = true;
 		  pagination.pauseReason = "上游连续无响应，已暂停自动查找";
         }
-        if(searchTime.startTime)tab.historyTimeCursor=pagination.nextBegIndex;else tab.nextBegIndex = pagination.nextBegIndex;
+        tab.nextBegIndex = pagination.nextBegIndex;
+        if(scanCount>0){const range=globalThis.deepLegendsHistoryFilters?.serverTimeRange(tab,advancedFilterContext(tab));if(range?.startTime && additions.some(m=>Number(m.startedAt || m.createdAt)<range.startTime*1000))pagination.hasMore=false;}
         delete pagination.nextBegIndex;
         tab.data = { ...tab.data, matches: [...baseMatches, ...additions], pagination: { ...pagination, moreError: "" } };
         appendAdditions = additions;
@@ -1187,14 +1199,6 @@
       }
       if (error.name !== "RequestCancelled") {
         tab.detailRetryNotBefore=Date.now()+Math.max(0,Number(error.retryAfter || 0)*1000);
-        if (!append && tab.playerRef && tab.riotId && /引用/.test(error.message)) {
-          tab.playerRefs?.delete(tab.playerRef);
-          tab.playerRef = "";
-          tab.loading = false;
-          tab.loadingMore = false;
-          loadOverview(tab, true);
-          return;
-        }
         if (!append && error.status === 404 && !/引用/.test(error.message)) markProMismatch(tab);
         if (append) {
           if(error.status===503 && !riotTab(tab)){tab.historyFailureClass="official";if(tab.advancedSearch)tab.advancedSearch.stopReason="outage";}
@@ -1217,6 +1221,7 @@
       if (tab.overviewRequestToken === requestToken) {
         if (!append) {delete tab.overviewMatchSnapshot;clearTimeout(tab.historyWaitTimer);}
         tab.loading = false;
+      if(tab.lpRefreshPending){tab.lpRefreshPending=false;queueMicrotask(()=>{if(!tab.closed)void loadOverview(tab,true);});}
         tab.loadingMore = false;
         if (tab.pendingHistoricalRanks && !tab.closed && !state.destroyed) {
           const pending = tab.pendingHistoricalRanks; delete tab.pendingHistoricalRanks;
@@ -1236,6 +1241,10 @@
       void loadOverviewCurrentGame(tab);
     }
     if (loaded && !append) tab.initialPagePending = false;
+    if(loaded && initialKRPage && tab.data?.pagination?.hasMore && !tab.data.pagination.partial && tab.data.matches.length>=requestCount && tab.data.matches.length<Number(state.settings.matchCount)) {
+      clearTimeout(tab.riotInitialTailTimer);
+      tab.riotInitialTailTimer=setTimeout(()=>{if(!tab.closed && !state.destroyed && !tab.loading && !tab.loadingMore && tab.data?.pagination?.hasMore)void loadOverview(tab,false,true,false,true,10,false,true);},250);
+    }
     return loaded;
   }
 
@@ -2189,7 +2198,7 @@
   }
 
   function careerSectionEntries(data, tab) {
-    const pendingMatches=matchesPending(tab),pendingAggregates=Boolean(tab?.loading && !tab.recentStatsReceived && !(Number(data?.historyRequested)>0)),pendingStats=!pendingMatches && !pendingAggregates && historyStatsPending(data,tab);
+    const pendingMatches=matchesPending(tab),pendingAggregates=Boolean(tab?.loading && (tab.initialPagePending || !data.matches?.length) && !tab.recentStatsReceived && !(Number(data?.historyRequested)>0)),pendingStats=!pendingMatches && !pendingAggregates && historyStatsPending(data,tab);
     const partialHistory=Boolean(data.pagination?.partial || tab?.initialPagePending || tab?.initialPageError || tab?.loading || data.capabilities?.some(item=>item.name==="match-history" && item.state==="failed"));
     const recentHistoryCapability = (data.capabilities || []).find((item) => item.name === "seven-day-history");
     const recentQueue = rankedQueueData(data, tab, "recent");
@@ -2210,11 +2219,14 @@
       ["masteries", renderMasteries(data.masteries || [], (data.capabilities || []).some(item => item.name === "champion-mastery" && item.state === "available"), data.masteryChampionCount)],
 	  ["positions", renderPositionStats(positionQueue.positions, positionQueue.positionQueueId || positionQueue.queueId, rankedQueueSwitcher(tab, positionQueue.queueId, "position"), positionQueue.positionQueueLabel, positionQueue.queueGames,partialHistory)],
       ["recent-players", renderRecentPlayers(data.recentPlayers || [], recentHistoryCapability,pendingStats,partialHistory)],
-      ["activity", `${renderActivity(data.activityHours || [],pendingStats)}${renderOverviewShareButton()}`],
+      ["activity", renderActivity(data.activityHours || [],pendingStats).replace("</section>", `${renderOverviewShareButton()}</section>`)],
     ].map(([key,markup])=> {
+      const capability={ranks:'ranked-stats',masteries:'champion-mastery'}[key];
+      if(tab.loading && !data.matches?.length && capability && !data.capabilities?.some(c=>c.name===capability))return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><div class="career-pending gameplay-skeleton"><span></span><span></span><span></span></div></section>`];
       const titles={'recent-ranked':'近期排位',ability:'能力表现',positions:'位置偏好','recent-players':'最近一起玩',activity:'时间分布'};
-      if(!(data.matches?.length) && (tab.initialPageError || tab.error || historyServiceState(tab)) && !tab.loading && titles[key])return [key,`<section class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="ability-unavailable"><strong>暂不可用</strong></div></section>`];
-      if((pendingMatches || pendingAggregates) && titles[key])return [key,`<section class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="career-pending gameplay-skeleton"><span></span><span></span><span></span></div></section>`];
+      if(!(data.matches?.length) && (tab.initialPageError || tab.error || historyServiceState(tab)) && !tab.loading && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="ability-unavailable"><strong>暂不可用</strong></div></section>`];
+      if((pendingMatches || pendingAggregates) && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="career-pending gameplay-skeleton"><span></span><span></span><span></span></div></section>`];
+      markup=markup.replace('<section',`<section data-career-key="${key}"`);
       return [key,!pendingStats && partialHistory && ['recent-ranked','ability','positions','recent-players','activity'].includes(key)?markup.replace('</h3>',`</h3><small class="history-sample-label">基于最近 ${Number(data.historyLoaded ?? data.matches?.length ?? 0)} 场</small>`):markup];
     });
   }
@@ -2239,8 +2251,13 @@
     window.reportFlowDiagnostic?.('overview_rerender_client','render',{reason:tab.overviewRenderReason || 'renderOverview',tabType:tab.current?'self':tabGroup(tab)==='pro' || tab.data?.player?.proPlayer?'pro':riotTab(tab)?'riot':'cn',filterRetained:Boolean(container.querySelector('.match-filterbar')),modalOpen:Boolean(tab.advancedMenu?.open)});
     if(tab.advancedMenu?.open && container._afBoundTab===tab){tab.overviewRenderDeferred=true;globalThis.deepLegendsHistoryFilters?.refresh(container,tab,advancedFilterContext(tab));return;}
     try {
+      const scroll=container.closest('.player-overlay-scroll') || document.getElementById('app-scroll'),top=scroll?.scrollTop;
+      const retain=container._overviewViewTab===tab;
       activateOverviewView(container, tab);
       renderOverviewBodyContent(container, tab);
+      if(retain && scroll && top>0 && scroll.scrollTop===0){
+        window.reportFlowDiagnostic?.('overview_scroll_reset','restored',{render_reason:tab.overviewRenderReason || 'renderOverview',tab_type:tab.current?'self':tabGroup(tab),scroll_before:top,scroll_after:scroll.scrollTop});scroll.scrollTop=top;
+      }
       scheduleHistoryServerRetry(tab);
       if (tab.current && tab.data && connected()) window.dispatchEvent(new CustomEvent("deep-legends:overview-ready"));
     } catch (error) {
@@ -2248,6 +2265,11 @@
       container.innerHTML = emptyState("总览渲染失败", `页面渲染时出现异常：${error?.message || error}`, true);
       container.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadOverview(tab, true));
     }
+  }
+
+  function renderOverviewPendingPage() {
+    const cards=['ranks','recent-ranked','ability','champions','masteries','positions','recent-players','activity'];
+    return `<section class="summoner-strip overview-strip-skeleton gameplay-skeleton" aria-label="正在读取召唤师"><span></span><span></span><span></span></section><div class="overview-layout"><aside class="career-column">${cards.map(key=>`<section data-career-key="${key}" class="career-section"><div class="career-pending gameplay-skeleton"><span></span><span></span><span></span></div></section>`).join('')}</aside><section class="matches-column"><div class="match-filterbar gameplay-skeleton" aria-label="正在读取筛选"><span></span><span></span></div><div class="match-list">${renderPendingMatches()}</div></section></div>`;
   }
 
   function renderSelfIdentityHeader(tab) {
@@ -2274,7 +2296,7 @@
     container.dataset.matchTierScope = tierScope;
     if (!tab.data && !tab.error) {
       disposeMatchRowHeight(container);
-      container.innerHTML = quotaMessage + renderSelfIdentityHeader(tab) + (historyServiceState(tab) ? renderHistoryServiceStatus(tab) : '<div class="gameplay-skeleton"><span></span><span></span><span></span><span></span></div>');
+      container.innerHTML = quotaMessage + renderSelfIdentityHeader(tab) + (historyServiceState(tab) ? renderHistoryServiceStatus(tab) : renderOverviewPendingPage());
       container.querySelector('[data-gameplay-retry]')?.addEventListener('click',()=>loadOverview(tab,true));
       return;
     }
@@ -2349,7 +2371,7 @@
       return `${typeof value}:${String(value)}`;
     }).join("|");
     const careerSections = sameOverview && container._careerSignature === careerSignature && container.querySelector(".career-column") ? "" : renderCareerSections(data, tab);
-    const stripHTML = `
+    const stripHTML = data.profilePending && tab.loading ? `<section class="summoner-strip overview-strip-skeleton gameplay-skeleton" aria-label="正在读取召唤师"><span></span><span></span><span></span></section>` : `
       <section class="summoner-strip">
         ${backgroundArt}
         ${profileIcon}
@@ -2375,7 +2397,7 @@
         <section class="matches-column" aria-label="最近对局">
           ${matches.length ? renderHistoryServiceStatus(tab,true) : ""}
           <div class="overview-career-entry"><button class="career-dialog-trigger" type="button" aria-haspopup="dialog" aria-controls="career-dialog" data-open-career-dialog><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg><span>生涯统计</span></button></div>
-          ${renderMatchFilters(tab)}
+          ${matchesPending(tab)?'<div class="match-filterbar gameplay-skeleton" aria-label="正在读取筛选"><span></span><span></span></div>':renderMatchFilters(tab)}
           ${matchDetailsWarning}
           ${tab.initialPageError && !historyServiceState(tab) ? `<div class="notice is-warning" role="alert">${relaySlowState(tab)?"":`<p>已保留前 ${number(rawMatches.length)} 场，完整战绩暂未补齐：${escapeHTML(tab.initialPageError)}</p>`}<button class="text-button" type="button" data-complete-overview>重试补齐</button></div>` : ""}
           ${riotTab(tab) ? '<div data-current-game hidden></div>' : ""}
@@ -2412,13 +2434,17 @@
     // Initialize the final DOM, including retained artwork, not placeholders
     // that are about to be discarded (which also unregisters detached artwork).
     prepareImages(container);
+    for(const [key,markup] of typeof careerSectionEntries==='function'?careerSectionEntries(data,tab):[]){const card=[...(container.querySelector('.career-column')?.children || [])].find(node=>node.dataset.careerKey===key);if(card)card._careerMarkup=markup;}
     container._careerChildHTML = careerChildHTML;
     container._stripHTML = stripHTML;
     container._backgroundArt = backgroundArt;
     container._careerSignature = careerSignature;
     container._careerHTML = careerSections;
     const renderedList = container.querySelector(".match-list");
-    if (renderedList) renderedList._matchData = new Map(rawMatches.map(match => [String(match.gameId), match]));
+    if (renderedList) {
+      renderedList._matchData = new Map(rawMatches.map(match => [String(match.gameId), match]));
+      if(!preserveMatchList)window.reportFlowDiagnostic?.('lp_chip_render','render',{ranked_matches:matches.filter(m=>[420,440].includes(Number(m.queueId))).length,with_delta:matches.filter(m=>m.lpDelta!=null).length,chips:renderedList.querySelectorAll('.lp-delta').length,revision_skipped:0});
+    }
     container._matchListMatches = rawMatches;
     container._matchListFilter = tab.matchFilter;
     container._matchListViewRevision = Number(tab.matchViewRevision || 0);
@@ -2439,7 +2465,7 @@
     if(!load || !data) return;
     const opgg=tab.opggSeason?.data;
     const position=rankedQueueData(data,tab,"position");
-    const cards=[["matches",Array.isArray(data.matches) && (data.matches.length > 0 || data.pagination && !data.pagination.partial),"network"],["ranks",(data.ranks||[]).length,"network"],
+    const cards=[["matches",Array.isArray(data.matches) && (data.matches.length > 0 || tab.matchesReceived && data.pagination && !data.pagination.partial),"network"],["ranks",(data.ranks||[]).length,"network"],
       ["champions",opgg ? Number(opgg.overall?.games)>0 : Number(data.seasonStatsProgress?.scanned)>0 || (data.seasonChampionStats||data.championStats||[]).length,opgg ? "opgg" : data.seasonStatsProgress ? "snapshot" : "network"],
       ["masteries",(data.masteries||[]).length,"network"],
       ["positions",(position.positions||[]).length,"network"]];
@@ -2852,15 +2878,16 @@
 
   async function loadMayhemRating(tab, quietStart = false) {
     const current = mayhemRatingStatus(tab);
-    const permanent = current.status === "ready" && (current.data?.available && Date.now()-Number(current.at || 0)<6*3600_000 || current.data?.unavailableReason === "未收录" && Date.now()-Number(current.at || 0)<3600_000);
-    if (!current.playerRef || current.status === "loading" || permanent || riotTab(tab) || !tabServerID(tab)) return;
+    const permanent = current.status === "ready" && (current.data?.available && Date.now()-Number(current.at || 0)<24*3600_000 || current.data?.unavailableReason === "未收录" && Date.now()-Number(current.at || 0)<600_000);
+    if (!current.playerRef || current.status === "loading" || current.refreshing || permanent || current.status==='error' && Date.now()-Number(current.at || 0)<600_000 && !tab.mayhemRatingManual || riotTab(tab) || !tabServerID(tab)) return;
     const requestToken = Number(tab.mayhemRatingRequestToken || 0) + 1;
     tab.mayhemRatingRequestToken = requestToken;
-    tab.mayhemRating = { status: "loading", playerRef: current.playerRef, data: null, error: "" };
+    tab.mayhemRating = { status: current.data?.available ? "ready" : "loading", refreshing:true, playerRef: current.playerRef, data: current.data?.available ? current.data : null, error: "" };
     updateMayhemRatingPopover(tab);
     try {
-      const params = new URLSearchParams({ playerRef: current.playerRef, ...(quietStart?{prefetch:"1"}:{}) });
-      const data = await api(`/api/gameplay/mayhem-rating?${params}`, {}, `mayhem-rating:${tab.key}`, 40000);
+      const params = new URLSearchParams({ playerRef: current.playerRef, ...(quietStart?{prefetch:"1"}:tab.mayhemRatingManual?{retry:"1"}:{}) });
+      tab.mayhemRatingManual=false;
+      const data = await api(`/api/gameplay/mayhem-rating?${params}`, {}, `mayhem-rating:${tab.key}`, 45000);
       if (tab.closed || tab.mayhemRatingRequestToken !== requestToken || mayhemRatingStatus(tab).playerRef !== current.playerRef) return;
       tab.mayhemRating = { status: data.available || data.unavailableReason === "未收录" ? "ready" : "error", playerRef: current.playerRef, data, error: "", at: Date.now() };
     } catch (error) {
@@ -2876,7 +2903,7 @@
       control.dataset.ratingTab=tab.key;
       const trigger = control.querySelector("[data-rank-mmr-trigger]");
       const setExpanded = (expanded) => {trigger?.setAttribute("aria-expanded", String(expanded)); if(expanded && mayhemRatingStatus(tab).status !== "loading") void loadMayhemRating(tab);};
-      control.querySelector("[data-mayhem-rating-retry]")?.addEventListener("click", () => {tab.mayhemRating = {...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
+      control.querySelector("[data-mayhem-rating-retry]")?.addEventListener("click", () => {tab.mayhemRatingManual=true;tab.mayhemRating = {...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
       control.addEventListener("mouseenter", () => setExpanded(true));
       control.addEventListener("mouseleave", () => setExpanded(false));
       control.addEventListener("focusin", () => setExpanded(true));
@@ -2891,14 +2918,22 @@
     for(const control of document.querySelectorAll(".rank-mmr-control")) {
       if(control.dataset.ratingTab!==tab.key || !fresh)continue;
       control.querySelector(".rank-mmr-popover").innerHTML=fresh.innerHTML;
-      control.querySelector("[data-mayhem-rating-retry]")?.addEventListener("click",()=>{tab.mayhemRating={...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
+      control.querySelector("[data-mayhem-rating-retry]")?.addEventListener("click",()=>{tab.mayhemRatingManual=true;tab.mayhemRating={...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
     }
   }
 
   function updateCareerCards(tab, reason) {
-    const container=overviewContainer(tab),root=container?.querySelector('.career-column');if(!root || !tab.data){rerenderTab(tab,reason);return;}
+    const container=overviewContainer(tab),root=container?.querySelector('.career-column');if(!root || !tab.data)return;
     if(tab.advancedMenu?.open){tab.overviewRenderDeferred=true;globalThis.deepLegendsHistoryFilters?.refresh(container,tab,advancedFilterContext(tab));return;}
-    root.innerHTML=renderCareerSections(tab.data,tab);container._careerSignature=null;
+    const template=document.createElement('template');
+    for(const [key,markup] of careerSectionEntries(tab.data,tab)){
+      const old=[...root.children].find(node=>node.dataset.careerKey===key);
+      if(old?._careerMarkup===markup)continue;
+      template.innerHTML=markup;const fresh=template.content.firstElementChild;if(!fresh)continue;fresh._careerMarkup=markup;
+      if(old?.outerHTML===fresh.outerHTML){old._careerMarkup=markup;continue;}
+      if(old)old.replaceWith(fresh);else root.append(fresh);
+    }
+    container._careerSignature=null;
     bindPlayerLinks(root,tab);bindRankHistoryControls(root);bindRankedQueueControls(root,tab);bindMayhemRatingControls(root,tab);bindOverviewShareControls(root,container,tab);
     root.querySelectorAll('[data-overview-subpage]').forEach(button=>button.addEventListener('click',()=>openOverviewSubpage(tab,button.dataset.overviewSubpage)));
     root.querySelector('[data-gameplay-retry]')?.addEventListener('click',()=>loadOverview(tab,true));applyRenderedMetricStyles(root);prepareImages(root);
@@ -3621,10 +3656,11 @@
     return `<i class="match-score${tone}" data-tooltip="${safe(tooltip)}" data-tooltip-score="${safe(JSON.stringify({ value: record.score.toFixed(1), parts }))}" data-tooltip-size="compact" tabindex="0">${record.score.toFixed(1)}</i>`;
   }
 
-  function scorePlacementChip(record) {
+  function scorePlacementChip(record, card = false) {
+    if(card && (!Number.isInteger(Number(record?.rank)) || Number(record?.rank)<1 || !Number.isInteger(Number(record?.total)) || Number(record?.total)<Number(record.rank)))return "";
     const badge = scoreBadgeChip(record);
     if (badge) return badge;
-    return Number(record?.rank) === 1 ? "" : scoreRankChip(record?.rank, record?.total);
+    return !card && Number(record?.rank) === 1 ? "" : scoreRankChip(record?.rank, record?.total);
   }
 
   function renderMatchScoreCell(record) {
@@ -3919,7 +3955,7 @@
     if(match.result==="remake" || match.result==="unknown" || !subject)return "";
     const tags=matchDataTags(match,subject).map(tag=>({...tag,priority:20000+tag.priority,markup:`<b class="match-data-tag is-data-${tag.kind}${tag.star ? " is-global" : ""}" data-tooltip="${escapeHTML(tag.description)}" data-tooltip-size="compact">${escapeHTML(tag.label)}</b>`}));
     const add=(markup,label,priority,description=label)=>{if(markup)tags.push({markup,label,priority,description});};
-    const evaluation=scoreBadgeChip(record);add(evaluation,record?.badge || "评分",50000);
+    const evaluation=scorePlacementChip(record,true);add(evaluation,record?.badge || "评分排名",60000);
     const levels=[[5,"pentaKills",20000],[4,"quadraKills",1300],[3,"tripleKills",300],[2,"doubleKills",100]];
     const observed=levels.some(([,key])=>subject[key]!=null);
     let higher=0;
@@ -3934,7 +3970,7 @@
     if(subject.deaths===0)add('<b class="match-zero-deaths">零阵亡</b>',"零阵亡",10000,"阵亡：0 次");
     if(!tags.length)return "";
     tags.sort((a,b)=>b.priority-a.priority);
-    return `<span class="match-tags-collection">${tags.map(tag=>`<span data-match-tag${tag.markup.includes("data-tooltip=") ? "" : ` data-tooltip="${escapeHTML(tag.description)}" data-tooltip-size="compact"`}${tag.priority===50000 ? ' data-match-tag-pinned=""' : ""}>${tag.markup}</span>`).join("")}<button type="button" class="match-tags-more" data-match-tags-more aria-label="查看其余标签" aria-expanded="false" hidden></button></span>`;
+    return `<span class="match-tags-collection">${tags.map(tag=>`<span data-match-tag${tag.markup.includes("data-tooltip=") ? "" : ` data-tooltip="${escapeHTML(tag.description)}" data-tooltip-size="compact"`}${tag.priority===60000 ? ' data-match-tag-pinned=""' : ""}>${tag.markup}</span>`).join("")}<button type="button" class="match-tags-more" data-match-tags-more aria-label="查看其余标签" aria-expanded="false" hidden></button></span>`;
   }
 
   // One body-level panel survives list/filter DOM moves; rows hold no global listeners.
@@ -5141,7 +5177,7 @@
     const isActive=()=>!state.destroyed && !tab.closed && (tab.overlay ? state.overlay.at(-1)===tab : activeTab(overviewGroupForSection())===tab) && (!tab.current || connected());
     return {rows,version:()=>tab.data?.matches || tab,subject:match=>matchSubject(match,tab.data?.player?.playerRef || tab.playerRef),tags:matchDataTags,
       seasonStart:tab.data?.seasonStart,storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)},
-      cursor:()=>af?.serverTimeRange(tab,{seasonStart:tab.data?.seasonStart}).startTime ? Number(tab.historyTimeCursor || 0) : Number(tab.nextBegIndex || Number(tab.data?.pagination?.begIndex || 0)+Number(tab.data?.pagination?.count || 0)),
+      cursor:()=>Number(tab.nextBegIndex || Number(tab.data?.pagination?.begIndex || 0)+Number(tab.data?.pagination?.count || 0)),
       heroSearch:(query,id,label)=>window.deepLegendsChampionSearch?.scoreOption(query,id,label) || window.deepLegendsRuntime.scoreChampionSearchOption(query,id,label,state.historyFilterCatalog?.champions?.find(row=>Number(row.id)===Number(id))),
       ensureSearch:()=>{void ensureHistoryFilterSearch(tab);},
       stylesReady:()=>Boolean(state.historyFilterStylesReady),ensureStyles:ensureHistoryFilterStyles,
@@ -5368,7 +5404,7 @@
     if (list) {
       reconcileFilteredMatchList(list, tab);
     }
-    appendOverviewMatches(tab, []);
+    appendOverviewMatches(tab, [], true);
     if (restoreScroll) restoreMatchScrollTop(tab);
   }
 
@@ -5393,13 +5429,14 @@
     } else for(const node of removed)node.remove();
     while(cache.size>60)cache.delete(cache.keys().next().value);
     const playerRef=tab.data?.player?.playerRef || tab.playerRef || '';
+    let revisionSkipped=0;
     for(const match of visible) {
       const id=String(match.gameId),cached=cache.get(id);
       let entry=entries.get(id),old=previous.get(id);
       if(!entry && cached?.match===match){entry=cached.entry;old=cached.match;cache.delete(id);entries.set(id,entry);}
-      const changed=old!==match && (!old?.revision || old.revision!==match.revision);
+      const changed=old!==match && (!old?.revision || old.revision!==match.revision || old.lpDelta!==match.lpDelta);
       const wasOpen=entry?.querySelector('[data-toggle-match][aria-expanded="true"]');
-      if(entry && !changed && (!wasOpen || tab.openMatches.has(id)))continue;
+      if(entry && !changed && (!wasOpen || tab.openMatches.has(id))){if(old?.revision===match.revision)revisionSkipped++;continue;}
       const template=document.createElement('template');template.innerHTML=renderMatch(match,playerRef,tab);
       const replacement=template.content.firstElementChild;bindOverviewContent(replacement,tab);applyRenderedMetricStyles(replacement);prepareImages(replacement);
       if(entry?.parentNode===list)entry.replaceWith(replacement);entries.set(id,replacement);
@@ -5415,6 +5452,7 @@
     }
     if(globalThis.deepLegendsHistoryFilters)globalThis.deepLegendsHistoryFilters.decorate(list,tab,advancedFilterContext(tab));
     list._matchData=current;
+    window.reportFlowDiagnostic?.('lp_chip_render','render',{ranked_matches:visible.filter(m=>[420,440].includes(Number(m.queueId))).length,with_delta:visible.filter(m=>m.lpDelta!=null).length,chips:list.querySelectorAll('.lp-delta').length,revision_skipped:revisionSkipped});
   }
 
   function rerenderMatch(tab, id) {
@@ -7023,7 +7061,7 @@
 	const historySummary = historyPending
 	  ? '<dl class="is-history-pending" aria-label="战绩读取中"><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div></dl>'
 	  : liveArena?.arenaSummary(player, identityKind, emptySummary) || `<dl><div><dt>${recordGames ? `近 ${number(recordGames)} 局` : "当前模式"}</dt><dd class="live-record-value">${displayStats.games ? `${number(displayStats.wins)}胜 ${number(displayStats.losses)}负` : emptySummary}</dd></div>${player.hidden === true && !displayStats.games ? "" : `<div><dt>胜率</dt><dd class="win-rate-value">${displayStats.games ? percent(displayStats.winRate) : "—"}</dd></div><div><dt>KDA</dt><dd class="live-kda-value">${displayStats.games ? `${kda(displayStats.kda)}:1` : "—"}</dd></div>`}</dl>`;
-	return `<article class="live-player${rowTone}">${iconFigure("champion", championId, player.championName, "live")}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}" ${proBadgeAttributes(player)}` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${hiddenChip}${liveAutofillChip}${premadeTag}${player.mySquad && !(identityKind === "arena" && liveArena) ? '<span class="my-squad-chip">我的小队</span>' : ""}${renderProIdentityBadge(player)}</div>${liveArena ? liveArena.identityLine(player, identityKind, contextCopy) : contextCopy ? `<span>${escapeHTML(contextCopy)}</span>` : ""}${recentPositions}</div>${historySummary}</article>`;
+	return `<article class="live-player${rowTone}">${iconFigure("champion", championId, player.championName, "live")}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}" ${proBadgeAttributes(player)}` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${hiddenChip}${liveAutofillChip}${premadeTag}${player.mySquad && !(identityKind === "arena" && liveArena) ? '<span class="my-squad-chip">我的小队</span>' : ""}${renderProIdentityBadge(player)}</div>${liveArena ? liveArena.identityLine(player, identityKind, contextCopy) : contextCopy ? `<span>${phase!=='ChampSelect' || player.hidden || arenaMode || aramMode?escapeHTML(contextCopy):`${escapeHTML(positionLabel(displayPosition || player.position))} · <b class="live-rank-title">${escapeHTML(rankCopy)}</b>`}</span>` : ""}${recentPositions}</div>${historySummary}</article>`;
   }
 
 	  function orderLivePlayers(players, groupByTeam = true) {
@@ -7743,7 +7781,7 @@
     const playerRows = (source) => source.map((player, index) => {
         const key = escapeHTML(String(player.playerRef || `${player.teamId}:${player.cellId ?? index}`));
         const card = renderLivePlayer(player, index, arenaMode, data.currentChampionId, orderedPlayers, renderLiveRecentPositions(player, data.queueId), isARAMRelatedMatch(data), liveAugmentRecommendationSource(data) === "hextech", data.phase, liveGameMode === "PRACTICETOOL" ? practicePlayerPosition(player, data) : "", identityKind)
-          .replace('<article ', `<article data-live-player-row="card:${key}" `);
+          .replace('<article ', `<article data-live-player-row="card:${key}"${data.phase==='ChampSelect'?' data-champselect-insight':''} `);
         const history = champSelectEnemyPlaceholder(player, data.phase, orderedPlayers) ? '<div class="insight-match-row"></div>' : renderInsightMatches(player);
         return card + history.replace('<div ', `<div data-live-player-row="history:${key}" `);
       }).join("");
@@ -9187,6 +9225,7 @@
   window.addEventListener("deep-legends:player-group", event => selectPlayerGroup(event.detail?.group));
   nodes.liveRefresh.addEventListener("click", () => loadLive(true, "manual"));
   window.addEventListener("deep-legends:riot-key-updated", () => {
+	state.lastRiotKeyChangeAt=Date.now();
 	state.riotKeyGeneration = Number(state.riotKeyGeneration || 0) + 1;
 	for (const key of state.specialistRuneFlights.keys()) state.controllers?.get?.(`live-specialist-runes:${key}`)?.abort?.();
 	state.specialistRuneFlights.clear();
@@ -9204,7 +9243,8 @@
   });
 	window.addEventListener("deep-legends:overview-player", (event) => applyOverviewPlayerIdentity(event.detail?.summoner || state.status?.summoner));
   window.addEventListener("deep-legends:section", (event) => activateSection(event.detail?.name || "overview"));
-	window.addEventListener("deep-legends:overview-matches", event => handleOverviewMatches(event.detail));
+	window.addEventListener("deep-legends:lp-recorded", () => {for(const tab of [...(state.tabs || []),...(state.overlay || [])])if(tab.current || tab.data?.player?.isCurrent){if(tab.loading)tab.lpRefreshPending=true;else void loadOverview(tab,true);}});
+ window.addEventListener("deep-legends:overview-matches", event => handleOverviewMatches(event.detail));
 	window.addEventListener("deep-legends:riot-relay-recovered", () => { void handleRelayRecovered(); });
 	window.addEventListener("deep-legends:season-progress", (event) => { void handleSeasonProgress(event.detail || {}); });
 	window.addEventListener("deep-legends:overview-incremental", (event) => { void handleOverviewIncremental(event.detail || {}); });

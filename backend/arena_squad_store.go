@@ -18,6 +18,7 @@ type arenaSquadMember struct {
 	SummonerName string `json:"summonerName,omitempty"`
 	GameName     string `json:"gameName,omitempty"`
 	TagLine      string `json:"tagLine,omitempty"`
+	ChampionID   int64  `json:"championId,omitempty"`
 }
 type arenaSquadRecord struct {
 	Scope      string             `json:"scope"`
@@ -51,7 +52,7 @@ func (a *app) persistArenaSquad(gameID int64) {
 	}
 	record := arenaSquadRecord{Scope: scope, GameID: gameID, RecordedAt: time.Now().UTC()}
 	for _, p := range a.arenaAllyPlayers {
-		record.Members = append(record.Members, arenaSquadMember{p.PUUID, p.SummonerID, p.SummonerName, p.GameName, p.TagLine})
+		record.Members = append(record.Members, arenaSquadMember{p.PUUID, p.SummonerID, p.SummonerName, p.GameName, p.TagLine, p.ChampionID})
 	}
 	data, err := json.Marshal(record)
 	if err == nil {
@@ -92,7 +93,7 @@ func (a *app) restoreArenaSquad(gameID int64) {
 	a.arenaAllyKeys = make(map[string]struct{})
 	a.arenaAllyPlayers = nil
 	for _, p := range record.Members {
-		player := lcuLivePlayer{PUUID: p.PUUID, SummonerID: p.SummonerID, SummonerName: p.SummonerName, GameName: p.GameName, TagLine: p.TagLine}
+		player := lcuLivePlayer{PUUID: p.PUUID, SummonerID: p.SummonerID, SummonerName: p.SummonerName, GameName: p.GameName, TagLine: p.TagLine, ChampionID: p.ChampionID}
 		a.arenaAllyPlayers = append(a.arenaAllyPlayers, player)
 		for _, key := range arenaAllyIdentityKeys(player) {
 			a.arenaAllyKeys[key] = struct{}{}

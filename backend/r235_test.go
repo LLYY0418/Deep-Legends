@@ -164,6 +164,12 @@ func TestR235RatingHeaderAndBodyBudgetsAndFailureRetry(t *testing.T) {
 	}
 	var event map[string]any
 	client.observe = func(e map[string]any) { event = e }
+	client.mu.Lock()
+	for key, entry := range client.cache {
+		entry.expiresAt = time.Now().Add(-time.Second)
+		client.cache[key] = entry
+	}
+	client.mu.Unlock()
 	if got := client.lookup(t.Context(), "Self", "tag"); !got.Available || got.Rating != 2350 {
 		t.Fatal(got)
 	}

@@ -113,6 +113,10 @@ jobs:
           python3 scripts/r269-mutations.py --out "$RUNNER_TEMP/r269-mutations"
           CHROME_BIN="$chrome" R269_BACKEND="$RUNNER_TEMP/r264-public" python3 scripts/r270-mutations.py --out "$RUNNER_TEMP/r270-mutations"
           CHROME_BIN="$chrome" R269_BACKEND="$RUNNER_TEMP/r264-public" python3 scripts/r271-mutations.py --browser --out "$RUNNER_TEMP/r271-mutations"
+          mkdir -p "$RUNNER_TEMP/r272-shape"
+          R272_SHAPE_OUTPUT="$RUNNER_TEMP/r272-shape/result.json" R272_OVERVIEW_FIXTURE="$RUNNER_TEMP/r272-overview.json" go test ./backend -run '^TestR272SyntheticOverviewWireBudget$' -count=1
+          CHROME_BIN="$chrome" R266_BACKEND="$RUNNER_TEMP/r264-public" R266_BROWSER_OUT="$RUNNER_TEMP/r272-browser" R272_OVERVIEW_FIXTURE="$RUNNER_TEMP/r272-overview.json" node scripts/r272-browser.cjs
+          python3 scripts/r272-mutations.py --out "$RUNNER_TEMP/r272-mutations"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -130,6 +134,9 @@ jobs:
             ${{ runner.temp }}/r269-mutations/**
             ${{ runner.temp }}/r270-mutations/**
             ${{ runner.temp }}/r271-mutations/**
+            ${{ runner.temp }}/r272-browser/**
+            ${{ runner.temp }}/r272-shape/**
+            ${{ runner.temp }}/r272-mutations/**
           if-no-files-found: warn
       - name: Test installer module
         working-directory: installer

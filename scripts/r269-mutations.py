@@ -28,7 +28,7 @@ with tempfile.TemporaryDirectory(prefix='r269-mutants-') as temp:
  ('p1-inflight-key-change','riot_routing.go','if credential, ok := ctx.Value(riotPinnedCredentialKey{}).(riotPinnedCredential); ok {','if credential, ok := ctx.Value(riotPinnedCredentialKey{}).(riotPinnedCredential); false && ok {','TestR269IdentityPinsKeyDuringLookup'),
  ('p5-repeat-first-screen','gameplay.go','respondJSON(w, riotOverviewPage{response.Player, response.Matches, response.Pagination, response.Capabilities})','respondJSON(w, response)','TestR269PaginationIsDeltaAndTimeIsPushedDown'),
  ('p8-fast-retry','sgp_api.go','1500 * time.Millisecond, 3 * time.Second','250 * time.Millisecond, 750 * time.Millisecond','TestR269SGPBackoffAndEarlyProbe'),
- ('p10-short-success-ttl','aramkit_rating.go','aramkitRatingSuccessTTL    = 6 * time.Hour','aramkitRatingSuccessTTL    = 10 * time.Minute','TestR269MayhemDiskTTLAndNoRecordCache'),
+ ('p10-short-success-ttl','aramkit_rating.go','aramkitRatingSuccessTTL    = 24 * time.Hour','aramkitRatingSuccessTTL    = 10 * time.Minute','TestR269MayhemDiskTTLAndNoRecordCache'),
  ('p10-no-disk-cache','aramkit_rating.go','if !present && c.disk != nil {','if false && !present && c.disk != nil {','TestR269MayhemDiskTTLAndNoRecordCache'),
  ('p11-poll-spam','r269_diagnostics.go','if same && (stateOnly || now.Sub(prior.at) < time.Minute) {','if false && same && (stateOnly || now.Sub(prior.at) < time.Minute) {','TestR269RequestCommonFieldsAndWindowCompaction'),
  ('p12-unsafe-message','r269_diagnostics.go','message = errorUserPath.ReplaceAllString(message, "${1}[redacted]")','message = message','TestR269DiagnosticMessageAndUserScope')]

@@ -10,8 +10,9 @@ func (a *app) publishOverviewCards(ctx context.Context, player Summoner, referen
 		return
 	}
 	partial := gameplayOverview{
-		Player:  gameplayPlayer{PlayerRef: player.PUUID, DisplayName: gameplayDisplayName(player), GameName: player.GameName, TagLine: player.TagLine, ProfileIconID: player.ProfileIconID, SummonerLevel: player.SummonerLevel, Region: reference.Region, ServerID: reference.ServerID, ServerName: tencentServerName(reference.ServerID), IsCurrent: isCurrent, reference: reference},
-		Matches: []gameplayMatch{}, Ranks: append([]gameplayRank(nil), ranks...), Masteries: append([]gameplayMastery(nil), masteries...), Capabilities: []EndpointCapability{capability}, ProfilePending: capability.Name != "summoner" || capability.State != capabilityAvailable,
+		Player:     gameplayPlayer{PlayerRef: player.PUUID, DisplayName: gameplayDisplayName(player), GameName: player.GameName, TagLine: player.TagLine, ProfileIconID: player.ProfileIconID, SummonerLevel: player.SummonerLevel, Region: reference.Region, ServerID: reference.ServerID, ServerName: tencentServerName(reference.ServerID), IsCurrent: isCurrent, reference: reference},
+		Pagination: gameplayPagination{Partial: true},
+		Matches:    []gameplayMatch{}, Ranks: append([]gameplayRank(nil), ranks...), Masteries: append([]gameplayMastery(nil), masteries...), Capabilities: []EndpointCapability{capability}, ProfilePending: capability.Name != "summoner" || capability.State != capabilityAvailable,
 	}
 	a.publicizeOverviewReferences(&partial)
 	progress(partial)

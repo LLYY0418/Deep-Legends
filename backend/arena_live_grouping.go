@@ -130,7 +130,7 @@ func (a *app) markRememberedArenaSquad(response *gameplayLiveResponse) {
 	gameID := a.arenaAllyGameID
 	a.arenaAlliesMu.RUnlock()
 	for i := range response.Players {
-		response.Players[i].MySquad = false
+		response.Players[i].MySquad = response.Players[i].champSelectSquad
 	}
 	if gameID != 0 && gameID != response.GameID {
 		return
@@ -163,39 +163,35 @@ func (a *app) applyArenaLiveGrouping(client *LCUClient, current Summoner, respon
 		remembered = nil
 	}
 	a.arenaAlliesMu.RUnlock()
-	// A missing gameflow member can still be an ally in the complete playerlist.
-	for i, ally := range remembered {
-		present := false
-		for _, p := range response.Players {
-			if ally.PUUID != "" && ally.PUUID == p.reference.PlayerRef {
-				present = true
+	// ChampSelect certifies the local squad even when gameflow loses a cell.
+	// Prefer stable identity; unique champions only recover that already-known cell.
+	for _, ally := range remembered {
+		matchIndex := -1
+		for i, p := range response.Players {
+			if ally.PUUID != "" && ally.PUUID != emptyLCUPlayerPUUID && ally.PUUID == p.reference.PlayerRef || ally.SummonerID > 0 && ally.SummonerID == p.reference.SummonerID {
+				matchIndex = i
 				break
 			}
 		}
-		if !present && ally.PUUID != "" {
-			if summoner, cap := loadGameplaySummoner(client, gameplayReference{PlayerRef: ally.PUUID, SummonerID: ally.SummonerID}); cap.State == capabilityAvailable {
-				remembered[i].SummonerName = summoner.DisplayName
-				remembered[i].GameName = summoner.GameName
-				remembered[i].TagLine = summoner.TagLine
+		if matchIndex < 0 && ally.ChampionID > 0 {
+			candidate, count := -1, 0
+			for i, p := range response.Players {
+				if p.ChampionID == ally.ChampionID {
+					candidate = i
+					count++
+				}
+			}
+			if count == 1 {
+				matchIndex = candidate
 			}
 		}
-	}
-	// Restore only known squad members corroborated by the live playerlist.
-	// This is identity matching, never a position/order-derived assignment.
-	for _, ally := range remembered {
-		identity := arenaObservedPlayer(ally)
-		present, observed := false, false
-		for _, p := range response.Players {
-			present = present || arenaSameIdentity(identity, arenaObservedPlayer(lcuLivePlayer{PUUID: p.reference.PlayerRef, GameName: p.GameName, TagLine: p.TagLine, SummonerName: p.DisplayName}))
-		}
-		for _, keys := range snapshot.OrderedIdentities {
-			observed = observed || arenaSameIdentity(identity, arenaObservedIdentity{Keys: arenaExactNameKeys(keys)})
-		}
-		if present || !observed {
+		if matchIndex >= 0 {
+			response.Players[matchIndex].champSelectSquad = true
+			response.Players[matchIndex].MySquad = true
 			continue
 		}
 		ref := normalizeGameplayReference(gameplayReference{PlayerRef: ally.PUUID, SummonerID: ally.SummonerID, GameName: ally.GameName, TagLine: ally.TagLine, DisplayName: ally.SummonerName, ServerID: clientTencentServerID(client)})
-		response.Players = append(response.Players, gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: ally.PUUID, GameName: ally.GameName, TagLine: ally.TagLine, DisplayName: ally.SummonerName, IsCurrent: ally.PUUID == current.PUUID, reference: ref}, MySquad: true, IsAlly: true, TeamID: 100, ChampionID: ally.ChampionID, ChampionLocked: ally.ChampionID > 0, HistoryState: "unavailable"})
+		response.Players = append(response.Players, gameplayLivePlayer{gameplayPlayer: gameplayPlayer{DisplayName: "隐藏玩家", Hidden: true, reference: ref}, champSelectSquad: true, MySquad: true, IsAlly: true, TeamID: 100, ChampionID: ally.ChampionID, ChampionLocked: ally.ChampionID > 0, HistoryState: "unavailable"})
 	}
 	a.markRememberedArenaSquad(response)
 	// Verify what was actually marked, not merely what was remembered.

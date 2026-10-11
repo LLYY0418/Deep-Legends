@@ -20,7 +20,7 @@ function extract(source, name) {
 }
 function compile(source, names, dependencies = {}) {
   names = [...names];
-  for (const name of ['matchesPending','renderPendingMatches','reportDeferredMatchesCard','syncCollectionSession']) {
+  for (const name of ['scorePlacementChip','scoreRankChip','ordinalLabel','renderOverviewPendingPage','matchesPending','renderPendingMatches','reportDeferredMatchesCard','syncCollectionSession','requestOverviewWithReferenceRetry']) {
     if (!names.includes(name) && !dependencies[name] && source.includes(`function ${name}(`) && names.some(n => extract(source,n).includes(`${name}(`))) names.push(name);
   }
   dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };

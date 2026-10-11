@@ -147,13 +147,21 @@ func TestR269MayhemDiskTTLAndNoRecordCache(t *testing.T) {
 		if !first.Available && first.UnavailableReason != "未收录" {
 			t.Fatal(first)
 		}
+		entry, err := c.disk.readDisk(riotIdentityKey("mayhem:fixture|cn"))
+		expectedTTL := 10 * time.Minute
+		if first.Available {
+			expectedTTL = 24 * time.Hour
+		}
+		if err != nil || !entry.ExpiresAt.Equal(now.Add(expectedTTL)) {
+			t.Fatal("persisted rating TTL changed", err, entry.ExpiresAt.Sub(now))
+		}
 		restarted := newAramkitTestClient(transport)
 		restarted.disk = c.disk
 		restarted.now = c.now
 		if first.Available {
-			now = now.Add(5 * time.Hour)
+			now = now.Add(23 * time.Hour)
 		} else {
-			now = now.Add(59 * time.Minute)
+			now = now.Add(9 * time.Minute)
 		}
 		result := restarted.lookup(context.Background(), "Fixture", "CN")
 		if calls.Load() != 1 || result.Available != first.Available {
@@ -161,6 +169,10 @@ func TestR269MayhemDiskTTLAndNoRecordCache(t *testing.T) {
 		}
 		now = now.Add(2 * time.Hour)
 		restarted.lookup(context.Background(), "Fixture", "CN")
+		deadline := time.Now().Add(time.Second)
+		for calls.Load() < 2 && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
 		if calls.Load() != 2 {
 			t.Fatal("expired cache reused")
 		}
@@ -469,7 +481,7 @@ func TestR269DecryptRecoveryKeepsReturnedCredentialScope(t *testing.T) {
 				}
 				return r206RelayResponse(400, []byte(`{"message":"Exception decrypting"}`)), nil
 			})}
-			ctx := context.WithValue(context.Background(), riotLookupIdentityKey{}, riotLookupIdentity{"Fixture", "KR1", "foreign-key-token", "embedded"})
+			ctx := context.WithValue(context.Background(), riotLookupIdentityKey{}, riotLookupIdentity{"Fixture", "KR1", "foreign-key-token", riotCredentialScope(context.Background())})
 			for i := 0; i < 2; i++ {
 				var ids []string
 				if err := p.get(ctx, p.clusterHost(), "/lol/match/v5/matches/by-puuid/foreign-key-token/ids", nil, &ids); err != nil || len(ids) != 1 {
@@ -498,6 +510,12 @@ func TestR269MayhemCachedSuccessRefreshesWithoutBlocking(t *testing.T) {
 	if !first.Available {
 		t.Fatal(first)
 	}
+	c.mu.Lock()
+	for key, entry := range c.cache {
+		entry.expiresAt = time.Now().Add(-time.Second)
+		c.cache[key] = entry
+	}
+	c.mu.Unlock()
 	at := time.Now()
 	cached := c.lookup(context.Background(), "Fixture", "CN")
 	if !cached.Available || time.Since(at) > 200*time.Millisecond {

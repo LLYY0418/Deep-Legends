@@ -37,7 +37,7 @@ test('R258 disconnect removes only self DOM, retains other list nodes, and false
  const otherList=h.document.createElement('div');otherList.className='match-list';otherList.textContent='other matches';
  const fragment=h.document.createDocumentFragment();fragment.append(otherList);h.nodes.overviewContent._overviewViews.set(h.other,{content:fragment,values:{}});
  h.current.data={player:{playerRef:'player_self'},matches:[{gameId:1}]};h.current.overviewCardLoad.selfReady=true;
- const selfList=h.document.createElement('div');selfList.className='match-list';h.nodes.overviewContent.append(selfList);
+ const selfList=h.document.createElement('div');selfList.className='match-list';const pendingList=h.nodes.overviewContent.querySelector('.match-list');if(pendingList)pendingList.replaceWith(selfList);else h.nodes.overviewContent.append(selfList);
  h.updateStatus(viewStatus({...identity,connected:false,clientDiscovery:'exiting'}));assert(!h.nodes.playerTabs.querySelector('[data-player-tab="current"]'));assert.equal(h.current.closed,true);assert.equal(h.current.data.matches[0].gameId,1);assert.equal(otherList.textContent,'other matches');assert.equal(h.el.startupLoading.hidden,true);
  h.updateStatus(viewStatus(identity));assert.equal(h.loads.length,1);assert.equal(h.nodes.overviewContent.querySelector('.match-list'),selfList);
  h.updateStatus(viewStatus({...identity,connected:false,clientDiscovery:'exiting'}));h.updateStatus(viewStatus({connected:false,clientDiscovery:'credentials-unreadable'}));h.updateReadingOverlay();h.updateStatus(viewStatus({connected:false,clientDiscovery:'process-not-found'}));h.updateReadingOverlay();assert.equal(h.el.startupLoading.hidden,true);

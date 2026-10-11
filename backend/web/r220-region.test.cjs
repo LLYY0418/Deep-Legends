@@ -69,7 +69,7 @@ test('R220 local Riot overview permits the retry budget and still accepts ordina
  const f=compile(gameplay,['api'],{state,Headers,AbortController,fetch:async(path,options)=>{requests.push({path,accept:options.headers.get('Accept')});return new Response('{"matches":[]}',{headers:{'Content-Type':'application/json'}});},setTimeout:()=>1,clearTimeout:()=>{}});
  const result=await f.api('/api/gameplay/overview?count=10',{onProgress:()=>{}},'current',190000);
  assert.deepEqual(result,{matches:[]});assert.equal(requests[0].accept,'application/x-ndjson');
- assert.match(gameplay,/const payload = tab.current && connected\(\)/);
+ assert.match(gameplay,/const requestOverview=async\(requestBody\)=>tab.current && connected\(\)/);
  assert.match(gameplay,/verification.expectGameId[^\n]+\{onProgress\}, requestKey, timeout/);
 });
 

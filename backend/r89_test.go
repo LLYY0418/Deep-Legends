@@ -378,8 +378,9 @@ func TestR89ActualConcurrencyPhasesAndQueue(t *testing.T) {
 	})}
 	champions.clientMu.Unlock()
 
-	events := make(chan map[string]any, 64)
-	champions.diag = func(event map[string]any) { events <- event }
+	var eventsMu sync.Mutex
+	var events []map[string]any
+	champions.diag = func(event map[string]any) { eventsMu.Lock(); events = append(events, event); eventsMu.Unlock() }
 	a := &app{riot: newRiotProvider(champions)}
 	phases := newOverviewPhaseTimings(time.Now())
 	ctx := context.WithValue(context.Background(), overviewPhasesContextKey{}, phases)
@@ -398,12 +399,13 @@ func TestR89ActualConcurrencyPhasesAndQueue(t *testing.T) {
 	}
 
 	var cost map[string]any
-	for len(events) > 0 {
-		event := <-events
+	eventsMu.Lock()
+	for _, event := range events {
 		if event["event"] == "riot_overview_cost" {
 			cost = event
 		}
 	}
+	eventsMu.Unlock()
 	if cost["details_inflight_peak"] != 8 || cost["limiter_queue_ms"].(int64) <= 0 {
 		t.Fatalf("cost %+v", cost)
 	}

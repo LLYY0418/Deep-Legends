@@ -306,6 +306,7 @@
   function createCard(fields, item) {
     const card = el.template.content.firstElementChild.cloneNode(true);
     card.dataset.facadeKey = `${state.view}:${item.id}`;
+    window.deepLegendsCollectionNewItems?.decorate(card,state.view,item.id);
     card.querySelector("strong").textContent = fields.title;
     card.querySelector(".skin-hero").textContent = fields.hero;
     card.querySelector(".skin-meta").textContent = fields.meta;
@@ -393,7 +394,7 @@
         const fields = state.view === "icons" ? facadeCollectionIconFields(item, unavailable) : facadeCollectionBannerFields(item, unavailable);
         const key = `${state.view}:${item.id}`;
         let card = existing.get(key);
-        if (card) refreshCard(card, fields, item);
+        if (card) {refreshCard(card, fields, item);window.deepLegendsCollectionNewItems?.decorate(card,state.view,item.id);}
         else card = createCard(fields, item);
         if (el.grid.children[index - 1] !== card) el.grid.insertBefore(card, el.grid.children[index - 1] || null);
       }
@@ -408,11 +409,13 @@
     if (!force && state[key]) { render(); return; }
     if (state.flights[key]) return state.flights[key];
     el.grid.setAttribute("aria-busy", "true");
+    const collectionAccount=state.collectionAccount;
     const flight = (async () => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 10000);
       try {
         const response = await fetch(`/api/facade/${key}`, { signal: controller.signal, headers: { Accept: "application/json" } });
+        if(collectionAccount!==state.collectionAccount)return;
         if (response.status === 409) {
           state.connected = false;
           state.icons = state.banners = null;
@@ -420,14 +423,16 @@
           return;
         }
         if (!response.ok) throw new Error(`目录读取失败（${response.status}）`);
-        state[key] = await response.json();
+        const payload=await response.json();if(collectionAccount!==state.collectionAccount)return;
+        state[key] = payload;
+        if(!ownershipUnavailable())window.deepLegendsCollectionNewItems?.update(key,state[key][key] || []);
         if (key === "banners") resetBannerRatioSample();
         if (state.view === view) { syncControls(); render(); }
       } catch (error) {
-        if (state.view === view) renderError(error?.message || "目录读取失败");
+        if (collectionAccount===state.collectionAccount && state.view === view) renderError(error?.message || "目录读取失败");
       } finally {
         clearTimeout(timer);
-        state.flights[key] = null;
+        if(collectionAccount===state.collectionAccount)state.flights[key] = null;
       }
     })();
     state.flights[key] = flight;
@@ -514,14 +519,23 @@
   el.dialog.addEventListener("cancel", (event) => { event.preventDefault(); el.dialog.close(); });
   el.dialog.addEventListener("close", () => window.desktopTheme?.setModalOpen?.(false));
 
-  window.addEventListener("deep-legends:status", (event) => {
+  const onStatus=(event) => {
+    window.deepLegendsCollectionNewItems?.setAccount(event.detail);
+    const collectionAccount=[event.detail?.clientRegion,event.detail?.serverId,event.detail?.collectionAccount].join("|");
+    const changedAccount=state.collectionAccount!==collectionAccount;
+    const changedSnapshot=changedAccount || state.lastSync!==event.detail?.lastSync;state.lastSync=event.detail?.lastSync;state.collectionAccount=collectionAccount;
+    if(changedAccount){state.renderGeneration++;state.flights={icons:null,banners:null};state.icons=state.banners=null;}
     const connected = Boolean(event.detail?.connected);
+    if(connected && state.connected && changedSnapshot){state.icons=state.banners=null;if(panelVisible())void load(state.view,true);}
     if (connected === state.connected) return;
     state.connected = connected;
     state.icons = state.banners = null;
     if (!connected) el.dialog.close?.();
     if (panelVisible()) activate();
-  });
+  };
 
+  if(window.deepLegendsSections)window.deepLegendsSections.listen('deep-legends:status',onStatus);
+  else window.addEventListener('deep-legends:status',onStatus);
+  window.deepLegendsSections?.register('favorites-facade',()=>{if(panelVisible())activate();});
   window.deepLegendsFavoritesFacade = Object.freeze({ activate, setView });
 })();

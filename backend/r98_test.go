@@ -172,7 +172,7 @@ func TestR98OverviewEndpointCachesAndKeys(t *testing.T) {
 		t.Fatal("cache keys aliased pages/count/queue/type/players", f.calls)
 	}
 	// Validate actual envelopes and expire both layers; TTL is not just a constant.
-	expected := map[string]time.Duration{"matchIDs": time.Minute, "ranks": 3 * time.Minute, "mastery": 30 * time.Minute}
+	expected := map[string]time.Duration{"matchIDs": time.Minute, "ranks": 10 * time.Minute, "mastery": 30 * time.Minute}
 	for identity, want := range map[string]time.Duration{"matchIDs:subject|count=20&start=0": expected["matchIDs"], "ranks:subject": expected["ranks"], "mastery:subject|count=5": expected["mastery"]} {
 		key := p.identityContextKey(ctx, identity)
 		cache := p.identityDisk

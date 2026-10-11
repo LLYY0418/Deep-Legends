@@ -44,8 +44,8 @@ test("游戏时间分布下方提供等栏宽分享按钮，并在选定路径�
   const button = overview.querySelector(".career-column [data-generate-overview-share]");
   assert.ok(activity, "总览缺少游戏时间分布");
   assert.ok(button, "游戏时间分布下方缺少生成分享图按钮");
-  assert.equal(activity.nextElementSibling, button, "分享按钮必须紧跟游戏时间分布");
-  assert.equal(button.parentElement.classList.contains("career-column"), true, "按钮应直接占满左侧生涯栏宽度");
+  assert.equal(activity.querySelector(":scope > [data-generate-overview-share]"), button, "分享按钮在时间分布唯一顶层section内");
+  assert.equal(button.parentElement, activity, "分享按钮保留等栏宽的activity容器");
   assert.ok(button.querySelector("svg"), "分享按钮文字前应有图标");
   assert.match(button.textContent, /生成分享图/);
 	const matchList = overview.querySelector(".match-list");

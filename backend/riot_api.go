@@ -429,6 +429,10 @@ func (p *riotProvider) getLimitedRoute(ctx context.Context, host, requestPath st
 	if !riotKeyConfigured() {
 		return errRiotKeyMissing
 	}
+	key, source := riotRequestCredential(ctx)
+	if event := riotSameCredentialDiagnostic(key, riotEmbeddedKey(), source); event != nil {
+		p.routeRecord(event)
+	}
 	scope := riotRequestRateScope(host, requestPath)
 	ctx = context.WithValue(ctx, riotRateScopeKey{}, scope)
 	if _, source := riotRequestCredential(ctx); source == "relay" {
@@ -513,7 +517,11 @@ func (p *riotProvider) getLimitedRoute(ctx context.Context, host, requestPath st
 			request = request.WithContext(httptrace.WithClientTrace(request.Context(), &httptrace.ClientTrace{GotFirstResponseByte: func() {
 				elapsed := time.Since(requestedAt)
 				responseTTFB.Store(int64(elapsed))
-				riotRelays.recordTTFB(elapsed)
+				if source == "relay" {
+					riotRelays.recordTTFB(elapsed)
+				} else {
+					riotRelays.recordTTFB(elapsed, "direct")
+				}
 			}}))
 		}
 		response, err := client.Do(request)
@@ -894,7 +902,8 @@ type riotMatch struct {
 func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine string) (riotAccount, error) {
 	ctx = riotPinnedIdentityContext(ctx)
 	account, err := p.accountByRiotIDPinned(ctx, gameName, tagLine)
-	if err != nil && riotCredentialScope(ctx) == "embedded" && ctx.Err() == nil {
+	_, source := riotRequestCredential(ctx)
+	if err != nil && source == "embedded" && ctx.Err() == nil {
 		var status *riotStatusError
 		fallback := !errors.As(err, &status)
 		if status != nil {
@@ -1012,7 +1021,7 @@ func (p *riotProvider) fetchAccountByPUUID(ctx context.Context, puuid string) (r
 
 func (p *riotProvider) summonerByPUUID(ctx context.Context, puuid string) (riotSummoner, error) {
 	var summoner riotSummoner
-	err := p.cachedPublicIdentity(ctx, "summoner:"+puuid, 5*time.Minute, &summoner, func(ctx context.Context) error {
+	err := p.cachedPublicIdentity(ctx, "summoner:"+puuid, 10*time.Minute, &summoner, func(ctx context.Context) error {
 		return p.get(ctx, p.platformHost(), "/lol/summoner/v4/summoners/by-puuid/"+url.PathEscape(puuid), nil, &summoner)
 	})
 	return summoner, err
@@ -1020,7 +1029,7 @@ func (p *riotProvider) summonerByPUUID(ctx context.Context, puuid string) (riotS
 
 func (p *riotProvider) leagueEntries(ctx context.Context, puuid string) ([]riotLeagueEntry, error) {
 	var entries []riotLeagueEntry
-	err := p.cachedPublicIdentity(ctx, "ranks:"+puuid, 3*time.Minute, &entries, func(ctx context.Context) error {
+	err := p.cachedPublicIdentity(ctx, "ranks:"+puuid, 10*time.Minute, &entries, func(ctx context.Context) error {
 		err := p.get(ctx, p.platformHost(), "/lol/league/v4/entries/by-puuid/"+url.PathEscape(puuid), nil, &entries)
 		if err == nil {
 			p.observeProSeedRank(puuid, entries)
@@ -1809,6 +1818,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		partial.Pagination.Partial = partial.HistoryLoaded < len(ids)
 		deriveRiotOverviewStats(&partial, puuid, names, provider.region())
 		a.completeOverviewBackground(&partial, puuid)
+		a.annotateOverviewLP(&partial, "riot", true)
 		a.publicizeOverviewReferences(&partial)
 		if len(cardOnly) > 0 && cardOnly[0] {
 			if cardProgress != nil {
@@ -1965,6 +1975,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		// 少于 ids），保证前端推进下一页偏移量时不会与本页重叠。
 		Pagination: riotOverviewPagination(begIndex, len(ids), count, matchFilter),
 	}
+	a.annotateOverviewLP(&response, "riot")
 	if begIndex > 0 {
 		a.publicizeOverviewReferences(&response)
 		if progress != nil {

@@ -115,3 +115,12 @@
 .af-options button[data-af-zero]:not(.is-active) { opacity: .55; }
 .af-counts, .af-count { display: inline-flex; align-items: center; font-size: 12px; line-height: 1; }
 .af-counts > span, .af-counts > button { font-size: 12px; }
+
+/* R272: align the count row with the first 30px capsule row. */
+.af-conditionbar > .af-counts { min-height: 30px; }
+.af-counts > span { gap: 4px; }
+.af-counts b, [data-af-preview] b { color: var(--primary-strong); font-weight: 700; }
+.af-modal-footer > [data-af-preview] { color: var(--ink); font-size: 14px; }
+.af-current-conditions { display: flex; flex-direction: column; gap: 8px; }
+.af-current-conditions > strong { font-size: 14px; }
+.af-current-conditions .af-capsule > span { padding: 4px 8px; font-size: 11px; }

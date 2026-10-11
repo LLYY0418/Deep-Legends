@@ -83,16 +83,16 @@ function accountHarness(source = appSource) {
   const state = { status: { connected: true, eventStream: true }, destroyed: false };
   let apiImpl = async () => payload();
   const deps = {
-    state, el, window, api: (...args) => apiImpl(...args),
+    state, el, window, document:window.document, requestAnimationFrame:window.requestAnimationFrame?.bind(window) || (fn=>fn()), api: (...args) => apiImpl(...args),
     escapeHTML: (value) => String(value ?? ""), formatNumber: (value) => String(value ?? 0),
-    playerName: () => "测试玩家", lootCategorySlug: () => "material", lootCategoryIcon: () => "◇",
-    lootCard: (item) => `<div class="loot-art"><img src="${item.asset}" alt=""><b>${item.count}</b></div>`,
+    playerName: () => "测试玩家", lootCategorySlug: Function(`${functionSource(appSource,"lootCategorySlug")};return lootCategorySlug;`)(), lootCategoryIcon: () => "◇",
+    lootCard: (item) => `<article data-loot-collection-id="${item.lootId}"><div class="loot-art"><img src="${item.asset}" alt=""><b>${item.count}</b></div></article>`,
     capabilityName: (value) => value, sourceStateLabel: (value) => value,
     rewardStatusLabel: (value) => value, formatDateTime: (value) => value,
     loadNextLootImage: () => {}, renderPanelError: () => { throw new Error("unexpected panel error"); },
   };
   const names = Object.keys(deps);
-  const loadAccount = Function(...names, `async ${functionSource(source, "loadAccount")}; return loadAccount;`)(...names.map((name) => deps[name]));
+  const loadAccount = Function(...names, `${functionSource(source,"lootPendingAccount")} ${functionSource(source,"reconcileAccountLoot")} async ${functionSource(source, "loadAccount")}; return loadAccount;`)(...names.map((name) => deps[name]));
   return { window, el, state, loadAccount, setAPI: (value) => { apiImpl = value; }, close: () => window.close() };
 }
 

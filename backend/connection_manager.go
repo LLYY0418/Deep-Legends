@@ -212,6 +212,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 	sessionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	a.beginConnectionPriority(sessionCtx, client)
+	a.prefetchSelfMayhemRating(client)
 	a.goSafe("connection_manager.platform", func() { a.recordDiagnostic(clientPlatformDiagnostic(client)) })
 	a.scheduleConnectionWork(sessionCtx, client, "connection_manager.settings-watch", false, func() { a.beginGameSettingsWatch(sessionCtx, client) })
 	a.scheduleConnectionWork(sessionCtx, client, "connection_manager.catalog-version", false, func() { a.warmClientCatalogVersion(sessionCtx, client) })
@@ -848,8 +849,11 @@ func (a *app) markCollectionDirtyAt(now time.Time, kinds ...string) bool {
 	a.mu.Lock()
 	during := a.syncing
 	suppressed := !a.collectionRefreshFinishedAt.IsZero() && now.Sub(a.collectionRefreshFinishedAt) < 5*time.Second
-	if previous := a.collectionEventAt[kind]; !previous.IsZero() && now.Sub(previous) < 30*time.Second {
+	if previous := a.collectionEventAt[kind]; kind != "inventory" && kind != "champions" && !previous.IsZero() && now.Sub(previous) < 30*time.Second {
 		suppressed = true
+	}
+	if kind == "inventory" || kind == "champions" {
+		suppressed = false
 	}
 	if !suppressed {
 		if a.collectionEventAt == nil {
@@ -863,6 +867,7 @@ func (a *app) markCollectionDirtyAt(now time.Time, kinds ...string) bool {
 	a.recordDiagnostic(map[string]any{"event": "collection_dirty_marked", "uri_kind": kind, "during_refresh": during, "suppressed": suppressed})
 	if !suppressed {
 		a.broadcastEvent("collection-dirty")
+		a.scheduleCollectionEventRefresh(collectionEventRefreshDelay)
 	}
 	return !suppressed
 }

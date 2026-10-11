@@ -26,7 +26,7 @@ type riotPUUIDState struct {
 
 func riotCredentialScope(ctx context.Context) string {
 	key, source := riotRequestCredential(ctx)
-	if source == "user" || source == "env" {
+	if source == "user" || source == "env" || source == "embedded" {
 		sum := sha256.Sum256([]byte(key))
 		return fmt.Sprintf("user:%x", sum[:4])
 	}

@@ -43,11 +43,16 @@
   function patch(container,entries){
     const column=container.querySelector('.career-column');if(!column)return;
     const template=container.ownerDocument.createElement('template');
-    entries.forEach(([,markup],i)=>{
-      const old=column.children[i];
-      if(old?.outerHTML===markup)return;
+    const keys=new Set(entries.map(([key])=>key));
+    for(const old of [...column.children])if(!keys.has(old.dataset.careerKey))old.remove();
+    entries.forEach(([key,markup])=>{
+      const old=[...column.children].find(node=>node.dataset.careerKey===key);
+      if(old?._careerMarkup===markup)return;
       template.innerHTML=markup;
-      if(old)old.replaceWith(template.content.cloneNode(true));else column.append(template.content.cloneNode(true));
+      const fresh=template.content.firstElementChild;if(!fresh)return;
+      fresh.dataset.careerKey=key;fresh._careerMarkup=markup;
+      if(old?.outerHTML===fresh.outerHTML){old._careerMarkup=markup;return;}
+      if(old)old.replaceWith(fresh);else column.append(fresh);
     });
   }
   function update(container,tab,sameOverview,ctx){

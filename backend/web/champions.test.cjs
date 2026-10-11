@@ -303,7 +303,7 @@ function assertR46Contracts({
 function assertR47Contracts({ js = gameplayScript, css = gameplayStyles, goSource = gameplayBackend } = {}) {
   const arenaMode = goFunctionSource(goSource, "isArenaChampSelectMode");
   assert.match(arenaMode, /strings\.EqualFold\(strings\.TrimSpace\(gameMode\), "CHERRY"\)/);
-  assert.match(goSource, /func filterArenaChampSelectPlayers[\s\S]{0,1200}puuid == "" \|\| strings\.EqualFold\(puuid, emptyLCUPlayerPUUID\)/);
+  assert.match(goSource, /func filterArenaChampSelectPlayers[\s\S]{0,1200}puuid != "" && !strings\.EqualFold\(puuid, emptyLCUPlayerPUUID\)/);
   const liveHandler = goFunctionSource(goSource, "loadGameplayLive");
   assert.match(liveHandler, /if isArenaChampSelectMode\(response\.GameMode\)\s*\{[\s\S]*filterArenaChampSelectPlayers\(rawPlayers\)[\s\S]*ChampSelectNotice = arenaChampSelectNotice/);
 
@@ -2267,7 +2267,7 @@ test("damage analysis sorts by a real metric and shows full colored values", () 
   assert.match(gameplayStyles, /\.match-stat\s*\{[^}]*minmax\(0,1fr\)/s);
   assert.match(gameplayStyles, /\.match-list\s*\{[^}]*overflow-anchor:\s*none/s);
 	assert.match(gameplayScript, /tab\.paginationStalls = upstreamAdditions > 0 \? 0/);
-  assert.match(gameplayScript, /function appendOverviewMatches\(tab, additions\)/);
+  assert.match(gameplayScript, /function appendOverviewMatches\(tab, additions, reconciled = false\)/);
   assert.match(gameplayScript, /if \(append\) appendOverviewMatches\(tab, appendAdditions\);/);
 });
 
@@ -4209,7 +4209,7 @@ test("R63 match-tier scope ignores transient tab keys", () => {
 	assert.equal(matchTierScope({ key: "tab-a", data: { player } }), matchTierScope({ key: "tab-b", data: { player } }));
 });
 
-test("R61 append uses an independent controller and queues timed revalidation", async () => {
+test("R61 append keeps an independent controller and does not queue a full reload on re-entry", async () => {
 	const tab = { key: "player-1", loadingMore: true, data: { pagination: { hasMore: true } }, openMatches: new Set(), matchDetailTabs: new Map() };
 	const state = { section: "champions", liveTimer: 0, tabs: [tab], settings: { defaultMatchFilter: "all" } };
 	const reloads = [];
@@ -4232,7 +4232,7 @@ test("R61 append uses an independent controller and queues timed revalidation", 
 		renderLive: () => {},
 	});
 	activateSection("overview");
-	assert.equal(tab.reloadAfterAppend, true);
+	assert.equal(tab.reloadAfterAppend, undefined);
 	assert.equal(reloads.length, 0, "timed revalidation must not preempt an in-flight append");
 	assert.equal(overviewRenders, 1);
 
@@ -5881,7 +5881,7 @@ test("R189 nonblank fallback loot remains visible without a pending hint", () =>
 	});
 	const markup = functions.lootCard({ lootId: "CHEST_224", displayName: "宝箱 224", dataPending: false, localizedName: "未命名战利品", count: 1 });
 	assert.match(markup, /宝箱 224/);
-	assert.doesNotMatch(markup, /CHEST_224|客户端数据暂未同步|is-name-pending/);
+	assert.doesNotMatch(markup.replace(/data-loot-collection-id="[^"]*"/g,""), /CHEST_224|客户端数据暂未同步|is-name-pending/);
 	assert.doesNotMatch(markup, />未命名战利品</);
 	const emptyShell = functions.lootCard({ lootId: "", lootName: "", type: "", localizedDescription: "不得展示的说明", count: 30 });
 	assert.match(emptyShell, /客户端返回的空白条目/);

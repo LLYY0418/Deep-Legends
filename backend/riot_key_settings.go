@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -82,6 +86,29 @@ func (s *riotKeyStore) effective() (string, string) {
 		return "", "relay"
 	}
 	return "", "none"
+}
+
+// One unpredictable salt for this process. Digests never leave memory.
+var riotCredentialDiagnosticSalt = sync.OnceValue(func() [32]byte {
+	var salt [32]byte
+	if _, err := rand.Read(salt[:]); err != nil {
+		panic("credential diagnostic entropy unavailable")
+	}
+	return salt
+})
+
+func riotSameCredentialDiagnostic(key, embedded, source string) map[string]any {
+	if source != "env" && source != "user" && source != "embedded" && source != "relay" {
+		return nil
+	}
+	salt := riotCredentialDiagnosticSalt()
+	digest := func(value string) []byte {
+		h := hmac.New(sha256.New, salt[:])
+		h.Write([]byte(value))
+		return h.Sum(nil)
+	}
+	same := key != "" && embedded != "" && subtle.ConstantTimeCompare(digest(key), digest(embedded)) == 1
+	return map[string]any{"event": "same_credential", "same_credential": same, "source": source}
 }
 
 func riotKeySource() string { _, source := riotUserKeys.effective(); return source }
@@ -196,6 +223,7 @@ func (s *riotKeyStore) migrateEmbedded(record func(map[string]any)) error {
 
 func (a *app) handleRiotKeySettings(w http.ResponseWriter, r *http.Request) {
 	result := ""
+	priorScope := riotCredentialScope(r.Context())
 	var err error
 	switch r.Method {
 	case http.MethodPost:
@@ -226,7 +254,11 @@ func (a *app) handleRiotKeySettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodGet && result != "invalid" {
-		a.clearRiotCredentialFailures()
+		same := priorScope == riotCredentialScope(r.Context())
+		if !same {
+			a.clearRiotCredentialFailures()
+		}
+		a.recordDiagnostic(map[string]any{"event": "riot_credential_switch", "same_credential": same})
 		a.broadcastEvent("riot-key-updated")
 	}
 	respondJSON(w, map[string]any{"status": riotKeyState(), "source": riotKeySource(), "result": result})

@@ -68,6 +68,7 @@ var (
 var hiddenPlayerUUIDMask = [16]byte{0x81, 0x70, 0x76, 0xa9, 0xf4, 0x51, 0x50, 0x9b, 0x95, 0x98, 0x68, 0x13, 0xce, 0x91, 0x17, 0xe7}
 
 type gameplayOverviewRequest struct {
+	Background   bool   `json:"background,omitempty"`
 	StartTime    int64  `json:"startTime,omitempty"`
 	EndTime      int64  `json:"endTime,omitempty"`
 	ExpectedTier string `json:"expectedTier,omitempty"`
@@ -227,6 +228,7 @@ type participantCompletenessSummary struct {
 }
 
 type gameplayOverview struct {
+	MatchesDelta        bool                     `json:"matchesDelta,omitempty"`
 	SeasonStart         time.Time                `json:"seasonStart"`
 	HistoryGeneration   uint64                   `json:"historyGeneration,omitempty"`
 	HistoryRequested    int                      `json:"historyRequested,omitempty"`
@@ -746,6 +748,10 @@ type lcuTeam struct {
 }
 
 func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
+	shape := newOverviewResponseShape()
+	w = &overviewShapeWriter{w, shape}
+	defer func() { a.recordDiagnostic(shape.event()) }()
+	progressSeen := make(map[int64]string)
 	a.mu.RLock()
 	warmClient := a.lcu
 	a.mu.RUnlock()
@@ -902,6 +908,9 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		if reference.Region == "" {
 			reference = gameplayReference{GameName: request.GameName, TagLine: request.TagLine, Region: riotPlatform(request.Region)}
 		}
+		if request.Background {
+			r = r.WithContext(withRiotBackground(r.Context()))
+		}
 		phases.mark("identity")
 		stream = request.BegIndex == 0 && strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
 		streamStarted := false
@@ -909,6 +918,11 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		emit := func(value any) {
 			emitMu.Lock()
 			defer emitMu.Unlock()
+			if frame, ok := value.(map[string]any); ok && (frame["type"] == "cards" || frame["type"] == "progress") {
+				if partial, ok := frame["overview"].(gameplayOverview); ok {
+					frame["overview"] = compactOverviewProgress(partial, progressSeen)
+				}
+			}
 			if !streamStarted {
 				w.Header().Set("Content-Type", "application/x-ndjson")
 				w.Header().Set("Cache-Control", "no-store")
@@ -922,11 +936,13 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		if stream {
 			r = r.WithContext(context.WithValue(r.Context(), riotOverviewProgressKey{}, func(partial gameplayOverview) {
 				partial.Pagination.Filter = request.MatchFilter
+				partial.Pagination.Partial = true
 				emit(map[string]any{"type": "progress", "overview": partial})
 			}))
 			if r.Header.Get("X-Overview-Cards") == "1" {
 				r = r.WithContext(context.WithValue(r.Context(), localOverviewCardsProgressKey{}, func(partial gameplayOverview) {
 					partial.Pagination.Filter = request.MatchFilter
+					partial.Pagination.Partial = true
 					emit(map[string]any{"type": "cards", "overview": partial})
 				}))
 			}
@@ -1021,6 +1037,9 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	emit := func(kind string, value gameplayOverview) {
 		emitMu.Lock()
 		defer emitMu.Unlock()
+		if kind != "complete" {
+			value = compactOverviewProgress(value, progressSeen)
+		}
 		w.Header().Set("Content-Type", "application/x-ndjson")
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(map[string]any{"type": kind, "overview": value})
@@ -1612,9 +1631,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	capabilities = append(capabilities, historyCapabilities...)
 	a.recordMatchModeClassifications(matches)
 	// 标注本地追踪到的排位胜点变化（仅当前登录玩家的场次有记录）。
-	if isCurrent {
-		a.lpTracker.annotate(matches, playerRef)
-	}
+	a.annotateLP(matches, playerRef, "sgp", isCurrent)
 	playerData := gameplayPlayer{
 		PlayerRef: playerRef, DisplayName: gameplayDisplayName(player), GameName: player.GameName,
 		TagLine: player.TagLine, ProfileIconID: player.ProfileIconID, SummonerLevel: player.SummonerLevel,
@@ -7431,6 +7448,7 @@ type gameplayLivePlayer struct {
 	IdentityUnresolved   bool   `json:"identityUnresolved,omitempty"`
 	TeamID               int64  `json:"teamId"`
 	ArenaGroup           string `json:"arenaGroup,omitempty"`
+	champSelectSquad     bool
 	MySquad              bool   `json:"mySquad,omitempty"`
 	PremadeGroup         string `json:"premadeGroup,omitempty"`
 	PremadeSize          int    `json:"premadeSize,omitempty"`
@@ -7720,15 +7738,29 @@ func filterArenaChampSelectPlayers(players []struct {
 		player lcuLivePlayer
 		team   int64
 	}, 0, len(players))
-	filtered := 0
-	for _, player := range players {
-		puuid := strings.TrimSpace(player.player.PUUID)
-		if puuid == "" || strings.EqualFold(puuid, emptyLCUPlayerPUUID) {
-			filtered++
-			continue
+	selected := map[int]bool{}
+	for i, entry := range players {
+		puuid := strings.TrimSpace(entry.player.PUUID)
+		if puuid != "" && !strings.EqualFold(puuid, emptyLCUPlayerPUUID) {
+			selected[i] = true
 		}
-		visible = append(visible, player)
 	}
+	// Keep known hidden picks only in unfilled squad cells. Invalid extra LCU
+	// slots cannot expand a trio to five; identified players take precedence.
+	for i, entry := range players {
+		if len(selected) >= 3 {
+			break
+		}
+		if !selected[i] && entry.player.ChampionID > 0 {
+			selected[i] = true
+		}
+	}
+	for i, entry := range players {
+		if selected[i] {
+			visible = append(visible, entry)
+		}
+	}
+	filtered := len(players) - len(visible)
 	return visible, filtered
 }
 

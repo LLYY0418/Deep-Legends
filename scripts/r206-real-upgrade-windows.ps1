@@ -16,7 +16,7 @@ $evidence = Join-Path $root "evidence"
 New-Item -ItemType Directory -Force $install,$data,$evidence | Out-Null
 Save-R271RunnerHost $evidence
 $setupSequence = 0
-$appDirectories = @($install, (Join-Path $root 'installed-079'), (Join-Path $root 'installed-080'), (Join-Path $root 'installed-081-2.25'), (Join-Path $root 'installed-081-2.5'))
+$appDirectories = @($install, (Join-Path $root 'installed-079'), (Join-Path $root 'installed-080'), (Join-Path $root 'installed-081-2.25'), (Join-Path $root 'installed-081-2.5'), (Join-Path $root 'installed-082-2'))
 $debugPorts = @()
 $cleanupSequence = 0
 $launchSequence = 0
@@ -461,6 +461,71 @@ try {
     Get-Content (Join-Path $r269Evidence '081-to-082-real-upgrade-summary.json')
     }
     Remove-Item Env:R269_LEGACY_SCALE
+
+    # R272: additional independent published 082 to candidate chain.
+    foreach ($legacyScale in @('2')) {
+    $env:R272_LEGACY_SCALE=$legacyScale
+    $r269Evidence=Join-Path $evidence ("082-to-083-"+$legacyScale)
+    New-Item -ItemType Directory -Force $r269Evidence | Out-Null
+    # Additional, independent published 0.12.82 -> candidate chain. Preferences
+    # are written through actual installed 082 UI handlers, never injected as
+    # sentinel files or restored into candidate localStorage by this harness.
+    Stop-InstalledApp
+    $install = Join-Path $root ("installed-082-"+$legacyScale)
+    New-Item -ItemType Directory -Force $install | Out-Null
+    $published082 = Join-Path $root 'Deep-Legends-Setup-0.12.82-public.exe'
+    Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.82/Deep-Legends-Setup-0.12.82-public.exe' -OutFile $published082
+    if ((Get-FileHash $published082 -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'c87bbeb6ea99eda83ec191c6026410851049e54ece9623ca4121ec70c06c88d6') { throw 'Published 0.12.82 setup checksum mismatch' }
+    Run-Setup $published082 -Version '0.12.82'
+    Assert-InstalledVersion '0.12.82'
+    Wait-R265InstallerLaunch
+    Stop-InstalledApp
+    $debugPort=Start-R265DebugApp
+    node scripts/r272-persisted-ui.cjs $debugPort write-settings $r269Evidence *> (Join-Path $r269Evidence '082-unmodified-settings-write.log')
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '082-unmodified-settings-write.log'); throw 'Unmodified published 082 UI did not write settings' }
+    node scripts/r272-persisted-ui.cjs $debugPort write-presets $r269Evidence *> (Join-Path $r269Evidence '082-format-presets-write.log')
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '082-format-presets-write.log'); throw 'Published 082 UI did not save presets' }
+    $actualPublished082Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r269Evidence '082-normal-close.json')
+    Stop-InstalledApp -ObserveOnly
+    $actualPublished082Files=@{}
+    foreach ($name in @('window-bounds.json','ui-scale.json')) {
+        $file=Join-Path $userData $name
+        if (-not (Test-Path $file)) { throw "Actual 082 persistent file missing: $name" }
+        Copy-Item $file (Join-Path $r269Evidence ("082-actual-before-"+$name)) -Force
+        $actualPublished082Files[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
+    }
+    $candidateSetupPath=(Resolve-Path $Setup).Path
+    Run-Setup $candidateSetupPath -Version $candidateVersion
+    Assert-InstalledVersion $candidateVersion
+    Wait-R265InstallerLaunch
+    Stop-InstalledApp
+    $debugPort=Start-R265DebugApp
+    node scripts/r272-persisted-ui.cjs $debugPort read $r269Evidence *> (Join-Path $r269Evidence '083-actual-ui-read.log')
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '083-actual-ui-read.log'); throw 'Actual 082 UI-written preferences changed after candidate upgrade' }
+    $actual083Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r269Evidence '083-normal-close.json')
+    Stop-InstalledApp -ObserveOnly
+    $debugPort=Start-R265DebugApp
+    node scripts/r272-persisted-ui.cjs $debugPort restart $r269Evidence *> (Join-Path $r269Evidence '083-preset-restart.log')
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '083-preset-restart.log'); throw 'Renamed preset was not retained after candidate restart' }
+    node scripts/r272-persisted-ui.cjs $debugPort corrupt $r269Evidence *> (Join-Path $r269Evidence '083-corrupt-preset.log')
+    if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '083-corrupt-preset.log'); throw 'Corrupt preset damaged other settings or was not discarded' }
+    Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r269Evidence '083-second-normal-close.json') | Out-Null
+    Stop-InstalledApp -ObserveOnly
+    $actualPublished082Comparisons=@()
+    foreach ($file in $actualPublished082Files.Keys) {
+        $after=(Get-FileHash $file -Algorithm SHA256).Hash
+        $actualPublished082Comparisons+=@{name=(Split-Path $file -Leaf);before_sha256=$actualPublished082Files[$file];after_sha256=$after}
+        if ((Split-Path $file -Leaf) -eq 'ui-scale.json') {
+            $scale=Get-Content $file -Raw | ConvertFrom-Json
+            if ($scale.mode -ne 'fixed' -or $scale.value -ne 2) { throw 'Published 082 zoom was not migrated to 2' }
+        } elseif ($after -ne $actualPublished082Files[$file]) { throw "Actual 082 persisted file changed after upgrade: $file" }
+        Copy-Item $file (Join-Path $r269Evidence ("083-actual-after-"+(Split-Path $file -Leaf))) -Force
+    }
+    $actualPublished082Comparisons | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $r269Evidence '082-to-083-persistent-files.json')
+    @{upgrade_from='0.12.82';upgrade_to=$candidateVersion;key_mode='public';setup082_sha256='c87bbeb6ea99eda83ec191c6026410851049e54ece9623ca4121ec70c06c88d6';settings_written_by='unmodified published 082 renderer UI';preset_scope='actual published 082 UI-written presets, no resource substitution';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;scale_before=2;scale_after=2;window_bounds_equal=$true;preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $r269Evidence '082-to-083-real-upgrade-summary.json')
+    Get-Content (Join-Path $r269Evidence '082-to-083-real-upgrade-summary.json')
+    }
+    Remove-Item Env:R272_LEGACY_SCALE
 
 } catch {
     # Capture before final cleanup, including foreign install paths/port owners.

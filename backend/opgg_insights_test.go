@@ -785,7 +785,7 @@ func TestRiotRateLimitRecordsDiagnosticAndRequestScopedCount(t *testing.T) {
 	}
 	filteredEvents := events[:0]
 	for _, event := range events {
-		if event["event"] != "riot_rate_limited" && event["event"] != "riot_request" {
+		if event["event"] != "riot_rate_limited" && event["event"] != "riot_request" && event["event"] != "same_credential" {
 			t.Fatalf("unexpected diagnostic: %v", event["event"])
 		}
 		if event["event"] == "riot_rate_limited" {

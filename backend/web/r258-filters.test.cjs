@@ -50,21 +50,21 @@ test('R258 P7 existing data tags obey ARAM/Arena eligibility, scope and numeric 
  tab.advancedConditions.performance=condition(['zero']);assert.equal(af.filter([rift],tab,c).length,1);
 });
 
-test('R258 P7 time uses backend season boundary and duration categories partition boundaries',()=>{
+test('R258 P7 time migrates the removed season value and duration categories partition boundaries',()=>{
  const c=ctx();for(const [duration,value] of [[1199,'short'],[1200,'medium'],[1800,'long'],[2400,'long'],[2401,'verylong']])assert.equal(af.filter([match(1,{durationSeconds:duration})],{advancedConditions:{duration:condition([value])}},c).length,1);
  const tab={advancedConditions:{time:condition(['season'])}};
- assert.equal(af.filter([match(1,{createdAt:'2026-01-07T23:59:59Z'})],tab,c).length,0);
- assert.equal(af.filter([match(1,{createdAt:'2026-01-08T00:00:00Z'})],tab,c).length,1);
+ assert.deepEqual(af.normalize(tab.advancedConditions),{});
+ assert(!af.options([],"time",c).some(o=>o.value==="season"));
 });
 
 function searchFixture() {
  const tab={advancedConditions:{hero:condition(['86'])},data:{pagination:{hasMore:true},matches:[]}},c=ctx();let cursor=0,calls=0,renders=0;
- Object.assign(c,{rows:()=>tab.data.matches,cursor:()=>cursor,isActive:()=>true,render:()=>renders++,load:async count=>{assert(count>0 && count<=20);assert(++calls<=20,'search passed 300-scanned limit');cursor+=count;return true;}});
+ Object.assign(c,{rows:()=>tab.data.matches,cursor:()=>cursor,isActive:()=>true,render:()=>renders++,load:async count=>{assert(count>0 && count<=20);assert(++calls<=20,'search passed 300-scanned limit');for(let i=0;i<count;i++){const m=match(cursor+i);m.participants[0].championId=1;tab.data.matches.push(m);}cursor+=count;return true;}});
  return {tab,c,get calls(){return calls},get renders(){return renders},setCursor:value=>cursor=value};
 }
 test('R258 P7 forward search stops at ten and caps scanned at 300, single flight',async()=>{
  let h=searchFixture();await af.find(h.tab,h.c);assert.equal(h.calls,15);assert.equal(h.tab.advancedSearch.scanned,300);assert.equal(h.tab.advancedSearch.running,false);
- h=searchFixture();h.c.load=async count=>{h.setCursor(count);h.tab.data.matches=Array.from({length:10},(_,i)=>{const m=match(i);m.participants[0].championId=86;return m;});return true;};await af.find(h.tab,h.c);assert.equal(h.tab.advancedSearch.scanned,20);
+ h=searchFixture();h.c.load=async count=>{h.setCursor(count);h.tab.data.matches=Array.from({length:10},(_,i)=>{const m=match(i);m.participants[0].championId=86;return m;});return true;};await af.find(h.tab,h.c);assert.equal(h.tab.advancedSearch.scanned,10);
  h=searchFixture();let resolve;h.c.load=()=>new Promise(r=>resolve=r);const first=af.find(h.tab,h.c);assert.equal(await af.find(h.tab,h.c),false);let aborted=0;af.cancel(h.tab,()=>aborted++);resolve(true);await first;assert.equal(aborted,1);assert.equal(h.tab.advancedSearch.scanned,0);assert.equal(h.tab.advancedSearch.running,false);
 });
 

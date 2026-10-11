@@ -116,19 +116,7 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 	var raw json.RawMessage
 	source := ""
 	found := false
-	if a.sgp != nil && clientRiotPlatform(client) == "" && serverID != "" && !isRemoteTencentServer(client, serverID) {
-		if stats, err := a.sgp.rankedStatsOn(ctx, client, serverID, playerRef, isCurrent, privacy); err == nil {
-			source = dataSourceSGP
-			for _, queue := range stats.Queues {
-				if queue.QueueType == "CHERRY" {
-					tier, rating, found = queue.RatedTier, queue.RatedRating, true
-					raw = stats.cherryRaw
-					break
-				}
-			}
-		}
-	}
-	if source == "" && client != nil {
+	if client != nil && !isRemoteTencentServer(client, serverID) {
 		path := "/lol-ranked/v1/ranked-stats/" + url.PathEscape(playerRef)
 		if isCurrent {
 			path = "/lol-ranked/v1/current-ranked-stats"
@@ -144,6 +132,18 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 				}
 				if json.Unmarshal(entry, &queue) == nil && queue.QueueType == "CHERRY" {
 					tier, rating, found, raw = queue.RatedTier, queue.RatedRating, true, entry
+					break
+				}
+			}
+		}
+	}
+	if !found && a.sgp != nil && clientRiotPlatform(client) == "" && serverID != "" && !isRemoteTencentServer(client, serverID) {
+		if stats, err := a.sgp.rankedStatsOn(ctx, client, serverID, playerRef, isCurrent, privacy); err == nil {
+			source = dataSourceSGP
+			for _, queue := range stats.Queues {
+				if queue.QueueType == "CHERRY" {
+					tier, rating, found = queue.RatedTier, queue.RatedRating, true
+					raw = stats.cherryRaw
 					break
 				}
 			}

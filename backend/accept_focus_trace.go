@@ -101,11 +101,15 @@ func startAcceptFocusTrace(ctx context.Context, client *LCUClient, delayMS int, 
 			state["foreground_is_original"] = original.window != 0 && foreground.window == original.window
 			previousWindow = foreground.window
 			samples++
-			raw, _ := json.Marshal(state)
-			if string(raw) != previous || samples%10 == 0 {
-				if string(raw) != previous {
-					changes++
+			signature := map[string]any{}
+			for k, v := range state {
+				if k == "client_windows" || k == "foreground" || k == "observation_available" {
+					signature[k] = v
 				}
+			}
+			raw, _ := json.Marshal(signature)
+			if string(raw) != previous {
+				changes++
 				state["event"] = "accept_focus_window"
 				state["sample"] = samples
 				t.emit(state)

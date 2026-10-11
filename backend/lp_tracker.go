@@ -84,6 +84,7 @@ type lpTracker struct {
 	baselineDiagnostics map[string]lpBaselineDiagnostic
 	staleRejections     map[string]time.Time
 	invalidateRanks     func(string)
+	onRecorded          func(string)
 }
 
 func newLPTracker(store *localStore) *lpTracker {
@@ -284,12 +285,16 @@ func (t *lpTracker) annotate(matches []gameplayMatch, playerRef string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for index := range matches {
+		if _, ranked := lpRankedQueues[matches[index].QueueID]; !ranked || matches[index].Result == "remake" {
+			continue
+		}
 		record, ok := t.history.Games[strconv.FormatInt(matches[index].GameID, 10)]
 		if !ok || record.AccountHash != accountHash {
 			continue
 		}
 		delta := record.Delta
 		matches[index].LpDelta = &delta
+		updateMatchRevision(&matches[index])
 	}
 }
 
@@ -680,6 +685,9 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 			t.history.Games[gameKey] = lpGameRecord{hash, queue, after - before, t.now().UnixMilli()}
 			t.mu.Unlock()
 			t.recordObservation(diagnostic("lp_capture_recorded", "", snapshot, source))
+			if t.onRecorded != nil {
+				t.onRecorded(playerRef)
+			}
 			return
 		}
 		if !firstChanged {
@@ -728,6 +736,9 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 		t.history.Games[gameKey] = lpGameRecord{hash, queue, delta, t.now().UnixMilli()}
 		t.mu.Unlock()
 		t.recordObservation(diagnostic("lp_capture_recorded", "", snapshot, source))
+		if t.onRecorded != nil {
+			t.onRecorded(playerRef)
+		}
 		return
 	}
 	if hasStart && seenMismatch && !seenSameSource {

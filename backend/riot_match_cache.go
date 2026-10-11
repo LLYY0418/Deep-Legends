@@ -61,9 +61,16 @@ func (p *riotProvider) persistRiotMatch(key string, match *riotMatch) {
 	}
 	hash := sha256.Sum256(data)
 	now := time.Now()
-	_ = p.matchDisk.writeDisk(championCacheEnvelope{Schema: championCacheSchema, Key: key,
+	if p.matchDisk == nil || p.matchDisk.dir == "" {
+		p.routeRecord(map[string]any{"event": "riot_match_disk_write", "result": "disabled", "reason": "directory_unavailable"})
+		return
+	}
+	err = p.matchDisk.writeDisk(championCacheEnvelope{Schema: championCacheSchema, Key: key,
 		FetchedAt: now,
 		Hash:      hex.EncodeToString(hash[:]), Data: data})
+	if err != nil {
+		p.routeRecord(map[string]any{"event": "riot_match_disk_write", "result": "failed", "reason": "write_failed"})
+	}
 }
 
 func validRiotMatchContents(match *riotMatch, id string) bool {

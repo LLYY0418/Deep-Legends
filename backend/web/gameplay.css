@@ -2291,3 +2291,11 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .career-pending.gameplay-skeleton span:nth-child(2) { max-width: 60%; }
 @media(max-width:900px) { .match-skeleton.gameplay-skeleton { grid-template-columns: 50px 48px minmax(80px,1fr); } .match-skeleton span:nth-child(n+4) { display: none; } }
 [data-match-layout][data-icon-overlap] { grid-template-columns: 124px minmax(0,96px) minmax(0,1fr); }
+
+/* R272: the full-page skeleton shares the R267 luminance treatment. */
+.overview-strip-skeleton { min-height: 116px; display: grid; grid-template-columns: 72px minmax(120px,1fr) 160px; gap: 18px; align-items: center; }
+.overview-strip-skeleton > span { height: 48px; }
+.match-filterbar.gameplay-skeleton { min-height: 42px; }
+[data-champselect-insight].live-player { padding-top: 13px; padding-bottom: 13px; }
+[data-champselect-insight] .live-recent-positions { margin-top: 10px; }
+[data-champselect-insight] .live-rank-title { color: var(--primary-strong); font-weight: 700; }

@@ -89,7 +89,7 @@ test("炫彩横栏包含臻彩并只显示去掉所属皮肤后的短名称", ()
   assert.match(source, /chroma-mini-name/);
   assert.match(source, /chroma-prestige-badge/);
   assert.match(source, /chromaImageSources\(chroma, "ordinary"\)/);
-  assert.match(source, /openChromaDetails\(chroma, parent\.items, \{ artworkMode: "ordinary" \}\)/);
+  assert.match(source, /openChromaDetails\(button\._collectionSkin, button\._collectionCandidates, \{ artworkMode: "ordinary" \}\)/);
 });
 
 test("臻彩详情可在普通炫彩图与独立原画之间切换", () => {
@@ -182,6 +182,7 @@ test("卡片资源采用可视区延迟加载且远程臻彩受独立并发限�
   assert.match(source, /new IntersectionObserver/);
   assert.match(source, /rootMargin:\s*"620px 0px"/);
   assert.match(source, /state\.activePrestigeCardImages < 2/);
-  assert.match(functionSource("makeChromaStack"), /deferCardImageSources/);
+  assert.match(functionSource("makeChromaStack"), /makeChromaMiniCard/);
+  assert.match(functionSource("makeChromaMiniCard"), /deferCardImageSources/);
   assert.match(source, /function makeSkinCard[\s\S]{0,1800}deferCardImageSources/);
 });

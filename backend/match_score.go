@@ -205,6 +205,10 @@ func applyMatchScores(m *gameplayMatch) {
 	for i := range m.Participants {
 		m.Participants[i].Score = scores[m.Participants[i].ParticipantID]
 	}
+	updateMatchRevision(m)
+}
+
+func updateMatchRevision(m *gameplayMatch) {
 	m.Revision = ""
 	if data, err := json.Marshal(m); err == nil {
 		sum := sha256.Sum256(data)
@@ -239,6 +243,20 @@ func (a *app) recordMatchScores(source string, m gameplayMatch, contexts ...cont
 		}
 	}
 	if !valid {
+		if m.Result == "remake" {
+			batch.remakeSkipped++
+			return
+		}
+		reason := "missing_score"
+		if m.Result == "unknown" {
+			reason = "unknown_result"
+		} else if len(m.Participants) < 2 {
+			reason = "single_participant"
+		}
+		if batch.failedReasons == nil {
+			batch.failedReasons = map[string]int{}
+		}
+		batch.failedReasons[reason]++
 		batch.failed++
 		if batch.failed <= 3 {
 			a.recordDiagnostic(map[string]any{"event": "match_score_failed", "source": source, "reason": "missing_score", "version": matchScoreParamVersion})

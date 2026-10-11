@@ -49,12 +49,13 @@ try {
     $hostLines = @(Save-R271RunnerHost $evidence)
     $hostRecord = Get-Content (Join-Path $evidence 'r271-runner-host.json') -Raw | ConvertFrom-Json
     Assert-R271 ($hostRecord.cpu_names[0] -eq 'synthetic Intel Xeon 6973P-C' -and $hostRecord.windows_version -eq '10.0.fixture') 'CPU and Windows version must be preserved'
-    foreach ($version in @('0.12.65','0.12.68','0.12.76','0.12.79','0.12.80','0.12.81','0.12.82')) {
+    foreach ($version in @('0.12.65','0.12.68','0.12.76','0.12.79','0.12.80','0.12.81','0.12.82','0.12.83')) {
         $script:fixtureVersion = $version; $script:fixtureFile = Join-Path $fixture ("Setup-$version.exe"); [IO.File]::WriteAllText($script:fixtureFile, 'unchanged synthetic installer')
         $script:fixtureExit = 0
         Run-Setup -File $script:fixtureFile -Version $version | Out-Null
         Assert-R271 (($script:lastSetupDeadline - (Get-Date)).TotalSeconds -ge 178 -and ($script:lastSetupDeadline - (Get-Date)).TotalSeconds -le 180) 'original 180 second deadline must remain'
     }
+    $script:fixtureVersion = '0.12.82'; $script:fixtureFile = Join-Path $fixture 'Setup-0.12.82.exe'
     $script:fixtureExit = 2
     $output = New-Object 'System.Collections.Generic.List[string]'
     $failure = ''
@@ -70,6 +71,6 @@ try {
     $script:queryFails = $true
     try { Run-Setup -File $script:fixtureFile -Version '0.12.82' | Out-Null } catch { $failure = $_.Exception.Message }
     Assert-R271 ($failure -eq 'Real installer failed: 2') 'event log failure must not replace installer failure'
-    Assert-R271 ($script:flushCalls -eq 9) 'redirected output must finish before success or failure is handled'
-    Write-Output 'PASS R271 actual Run-Setup redirects seven versions, preserves arguments/deadline, captures failure tails, filters events and redacts output'
+    Assert-R271 ($script:flushCalls -eq 10) 'redirected output must finish before success or failure is handled'
+    Write-Output 'PASS R271 actual Run-Setup redirects eight versions, preserves arguments/deadline, captures failure tails, filters events and redacts output'
 } finally { $env:TEMP = $oldTemp; $env:TMP = $oldTmp; Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction SilentlyContinue }

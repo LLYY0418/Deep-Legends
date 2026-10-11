@@ -63,7 +63,9 @@ test("R123 favorites page exposes the facade collection subpage", () => {
   assert.match(html, /aria-label="头像与旗帜视图"/);
   assert.match(html, /id="favorites-facade-panel"/);
   assert.match(html, /id="facade-detail-dialog"/);
-  assert.match(html, /src="\/favorites-facade\.js"/);
+  assert.doesNotMatch(html, /src="\/favorites-facade\.js"/);
+  assert.match(fs.readFileSync(path.join(__dirname,"section-loader.js"),"utf8"),/favorites:\s*\["favorites-facade"\]/);
+  assert.match(facadeSource,/register\('favorites-facade'/);
   assert.match(html, /头像旗帜与拥有状态/);
   assert.match(html, /<div id="facade-list-meta"[^>]*><\/div>/, "断连占位文案不得预置「等待客户端数据」");
   assert.match(facadeSource, /el\.toolbar\.hidden = true;/);

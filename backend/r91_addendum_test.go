@@ -148,8 +148,8 @@ func TestR91AddendumOneRequestStreamsFiveThenTwenty(t *testing.T) {
 		if frame.Type != "progress" {
 			break
 		}
-		if len(frame.Overview.Matches) < 5 || len(frame.Overview.Matches) > 20 {
-			t.Fatal("invalid cumulative preview")
+		if !frame.Overview.MatchesDelta || len(frame.Overview.Matches) > 20 || !frame.Overview.Pagination.Partial {
+			t.Fatal("invalid pending delta preview")
 		}
 	}
 	if err := scanner.Err(); err != nil {

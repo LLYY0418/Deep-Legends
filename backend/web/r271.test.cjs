@@ -25,7 +25,7 @@ test('R271 committing a filter keeps the overview shell and flushes deferred dat
  for(let i=0;i<5;i++)f.advancedFilterContext(tab).change();assert.equal(filtered,5,'filter commits must update the match view without rebuilding the career/header shell');assert.equal(full,0);assert.equal(tab.matchViewRevision,5);assert.equal(canceled,5);assert.equal(tab.filteredVisibleCount,20);
  tab.overviewRenderDeferred=true;f.advancedFilterContext(tab).change();assert.equal(full,1,'an asynchronous data update deferred while editing must be rendered');assert.equal(tab.overviewRenderDeferred,false);root._overviewViewTab={};f.advancedFilterContext(tab).change();assert.equal(full,2,'a reused view must take the complete ownership-safe render path');dom.window.close();
 });
-test('R271 the real PowerShell setup collector preserves failure diagnostics and seven version launches',()=>{
+test('R271 the real PowerShell setup collector preserves failure diagnostics and eight version launches',()=>{
  const {spawnSync}=require('node:child_process'),root=path.resolve(__dirname,'../..');
  const args=['-NoProfile','-File',path.join(root,'scripts/r271-installer-diagnostics.test.ps1')];
  if(process.env.R271_RUN_SOURCE)args.push('-RunSource',process.env.R271_RUN_SOURCE);

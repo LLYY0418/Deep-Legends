@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -226,12 +227,16 @@ func (p *riotProvider) observeEmbeddedQuota(header http.Header, status int) {
 		if riotUserKeys.quotaWindowAt.IsZero() || time.Since(riotUserKeys.quotaWindowAt) >= 120*time.Second {
 			riotUserKeys.quotaWindowAt = time.Now()
 		}
-		if count*5 >= limit*4 {
-			riotUserKeys.routeUntil = riotUserKeys.quotaWindowAt.Add(120 * time.Second)
+		until := riotUserKeys.quotaWindowAt.Add(120 * time.Second)
+		wait := time.Until(until)
+		relay, direct := riotRouteMedianCosts()
+		useRelay := count*5 >= limit*4
+		if useRelay {
+			riotUserKeys.routeUntil = until
 		}
 		riotUserKeys.mu.Unlock()
 		if count*5 >= limit*4 {
-			p.routeRecord(map[string]any{"event": "riot_quota_guard", "count": count, "limit": limit, "window_s": 120, "action": "relay"})
+			p.routeRecord(map[string]any{"event": "riot_quota_guard", "count": count, "limit": limit, "window_s": 120, "action": map[bool]string{true: "relay", false: "direct"}[useRelay], "wait_ms": wait.Milliseconds(), "relay_median_ms": relay.Milliseconds(), "direct_median_ms": direct.Milliseconds()})
 		}
 	}
 
@@ -242,4 +247,19 @@ func riotAttemptBudget(path string) time.Duration {
 		return 8 * time.Second
 	}
 	return 15 * time.Second
+}
+
+func riotRouteMedianCosts() (time.Duration, time.Duration) {
+	riotRelays.mu.Lock()
+	defer riotRelays.mu.Unlock()
+	median := func(label string, fallback time.Duration) time.Duration {
+		entry := riotRelays.entrySummaries[label]
+		if entry == nil || len(entry.TTFBMillis) < 3 {
+			return fallback
+		}
+		values := append([]float64(nil), entry.TTFBMillis[max(0, len(entry.TTFBMillis)-20):]...)
+		sort.Float64s(values)
+		return time.Duration(values[len(values)/2] * float64(time.Millisecond))
+	}
+	return median("A", 8*time.Second), median("direct", 500*time.Millisecond)
 }
