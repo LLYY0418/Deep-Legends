@@ -32,11 +32,16 @@ class HexdataSummaryTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name);self.folder=self.root/'job';(self.folder/'0/hexdata').mkdir(parents=True)
         self.rows=[dict(kind='windows-hexdata',index=0,iteration=0,label='hexdata',job='windows-hexdata-0',run='1',sha='fixture-sha',duration_ms=100,exitCode=0,signatures=[])]
         self.jobs=[dict(jobs=[dict(name='windows-hexdata-0',conclusion='success',html_url='https://github.com/fixture/repo/actions/runs/1/job/2')])]
-        command=['go','test','-race','-json','-count=200','-cpu=1,2,4','-run','^('+'|'.join(module.HEXDATA_TESTS)+')$','./backend']
-        self.stress=dict(platform='win32',sha='fixture-sha',count=200,cpu=[1,2,4],command=command,exitCode=0,rows=[dict(test=t,passed=600,failed=0,samples=600) for t in module.HEXDATA_TESTS])
-        self.events=[dict(Action='pass',Test=t,Elapsed=0.01) for t in module.HEXDATA_TESTS for _ in range(600)]
+        self.stress=dict(platform='win32',sha='fixture-sha',count=200,cpu=[1,2,4],strategy='per-test-default-timeout',exitCode=0,rows=[dict(test=t,passed=600,failed=0,samples=600) for t in module.HEXDATA_TESTS],invocations=[])
+        self.parts=[]
+        for i,t in enumerate(module.HEXDATA_TESTS):
+            command=['go','test','-race','-json','-count=200','-cpu=1,2,4','-run','^('+t+')$','./backend']
+            self.stress['invocations'].append(dict(test=t,command=command,exitCode=0,error=None,raw='invocation-'+str(i)+'.jsonl',duration_ms=100))
+            self.parts.append([dict(Action='pass',Package='lol-loot-assistant/backend',Test=t,Elapsed=0.01) for _ in range(600)]+[dict(Action='pass',Package='lol-loot-assistant/backend',Elapsed=6)])
+        self.events=[e for part in self.parts for e in part]
     def result(self):
         (self.folder/'samples.json').write_text(json.dumps(self.rows));(self.folder/'0/hexdata/stress-summary.json').write_text(json.dumps(self.stress));(self.folder/'0/hexdata/stress.jsonl').write_text('\n'.join(json.dumps(e) for e in self.events)+'\n')
+        for i,part in enumerate(self.parts):(self.folder/'0/hexdata'/('invocation-'+str(i)+'.jsonl')).write_text('\n'.join(json.dumps(e) for e in part)+'\n')
         return module.summarize(self.root,self.jobs,'fixture/repo',1,inventory={},catalog=[],plan=[('windows-hexdata',0,1)])
     def test_complete_stress_and_metrics(self):
         r=self.result();self.assertTrue(r['success']);self.assertEqual(r['hexdataStress'][0]['rows'][0]['samples'],600);self.assertEqual(r['metrics']['windows-hexdata/'+module.HEXDATA_TESTS[0]]['count'],600)
@@ -45,11 +50,23 @@ class HexdataSummaryTests(unittest.TestCase):
     def test_missing_test_rejected(self):
         self.stress['rows'].pop();self.assertFalse(self.result()['success'])
     def test_wrong_count_cpu_or_race_rejected(self):
-        self.stress['command'].remove('-race');self.assertFalse(self.result()['success'])
+        self.stress['invocations'][0]['command'].remove('-race');self.assertFalse(self.result()['success'])
     def test_failed_stress_rejected(self):
         self.stress['rows'][0].update(passed=599,failed=1);self.assertFalse(self.result()['success'])
     def test_raw_failure_cannot_hide_in_clean_summary(self):
         self.events.append(dict(Action='fail',Test=module.HEXDATA_TESTS[0]));self.assertFalse(self.result()['success'])
+    def test_missing_invocation_rejected(self):
+        self.stress['invocations'].pop();self.assertFalse(self.result()['success'])
+    def test_grouped_package_fuse_rejected(self):
+        self.stress['invocations'][0]['command'][-2]='^('+'|'.join(module.HEXDATA_TESTS)+')$';self.assertFalse(self.result()['success'])
+    def test_invocation_failure_cannot_hide_in_combined(self):
+        self.parts[0].append(dict(Action='fail'));self.assertFalse(self.result()['success'])
+    def test_ten_minute_fuse_cannot_be_extended(self):
+        self.stress['invocations'][0]['command'].insert(2,'-timeout=20m');self.assertFalse(self.result()['success'])
+    def test_wrong_package_pass_rejected(self):
+        self.parts[0][-1]['Package']='other';self.assertFalse(self.result()['success'])
+    def test_partial_package_pass_rejected(self):
+        self.parts[0].pop();self.assertFalse(self.result()['success'])
     def test_wrong_sha_rejected(self):
         self.stress['sha']='other';self.assertFalse(self.result()['success'])
 

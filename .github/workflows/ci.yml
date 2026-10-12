@@ -64,6 +64,12 @@ jobs:
         run: node scripts/r276-cleanup-mutations.cjs "$RUNNER_TEMP/r276-cleanup-mutations"
       - name: R276 precise API fault policy regression and mutations
         run: node scripts/r276-api-policy-mutations.cjs "$RUNNER_TEMP/r276-api-policy-mutations"
+      - name: R276 default-timeout stress partition regression and mutations
+        run: node scripts/r276-hexdata-stress-mutations.cjs "$RUNNER_TEMP/r276-hexdata-stress-mutations"
+      - name: R276 filter geometry fixture regression and mutation
+        run: node scripts/r276-filter-geometry-mutations.cjs "$RUNNER_TEMP/r276-filter-geometry-mutations"
+      - name: R276 canceled update-probe fixture regression and mutation
+        run: python3 scripts/r276-update-probe-mutations.py --out "$RUNNER_TEMP/r276-update-probe-mutations"
       - name: Verify sweep evidence rejects missing samples
         run: python3 scripts/r276-sweep-summary.test.py
       - uses: actions/upload-artifact@v4
@@ -84,6 +90,9 @@ jobs:
             ${{ runner.temp }}/r276-installed-demo-mutations/**
             ${{ runner.temp }}/r276-recovery-scope-mutations/**
             ${{ runner.temp }}/r276-translation-fixture-mutations/**
+            ${{ runner.temp }}/r276-hexdata-stress-mutations/**
+            ${{ runner.temp }}/r276-filter-geometry-mutations/**
+            ${{ runner.temp }}/r276-update-probe-mutations/**
           if-no-files-found: error
       - name: Vet
         run: go vet ./...

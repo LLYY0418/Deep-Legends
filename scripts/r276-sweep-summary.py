@@ -72,14 +72,25 @@ def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN,upgrade
             base=directory/str(iteration)
             if kind in ['linux-hexdata','windows-hexdata']:
                 stress=read(base/'hexdata/stress-summary.json');platform='linux' if kind=='linux-hexdata' else 'win32'
-                expected_command=['go','test','-race','-json','-count=200','-cpu=1,2,4','-run','^('+'|'.join(HEXDATA_TESTS)+')$','./backend']
                 if not isinstance(stress,dict):continue
                 stress_rows=stress.get('rows',[])
-                if stress.get('platform')!=platform or stress.get('sha')!=rows[0].get('sha') or stress.get('count')!=200 or stress.get('cpu')!=[1,2,4] or stress.get('command')!=expected_command or stress.get('exitCode')!=0:errors.append('wrong Hexdata stress command/identity '+name)
+                if stress.get('platform')!=platform or stress.get('sha')!=rows[0].get('sha') or stress.get('count')!=200 or stress.get('cpu')!=[1,2,4] or stress.get('strategy')!='per-test-default-timeout' or stress.get('exitCode')!=0:errors.append('wrong Hexdata stress command/identity '+name)
                 if sorted(r.get('test','') for r in stress_rows)!=sorted(HEXDATA_TESTS):errors.append('incomplete Hexdata test inventory '+name)
                 try:events=[json.loads(line) for line in (base/'hexdata/stress.jsonl').read_text().splitlines() if line]
                 except (OSError,ValueError):events=[];errors.append('missing/invalid Hexdata raw events '+name)
                 if any(e.get('Action')=='fail' for e in events) or any('WARNING: DATA RACE' in e.get('Output','') for e in events):errors.append('failed/racing Hexdata raw events '+name)
+                invocations=stress.get('invocations',[]);combined=[]
+                if [i.get('test') for i in invocations]!=HEXDATA_TESTS:errors.append('incomplete/duplicate Hexdata invocation inventory '+name)
+                for index,invocation in enumerate(invocations):
+                    test=invocation.get('test');raw='invocation-'+str(index)+'.jsonl'
+                    command=['go','test','-race','-json','-count=200','-cpu=1,2,4','-run','^('+str(test)+')$','./backend']
+                    if invocation.get('command')!=command or invocation.get('raw')!=raw or invocation.get('exitCode')!=0 or invocation.get('error') is not None:errors.append('invalid Hexdata invocation command/status '+name+'/'+str(test))
+                    try:part=[json.loads(line) for line in (base/'hexdata'/raw).read_text().splitlines() if line]
+                    except (OSError,ValueError):part=[];errors.append('missing/invalid Hexdata invocation raw '+name+'/'+str(test))
+                    combined.extend(part)
+                    if sum(e.get('Action')=='pass' and e.get('Package')=='lol-loot-assistant/backend' and e.get('Test')==test for e in part)!=600 or sum(e.get('Action')=='pass' and e.get('Package')=='lol-loot-assistant/backend' and not e.get('Test') for e in part)!=1 or any(e.get('Action')=='fail' or 'WARNING: DATA RACE' in e.get('Output','') for e in part):errors.append('failed/partial Hexdata invocation '+name+'/'+str(test))
+                if combined!=events:errors.append('Hexdata combined raw differs from invocation evidence '+name)
+
                 for test in HEXDATA_TESTS:
                     evidence=[r for r in stress_rows if r.get('test')==test]
                     passes=[e for e in events if e.get('Action')=='pass' and e.get('Test')==test]

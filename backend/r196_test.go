@@ -21,14 +21,19 @@ type r196RoundTrip func(*http.Request) (*http.Response, error)
 func (f r196RoundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 type r196Events struct {
-	mu   sync.Mutex
-	rows []map[string]any
+	mu               sync.Mutex
+	rows             []map[string]any
+	probeCompleted   chan struct{}
+	probeWaitStarted chan struct{}
 }
 
 func (e *r196Events) record(row map[string]any) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.rows = append(e.rows, row)
+	if e.probeCompleted != nil && row["event"] == "update_download_probe" {
+		e.probeCompleted <- struct{}{}
+	}
 }
 func (e *r196Events) named(name string) []map[string]any {
 	e.mu.Lock()
@@ -74,7 +79,7 @@ func TestR196ProbeSelectsFastMirror(t *testing.T) {
 	data := bytes.Repeat([]byte("installer"), 256*1024)
 	u := updateTestManager(t, data)
 	u.mirrors = []string{"", "https://fast.test/", "https://html.test/"}
-	events := &r196Events{}
+	events := &r196Events{probeCompleted: make(chan struct{}, 3)}
 	u.diagnostic = events.record
 	var starts atomic.Int32
 	var selected string
@@ -107,9 +112,10 @@ func TestR196ProbeSelectsFastMirror(t *testing.T) {
 	u.mu.Lock()
 	done := u.downloadDone
 	u.mu.Unlock()
+	probeWatchdog := time.After(10 * time.Second)
 	select {
 	case <-done:
-	case <-time.After(10 * time.Second):
+	case <-probeWatchdog:
 		t.Fatal("probe race stuck")
 	}
 	mu.Lock()
@@ -118,6 +124,7 @@ func TestR196ProbeSelectsFastMirror(t *testing.T) {
 	if got != "fast.test" || u.Status().State != "ready" || starts.Load() != 3 {
 		t.Fatalf("selection=%s status=%+v starts=%d", got, u.Status(), starts.Load())
 	}
+	r276WaitUpdateProbeDiagnostics(t, events, probeWatchdog)
 	probes := events.named("update_download_probe")
 	if len(probes) != 3 {
 		t.Fatalf("probes=%v", probes)

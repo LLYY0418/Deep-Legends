@@ -3,6 +3,7 @@ const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 const {browserAPI}=require('./r276-browser-api-fixtures.cjs');
 const {freshChromeFixture}=require('./r276-fresh-chrome-fixture.cjs');
+const {settleFilterGeometry}=require('./r276-filter-geometry-fixture.cjs');
 // Real public backend and its CSP/assets, with explicit synthetic API fixtures.
 const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=process.env.R266_BROWSER_OUT||path.join(os.tmpdir(),'deep-legends-r266-browser');
@@ -95,11 +96,12 @@ async function start(){
   await click('.match-filterbar [data-history-filter-load],.match-filterbar [data-af-open]');await until("document.querySelector('[data-af-menu]')?.open");await click('[data-af-category="hero"]');
   const dialog=await evaluate("(()=>{const r=document.querySelector('[data-af-menu]').getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height,cx:r.left+r.width/2,cy:r.top+r.height/2}})()");assert(Math.abs(dialog.cx-width/2)<1 && Math.abs(dialog.cy-height/2)<1,JSON.stringify(dialog));
   assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-af-page]')].map(n=>n.textContent)"),['条件','常用']);
-  await evaluate("window.__r266Tasks=[];new PerformanceObserver(list=>__r266Tasks.push(...list.getEntries().map(e=>({start:e.startTime,duration:e.duration})))).observe({type:'longtask'});window.__r266ListMutations=0;new MutationObserver(records=>__r266ListMutations+=records.length).observe(document.querySelector('.match-list'),{childList:true,subtree:true});window.__r266Options=[...document.querySelectorAll('[data-af-option]')];window.__r266Images=__r266Options.map(n=>n.querySelector('img'));window.__r266ClickStart=performance.now()");
+  await settleFilterGeometry(evaluate);
+  await evaluate("window.__r266Tasks=[];new PerformanceObserver(list=>__r266Tasks.push(...list.getEntries().map(e=>({start:e.startTime,duration:e.duration})))).observe({type:'longtask'});window.__r266ListMutations=0;window.__r266MutationDetails=[];new MutationObserver(records=>{__r266ListMutations+=records.length;for(const record of records)if(__r266MutationDetails.length<40)__r266MutationDetails.push({at:performance.now(),target:record.target.className,added:[...record.addedNodes].map(n=>({type:n.nodeType,className:n.className,text:n.nodeType===3&&/^\\+\\d+$/.test(n.textContent)?n.textContent:null})),removed:record.removedNodes.length});}).observe(document.querySelector('.match-list'),{childList:true,subtree:true});window.__r266Options=[...document.querySelectorAll('[data-af-option]')];window.__r266Images=__r266Options.map(n=>n.querySelector('img'));window.__r266ClickStart=performance.now()");
   if(process.env.R276_TRACE)await evaluate("performance.mark('r276-option103-start')");await click('[data-af-option="103"]');await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
-  clickEvidence=await evaluate("({clickStart:__r266ClickStart,clickEnd:performance.now(),tasks:__r266Tasks.filter(t=>t.start>=__r266ClickStart),catalogFlight:__r266Game.state.historyFilterCatalogFlight,catalogReady:!!__r266Game.state.historyFilterCatalog})");
+  clickEvidence=await evaluate("({clickStart:__r266ClickStart,clickEnd:performance.now(),tasks:__r266Tasks.filter(t=>t.start>=__r266ClickStart),catalogFlight:__r266Game.state.historyFilterCatalogFlight,catalogReady:!!__r266Game.state.historyFilterCatalog,listMutations:__r266ListMutations,mutationDetails:__r266MutationDetails})");
   {
-    const keepTrace=process.env.R276_TRACE || clickEvidence.tasks.reduce((n,t)=>n+t.duration,0)>100;
+    const keepTrace=process.env.R276_TRACE || clickEvidence.listMutations>0 || clickEvidence.tasks.reduce((n,t)=>n+t.duration,0)>100;
     if(keepTrace)fs.writeFileSync(path.join(out,`${theme}-${width}-click-evidence.json`),JSON.stringify(clickEvidence,null,2));
     const finished=new Promise(resolve=>{const handler=e=>{const m=JSON.parse(e.data);if(m.method==='Tracing.tracingComplete'){ws.removeEventListener('message',handler);resolve(m.params.stream);}};ws.addEventListener('message',handler);});
     await send('Tracing.end');const stream=await finished;let trace='';
