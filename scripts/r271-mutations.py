@@ -2,6 +2,8 @@
 import argparse,json,os,subprocess,tempfile,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
+import runpy
+_proof=runpy.run_path(str(ROOT/'scripts/mutation-source-proof.py'));_snapshot=_proof['snapshot'](ROOT)
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);p.add_argument('--browser',action='store_true');args=p.parse_args();args.out.mkdir(parents=True,exist_ok=True);rows=[]
 def run(name,env=None,negative=False,cmd=None):
  t=time.monotonic();r=subprocess.run(cmd or ['node','--test','backend/web/r271.test.cjs'],cwd=ROOT,env={**os.environ,**(env or {})},capture_output=True,text=True,timeout=180);log=r.stdout+r.stderr;(args.out/(name+'.log')).write_text(log)
@@ -22,3 +24,5 @@ with tempfile.TemporaryDirectory(prefix='r271-mutants-') as tmp:
   web=tmp/'web';web.mkdir();(web/'gameplay.js').write_text(mutant)
   run('native-full-overview-filter-commit',{'R266_WEB_OVERRIDE':str(web),'R269_BROWSER_OUT':str(args.out/'native-mutant')},True,['node','scripts/r269-browser.cjs'])
  run('restored')
+
+_proof['unchanged'](ROOT,_snapshot)

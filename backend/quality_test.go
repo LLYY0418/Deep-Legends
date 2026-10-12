@@ -1041,6 +1041,7 @@ func TestDiagnosticLogExportFilenameChangesWithExportTime(t *testing.T) {
 }
 
 func TestDiagnosticsExposeCurrentLogSizeAndEventCount(t *testing.T) {
+	r276IsolateRelaySummary(t)
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "logs"), 0o700); err != nil {
 		t.Fatal(err)

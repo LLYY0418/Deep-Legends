@@ -163,125 +163,62 @@ test('R117 item set skip diagnostics execute in both rejected branches', async (
   assert.equal(diagnostics[0].detail.reason, 'missing-champion-id');
   assert.equal(apiCalls, 0, '两个拒绝分支都不得发出写请求');
 });
-test('R117 real Chromium guards are wired into CI and cannot silently skip', () => {
-  const ciPath = path.join(root, '..', '..', '.github', 'workflows', 'ci.yml');
-  const ci = fs.readFileSync(ciPath, 'utf8');
-  // P1-2 的根因是「脚本存在但从不在 CI 执行」。只做子串匹配的话，给这一步加一行
-  // continue-on-error: true 就能把失败吞掉而测试照样绿，所以这里解析 YAML 按结构断言。
-  const yaml = require('../../desktop/node_modules/js-yaml');
-  const workflow = yaml.load(ci);
-  const quality = workflow.jobs.quality;
-  const steps = quality.steps;
-  const guard = steps.find((step) => step?.name === 'Real Chromium image-queue and lazy-CSS guards');
-  assert.equal(quality['continue-on-error'], undefined, 'job 级 continue-on-error 会让整个 job 的失败被吞掉');
-  assert.equal(quality.if, undefined, 'job 级 if 会让整个 job 在默认 push/PR 流程里被跳过');
-  assert.ok(guard, 'CI quality job 里找不到真 Chromium 护栏步骤');
-  assert.equal(guard['continue-on-error'], undefined, 'continue-on-error 会吞掉浏览器护栏的失败');
-  assert.equal(guard.if, undefined, '条件执行会让护栏在默认路径上被整步跳过');
-  for (const step of steps) {
-    assert.notEqual(step['continue-on-error'], true, `步骤「${step.name}」用 continue-on-error 吞掉了失败`);
+function verifyR117ChromiumWiring(workflow, runner, catalog) {
+  const quality = workflow.jobs.quality, browser = workflow.jobs['browser-main'];
+  assert.ok(quality && browser, 'quality and browser-main must exist');
+  const allowedJobKeys = ['name','needs','runs-on','steps','permissions','environment','container','services','outputs'];
+  for (const [name, job] of [['quality',quality],['browser-main',browser]]) {
+    assert.deepEqual(Object.keys(job).filter(k=>!allowedJobKeys.includes(k)), [], name+' has an unaudited control-flow field');
+    assert.equal(job.needs, undefined, name+' must not depend on a skipped job');
+    for (const step of job.steps) {
+      assert.equal(step['continue-on-error'], undefined, name+' step must not swallow failure');
+      if (step.shell!==undefined)assert.ok(['bash','sh','pwsh','powershell','python'].includes(step.shell), 'only built-in fail-fast shells');
+    }
   }
-  const run = String(guard.run);
-  const expectedLines = [
+  const guard=browser.steps.find(s=>s.name==='Run isolated offline browser guards');
+  const chrome=browser.steps.find(s=>s.name==='Require real Chromium');
+  assert.ok(guard && chrome, 'real Chromium prerequisites and runner must execute');
+  assert.deepEqual(Object.keys(guard).sort(), ['name','run'], 'guard may not add skip, environment or shell overrides');
+  assert.equal(guard.run.trim(), 'node scripts/r276-browser-job.cjs main "$RUNNER_TEMP/r276-browser-main"');
+  assert.deepEqual(Object.keys(chrome).sort(), ['name','run','shell']);assert.equal(chrome.shell,'bash');
+  const chromeLines=[
     'chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"',
-    'test -n "$chrome" || { echo "no Chrome/Chromium binary on the runner; browser guards must not silently skip" >&2; exit 1; }',
-    'echo "using $chrome"',
-    'CHROME_BIN="$chrome" R100_BROWSER_OUTPUT="$RUNNER_TEMP/r100-browser" node desktop/r100-browser.cjs',
-    'CHROME_BIN="$chrome" R117_BROWSER_OUTPUT="$RUNNER_TEMP/r117-browser" node desktop/r117-browser.cjs',
+    'test -n "$chrome"',
+    'echo "CHROME_BIN=$chrome" >> "$GITHUB_ENV"',
   ];
-  const runLines = run.split('\n').map((line) => line.trim()).filter(Boolean);
-  assert.deepEqual(runLines, expectedLines, 'CI 浏览器护栏 run 块只能包含审计过的精确命令');
-  const unapprovedLines = runLines.filter((line) => !expectedLines.slice(0, 2).includes(line));
-  assert.doesNotMatch(unapprovedLines.join('\n'), /\|\||&&|\bif\b|(?:^|[;\n])\s*:\s*(?:#.*)?(?:$|[;\n])|set \+e|2>\/dev\/null/, 'run 块不得加入 shell 级失败软化');
-  for (const [name, expected] of [
-    ['r100-browser.cjs', expectedLines[3]],
-    ['r117-browser.cjs', expectedLines[4]],
-  ]) {
-    assert.ok(fs.existsSync(path.join(root, '..', '..', 'desktop', name)), name);
-    const commandLines = runLines.filter((line) => line.includes(`node desktop/${name}`));
-    assert.equal(commandLines.length, 1, `${name} 必须且只能在 CI 执行一次`);
-    assert.equal(commandLines[0], expected, `${name} 命令不得附带会吞掉失败的后缀`);
+  assert.deepEqual(chrome.run.trim().split('\n').map(s=>s.trim()),chromeLines, 'Chrome discovery must fail when unavailable');
+  const triggers=workflow.on??workflow[true];
+  for(const name of ['push','pull_request']){
+    assert.ok(Object.hasOwn(triggers,name), 'push/PR must run default guards');
+    const spec=triggers[name];
+    if(spec!=null){assert.equal(typeof spec,'object');for(const filter of ['branches','branches-ignore','paths','paths-ignore','tags'])assert.equal(spec[filter],undefined);
+      assert.deepEqual(spec['tags-ignore'],name==='push'?['v*']:undefined,'only audited v-tag exclusion is permitted');}
   }
-  assert.match(run, /browser guards must not silently skip/);
-  // ---- P1-2（R120）：从黑名单改成「护栏处于默认执行路径」的结构不变量 ----
-  // 原写法只列已知的坏字段与精确命令行，换一种同等效果但语法不同的形状就绕过去了
-  // （例如给步骤加 `shell: bash {0}` 去掉默认的 -e、或把 on.push 的分支过滤设成永不
-  // 匹配）。下面每一条都是白名单/结构断言：新形状要么落在允许清单外，要么直接缺字段。
-  const triggers = workflow.on ?? workflow[true]; // js-yaml 3 会把 `on` 解析成布尔 true
-  assert.ok(triggers && typeof triggers === 'object', 'workflow 缺少 on: 触发器');
-  for (const trigger of ['push', 'pull_request']) {
-    assert.ok(Object.prototype.hasOwnProperty.call(triggers, trigger),
-      `workflow.on 必须包含 ${trigger}：只有 workflow_dispatch 时 push/PR 根本不触发护栏`);
-    const spec = triggers[trigger];
-    if (spec !== null && spec !== undefined) {
-      assert.equal(typeof spec, 'object', `workflow.on.${trigger} 只能是 null 或映射，不能是字符串/数组过滤`);
-      for (const filter of ['branches', 'branches-ignore', 'paths', 'paths-ignore', 'tags', 'tags-ignore']) {
-        assert.equal(spec[filter], undefined,
-          `workflow.on.${trigger}.${filter} 会让护栏在默认 push/PR 路径上整轮不触发`);
-      }
-    }
+  const noShell=(node)=>{if(!node||typeof node!=='object')return;for(const [key,value] of Object.entries(node)){assert.notEqual(key,'shell','defaults cannot replace fail-fast shells');noShell(value);}};
+  noShell(workflow.defaults);noShell(quality.defaults);noShell(browser.defaults);noShell(guard);
+  for(const [label,env] of [['workflow',workflow.env],['quality',quality.env],['browser',browser.env]])for(const key of Object.keys(env??{}))assert.doesNotMatch(key,/_SOURCE$|NODE_OPTIONS|R276_BROWSER_ONLY/,label+' cannot override guarded source or selection');
+  for(const [name,job] of [['quality',quality],['browser',browser]])for(const step of job.steps){if(typeof step.run==='string'&&step!==chrome)assert.doesNotMatch(step.run,/GITHUB_ENV|GITHUB_PATH/,name+' cannot inject guard environment');}
+  const frontend=quality.steps.find(s=>s.name==='Test frontend and desktop renderers');assert.ok(frontend);assert.equal(frontend.if,undefined);assert.equal(frontend['continue-on-error'],undefined);
+  for(const [name,file,key] of [['r100','desktop/r100-browser.cjs','R100_BROWSER_OUTPUT'],['r117','desktop/r117-browser.cjs','R117_BROWSER_OUTPUT']]){
+    const rows=catalog.guards.filter(r=>r[0]===name);assert.deepEqual(rows,[[name,file,key]],'each original guard must appear exactly once without source overrides');
+    assert.equal(catalog.selectGuards('main').filter(r=>r[0]===name).length,1,'default main shard must select each guard');
+    assert.ok(fs.existsSync(path.join(root,'../..',file)));
   }
-  // `shell: bash {0}` 与 GitHub 默认的 `bash -e {0}` 只差一个 -e，去掉它之后 r100 失败、
-  // r117 通过，步骤照样绿。defaults 可以作用到整个 workflow 或整个 job，所以递归检查。
-  const assertNoShellKey = (label, node) => {
-    if (node === null || typeof node !== 'object') return;
-    for (const [key, value] of Object.entries(node)) {
-      assert.notEqual(key, 'shell',
-        `${label} 不得出现 shell 字段：自定义 shell 模板可以去掉默认的 -e，让护栏失败被吞掉`);
-      assertNoShellKey(`${label}.${key}`, value);
-    }
-  };
-  assertNoShellKey('workflow.defaults', workflow.defaults);
-  assertNoShellKey('jobs.quality.defaults', quality.defaults);
-  assertNoShellKey('护栏步骤', guard);
-  for (const step of steps) {
-    if (step && step.shell !== undefined) {
-      assert.ok(['bash', 'sh', 'pwsh', 'powershell', 'python'].includes(step.shell),
-        `步骤「${step.name}」的 shell 只允许 GitHub 内建写法（Linux 上自带 -e），实际是 ${JSON.stringify(step.shell)}`);
-    }
+  assert.match(runner,/for\(const \[name,file,key,extra=\{\}\] of selected\)/);
+  assert.match(runner,/await runOffline\(process.execPath,\[file\]/);
+  assert.match(runner,/assert\.equal\(result\.code,0,name\+' guard failed'\)/,'the actual child exit code must fail the job');
+}
+test('R117 real Chromium guards are wired into CI and cannot silently skip',()=>{
+  const yaml=require('../../desktop/node_modules/js-yaml'),base=path.join(root,'../..');
+  const workflow=yaml.load(fs.readFileSync(path.join(base,'.github/workflows/ci.yml'),'utf8'));
+  const runner=fs.readFileSync(path.join(base,'scripts/r276-browser-job.cjs'),'utf8');
+  const catalog=require('../../scripts/r276-browser-catalog.cjs');
+  verifyR117ChromiumWiring(workflow,runner,catalog);
+  for(const mutate of [w=>w.jobs['browser-main'].if='false',w=>w.jobs['browser-main']['continue-on-error']=true,w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').if='false',w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').run+=' || true',w=>w.on.push['paths']=['never']]){
+    const bad=structuredClone(workflow);mutate(bad);assert.throws(()=>verifyR117ChromiumWiring(bad,runner,catalog),assert.AssertionError,'unsafe workflow mutation must FAIL');
   }
-  // job 级字段用显式允许清单，而不是逐个禁止 if / continue-on-error / strategy …：
-  // 任何没被审计过的控制流字段都视为可疑。env 刻意不在清单里——它能把护栏脚本读的
-  // 源码换成桩文件（见下面的 *_SOURCE 断言）。
-  const allowedJobKeys = ['name', 'needs', 'runs-on', 'steps', 'permissions', 'environment', 'container', 'services', 'outputs'];
-  const unexpectedJobKeys = Object.keys(quality).filter((key) => !allowedJobKeys.includes(key));
-  assert.deepEqual(unexpectedJobKeys, [],
-    `jobs.quality 出现了未审计的字段：${unexpectedJobKeys.join(', ')}（控制流字段可以让护栏不执行或失败被吞）`);
-  const allowedGuardKeys = ['name', 'run', 'env'];
-  const unexpectedGuardKeys = Object.keys(guard).filter((key) => !allowedGuardKeys.includes(key));
-  assert.deepEqual(unexpectedGuardKeys, [],
-    `护栏步骤只允许 ${allowedGuardKeys.join(' / ')}，实际多出：${unexpectedGuardKeys.join(', ')}`);
-  const allowedGuardEnv = ['CHROME_BIN', 'R100_BROWSER_OUTPUT', 'R117_BROWSER_OUTPUT'];
-  if (guard.env !== undefined) {
-    assert.equal(typeof guard.env, 'object', 'guard.env 必须是映射');
-    const unexpectedGuardEnv = Object.keys(guard.env).filter((key) => !allowedGuardEnv.includes(key));
-    assert.deepEqual(unexpectedGuardEnv, [],
-      `护栏步骤的 env 只允许 ${allowedGuardEnv.join(' / ')}，实际多出：${unexpectedGuardEnv.join(', ')}`);
-  }
-  // desktop/r100-browser.cjs 读 R100_APP_SOURCE / R100_QUEUE_SOURCE，指向桩文件就等于
-  // 护栏在测假的源码。三个层级都不允许出现 *_SOURCE 覆盖变量。
-  for (const [label, env] of [['workflow.env', workflow.env], ['jobs.quality.env', quality.env], ['护栏步骤 env', guard.env]]) {
-    for (const key of Object.keys(env ?? {})) {
-      assert.doesNotMatch(key, /_SOURCE$/, `${label} 不得定义 ${key}：它会让护栏读取被替换掉的源码`);
-    }
-  }
-  // ---- P3-1（R120 复测）可选加固，三条全部采纳 ----
-  // 1) needs 指向一个 if:false 的 job 会让 quality 整个被跳过（needs 在允许清单里，
-  //    所以必须单独钉死）；2) 任何前置步骤往 $GITHUB_ENV / $GITHUB_PATH 写一行，就能给
-  //    护栏注入 R100_APP_SOURCE / NODE_OPTIONS 之类变量，绕开上面只查 env 映射的断言；
-  //    3) 给运行本测试的前端步骤加 if:false，护栏自己就永远不执行。
-  assert.equal(quality.needs, undefined,
-    'jobs.quality 不得依赖其它 job：needs 指向一个 if:false 的 job 就能让护栏整体被跳过');
-  const frontendStep = steps.find((step) => step?.name === 'Test frontend and desktop renderers');
-  assert.ok(frontendStep, 'quality job 里找不到运行前端测试（含本护栏测试）的步骤');
-  assert.equal(frontendStep.if, undefined, '前端测试步骤加条件会让本护栏测试自身不再执行');
-  assert.equal(frontendStep['continue-on-error'], undefined, '前端测试步骤的失败不得被吞掉');
-  for (const step of steps) {
-    if (typeof step?.run === 'string') {
-      assert.doesNotMatch(step.run, /GITHUB_ENV|GITHUB_PATH/,
-        `步骤「${step.name}」不得写 GITHUB_ENV/GITHUB_PATH：前置步骤可借此给护栏注入 R100_APP_SOURCE / NODE_OPTIONS 等环境变量`);
-    }
-  }
+  assert.throws(()=>verifyR117ChromiumWiring(workflow,runner.replace("assert.equal(result.code,0,name+' guard failed')","void result"),catalog),assert.AssertionError,'swallowed child failure must FAIL');
+  assert.throws(()=>verifyR117ChromiumWiring(workflow,runner,{...catalog,guards:catalog.guards.filter(r=>r[0]!=='r117')}),assert.AssertionError,'removed guard must FAIL');
 });
 
 test('R117 section loader waits for page styles before module execution', () => {

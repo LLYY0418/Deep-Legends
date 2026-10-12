@@ -62,20 +62,25 @@ func TestR102SeedAccountSupportsMultipleAccountsPerPlayer(t *testing.T) {
 func TestR102SeedAnchorKeysAreUniquePerAccount(t *testing.T) {
 	seed := r102FixtureSeed(2)
 	root := t.TempDir()
-	calls := 0
-	handler := func(r *http.Request) (*http.Response, error) { calls++; return r102AccountResponse(r), nil }
+	calls := newR276RequestCounter()
+	handler := calls.handler(func(r *http.Request) (*http.Response, error) { return r102AccountResponse(r), nil })
 	p := r99SeedProvider(t, root, handler)
 	for i := range seed.Accounts {
 		if _, err := p.resolveProSeed(context.Background(), seed, i); err != nil {
 			t.Fatal(err)
 		}
 	}
+	// A restart must see both persisted anchors, not whichever async writes
+	// happened to finish before the second provider was constructed.
+	r274Flush(t, p.identityDisk)
 	keys := map[string]bool{}
+	p.identityDisk.mu.Lock()
 	for key := range p.identityDisk.entries {
 		if strings.Contains(key, "|proseed:") {
 			keys[key] = true
 		}
 	}
+	p.identityDisk.mu.Unlock()
 	if len(keys) != 2 {
 		t.Fatalf("anchor count = %d", len(keys))
 	}
@@ -86,8 +91,11 @@ func TestR102SeedAnchorKeysAreUniquePerAccount(t *testing.T) {
 			t.Fatalf("restart anchor %d: %+v %v", i, a, err)
 		}
 	}
-	if calls != 4 {
-		t.Fatalf("want two initial names and two stable lookups: %d", calls)
+	if err := calls.wait(context.Background(), 4, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := calls.load(); got != 4 {
+		t.Fatalf("want two initial names and two stable lookups: %d", got)
 	}
 }
 func TestR102SeedRealNameAndPositionComeFromRoster(t *testing.T) {

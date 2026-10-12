@@ -12,7 +12,7 @@ const chrome=process.env.CHROME_BIN || (process.platform==='darwin' ? '/Applicat
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r74-banner-'));
 let proc,ws,server;
 async function main(){
- const launched=await launchChrome({executable:chrome,args:['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${temp}`,'about:blank'],directory:path.join(os.tmpdir(),'overview-banner-layout')});
+ const launched=await launchChrome({executable:chrome,args:['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${temp}`,'about:blank'],directory:process.env.R276_BANNER_OUT||path.join(os.tmpdir(),'overview-banner-layout')});
  proc=launched.child;const url=launched.endpoint;
  ws=new WebSocket(url); await new Promise((res,rej)=>{ws.addEventListener('open',res,{once:true});ws.addEventListener('error',rej,{once:true});});
  let seq=0;const pending=new Map();ws.addEventListener('message',e=>{const msg=JSON.parse(e.data);if(pending.has(msg.id)){const [resolve,reject]=pending.get(msg.id);pending.delete(msg.id);msg.error?reject(Error(JSON.stringify(msg.error))):resolve(msg.result);}});

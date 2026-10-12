@@ -2,6 +2,7 @@ name: quality-and-windows-release
 
 on:
   push:
+    tags-ignore: ['v*']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -29,11 +30,27 @@ jobs:
         run: node scripts/verify-no-docs-tracked.cjs
       - name: Prepare verified published update compatibility input
         run: node scripts/prepare-r238-update-fixture.cjs
+      - name: Prepare Go dependencies before offline tests
+        run: go mod download
       - name: Check formatting
         shell: bash
         run: |
           unformatted="$(find . -type d \( -name '.*' ! -name . -o -name node_modules -o -name vendor -o -name dist \) -prune -o -type f -name '*.go' -print0 | xargs -0 gofmt -l)"
           test -z "$unformatted"
+      - name: Audit captured writes in test callbacks
+        run: go run ./scripts/check-test-captures --json="$RUNNER_TEMP/test-capture-audit.json"
+      - name: R276 deterministic fixture and audit mutations
+        run: python3 scripts/r276-fixture-mutations.py --out "$RUNNER_TEMP/r276-fixture-mutations"
+      - name: Verify sweep evidence rejects missing samples
+        run: python3 scripts/r276-sweep-summary.test.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r276-test-capture-and-fixture-proof
+          path: |
+            ${{ runner.temp }}/test-capture-audit.json
+            ${{ runner.temp }}/r276-fixture-mutations/**
+          if-no-files-found: error
       - name: Vet
         run: go vet ./...
       - name: Verify release license isolation
@@ -45,10 +62,12 @@ jobs:
         run: node scripts/r252-license-check.cjs
       - name: R265 actual license embedded asset inventory guard
         run: go test ./backend -tags=license -run '^TestR265AllReleaseEmbeddedAssets$' -count=1
+      - name: R272 synthetic overview wire budget guard
+        run: go test ./backend -run '^TestR272SyntheticOverviewWireBudget$' -count=1
       - name: Verify CI test filters
         run: node scripts/verify-ci-test-filters.cjs
       - name: Test with race detector
-        run: go test -count=1 -race ./...
+        run: node scripts/r276-offline.cjs -- go test -count=1 -race ./...
       - name: Validate frontend JavaScript
         run: |
           node --check backend/web/app.js
@@ -84,64 +103,6 @@ jobs:
             ${{ runner.temp }}/renderer-budget-gate.json
       - name: Test Riot relay Worker
         run: node --test relay/riot-worker/*.test.mjs
-      # P1-2：这两个脚本以前从不在任何流程里执行，护栏失效了半年没人发现。
-      # 找不到浏览器时直接失败，不允许静默跳过。
-      - name: Real Chromium image-queue and lazy-CSS guards
-        run: |
-          chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
-          test -n "$chrome" || { echo "no Chrome/Chromium binary on the runner; browser guards must not silently skip" >&2; exit 1; }
-          echo "using $chrome"
-          CHROME_BIN="$chrome" R100_BROWSER_OUTPUT="$RUNNER_TEMP/r100-browser" node desktop/r100-browser.cjs
-          CHROME_BIN="$chrome" R117_BROWSER_OUTPUT="$RUNNER_TEMP/r117-browser" node desktop/r117-browser.cjs
-      - name: R264 real public backend and production CSP regression
-        run: |
-          chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
-          test -n "$chrome"
-          version="$(node -p "require('./desktop/package.json').version")"
-          fingerprint="$(node desktop/source-fingerprint.cjs)"
-          fake_cipher="$(go run ./backend -encrypt-riot-key RGAPI-00000000-0000-0000-0000-000000000000)"
-          go build -tags= -buildvcs=false -ldflags="-X main.version=$version -X main.buildFingerprint=$fingerprint -X main.riotAPIKey= -X main.riotAPIKeyCipher=$fake_cipher" -o "$RUNNER_TEMP/r264-public" ./backend
-          CHROME_BIN="$chrome" R264_BACKEND="$RUNNER_TEMP/r264-public" R264_BROWSER_OUT="$RUNNER_TEMP/r264-browser" node scripts/r264-browser.cjs
-          DEEP_LEGENDS_KEY_MODE=public node desktop/verify-embedded-riot-key.cjs --expect-fake --file="$RUNNER_TEMP/r264-public"
-          CHROME_BIN="$chrome" R265_BACKEND="$RUNNER_TEMP/r264-public" R265_BROWSER_OUT="$RUNNER_TEMP/r265-browser" node scripts/r265-browser.cjs
-          CHROME_BIN="$chrome" R266_BACKEND="$RUNNER_TEMP/r264-public" R266_BROWSER_OUT="$RUNNER_TEMP/r266-browser" node scripts/r266-browser.cjs
-          CHROME_BIN="$chrome" R266_BACKEND="$RUNNER_TEMP/r264-public" R266_MATRIX=1 R266_BROWSER_OUT="$RUNNER_TEMP/r266-matrix" node scripts/r266-browser.cjs
-          git fetch --no-tags --depth=1 origin c725ba27d69289a43c20cf5198bb96f4b3af49e4
-          CHROME_BIN="$chrome" R269_BACKEND="$RUNNER_TEMP/r264-public" R269_GEOMETRY_CURRENT="$RUNNER_TEMP/r266-matrix" R269_GEOMETRY_OUT="$RUNNER_TEMP/r269-geometry" node scripts/r269-geometry.cjs
-          CHROME_BIN="$chrome" R269_BACKEND="$RUNNER_TEMP/r264-public" R269_BROWSER_OUT="$RUNNER_TEMP/r269-browser" node scripts/r269-browser.cjs
-          CHROME_BIN="$chrome" R267_BACKEND="$RUNNER_TEMP/r264-public" R267_BROWSER_OUT="$RUNNER_TEMP/r267-browser" node scripts/r267-browser.cjs
-          python3 scripts/r269-mutations.py --out "$RUNNER_TEMP/r269-mutations"
-          CHROME_BIN="$chrome" R269_BACKEND="$RUNNER_TEMP/r264-public" python3 scripts/r270-mutations.py --out "$RUNNER_TEMP/r270-mutations"
-          CHROME_BIN="$chrome" R269_BACKEND="$RUNNER_TEMP/r264-public" python3 scripts/r271-mutations.py --browser --out "$RUNNER_TEMP/r271-mutations"
-          mkdir -p "$RUNNER_TEMP/r272-shape"
-          R272_SHAPE_OUTPUT="$RUNNER_TEMP/r272-shape/result.json" R272_OVERVIEW_FIXTURE="$RUNNER_TEMP/r272-overview.json" go test ./backend -run '^TestR272SyntheticOverviewWireBudget$' -count=1
-          CHROME_BIN="$chrome" R266_BACKEND="$RUNNER_TEMP/r264-public" R266_BROWSER_OUT="$RUNNER_TEMP/r272-browser" R272_OVERVIEW_FIXTURE="$RUNNER_TEMP/r272-overview.json" node scripts/r272-browser.cjs
-          python3 scripts/r272-mutations.py --out "$RUNNER_TEMP/r272-mutations"
-          python3 scripts/r273-mutations.py --out "$RUNNER_TEMP/r273-mutations"
-          python3 scripts/r274-mutations.py --out "$RUNNER_TEMP/r274-mutations"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: chromium-guards-linux
-          path: |
-            ${{ runner.temp }}/r100-browser/**
-            ${{ runner.temp }}/r117-browser/**
-            ${{ runner.temp }}/r264-browser/**
-            ${{ runner.temp }}/r265-browser/**
-            ${{ runner.temp }}/r266-browser/**
-            ${{ runner.temp }}/r266-matrix/**
-            ${{ runner.temp }}/r267-browser/**
-            ${{ runner.temp }}/r269-browser/**
-            ${{ runner.temp }}/r269-geometry/**
-            ${{ runner.temp }}/r269-mutations/**
-            ${{ runner.temp }}/r270-mutations/**
-            ${{ runner.temp }}/r271-mutations/**
-            ${{ runner.temp }}/r272-browser/**
-            ${{ runner.temp }}/r272-shape/**
-            ${{ runner.temp }}/r272-mutations/**
-            ${{ runner.temp }}/r273-mutations/**
-            ${{ runner.temp }}/r274-mutations/**
-          if-no-files-found: warn
       - name: Test installer module
         working-directory: installer
         run: go test ./...
@@ -187,16 +148,75 @@ jobs:
         with:
           name: r238-default-electron-windows
           path: ${{ runner.temp }}/deep-legends-r238-default-electron/**
+      - name: Build desktop client and checksums
+        shell: pwsh
+        run: |
+          $version = node -p "require('./desktop/package.json').version"
+          if ($LASTEXITCODE -ne 0) { throw "Unable to read desktop package version" }
+          $fakeCipher = (& go run ./backend -encrypt-riot-key 'RGAPI-00000000-0000-0000-0000-000000000000').Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $fakeCipher) { throw "Fake key encryption failed" }
+          ./build-desktop-windows.ps1 -Version $version -KeyMode public -SkipTestsInCI -RiotAPIKeyCipher $fakeCipher
+          if ($LASTEXITCODE -ne 0) { throw "Desktop build failed" }
+          $env:DEEP_LEGENDS_KEY_MODE='public'
+          node desktop/verify-embedded-riot-key.cjs --expect-fake
+          if ($LASTEXITCODE -ne 0) { throw "Fake embedded key verification failed" }
+      - name: Verify checksums
+        shell: pwsh
+        run: |
+          Get-Content dist/desktop/SHA256SUMS-public.txt | ForEach-Object {
+            $parts = $_ -split '  ', 2
+            $actual = (Get-FileHash -Algorithm SHA256 (Join-Path dist/desktop $parts[1])).Hash.ToLowerInvariant()
+            if ($actual -ne $parts[0]) { throw "Checksum mismatch: $($parts[1])" }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deep-legends-windows-x64
+          path: |
+            dist/desktop/*.exe
+            dist/desktop/*.zip
+            dist/desktop/SHA256SUMS-public.txt
+          if-no-files-found: error
+
+  windows-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install desktop test dependencies
+        run: npm ci --prefix desktop
+      - name: Prepare verified published update compatibility input
+        run: node scripts/prepare-r238-update-fixture.cjs
       # R225: restore all Windows-compiled shared paths, not only Linux skips.
       # Includes TestUpdate*, TestR204KeySaveAndClear, TestR204KeyRuntime401AndPrivacy
       # and TestSplitRegistryPathSupportsNativeTencentKeys. JSON proves actual passes.
+      - name: Prepare backend Go dependencies before offline tests
+        run: go mod download
+      - name: Prepare installer Go dependencies before offline tests
+        working-directory: installer
+        run: go mod download
       - name: Test full Windows backend and installer suites
         shell: pwsh
         run: |
-          node scripts/run-ci-tests.cjs go backend
+          $env:R276_OFFLINE_OUTPUT="$env:RUNNER_TEMP/r276-backend-offline.json"
+          node scripts/r276-offline.cjs -- node scripts/run-ci-tests.cjs go backend
           if ($LASTEXITCODE -ne 0) { throw "Windows backend tests or pass inventory failed" }
-          node scripts/run-ci-tests.cjs go installer
+          $env:R276_OFFLINE_OUTPUT="$env:RUNNER_TEMP/r276-installer-offline.json"
+          node scripts/r276-offline.cjs -- node scripts/run-ci-tests.cjs go installer
           if ($LASTEXITCODE -ne 0) { throw "Windows installer tests or pass inventory failed" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r276-windows-offline-proof
+          path: ${{ runner.temp }}/r276-*-offline.json
+          if-no-files-found: error
       - name: R252 thirty independent R104 cold-start timelines
         shell: pwsh
         run: |
@@ -224,10 +244,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Windows setup-only guards failed" }
           node scripts/run-ci-tests.cjs node --expected-tests=2 scripts/r82-startup-ab-script.test.cjs
           if ($LASTEXITCODE -ne 0) { throw "PowerShell script guards failed" }
-      # R274 requires a measured push and two measured dispatches on this
-      # release branch. Other branches and tag runs retain the opt-in policy.
+      # Release and infrastructure acceptance branch pushes measure Windows;
+      # dispatch retains its explicit, default-true input.
       - name: Measure full desktop renderer tests on Windows
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/codex/release-0.12.83') || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers)
+        if: (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/codex/release-') || github.ref == 'refs/heads/codex/ci-hardening-r276')) || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers)
         shell: pwsh
         env:
           R222_NODE_TIMING_OUTPUT: ${{ runner.temp }}/renderer-timings-windows.json
@@ -235,30 +255,31 @@ jobs:
           node scripts/test-renderers.cjs desktop
           if ($LASTEXITCODE -ne 0) { throw "Windows renderer test or time budget failed" }
       - uses: actions/upload-artifact@v4
-        if: always() && ((github.event_name == 'push' && github.ref == 'refs/heads/codex/release-0.12.83') || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers))
+        if: always() && ((github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/codex/release-') || github.ref == 'refs/heads/codex/ci-hardening-r276')) || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers))
         with:
           name: renderer-timings-windows
           path: ${{ runner.temp }}/renderer-timings-windows.json
-      - name: Build desktop client and checksums
-        shell: pwsh
-        run: |
-          $version = node -p "require('./desktop/package.json').version"
-          if ($LASTEXITCODE -ne 0) { throw "Unable to read desktop package version" }
-          $fakeCipher = (& go run ./backend -encrypt-riot-key 'RGAPI-00000000-0000-0000-0000-000000000000').Trim()
-          if ($LASTEXITCODE -ne 0 -or -not $fakeCipher) { throw "Fake key encryption failed" }
-          ./build-desktop-windows.ps1 -Version $version -KeyMode public -SkipTestsInCI -RiotAPIKeyCipher $fakeCipher
-          if ($LASTEXITCODE -ne 0) { throw "Desktop build failed" }
-          $env:DEEP_LEGENDS_KEY_MODE='public'
-          node desktop/verify-embedded-riot-key.cjs --expect-fake
-          if ($LASTEXITCODE -ne 0) { throw "Fake embedded key verification failed" }
-      - name: Verify checksums
-        shell: pwsh
-        run: |
-          Get-Content dist/desktop/SHA256SUMS-public.txt | ForEach-Object {
-            $parts = $_ -split '  ', 2
-            $actual = (Get-FileHash -Algorithm SHA256 (Join-Path dist/desktop $parts[1])).Hash.ToLowerInvariant()
-            if ($actual -ne $parts[0]) { throw "Checksum mismatch: $($parts[1])" }
-          }
+
+  windows-upgrade:
+    needs: windows-build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install desktop test dependencies
+        run: npm ci --prefix desktop
+      - uses: actions/download-artifact@v4
+        with:
+          name: deep-legends-windows-x64
+          path: dist/desktop
       - name: Real 0.12.65/0.12.68/0.12.76 installation and candidate upgrade
         shell: pwsh
         run: |
@@ -270,11 +291,160 @@ jobs:
           name: r206-real-upgrade-evidence
           path: ${{ runner.temp }}/deep-legends-r206-real-upgrade/evidence/*
           if-no-files-found: warn
+
+  browser-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install desktop test dependencies
+        run: npm ci --prefix desktop
+      - name: Require real Chromium
+        shell: bash
+        run: |
+          chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+          test -n "$chrome"
+          echo "CHROME_BIN=$chrome" >> "$GITHUB_ENV"
+      - name: Run isolated offline browser guards
+        run: node scripts/r276-browser-job.cjs main "$RUNNER_TEMP/r276-browser-main"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux-shard-main
+          path: ${{ runner.temp }}/r276-browser-main/**
+          if-no-files-found: error
+
+  browser-r265:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install desktop test dependencies
+        run: npm ci --prefix desktop
+      - name: Require real Chromium
+        shell: bash
+        run: |
+          chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+          test -n "$chrome"
+          echo "CHROME_BIN=$chrome" >> "$GITHUB_ENV"
+      - name: Run isolated offline browser guards
+        run: node scripts/r276-browser-job.cjs r265 "$RUNNER_TEMP/r276-browser-r265"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux-shard-r265
+          path: ${{ runner.temp }}/r276-browser-r265/**
+          if-no-files-found: error
+
+  mutations-1:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install desktop test dependencies
+        run: npm ci --prefix desktop
+      - name: Prepare Go dependencies before offline mutations
+        run: go mod download
+      - name: Run isolated mutation shard
+        run: node scripts/r276-mutation-job.cjs 1 "$RUNNER_TEMP/r276-mutations-1"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux-shard-mutations-1
+          path: ${{ runner.temp }}/r276-mutations-1/**
+          if-no-files-found: error
+
+  mutations-2:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install desktop test dependencies
+        run: npm ci --prefix desktop
+      - name: Prepare Go dependencies before offline mutations
+        run: go mod download
+      - name: Run isolated mutation shard
+        run: node scripts/r276-mutation-job.cjs 2 "$RUNNER_TEMP/r276-mutations-2"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux-shard-mutations-2
+          path: ${{ runner.temp }}/r276-mutations-2/**
+          if-no-files-found: error
+
+  mutations-3:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install desktop test dependencies
+        run: npm ci --prefix desktop
+      - name: Prepare Go dependencies before offline mutations
+        run: go mod download
+      - name: Run isolated mutation shard
+        run: node scripts/r276-mutation-job.cjs 3 "$RUNNER_TEMP/r276-mutations-3"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux-shard-mutations-3
+          path: ${{ runner.temp }}/r276-mutations-3/**
+          if-no-files-found: error
+
+  chromium-evidence:
+    if: always()
+    needs: [browser-main, browser-r265, mutations-1, mutations-2, mutations-3]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: chromium-guards-linux-shard-*
+          merge-multiple: true
+          path: evidence
       - uses: actions/upload-artifact@v4
         with:
-          name: deep-legends-windows-x64
-          path: |
-            dist/desktop/*.exe
-            dist/desktop/*.zip
-            dist/desktop/SHA256SUMS-public.txt
+          name: chromium-guards-linux
+          path: evidence/**
           if-no-files-found: error

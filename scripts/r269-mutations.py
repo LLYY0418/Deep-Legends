@@ -2,6 +2,8 @@
 import argparse,json,os,shutil,subprocess,tempfile,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
+import runpy
+_proof=runpy.run_path(str(ROOT/'scripts/mutation-source-proof.py'));_snapshot=_proof['snapshot'](ROOT)
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);p.add_argument('--browser',action='store_true');ARGS=p.parse_args();OUT=ARGS.out;OUT.mkdir(parents=True,exist_ok=True);results=[]
 def run(name,cmd,cwd=ROOT,extra=None,negative=False):
  start=time.monotonic();r=subprocess.run(cmd,cwd=cwd,env={**os.environ,'RIOT_API_KEY':'RGAPI-00000000-0000-0000-0000-000000000000',**(extra or {})},capture_output=True,text=True,timeout=180);log=r.stdout+r.stderr;(OUT/(name+'.log')).write_text(log);ok=r.returncode!=0 if negative else r.returncode==0
@@ -37,7 +39,7 @@ with tempfile.TemporaryDirectory(prefix='r269-mutants-') as temp:
   target=go/'backend'/file;original=target.read_text();assert a in original,(name,a);target.write_text(original.replace(a,b))
   try:run(name,['go','test','./backend','-count=1','-run','^'+test+'$'],cwd=go,negative=True)
   finally:target.write_text(original)
- run('go-restored',['go','test','./backend','-count=1','-run','^TestR269'],cwd=go)
+ run('go-restored-target',['go','test','./backend','-count=1','-run','^TestR269IdentityPinsKeyDuringLookup$'],cwd=go)
 
 if ARGS.browser:
  with tempfile.TemporaryDirectory(prefix='r269-browser-mutants-') as temp:
@@ -46,3 +48,5 @@ if ARGS.browser:
   web=temp/'career';web.mkdir();source=(ROOT/'backend/web/gameplay.js').read_text();old='const width = container.querySelector(".overview-layout")?.clientWidth || container.clientWidth;';assert old in source;source=source.replace(old,'const width = container.querySelector(".overview-layout")?.getBoundingClientRect().width || container.getBoundingClientRect().width;');old='nodes.careerDialog.open && !container.querySelector("[data-open-career-dialog]")?.offsetParent';assert old in source;source=source.replace(old,'nodes.careerDialog.open && width > 1020');(web/'gameplay.js').write_text(source)
   run('p7-scaled-width-closes-career',['node','scripts/r269-browser.cjs'],extra={'R266_WEB_OVERRIDE':str(web),'R269_BROWSER_OUT':str(OUT/'p7-browser')},negative=True)
   run('browser-restored',['node','scripts/r269-browser.cjs'],extra={'R269_BROWSER_OUT':str(OUT/'browser-restored')})
+
+_proof['unchanged'](ROOT,_snapshot)

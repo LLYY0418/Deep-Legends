@@ -2,6 +2,8 @@
 import argparse,json,os,subprocess,tempfile,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
+import runpy
+_proof=runpy.run_path(str(ROOT/'scripts/mutation-source-proof.py'));_snapshot=_proof['snapshot'](ROOT)
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);args=p.parse_args();args.out=args.out.resolve();args.out.mkdir(parents=True,exist_ok=True);rows=[]
 js=['node','--test','backend/web/r273-first-chunk.test.cjs','backend/web/r272-score-tags.test.cjs']
 def run(name,env=None,negative=False,command=None):
@@ -52,3 +54,5 @@ with tempfile.TemporaryDirectory(prefix='r273-go-mutants-') as tmp:
  assert any(row['spans_us']['detail_worker'] for row in records if row['stage']=='controlled-overlap')
  run('restored-go',command=command)
 run('restored-js')
+
+_proof['unchanged'](ROOT,_snapshot)

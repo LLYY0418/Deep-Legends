@@ -1,6 +1,8 @@
 import argparse,pathlib,tempfile,subprocess,os,json,time
 p=argparse.ArgumentParser();p.add_argument('--out',required=True);args=p.parse_args()
 root=pathlib.Path(__file__).resolve().parents[1];out=pathlib.Path(args.out).resolve();out.mkdir(parents=True,exist_ok=True);rows=[]
+import runpy
+_proof=runpy.run_path(str(root/'scripts/mutation-source-proof.py'));_snapshot=_proof['snapshot'](root)
 def run(name,command,extra,negative,signature=None):
     env=dict(os.environ,RIOT_API_KEY='RGAPI-00000000-0000-0000-0000-000000000000',**extra);start=time.monotonic()
     result=subprocess.run(command,cwd=root,env=env,capture_output=True,text=True,timeout=180);log=result.stdout+result.stderr;(out/(name+'.log')).write_text(log)
@@ -23,3 +25,5 @@ with tempfile.TemporaryDirectory(prefix='r270-mutants-') as temporary:
     run('delete-before-process-exit',test,{'R270_GEOMETRY_SOURCE':str(lifecycle)},True,'a late writer must not recreate the deleted profile')
     run('native-unbound-open-deferred',['node','scripts/r269-browser.cjs'],{'R266_WEB_OVERRIDE':str(folder),'R269_BROWSER_OUT':str(out/'native-unbound-open-deferred'),'R269_BACKEND':os.environ.get('R269_BACKEND') or os.environ.get('R266_BACKEND') or '/tmp/r270-public'},True,"timeout document.querySelector('dialog[data-af-menu]:modal')")
 run('restored',test,{},False)
+
+_proof['unchanged'](root,_snapshot)

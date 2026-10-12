@@ -1,0 +1,204 @@
+name: R276 flake sweep
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  samples:
+    name: ${{ matrix.kind }}-${{ matrix.index }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: linux-race
+            index: 0
+            iterations: 5
+            os: ubuntu-latest
+          - kind: linux-race
+            index: 1
+            iterations: 5
+            os: ubuntu-latest
+          - kind: linux-race
+            index: 2
+            iterations: 5
+            os: ubuntu-latest
+          - kind: linux-race
+            index: 3
+            iterations: 5
+            os: ubuntu-latest
+          - kind: linux-race
+            index: 4
+            iterations: 5
+            os: ubuntu-latest
+          - kind: linux-race
+            index: 5
+            iterations: 5
+            os: ubuntu-latest
+          - kind: linux-race
+            index: 6
+            iterations: 5
+            os: ubuntu-latest
+          - kind: linux-race
+            index: 7
+            iterations: 5
+            os: ubuntu-latest
+          - kind: linux-renderers
+            index: 0
+            iterations: 2
+            os: ubuntu-latest
+          - kind: linux-renderers
+            index: 1
+            iterations: 2
+            os: ubuntu-latest
+          - kind: linux-renderers
+            index: 2
+            iterations: 2
+            os: ubuntu-latest
+          - kind: linux-renderers
+            index: 3
+            iterations: 2
+            os: ubuntu-latest
+          - kind: linux-renderers
+            index: 4
+            iterations: 2
+            os: ubuntu-latest
+          - kind: browser-main
+            index: 0
+            iterations: 5
+            os: ubuntu-latest
+          - kind: browser-main
+            index: 1
+            iterations: 5
+            os: ubuntu-latest
+          - kind: browser-main
+            index: 2
+            iterations: 5
+            os: ubuntu-latest
+          - kind: browser-main
+            index: 3
+            iterations: 5
+            os: ubuntu-latest
+          - kind: browser-r265
+            index: 0
+            iterations: 5
+            os: ubuntu-latest
+          - kind: browser-r265
+            index: 1
+            iterations: 5
+            os: ubuntu-latest
+          - kind: browser-r265
+            index: 2
+            iterations: 5
+            os: ubuntu-latest
+          - kind: browser-r265
+            index: 3
+            iterations: 5
+            os: ubuntu-latest
+          - kind: windows-go
+            index: 0
+            iterations: 3
+            os: windows-latest
+          - kind: windows-go
+            index: 1
+            iterations: 3
+            os: windows-latest
+          - kind: windows-go
+            index: 2
+            iterations: 3
+            os: windows-latest
+          - kind: windows-go
+            index: 3
+            iterations: 3
+            os: windows-latest
+          - kind: windows-renderers
+            index: 0
+            iterations: 3
+            os: windows-latest
+          - kind: windows-renderers
+            index: 1
+            iterations: 3
+            os: windows-latest
+          - kind: windows-renderers
+            index: 2
+            iterations: 3
+            os: windows-latest
+          - kind: windows-renderers
+            index: 3
+            iterations: 3
+            os: windows-latest
+          - kind: windows-cold
+            index: 0
+            iterations: 1
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install desktop test dependencies
+        run: npm ci --prefix desktop
+      - name: Prepare pinned public compatibility fixture
+        if: matrix.kind == 'linux-race' || matrix.kind == 'windows-go'
+        run: node scripts/prepare-r238-update-fixture.cjs
+      - name: Prepare Go dependencies before offline samples
+        if: matrix.kind == 'linux-race' || matrix.kind == 'windows-go'
+        run: go mod download
+      - name: Require real Chromium and prepare synthetic executable
+        if: startsWith(matrix.kind, 'browser-')
+        shell: bash
+        run: |
+          chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+          test -n "$chrome"
+          echo "CHROME_BIN=$chrome" >> "$GITHUB_ENV"
+          node scripts/r276-public-fixture.cjs "$RUNNER_TEMP/r276-public"
+          echo "R276_PUBLIC_BACKEND=$RUNNER_TEMP/r276-public" >> "$GITHUB_ENV"
+      - name: Run every predetermined sample
+        env:
+          R276_JOB_NAME: ${{ matrix.kind }}-${{ matrix.index }}
+        run: python scripts/r276-sweep.py --kind ${{ matrix.kind }} --index ${{ matrix.index }} --iterations ${{ matrix.iterations }} --out "${{ runner.temp }}/sweep"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sweep-${{ matrix.kind }}-${{ matrix.index }}
+          path: ${{ runner.temp }}/sweep/**
+          if-no-files-found: error
+
+  summary:
+    if: always()
+    needs: samples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sweep-*
+          path: samples
+      - name: Capture job links
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" > jobs.json
+      - name: Require complete zero-failure sweep
+        run: python3 scripts/r276-sweep-summary.py --input samples --jobs jobs.json --output sweep-summary.json --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sweep-summary
+          path: |
+            sweep-summary.json
+            jobs.json
+          if-no-files-found: error

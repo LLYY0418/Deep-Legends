@@ -2,6 +2,8 @@
 import argparse,json,os,subprocess,tempfile,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
+import runpy
+_proof=runpy.run_path(str(ROOT/'scripts/mutation-source-proof.py'));_snapshot=_proof['snapshot'](ROOT)
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);args=p.parse_args();args.out=args.out.resolve();args.out.mkdir(parents=True,exist_ok=True);rows=[]
 def run(name,command,env=None,negative=False):
  started=time.monotonic();result=subprocess.run(command,cwd=ROOT,env={**os.environ,**(env or {})},capture_output=True,text=True,timeout=120)
@@ -47,4 +49,7 @@ with tempfile.TemporaryDirectory(prefix='r272-mutants-') as temp:
  javascript('lost-server-invalidation','backend/web/app.js',' || state.collectionScope!==scope','', 'R272_APP_SOURCE')
  javascript('old-server-response-accepted','backend/web/app.js','collectionAccount!==[state.status?.clientRegion,state.status?.serverId,state.status?.collectionAccount].join("|")','false', 'R272_APP_SOURCE')
  javascript('matches-prematurely-ready-aggregates','backend/web/gameplay.js','(tab.initialPagePending || !data.matches?.length) && !tab.recentStatsReceived','!data.matches?.length && !tab.recentStatsReceived', 'R272_GAMEPLAY_SOURCE')
- run('restored-go',go);run('restored-js',js)
+ run('restored-go-target',['go','test','./backend','-run','^TestR272LPRevisionAndDeltaFrames$','-count=1','-v']);run('restored-js',js)
+ assert '--- PASS: TestR272LPRevisionAndDeltaFrames' in (args.out/'restored-go-target.log').read_text()
+
+_proof['unchanged'](ROOT,_snapshot)

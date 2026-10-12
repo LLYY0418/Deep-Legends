@@ -348,6 +348,7 @@ func TestR180QualitySkippedCountsAndSlots(t *testing.T) {
 
 func TestR180RealRosterStageDiagnostics(t *testing.T) {
 	f := r180Fixture(t)
+	observedFrom := time.Now()
 	var ingame atomic.Bool
 	old := f.c.http.Transport
 	positions := []string{"BOTTOM", "UTILITY", "TOP", "JUNGLE", "MIDDLE"}
@@ -451,11 +452,13 @@ func TestR180RealRosterStageDiagnostics(t *testing.T) {
 	if len(events) != 10 {
 		t.Fatal("missing player events", events)
 	}
+	observedUntil := time.Now()
 	unique := map[string]bool{}
 	for _, e := range events {
-		age := float64(8)
-
-		if e["shown_newest_age_min"] != age || e["subject_unmatched"] != float64(0) || e["remake_skipped"] != float64(0) {
+		// Fixture games are eight minutes old at creation; production samples
+		// their age while this real roster load runs, not at that earlier instant.
+		age, ok := e["shown_newest_age_min"].(float64)
+		if !ok || !r276AgeWithinCapture(age, f.created(12), observedFrom, observedUntil) || e["subject_unmatched"] != float64(0) || e["remake_skipped"] != float64(0) {
 			t.Fatal("wrong final diagnostic window", e)
 		}
 		key := fmt.Sprintf("%v:%v", e["team"], e["slot"])

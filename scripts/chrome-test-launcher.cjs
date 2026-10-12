@@ -4,6 +4,7 @@ const {spawn}=require('node:child_process');
 const fs=require('node:fs'),path=require('node:path');
 const realClock={now:()=>performance.now(),setTimeout,clearTimeout};
 async function launchChrome({executable,args,directory,clock=realClock,onStderr=()=>{}}){
+ if(process.env.R276_OFFLINE_PROXY)args=[...args,'--proxy-server='+process.env.R276_OFFLINE_PROXY,'--proxy-bypass-list=localhost;127.0.0.1;[::1]'];
  const attempts=[];
  const save=()=>{fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(path.join(directory,'chrome-startup.json'),JSON.stringify({attempts},null,2)+'\n');fs.writeFileSync(path.join(directory,'chrome-startup-stderr.log'),attempts.map(a=>`attempt ${a.attempt} (${a.result})\n${a.stderr}`).join('\n'));};
  const failure=()=>Error(attempts.map(a=>`Chrome ${a.result==='timeout'?'startup timeout':a.result} attempt ${a.attempt} (pid=${a.pid}, exit=${a.exitCode}, signal=${a.signalCode}): ${a.stderr}`).join('\n'));
