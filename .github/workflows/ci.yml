@@ -48,6 +48,10 @@ jobs:
         run: python3 scripts/r276-legacy-installer-retry-mutations.py --out "$RUNNER_TEMP/r276-legacy-installer-retry-mutations"
       - name: R276 native installed port-owner regression and mutations
         run: node scripts/r276-port-owner-mutations.cjs "$RUNNER_TEMP/r276-port-owner-mutations"
+      - name: R276 bounded offline PowerShell fixture diagnostics
+        run: node scripts/r276-powershell-fixture-mutations.cjs "$RUNNER_TEMP/r276-powershell-fixture-mutations"
+      - name: R276 fresh renderer fixture isolation regression and mutations
+        run: node scripts/r276-fresh-chrome-mutations.cjs "$RUNNER_TEMP/r276-fresh-chrome-mutations"
       - name: Audit browser process and directory cleanup
         run: node scripts/check-browser-cleanup.cjs --json="$RUNNER_TEMP/browser-cleanup-audit.json"
       - name: R276 deterministic cleanup regression and mutations
@@ -69,6 +73,8 @@ jobs:
             ${{ runner.temp }}/r276-hexdata-mutations/**
             ${{ runner.temp }}/r276-legacy-installer-retry-mutations/**
             ${{ runner.temp }}/r276-port-owner-mutations/**
+            ${{ runner.temp }}/r276-powershell-fixture-mutations/**
+            ${{ runner.temp }}/r276-fresh-chrome-mutations/**
           if-no-files-found: error
       - name: Vet
         run: go vet ./...

@@ -2,6 +2,7 @@
 const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 const {browserAPI}=require('./r276-browser-api-fixtures.cjs');
+const {freshChromeFixture}=require('./r276-fresh-chrome-fixture.cjs');
 // Real public backend and its CSP/assets, with explicit synthetic API fixtures.
 const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=process.env.R266_BROWSER_OUT||path.join(os.tmpdir(),'deep-legends-r266-browser');
@@ -56,11 +57,13 @@ async function start(){
  });
  for(const theme of (process.env.R266_CASE_ONE || process.env.R266_CARD_SERVER?['dark']:['dark','light']))for(const width of (process.env.R266_MATRIX || process.env.R266_CASE_ONE || process.env.R266_CARD_SERVER?[1440]:[1920,1440,1280,900])){
   const storage='empty',height=width===900?760:900;
-  const {targetId}=await send('Target.createTarget',{url:'about:blank'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true}),call=(m,p)=>send(m,p,sessionId);
+  let {browserContextId}=await send('Target.createBrowserContext'),{targetId}=await send('Target.createTarget',{url:'about:blank',browserContextId}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});
+  const call=(m,p)=>send(m,p,sessionId);
   const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
   const until=async expression=>{for(let i=0;i<100;i++){if(await evaluate(`Boolean(${expression})`))return;await new Promise(resolve=>setTimeout(resolve,50));}const snapshot=await evaluate("({api:window.__r266API?.slice(-20),statuses:window.__r266Statuses?.slice(-10),ensureCalls:window.__r266EnsureCalls,conflict:window.__r266Conflict,hidden:document.hidden,view:document.querySelector('#favorites-panel')?.textContent.slice(0,1200),grid:document.querySelector('#skin-grid')?.textContent.slice(0,500),launch:document.querySelector('#client-launchpad')?.hidden,filter:!!document.querySelector('[data-af-open]'),timingState:window.__r266Game && {section:__r266Game.state.section,tabs:__r266Game.state.tabs.map(t=>({key:t.key,loading:t.loading,matches:t.data?.matches?.length,error:t.error}))},requests:window.__r266OverviewRequests,modal:document.querySelector('[data-af-menu]')?.outerHTML.slice(0,200),menu:document.querySelector('#overview-content')?._afBoundTab?.advancedMenu,overview:document.querySelector('#overview-content')?._overviewViewTab && {loading:document.querySelector('#overview-content')._overviewViewTab.loading,error:document.querySelector('#overview-content')._overviewViewTab.initialPageError}})");throw Error('timeout '+expression+' '+JSON.stringify(snapshot));};
   const click=selector=>evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
   const shot=async name=>{if(storage!=='empty')return;const r=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,`${theme}-${name}.png`),Buffer.from(r.data,'base64'));};
+  const initializePage=async()=>{
   await send('Target.activateTarget',{targetId});
   await call('Network.enable');await call('Page.enable');await call('Runtime.enable');await call('Log.enable');await call('Runtime.addBinding',{name:'r266CSP'});
   const values=storage==='saved'?saved:storage==='malformed'?{...saved,'deep-legends-history-presets-v1':'[{"name":"bad","conditions":42}]','lol-loot-player-tab-order':'{"bad":1}','lol-loot-default-match-filter':'wrong'}:{};
@@ -71,7 +74,9 @@ async function start(){
   await call('Network.setCookie',{name:'lol_loot_token',value:ready.token,url:ready.baseUrl,httpOnly:true});
   await call('Page.navigate',{url:ready.baseUrl+'/?demo&section=overview'+(process.env.R266_MATRIX?'&matrix':'')});
   if(process.env.R266_CARD_SERVER)await until("!!window.__r266Game && !!document.querySelector('#setting-default-page')");else {await until("document.querySelector('.match-list .match-entry')");await until("!document.querySelector('#overview-content')._overviewViewTab.loading");}await evaluate(`document.documentElement.dataset.theme='${theme}'`);
-  if(process.env.R266_CARD_SERVER){await evaluate("window.__r266CardEvents=[];window.__r266TimingStarted=true;window.dispatchEvent(new CustomEvent('deep-legends:open-player',{detail:{gameName:'Fixture',tagLine:'KR1',region:'kr',source:'pro-players',proPlayer:{playerName:'Rookie',teamCode:'IG'}}}));");await until("document.querySelector('#overview-content')._overviewViewTab?.group==='pro' && document.querySelector('.match-list .match-entry')");await until("document.querySelector('#overview-content')._overviewViewTab?.opggSeason?.data && document.querySelector('.career-column').textContent.includes('杰斯')");const cardEvidence=await evaluate("({events:__r266CardEvents,opggDOMReadyMs:Math.round(performance.now()-document.querySelector('#overview-content')._overviewViewTab.overviewCardLoad.startedAt),opggGames:document.querySelector('#overview-content')._overviewViewTab.opggSeason.data.overall.games})");for(const card of ['ranks','masteries','positions'])assert(cardEvidence.events.some(e=>e.card===card),JSON.stringify(cardEvidence));assert.equal(cardEvidence.opggGames,573);results.push(cardEvidence);await shot('p7-cards');closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});break;}
+  };
+  await initializePage();
+  if(process.env.R266_CARD_SERVER){await evaluate("window.__r266CardEvents=[];window.__r266TimingStarted=true;window.dispatchEvent(new CustomEvent('deep-legends:open-player',{detail:{gameName:'Fixture',tagLine:'KR1',region:'kr',source:'pro-players',proPlayer:{playerName:'Rookie',teamCode:'IG'}}}));");await until("document.querySelector('#overview-content')._overviewViewTab?.group==='pro' && document.querySelector('.match-list .match-entry')");await until("document.querySelector('#overview-content')._overviewViewTab?.opggSeason?.data && document.querySelector('.career-column').textContent.includes('杰斯')");const cardEvidence=await evaluate("({events:__r266CardEvents,opggDOMReadyMs:Math.round(performance.now()-document.querySelector('#overview-content')._overviewViewTab.overviewCardLoad.startedAt),opggGames:document.querySelector('#overview-content')._overviewViewTab.opggSeason.data.overall.games})");for(const card of ['ranks','masteries','positions'])assert(cardEvidence.events.some(e=>e.card===card),JSON.stringify(cardEvidence));assert.equal(cardEvidence.opggGames,573);results.push(cardEvidence);await shot('p7-cards');closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});await send('Target.disposeBrowserContext',{browserContextId});break;}
   if(process.env.R266_MATRIX) {
     for(const w of [900,1100,1280,1440,1600,1920])for(const zoom of [.9,1,1.1,1.25,'auto']) {
       await call('Emulation.setDeviceMetricsOverride',{width:w,height:900,deviceScaleFactor:1,mobile:false});await evaluate(`(()=>{const input=document.getElementById('setting-ui-scale');input.value='${zoom}';input.dispatchEvent(new Event('change',{bubbles:true}));})()`);await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
@@ -80,11 +85,11 @@ async function start(){
       const overlaps=[];for(const card of rects)for(let i=0;i<card.blocks.length;i++)for(let j=i+1;j<card.blocks.length;j++){const a=card.blocks[i],b=card.blocks[j];if(a.visible && b.visible && Math.min(a.right,b.right)-Math.max(a.left,b.left)>.5 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>.5)overlaps.push({mode:card.mode,a:a.selector,b:b.selector});}
       assert.equal(rects.length,3,'matrix requires all three modes');for(const card of rects)for(const selector of ['.match-champion > .game-icon','.match-loadout-mini','.match-kda','.match-actions'])assert(card.blocks.find(b=>b.selector===selector)?.visible,JSON.stringify({theme,w,zoom,card,missing:selector}));if(!process.env.R266_MATRIX_BASELINE)assert.equal(overlaps.length,0,JSON.stringify({theme,w,zoom,overlaps}));await shot('p5-'+w+'-'+zoom);results.push({theme,w,zoom,scale,overlaps,rects});
     }
-    closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});break;
+    closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});await send('Target.disposeBrowserContext',{browserContextId});break;
   }
   if(process.env.R272_CHECKS)await require('./r272-browser-checks.cjs')({evaluate,until,click,call,shot,ready,results,errors});
-  if(process.env.R272_SCENE_ONLY){closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});continue;}
-  if(process.env.R269_CHECKS)await require('./r269-browser-checks.cjs')({evaluate,until,click,call,shot,ready,results,errors,releaseFilters:()=>releaseFilters?.()});
+  if(process.env.R272_SCENE_ONLY){closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});await send('Target.disposeBrowserContext',{browserContextId});continue;}
+  if(process.env.R269_CHECKS)await require('./r269-browser-checks.cjs')({evaluate,until,click,call,shot,ready,results,errors,releaseFilters:()=>releaseFilters?.(),restartFixture:async()=>{await freshChromeFixture({send,targetId,sessionId,browserContextId,closedSessions,initialize:async next=>{({targetId,sessionId,browserContextId}=next);await initializePage();}});const originalRows=await evaluate("document.querySelector('#overview-content')._overviewViewTab.data.matches.length");assert.equal(originalRows,1000,'fresh R266 fixture must keep all original rows');results.push({r276:'r269-to-r266-fresh-context',browserContextId,originalRows});}});
   currentCase={theme,width};
   await send('Tracing.start',{categories:'devtools.timeline,blink.user_timing'+(process.env.R276_TRACE?',disabled-by-default-v8.cpu_profiler':''),transferMode:'ReturnAsStream'});
   await click('.match-filterbar [data-history-filter-load],.match-filterbar [data-af-open]');await until("document.querySelector('[data-af-menu]')?.open");await click('[data-af-category="hero"]');
@@ -133,7 +138,7 @@ async function start(){
     results.push({theme,width,settings,collectionFirst:firstCount.count,collectionFirstMs:firstCount.ms,collectionCards:1192,collectionLongestMs:collectionMax,pendingSamples:samples});
   }
   results.push({theme,width,dialog,filterCommitShellRetained,cycleLongTasksMs:cycleTasks,clickLongTasksMs:clickTasks,applyLongTasksMs:total,applyLongestMs:max,...metrics});
-  closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});
+  closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});if(browserContextId)await send('Target.disposeBrowserContext',{browserContextId});
  }
  assert.equal(violations.length,0,JSON.stringify(violations));assert.equal(errors.length,0,JSON.stringify(errors));
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({host:{platform:process.platform,arch:process.arch,node:process.version},completedAt:new Date().toISOString(),scope:process.env.R266_CARD_SERVER?'real Chromium + actual overview/OP.GG Go handlers and embedded assets; identical fake upstreams; no production binary/Windows/real latency claim':'real Chromium on recorded host; public production binary/CSP; synthetic API data; no Windows/real LCU claim',csp,results,errors,violations,canceledInterceptions},null,2));

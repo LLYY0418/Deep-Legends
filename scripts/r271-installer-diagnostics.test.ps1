@@ -1,6 +1,10 @@
 param([string]$RunSource = (Join-Path $PSScriptRoot 'r206-real-upgrade-windows.ps1'), [string]$HelperSource = (Join-Path $PSScriptRoot 'r271-installer-diagnostics.ps1'))
 $ErrorActionPreference = 'Stop'
+$fixtureClock = [Diagnostics.Stopwatch]::StartNew()
+function Write-R271Stage([string]$Stage) { [Console]::Out.WriteLine(('R271_STAGE {0} {1}ms' -f $Stage, $fixtureClock.ElapsedMilliseconds)); [Console]::Out.Flush() }
+Write-R271Stage 'script-start'
 . $HelperSource
+Write-R271Stage 'helper-loaded'
 function Assert-R271($Condition, [string]$Message) { if (!$Condition) { throw "ASSERTION FAILED: $Message" } }
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('r271-setup-test-' + [Guid]::NewGuid().ToString('N'))
 $oldTemp = $env:TEMP; $oldTmp = $env:TMP
@@ -46,17 +50,22 @@ try {
     $match = [regex]::Match($source, '(?s)function Run-Setup\(.*?(?=\r?\nfunction Get-R265AppState)')
     Assert-R271 $match.Success 'actual Run-Setup function must be extracted'
     . ([ScriptBlock]::Create($match.Value))
+    Write-R271Stage 'fixture-ready'
     $hostLines = @(Save-R271RunnerHost $evidence)
+    Write-R271Stage 'host-saved'
     $hostRecord = Get-Content (Join-Path $evidence 'r271-runner-host.json') -Raw | ConvertFrom-Json
     Assert-R271 ($hostRecord.cpu_names[0] -eq 'synthetic Intel Xeon 6973P-C' -and $hostRecord.windows_version -eq '10.0.fixture') 'CPU and Windows version must be preserved'
     foreach ($version in @('0.12.65','0.12.68','0.12.76','0.12.79','0.12.80','0.12.81','0.12.82','0.12.83')) {
         $script:fixtureVersion = $version; $script:fixtureFile = Join-Path $fixture ("Setup-$version.exe"); [IO.File]::WriteAllText($script:fixtureFile, 'unchanged synthetic installer')
         $script:fixtureExit = 0
+        Write-R271Stage ('launch-' + $version)
         Run-Setup -File $script:fixtureFile -Version $version | Out-Null
+        Write-R271Stage ('completed-' + $version)
         Assert-R271 (($script:lastSetupDeadline - (Get-Date)).TotalSeconds -ge 178 -and ($script:lastSetupDeadline - (Get-Date)).TotalSeconds -le 180) 'original 180 second deadline must remain'
     }
     $script:fixtureVersion = '0.12.82'; $script:fixtureFile = Join-Path $fixture 'Setup-0.12.82.exe'
     $script:fixtureExit = 2
+    Write-R271Stage 'nonzero-diagnostics-start'
     $output = New-Object 'System.Collections.Generic.List[string]'
     $failure = ''
     try { Run-Setup -File $script:fixtureFile -Version '0.12.82' | ForEach-Object { $output.Add([string]$_) } } catch { $failure = $_.Exception.Message }
@@ -68,9 +77,12 @@ try {
     Assert-R271 ($records.Count -eq 1) 'failure must save application error evidence'
     $record = Get-Content $records[0].FullName -Raw | ConvertFrom-Json
     Assert-R271 ($record.application_errors.Count -eq 1 -and $record.application_errors[0].event_id -eq 1000) 'only recent matching PID event may be included'
+    Write-R271Stage 'nonzero-diagnostics-completed'
     $script:queryFails = $true
+    Write-R271Stage 'query-failure-start'
     try { Run-Setup -File $script:fixtureFile -Version '0.12.82' | Out-Null } catch { $failure = $_.Exception.Message }
     Assert-R271 ($failure -eq 'Real installer failed: 2') 'event log failure must not replace installer failure'
     Assert-R271 ($script:flushCalls -eq 10) 'redirected output must finish before success or failure is handled'
+    Write-R271Stage 'assertions-completed'
     Write-Output 'PASS R271 actual Run-Setup redirects eight versions, preserves arguments/deadline, captures failure tails, filters events and redacts output'
-} finally { $env:TEMP = $oldTemp; $env:TMP = $oldTmp; Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction SilentlyContinue }
+} finally { Write-R271Stage 'cleanup-start'; $env:TEMP = $oldTemp; $env:TMP = $oldTmp; Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction SilentlyContinue; Write-R271Stage 'cleanup-completed' }

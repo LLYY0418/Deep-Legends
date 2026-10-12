@@ -26,9 +26,9 @@ test('R271 committing a filter keeps the overview shell and flushes deferred dat
  tab.overviewRenderDeferred=true;f.advancedFilterContext(tab).change();assert.equal(full,1,'an asynchronous data update deferred while editing must be rendered');assert.equal(tab.overviewRenderDeferred,false);root._overviewViewTab={};f.advancedFilterContext(tab).change();assert.equal(full,2,'a reused view must take the complete ownership-safe render path');dom.window.close();
 });
 test('R271 the real PowerShell setup collector preserves failure diagnostics and eight version launches',()=>{
- const {spawnSync}=require('node:child_process'),root=path.resolve(__dirname,'../..');
- const args=['-NoProfile','-File',path.join(root,'scripts/r271-installer-diagnostics.test.ps1')];
+ const {runFixture}=require('../../scripts/r276-powershell-fixture.cjs'),root=path.resolve(__dirname,'../..');
+ const args=['-NoProfile','-NonInteractive','-File',path.join(root,'scripts/r271-installer-diagnostics.test.ps1')];
  if(process.env.R271_RUN_SOURCE)args.push('-RunSource',process.env.R271_RUN_SOURCE);
  if(process.env.R271_HELPER_SOURCE)args.push('-HelperSource',process.env.R271_HELPER_SOURCE);
- const r=spawnSync(process.env.PWSH_BIN || 'pwsh',args,{cwd:root,encoding:'utf8',timeout:15000});assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/PASS R271 actual Run-Setup/);
+ const r=runFixture(process.env.PWSH_BIN || 'pwsh',args,{cwd:root});assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/PASS R271 actual Run-Setup/);
 });

@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict');
-module.exports=async({evaluate,until,click,call,shot,ready,results,errors,releaseFilters})=>{
+module.exports=async({evaluate,until,click,call,shot,ready,results,errors,releaseFilters,restartFixture})=>{
  const rating=await evaluate("({calls:window.__r269Ratings || [],status:document.querySelector('#overview-content')._overviewViewTab.mayhemRating?.status})");assert.equal(rating.calls.length,1);assert.equal(rating.calls[0].prefetch,'1');assert.equal(rating.status,'ready');const ratingTiming=await evaluate("(async()=>{const at=performance.now(),n=document.querySelector('[data-rank-mmr-trigger]');n.focus();await new Promise(requestAnimationFrame);return {ms:performance.now()-at,text:n.closest('.rank-mmr-control').textContent}})()");assert(/2[,]?054/.test(ratingTiming.text));assert(ratingTiming.ms<=200,JSON.stringify(ratingTiming));results.push({r269:'mayhem-prefetched',...rating});
  await require('./r270-browser-checks.cjs')({evaluate,until,click,call,shot,ready,results,releaseFilters});
  console.log('R269 modal start');
@@ -55,5 +55,5 @@ module.exports=async({evaluate,until,click,call,shot,ready,results,errors,releas
  // DELETE and its embedded-source response still execute the real local backend.
  await evaluate("window.__r269KeyFetch=window.fetch;window.__r269Personal=false;window.fetch=(url,init)=>{if(String(url).endsWith('/api/riot-key')){if(init?.method==='DELETE'){__r269Personal=false;return __r269KeyFetch(url,init);}if(init?.method==='POST')__r269Personal=true;if(__r269Personal)return Promise.resolve(new Response(JSON.stringify({status:'configured',source:'personal',result:'valid'}),{headers:{'Content-Type':'application/json'}}));}return __r269KeyFetch(url,init)};document.querySelector('#setting-riot-key-input').value='RGAPI-00000000-0000-0000-0000-000000000000';document.querySelector('#setting-riot-key-save').click();true");await until("document.querySelector('#setting-riot-key-state').textContent==='已配置'");await click('#setting-riot-key-clear');await until("document.querySelector('#setting-riot-key-state').textContent==='使用内置服务'");await evaluate('window.fetch=__r269KeyFetch;true');results.push({r269:'clear-personal-key-native',label:'使用内置服务',restartRequired:false,acceptanceSynthetic:true,clearUsesRealBackend:true});
  // Restart the fixture before the original R266 budgets and assertions run.
- await call('Page.navigate',{url:ready.baseUrl+'/?demo&section=overview'});await until("document.querySelector('.match-list .match-entry') && !document.querySelector('#overview-content')._overviewViewTab.loading");
+ await restartFixture();
 };
