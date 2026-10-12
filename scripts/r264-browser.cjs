@@ -1,6 +1,7 @@
 'use strict';
 const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
+const {r264API}=require('./r276-browser-api-fixtures.cjs');
 // Real public backend and its CSP/assets, with explicit synthetic API fixtures.
 const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=process.env.R264_BROWSER_OUT||path.join(os.tmpdir(),'deep-legends-r264-browser');
@@ -62,7 +63,9 @@ async function start(){
   if(m.method==='Log.entryAdded' && m.params.entry.level==='error')errors.push(m.params.entry);
   if(m.method==='Runtime.bindingCalled' && m.params.name==='r264CSP')violations.push(JSON.parse(m.params.payload));
   if(m.method==='Fetch.requestPaused')void (async()=>{const url=m.params.request.url,pathname=new URL(url).pathname,id=m.params.requestId;
-   if(pathname==='/api/image' || pathname==='/api/champion-asset'){await send('Fetch.fulfillRequest',{requestId:id,responseCode:200,responseHeaders:[{name:'Content-Type',value:'image/svg+xml'}],body:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#23384a"/><circle cx="320" cy="180" r="80" fill="#cc9e45"/></svg>').toString('base64')},m.sessionId);}
+   const fixture=r264API(new URL(url));
+   if(fixture)await send('Fetch.fulfillRequest',{requestId:id,responseCode:200,responseHeaders:[{name:'Content-Type',value:'application/json'}],body:Buffer.from(JSON.stringify(fixture)).toString('base64')},m.sessionId);
+   else if(pathname==='/api/image' || pathname==='/api/champion-asset'){await send('Fetch.fulfillRequest',{requestId:id,responseCode:200,responseHeaders:[{name:'Content-Type',value:'image/svg+xml'}],body:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#23384a"/><circle cx="320" cy="180" r="80" fill="#cc9e45"/></svg>').toString('base64')},m.sessionId);}
    else if(pathname==='/demo-data.js'){const response=await fetch(ready.baseUrl+pathname),body=(await response.text()).replace('  const fixtures = new Map([',inject+'\n  const fixtures = new Map([').replace('    const params = new URLSearchParams(url.split("?")[1] || "");','    const params = new URLSearchParams(url.split("?")[1] || "");'+intercept);await send('Fetch.fulfillRequest',{requestId:id,responseCode:200,responseHeaders:[{name:'Content-Type',value:'text/javascript'}],body:Buffer.from(body).toString('base64')},m.sessionId);}
    else if(url.startsWith(ready.baseUrl+'/'))await send('Fetch.continueRequest',{requestId:id},m.sessionId);
    else await send('Fetch.failRequest',{requestId:id,errorReason:'BlockedByClient'},m.sessionId);

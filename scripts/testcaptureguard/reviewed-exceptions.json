@@ -507,42 +507,42 @@
     "file": "backend/hexdata_test.go",
     "line": 143,
     "target": "event",
-    "source_sha256": "7eefd07c929a970393dedee8c8b2239a99d101c59aabba912fcddaaa91d6d522",
+    "source_sha256": "f6b0837b4da105dc7e1fee355bbe13342ac41b637c776a43a89d017b6ec4d7ee",
     "comment": "r276-capture-safe: TestHexdataHeroShapeReportsActualRecommendationAndItemCounts: the audited fixture operations in this test invoke this callback serially and return before event is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/hexdata_test.go",
     "line": 183,
     "target": "events",
-    "source_sha256": "7eefd07c929a970393dedee8c8b2239a99d101c59aabba912fcddaaa91d6d522",
+    "source_sha256": "f6b0837b4da105dc7e1fee355bbe13342ac41b637c776a43a89d017b6ec4d7ee",
     "comment": "r276-capture-safe: TestHexdataShapeFailureDistinguishesParseFromEmptyPayload: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/hexdata_test.go",
     "line": 207,
     "target": "event",
-    "source_sha256": "7eefd07c929a970393dedee8c8b2239a99d101c59aabba912fcddaaa91d6d522",
+    "source_sha256": "f6b0837b4da105dc7e1fee355bbe13342ac41b637c776a43a89d017b6ec4d7ee",
     "comment": "r276-capture-safe: TestInspectHexdataPayloadReportsRawFieldsWhenRowsAreRejected: the audited fixture operations in this test invoke this callback serially and return before event is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/hexdata_test.go",
     "line": 336,
     "target": "events",
-    "source_sha256": "7eefd07c929a970393dedee8c8b2239a99d101c59aabba912fcddaaa91d6d522",
+    "source_sha256": "f6b0837b4da105dc7e1fee355bbe13342ac41b637c776a43a89d017b6ec4d7ee",
     "comment": "r276-capture-safe: TestReportRSCRejectedItemsEmitsActualIDAndReason: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/hexdata_test.go",
-    "line": 969,
+    "line": 977,
     "target": "got",
-    "source_sha256": "7eefd07c929a970393dedee8c8b2239a99d101c59aabba912fcddaaa91d6d522",
+    "source_sha256": "f6b0837b4da105dc7e1fee355bbe13342ac41b637c776a43a89d017b6ec4d7ee",
     "comment": "r276-capture-safe: TestHexdataRequestUsesHonestUserAgent: the audited fixture operations in this test invoke this callback serially and return before got is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/hexdata_test.go",
-    "line": 1006,
+    "line": 1014,
     "target": "slept",
-    "source_sha256": "7eefd07c929a970393dedee8c8b2239a99d101c59aabba912fcddaaa91d6d522",
+    "source_sha256": "f6b0837b4da105dc7e1fee355bbe13342ac41b637c776a43a89d017b6ec4d7ee",
     "comment": "r276-capture-safe: TestHexdataPaceAllowsFourIdleBurstRequestsThenJitters: the audited fixture operations in this test invoke this callback serially and return before slept is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

@@ -136,6 +136,14 @@ jobs:
             index: 0
             iterations: 1
             os: windows-latest
+          - kind: linux-hexdata
+            index: 0
+            iterations: 1
+            os: ubuntu-latest
+          - kind: windows-hexdata
+            index: 0
+            iterations: 1
+            os: windows-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -153,11 +161,20 @@ jobs:
       - name: Install desktop test dependencies
         run: npm ci --prefix desktop
       - name: Prepare pinned public compatibility fixture
-        if: matrix.kind == 'linux-race' || matrix.kind == 'windows-go'
+        if: matrix.kind == 'linux-race' || matrix.kind == 'windows-go' || endsWith(matrix.kind, '-hexdata')
         run: node scripts/prepare-r238-update-fixture.cjs
       - name: Prepare Go dependencies before offline samples
-        if: matrix.kind == 'linux-race' || matrix.kind == 'windows-go'
+        if: matrix.kind == 'linux-race' || matrix.kind == 'windows-go' || endsWith(matrix.kind, '-hexdata')
         run: go mod download
+      - name: Require native Windows race compiler
+        if: matrix.kind == 'windows-hexdata'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
+            $compiler = @('C:\mingw64\bin', 'C:\msys64\mingw64\bin') | Where-Object { Test-Path (Join-Path $_ 'gcc.exe') } | Select-Object -First 1
+            if (-not $compiler) { throw 'Windows race compiler is unavailable' }
+            $compiler | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
       - name: Require real Chromium and prepare synthetic executable
         if: startsWith(matrix.kind, 'browser-')
         shell: bash

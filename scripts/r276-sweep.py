@@ -26,6 +26,8 @@ for iteration in range(a.iterations):
         args=['go','test','-race'] if a.kind=='linux-race' else ['go','test']
         args+=['-count=1','-shuffle='+str(seed),'-cpu='+str(cpu),'./...']
         run('full-go',['node','scripts/r276-offline.cjs','--',*args],{'R276_OFFLINE_OUTPUT':str(folder/'offline.json')},folder,seed,cpu)
+    elif a.kind in ['linux-hexdata','windows-hexdata']:
+        run('hexdata',['node','scripts/r276-offline.cjs','--','node','scripts/r276-hexdata-stress.cjs',str(folder/'hexdata')],{'CGO_ENABLED':'1','R276_OFFLINE_OUTPUT':str(folder/'offline.json')},folder)
     elif a.kind in ['browser-main','browser-r265']:
         run('browser',['node','scripts/r276-browser-job.cjs',a.kind.removeprefix('browser-'),str(folder/'guards')],{},folder)
     elif a.kind in ['linux-renderers','windows-renderers']:

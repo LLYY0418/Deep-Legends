@@ -60,7 +60,7 @@ function removeDirectoriesSync(directories, {warn = warning, remove = directory 
 async function cleanupChromeTest({children = [], sockets = [], servers = [], directories = []} = {}, options = {}) {
  const warn = options.warn || warning;
  try {
-  for (const socket of sockets) {try {socket?.close();} catch (error) {warn(error.message);}}
+  for (const socket of sockets) {try {await socket?.close();} catch (error) {warn(error.message);}}
   const stopped = await Promise.all(children.map(child => stopChild(child, options)));
   await Promise.all(servers.map(server => closeServer(server, options)));
   if (stopped.every(Boolean)) await removeDirectories(directories, options);

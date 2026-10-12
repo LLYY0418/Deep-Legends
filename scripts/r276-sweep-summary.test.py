@@ -27,4 +27,29 @@ class SummaryTests(unittest.TestCase):
         self.timing['summary']['duration_ms']=float('nan');self.assertFalse(self.result()['success'])
     def test_missing_sha_rejected(self):
         self.rows[0]['sha']=None;self.assertFalse(self.result()['success'])
+class HexdataSummaryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name);self.folder=self.root/'job';(self.folder/'0/hexdata').mkdir(parents=True)
+        self.rows=[dict(kind='windows-hexdata',index=0,iteration=0,label='hexdata',job='windows-hexdata-0',run='1',sha='fixture-sha',duration_ms=100,exitCode=0,signatures=[])]
+        self.jobs=[dict(jobs=[dict(name='windows-hexdata-0',conclusion='success',html_url='https://github.com/fixture/repo/actions/runs/1/job/2')])]
+        command=['go','test','-race','-json','-count=200','-cpu=1,2,4','-run','^('+'|'.join(module.HEXDATA_TESTS)+')$','./backend']
+        self.stress=dict(platform='win32',sha='fixture-sha',count=200,cpu=[1,2,4],command=command,exitCode=0,rows=[dict(test=t,passed=600,failed=0,samples=600) for t in module.HEXDATA_TESTS])
+        self.events=[dict(Action='pass',Test=t,Elapsed=0.01) for t in module.HEXDATA_TESTS for _ in range(600)]
+    def result(self):
+        (self.folder/'samples.json').write_text(json.dumps(self.rows));(self.folder/'0/hexdata/stress-summary.json').write_text(json.dumps(self.stress));(self.folder/'0/hexdata/stress.jsonl').write_text('\n'.join(json.dumps(e) for e in self.events)+'\n')
+        return module.summarize(self.root,self.jobs,'fixture/repo',1,inventory={},catalog=[],plan=[('windows-hexdata',0,1)])
+    def test_complete_stress_and_metrics(self):
+        r=self.result();self.assertTrue(r['success']);self.assertEqual(r['hexdataStress'][0]['rows'][0]['samples'],600);self.assertEqual(r['metrics']['windows-hexdata/'+module.HEXDATA_TESTS[0]]['count'],600)
+    def test_missing_raw_repetition_rejected(self):
+        self.events.pop();self.assertFalse(self.result()['success'])
+    def test_missing_test_rejected(self):
+        self.stress['rows'].pop();self.assertFalse(self.result()['success'])
+    def test_wrong_count_cpu_or_race_rejected(self):
+        self.stress['command'].remove('-race');self.assertFalse(self.result()['success'])
+    def test_failed_stress_rejected(self):
+        self.stress['rows'][0].update(passed=599,failed=1);self.assertFalse(self.result()['success'])
+    def test_raw_failure_cannot_hide_in_clean_summary(self):
+        self.events.append(dict(Action='fail',Test=module.HEXDATA_TESTS[0]));self.assertFalse(self.result()['success'])
+    def test_wrong_sha_rejected(self):
+        self.stress['sha']='other';self.assertFalse(self.result()['success'])
 if __name__=='__main__':unittest.main()

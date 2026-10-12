@@ -8,7 +8,7 @@ async function main(){
  const env={};
  if(shard==='1'){
   const binary=path.join(out,'r264-public');require('./r276-public-fixture.cjs').build(binary);
-  env.R269_BACKEND=binary;env.R266_BACKEND=binary;
+  env.R269_BACKEND=binary;env.R266_BACKEND=binary;env.R264_BACKEND=binary;
   const chrome=spawnSync('bash',['-c','command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium'],{encoding:'utf8'});
   if(!process.env.CHROME_BIN&&chrome.status!==0)throw Error('real Chromium required');
   env.CHROME_BIN=process.env.CHROME_BIN||chrome.stdout.trim();
@@ -22,6 +22,8 @@ async function main(){
  if(shard==='1'){
   const result=await runOffline(process.execPath,['scripts/r276-browser-fixture-mutations.cjs',path.join(out,'r276-browser-mutations')],{env,output:path.join(out,'r276-browser-mutations-offline.json')});
   if(result.code!==0)throw Error('R276 missing-browser-fixture mutations failed');
+  const r264=await runOffline(process.execPath,['scripts/r276-r264-fixture-mutations.cjs',path.join(out,'r276-r264-mutations')],{env,output:path.join(out,'r276-r264-mutations-offline.json')});
+  if(r264.code!==0)throw Error('R276 R264 missing-rankings mutation failed');
  }
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

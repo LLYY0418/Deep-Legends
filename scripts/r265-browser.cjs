@@ -1,6 +1,7 @@
 'use strict';
 const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
+const {r265API}=require('./r276-browser-api-fixtures.cjs');
 const {PausedRequests,timeoutDiagnostic}=require('./fetch-paused-diagnostics.cjs');
 const pausedRequests=new PausedRequests();
 // Real Chromium against a public binary and production CSP. API/image inputs
@@ -69,7 +70,9 @@ async function main(){
   if(m.method==='Fetch.requestPaused'){const diagnosticKey=pausedRequests.enter(m.params,m.sessionId);void(async()=>{
    const release=async(method,params)=>{pausedRequests.release(diagnosticKey,method);const result=await send(method,params,m.sessionId);pausedRequests.complete(diagnosticKey);return result;};
    const {requestId,request}=m.params,url=new URL(request.url),fulfill=(body,type)=>release('Fetch.fulfillRequest',{requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:type}],body:Buffer.from(body).toString('base64')});
-   if(['/api/image','/api/champion-asset'].includes(url.pathname))await fulfill('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#345366"/></svg>','image/svg+xml');
+   const catalog=r265API(url,request.method);
+   if(catalog)await fulfill(JSON.stringify(catalog),'application/json');
+   else if(['/api/image','/api/champion-asset'].includes(url.pathname))await fulfill('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#345366"/></svg>','image/svg+xml');
    else if(url.pathname==='/demo-data.js'){let body=await(await fetch(request.url)).text();body=body.replace('    const params = new URLSearchParams(url.split("?")[1] || "");','    const params = new URLSearchParams(url.split("?")[1] || "");'+fixture);await fulfill(body,'text/javascript');}
    else if(request.url.startsWith(ready.baseUrl+'/'))await release('Fetch.continueRequest',{requestId});
    else await release('Fetch.failRequest',{requestId,errorReason:'BlockedByClient'});

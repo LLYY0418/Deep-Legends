@@ -3,6 +3,7 @@
 'use strict';
 const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
+const {serveStaticAPI}=require('../scripts/r276-browser-api-fixtures.cjs');
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -33,6 +34,7 @@ async function main(){
    }
    if(process.env.R140_APP_CSS && pathname==='/app.css') {res.setHeader('Content-Type','text/css');res.end(fs.readFileSync(process.env.R140_APP_CSS));return;}
    if (process.env.DIAGNOSTICS_1555_LAYOUT === '1' && pathname === '/api/events') { res.writeHead(200, {'Content-Type':'text/event-stream','Cache-Control':'no-cache'}); res.write('data: ready\n\n'); return; }
+   if(serveStaticAPI(req,res))return;
    const file=path.resolve(web,pathname==='/'?'index.html':'.'+pathname);
    if(!file.startsWith(web+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.statusCode=404;res.end();return;}
    const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png'};

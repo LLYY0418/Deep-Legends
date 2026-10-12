@@ -1,0 +1,42 @@
+[
+  {
+    "guard": "r100",
+    "method": "GET",
+    "path": "/api/status",
+    "status": 503,
+    "maxCount": 3,
+    "reason": "Three intentional failed status polls must show local recovery, retain loaded content and recover after successful poll",
+    "assertions": [
+      {
+        "file": "desktop/r100-browser.cjs",
+        "line": 78,
+        "source_sha256": "aec2d66c9d04b5e366d31672ad8ec8f073a6e427ff65eac5aadc3163eaba546a",
+        "snippet": "assert.equal(await evaluate('document.body.classList.contains(\"is-fatal\")'),false,'poll failure must not be a fatal page');"
+      },
+      {
+        "file": "desktop/r100-browser.cjs",
+        "line": 79,
+        "source_sha256": "aec2d66c9d04b5e366d31672ad8ec8f073a6e427ff65eac5aadc3163eaba546a",
+        "snippet": "assert.equal(await evaluate('document.querySelector(\"#local-status-recovery\").hidden'),false);"
+      },
+      {
+        "file": "desktop/r100-browser.cjs",
+        "line": 80,
+        "source_sha256": "aec2d66c9d04b5e366d31672ad8ec8f073a6e427ff65eac5aadc3163eaba546a",
+        "snippet": "assert.equal(await evaluate('document.querySelector(\"#content\").textContent'),'已加载的战绩');"
+      },
+      {
+        "file": "desktop/r100-browser.cjs",
+        "line": 82,
+        "source_sha256": "aec2d66c9d04b5e366d31672ad8ec8f073a6e427ff65eac5aadc3163eaba546a",
+        "snippet": "assert.equal(await evaluate('document.querySelector(\"#local-status-recovery\").hidden'),true);"
+      },
+      {
+        "file": "desktop/r100-browser.cjs",
+        "line": 83,
+        "source_sha256": "aec2d66c9d04b5e366d31672ad8ec8f073a6e427ff65eac5aadc3163eaba546a",
+        "snippet": "assert.deepEqual(await evaluate('window.__statusRenderFailures'),[],'status fixture must execute every production dependency');"
+      }
+    ]
+  }
+]

@@ -42,10 +42,14 @@ jobs:
         run: go run ./scripts/check-test-captures --json="$RUNNER_TEMP/test-capture-audit.json"
       - name: R276 deterministic fixture and audit mutations
         run: python3 scripts/r276-fixture-mutations.py --out "$RUNNER_TEMP/r276-fixture-mutations"
+      - name: R276 complete Hexdata restart barrier mutations
+        run: python3 scripts/r276-hexdata-mutations.py --out "$RUNNER_TEMP/r276-hexdata-mutations"
       - name: Audit browser process and directory cleanup
         run: node scripts/check-browser-cleanup.cjs --json="$RUNNER_TEMP/browser-cleanup-audit.json"
       - name: R276 deterministic cleanup regression and mutations
         run: node scripts/r276-cleanup-mutations.cjs "$RUNNER_TEMP/r276-cleanup-mutations"
+      - name: R276 precise API fault policy regression and mutations
+        run: node scripts/r276-api-policy-mutations.cjs "$RUNNER_TEMP/r276-api-policy-mutations"
       - name: Verify sweep evidence rejects missing samples
         run: python3 scripts/r276-sweep-summary.test.py
       - uses: actions/upload-artifact@v4
@@ -55,8 +59,10 @@ jobs:
           path: |
             ${{ runner.temp }}/browser-cleanup-audit.json
             ${{ runner.temp }}/r276-cleanup-mutations/**
+            ${{ runner.temp }}/r276-api-policy-mutations/**
             ${{ runner.temp }}/test-capture-audit.json
             ${{ runner.temp }}/r276-fixture-mutations/**
+            ${{ runner.temp }}/r276-hexdata-mutations/**
           if-no-files-found: error
       - name: Vet
         run: go vet ./...

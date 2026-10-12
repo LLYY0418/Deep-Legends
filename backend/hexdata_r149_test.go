@@ -116,7 +116,7 @@ func TestR149MayhemCatalogsWarmConcurrentlyAndRestartFromDisk(t *testing.T) {
 	if got := requests.Load(); got != 5 {
 		t.Fatalf("cold catalog requests = %d, want 5", got)
 	}
-	r274Flush(t, provider.cache)
+	r276HexdataRestartBarrier(t, provider)
 	restarted := newHexdataBudgetProvider(t, root, transport)
 	restarted.patch = "16.19.1"
 	restarted.prefetchMayhemCatalogs()

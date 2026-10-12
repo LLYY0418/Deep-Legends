@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm');
 const {PausedRequests,timeoutDiagnostic}=require(process.env.R275_FETCH_HELPER||'../scripts/fetch-paused-diagnostics.cjs');
+const {r265API}=require('../scripts/r276-browser-api-fixtures.cjs');
 const source=fs.readFileSync(path.join(__dirname,'../scripts/r265-browser.cjs'),'utf8');
 const handlerStart=source.indexOf("if(m.method==='Fetch.requestPaused')"),handlerEnd=source.indexOf('\n });\n async function page',handlerStart);
 // Capture the existing async handler promise without changing its branches.
@@ -9,8 +10,8 @@ const lifecycle=source.slice(source.indexOf("if(m.method==='Network.loadingFaile
 function paused(url='http://127.0.0.1:1/api/champion-asset?token=SECRET&key=PRIVATE'){
  let time=0,resolve,reject,method;
  const tracker=new PausedRequests(()=>time);tracker.attach('raw-session','raw-target');
- const context={m:{method:'Fetch.requestPaused',sessionId:'raw-session',params:{requestId:'raw-request',networkId:'raw-network',resourceType:'Image',request:{url,headers:{Cookie:'SECRET',Authorization:'SECRET'}}}},
-  pausedRequests:tracker,ready:{baseUrl:'http://127.0.0.1:1'},URL,Buffer,Promise,Error,closed:new Set(),canceled:new Set(),errors:[],
+ const context={m:{method:'Fetch.requestPaused',sessionId:'raw-session',params:{requestId:'raw-request',networkId:'raw-network',resourceType:'Image',request:{url,method:'GET',headers:{Cookie:'SECRET',Authorization:'SECRET'}}}},
+  r265API,pausedRequests:tracker,ready:{baseUrl:'http://127.0.0.1:1'},URL,Buffer,Promise,Error,closed:new Set(),canceled:new Set(),errors:[],
   send:command=>{method=command;return new Promise((yes,no)=>{resolve=yes;reject=no;});},setTimeout:(done,ms)=>{assert.equal(ms,50);time+=ms;done();}};
  vm.runInNewContext(handler,context);
  return {context,tracker,method:()=>method,advance:ms=>{time+=ms;},resolve:()=>resolve({}),reject:error=>reject(error)};

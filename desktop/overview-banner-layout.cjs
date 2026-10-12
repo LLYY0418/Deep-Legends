@@ -3,6 +3,7 @@
 'use strict';
 const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
+const {serveStaticAPI}=require('../scripts/r276-browser-api-fixtures.cjs');
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -25,6 +26,7 @@ async function main(){
  await call('Page.enable');
  server=require('node:http').createServer((req,res)=>{
    const pathname=new URL(req.url,'http://localhost').pathname;
+   if(serveStaticAPI(req,res))return;
    const file=path.resolve(web,pathname==='/'?'index.html':'.'+pathname);
    if(!file.startsWith(web+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.statusCode=404;res.end();return;}
    const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png'};

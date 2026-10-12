@@ -84,7 +84,7 @@ func newHexdataBudgetProvider(t *testing.T, root string, transport http.RoundTri
 	provider.hexdata.maximumJitter = 0
 	provider.hexdata.retryDelay = 0
 	provider.client = &http.Client{Transport: transport}
-	t.Cleanup(func() { r274Flush(t, provider.cache) })
+	t.Cleanup(func() { r276HexdataRestartBarrier(t, provider) })
 	return provider
 }
 
@@ -497,7 +497,7 @@ func TestHexdataColdRankingBudgetAndDiskRestart(t *testing.T) {
 		}
 	}
 
-	r274Flush(t, provider.cache)
+	r276HexdataRestartBarrier(t, provider)
 	restarted := newHexdataBudgetProvider(t, root, transport)
 	ranking, err = restarted.loadHexdataRankings(context.Background())
 	restarted.hexdata.prefetchWait.Wait()
@@ -565,7 +565,9 @@ func TestHexdataSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNone(t *tes
 		return hexdataResponse(request, heroData), nil
 	})
 	provider := newHexdataBudgetProvider(t, root, transport)
+	stateGate := r274Gate(t, provider.hexdata.stateDisk, "hexdata-state")
 	provider.hexdata.adoptCitation(championSourceCitation{Source: "Hexdata", Patch: "16.16", ReportDate: "2026-08-19", BuildID: hexdataTestBuild, CanonicalURL: "https://hexdata.com.cn/hero/67-vayne"})
+	r274Wait(t, stateGate.entered, "same-hero state gate not reached", provider.hexdata.stateDisk)
 
 	const concurrentLoads = 10
 	start := make(chan struct{})
@@ -602,6 +604,12 @@ func TestHexdataSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNone(t *tes
 	}
 
 	r274Flush(t, provider.cache)
+	// Release the writer only when the complete restart barrier observes it.
+	// Replacing the new barrier with cache-only flushing deterministically fails
+	// the original restart request-count assertion, on every platform.
+	if err := r276HexdataRestartDrain(provider, r276ReleaseStateClock{r274RealClock{}, stateGate}); err != nil {
+		t.Fatal("same-hero complete restart barrier", err)
+	}
 	restarted := newHexdataBudgetProvider(t, root, transport)
 	page, err := restarted.hexdata.load(context.Background(), "hero", "67", "/hero/67-vayne", "text/html,application/xhtml+xml", false)
 	if err != nil || len(page.Data) == 0 {

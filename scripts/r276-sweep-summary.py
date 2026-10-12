@@ -2,9 +2,10 @@
 import argparse, collections, json, math, statistics, subprocess
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-PLAN=[(kind,index,iterations) for kind,count,iterations in [('linux-race',8,5),('linux-renderers',5,2),('browser-main',4,5),('browser-r265',4,5),('windows-go',4,3),('windows-renderers',4,3),('windows-cold',1,1)] for index in range(count)]
+HEXDATA_TESTS=['TestHexdataSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNone','TestHexdataColdRankingBudgetAndDiskRestart','TestR149MayhemCatalogsWarmConcurrentlyAndRestartFromDisk','TestR276HexdataRestartWaitsForStateAndUsesDisk']
+PLAN=[(kind,index,iterations) for kind,count,iterations in [('linux-race',8,5),('linux-renderers',5,2),('browser-main',4,5),('browser-r265',4,5),('windows-go',4,3),('windows-renderers',4,3),('windows-cold',1,1),('linux-hexdata',1,1),('windows-hexdata',1,1)] for index in range(count)]
 def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN):
-    errors=[];samples=[];metrics=collections.defaultdict(list);failures=collections.defaultdict(list)
+    errors=[];samples=[];hexdata_stress=[];metrics=collections.defaultdict(list);failures=collections.defaultdict(list)
     jobmap={j['name']:j for page in jobs for j in page.get('jobs',[])}
     if inventory is None:
         inventory={'linux':sorted(str(p.relative_to(ROOT)).replace('\\','/') for d in ['backend/web','desktop','scripts'] for p in (ROOT/d).glob('*.test.cjs')),'win32':sorted(str(p.relative_to(ROOT)).replace('\\','/') for p in (ROOT/'desktop').glob('*.test.cjs'))}
@@ -27,7 +28,7 @@ def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN):
         if job is None or not job.get('html_url') or job.get('conclusion')!='success':errors.append('missing/failed job '+name)
         if key not in seen_jobs:errors.append('missing samples '+name);continue
         directory,rows=seen_jobs[key]
-        labels=['full-go'] if kind in ['linux-race','windows-go'] else ['browser'] if kind.startswith('browser-') else ['calibration-before','renderers','calibration-after','budget'] if kind=='linux-renderers' else ['renderers'] if kind=='windows-renderers' else ['compile-cold','cold']
+        labels=['hexdata'] if kind in ['linux-hexdata','windows-hexdata'] else ['full-go'] if kind in ['linux-race','windows-go'] else ['browser'] if kind.startswith('browser-') else ['calibration-before','renderers','calibration-after','budget'] if kind=='linux-renderers' else ['renderers'] if kind=='windows-renderers' else ['compile-cold','cold']
         expected={(iteration,label) for iteration in range(iterations) for label in labels};actual=[(s.get('iteration'),s.get('label')) for s in rows]
         if set(actual)!=expected or len(actual)!=len(expected):errors.append('incomplete/duplicate iterations '+name)
         for s in rows:
@@ -41,7 +42,26 @@ def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN):
             samples.append(s)
         for iteration in range(iterations):
             base=directory/str(iteration)
-            if kind in ['linux-renderers','windows-renderers']:
+            if kind in ['linux-hexdata','windows-hexdata']:
+                stress=read(base/'hexdata/stress-summary.json');platform='linux' if kind=='linux-hexdata' else 'win32'
+                expected_command=['go','test','-race','-json','-count=200','-cpu=1,2,4','-run','^('+'|'.join(HEXDATA_TESTS)+')$','./backend']
+                if not isinstance(stress,dict):continue
+                stress_rows=stress.get('rows',[])
+                if stress.get('platform')!=platform or stress.get('sha')!=rows[0].get('sha') or stress.get('count')!=200 or stress.get('cpu')!=[1,2,4] or stress.get('command')!=expected_command or stress.get('exitCode')!=0:errors.append('wrong Hexdata stress command/identity '+name)
+                if sorted(r.get('test','') for r in stress_rows)!=sorted(HEXDATA_TESTS):errors.append('incomplete Hexdata test inventory '+name)
+                try:events=[json.loads(line) for line in (base/'hexdata/stress.jsonl').read_text().splitlines() if line]
+                except (OSError,ValueError):events=[];errors.append('missing/invalid Hexdata raw events '+name)
+                if any(e.get('Action')=='fail' for e in events) or any('WARNING: DATA RACE' in e.get('Output','') for e in events):errors.append('failed/racing Hexdata raw events '+name)
+                for test in HEXDATA_TESTS:
+                    evidence=[r for r in stress_rows if r.get('test')==test]
+                    passes=[e for e in events if e.get('Action')=='pass' and e.get('Test')==test]
+                    if len(evidence)!=1 or evidence[0].get('samples')!=600 or evidence[0].get('passed')!=600 or evidence[0].get('failed')!=0 or len(passes)!=600:errors.append('incomplete/failed Hexdata repetitions '+name+'/'+test)
+                    durations=[e.get('Elapsed') for e in passes]
+                    if not durations or any(not isinstance(v,(int,float)) or not math.isfinite(v) or v<0 for v in durations):errors.append('invalid Hexdata elapsed '+name+'/'+test)
+                    else:metrics[kind+'/'+test].extend(v*1000 for v in durations)
+                hexdata_stress.append(dict(kind=kind,jobLink=job.get('html_url') if job else None,**stress))
+            elif kind in ['linux-renderers','windows-renderers']:
+
                 timing=read(base/'renderer-timings.json');platform='linux' if kind=='linux-renderers' else 'win32'
                 if not isinstance(timing,dict):continue
                 files=timing.get('files',[])
@@ -79,7 +99,7 @@ def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN):
             denominator=sum(row['kind']==kind and row['label']==label for row in samples)
             by_kind.append(dict(kind=kind,label=label,count=count,denominator=denominator,fraction=count/denominator))
         signatures.append(dict(signature=signature,count=len(rows),denominator=len(samples),fraction=len(rows)/len(samples) if samples else 0,byKind=by_kind,jobLinks=sorted({row['jobLink'] for row in rows if row.get('jobLink')}),examples=rows))
-    return dict(success=bool(samples) and not errors and not signatures,sha=next(iter(shas)) if len(shas)==1 else None,runLink='https://github.com/'+repo+'/actions/runs/'+str(run),samples=len(samples),coverage={str(key):len(value[1]) for key,value in seen_jobs.items()},errors=errors,failures=signatures,metrics={name:dict(count=len(values),min_ms=min(values),median_ms=statistics.median(values),max_ms=max(values)) for name,values in metrics.items()},sampleRecords=samples)
+    return dict(success=bool(samples) and not errors and not signatures,sha=next(iter(shas)) if len(shas)==1 else None,runLink='https://github.com/'+repo+'/actions/runs/'+str(run),samples=len(samples),coverage={str(key):len(value[1]) for key,value in seen_jobs.items()},hexdataStress=hexdata_stress,errors=errors,failures=signatures,metrics={name:dict(count=len(values),min_ms=min(values),median_ms=statistics.median(values),max_ms=max(values)) for name,values in metrics.items()},sampleRecords=samples)
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--input',type=Path,required=True);p.add_argument('--jobs',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--repo',required=True);p.add_argument('--run',required=True);a=p.parse_args()
     summary=summarize(a.input,json.loads(a.jobs.read_text()),a.repo,a.run)
