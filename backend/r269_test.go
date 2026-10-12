@@ -484,6 +484,7 @@ func TestR269DecryptRecoveryKeepsReturnedCredentialScope(t *testing.T) {
 				return r206RelayResponse(400, []byte(`{"message":"Exception decrypting"}`)), nil
 			})}
 			ctx := context.WithValue(context.Background(), riotLookupIdentityKey{}, riotLookupIdentity{"Fixture", "KR1", "foreign-key-token", riotCredentialScope(context.Background())})
+			ctx = r276RecoveryFixtureContext(ctx, accountStatus)
 			for i := 0; i < 2; i++ {
 				var ids []string
 				if err := p.get(ctx, p.clusterHost(), "/lol/match/v5/matches/by-puuid/foreign-key-token/ids", nil, &ids); err != nil || len(ids) != 1 {

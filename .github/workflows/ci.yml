@@ -52,6 +52,8 @@ jobs:
         run: node scripts/r276-powershell-fixture-mutations.cjs "$RUNNER_TEMP/r276-powershell-fixture-mutations"
       - name: R276 fresh renderer fixture isolation regression and mutations
         run: node scripts/r276-fresh-chrome-mutations.cjs "$RUNNER_TEMP/r276-fresh-chrome-mutations"
+      - name: R276 recovery scope fixture regression and mutation
+        run: python3 scripts/r276-recovery-scope-mutations.py --out "$RUNNER_TEMP/r276-recovery-scope-mutations"
       - name: R276 installed demo startup navigation regression and mutations
         run: node scripts/r276-installed-demo-mutations.cjs "$RUNNER_TEMP/r276-installed-demo-mutations"
       - name: Audit browser process and directory cleanup
@@ -78,6 +80,7 @@ jobs:
             ${{ runner.temp }}/r276-powershell-fixture-mutations/**
             ${{ runner.temp }}/r276-fresh-chrome-mutations/**
             ${{ runner.temp }}/r276-installed-demo-mutations/**
+            ${{ runner.temp }}/r276-recovery-scope-mutations/**
           if-no-files-found: error
       - name: Vet
         run: go vet ./...

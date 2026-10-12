@@ -2054,14 +2054,14 @@
     "file": "backend/r269_test.go",
     "line": 191,
     "target": "waits",
-    "source_sha256": "fd068c203a8bb4bcd53891fbe274a828f165a3d8e98fb0f5e43fba07889c0dfe",
+    "source_sha256": "5c6e02b4916382c2d5c23c27a15b318c09cd3fbd8959f693a8222a0e1cc3e34e",
     "comment": "r276-capture-safe: TestR269SGPBackoffAndEarlyProbe: the audited fixture operations in this test invoke this callback serially and return before waits is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r269_test.go",
     "line": 195,
     "target": "calls",
-    "source_sha256": "fd068c203a8bb4bcd53891fbe274a828f165a3d8e98fb0f5e43fba07889c0dfe",
+    "source_sha256": "5c6e02b4916382c2d5c23c27a15b318c09cd3fbd8959f693a8222a0e1cc3e34e",
     "comment": "r276-capture-safe: TestR269SGPBackoffAndEarlyProbe: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

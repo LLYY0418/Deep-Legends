@@ -9,6 +9,8 @@ function run(name,file,negative){
 try{
  run('baseline');
  for(const [name,needle,value] of [
+  ['initial-load-not-awaited',"if(!(document.readyState==='complete' && window.deepLegendsMatchCards && !!document.querySelector('#setting-default-page + .app-select')))return false;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return document.readyState==='complete' && !!document.querySelector('#setting-default-page + .app-select');","return !!document.querySelector('#setting-default-page + .app-select');"],
+  ['removed-legacy-connected-field',"window.deepLegendsMatchCards.live.state.status?.clientView?.state === 'ready'",'window.deepLegendsMatchCards.live.state.status?.connected'],
   ['default-frame-not-drained','await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));',''],
   ['stale-document-marker-accepted','window.__r265ProbeLoad===${marker}', 'true'],
   ['business-match-gate-removed',`await until("document.querySelector('.match-list .match-entry')");`,'']

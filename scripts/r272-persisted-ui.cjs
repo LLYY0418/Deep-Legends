@@ -53,7 +53,7 @@ async function probe({port,phase,out}){
  };
  const openSaved=async()=>{await openFilter();await click('[data-af-page="saved"]');};
  try{
-  await call('Page.enable');await call('Runtime.enable');await until("!!document.querySelector('#setting-default-page + .app-select')");
+  await call('Page.enable');await call('Runtime.enable');await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
   const initial=await evaluate("({origin:location.origin,defaultPage:document.querySelector('#setting-default-page').value,liveVisible:!document.querySelector('#live-panel').hidden})");
   if(phase==='write-settings'){
    // No Fetch interception, no missing-script repair in this phase.
