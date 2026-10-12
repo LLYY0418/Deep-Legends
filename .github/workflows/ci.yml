@@ -3,6 +3,7 @@ name: quality-and-windows-release
 on:
   push:
     tags-ignore: ['v*']
+    branches: ['**']
   pull_request:
   workflow_dispatch:
     inputs:
