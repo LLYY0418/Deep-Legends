@@ -27,6 +27,9 @@ function evaluate(timings, calibrations, reference) {
   if (!timings || timings.success !== true) failures.push("renderer suite did not succeed");
   if (timings?.scope !== "all") failures.push(`renderer scope must be all, got ${timings?.scope}`);
   if (timings?.platform !== "linux") failures.push(`renderer platform must be linux, got ${timings?.platform}`);
+  if(timings?.file_budget_ms!==90000)failures.push("Linux file budget must stay 90000ms");
+  if(timings?.suite_budget_ms!==240000)failures.push("suite budget must stay 240000ms");
+  if(!Array.isArray(timings?.files)||!timings.files.length||timings.files.some(row=>!finitePositive(row.duration_ms)||row.duration_ms>90000))failures.push("missing or over-budget Linux file timings");
   const raw = timings?.summary?.duration_ms;
   if (!finitePositive(raw)) failures.push("renderer duration_ms missing");
   else if (raw > 240000) failures.push(`raw renderer suite ${raw}ms exceeds the absolute 240000ms budget`);

@@ -17,6 +17,8 @@ with tempfile.TemporaryDirectory(prefix='r270-mutants-') as temporary:
     for n in [265,266,269]:
         source=(root/f'scripts/r{n}-persisted-ui.cjs').read_text();selector='dialog[data-af-menu]:modal .af-saved .af-empty';assert source.count(selector)==1;(probes/f'r{n}-persisted-ui.cjs').write_text(source.replace(selector,'.af-empty'))
     run('unscoped-saved-empty',test,{'R270_PERSISTED_DIR':str(probes)},True,'must see the current modal')
+    # The relocated geometry mutant uses the same shared startup helper.
+    (folder/'chrome-test-launcher.cjs').write_text((root/'scripts/chrome-test-launcher.cjs').read_text())
     lifecycle=folder/'geometry.cjs';source=(root/'scripts/r269-geometry.cjs').read_text();assert source.count('await Promise.race')==1;lifecycle.write_text(source.replace('await Promise.race','void Promise.race'))
     run('delete-before-process-exit',test,{'R270_GEOMETRY_SOURCE':str(lifecycle)},True,'a late writer must not recreate the deleted profile')
     run('native-unbound-open-deferred',['node','scripts/r269-browser.cjs'],{'R266_WEB_OVERRIDE':str(folder),'R269_BROWSER_OUT':str(out/'native-unbound-open-deferred'),'R269_BACKEND':os.environ.get('R269_BACKEND') or os.environ.get('R266_BACKEND') or '/tmp/r270-public'},True,"timeout document.querySelector('dialog[data-af-menu]:modal')")

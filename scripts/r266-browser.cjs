@@ -1,4 +1,5 @@
 'use strict';
+const {launchChrome}=require('./chrome-test-launcher.cjs');
 // Real public backend and its CSP/assets, with explicit synthetic API fixtures.
 const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=process.env.R266_BROWSER_OUT||path.join(os.tmpdir(),'deep-legends-r266-browser');
@@ -29,8 +30,8 @@ async function start(){
  if(!process.env.R266_CARD_SERVER)backend=spawn(process.env.R266_BACKEND||'/tmp/r266-public',['--desktop'],{cwd:root,env:{...process.env,...(process.env.R269_CHECKS?{RIOT_API_KEY:''}:{}),LOL_LOOT_DATA_DIR:path.join(temp,'data')},stdio:['ignore','pipe','pipe']});
  const ready=process.env.R266_CARD_SERVER?JSON.parse(fs.readFileSync(process.env.R266_CARD_SERVER,'utf8')):await new Promise((resolve,reject)=>{let data='';const timer=setTimeout(()=>reject(Error('Backend startup timeout')),20000);backend.once('error',reject);backend.stdout.on('data',c=>{data+=c;for(const line of data.split('\n')){try{const value=JSON.parse(line.replace(/^LOOT_READY /,''));if(value.baseUrl){clearTimeout(timer);resolve(value);return}}catch{}}});backend.once('exit',code=>reject(Error('Backend exited '+code)));});
  const csp=(await fetch(ready.bootstrapUrl)).headers.get('content-security-policy');assert(csp?.includes("script-src 'self'") && !csp.includes('unsafe-inline'));
- chrome=spawn(process.env.CHROME_BIN||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',['--headless=new','--no-sandbox','--disable-background-networking','--disable-renderer-backgrounding','--disable-background-timer-throttling','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${path.join(temp,'chrome')}`,'about:blank'],{stdio:['ignore','ignore','pipe']});
- const endpoint=await new Promise((resolve,reject)=>{let data='';const timer=setTimeout(()=>reject(Error('Chrome startup timeout')),20000);chrome.once('error',reject);chrome.stderr.on('data',c=>{data+=c;const match=data.match(/DevTools listening on (ws:\/\/[^\s]+)/);if(match){clearTimeout(timer);resolve(match[1]);}});});
+ const launched=await launchChrome({executable:process.env.CHROME_BIN||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--headless=new','--no-sandbox','--disable-background-networking','--disable-renderer-backgrounding','--disable-background-timer-throttling','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${path.join(temp,'chrome')}`,'about:blank'],directory:out});
+ chrome=launched.child;const endpoint=launched.endpoint;
  ws=new WebSocket(endpoint);await new Promise((resolve,reject)=>{ws.addEventListener('open',resolve,{once:true});ws.addEventListener('error',reject,{once:true});});
  let seq=0;const pending=new Map();
  const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{const id=++seq,timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method));},30000);pending.set(id,[v=>{clearTimeout(timer);resolve(v)},e=>{clearTimeout(timer);reject(e)}]);ws.send(JSON.stringify({id,method,params,sessionId}));});

@@ -1,4 +1,7 @@
 'use strict';
+const {launchChrome}=require('./chrome-test-launcher.cjs');
+const {PausedRequests,timeoutDiagnostic}=require('./fetch-paused-diagnostics.cjs');
+const pausedRequests=new PausedRequests();
 // Real Chromium against a public binary and production CSP. API/image inputs
 // are explicitly synthetic; this does not claim real Windows or LCU evidence.
 const {spawn,execFileSync}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
@@ -52,27 +55,30 @@ async function main(){
  backend=spawn(process.env.R265_BACKEND || path.join(os.tmpdir(),'r265-public'),['--desktop'],{cwd:root,env:{...process.env,LOL_LOOT_DATA_DIR:path.join(tmp,'data')},stdio:['ignore','pipe','pipe']});
  const ready=await new Promise((resolve,reject)=>{let data='';const timer=setTimeout(()=>reject(Error('Backend startup timeout')),20000);backend.on('error',reject);backend.stdout.on('data',c=>{data+=c;for(const line of data.split('\n'))try{const v=JSON.parse(line.replace(/^LOOT_READY /,''));if(v.baseUrl){clearTimeout(timer);resolve(v);}}catch{}});});
  const csp=(await fetch(ready.bootstrapUrl)).headers.get('content-security-policy');assert(csp.includes("script-src 'self'") && !csp.includes('unsafe-inline'));
- chrome=spawn(process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',['--headless=new','--no-sandbox','--disable-background-networking','--disable-renderer-backgrounding','--disable-background-timer-throttling','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${path.join(tmp,'chrome')}`,'about:blank'],{stdio:['ignore','ignore','pipe']});
- const endpoint=await new Promise((resolve,reject)=>{let data='';const timer=setTimeout(()=>reject(Error('Chrome startup timeout')),20000);chrome.on('error',reject);chrome.stderr.on('data',c=>{data+=c;const m=data.match(/DevTools listening on (ws:\/\/\S+)/);if(m){clearTimeout(timer);resolve(m[1]);}});});
+ const launched=await launchChrome({executable:process.env.CHROME_BIN || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--headless=new','--no-sandbox','--disable-background-networking','--disable-renderer-backgrounding','--disable-background-timer-throttling','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${path.join(tmp,'chrome')}`,'about:blank'],directory:out});
+ chrome=launched.child;const endpoint=launched.endpoint;
  ws=new WebSocket(endpoint);await new Promise(resolve=>ws.addEventListener('open',resolve,{once:true}));
  let seq=0;const pending=new Map();
  const send=(method,params={},sessionId)=>new Promise((resolve,reject)=>{const id=++seq,timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method));},30000);pending.set(id,[v=>{clearTimeout(timer);resolve(v)},e=>{clearTimeout(timer);reject(e)}]);ws.send(JSON.stringify({id,method,params,sessionId}));});
  ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(pending.has(m.id)){const [ok,no]=pending.get(m.id);pending.delete(m.id);m.error?no(Error(JSON.stringify(m.error))):ok(m.result);}
   if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails);
-  if(m.method==='Network.loadingFailed' && m.params.canceled)canceled.add(m.sessionId+':'+m.params.requestId);
+  if(m.method==='Network.loadingFailed' && m.params.canceled){canceled.add(m.sessionId+':'+m.params.requestId);pausedRequests.cancel(m.sessionId,m.params.requestId);}
+  if(m.method==='Target.detachedFromTarget')pausedRequests.close(m.params.sessionId);
   if(m.method==='Runtime.bindingCalled')violations.push(JSON.parse(m.params.payload));
-  if(m.method==='Fetch.requestPaused')void(async()=>{
-   const {requestId,request}=m.params,url=new URL(request.url),fulfill=(body,type)=>send('Fetch.fulfillRequest',{requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:type}],body:Buffer.from(body).toString('base64')},m.sessionId);
+  if(m.method==='Fetch.requestPaused'){const diagnosticKey=pausedRequests.enter(m.params,m.sessionId);void(async()=>{
+   const release=async(method,params)=>{pausedRequests.release(diagnosticKey,method);const result=await send(method,params,m.sessionId);pausedRequests.complete(diagnosticKey);return result;};
+   const {requestId,request}=m.params,url=new URL(request.url),fulfill=(body,type)=>release('Fetch.fulfillRequest',{requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:type}],body:Buffer.from(body).toString('base64')});
    if(['/api/image','/api/champion-asset'].includes(url.pathname))await fulfill('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#345366"/></svg>','image/svg+xml');
    else if(url.pathname==='/demo-data.js'){let body=await(await fetch(request.url)).text();body=body.replace('    const params = new URLSearchParams(url.split("?")[1] || "");','    const params = new URLSearchParams(url.split("?")[1] || "");'+fixture);await fulfill(body,'text/javascript');}
-   else if(request.url.startsWith(ready.baseUrl+'/'))await send('Fetch.continueRequest',{requestId},m.sessionId);
-   else await send('Fetch.failRequest',{requestId,errorReason:'BlockedByClient'},m.sessionId);
-  })().catch(async e=>{if(closed.has(m.sessionId))return;if(e.message.includes('Invalid InterceptionId')){await new Promise(r=>setTimeout(r,50));if(canceled.has(m.sessionId+':'+m.params.networkId))return;}errors.push({message:e.message});});
+   else if(request.url.startsWith(ready.baseUrl+'/'))await release('Fetch.continueRequest',{requestId});
+   else await release('Fetch.failRequest',{requestId,errorReason:'BlockedByClient'});
+  })().catch(async e=>{if(closed.has(m.sessionId)){pausedRequests.complete(diagnosticKey);return;}if(e.message.includes('Invalid InterceptionId')){await new Promise(r=>setTimeout(r,50));if(canceled.has(m.sessionId+':'+m.params.networkId)){pausedRequests.complete(diagnosticKey);return;}}errors.push({message:e.message});});}
  });
  async function page(theme,k,width=1500,scenario){
   const {targetId}=await send('Target.createTarget',{url:'about:blank'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true}),call=(m,p)=>send(m,p,sessionId);
+  pausedRequests.attach(sessionId,targetId);
   const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
-  const until=async expr=>{for(let i=0;i<200;i++){if(await evaluate(expr))return;await new Promise(r=>setTimeout(r,50));}throw Error('timeout '+expr+' '+JSON.stringify(await evaluate("({url:location.href,ready:document.readyState,hidden:document.hidden,section:document.querySelector('[data-section].is-active')?.dataset.section,body:document.body.textContent.slice(0,300),view:document.querySelector('#overview-content')?.textContent.slice(0,1200),demo:document.body.classList.contains('is-demo'),gameplay:!!window.deepLegendsGameplay,requests:window.__r265RecoveryRequests,styles:[...document.querySelectorAll('link[rel=stylesheet]')].map(n=>n.href)})")));};
+  const until=async expr=>{for(let i=0;i<200;i++){if(await evaluate(expr))return;await new Promise(r=>setTimeout(r,50));}throw timeoutDiagnostic('timeout '+expr+' '+JSON.stringify(await evaluate("({url:location.pathname,ready:document.readyState,hidden:document.hidden,section:document.querySelector('[data-section].is-active')?.dataset.section,body:document.body.textContent.slice(0,300),view:document.querySelector('#overview-content')?.textContent.slice(0,1200),demo:document.body.classList.contains('is-demo'),gameplay:!!window.deepLegendsGameplay,requests:window.__r265RecoveryRequests,styles:[...document.querySelectorAll('link[rel=stylesheet]')].map(n=>new URL(n.href).pathname)})")),pausedRequests);};
   const click=s=>evaluate(`document.querySelector(${JSON.stringify(s)}).click()`),frame=()=>evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
   const shot=async name=>{await frame();const v=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(v.data,'base64'));};
   await send('Target.activateTarget',{targetId});for(const m of ['Network.enable','Page.enable','Runtime.enable'])await call(m);await call('Runtime.addBinding',{name:'r265CSP'});
@@ -80,7 +86,7 @@ async function main(){
   await call('Fetch.enable',{patterns:[{urlPattern:'*'}]});await call('Emulation.setDeviceMetricsOverride',{width,height:scenario?1100:1900,deviceScaleFactor:1,mobile:false});
   await call('Network.setCookie',{name:'lol_loot_token',value:ready.token,url:ready.baseUrl,httpOnly:true});await call('Page.navigate',{url:ready.baseUrl+'/?demo&section=overview'+(k==null?'':'&k='+k)+(scenario?'&recovery='+scenario:'')});
   await until("document.querySelector('.match-list .match-entry')");await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
-  return {call,evaluate,until,click,frame,shot,async close(){closed.add(sessionId);await send('Target.closeTarget',{targetId});}};
+  return {call,evaluate,until,click,frame,shot,async close(){closed.add(sessionId);pausedRequests.close(sessionId);await send('Target.closeTarget',{targetId});}};
  }
  for(const theme of ['dark','light']){
   if(!process.env.R265_CASE || process.env.R265_CASE==='filters'){
@@ -165,4 +171,4 @@ async function main(){
  assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(violations.length,0,JSON.stringify(violations));
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({host:{platform:process.platform,node:process.version},csp,scope:'real Chromium; public production binary/CSP; synthetic API/image fixtures',results,errors,violations},null,2));console.log(JSON.stringify({cases:results.length,screenshots:fs.readdirSync(out).filter(f=>f.endsWith('.png')).length,errors:errors.length}));
 }
-main().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>{ws?.close();chrome?.kill();backend?.kill();setTimeout(()=>fs.rmSync(tmp,{recursive:true,force:true,maxRetries:8,retryDelay:100}),250).unref();});
+main().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,pendingFetch:pausedRequests.snapshot(),results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>{ws?.close();chrome?.kill();backend?.kill();setTimeout(()=>fs.rmSync(tmp,{recursive:true,force:true,maxRetries:8,retryDelay:100}),250).unref();});

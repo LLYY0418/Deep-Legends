@@ -62,8 +62,11 @@ test("R86 CI uses the package version, installs test dependencies and needs no p
   assert.match(ci, /node scripts\/test-renderers\.cjs all/);
   const timingRunner = fs.readFileSync(path.join(root, "scripts/test-renderers.cjs"), "utf8");
   assert.match(timingRunner, /\["backend\/web", "desktop", "scripts"\]/);
-  assert.match(timingRunner, /duration_ms > 90000/);
-  assert.match(timingRunner, /duration_ms > 240000/);
+  assert.match(timingRunner, /withinBudgets\(process.platform,timings,summary.duration_ms\)/);
+  const budgets=require("../scripts/renderer-budgets.cjs");
+  assert.equal(budgets.fileBudget("linux"),90000);
+  assert.equal(budgets.fileBudget("win32"),120000);
+  assert.equal(budgets.suiteBudget,240000);
   assert.match(windows, /node scripts\/run-ci-tests\.cjs go backend/);
   assert.match(windows, /node scripts\/run-ci-tests\.cjs go installer/);
   assert.match(ci, /run: node scripts\/verify-ci-test-filters\.cjs/);

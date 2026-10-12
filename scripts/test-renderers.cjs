@@ -11,7 +11,9 @@ const directories = scope === "desktop" ? ["desktop"] : ["backend/web", "desktop
 const files = directories.flatMap(directory => fs.readdirSync(path.join(root, directory))
   .filter(name => name.endsWith(".test.cjs")).sort().map(name => path.join(root, directory, name)));
 const fileNames = new Set(files);
-const timings = [];
+const timings = [], cases = [];
+const {fileBudget,suiteBudget,withinBudgets}=require("./renderer-budgets.cjs");
+const file_budget_ms=fileBudget(process.platform);
 // Full coverage includes both DOM work and asynchronous fixture waits. Five
 // bounded workers let those waits overlap; the desktop-only scope keeps four.
 const concurrency = scope === "all" ? 5 : 4;
@@ -42,8 +44,9 @@ let failed = false;
       if (event.type === "test:complete" && fileNames.has(data.name)) {
         const row = { file: path.relative(root, data.file).replaceAll(path.sep, "/"), duration_ms: data.details.duration_ms, group: group.name };
         timings.push(row);
-        if (row.duration_ms > 90000) { failed = true; console.error(`File exceeded 90s: ${JSON.stringify(row)}`); }
+        if (!withinBudgets(process.platform,[row],0)) { failed = true; console.error(`File exceeded ${file_budget_ms/1000}s: ${JSON.stringify(row)}`); }
       }
+      if (event.type === "test:complete" && !fileNames.has(data.name) && data.file) cases.push({file:path.relative(root,data.file).replaceAll(path.sep,"/"),name:data.name,nesting:data.nesting,duration_ms:data.details.duration_ms});
       if (event.type === "test:summary" && !data.file) groupSummary = data;
     }
     if (!groupSummary?.success) failed = true;
@@ -53,9 +56,9 @@ let failed = false;
   const counts = {};
   for (const group of summaries) for (const [name, count] of Object.entries(group.summary?.counts || {})) counts[name] = (counts[name] || 0) + count;
   const summary = { success: summaries.length === groups.length && summaries.every(group => group.summary?.success), counts, duration_ms };
-  if (!summary.success || summary.duration_ms > 240000 || timings.length !== files.length || new Set(timings.map(row => row.file)).size !== files.length) failed = true;
+  if (!summary.success || !withinBudgets(process.platform,timings,summary.duration_ms) || timings.length !== files.length || new Set(timings.map(row => row.file)).size !== files.length) failed = true;
   const result = { scope, platform: process.platform, concurrency, groups: summaries,
-    file_budget_ms: 90000, suite_budget_ms: 240000, files: timings, summary, success: !failed };
+    file_budget_ms, suite_budget_ms: suiteBudget, files: timings, cases, summary, success: !failed };
   if (process.env.R222_NODE_TIMING_OUTPUT) fs.writeFileSync(process.env.R222_NODE_TIMING_OUTPUT, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));
   process.exitCode = failed ? 1 : 0;

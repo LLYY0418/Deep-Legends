@@ -8,7 +8,7 @@ on:
       measure_windows_renderers:
         description: "R222 acceptance: run full desktop tests once on Windows and record budgets"
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read

@@ -6,7 +6,7 @@ const { evaluate } = require("./renderer-budget-gate.cjs");
 const { calibrate, workload, loadJSDOM } = require("./runner-calibration.cjs");
 
 const reference = { workload_version: 1, iterations: 40, concurrency: 5, checksum: 49440, reference_ms: 4000, margin_budget_ms: 192000, hard_budget_ms: 240000 };
-const timings = duration => ({ success: true, scope: "all", platform: "linux", concurrency: 5, summary: { duration_ms: duration } });
+const timings = duration => ({ success: true, scope: "all", platform: "linux", concurrency: 5, file_budget_ms:90000,suite_budget_ms:240000,files:[{file:"fixture.test.cjs",duration_ms:89000}],summary: { duration_ms: duration } });
 const calibration = median => ({ workload_version: 1, iterations: 40, concurrency: 5, checksum: 49440, median_ms: median });
 
 test("same commit on a 1.6x slower runner passes when it is within margin at reference speed", () => {
@@ -120,3 +120,5 @@ test("every observed CI run of 7d5e7b31 passes at the committed reference on all
     assert.ok(result.normalized_ms < 140000, `${run} ${cpu}: ${result.normalized_ms}`);
   }
 });
+
+test("R275 Linux timing artifacts reject relaxed or missing file budgets",()=>{for(const changed of [{file_budget_ms:120000},{suite_budget_ms:300000},{files:[]},{files:[{duration_ms:91000}]}])assert.equal(evaluate({...timings(120000),...changed},[calibration(4000),calibration(4000)],reference).ok,false);});
