@@ -1,4 +1,5 @@
 'use strict';
+const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 const {PausedRequests,timeoutDiagnostic}=require('./fetch-paused-diagnostics.cjs');
 const pausedRequests=new PausedRequests();
@@ -171,4 +172,4 @@ async function main(){
  assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(violations.length,0,JSON.stringify(violations));
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({host:{platform:process.platform,node:process.version},csp,scope:'real Chromium; public production binary/CSP; synthetic API/image fixtures',results,errors,violations},null,2));console.log(JSON.stringify({cases:results.length,screenshots:fs.readdirSync(out).filter(f=>f.endsWith('.png')).length,errors:errors.length}));
 }
-main().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,pendingFetch:pausedRequests.snapshot(),results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>{ws?.close();chrome?.kill();backend?.kill();setTimeout(()=>fs.rmSync(tmp,{recursive:true,force:true,maxRetries:8,retryDelay:100}),250).unref();});
+main().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,pendingFetch:pausedRequests.snapshot(),results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[tmp]}));

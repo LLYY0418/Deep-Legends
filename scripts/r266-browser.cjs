@@ -1,4 +1,5 @@
 'use strict';
+const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 const {browserAPI}=require('./r276-browser-api-fixtures.cjs');
 // Real public backend and its CSP/assets, with explicit synthetic API fixtures.
@@ -85,19 +86,20 @@ async function start(){
   if(process.env.R272_SCENE_ONLY){closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});continue;}
   if(process.env.R269_CHECKS)await require('./r269-browser-checks.cjs')({evaluate,until,click,call,shot,ready,results,errors,releaseFilters:()=>releaseFilters?.()});
   currentCase={theme,width};
-  if(process.env.R276_TRACE)await send('Tracing.start',{categories:'devtools.timeline,blink.user_timing,disabled-by-default-v8.cpu_profiler',transferMode:'ReturnAsStream'});
+  await send('Tracing.start',{categories:'devtools.timeline,blink.user_timing'+(process.env.R276_TRACE?',disabled-by-default-v8.cpu_profiler':''),transferMode:'ReturnAsStream'});
   await click('.match-filterbar [data-history-filter-load],.match-filterbar [data-af-open]');await until("document.querySelector('[data-af-menu]')?.open");await click('[data-af-category="hero"]');
   const dialog=await evaluate("(()=>{const r=document.querySelector('[data-af-menu]').getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height,cx:r.left+r.width/2,cy:r.top+r.height/2}})()");assert(Math.abs(dialog.cx-width/2)<1 && Math.abs(dialog.cy-height/2)<1,JSON.stringify(dialog));
   assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-af-page]')].map(n=>n.textContent)"),['条件','常用']);
   await evaluate("window.__r266Tasks=[];new PerformanceObserver(list=>__r266Tasks.push(...list.getEntries().map(e=>({start:e.startTime,duration:e.duration})))).observe({type:'longtask'});window.__r266ListMutations=0;new MutationObserver(records=>__r266ListMutations+=records.length).observe(document.querySelector('.match-list'),{childList:true,subtree:true});window.__r266Options=[...document.querySelectorAll('[data-af-option]')];window.__r266Images=__r266Options.map(n=>n.querySelector('img'));window.__r266ClickStart=performance.now()");
   if(process.env.R276_TRACE)await evaluate("performance.mark('r276-option103-start')");await click('[data-af-option="103"]');await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
   clickEvidence=await evaluate("({clickStart:__r266ClickStart,clickEnd:performance.now(),tasks:__r266Tasks.filter(t=>t.start>=__r266ClickStart),catalogFlight:__r266Game.state.historyFilterCatalogFlight,catalogReady:!!__r266Game.state.historyFilterCatalog})");
-  if(process.env.R276_TRACE){
-    fs.writeFileSync(path.join(out,`${theme}-${width}-click-evidence.json`),JSON.stringify(clickEvidence,null,2));
+  {
+    const keepTrace=process.env.R276_TRACE || clickEvidence.tasks.reduce((n,t)=>n+t.duration,0)>100;
+    if(keepTrace)fs.writeFileSync(path.join(out,`${theme}-${width}-click-evidence.json`),JSON.stringify(clickEvidence,null,2));
     const finished=new Promise(resolve=>{const handler=e=>{const m=JSON.parse(e.data);if(m.method==='Tracing.tracingComplete'){ws.removeEventListener('message',handler);resolve(m.params.stream);}};ws.addEventListener('message',handler);});
     await send('Tracing.end');const stream=await finished;let trace='';
     for(;;){const part=await send('IO.read',{handle:stream});trace+=part.base64Encoded?Buffer.from(part.data,'base64').toString():part.data;if(part.eof)break;}
-    await send('IO.close',{handle:stream});fs.writeFileSync(path.join(out,`${theme}-${width}-click-trace.json`),trace);
+    await send('IO.close',{handle:stream});if(keepTrace)fs.writeFileSync(path.join(out,`${theme}-${width}-click-trace.json`),trace);
   }
   assert.equal(await evaluate('__r266ListMutations'),0);const clickTasks=clickEvidence.tasks.reduce((n,t)=>n+t.duration,0);assert(clickTasks<=100,'click long tasks '+clickTasks);
   for(const id of [238,157,875,145])await click('[data-af-option="'+id+'"]');assert.equal(await evaluate('__r266ListMutations'),0);for(const id of [157,875,145])await click('[data-af-option="'+id+'"]');
@@ -137,4 +139,4 @@ async function start(){
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({host:{platform:process.platform,arch:process.arch,node:process.version},completedAt:new Date().toISOString(),scope:process.env.R266_CARD_SERVER?'real Chromium + actual overview/OP.GG Go handlers and embedded assets; identical fake upstreams; no production binary/Windows/real latency claim':'real Chromium on recorded host; public production binary/CSP; synthetic API data; no Windows/real LCU claim',csp,results,errors,violations,canceledInterceptions},null,2));
  console.log(JSON.stringify({cases:results.length,errors:errors.length,violations:violations.length}));
 }
-start().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,currentCase,clickEvidence,results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>{ws?.close();chrome?.kill();backend?.kill();setTimeout(()=>fs.rmSync(temp,{recursive:true,force:true,maxRetries:8,retryDelay:100}),250).unref();});
+start().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,currentCase,clickEvidence,results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[temp]}));

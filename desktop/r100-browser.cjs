@@ -1,6 +1,7 @@
 // Real Chromium layout guard. No jsdom measurements or external npm dependency.
 // CHROME_BIN=/path/to/chrome node desktop/r100-browser.cjs
 'use strict';
+const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
@@ -91,23 +92,4 @@ async function main(){
  fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({passed:true,statusMilliseconds:elapsed,peakImages,recovered:true,confirmedExitFatal:true,restartRequested:true},null,2));
  console.log('R100 Chromium PASS',JSON.stringify({elapsed,peakImages}));
 }
-// 收尾清理必须尽力而为：proc.kill() 之后 Chrome 子进程还在写 profile 目录，立刻
-// rmSync 会偶发 ENOTEMPTY。它从 .finally 里抛出去就是未处理拒绝、退出码 1——护栏
-// 实际通过也会把 CI 变红，人就会习惯性加 || true，正是护栏最该防的事。所以这里先
-// 等进程真的退出（带超时）再删目录，删除失败只打一行清理警告；主流程失败的退出码
-// 仍由上面的 catch 决定，绝不被清理路径掩盖。
-async function cleanup(){
- try{ws?.close();}catch(error){}
- if(proc&&proc.exitCode===null&&proc.signalCode===null){
-  const exited=new Promise(resolve=>{const timer=setTimeout(resolve,5000);const done=()=>{clearTimeout(timer);resolve();};proc.once('exit',done);proc.once('error',done);});
-  try{proc.kill();}catch(error){}
-  await exited;
- }
- try{server?.closeAllConnections();}catch(error){}
- await new Promise(resolve=>{const timer=setTimeout(resolve,2000);if(!server){clearTimeout(timer);resolve();return;}server.close(()=>{clearTimeout(timer);resolve();});});
- for(let attempt=1;attempt<=8;attempt++){
-  try{fs.rmSync(temp,{recursive:true,force:true});return;}
-  catch(error){if(attempt===8){console.error(`cleanup warning: ${temp} left behind (${error.message})`);return;}await new Promise(resolve=>setTimeout(resolve,150));}
- }
-}
-main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{cleanup().catch(error=>console.error('cleanup warning:',error&&error.message));});
+main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[proc],sockets:[ws],servers:[server],directories:[temp]}));

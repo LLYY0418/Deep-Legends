@@ -2,6 +2,7 @@
 // Real R267 page/guards, with backend HTTP(S) upstreams sent to a rejecting
 // loopback proxy. Browser-side nonlocal requests retain their original block.
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
+const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const root=path.resolve(__dirname,'..'),out=path.resolve(process.env.R275_OFFLINE_OUT||path.join(os.tmpdir(),'r275-offline'));
 const binary=process.env.R267_BACKEND;if(!binary)throw Error('R267_BACKEND must name the synthetic public build');
 let backend;const requests=[],sockets=new Set();
@@ -20,7 +21,7 @@ async function main(){
   const response=await fetch(ready.baseUrl+'/api/champion-asset?source=communitydragon&path='+encodeURIComponent(asset),{headers:{'X-Local-Token':ready.token}});
   assert.notEqual(response.status,200,'offline control unexpectedly reached an upstream');assert.ok(requests.some(r=>r.host.includes('communitydragon')),'upstream control did not use the rejecting proxy');
   fs.writeFileSync(path.join(out,'control.json'),JSON.stringify({status:response.status,requests},null,2));
- }finally{if(backend){const closed=new Promise(resolve=>backend.once('close',resolve));backend.kill();await closed;}fs.rmSync(data,{recursive:true,force:true});}
+ }finally{await cleanupChromeTest({children:[backend],directories:[data]});}
  for(const name of ['no-champion-fixture','no-spells-fixture','fixed']){
   const mutant=name!=='fixed',folder=path.join(out,name);fs.mkdirSync(folder,{recursive:true});
   // Compile a temporary in-memory variant under the real script filename so
@@ -34,4 +35,4 @@ async function main(){
  }
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({blockedUpstreamControl:true,championMutant:'FAIL',spellsMutant:'FAIL',fixed:'PASS',requests},null,2));
 }
-main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{for(const socket of sockets)socket.destroy();proxy.close();});
+main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{for(const socket of sockets)socket.destroy();return cleanupChromeTest({servers:[proxy]});});

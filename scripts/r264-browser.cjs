@@ -1,4 +1,5 @@
 'use strict';
+const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 // Real public backend and its CSP/assets, with explicit synthetic API fixtures.
 const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
@@ -157,4 +158,4 @@ async function start(){
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({host:{platform:process.platform,arch:process.arch,node:process.version},completedAt:new Date().toISOString(),scope:'real Chromium on recorded host; public production binary/CSP; synthetic API data; no Windows/real LCU claim',csp,results,errors,violations,canceledInterceptions},null,2));
  console.log(JSON.stringify({cases:results.length,errors:errors.length,violations:violations.length}));
 }
-start().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>{ws?.close();chrome?.kill();backend?.kill();setTimeout(()=>fs.rmSync(temp,{recursive:true,force:true,maxRetries:8,retryDelay:100}),250).unref();});
+start().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[temp]}));

@@ -1,5 +1,6 @@
 "use strict";
 // Run with Electron (not node): real preload/IPC/reload and export isolation.
+const {cleanupChromeTest,removeDirectoriesSync}=require("../scripts/chrome-test-cleanup.cjs");
 const electron=require("electron");
 const {app,BrowserWindow,ipcMain}=electron;
 const fs=require("node:fs"),os=require("node:os"),path=require("node:path"),http=require("node:http"),assert=require("node:assert/strict");
@@ -28,19 +29,21 @@ app.whenReady().then(async()=>{
   // Boot the production main module without launching the real LoL backend.
   const appProxy=new Proxy(app,{get(target,key){if(key==="whenReady")return()=>({then(){}});const value=target[key];return typeof value==="function"?value.bind(target):value;}});
   const productionRequire=createRequire(path.join(__dirname,"main.cjs"));
-  const shell=new Function("require","__dirname","process",fs.readFileSync(path.join(__dirname,"main.cjs"),"utf8")+'\nreturn {boot(base){backendReady={baseUrl:base,bootstrapUrl:base+"/?demo"};createMainWindow();return mainWindow;},stop(){quitting=true;}};')(
+  const shell=new Function("require","__dirname","process",fs.readFileSync(path.join(__dirname,"main.cjs"),"utf8")+'\nreturn {boot(base){backendReady={baseUrl:base,bootstrapUrl:base+"/?demo",token:"local-test-fixture"};createMainWindow();return mainWindow;},stop(){quitting=true;}};')(
     name=>name==="electron"?{...electron,app:appProxy}:productionRequire(name),__dirname,process);
   main=shell.boot(baseURL);
   await once(main.webContents,"did-finish-load");
   await eventually(async()=>await main.webContents.executeJavaScript('!!document.querySelector(".match-summary")'));
   const mainSender={sender:main.webContents};
   ipcMain.emit("desktop-scale-set",mainSender,"fixed",2);
-  await eventually(()=>Math.abs(main.webContents.getZoomFactor()-2)<1e-8);
+  await eventually(async()=>Number(await main.webContents.executeJavaScript("getComputedStyle(document.querySelector('.app-frame')).zoom"))===2);
+  assert.equal(main.webContents.getZoomFactor(),1,"CSS scaling must not be multiplied by native zoom");
   assert.deepEqual(main.getMinimumSize(),[1560,1200]);
   assert.equal(await main.webContents.executeJavaScript('document.querySelector("#setting-ui-scale").value'),"2");
   main.webContents.reload();await once(main.webContents,"did-finish-load");
-  await eventually(()=>Math.abs(main.webContents.getZoomFactor()-2)<1e-8);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(temp,"ui-scale.json"))),{mode:"fixed",value:2});
+  await eventually(async()=>Number(await main.webContents.executeJavaScript("getComputedStyle(document.querySelector('.app-frame')).zoom"))===2);
+  assert.equal(main.webContents.getZoomFactor(),1,"CSS scaling must not be multiplied by native zoom");
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(temp,"ui-scale.json"))),{mode:"fixed",value:2,defaultAuto:1});
   // The same document and the real export renderer must have identical pixel
   // dimensions at every main-window zoom, including changes during capture.
   const exports=[];
@@ -66,8 +69,9 @@ app.whenReady().then(async()=>{
   console.log(JSON.stringify({electron:process.versions.electron,results}));
   console.log("R79 real Electron IPC/reload/minimum/export isolation PASS");
   shell.stop();
-}).catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{
-  for(const window of BrowserWindow.getAllWindows())window.destroy();server?.close();
+}).catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
+  for(const window of BrowserWindow.getAllWindows())window.destroy();
+  await cleanupChromeTest({servers:[server]});
   app.exit(process.exitCode||0);
 });
-app.on("quit",()=>fs.rmSync(temp,{recursive:true,force:true,maxRetries:8,retryDelay:100}));
+app.on("quit",()=>removeDirectoriesSync([temp]));

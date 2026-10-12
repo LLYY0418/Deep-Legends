@@ -20,7 +20,7 @@ test('R276 complete CI excludes v tags while the unchanged release workflow keep
 test('R276 mutation gates run every dispatch and release push, preserving ordinary branch policy',()=>{
  for(const name of ['mutations-1','mutations-2','mutations-3']){
   const block=job(ci,name),expression=block.match(/\n    if: ([^\n]+)/)[1];
-  for(const [event,ref,want] of [['push','refs/heads/codex/release-0.12.84',true],['push','refs/heads/codex/ci-hardening-r276',false],['pull_request','refs/pull/1/merge',false],['workflow_dispatch','refs/heads/codex/ci-hardening-r276',true]])assert.equal(condition(expression,event,ref,false),want,name);
+  for(const [event,ref,want] of [['push','refs/heads/codex/release-0.12.84',true],['push','refs/heads/codex/ci-hardening-r276',true],['push','refs/heads/codex/other',false],['pull_request','refs/pull/1/merge',false],['workflow_dispatch','refs/heads/codex/ci-hardening-r276',true]])assert.equal(condition(expression,event,ref,false),want,name);
  }
 });
 test('R276 Windows acceptance pushes and default-true dispatch really measure',()=>{
@@ -30,7 +30,7 @@ test('R276 Windows acceptance pushes and default-true dispatch really measure',(
 });
 test('R276 separate VMs preserve browser, mutation, upgrade and artifact gates',()=>{
  for(const name of ['quality','browser-main','browser-r265','mutations-1','mutations-2','mutations-3','windows-build','windows-tests','windows-upgrade','chromium-evidence'])assert(job(ci,name));
- const quality=job(ci,'quality');assert.match(quality,/scripts\/check-test-captures/);assert.match(quality,/r276-offline\.cjs -- go test -count=1 -race \.\/\.\.\./);
+ const quality=job(ci,'quality');assert.match(quality,/scripts\/check-test-captures/);assert.match(quality,/scripts\/check-browser-cleanup\.cjs/);assert.match(quality,/scripts\/r276-cleanup-mutations\.cjs/);assert.match(quality,/r276-offline\.cjs -- go test -count=1 -race \.\/\.\.\./);
  const catalog=require('./r276-browser-catalog.cjs').guards.map(row=>row[0]);for(const name of ['r100','r117','r258','r264','r265','r266','r266-matrix','r267','r269-geometry','r269','r272'])assert(catalog.includes(name),name);
  const build=fs.readFileSync(path.join(root,'scripts/r276-public-fixture.cjs'),'utf8');assert.match(build,/verify-embedded-riot-key\.cjs/);assert.match(build,/--expect-fake/);assert.match(build,/--file=/);
  const upgrade=job(ci,'windows-upgrade');assert.match(upgrade,/needs: windows-build/);assert.match(upgrade,/name: deep-legends-windows-x64/);assert.match(upgrade,/r206-real-upgrade-windows\.ps1/);

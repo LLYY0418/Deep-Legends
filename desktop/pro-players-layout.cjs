@@ -1,6 +1,7 @@
 // Real Chromium layout guard. No jsdom measurements or external npm dependency.
 // CHROME_BIN=/path/to/chrome node desktop/pro-players-layout.cjs
 'use strict';
+const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
@@ -92,4 +93,4 @@ async function main(){
  assert.ok(brokenHeights.length>2,'nowrap mutant survived');
  console.log('Chromium overflow/row-height/indent guards and their mutants PASS; strict short-name density remains a documented specification conflict.');
 }
-main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{ws?.close();proc?.kill();server?.close();fs.rmSync(temp,{recursive:true,force:true,maxRetries:8,retryDelay:100});});
+main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[proc],sockets:[ws],servers:[server],directories:[temp]}));

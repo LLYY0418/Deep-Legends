@@ -1,4 +1,5 @@
 'use strict';
+const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 // Production app / synthetic API fixtures. These screenshots do not claim Windows/LCU evidence.
@@ -115,4 +116,4 @@ async function main(){
  const summary={scope:'macOS real Chromium; production default HTML/JS with synthetic API data. 未在 Windows 实跑. No real LCU or upstream claims.',results,errors};
  fs.writeFileSync(path.join(out,'chromium-synthetic.json'),JSON.stringify(summary,null,2));assert.equal(errors.length,0,JSON.stringify(errors));console.log(JSON.stringify({results:results.length,errors:errors.length}));
 }
-main().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>{ws?.close();chrome?.kill();server?.closeAllConnections();server?.close();fs.rmSync(temp,{recursive:true,force:true,maxRetries:8,retryDelay:100})});
+main().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>cleanupChromeTest({children:[chrome],sockets:[ws],servers:[server],directories:[temp]}));

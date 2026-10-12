@@ -42,6 +42,10 @@ jobs:
         run: go run ./scripts/check-test-captures --json="$RUNNER_TEMP/test-capture-audit.json"
       - name: R276 deterministic fixture and audit mutations
         run: python3 scripts/r276-fixture-mutations.py --out "$RUNNER_TEMP/r276-fixture-mutations"
+      - name: Audit browser process and directory cleanup
+        run: node scripts/check-browser-cleanup.cjs --json="$RUNNER_TEMP/browser-cleanup-audit.json"
+      - name: R276 deterministic cleanup regression and mutations
+        run: node scripts/r276-cleanup-mutations.cjs "$RUNNER_TEMP/r276-cleanup-mutations"
       - name: Verify sweep evidence rejects missing samples
         run: python3 scripts/r276-sweep-summary.test.py
       - uses: actions/upload-artifact@v4
@@ -49,6 +53,8 @@ jobs:
         with:
           name: r276-test-capture-and-fixture-proof
           path: |
+            ${{ runner.temp }}/browser-cleanup-audit.json
+            ${{ runner.temp }}/r276-cleanup-mutations/**
             ${{ runner.temp }}/test-capture-audit.json
             ${{ runner.temp }}/r276-fixture-mutations/**
           if-no-files-found: error
@@ -354,7 +360,7 @@ jobs:
           if-no-files-found: error
 
   mutations-1:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/codex/release-') || github.ref == 'refs/heads/codex/ci-hardening-r276'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -381,7 +387,7 @@ jobs:
           if-no-files-found: error
 
   mutations-2:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/codex/release-') || github.ref == 'refs/heads/codex/ci-hardening-r276'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -408,7 +414,7 @@ jobs:
           if-no-files-found: error
 
   mutations-3:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/codex/release-') || github.ref == 'refs/heads/codex/ci-hardening-r276'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

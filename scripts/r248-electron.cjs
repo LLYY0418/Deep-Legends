@@ -1,4 +1,5 @@
 "use strict";
+const {cleanupChromeTest}=require("./chrome-test-cleanup.cjs");
 const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
 // Real Electron/production main + isolated synthetic HTTP backend. No license
 // files, real codes, external network, or private-key files are used.
@@ -17,7 +18,7 @@ if (process.argv[2] === "--backend") {
 } else {
 async function probe({ phase, state = "ACTIVE", sourceRoot = root, transition = false, rendererDelay = 0, index = 1, flipBeforeAck = false, storedBounds = null, frontendAssetDirectory = "" }) {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "r240-electron-")), directory = path.join(out, `${phase}-${state}-${index}`);
-  fs.mkdirSync(directory, { recursive: true }); const rows = [], serverRequests = [], transportEvents = []; let current = state, generation = 1, nativeReads = 0;
+  fs.mkdirSync(directory, { recursive: true }); const rows = [], serverRequests = [], transportEvents = []; let current = state, generation = 1, nativeReads = 0, child;
   const web = path.join(sourceRoot, "backend/web");
   const server = http.createServer((req, res) => {
     serverRequests.push(req.url);
@@ -116,9 +117,9 @@ require(${JSON.stringify(path.join(shell, "main.cjs"))});
     const saveChildOutput=()=>{for(const [stream,value] of Object.entries(childOutput))fs.writeFileSync(path.join(directory,"electron-"+stream+".log"),value);};
     await new Promise((resolve, reject) => {
       processSpawnStartedAt=Date.now();
-      const child = spawn(require(path.join(root, "desktop/node_modules/electron")), ["--disable-gpu", temp], { env, stdio: ["ignore", "pipe", "pipe"] }); let output = "";
+      child = spawn(require(path.join(root, "desktop/node_modules/electron")), ["--disable-gpu", temp], { env, stdio: ["ignore", "pipe", "pipe"] }); let output = "";
       child.stdout.on("data", c => { output += c; childOutput.stdout += c; }); child.stderr.on("data", c => { output += c; childOutput.stderr += c; });
-      const timer = setTimeout(() => { saveChildOutput(); child.kill(); reject(Error("real Electron timeout: " + output.slice(-2000))); }, 30000);
+      const timer = setTimeout(() => { saveChildOutput(); reject(Error("real Electron timeout: " + output.slice(-2000))); }, 30000);
       child.once("error", error=>{clearTimeout(timer);saveChildOutput();reject(error);}); child.once("exit", code => { clearTimeout(timer); saveChildOutput(); code === 0 ? resolve() : reject(Error("Electron exited " + code + ": " + output.slice(-2000))); });
     });
     const expectedState = flipBeforeAck ? "LOCKED" : state;
@@ -143,7 +144,7 @@ require(${JSON.stringify(path.join(shell, "main.cjs"))});
       if(storedBounds){assert.ok(first.bounds.width>=storedBounds.width-40 && first.bounds.width<=storedBounds.width,"R248 restores saved bounds");}
     }
     return result;
-  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); fs.rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
+  } finally { await cleanupChromeTest({children:[child],servers:[server],directories:[temp]}); }
 }
 module.exports = { probe };
 if (require.main === module) {
