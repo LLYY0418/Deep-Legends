@@ -32,8 +32,8 @@ async function probe({port,phase,out}){
  const target=await waitForInstalledTarget({port,phase,out});
  if(process.platform==='win32'){
   const expectedPID=Number(process.env.R265_EXPECTED_ELECTRON_PID);assert(Number.isInteger(expectedPID)&&expectedPID>0,'installed Electron PID proof missing');
-  const owners=JSON.parse(execFileSync('powershell.exe',['-NoProfile','-Command',`@(Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction Stop | Select-Object -ExpandProperty OwningProcess -Unique) | ConvertTo-Json -Compress`],{encoding:'utf8',timeout:5000}));
-  const processIDs=Array.isArray(owners)?owners:[owners];fs.writeFileSync(path.join(out,`r265-cdp-owner-${phase}.json`),JSON.stringify({port,expectedPID,owners:processIDs},null,2));
+  const ownerProof=require('./r276-windows-port-owner.cjs').verifyInstalledPortOwner({port,expectedPID,evidence:path.join(out,`r265-cdp-owner-${phase}.json`)});
+  const processIDs=ownerProof.owners;
   assert(processIDs.length>0&&processIDs.every(pid=>pid===expectedPID),'CDP port belongs to another process');
  }
  const ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{ws.addEventListener('open',resolve,{once:true});ws.addEventListener('error',reject,{once:true})});
