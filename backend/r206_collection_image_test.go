@@ -121,7 +121,8 @@ func TestR206TranslationsTimeoutUsesPreviousCache(t *testing.T) {
 }
 
 func TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds(t *testing.T) {
-	t.Parallel()
+	// Measure this refresh without unrelated parallel fixture work; its own
+	// catalog requests remain concurrent in loadLootMetadata.
 	const injectedTimeout = 300 * time.Millisecond
 	translationStarted := make(chan time.Time, 1)
 	translationDone := make(chan time.Time, 1)
@@ -182,7 +183,13 @@ func TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds(t *testing
 		}
 	}))
 	defer server.Close()
-	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	localHTTP := server.Client()
+	origin, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	localHTTP.Transport = r276MissingLocalTranslationTransport(origin, localHTTP.Transport)
+	client := &LCUClient{baseURL: server.URL, token: "test-token", http: localHTTP}
 	pool := PoolManifest{ID: "test", Names: []string{targetName}, Entries: []PoolEntry{{ID: targetID, Name: targetName}}, Hash: "test-hash"}
 	provider := newChampionProvider()
 	provider.lootTranslationTimeout = injectedTimeout

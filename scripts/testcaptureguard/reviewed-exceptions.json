@@ -1522,14 +1522,14 @@
     "file": "backend/r206_collection_image_test.go",
     "line": 63,
     "target": "calls",
-    "source_sha256": "7697b0bc39f9ab22f3158e087c3dd832d82d203b141825993fd1f7a1f2b44283",
+    "source_sha256": "0dd18975b6058e2e3fd8d72109d487a374930a39258f994b34b2a7dc947dba55",
     "comment": "r276-capture-safe: TestR206CollectionRetryDoesNotReadIdentity: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r206_collection_image_test.go",
     "line": 81,
     "target": "remoteCalls",
-    "source_sha256": "7697b0bc39f9ab22f3158e087c3dd832d82d203b141825993fd1f7a1f2b44283",
+    "source_sha256": "0dd18975b6058e2e3fd8d72109d487a374930a39258f994b34b2a7dc947dba55",
     "comment": "r276-capture-safe: TestR206LocalImage404NeverFetchesRemote: the audited fixture operations in this test invoke this callback serially and return before remoteCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
