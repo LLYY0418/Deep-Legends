@@ -43,7 +43,7 @@ test('R276 restart race stress is part of both sweeps, never a separate CI trigg
  for(const kind of ['linux-hexdata','windows-hexdata'])assert.match(sweep,new RegExp('kind: '+kind+'\\n\\s+index: 0\\n\\s+iterations: 1'));
  assert.match(sweep,/Require native Windows race compiler/);assert.match(sweep,/if: matrix.kind == 'windows-hexdata'/);
  const stress=fs.readFileSync(path.join(root,'scripts/r276-hexdata-stress.cjs'),'utf8');assert.match(stress,/'-race','-json','-count=200','-cpu=1,2,4'/);
- assert.equal(require('./r276-hexdata-stress.cjs').tests.length,4);
+ assert.equal(require('./r276-hexdata-stress.cjs').tests.length,10);
  assert.match(job(ci,'quality'),/scripts\/r276-hexdata-mutations\.py/);
  const browserJob=fs.readFileSync(path.join(root,'scripts/r276-browser-job.cjs'),'utf8');assert.match(browserJob,/census\.requireClean\(report,name\)/);assert.match(browserJob,/selected\.filter\(row=>row\[0\]!=='r275-offline'\)/);
 });

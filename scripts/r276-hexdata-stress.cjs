@@ -5,7 +5,13 @@ const tests=[
  'TestHexdataSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNone',
  'TestHexdataColdRankingBudgetAndDiskRestart',
  'TestR149MayhemCatalogsWarmConcurrentlyAndRestartFromDisk',
- 'TestR276HexdataRestartWaitsForStateAndUsesDisk'
+ 'TestR276HexdataRestartWaitsForStateAndUsesDisk',
+ 'TestAdoptingNewBuildIDPrunesStaleHexdataFilesAsynchronously',
+ 'TestPruneStaleHexdataBuildsRemovesExpiredBuildsOnly',
+ 'TestPruneStaleHexdataBuildsMakesNoRequests',
+ 'TestHexdataCircuitStatePersistsAcrossRestart',
+ 'TestHexdataRestartClearsLongLivedPersistedCircuit',
+ 'TestHexdataHTTP429OpensPersistentCircuitBeforeNextRequest'
 ];
 function main(){
  assert(process.argv[2],'usage: node scripts/r276-hexdata-stress.cjs <out>');

@@ -319,6 +319,7 @@ func TestAdoptingNewBuildIDPrunesStaleHexdataFilesAsynchronously(t *testing.T) {
 	stale := r116aWriteHexdataEntry(t, cache, r116aAncientBuild+"|hero-json|157", now.Add(-30*24*time.Hour), `{"items":[]}`)
 	previous := r116aWriteHexdataEntry(t, cache, r116aPreviousBuild+"|hero-json|157", now.Add(-time.Hour), `{"items":[]}`)
 	statePath := filepath.Join(root, championDataCacheDirectory, "hexdata-state.json")
+	stateGate := r274Gate(t, provider.hexdata.stateDisk, "hexdata-state")
 
 	// 走生产路径：loadHexdataMeta 成功后 adoptMeta 触发异步清理。
 	snapshot, err := provider.loadHexdataMeta(context.Background())
@@ -328,7 +329,16 @@ func TestAdoptingNewBuildIDPrunesStaleHexdataFilesAsynchronously(t *testing.T) {
 	if snapshot.BuildID != r116aCurrentBuild {
 		t.Fatalf("snapshot buildID = %q, want %q", snapshot.BuildID, r116aCurrentBuild)
 	}
+	r274Wait(t, stateGate.entered, "adopted state write not reached", provider.hexdata.stateDisk)
 	provider.hexdata.pruneWait.Wait()
+	r274Flush(t, provider.cache)
+	// The old prune-only barrier deterministically leaves the state absent.
+	if r116aExists(statePath) {
+		t.Fatal("blocked state writer unexpectedly published its file")
+	}
+	if err := r276HexdataRestartDrain(provider, r276ReleaseStateClock{r274RealClock{}, stateGate}); err != nil {
+		t.Fatal(err)
+	}
 	if r116aExists(stale) {
 		t.Fatal("stale build file survived the async prune")
 	}
@@ -358,7 +368,7 @@ func TestAdoptingNewBuildIDPrunesStaleHexdataFilesAsynchronously(t *testing.T) {
 	if !provider.hexdata.adoptCitation(championSourceCitation{Source: "Hexdata", Patch: "16.18", ReportDate: "2026-09-18", BuildID: r116aCurrentBuild, CanonicalURL: "https://" + hexdataHost + "/heroes"}) {
 		t.Fatal("adoptCitation rejected a complete citation")
 	}
-	provider.hexdata.pruneWait.Wait()
+	r276HexdataRestartBarrier(t, provider)
 	if !r116aExists(another) {
 		t.Fatal("adopting the same buildID triggered a second disk scan; prune must run at most once per (process, buildID)")
 	}
@@ -366,7 +376,7 @@ func TestAdoptingNewBuildIDPrunesStaleHexdataFilesAsynchronously(t *testing.T) {
 	if !provider.hexdata.adoptCitation(championSourceCitation{Source: "Hexdata", Patch: "16.20", ReportDate: "2026-10-02", BuildID: "hexdata-2026-10-02-cccccccccccc", CanonicalURL: "https://" + hexdataHost + "/heroes"}) {
 		t.Fatal("adoptCitation rejected the rotated citation")
 	}
-	provider.hexdata.pruneWait.Wait()
+	r276HexdataRestartBarrier(t, provider)
 	if r116aExists(another) {
 		t.Fatal("rotating the buildID did not prune the ancient build")
 	}
@@ -450,7 +460,7 @@ func TestPruneStaleHexdataBuildsMakesNoRequests(t *testing.T) {
 	provider.cache.now = func() time.Time { return now }
 	r116aWriteHexdataEntry(t, provider.cache, r116aAncientBuild+"|hero-json|157", now.Add(-30*24*time.Hour), `{}`)
 	provider.hexdata.adoptMeta(hexdataMetaSnapshot{BuildID: r116aCurrentBuild, ReportPatch: "16.18", ReportDate: "2026-09-18", HeroCount: 173, AugmentCount: 211})
-	provider.hexdata.pruneWait.Wait()
+	r276HexdataRestartBarrier(t, provider)
 	if got := len(recorder.hexdataPaths()); got != 0 {
 		t.Fatalf("prune issued %d requests", got)
 	}

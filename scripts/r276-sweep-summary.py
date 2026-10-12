@@ -1,10 +1,38 @@
 """Require exact coverage and intact evidence before declaring a clean sweep."""
 import argparse, collections, json, math, statistics, subprocess
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 ROOT=Path(__file__).resolve().parents[1]
-HEXDATA_TESTS=['TestHexdataSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNone','TestHexdataColdRankingBudgetAndDiskRestart','TestR149MayhemCatalogsWarmConcurrentlyAndRestartFromDisk','TestR276HexdataRestartWaitsForStateAndUsesDisk']
+HEXDATA_TESTS=['TestHexdataSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNone','TestHexdataColdRankingBudgetAndDiskRestart','TestR149MayhemCatalogsWarmConcurrentlyAndRestartFromDisk','TestR276HexdataRestartWaitsForStateAndUsesDisk','TestAdoptingNewBuildIDPrunesStaleHexdataFilesAsynchronously','TestPruneStaleHexdataBuildsRemovesExpiredBuildsOnly','TestPruneStaleHexdataBuildsMakesNoRequests','TestHexdataCircuitStatePersistsAcrossRestart','TestHexdataRestartClearsLongLivedPersistedCircuit','TestHexdataHTTP429OpensPersistentCircuitBeforeNextRequest']
 PLAN=[(kind,index,iterations) for kind,count,iterations in [('linux-race',8,5),('linux-renderers',5,2),('browser-main',4,5),('browser-r265',4,5),('windows-go',4,3),('windows-renderers',4,3),('windows-cold',1,1),('linux-hexdata',1,1),('windows-hexdata',1,1)] for index in range(count)]
-def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN):
+def upgrade_retry_evidence(folder,sha):
+    errors=[];runs=[]
+    if folder is None:return dict(total_retries=0,scope='no acceptance context supplied',runs=[]),[]
+    for meta_file in sorted(folder.glob('*/acceptance-run.json')):
+        try:
+            meta=json.loads(meta_file.read_text());directory=meta_file.parent/'upgrade'
+            data=json.loads((directory/'r276-legacy-installer-retries.json').read_text(encoding='utf-8-sig'))
+            records=data['records'];assert isinstance(records,list)
+            assert meta['head_sha']==sha and meta['conclusion']=='success' and meta['run_attempt']==1
+            assert data['total_retries']==len(records)
+            assert len(list(directory.glob('*-retry.json')))==len(records)
+            def local(original):return directory/(PureWindowsPath(original).name if '\\' in original else Path(original).name)
+            for record in records:
+                assert record['phase']=='published-legacy-setup' and record['version'] in ['0.12.65','0.12.68','0.12.76','0.12.80','0.12.81']
+                assert record['retry_count']==1 and record['attempt_count']==2 and record['completed'] is True
+                assert record['first_exit_code']!=0 and record['second_exit_code']==0
+                assert record['signature']=='invalid pointer found on stack + main.shellWndProc'
+                first=local(record['first_stderr']);second=local(record['second_stderr']);assert first!=second and second.is_file()
+                text=first.read_text(errors='replace');assert 'invalid pointer found on stack' in text and 'main.shellWndProc' in text
+                assert json.loads(local(record['evidence_json']).read_text(encoding='utf-8-sig'))==record
+                for stderr,exit_code in [(first,record['first_exit_code']),(second,record['second_exit_code'])]:
+                    result=json.loads(stderr.with_name(stderr.name.replace('-stderr.log','-result.json')).read_text(encoding='utf-8-sig'))
+                    assert result['version']==record['version'] and result['exit_code']==exit_code and result['stderr_bytes']==stderr.stat().st_size
+            runs.append(dict(run=meta['id'],event=meta['event'],sha=meta['head_sha'],link=meta['html_url'],total_retries=len(records),records=records))
+        except (OSError,ValueError,KeyError,AssertionError,TypeError) as e:errors.append('invalid acceptance legacy retry evidence '+str(meta_file)+': '+type(e).__name__)
+    if len(runs)!=2 or {r['event'] for r in runs}!={'push','workflow_dispatch'}:errors.append('missing push/dispatch legacy retry acceptance evidence')
+    return dict(total_retries=sum(r['total_retries'] for r in runs),scope='same-SHA acceptance CI; sweep does not execute installers',runs=runs),errors
+
+def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN,upgrade_folder=None):
     errors=[];samples=[];hexdata_stress=[];metrics=collections.defaultdict(list);failures=collections.defaultdict(list)
     jobmap={j['name']:j for page in jobs for j in page.get('jobs',[])}
     if inventory is None:
@@ -99,8 +127,10 @@ def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN):
             denominator=sum(row['kind']==kind and row['label']==label for row in samples)
             by_kind.append(dict(kind=kind,label=label,count=count,denominator=denominator,fraction=count/denominator))
         signatures.append(dict(signature=signature,count=len(rows),denominator=len(samples),fraction=len(rows)/len(samples) if samples else 0,byKind=by_kind,jobLinks=sorted({row['jobLink'] for row in rows if row.get('jobLink')}),examples=rows))
-    return dict(success=bool(samples) and not errors and not signatures,sha=next(iter(shas)) if len(shas)==1 else None,runLink='https://github.com/'+repo+'/actions/runs/'+str(run),samples=len(samples),coverage={str(key):len(value[1]) for key,value in seen_jobs.items()},hexdataStress=hexdata_stress,errors=errors,failures=signatures,metrics={name:dict(count=len(values),min_ms=min(values),median_ms=statistics.median(values),max_ms=max(values)) for name,values in metrics.items()},sampleRecords=samples)
+    upgrade_retries,upgrade_errors=upgrade_retry_evidence(upgrade_folder,next(iter(shas)) if len(shas)==1 else None)
+    errors.extend(upgrade_errors)
+    return dict(legacyInstallerRetries=upgrade_retries,success=bool(samples) and not errors and not signatures,sha=next(iter(shas)) if len(shas)==1 else None,runLink='https://github.com/'+repo+'/actions/runs/'+str(run),samples=len(samples),coverage={str(key):len(value[1]) for key,value in seen_jobs.items()},hexdataStress=hexdata_stress,errors=errors,failures=signatures,metrics={name:dict(count=len(values),min_ms=min(values),median_ms=statistics.median(values),max_ms=max(values)) for name,values in metrics.items()},sampleRecords=samples)
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--input',type=Path,required=True);p.add_argument('--jobs',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--repo',required=True);p.add_argument('--run',required=True);a=p.parse_args()
-    summary=summarize(a.input,json.loads(a.jobs.read_text()),a.repo,a.run)
+    p=argparse.ArgumentParser();p.add_argument('--input',type=Path,required=True);p.add_argument('--jobs',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--repo',required=True);p.add_argument('--run',required=True);p.add_argument('--upgrade-evidence',type=Path,required=True);a=p.parse_args()
+    summary=summarize(a.input,json.loads(a.jobs.read_text()),a.repo,a.run,upgrade_folder=a.upgrade_evidence)
     a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(summary,indent=2)+'\n');print(json.dumps({k:summary[k] for k in ['success','samples','errors']},indent=2));raise SystemExit(0 if summary['success'] else 1)

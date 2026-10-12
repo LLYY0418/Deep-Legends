@@ -2,6 +2,11 @@ name: R276 flake sweep
 
 on:
   workflow_dispatch:
+    inputs:
+      acceptance_runs:
+        description: 'Same-SHA successful push and dispatch CI run IDs, separated by comma'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -209,8 +214,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" > jobs.json
+      - name: Attach same-SHA legacy installer retry acceptance evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          R276_ACCEPTANCE_RUNS: ${{ inputs.acceptance_runs }}
+        run: python3 scripts/r276-sweep-upgrade-evidence.py --runs "$R276_ACCEPTANCE_RUNS" --sha "$GITHUB_SHA" --out acceptance-upgrade --repo "$GITHUB_REPOSITORY"
       - name: Require complete zero-failure sweep
-        run: python3 scripts/r276-sweep-summary.py --input samples --jobs jobs.json --output sweep-summary.json --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID"
+        run: python3 scripts/r276-sweep-summary.py --input samples --jobs jobs.json --output sweep-summary.json --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID" --upgrade-evidence acceptance-upgrade
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -218,4 +228,5 @@ jobs:
           path: |
             sweep-summary.json
             jobs.json
+            acceptance-upgrade/**
           if-no-files-found: error

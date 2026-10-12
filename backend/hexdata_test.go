@@ -659,12 +659,13 @@ func TestHexdataCircuitStatePersistsAcrossRestart(t *testing.T) {
 	}
 	provider := newChampionProvider()
 	client := newHexdataClient(provider, trackTestStore(t, &localStore{root: root}))
+	provider.hexdata = client
 	now := time.Now().UTC()
 	client.now = func() time.Time { return now }
 	for range hexdataCircuitFailureLimit {
 		client.recordFailure("heroes", 429, true)
 	}
-	r274Flush(t, client.stateDisk)
+	r276HexdataRestartBarrier(t, provider)
 	restarted := newHexdataClient(provider, trackTestStore(t, &localStore{root: root}))
 	restarted.now = func() time.Time { return now.Add(30 * time.Second) }
 	circuit := restarted.snapshot().Circuits["heroes"]
@@ -736,8 +737,9 @@ func TestHexdataRestartClearsLongLivedPersistedCircuit(t *testing.T) {
 	}
 	provider := newChampionProvider()
 	client := newHexdataClient(provider, trackTestStore(t, &localStore{root: root}))
+	provider.hexdata = client
 	client.now = func() time.Time { return now }
-	r274Flush(t, client.stateDisk)
+	r276HexdataRestartBarrier(t, provider)
 	client.loadState()
 	got := client.snapshot()
 	if !got.CircuitUntil.IsZero() || !got.CircuitProbeAt.IsZero() || got.Failures != 0 {
@@ -841,7 +843,7 @@ func TestHexdataHTTP429OpensPersistentCircuitBeforeNextRequest(t *testing.T) {
 		t.Fatalf("HTTP 429 circuit = %#v", circuit)
 	}
 
-	r274Flush(t, provider.hexdata.stateDisk)
+	r276HexdataRestartBarrier(t, provider)
 	restarted := newHexdataBudgetProvider(t, root, transport)
 	restarted.hexdata.now = func() time.Time { return now.Add(30 * time.Second) }
 	if _, err := restarted.hexdata.load(context.Background(), "heroes", "all", "/heroes", "text/html,application/xhtml+xml", false); err == nil || !strings.Contains(err.Error(), "circuit") {

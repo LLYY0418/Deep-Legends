@@ -44,6 +44,8 @@ jobs:
         run: python3 scripts/r276-fixture-mutations.py --out "$RUNNER_TEMP/r276-fixture-mutations"
       - name: R276 complete Hexdata restart barrier mutations
         run: python3 scripts/r276-hexdata-mutations.py --out "$RUNNER_TEMP/r276-hexdata-mutations"
+      - name: R276 exact published legacy installer retry regression and mutations
+        run: python3 scripts/r276-legacy-installer-retry-mutations.py --out "$RUNNER_TEMP/r276-legacy-installer-retry-mutations"
       - name: Audit browser process and directory cleanup
         run: node scripts/check-browser-cleanup.cjs --json="$RUNNER_TEMP/browser-cleanup-audit.json"
       - name: R276 deterministic cleanup regression and mutations
@@ -63,6 +65,7 @@ jobs:
             ${{ runner.temp }}/test-capture-audit.json
             ${{ runner.temp }}/r276-fixture-mutations/**
             ${{ runner.temp }}/r276-hexdata-mutations/**
+            ${{ runner.temp }}/r276-legacy-installer-retry-mutations/**
           if-no-files-found: error
       - name: Vet
         run: go vet ./...

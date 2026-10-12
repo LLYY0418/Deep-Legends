@@ -52,4 +52,35 @@ class HexdataSummaryTests(unittest.TestCase):
         self.events.append(dict(Action='fail',Test=module.HEXDATA_TESTS[0]));self.assertFalse(self.result()['success'])
     def test_wrong_sha_rejected(self):
         self.stress['sha']='other';self.assertFalse(self.result()['success'])
+
+class LegacyRetryEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name)
+        for i,event in enumerate(['push','workflow_dispatch']):
+            d=self.root/str(i);(d/'upgrade').mkdir(parents=True)
+            (d/'acceptance-run.json').write_text(json.dumps(dict(id=i,head_sha='same',conclusion='success',run_attempt=1,event=event,html_url='https://fixture/'+str(i))))
+            (d/'upgrade/r276-legacy-installer-retries.json').write_text(json.dumps(dict(total_retries=0,records=[])))
+        self.d=self.root/'0/upgrade'
+        self.record=dict(phase='published-legacy-setup',version='0.12.81',signature='invalid pointer found on stack + main.shellWndProc',retry_count=1,attempt_count=2,completed=True,first_exit_code=2,second_exit_code=0,first_stderr='C:\\fixture\\first-stderr.log',second_stderr='C:\\fixture\\second-stderr.log',evidence_json='C:\\fixture\\first-retry.json')
+    def result(self):
+        (self.d/'first-stderr.log').write_text('invalid pointer found on stack\nmain.shellWndProc')
+        (self.d/'second-stderr.log').write_text('')
+        (self.d/'first-retry.json').write_text(json.dumps(self.record))
+        for name,exit_code in [('first',self.record['first_exit_code']),('second',self.record['second_exit_code'])]:
+            (self.d/(name+'-result.json')).write_text(json.dumps(dict(version=self.record['version'],exit_code=exit_code,stderr_bytes=(self.d/(name+'-stderr.log')).stat().st_size)))
+        (self.d/'r276-legacy-installer-retries.json').write_text(json.dumps(dict(total_retries=1,records=[self.record])))
+        return module.upgrade_retry_evidence(self.root,'same')
+    def test_counts_both_runs_without_rerunning_installer(self):
+        data,errors=self.result();self.assertFalse(errors);self.assertEqual(data['total_retries'],1);self.assertEqual(len(data['runs']),2)
+    def test_retry_limit_two_rejected(self):
+        self.record['retry_count']=2;self.assertTrue(self.result()[1])
+    def test_candidate_retry_rejected(self):
+        self.record['version']='0.12.83';self.assertTrue(self.result()[1])
+    def test_failed_second_attempt_rejected(self):
+        self.record['second_exit_code']=2;self.assertTrue(self.result()[1])
+    def test_missing_other_acceptance_run_rejected(self):
+        (self.root/'1/acceptance-run.json').unlink();self.assertTrue(self.result()[1])
+    def test_wrong_sha_rejected(self):
+        self.result();self.assertTrue(module.upgrade_retry_evidence(self.root,'different')[1])
+
 if __name__=='__main__':unittest.main()
