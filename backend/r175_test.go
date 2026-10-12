@@ -27,9 +27,9 @@ func r175App(t *testing.T) *app {
 	}
 	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		a.closePublicCacheDisks(ctx)
+		r274CloseApp(t, a, ctx)
 	})
 	return a
 }

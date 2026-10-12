@@ -29,6 +29,10 @@ type cacheDiskQueue struct {
 	idle            chan struct{}
 	barrier         chan struct{}
 	running, closed bool
+	// Observational metadata only: tests can distinguish slow progress from a
+	// stalled writer. Production deadlines and queue policy do not use it.
+	completed uint64
+	progress  chan struct{}
 }
 
 func (q *cacheDiskQueue) ticket(key string) cacheDiskTicket {
@@ -95,8 +99,17 @@ func (q *cacheDiskQueue) drain(idle chan struct{}) {
 			close(idle)
 		}
 	}()
+	completed := false
 	for {
 		q.mu.Lock()
+		if completed {
+			q.completed++
+			if q.progress != nil {
+				close(q.progress)
+				q.progress = make(chan struct{})
+			}
+			completed = false
+		}
 		if len(q.tasks) == 0 {
 			q.running = false
 			close(q.idle)
@@ -117,6 +130,7 @@ func (q *cacheDiskQueue) drain(idle chan struct{}) {
 		if q.valid(task.ticket) {
 			task.run(func() bool { return q.valid(task.ticket) })
 		}
+		completed = true
 	}
 }
 func (q *cacheDiskQueue) clear() func() {

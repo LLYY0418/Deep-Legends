@@ -35,34 +35,25 @@ func r274Gate(t *testing.T, c *championDataCache, operation string) *r274DiskGat
 	}
 	t.Cleanup(func() {
 		g.unblock()
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := c.flushDisk(ctx); err != nil {
-			t.Error("writer cleanup", err)
-		}
+		r274Flush(t, c)
 	})
 	return g
 }
 
 func (g *r274DiskGate) unblock() { g.open.Do(func() { close(g.release) }) }
 
-func r274Wait[T any](t *testing.T, ch <-chan T, failure string) T {
+func r274Wait[T any](t *testing.T, ch <-chan T, failure string, caches ...*championDataCache) T {
 	t.Helper()
-	select {
-	case v := <-ch:
-		return v
-	case <-time.After(2 * time.Second):
-		t.Fatal(failure)
-		var zero T
-		return zero
+	v, err := r274Await(context.Background(), ch, caches, r274RealClock{})
+	if err != nil {
+		t.Fatal(failure, err)
 	}
+	return v
 }
 
 func r274Flush(t *testing.T, c *championDataCache) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := c.flushDisk(ctx); err != nil {
+	if err := r274Drain(context.Background(), c, r274RealClock{}); err != nil {
 		t.Fatal("durability barrier", err)
 	}
 }
@@ -84,8 +75,8 @@ func TestR274HexdataStateReturnsBeforeDisk(t *testing.T) {
 	g := r274Gate(t, h.stateDisk, "hexdata-state")
 	done := make(chan struct{})
 	go func() { h.recordFailure("heroes", 429, true); close(done) }()
-	r274Wait(t, g.entered, "Hexdata state writer not reached")
-	r274Wait(t, done, "Hexdata foreground waited for state write")
+	r274Wait(t, g.entered, "Hexdata state writer not reached", h.stateDisk)
+	r274Wait(t, done, "Hexdata foreground waited for state write", h.stateDisk)
 	if !h.mu.TryLock() {
 		t.Fatal("Hexdata global lock held during state write")
 	}
@@ -106,12 +97,13 @@ func TestR274PrestigeReadAndWriteDoNotHoldStoreLock(t *testing.T) {
 	for _, operation := range []string{"prestige-read", "prestige-write"} {
 		t.Run(operation, func(t *testing.T) {
 			store := r274AuxiliaryStore(t)
+			cache := store.auxiliaryCacheDisk()
 			id := "11914b2b-f986-474e-b3f7-1e8cc41b72c9"
 			jpeg := []byte{0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 'J', 'F', 'I', 'F', 0, 1}
 			if err := store.storePrestigeArtwork(id, jpeg); err != nil {
 				t.Fatal(err)
 			}
-			g := r274Gate(t, store.auxiliaryCacheDisk(), operation)
+			g := r274Gate(t, cache, operation)
 			done := make(chan error, 1)
 			go func() {
 				if operation == "prestige-write" {
@@ -125,15 +117,15 @@ func TestR274PrestigeReadAndWriteDoNotHoldStoreLock(t *testing.T) {
 				}
 				done <- nil
 			}()
-			r274Wait(t, g.entered, "prestige I/O gate not reached")
+			r274Wait(t, g.entered, "prestige I/O gate not reached", cache)
 			if !store.mu.TryLock() {
 				g.unblock()
-				r274Wait(t, done, "blocked writer cleanup")
+				r274Wait(t, done, "blocked writer cleanup", cache)
 				t.Fatal("localStore global lock held during artwork I/O")
 			}
 			store.mu.Unlock()
 			g.unblock()
-			if err := r274Wait(t, done, "artwork I/O did not finish"); err != nil {
+			if err := r274Wait(t, done, "artwork I/O did not finish", cache); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -150,8 +142,8 @@ func TestR274PrestigeTouchDoesNotBlockForeground(t *testing.T) {
 	g := r274Gate(t, store.auxiliaryCacheDisk(), "prestige-touch")
 	done := make(chan bool, 1)
 	go func() { _, ok := store.loadPrestigeArtwork(id); done <- ok }()
-	r274Wait(t, g.entered, "artwork touch not reached")
-	if !r274Wait(t, done, "foreground waited for artwork touch") {
+	r274Wait(t, g.entered, "artwork touch not reached", store.auxiliaryCacheDisk())
+	if !r274Wait(t, done, "foreground waited for artwork touch", store.auxiliaryCacheDisk()) {
 		t.Fatal("artwork cache miss")
 	}
 	if _, ok := store.loadPrestigeArtwork(id); !ok {
@@ -169,9 +161,9 @@ func TestR274ConcurrentDetailsReturnBeforeDisk(t *testing.T) {
 	for i := 1; i <= 10; i++ {
 		go func(id string) { _, _, err := p.matchByIDWithCache(context.Background(), id); done <- err }(fmt.Sprintf("KR_%d", i))
 	}
-	r274Wait(t, g.entered, "disk gate not reached")
+	r274Wait(t, g.entered, "disk gate not reached", p.matchDisk)
 	for i := 0; i < 10; i++ {
-		if err := r274Wait(t, done, "foreground detail waited for blocked disk write"); err != nil {
+		if err := r274Wait(t, done, "foreground detail waited for blocked disk write", p.matchDisk); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -198,14 +190,14 @@ func TestR274MemoryHitDuringBlockedWrite(t *testing.T) {
 	g := r274Gate(t, p.matchDisk, "write")
 	download := make(chan error, 1)
 	go func() { _, _, err := p.matchByIDWithCache(context.Background(), "KR_274"); download <- err }()
-	r274Wait(t, g.entered, "disk gate not reached")
+	r274Wait(t, g.entered, "disk gate not reached", p.matchDisk)
 	hit := make(chan string, 1)
 	go func() { _, source, _ := p.matchByIDWithCache(context.Background(), "KR_999"); hit <- source }()
-	if source := r274Wait(t, hit, "memory hit blocked behind disk write/cacheMu"); source != "hit" {
+	if source := r274Wait(t, hit, "memory hit blocked behind disk write/cacheMu", p.matchDisk); source != "hit" {
 		t.Fatal("memory entry lost", source)
 	}
 	g.unblock()
-	if err := r274Wait(t, download, "download did not finish"); err != nil {
+	if err := r274Wait(t, download, "download did not finish", p.matchDisk); err != nil {
 		t.Fatal(err)
 	}
 	r274Flush(t, p.matchDisk)
@@ -217,23 +209,23 @@ func TestR274ClearFencesBlockedAndQueuedWrites(t *testing.T) {
 	g := r274Gate(t, p.matchDisk, "write")
 	done := make(chan error, 1)
 	go func() { _, _, err := p.matchByIDWithCache(context.Background(), "KR_274"); done <- err }()
-	r274Wait(t, g.entered, "disk gate not reached")
+	r274Wait(t, g.entered, "disk gate not reached", p.matchDisk)
 	queued := make(chan error, 2)
 	for _, id := range []string{"KR_276", "KR_277"} {
 		go func(id string) { _, _, err := p.matchByIDWithCache(context.Background(), id); queued <- err }(id)
 	}
 	for i := 0; i < 2; i++ {
-		if err := r274Wait(t, queued, "queued detail waited for disk"); err != nil {
+		if err := r274Wait(t, queued, "queued detail waited for disk", p.matchDisk); err != nil {
 			t.Fatal(err)
 		}
 	}
 	cleared := make(chan error, 1)
 	go func() { cleared <- p.clearRiotMatchCaches() }()
-	if err := r274Wait(t, cleared, "clear blocked on writer holding cacheMu"); err != nil {
+	if err := r274Wait(t, cleared, "clear blocked on writer holding cacheMu", p.matchDisk); err != nil {
 		t.Fatal(err)
 	}
 	g.unblock()
-	if err := r274Wait(t, done, "download did not finish"); err != nil {
+	if err := r274Wait(t, done, "download did not finish", p.matchDisk); err != nil {
 		t.Fatal(err)
 	}
 	r274Flush(t, p.matchDisk)
@@ -263,8 +255,8 @@ func TestR274IdentityReturnsBeforeDiskWrite(t *testing.T) {
 		var out map[string]int
 		done <- p.cachedPublicIdentity(context.Background(), "anonymous-identity", time.Hour, &out, func(context.Context) error { out = map[string]int{"value": 274}; return nil })
 	}()
-	r274Wait(t, g.entered, "identity writer not reached")
-	if err := r274Wait(t, done, "identity foreground waited for diskMu write"); err != nil {
+	r274Wait(t, g.entered, "identity writer not reached", p.identityDisk)
+	if err := r274Wait(t, done, "identity foreground waited for diskMu write", p.identityDisk); err != nil {
 		t.Fatal(err)
 	}
 	var out map[string]int
@@ -287,8 +279,8 @@ func TestR274MatchTierReturnsBeforeDiskWrite(t *testing.T) {
 		a.writeMatchTierCache(274, &matchTiersResponse{Tier: "GOLD", Score: 1050, Samples: 3})
 		done <- struct{}{}
 	}()
-	r274Wait(t, g.entered, "tier writer not reached")
-	r274Wait(t, done, "tier foreground waited for diskMu write")
+	r274Wait(t, g.entered, "tier writer not reached", c)
+	r274Wait(t, done, "tier foreground waited for diskMu write", c)
 	value, ok := a.readMatchTierCache(274)
 	if !ok || value.Tier != "GOLD" || value.Score != 1050 || value.Samples != 3 {
 		t.Fatal("tier memory lost", value, ok)
@@ -310,7 +302,7 @@ func TestR274InvalidationHidesDiskWhileWriterBlocked(t *testing.T) {
 	}
 	g := r274Gate(t, c, "write")
 	c.enqueueDiskWrite(r274Envelope(key, "obsolete"))
-	r274Wait(t, g.entered, "writer not reached")
+	r274Wait(t, g.entered, "writer not reached", c)
 	c.invalidate(key)
 	if _, err := c.readDisk(key); err == nil {
 		t.Fatal("invalidated identity disk still readable while delete queued")
@@ -328,7 +320,7 @@ func TestR274DiskQueueBoundedAndCoalesced(t *testing.T) {
 	c := newPublicBinaryCache(&localStore{root: t.TempDir()}, "fixture", 200, 2<<20)
 	g := r274Gate(t, c, "write")
 	c.enqueueDiskWrite(r274Envelope("bootstrap|0", "active"))
-	r274Wait(t, g.entered, "writer not reached")
+	r274Wait(t, g.entered, "writer not reached", c)
 	for i := 1; i <= cacheDiskQueueLimit; i++ {
 		c.enqueueDiskWrite(r274Envelope(fmt.Sprintf("bootstrap|%d", i), "queued"))
 	}
@@ -362,7 +354,7 @@ func TestR274ShutdownDropsPendingKeepsExistingFiles(t *testing.T) {
 	}
 	g := r274Gate(t, c, "write")
 	c.enqueueDiskWrite(r274Envelope("bootstrap|active", "active"))
-	r274Wait(t, g.entered, "writer not reached")
+	r274Wait(t, g.entered, "writer not reached", c)
 	c.enqueueDiskWrite(r274Envelope("bootstrap|pending", "pending"))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -440,7 +432,7 @@ func TestR274DiskWriteDiagnosticsRetained(t *testing.T) {
 				t.Fatal(err)
 			}
 			r274Flush(t, p.matchDisk)
-			event := r274Wait(t, events, "write diagnostic missing")
+			event := r274Wait(t, events, "write diagnostic missing", p.matchDisk)
 			result := "failed"
 			if disabled {
 				result = "disabled"
@@ -475,8 +467,8 @@ func TestR274SuccessfulCanceledCallerStillPersists(t *testing.T) {
 	g := r274Gate(t, p.matchDisk, "write")
 	done := make(chan error, 1)
 	go func() { _, _, err := p.matchByIDWithCache(ctx, "KR_274"); done <- err }()
-	r274Wait(t, g.entered, "disk gate not reached")
-	if err := r274Wait(t, done, "paid canceled detail waited for disk"); err != nil {
+	r274Wait(t, g.entered, "disk gate not reached", p.matchDisk)
+	if err := r274Wait(t, done, "paid canceled detail waited for disk", p.matchDisk); err != nil {
 		t.Fatal("successful response discarded on cancellation", err)
 	}
 	p.cacheMu.Lock()
@@ -502,8 +494,8 @@ func TestR274MemoryHitDoesNotWaitForTouch(t *testing.T) {
 	g := r274Gate(t, p.matchDisk, "touch")
 	done := make(chan string, 1)
 	go func() { _, source, _ := p.matchByIDWithCache(context.Background(), "KR_274"); done <- source }()
-	r274Wait(t, g.entered, "touch gate not reached")
-	if source := r274Wait(t, done, "memory hit waited for blocked disk touch"); source != "hit" {
+	r274Wait(t, g.entered, "touch gate not reached", p.matchDisk)
+	if source := r274Wait(t, done, "memory hit waited for blocked disk touch", p.matchDisk); source != "hit" {
 		t.Fatal(source)
 	}
 	g.unblock()
@@ -519,7 +511,7 @@ func TestR274InvalidationsRetainedAtQueueCapacity(t *testing.T) {
 	}
 	g := r274Gate(t, c, "write")
 	c.enqueueDiskWrite(r274Envelope("bootstrap|active", "active"))
-	r274Wait(t, g.entered, "writer not reached")
+	r274Wait(t, g.entered, "writer not reached", c)
 	c.invalidate("bootstrap|delete-a")
 	for i := 0; i < cacheDiskQueueLimit-1; i++ {
 		c.enqueueDiskWrite(r274Envelope(fmt.Sprintf("bootstrap|pending-%d", i), "queued"))
@@ -550,7 +542,7 @@ func TestR274CorruptCleanupPreservesNewerAtomicWrite(t *testing.T) {
 	}
 	g := r274Gate(t, c, "write")
 	c.enqueueDiskWrite(r274Envelope(key, "new-valid"))
-	r274Wait(t, g.entered, "writer not reached")
+	r274Wait(t, g.entered, "writer not reached", c)
 	if _, err := c.readDisk(key); err == nil {
 		t.Fatal("corrupt data accepted")
 	}
@@ -567,9 +559,11 @@ func TestR274ShutdownDrainsInitializedOwnersWithoutCreatingCaches(t *testing.T) 
 	c := newPublicBinaryCache(store, "fixture", 200, 2<<20)
 	a := &app{storage: store, clientCatalogCache: c, proProfiles: proProfileCache{disk: c}}
 	c.enqueueDiskWrite(r274Envelope("bootstrap|shutdown", "persisted"))
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	a.closePublicCacheDisks(ctx)
+	done := make(chan struct{})
+	go func() { a.closePublicCacheDisks(ctx); close(done) }()
+	r274Wait(t, done, "shutdown queue did not drain", c)
 	if _, err := c.readDisk("bootstrap|shutdown"); err != nil {
 		t.Fatal("shutdown dropped completed public cache", err)
 	}
@@ -599,7 +593,7 @@ func TestR274ObservedAugmentsReadOutsideProviderLock(t *testing.T) {
 	g := r274Gate(t, p.cache, "read")
 	done := make(chan []gameplayAugment, 1)
 	go func() { done <- p.observedHexdataAugments() }()
-	r274Wait(t, g.entered, "observed disk read not reached")
+	r274Wait(t, g.entered, "observed disk read not reached", p.cache)
 	if !p.observedAugmentMu.TryLock() {
 		t.Fatal("observed disk read held provider lock")
 	}
@@ -609,9 +603,9 @@ func TestR274ObservedAugmentsReadOutsideProviderLock(t *testing.T) {
 		p.observeHexdataAugments([]hexdataAugmentRowV2{{AugmentID: 1, AugmentName: "new", AugmentIconURL: path}})
 		observed <- struct{}{}
 	}()
-	r274Wait(t, observed, "live observation waited for startup disk read")
+	r274Wait(t, observed, "live observation waited for startup disk read", p.cache)
 	g.unblock()
-	items := r274Wait(t, done, "startup read did not finish")
+	items := r274Wait(t, done, "startup read did not finish", p.cache)
 	if len(items) != 2 || items[0].Name != "new" || items[1].Name != "disk-only" {
 		t.Fatal("startup disk value overwrote live observation", items)
 	}
