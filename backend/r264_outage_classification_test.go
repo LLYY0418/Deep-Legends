@@ -5,15 +5,15 @@ import (
 	"time"
 )
 
-func TestR264OfficialOutageRequiresBothSourcesOrCooling(t *testing.T) {
+func TestR264OfficialOutageUsesOfficialSGPOrCooling(t *testing.T) {
 	for _, tc := range []struct {
 		attempts []DataSourceAttempt
 		cooling  int
 		want     bool
 	}{
-		{[]DataSourceAttempt{{Source: dataSourceSGP, StatusCode: 503}}, 0, false},
+		{[]DataSourceAttempt{{Source: dataSourceSGP, StatusCode: 503}}, 0, true},
 		{[]DataSourceAttempt{{Source: dataSourceLCU, StatusCode: 500}}, 0, false},
-		{[]DataSourceAttempt{{Source: dataSourceSGP, StatusCode: 503}, {Source: dataSourceLCU, StatusCode: 404}}, 0, false},
+		{[]DataSourceAttempt{{Source: dataSourceSGP, StatusCode: 503}, {Source: dataSourceLCU, StatusCode: 404}}, 0, true},
 		{[]DataSourceAttempt{{Source: dataSourceSGP, StatusCode: 503}, {Source: dataSourceLCU, StatusCode: 500}}, 0, true},
 		{nil, 42, true},
 	} {

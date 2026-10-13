@@ -176,6 +176,7 @@ type sgpProvider struct {
 	sessionOwner       *LCUClient
 	failUntil          time.Time
 	historyCircuits    map[string]*sgpHistoryCircuit
+	historyRecovered   func(string)
 	historyClock       func() time.Time
 	historyCache       map[string]sgpHistoryCacheEntry
 	historyGames       *historyGameCache
@@ -619,7 +620,7 @@ func (p *sgpProvider) recordObservation(event map[string]any) {
 }
 
 func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, kind sgpTokenKind, serverID, route, requestPath, endpoint string, out any) (resultErr error) {
-	probe, circuitErr := p.acquireHistoryCircuit(serverID, route)
+	probe, circuitErr := p.acquireHistoryProbe(serverID, route, ctx.Value(sgpBackgroundHistoryProbeKey{}) == true)
 	if circuitErr != nil {
 		p.recordObservation(map[string]any{"event": "sgp_history_circuit", "server_id": serverID, "route": route, "state": "cooldown"})
 		return circuitErr

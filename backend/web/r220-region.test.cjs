@@ -30,7 +30,7 @@ test('R220 top search defaults to the connected platform, keeps manual choice, a
  const f=compile(app,['searchRegion','searchServerID','applySearchRegion','updateSearchRegionLabel','updateSearchRegionStatus','setCNRegionExpanded'],{state,el,savePreference:(...x)=>preferences.push(x)});
  f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'jp1');assert.equal(el.playerSearchRegionLabel.textContent,'日服');assert.equal(f.searchServerID(),'');
  f.applySearchRegion('na1','HN1');assert.equal(f.searchRegion(),'na1');assert.equal(f.searchServerID(),'');f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'na1');
- state.status={connected:true,clientRegion:'TENCENT',serverId:'HN1',serverName:'艾欧尼亚'};f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'na1');
+ state.status={connected:true,clientRegion:'TENCENT',serverId:'HN1',serverName:'艾欧尼亚'};f.updateSearchRegionStatus(state.status);assert.equal(f.searchRegion(),'');assert.equal(f.searchServerID(),'');
  for(const region of ['kr','jp1','na1','euw1','eun1','tw2','vn2','sg2'])assert(el.playerSearchRegionMenu.querySelector(`[data-region-option="${region}"]`),region);
  for(const region of ['br1','la1','la2','me1','oc1','ru','tr1'])assert.equal(el.playerSearchRegionMenu.querySelector(`[data-region-option="${region}"]`),null);
  }finally{dom.window.close();}
@@ -69,8 +69,8 @@ test('R220 local Riot overview permits the retry budget and still accepts ordina
  const f=compile(gameplay,['api'],{state,Headers,AbortController,fetch:async(path,options)=>{requests.push({path,accept:options.headers.get('Accept')});return new Response('{"matches":[]}',{headers:{'Content-Type':'application/json'}});},setTimeout:()=>1,clearTimeout:()=>{}});
  const result=await f.api('/api/gameplay/overview?count=10',{onProgress:()=>{}},'current',190000);
  assert.deepEqual(result,{matches:[]});assert.equal(requests[0].accept,'application/x-ndjson');
- assert.match(gameplay,/const requestOverview=async\(requestBody\)=>tab.current && connected\(\)/);
- assert.match(gameplay,/verification.expectGameId[^\n]+\{onProgress\}, requestKey, timeout/);
+ assert.match(gameplay,/const requestOverview=async\(requestBody,noReference=false\)=>/);
+ assert.match(gameplay,/verification.expectGameId[^\n]+\{onProgress,headers:[^\n]+requestKey, timeout/);
 });
 
 test('R220 clicking a live JP player opens a JP overview and keeps rune application unchanged',()=>{

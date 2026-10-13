@@ -676,6 +676,7 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
+	"announcements.go":           1, // Public notice cache; no account, player identity or read state.
 	"collection_retry_cache.go":  1, // R241: declared blank-entry failure digests + 1h expiry; no account/ownership/quantity.
 	"season_head_refresh.go":     1, // R241: existing declared season-stats file, latest GameID/freshness timestamp only; no new directory or source.
 	"arena_squad_store.go":       1, // R230: root arena-squad.json; stores explicitly declares identities and 2h expiry.

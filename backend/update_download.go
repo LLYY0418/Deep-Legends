@@ -91,7 +91,8 @@ func verifyUpdateDigest(actual, expected string) error {
 	return nil
 }
 
-func (u *updateManager) Download() error {
+func (u *updateManager) Download() error { return u.download(false) }
+func (u *updateManager) download(background bool) error {
 	if !licenseOnlineUpdates {
 		return errors.New("当前构建不支持更新")
 	}
@@ -105,6 +106,11 @@ func (u *updateManager) Download() error {
 	if !u.status.Supported {
 		u.mu.Unlock()
 		return errors.New("请从发布页下载完整安装包")
+	}
+	if !background && (u.predownloading || u.status.State == "ready") {
+		u.predownloading = false
+		u.mu.Unlock()
+		return nil
 	}
 	if u.busyLocked() || u.manifest == nil || compareVersions(u.manifest.Version, u.status.Current) <= 0 {
 		u.mu.Unlock()
@@ -124,6 +130,7 @@ func (u *updateManager) Download() error {
 	}
 	ctx, cancel := context.WithCancel(u.ctx)
 	done := make(chan struct{})
+	u.predownloading = background
 	u.downloadCancel, u.downloadDone = cancel, done
 	u.status.State, u.status.Error, u.status.Progress = "downloading", "", updateProgress{TotalBytes: manifest.Asset.Size, SelectingSource: true}
 	mirrors := u.sourcesLocked()
@@ -134,11 +141,17 @@ func (u *updateManager) Download() error {
 
 		defer close(done)
 		defer cancel()
-		err := u.downloadAsset(ctx, manifest.Asset, mirrors)
+		var err error
+		if u.quickDownloads {
+			err = u.downloadAssetQuick(ctx, manifest.Asset, mirrors)
+		} else {
+			err = u.downloadAsset(ctx, manifest.Asset, mirrors)
+		}
 		if ctx.Err() != nil {
 			_ = os.Remove(filepath.Join(u.directory, manifest.Asset.Name+".part"))
 		}
 		u.mu.Lock()
+		u.predownloading = false
 		u.downloadCancel = nil
 		if ctx.Err() != nil {
 			u.status.State, u.status.Error, u.status.Progress = "available", "", updateProgress{}
@@ -396,7 +409,7 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 		}
 	})
 	writer := &updateDownloadWriter{file: file, received: &received, activity: &activity, pulses: pulses, nextPulse: offset + 512*1024}
-	count, copyErr := io.Copy(writer, io.TeeReader(io.LimitReader(response.Body, asset.Size-offset+1), hash))
+	count, copyErr := io.Copy(writer, io.TeeReader(io.LimitReader(updatePredownloadReader{u, ctx, response.Body}, asset.Size-offset+1), hash))
 	close(watchDone)
 	<-watchStopped
 	transfer.received = count

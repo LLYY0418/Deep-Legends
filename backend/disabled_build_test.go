@@ -112,6 +112,7 @@ func TestR248Existing01276ReleaseAsset(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := newUpdateManager("0.12.75", trackTestStore(t, &localStore{root: t.TempDir()}), nil)
+	u.autoPredownload = false // This fixture verifies manifest compatibility; R278 covers automatic transfer separately.
 	defer u.Close()
 	u.status.Portable = false
 	u.sourceDefaults = []string{""}

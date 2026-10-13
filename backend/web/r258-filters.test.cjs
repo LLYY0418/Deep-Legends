@@ -79,7 +79,7 @@ test('R258 P7 common presets capped at 12, replacing names, safe reads/writes',(
  const storage=new Map(),store={getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)};
  for(let i=0;i<12;i++)assert(af.savePreset(store,'筛选'+i,{result:condition(['win'])}));
  assert.equal(af.savePreset(store,'第13条',{hero:condition(['103'])}),false);
- assert(af.savePreset(store,'筛选0',{hero:condition(['103'])}));assert.deepEqual(Object.keys(af.readPresets(store)[0].conditions),['hero']);
+ assert.equal(af.savePreset(store,'筛选0',{hero:condition(['103'])}),false);assert.deepEqual(Object.keys(af.readPresets(store)[0].conditions),['result']);
  const broken={getItem(){throw Error('blocked')},setItem(){throw Error('blocked')}};assert.deepEqual(af.readPresets(broken),[]);assert.equal(af.savePreset(broken,'测试',{result:condition(['win'])}),false);
 });
 
@@ -118,7 +118,7 @@ test('saved filters rename inline because Electron has no window.prompt',()=>{
  q(root,'[data-af-rename="0"]').click();
  const input=q(root,'[data-af-rename-input="0"]');assert.equal(dom.window.document.activeElement,input);assert.equal(input.value,'常用A');
  input.value='常用B';q(root,'[data-af-rename-save="0"]').click();
- assert.deepEqual(errors,['已有同名常用筛选']);assert.equal(af.readPresets(c.storage)[0].name,'常用A');
+ assert.deepEqual(errors,[]);assert.equal(q(root,'[data-af-save-error]').textContent,'已有同名常用筛选');assert.equal(af.readPresets(c.storage)[0].name,'常用A');
  input.value='  排位胜场  ';input.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
  assert.deepEqual(af.readPresets(c.storage).map(p=>p.name),['排位胜场','常用B']);assert(!q(root,'[data-af-rename-input]'));
  assert.equal(q(root,'[data-af-menu]').hidden,false);

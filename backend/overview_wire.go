@@ -50,7 +50,7 @@ func overviewWireFrame(value gameplayOverview, kind string, seen map[int64]strin
 	matches := overviewListMatches(value.Matches)
 	if kind == "complete" {
 		for i, match := range value.Matches {
-			if revision, ok := seen[match.GameID]; ok && revision == match.Revision {
+			if revision, ok := seen[match.GameID]; ok && match.Revision != "" && revision == match.Revision {
 				matches[i] = overviewMatchReference{match.GameID, match.Revision}
 			}
 		}

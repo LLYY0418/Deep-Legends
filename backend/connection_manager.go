@@ -327,6 +327,9 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 					a.sgp.observeTokenEvent(client, event)
 					a.observeClientCatalogVersion(client, event)
 				}
+				if currentTokenClient {
+					a.observeCollectionSkinEvent(sessionCtx, client, event)
+				}
 				a.observeClientShutdownEvent(client, event, time.Now())
 				client.rememberAcceptFocusEvent(event)
 				recordObjectiveEvent(event)

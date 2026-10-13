@@ -28,11 +28,11 @@
 .startup-loading:not([hidden]) ~ .skip-link { visibility: hidden; pointer-events: none; }
 
 .gameplay-panel { min-height: 620px; }
-/* 页面内容作为命名容器：总览布局按实际可用宽度自适应，不再依赖视口断点（避免侧边栏挤压时出现横向滚动条） */
+
 .gameplay-content { padding-top: 16px; container: gameplay-page / inline-size; }
 #live-content { padding-top: 0; }
 .gameplay-panel.is-disconnected { min-height: 0; }
-/* Player group navigation stays reachable even without a connected client. */
+
 
 .player-workspace-head {
   position: sticky;
@@ -76,10 +76,10 @@
   border-radius: 10px;
 }
 
-/* 选中态与「当前登录账号」态必须一眼分得开，所以用两种完全不同的视觉语言：
-   · 选中 = 抬升的实底 + 亮字 + 底部一条粗的主色指示条（形状信号，不依赖配色）
-   · 当前账号 = 左侧一条金色竖条 + 名字前的 ★（见 .is-self）
-   两者叠加时互不遮挡。 */
+
+
+
+
 .player-tab-wrap.is-active {
   color: var(--primary);
   background: color-mix(in oklab,var(--surface-strong) 82%,var(--ink) 8%);
@@ -127,10 +127,10 @@
 
 .player-tab-copy { display: inline-flex; min-width: 0; align-items: center; line-height: 1.35; gap: var(--identity-chip-gap); }
 .player-tab-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 隐藏战绩玩家：名称下方的提示标签 */
+
 .player-tab-hidden { flex: 0 0 auto; width: fit-content; margin-top: 1px; padding: 0 5px; color: var(--warning); background: color-mix(in oklab,var(--warning) 13%,transparent); border: 1px solid color-mix(in oklab,var(--warning) 34%,transparent); border-radius: 5px; font-size: 9px; font-weight: 750; line-height: 1.6; white-space: nowrap; }
-/* 登录账号的页签固定第一：只用左侧金色竖条 + 星标区分，不再整块金色描边，
-   否则会和「选中态」撞在一起分不出来。 */
+
+
 .player-tab-wrap.is-self { background: var(--surface); border-color: transparent; }
 .player-tab-wrap.is-self::before { position: absolute; top: 8px; bottom: 8px; left: 0; width: 3px; background: var(--primary); border-radius: 0 3px 3px 0; content: ""; }
 .player-tab-wrap.is-self.is-active { background: color-mix(in oklab,var(--surface-strong) 82%,var(--ink) 8%); border-color: var(--hex-line); }
@@ -195,30 +195,30 @@
 .summoner-strip-copy .player-live-chip { color: var(--accent); overflow-wrap: anywhere; }
 .player-live-chip time { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* 熟练度与最高段位两列必须逐行对齐：标签行、图像行、名称行、数值行各自共用一条行轨。
-   用 subgrid 而不是给每个元素写死高度——两列的图像本来就不一样高（熟练度是头像+徽章
-   82px，段位徽章 78px），写死高度会把其中一边撑变形。也不能用 display: contents 让
-   figure 消失，那样熟练度那块的 data-tooltip 就没有 hover 目标了。
-   Electron 43 = Chromium 136，subgrid 从 Chromium 117 起就是稳定特性。 */
+
+
+
+
+
 .summoner-strip-highlights { display: grid; min-width: 0; align-self: stretch; align-content: center; grid-auto-flow: column; grid-auto-columns: minmax(92px,auto); grid-template-rows: auto auto auto; gap: 4px 16px; justify-items: center; padding-left: 16px; border-left: 1px solid color-mix(in oklab,var(--line) 75%,transparent); }
 .summoner-highlight { display: grid; min-width: 92px; grid-row: span 3; grid-template-rows: subgrid; margin: 0; justify-items: center; align-items: center; text-align: center; }
 .summoner-highlight figcaption { display: grid; grid-row: span 2; grid-template-rows: subgrid; justify-items: center; align-items: center; line-height: 1.25; }
 .summoner-highlight figcaption strong { max-width: 104px; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .summoner-highlight figcaption small { color: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* 熟练度徽章按客户端的版式：英雄头像完整可见，徽章从头像下缘探出来。
-   头像 z-index 高于徽章，所以徽章顶部那截旗面被头像压住，不会糊住英雄的脸。
-   头像是识别这名英雄的主角，徽章只是等级注脚，所以头像要比徽章明显更大——
-   徽章图本身已经表达了等级，真实等级（可能超过 10）写在下方说明里，
-   不再往徽章上盖一块 Lv 牌，那块牌正好压住徽章下半截的纹样。 */
-/* 熟练度头像徽标块（portrait）的高度必须卡在内容实际占据的高度，不能留白：
-   内容底边 = 徽章 top + 徽章 height。曾经容器比内容高 6px，多出的空白全部沉在
-   容器底部（因为头像贴顶排布），subgrid 行高被这一列撑高后整列"顶满"、没有自动
-   居中的空间，于是上下两侧间距不等、头像像是贴着上一行。容器高度=内容高度后，
-   上下两侧都只吃行间距，天然对称，不用额外加 margin 去凑。
-   ★改徽章尺寸或 top 时，这里的 height 必须跟着重算，测试里有硬等式钉着。
-   头像 52 + 徽章 42（top 36）是"再减一点但还看得清"的下限：头像小于 48px 时
-   英雄脸在圆形裁切里就辨认不出，徽章小于 40px 时旗面纹样糊成一团。 */
+
+
+
+
+
+
+
+
+
+
+
+
+
 .summoner-mastery-portrait { position: relative; display: block; width: 72px; height: 78px; }
 .game-icon.is-summoner-mastery-icon { position: absolute; top: 0; left: 50%; z-index: 2; width: 52px; height: 52px; flex-basis: 52px; transform: translateX(-50%); border: 2px solid color-mix(in oklab,var(--primary) 78%,var(--line)); border-radius: 50%; box-shadow: 0 3px 10px rgb(0 0 0 / .3); }
 .summoner-mastery-crest { position: absolute; top: 36px; left: 50%; z-index: 1; display: block; width: 42px; height: 42px; transform: translateX(-50%); object-fit: contain; filter: drop-shadow(0 2px 4px rgb(0 0 0 / .38)); }
@@ -244,8 +244,8 @@
   .overview-career-entry { display: flex; }
 }
 
-/* When the career column first re-enters, use its established 300px minimum
-   so the match roster does not become narrower than it was in compact mode. */
+
+
 @container gameplay-page (min-width: 1021px) and (max-width: 1300px) {
   .overview-layout { grid-template-columns: 300px minmax(0, 1fr); }
 }
@@ -257,8 +257,8 @@
 
 @container gameplay-page (max-width: 520px) {
 	.summoner-strip { grid-template-columns: auto minmax(0,1fr); }
-	/* 放不下时换到第二行，但仍然靠左、和上面的头像同一条左边缘，不要甩到右边去。
-	   min-width 归零后每块收缩到内容宽度，居中的内容边缘就正好落在头像的左边缘上。 */
+
+
 	.summoner-strip-highlights { grid-column: 1/-1; align-self: auto; justify-content: flex-start; gap: 4px 26px; padding: 9px 0 0; border-top: 1px solid color-mix(in oklab,var(--line) 72%,transparent); border-left: 0; }
 	.summoner-highlight { min-width: 0; }
 }
@@ -342,7 +342,7 @@
 .rank-row small, .rank-record span, .mastery-row small, .champion-stat-row small, .recent-player small { color: var(--muted); font-size: 11px; }
 .rank-row > b { color: var(--muted); font-size: 11px; }
 .rank-record { display: grid; justify-items: end; font-size: 12px; }
-/* 官方彩色段位徽章自带形状与配色，容器不再叠加圆形底 */
+
 .rank-crest { display: grid; width: 44px; height: 44px; place-items: center; color: var(--primary-strong); font-size: 12px; font-weight: 800; }
 .rank-crest.is-unranked { color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 50%; }
 .rank-crest-icon { width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 2px 4px rgb(0 0 0 / .4)); }
@@ -395,13 +395,13 @@
 .rank-milestone strong { overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .rank-milestone div > span { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 
-/* 圆环必须和「平均 K/D/A」永远同一行；「KDA」+「击杀参与率」打包成
-   .recent-ranked-metrics-tail 这一个整体，宽度够就跟着排在同一行，
-   不够就整体掉到下一行——不能只让其中一列换行，那样会把配对读的两个
-   数字拆散，也不能让圆环跟着一起被甩下去（之前的版本就是这样，圆环
-   单独悬在上面、下面空出一整行三列，被用户吐槽"太丑"）。
-   实测：总览左栏卡片内宽 338px，减 24px 内边距 = 314px；圆环 88px + 间距
-   11px = 99px，剩给指标区 215px，用来判断 tail 能不能跟第一列同行。 */
+
+
+
+
+
+
+
 .recent-ranked-content { display: flex; min-width: 0; align-items: center; gap: 11px; padding: 12px; }
 .recent-ranked-content > .recent-ranked-record { flex: 0 0 88px; }
 .recent-ranked-content > .recent-ranked-metrics { flex: 1 1 auto; min-width: 0; }
@@ -414,18 +414,18 @@
 .recent-ranked-record > small { display: flex; gap: 7px; font-size: 9px; font-style: normal; }
 .recent-ranked-record > small b { color: var(--success); }
 .recent-ranked-record > small i { color: var(--danger); font-style: normal; font-weight: 700; }
-/* 指标按真实内容定宽（flex 自然尺寸，等效 max-content），不压缩、不省略号。
-   .recent-ranked-metrics-tail 是「KDA」「击杀参与率」共用的 flex 子项，
-   对外层换行算法来说它是不可拆分的原子单元：要么整个跟着第一列排在同一行，
-   要么整个掉到下一行，绝不会出现只掉一列、另一列还留在上面的情况。 */
+
+
+
+
 .recent-ranked-metrics { display: flex; flex-wrap: wrap; min-width: 0; align-items: center; column-gap: 0; row-gap: 6px; margin: 0; }
-/* flex-grow: 1（而不是 0）让「平均K/D/A」和 tail 在有富余宽度时（比如生涯统计
-   弹窗，两栏平分 960px 宽的对话框，圆环+三列吃不满整行）各自把多出来的空间
-   吸收掉、把分隔线往右推开，不再挤成一坨；flex-shrink 仍然钉死在 0，
-   宽度不够时行为跟以前完全一样（不会被压缩出截断，只是不再有多余空间可占）。
-   tail 和「平均K/D/A」的 grow 权重都是 1：因为 tail 内部两列自己还要再分一次，
-   平均K/D/A 单独吃一整份、KDA+击杀参与率两个只各分半份，这也顺带回应了
-   "平均K/D/A 感觉该再宽一点"——它本来就该比另外两列分到更多余量。 */
+
+
+
+
+
+
+
 .recent-ranked-metrics-tail { display: flex; flex: 1 0 auto; min-width: 0; }
 .recent-ranked-metric { display: grid; flex: 1 0 auto; min-width: 0; min-height: 52px; align-content: center; padding: 0 7px; border-left: 1px solid var(--line); cursor: help; }
 .recent-ranked-metrics > .recent-ranked-metric:first-child { border-left: 0; }
@@ -464,18 +464,18 @@
 @container career-dialog (max-width: 260px) {
 	.rank-milestones { grid-template-columns: minmax(0,1fr); }
 	.rank-milestone + .rank-milestone { border-top: 1px solid var(--line); border-left: 0; }
-	/* 弹窗窄到这个程度，圆环也没法再跟指标凑一行了：三项数据整体收成竖排，
-	   平均K/D/A、KDA、击杀参与率各自独占一行，border-top 当分隔线。
-	   flex-direction 改 column 让 tail 里的 KDA/击杀参与率也各占一行，
-	   不再维持"打包同行"的效果——这个宽度下打包也放不下，不如老实竖排。 */
+
+
+
+
 	.recent-ranked-metrics, .recent-ranked-metrics-tail { flex-direction: column; }
 	.recent-ranked-metric { min-height: 46px; grid-template-columns: minmax(0,1fr) auto; align-items: center; border-left: 0; border-top: 1px solid var(--line); }
 	.recent-ranked-metrics > .recent-ranked-metric:first-child { border-top: 0; }
-	/* 260px 时"平均 K / D / A"标签本身就有 5 个字符+2 个斜杠，`auto` 值列会先
-	   按内容定宽把剩下的空间挤给 1fr 的标签列，实测标签只分到 47px 却需要
-	   57px，被 white-space:nowrap 强行截断成"平均 K / …"。这个宽度已经窄到
-	   放不下"标签+数值同一行都不截断"了，索性放开标签换行，用两行换空间，
-	   彻底不截断（数值那一列本来就不长，不受影响）。 */
+
+
+
+
+
 	.recent-ranked-metric dt { overflow: visible; white-space: normal; text-overflow: clip; }
 	.recent-ranked-metric dd { margin-top: 0; }
 }
@@ -632,12 +632,12 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 :root { --match-roster-width: clamp(150px,18cqi,190px); }
 .matches-column { container: matches-column / inline-size; }
 .match-entry { min-height: 118px; contain-intrinsic-size: 118px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-/* R230: let Chromium defer layout/paint of offscreen history cards. The
-   Performance trace showed 200ms spent laying out all 200 cards during a
-   tab-scroll rAF read. auto remembers each card's measured height on revisit. */
-/* R258: 124px is the measured collapsed first card at 863px width. Each list
-   observes one visible summary to adjust for its actual width/mode; auto keeps
-   the measured size of each expanded/revisited card. Total DOM is unchanged. */
+
+
+
+
+
+
 .match-list > .match-entry { content-visibility:auto; contain-intrinsic-size:auto var(--match-row-height,124px); }
 .overview-share-surface .match-entry { content-visibility:visible; contain-intrinsic-size:none; }
 .match-entry.is-win { background: color-mix(in oklab,var(--accent) 17%,var(--surface)); border-color: color-mix(in oklab,var(--accent) 55%,var(--line)); box-shadow: inset 4px 0 0 var(--accent); }
@@ -648,7 +648,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-detail-failure strong { color: var(--ink); font-size: 11px; }
 .match-detail-failure small { overflow-wrap: anywhere; font-size: 10px; }
 .match-detail-failure .text-button { min-height: 30px; flex: 0 0 auto; }
-/* 名单轨道在同一容器内统一宽度，沿用现有断点与最大宽度。 */
+
 .match-summary { display: grid; grid-template-columns: 108px minmax(0,1fr) var(--match-roster-width,clamp(150px,18cqi,190px)) 40px; align-items: center; gap: 8px; min-height: 118px; padding: 10px 10px 10px 14px; }
 .match-summary.is-arena { grid-template-columns: 108px minmax(220px,1fr) var(--match-roster-width,clamp(150px,18cqi,190px)) 40px; }
 .match-result-meta { display: grid; align-self: stretch; align-content: center; padding-right: 10px; border-right: 1px solid var(--line); }
@@ -658,18 +658,18 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-result-meta time, .match-result-meta small { color: var(--muted); font-size: 11px; }
 .match-result-meta time { cursor: help; }
 .result-word { display: flex; min-width: 0; align-items: center; gap: 6px; margin-top: 8px; overflow: hidden; color: var(--accent); font-weight: 750; }
-/* 排位胜点变化：仅单双排 / 灵活组排且本地记录到时展示 */
+
 .lp-delta { flex: 0 0 auto; padding: 1px 5px; border-radius: 5px; font-size: 10.5px; font-style: normal; font-weight: 800; cursor: help; font-variant-numeric: tabular-nums; }
 .lp-delta.is-gain { color: var(--success); background: color-mix(in oklab,var(--success) 16%,transparent); }
 .lp-delta.is-drop { color: var(--danger); background: color-mix(in oklab,var(--danger) 15%,transparent); }
-/* 中部主区：第一行 英雄+技能符文 / KDA / 数据列，第二行装备栏 + 徽章。
-   中列弹性伸缩，装备和标签使用全部宽度；统计项保持紧凑间距。 */
+
+
 .match-main { display: grid; align-self: start; min-width: 0; grid-template-columns: minmax(0,auto) minmax(96px,1fr) minmax(188px,1.4fr); align-items: center; gap: 9px 22px; }
 .match-main.is-arena { grid-template-columns: minmax(0,auto) minmax(96px,1fr) minmax(188px,1.4fr); }
 .match-champion { position: relative; display: grid; min-width: 0; min-height: 63px; grid-template-columns: 58px minmax(0,auto); align-items: center; gap: 7px; }
 .champion-level { position: absolute; top: 44px; left: 40px; display: grid; width: 22px; height: 22px; place-items: center; color: white; background: #171717; border-radius: 50%; font-size: 10px; }
-/* 各模式共用两行两列的外框尺寸，空槽也占同样宽度，后面的 KDA / 数据列才能对齐。
-   召唤师技能一列、主副系符文一列；斗魂为四个海克斯，海斗为技能+海克斯。 */
+
+
 .match-loadout-mini { --match-loadout-size: 28px; display: grid; width: calc(2 * var(--match-loadout-size) + 3px); min-height: 63px; grid-auto-flow: column; grid-template-columns: repeat(2,var(--match-loadout-size)); grid-template-rows: repeat(2,var(--match-loadout-size)); gap: 3px; }
 .match-loadout-mini > .game-icon.is-small, .match-loadout-mini > .arena-augment-icon, .match-loadout-mini > .match-loadout-slot, .match-loadout-mini > .arena-augment-slot { width: var(--match-loadout-size); height: var(--match-loadout-size); flex-basis: var(--match-loadout-size); }
 .match-loadout-mini > .arena-augment-icon > .game-icon.is-small { width: 100%; height: 100%; flex-basis: 100%; }
@@ -679,10 +679,10 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-kda strong { min-width: 0; max-width: 100%; overflow: hidden; font-size: 17px; text-overflow: ellipsis; white-space: nowrap; }
 .match-kda em { color: var(--danger); font-style: normal; }
 .match-kda small { max-width: 96px; color: var(--muted); font-size: 11px; line-height: 1.25; text-align: center; white-space: normal; }
-/* 数据列：按模式展示参团、补刀、段位或伤害数据，悬停有完整说明；
-   数值在定宽的数据块内对齐，不随标签展示区加宽而被推到中部末端。 */
-/* R132 P3：数据列定宽。平均段位异步回填（「…」→「💠 铂金 III」）时列宽不能跟着内容变，
-   否则同一页里已回填和未回填的卡片，参团率/CS 的数值会左右错位。 */
+
+
+
+
 .match-stats { display: grid; align-content: start; grid-template-rows: repeat(3,18px); gap: 5px; width: 188px; max-width: 100%; min-height: 54px; min-width: 0; justify-self: start; padding-left: 18px; border-left: 1px solid var(--line); }
 .match-stats.is-arena { align-content: start; grid-template-rows: repeat(3,18px); min-height: 54px; }
 .match-stat { display: grid; min-width: 0; grid-template-columns: 72px minmax(0,1fr); align-items: baseline; gap: 8px; font-size: 11px; cursor: help; white-space: nowrap; }
@@ -698,7 +698,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-tier-unknown { color: var(--faint); font-weight: 600; }
 .match-build { display: flex; min-width: 0; grid-column: 1 / -1; flex-wrap: nowrap; align-items: center; gap: 6px 12px; }
 .match-items { display: flex; flex: 0 0 auto; align-items: center; gap: 3px; }
-/* 装备槽：按原始槽位渲染，空位保留暗色占位框；第 7 格为饰品（圆形、留间隔） */
+
 .item-slot { position: relative; display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; }
 .item-slot.is-empty { background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 7px; opacity: .5; }
 .item-slot.is-trinket { margin-left: 7px; }
@@ -709,14 +709,14 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .table-items, .selected-rune-strip { display: flex; min-width: 0; flex-wrap: wrap; gap: 3px; }
 .match-badges { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; }
 .match-badges span { display: inline-flex; min-height: 18px; align-items: center; justify-content: center; padding: 1px 6px; color: var(--bg); background: var(--primary-strong); border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1; }
-/* 本场评分排名：前三名金 / 银 / 铜，其余中性配色 */
+
 .match-rank-chip { display: inline-flex; min-height: 18px; align-items: center; justify-content: center; padding: 1px 6px; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 6px; font-size: 10px; font-style: normal; font-weight: 800; line-height: 1; letter-spacing: .4px; cursor: help; font-variant-numeric: tabular-nums; }
 .match-rank-chip.is-rank-1 { color: var(--on-primary); background: linear-gradient(120deg,var(--medal-gold-start),var(--medal-gold-end)); border-color: transparent; }
 .match-rank-chip.is-rank-2 { color: #171C22; background: linear-gradient(120deg,var(--medal-silver-start),var(--medal-silver-end)); border-color: transparent; }
 .match-rank-chip.is-rank-3 { color: #2B190E; background: linear-gradient(120deg,var(--medal-bronze-start),var(--medal-bronze-end)); border-color: transparent; }
-/* 补位标签：与评分 chip 同族尺寸，用警告色说明「这条分路不是他自己选到的」 */
+
 .match-autofill-chip { display: inline-flex; flex: none; min-height: 18px; align-items: center; justify-content: center; padding: 1px 6px; color: var(--warning); background: color-mix(in oklab,var(--warning) 16%,transparent); border: 1px solid color-mix(in oklab,var(--warning) 45%,transparent); border-radius: 6px; font-size: 10px; font-style: normal; font-weight: 800; line-height: 1; letter-spacing: .4px; white-space: nowrap; cursor: help; }
-/* 单场评分与 MVP / SVP 徽章 */
+
 .match-score { min-width: 30px; padding: 1px 6px; color: var(--ink); background: var(--surface-strong); border-radius: 6px; font-size: 11px; font-style: normal; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
 .match-score.is-gold { color: var(--on-primary); background: var(--primary); }
 .match-score.is-good { color: var(--success); background: color-mix(in oklab,var(--success) 16%,transparent); }
@@ -728,14 +728,14 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-score-value, .match-score-badge { display: grid; min-width: 0; justify-items: end; }
 .match-score-badge { min-height: 18px; }
 .match-build > .match-score-cell { flex: 0 0 86px; justify-content: center; }
-/* 两队等分固定名单宽度；列间距保持 14px。 */
+
 .match-players { display: grid; width: 100%; min-width: 0; grid-template-columns: repeat(2,minmax(0,1fr)); justify-self: end; gap: 2px 14px; align-self: center; }
 .match-team-list { display: grid; gap: 1px; }
 .match-team-list button { display: flex; min-width: 0; align-items: center; gap: 5px; padding: 0; overflow: hidden; color: var(--muted); background: transparent; border: 0; font-size: 10.5px; text-align: left; }
 .match-team-list button:hover:not(:disabled) { color: var(--ink); }
 .match-team-list button:disabled { cursor: not-allowed; opacity: .62; }
 .match-team-list button span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 斗魂竞技场：卡片正面按名次预览前四队，展开详情展示全部队伍。 */
+
 .match-players.is-arena { display: grid; width: var(--match-roster-width,clamp(150px,18cqi,190px)); max-height: 98px; min-width: 0; grid-template-columns: minmax(0,1fr); gap: 2px; align-content: center; overflow: hidden; }
 .arena-team-row-compact { display: grid; min-width: 0; grid-template-columns: 18px minmax(0,1fr); align-items: center; gap: 4px; padding: 1px 5px; background: color-mix(in oklab,var(--bg) 50%,transparent); border: 1px solid var(--line); border-radius: 6px; }
 .arena-team-row-compact.is-first { border-color: color-mix(in oklab,var(--medal-gold-end) 55%,var(--line)); box-shadow: inset 2px 0 0 var(--medal-gold-end); }
@@ -746,7 +746,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .arena-team-roster { display: grid; min-width: 0; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
 .arena-team-roster button { display: flex; min-width: 0; align-items: center; gap: 4px; padding: 0; overflow: hidden; color: var(--muted); background: transparent; border: 0; font-size: 9.5px; text-align: left; }
 .arena-team-roster button span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 两人小队只有两个名字：一个靠左、一个靠右，避免右侧空出一整列。 */
+
 .arena-team-roster[data-team-size="2"] { display: flex; justify-content: space-between; gap: 8px; }
 .arena-team-roster[data-team-size="2"] button { flex: 0 1 auto; max-width: calc(50% - 4px); }
 .match-loadout-mini.is-augments { grid-auto-flow: row; grid-auto-columns: auto; }
@@ -763,13 +763,13 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .arena-augment-icon:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .arena-augment-slot { display: block; width: 26px; height: 26px; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 7px; }
 .arena-augment-slot.is-empty { opacity: .35; }
-/* 竞技场详情：按名次分组的小队卡与伤害对比 */
+
 .team-overview.is-arena > header strong { color: var(--muted); }
 .team-overview.is-arena.is-first > header strong { color: var(--primary-strong); }
 .team-overview.is-arena.is-top > header strong { color: var(--accent); }
 .damage-compare.is-arena .damage-team h4 { color: var(--muted); }
 .damage-compare.is-arena .damage-team:first-child h4 { color: var(--primary-strong); }
-/* 设计稿：右侧操作列，展开与回放按钮高度约 3:1，悬停浮起 */
+
 .match-actions { display: flex; align-self: stretch; width: 40px; flex-direction: column; gap: 4px; }
 .match-actions button { display: grid; width: 100%; place-items: center; padding: 0; color: var(--accent); background: color-mix(in oklab,var(--accent) 11%,transparent); border: 1px solid color-mix(in oklab,var(--accent) 26%,transparent); border-radius: 9px; transition: transform 150ms ease-out, background-color 150ms ease-out, color 150ms ease-out, box-shadow 150ms ease-out; }
 .match-actions svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
@@ -826,10 +826,10 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 	.match-summary.is-arena .match-actions { grid-column: 2; grid-row: 1; }
 }
 
-/* `.shell` caps the page at 1580px, so a 2304px window yields a
-   `.matches-column` of about 1124px.  Use measured, reachable container
-   breakpoints; desktop rosters override the max-width fallback while the
-   compact layout below 900px stays unchanged. */
+
+
+
+
 @container matches-column (min-width: 900px) {
 	.match-summary {
 		--match-roster-width: clamp(150px,18cqi,190px);
@@ -891,7 +891,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .team-overview.is-red > header strong { color: var(--danger); }
 .table-scroll { overflow-x: auto; }
 .match-table { width: 100%; min-width: 920px; table-layout: fixed; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
-/* Both teams use these seven tracks; names and missing items cannot resize one team. */
+
 .match-col-player { width: 24%; }
 .match-col-score { width: 13%; }
 .match-col-kda { width: 12%; }
@@ -914,7 +914,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 .team-analysis-grid { display: grid; grid-template-columns: repeat(3,minmax(150px,1fr)); gap: 7px; }
 .team-metric { min-width: 0; padding: 12px; background: color-mix(in oklab,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
-/* 红蓝双色对峙条：单元素渐变实现，蓝方在左、红方在右，长度即占比 */
+
 .team-metric-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .team-metric-head h4 { margin: 0; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .team-metric-value { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -927,12 +927,11 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .build-detail > section { overflow: hidden; background: color-mix(in oklab,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
 .build-detail > section > :not(header) { margin: 12px; }
 .detail-empty { padding: 22px; color: var(--muted); text-align: center; }
-.detail-empty { padding: 22px; color: var(--muted); text-align: center; }
 .detail-empty strong { color: var(--ink); }
 .detail-empty p { margin: 3px 0 0; }
 .detail-empty.compact { padding: 8px; }
 
-/* 装备路线：按分钟分组，组间箭头衔接；出售的装备降饱和并画斜线 */
+
 .timeline-route { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; row-gap: 12px; }
 .timeline-group { display: grid; justify-items: center; gap: 3px; }
 .timeline-group-items { display: flex; flex-wrap: wrap; gap: 3px; padding: 4px; background: color-mix(in oklab,var(--surface-strong) 62%,transparent); border: 1px solid var(--line); border-radius: 9px; }
@@ -942,8 +941,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .timeline-item.is-sold::after { position: absolute; top: 50%; right: 2px; left: 2px; height: 2px; background: var(--danger); border-radius: 2px; content: ""; transform: rotate(-45deg); }
 .timeline-arrow { align-self: center; margin-top: -14px; color: var(--muted); font-size: 15px; }
 
-/* 战绩详情的技能加点序列：一格一次加点（字母按技能着色 + 第几级）。
-   注意类名不能叫 .skill-order —— 对局页的技能顺序网格已占用该名。 */
+
+
 .match-skill-seq { display: flex; flex-wrap: wrap; gap: 3px; }
 .match-skill-cell { display: grid; width: 30px; height: 40px; place-items: center; align-content: center; background: color-mix(in oklab,var(--bg) 62%,transparent); border: 1px solid var(--line); border-radius: 6px; }
 .match-skill-cell b { font-size: 12px; }
@@ -958,7 +957,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-skill-priority b.is-slot-2 { color: var(--success); }
 .match-skill-priority b.is-slot-3 { color: #b48cf2; }
 
-/* 目录未加载时的占位图标：不发请求，安静等待目录就绪后重绘 */
+
 .game-icon.is-pending { background: color-mix(in oklab,var(--surface-strong) 68%,transparent); }
 
 .rune-loading-copy { margin-top: 8px; }
@@ -966,9 +965,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .game-icon { position: relative; display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; overflow: hidden; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 8px; font-size: 10px; }
 .game-icon > span { position: absolute; }
 .game-icon img { position: relative; z-index: 1; display: block; width: 100%; height: 100%; object-fit: cover; }
-/* 去掉英雄方形头像源图自带的一圈暗角：暗角实测从半径 0.42w 起才开始压暗，
-   放大 1.18 倍后可视区只剩中心 85%，正好整片落在暗角内侧。数值推导与踩过的坑
-   见 gameplay.js 里 iconFigure 上方的注释，别改成"看着差不多"的数。 */
+
+
+
 .game-icon.is-champion-art img { transform: scale(1.18); }
 .game-icon.is-tiny { flex-basis: 18px; width: 18px; height: 18px; border: 0; border-radius: 4px; }
 .game-icon.is-small { flex-basis: 26px; width: 26px; height: 26px; border-radius: 6px; }
@@ -982,7 +981,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .opgg-escape { display: grid; justify-items: center; gap: 8px; margin-top: 10px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); text-align: center; }
 .opgg-escape p { margin: 0; color: var(--muted); font-size: 12px; }
 
-/* ---------- 覆盖层：非总览页内查看玩家总览 ---------- */
+
 .player-overlay { position: absolute; top: var(--topbar-height); right: 0; bottom: 0; left: 0; z-index: 19; display: flex; flex-direction: column; background: var(--bg); }
 .app-main { position: relative; }
 .player-overlay-bar { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; min-height: 48px; padding: 6px clamp(18px, 3.2vw, 52px); background: var(--bg); border-bottom: 1px solid var(--line); }
@@ -1004,7 +1003,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .gameplay-skeleton span { min-height: 126px; background-color: var(--skeleton-base); background-image: linear-gradient(100deg,var(--skeleton-base) 20%,var(--skeleton-glint) 42%,var(--skeleton-base) 64%); background-size: 220% 100%; border-radius: var(--radius-md); animation: skeleton 1.3s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .gameplay-skeleton span { animation: none; background-image: none; } }
 
-/* 设计稿：阶段与队列信息放在“刷新对局”同一行的左侧 */
+
 .live-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; margin-bottom: 10px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .live-toolbar [data-live-status] { min-width: 0; flex: 0 1 auto; }
 .live-toolbar [data-live-status]:empty { display: none; }
@@ -1142,7 +1141,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 @container recommendation-area (min-width: 701px) {
   .recommendation-tab-row:has([data-lane-matchup-card]) .recommendation-tabs button { min-width: clamp(76px,12cqw,150px); }
 }
-/* 页签内加载遮罩：只盖住 tab 栏下方的这块面板，tab 栏与其上方内容照常可用。 */
+
 .recommendation-panel { position: relative; min-width: 0; min-height: 220px; }
 .recommendation-panel.is-loading { min-height: min(420px,calc(60dvh / var(--ui-zoom, 1))); }
 .recommendation-panel.is-loading > :not(.panel-loading) { display: none; }
@@ -1159,7 +1158,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .panel-loading-content { display: grid; width: 100%; min-height: min(220px,100%); max-height: min(220px,100%); place-content: center; justify-items: center; gap: 10px; padding: 24px; text-align: center; }
 .panel-loading strong { color: var(--ink); font-size: 13px; letter-spacing: 0; }
 .panel-loading small { max-width: 46ch; color: var(--muted); font-size: 10.5px; line-height: 1.6; }
-/* 双环反向旋转 + 主色渐隐描边，和整体的六边形金色主题一致 */
+
 .panel-spinner { position: relative; display: block; width: 42px; height: 42px; }
 .panel-spinner::before, .panel-spinner::after { position: absolute; inset: 0; border-radius: 50%; content: ""; }
 .panel-spinner::before {
@@ -1284,7 +1283,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .rune-detail .unified-rune-board { --rune-icon-size: 30px; --rune-style-icon-width: 28px; --rune-style-icon-height: 35px; --rune-header-height: 46px; --rune-row-height: 46px; min-height: 252px; }
 .unified-rune-column { display: grid; min-width: 0; grid-template-rows: var(--rune-header-height) repeat(4,var(--rune-row-height)); align-content: center; justify-items: center; padding: 10px 12px 12px; }
 .unified-rune-column + .unified-rune-column { border-left: 1px solid var(--line); }
-/* 符文系 SVG 是 24:30 的纵向资源，按 32x40 完整展示；普通符文仍保持 32x32。 */
+
 .unified-rune-column > header { display: flex; box-sizing: border-box; width: 100%; height: var(--rune-header-height); min-height: var(--rune-header-height); align-items: center; justify-content: center; padding: 6px 0; }
 .game-icon.is-rune-style { flex: 0 0 auto; flex-basis: var(--rune-style-icon-width); width: var(--rune-style-icon-width); height: var(--rune-style-icon-height); max-width: 100%; overflow: hidden; background: transparent; border: 0; border-radius: 0; }
 .unified-rune-column > header > .game-icon.is-rune-style { box-sizing: border-box; flex: 0 0 var(--rune-style-icon-width); width: var(--rune-style-icon-width); min-width: var(--rune-style-icon-width); max-width: var(--rune-style-icon-width); height: var(--rune-style-icon-height); min-height: var(--rune-style-icon-height); max-height: var(--rune-style-icon-height); }
@@ -1336,13 +1335,13 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .rune-option-button.is-selected .game-icon { opacity: 1; filter: none; }
 .rune-option-button.is-selected .game-icon { outline: 2px solid var(--primary); outline-offset: 2px; }
 .rune-shards .rune-option-button { width: var(--rune-icon-size); height: var(--rune-icon-size); }
-/* “详情”页签：队伍卡内嵌每名玩家的最近战绩小卡 */
+
 .live-teams.is-insight { padding-top: 0; }
 .live-teams.is-insight:not(.is-arena) { grid-template-rows: auto repeat(10,auto); }
 .live-teams.is-insight:not(.is-arena) > .live-team { display: grid; grid-row: 1 / span 11; grid-template-rows: subgrid; }
 .live-teams.is-insight:not(.is-arena) > .live-team > header { grid-row: 1; }
 .live-teams.is-insight:not(.is-arena) .live-player-list.is-insight { display: contents; }
-/* R193：隐藏玩家没有历史行；按各队内容排布，避免缺行使 subgrid 后续卡片错位。 */
+
 .live-teams.is-insight:not(.is-arena):has(.live-player.is-hidden) { grid-template-rows: none; }
 .live-teams.is-insight:not(.is-arena):has(.live-player.is-hidden) > .live-team { display: block; grid-row: auto; }
 .live-teams.is-insight:not(.is-arena):has(.live-player.is-hidden) .live-player-list.is-insight { display: grid; }
@@ -1377,7 +1376,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 
 
-/* 队伍分析：逐人伤害与承伤 */
+
 .damage-compare { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin-top: 7px; }
 .damage-team { padding: 12px; background: color-mix(in oklab,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
 .damage-team-head { display: flex; min-height: 30px; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
@@ -1396,7 +1395,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .damage-bar.is-blue i { background: var(--accent); }
 .damage-bar.is-red i { background: var(--danger); }
 
-/* 普通 5v5 逐人对抗：头像固定在外侧，两队数值与进度条向中线对照。 */
+
 .team-contribution { min-width: 0; margin-top: 7px; padding: 10px 12px 12px; background: color-mix(in oklab,var(--bg) 56%,transparent); border: 1px solid var(--line); border-radius: 10px; }
 .team-analysis-metrics { display: flex; min-width: 0; gap: 4px; padding: 0 0 9px; overflow-x: auto; border-bottom: 1px solid var(--line); overscroll-behavior-x: contain; scrollbar-width: none; }
 .team-analysis-metrics::-webkit-scrollbar { display: none; }
@@ -1426,13 +1425,13 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .recommendation-empty { padding: 20px 14px; color: var(--muted); text-align: center; }
 .recommendation-empty strong { color: var(--ink); }
 .recommendation-empty p { max-width: 60ch; margin: 3px auto 0; }
-/* 三个页签共用的整块空状态：图标 + 居中提示，位置完全一致 */
+
 .recommendation-empty.is-panel { display: grid; min-height: 380px; place-items: center; align-content: center; gap: 9px; padding: 32px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .recommendation-empty.is-panel > span { display: grid; width: 58px; height: 58px; place-items: center; color: var(--primary-strong); background: var(--primary-soft); border-radius: 50%; font-size: 28px; }
 .recommendation-empty.is-panel strong { font-size: 16px; }
 .recommendation-empty.is-panel p { margin: 0; }
 
-/* “对局”页签的新对局提示：随主题主色呼吸 */
+
 .live-beacon { position: absolute; top: 50%; right: 9px; width: 9px; height: 9px; background: var(--primary); border-radius: 50%; box-shadow: 0 0 0 0 color-mix(in oklab,var(--primary) 55%,transparent); animation: beacon-breathe 1.8s ease-in-out infinite; pointer-events: none; transform: translateY(-50%); }
 :root[data-sidebar="collapsed"] #section-live { overflow: visible; }
 :root[data-sidebar="collapsed"] #section-live .live-beacon { right: 7px; }
@@ -1442,12 +1441,12 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .live-beacon { animation: none; } }
 
-/* 回放按钮忙碌态：图标保持不变，仅降透明度提示处理中 */
+
 .match-replay.is-busy svg { opacity: .35; }
 .match-replay.is-busy { position: relative; }
 .match-replay.is-busy::after { position: absolute; width: 14px; height: 14px; border: 2px solid color-mix(in oklab,currentColor 30%,transparent); border-top-color: currentColor; border-radius: 50%; content: ""; animation: spin .8s linear infinite; }
 .recommendation-action { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 10px; padding: 11px 13px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-/* Keep the action against the same scrollport edge even at the end of the page. */
+
 .shell:has(#live-panel:not([hidden]) .recommendation-panel:not([hidden]) > .recommendation-action) { padding-bottom: 0; }
 .recommendation-action > div { display: grid; }
 .recommendation-action span { color: var(--muted); font-size: 10px; }
@@ -1460,8 +1459,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .build-recommendation-heading { display: flex; min-height: 44px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
 .build-recommendation-heading h3 { margin: 0; font-size: 13px; }
 
-/* 三块摘要（召唤师技能 / 出门装 / 鞋子）按各自内容占宽，不再强行等宽；
-   宽度不够时让摘要区整块换行，图标始终保持固定尺寸。 */
+
+
 .build-summary-bar { display: grid; grid-template-columns: repeat(3,minmax(0,auto)); grid-template-rows: repeat(2,minmax(0,auto)); overflow: visible; border-bottom: 1px solid var(--line); }
 .build-summary-bar > section { min-width: 0; padding: 12px 15px; }
 .build-summary-bar > section + section { border-left: 1px solid var(--line); }
@@ -1492,7 +1491,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .build-recommendation h3 { margin: 0 0 10px; font-size: 13px; }
 .skill-plan { min-width: 0; }
 .skill-priority { display: flex; min-width: 0; flex: 1 1 0; flex-wrap: nowrap; gap: 7px; }
-/* 技能图标与右侧选取率/胜率/场次同一行，垂直居中对齐 */
+
 .skill-priority-row { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px 16px; margin-bottom: 10px; }
 .skill-priority-row > .option-stats { flex: 0 0 auto; margin: 0; }
 .skill-icon-button { position: relative; display: grid; min-width: 0; flex: 0 1 auto; overflow: hidden; grid-template-columns: minmax(0,42px) minmax(0,1fr); align-items: center; gap: 7px; padding: 4px 8px 4px 4px; color: var(--ink); background: var(--surface-strong); border: 0; border-radius: 8px; font-size: 9px; }
@@ -1525,9 +1524,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .late-option-band.is-prismatic h3 { color: var(--rarity-prismatic-a); }
 .build-group-empty { min-height: 66px; margin: 0; display: grid; place-items: center; color: var(--faint); font-size: 11px; text-align: center; }
 .config-option-list { display: grid; gap: 6px; }
-/* 选用率/胜率始终与图标同一行靠右 */
+
 .config-option { display: flex; min-width: 0; min-height: var(--build-row-height, 60px); flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 1px 8px; background: color-mix(in oklab,var(--bg) 55%,transparent); border-radius: 8px; }
-/* 装备图标固定 42px；列宽不足时由外层装备分组换行，图标排本身不换行。 */
+
 .config-icons { display: flex; min-width: 0; flex: 0 0 auto; flex-wrap: nowrap; align-items: center; gap: 6px; overflow: visible; --option-icon-size: 42px; }
 .config-option.is-route .config-icons { flex-wrap: nowrap; overflow: visible; }
 .skill-plan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -1597,13 +1596,13 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .live-augment-column > div { grid-template-columns: minmax(0,1fr); }
 }
 
-/* 推荐区是独立的 inline-size 容器；这些规则必须按面板宽度而不是窗口宽度触发。 */
+
 @container recommendation-area (min-width: 1081px) {
   .build-core-ranking-row.is-mayhem-build-row { grid-template-columns: minmax(0,.75fr) minmax(0,1.25fr); }
   .build-core-ranking-row.is-mayhem-build-row > .live-item-ranking { align-self: stretch; border-top: 0; border-left: 1px solid var(--line); }
   .build-core-ranking-row.is-mayhem-build-row > .live-item-ranking > header { min-height: 41px; padding-block: 8px; }
   .build-core-ranking-row .build-item-row { grid-template-columns: minmax(0,1fr); }
-  /* 单列：核心装（三件套 + 箭头）比第四/五/六件宽；海斗行容器本身较窄，保持原来的固定宽度。 */
+
   .build-core-ranking-row:not(.is-mayhem-build-row) .build-item-row[data-depth-count="1"] { grid-template-columns: minmax(340px,1.5fr) minmax(0,1fr); }
   .build-core-ranking-row:not(.is-mayhem-build-row) .build-item-row[data-depth-count="2"] { grid-template-columns: minmax(340px,1.5fr) repeat(2,minmax(0,1fr)); }
   .build-core-ranking-row:not(.is-mayhem-build-row) .build-item-row[data-depth-count="3"] { grid-template-columns: minmax(340px,1.5fr) repeat(3,minmax(0,1fr)); }
@@ -1727,7 +1726,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .mini-loading { animation: none; }
 }
 
-/* 推荐区按容器宽度自适应：仅超宽容器才让两套符文并排，避免拥挤裁切 */
+
 @container (min-width: 1620px) {
   .rune-choice-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .rune-choice-card + .rune-choice-card { border-top: 0; border-left: 1px solid var(--line); }
@@ -1739,7 +1738,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .config-option { flex-wrap: nowrap; }
 }
 
-/* 经典排位详情在中等宽度仍保留双方并排；只有真正窄屏才退出 subgrid 并上下堆叠。 */
+
 @container recommendation-area (max-width: 840px) {
   .live-teams.is-insight:not(.is-arena) {
     grid-template-columns: minmax(0,1fr);
@@ -1805,7 +1804,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .live-arena-build-section.is-prismatic .arena-option-main > strong { font-size: 12px; }
 }
 
-/* 极窄窗口仍保留完整三件套；仅将统计信息移到下一行，装备图标不缩放也不拆行。 */
+
 @container build-recommendation (max-width: 360px) {
   .build-summary-bar .config-option { column-gap: 10px; padding-inline: 4px; }
   .item-core-column .config-option { align-items: stretch; flex-direction: column; gap: 6px; padding-block: 7px; }
@@ -1817,13 +1816,13 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 #overview-refresh.is-loading::before { content: ""; width: 12px; height: 12px; flex: 0 0 12px; border: 2px solid currentcolor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
 .overview-refreshing { position: sticky; right: 12px; bottom: 12px; z-index: 8; display: flex; width: fit-content; max-width: calc(100% - 24px); align-items: center; gap: 8px; margin: -36px 12px 12px auto; padding: 8px 11px; color: var(--ink); background: color-mix(in oklab,var(--surface) 92%,transparent); border: 1px solid var(--hex-line); border-radius: 8px; box-shadow: 0 8px 22px rgb(0 0 0 / .22); font-size: 10.5px; }
 
-/* Ranked role badges remain inside the player identity column. */
+
 .live-recent-positions { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-top:6px; font-size:12px; line-height:1.5; }
 .live-position-label { color:var(--ink); font-weight:600; white-space:nowrap; }
 .live-position-sample { display:inline-flex; align-items:center; padding:1px 7px; border:1px solid color-mix(in oklab,var(--primary) 55%,var(--line)); border-radius:5px; background:color-mix(in oklab,var(--primary) 16%,var(--surface)); color:var(--ink); font-weight:700; white-space:nowrap; }
 
-/* One overview, independent regional/pro player workspaces. */
-/* Compact workspace switcher, intentionally distinct from the search region selector. */
+
+
 .player-group-picker { position: relative; flex: 0 0 auto; min-width: 0; z-index: 34; }
 #player-group-button { display: inline-flex; align-items: center; gap: 6px; height: 34px; max-width: 110px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--primary); font-size: 12.5px; font-weight: 700; line-height: 1; white-space: nowrap; cursor: pointer; }
 .player-group-count { padding: 0 4px; border-radius: 4px; background: var(--surface-strong); font-variant-numeric: tabular-nums; }
@@ -1860,7 +1859,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .current-game-identity { min-width: 50px; flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .current-game-identity button, .current-game-identity strong { padding: 0; background: none; border: 0; text-align: left; font-size: 12px; font-weight: 700; color: var(--ink); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .current-game-identity button { cursor: pointer; }
-/* R132 P4：职业选手标签跟在名字右侧，宽度按内容自适应，不再在名字下方撑满整行。 */
+
 .current-game-name-row { display: flex; min-width: 0; align-items: center; gap: var(--identity-chip-gap); }
 .current-game-name-row > button, .current-game-name-row > strong { flex: 0 1 auto; min-width: 0; }
 .current-game-name-row .pro-identity-chip { flex: 0 0 auto; min-height: 18px; padding: 0 6px; font-size: 10.5px; line-height: 16px; }
@@ -1893,7 +1892,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .current-game-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .current-game-actions .text-button { font-size: 12px; padding: 5px 7px; }
 
-/* R75: unknown tournament outcomes stay neutral; no win/loss inference. */
+
 .specialist-game-row.is-unknown { border-color: var(--line); }
 .specialist-opponent.is-unknown { color: var(--muted); }
 .specialist-opponent.is-unknown .specialist-result-dot { background: var(--muted); }
@@ -1901,13 +1900,13 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .pro-event-label { flex-basis: 100%; overflow-wrap: anywhere; }
 .specialist-player-tab small { font-size: 12px; font-weight: 400; }
 
-/* Upstream shard IDs without reliable slot/multiplicity information. */
+
 .pro-known-shards { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .pro-known-shards > span:first-child { color: var(--muted); font-size: 12px; }
 
 .skill-priority-summary { color: var(--primary-strong); font-size: 16px; font-weight: 700; letter-spacing: .1em; white-space: nowrap; margin-inline: 20px; align-self: center; }
 
-/* One full-bleed image; overview-art.js centers the vertical focal point. */
+
 .summoner-strip-art.overview-art { inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .overview-art > img, .overview-art > video { position: absolute; inset: 0; width: 100%; height: 100%; }
 .overview-art > .overview-art-focus { object-fit: cover; object-position: center 32%; }
@@ -1929,7 +1928,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-stat-damage > b, .match-damage-value { color: var(--danger); }
 .match-stat-taken > b, .match-taken-value { color: var(--muted); }
 
-/* R95: badges stay in the existing flex identity row; grid geometry is unchanged. */
+
 .live-player-identity { flex-wrap: wrap; }
 .live-player-identity .pro-identity-chip, .my-squad-chip { flex: 0 0 auto; max-width: 100%; }
 .live-player-identity .pro-identity-chip { white-space: normal; overflow-wrap: anywhere; }
@@ -1937,13 +1936,13 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .my-squad-chip { font-size: 10px; color: #70cbb4; border: 1px solid currentColor; border-radius: 4px; padding: 1px 4px; }
 .arena-my-squad-notice { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
 
-/* R116-D P1-2/P1-3/P1-5：详情 tab 的克制/协同行内小条与队伍画像缺口标签。
-   markup 由 gameplay.js 的 renderLiveInsights 生成，「没命中就不渲染任何节点」，
-   所以这里不需要任何空态样式。
-   纪律：只用既有 CSS 变量（--bg/--ink/--muted/--faint/--line/--danger/--success/
-   --accent/--warning），不写死任何新 hex；border-radius / padding / gap 全部复用
-   仓库里已经出现过的取值，不抬高 r117-style.test.cjs 的样式棘轮预算
-   （当前 border-radius 33/33、padding 205/205、gap 54/54 都已顶格）。 */
+
+
+
+
+
+
+
 .live-roster-supplement { display: grid; gap: 6px; margin-bottom: 10px; }
 .roster-notice-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .roster-notice-strip small { flex: 1 1 100%; color: var(--faint); font-size: 9px; line-height: 1.5; }
@@ -1952,14 +1951,14 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .roster-notice.is-weak { color: var(--danger); border-color: var(--danger); }
 .roster-notice.is-strong { color: var(--success); border-color: var(--success); }
 .roster-notice.is-synergy { color: var(--accent); border-color: var(--accent); }
-/* evidence 不是 supported 时明确降级：虚线边 + 最弱前景色，不给它实色告警的样子。 */
+
 .roster-notice.is-unverified { color: var(--faint); border-style: dashed; }
 .team-portrait-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; }
 .team-portrait-tag { padding: 1px 5px; color: var(--warning); border: 1px solid var(--warning); border-radius: 999px; font-size: 9px; font-weight: 600; }
 
-/* R190: local to match build details; shared rune boards keep their breakpoints. */
+
 .match-players .match-player-name.is-current-player { color: var(--primary-strong); font-weight: 700; }
-.build-detail { container-type: inline-size; }
+
 .rune-split { display: grid; grid-template-columns: minmax(0,1fr); }
 .rune-split-tree { min-width: 0; border-bottom: 1px solid var(--line); }
 .rune-effects { display: grid; align-content: start; min-width: 0; padding: 8px 8px 10px; }
@@ -2017,6 +2016,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .rune-split-tree .unified-rune-board { --rune-icon-size: 34px; --rune-style-icon-width: 32px; --rune-style-icon-height: 40px; --rune-header-height: 52px; --rune-row-height: 52px; }
 }
 
+
 /* R211: size against the build panel, including sidebars and player overlays. */
 .build-detail { container-type: inline-size; }
 .build-player-selector { display:flex; align-items:center; justify-content:center; gap:14px; min-width:0; margin:12px 0; padding-top:12px; border-top:1px solid var(--line); }
@@ -2040,7 +2040,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 @container (max-width:899px) { .build-player-selector.is-arena { grid-template-columns:repeat(4,minmax(0,1fr)); } .is-arena .build-player { flex-basis:26px; width:26px; height:26px; } }
 @container (max-width:699px) { .build-player-selector:not(.is-arena) { gap:8px; } .build-player-selector:not(.is-arena) .build-player-group { gap:4px; } .build-player-selector:not(.is-arena) .build-player { flex-basis:28px; width:28px; height:28px; } }
 
-/* R211 banner streaks preserve the existing truncated-name tooltip. */
+
 .summoner-strip-copy > div { align-items:center; }
 .summoner-name-meta { flex:0 0 auto; white-space:nowrap; }
 .summoner-copy-name { cursor:pointer; }
@@ -2099,7 +2099,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .mastery-details-popover progress { display:block; width:100%; height:8px; accent-color:var(--primary); }
 @media (max-width:780px) { .overview-detail-summary { padding:14px; } .overview-detail-summary strong { font-size:21px; } }
 
-/* R216: wide table scrolls inside its card; page width remains bounded. */
+
 .overview-detail-page { min-width:0; max-width:100%; }
 .champion-table-tabs { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0; }
 .champion-table-tabs button { border:1px solid var(--line); border-radius:7px; padding:7px 12px; background:var(--surface); color:var(--muted); }
@@ -2131,7 +2131,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .table-multi-combined { display:none; }
 @container(max-width:899px) { .champion-data-table { min-width:1050px; } .champion-data-table .table-multi-single { display:none; } .champion-data-table .table-multi-combined { display:table-cell; } }
 
-/* R216 independent tag palette, with explicit readable light-theme colors. */
+
 :root {
 --tag-unstoppable:#E5484D;
 --tag-leader:#E8A13A;
@@ -2186,7 +2186,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .multikill-tag svg { position:absolute; inset:0; width:100%; height:100%; z-index:-1; }
 .multikill-tag > b { font-size:10px; line-height:1; color:white; text-shadow:0 1px 1px #0007; }
 .mk-plate { stroke:#ffd5a4; stroke-width:1; }
-/* Gradient stops use classes: the page CSP blocks style="" attributes. */
+
 .is-mk-2 .mk-stop-start { stop-color:var(--mk-2-start); }.is-mk-2 .mk-stop-end { stop-color:var(--mk-2-end); }
 .is-mk-3 .mk-stop-start { stop-color:var(--mk-3-start); }.is-mk-3 .mk-stop-end { stop-color:var(--mk-3-end); }
 .is-mk-4 .mk-stop-start { stop-color:var(--mk-4-start); }.is-mk-4 .mk-stop-end { stop-color:var(--mk-4-end); }
@@ -2205,7 +2205,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .champion-data-table td[colspan] { text-align:left; }
 .champion-data-table td[colspan] button { position:sticky; left:12px; }
 
-/* R218: matchup action stays readable on the stronger opponent-row surface. */
+
 .champion-data-table [data-table-more] { color:var(--ink); background:var(--surface-strong); border:1px solid var(--line); }
 
 .player-tab-region { flex: 0 0 auto; color: var(--muted); font-size: 10px; margin-left: 0; }
@@ -2215,16 +2215,16 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .multikill-tag.is-mk-4 > b { color:#FAE8FF; font-size:11px; }
 .multikill-tag.is-mk-5 > b { color:#3B1A00; font-size:11px; font-weight:800; text-shadow:0 0 2px rgba(255,247,214,.9); }
 
-/* R241: wide windows distribute the main tracks even when the career/sidebar
-   leave the match container below its compact breakpoint. Narrow windows keep
-   the existing compact arrangement; the roster retains its clamped width. */
+
+
+
 @media (min-width:1101px) {
   @container matches-column (min-width:720px) {
     .match-main,.match-main.is-arena { grid-template-columns:minmax(0,auto) minmax(96px,1fr) minmax(188px,1.4fr); }
   }
 }
 
-/* R241: data tags share the existing keyword palette and outline language. */
+
 .match-tags-collection { display:flex; flex-wrap:nowrap; align-items:center; gap:4px; width:100%; height:30px; min-width:0; overflow:hidden; white-space:nowrap; }
 .match-tags-collection > [data-match-tag] { display:inline-flex; flex:none; align-items:center; }
 .match-tags-collection > [hidden] { display:none !important; }
@@ -2247,7 +2247,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-tags-popover[data-placement="top"]::after { bottom:-5px; border-top:0; border-left:0; }
 .match-tags-popover[data-placement="bottom"]::after { top:-5px; border-bottom:0; border-right:0; }
 
-/* R257 shares the R241 portal's theme/arrow/shadow; only the content differs. */
+
 .season-data-note { display:inline-flex; flex:none; align-items:center; justify-content:center; width:26px; height:26px; padding:5px; border:0; border-radius:var(--radius-sm); background:transparent; color:var(--muted); cursor:pointer; }
 .season-data-note svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; }
 .season-data-note:hover,.season-data-note:focus-visible { color:var(--primary); }
@@ -2258,7 +2258,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .season-data-note-popover > strong { display:block; margin-bottom:6px; font-size:14px; }
 .season-data-note-popover > p { margin:6px 0 0; }
 
-/* R258 toolbar layout remains available before the filter module loads. */
+
 .match-filterbar { flex-wrap: wrap; }
 .match-filter-tabs { flex: 1 1 480px; }
 .match-filter-tools { display: flex; gap: 7px; margin-left: auto; flex: 0 0 auto; }
@@ -2273,8 +2273,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 .service-outage{min-height:360px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:0;padding:24px}.service-outage-disc{width:88px;height:88px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary)}.service-outage-icon{width:48px;height:48px;flex-shrink:0}.service-outage>strong{margin-top:16px;font-size:16px;font-weight:600}.service-outage>p{margin:6px 0 14px;max-width:360px;font-size:13px;color:var(--muted);line-height:1.5}.service-outage>small{margin-top:6px;font-size:12px;color:var(--faint)}.service-outage-compact,.service-outage-inline{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line-soft);border-radius:8px;padding:0 12px;color:var(--muted)}.service-outage-compact{height:40px;margin:0 0 12px}.service-outage-compact .service-outage-icon{width:20px;height:20px;color:var(--primary)}.service-outage-compact>span,.service-outage-inline>span{flex:1;font-size:13px}.service-outage-inline{padding:10px;margin:0 0 12px}.service-outage-inline .service-outage-icon{width:24px;height:24px;color:var(--primary)}.history-stats-pending .ability-unavailable{color:var(--muted)}@media(max-width:780px){.service-outage-disc{width:72px;height:72px}.service-outage .service-outage-icon{width:40px;height:40px}.service-outage-compact{padding:0 6px;gap:4px}.service-outage-inline{flex-wrap:wrap}.service-outage-inline>span{min-width:180px}}
 
-/* Filter trigger stays styled before its panel is requested. */
-/* R258 condition capsules. Colours follow the selected theme. */
+
+
 .af-select { position: relative; }
 .af-select > .app-select-trigger { min-height: 34px; display: flex; align-items: center; gap: 6px; width: auto; }
 .af-select > .app-select-trigger::after, .match-more-filter .app-select-trigger::after { transform: translateY(-50%) rotate(45deg); }
@@ -2292,7 +2292,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 @media(max-width:900px) { .match-skeleton.gameplay-skeleton { grid-template-columns: 50px 48px minmax(80px,1fr); } .match-skeleton span:nth-child(n+4) { display: none; } }
 [data-match-layout][data-icon-overlap] { grid-template-columns: 124px minmax(0,96px) minmax(0,1fr); }
 
-/* R272: the full-page skeleton shares the R267 luminance treatment. */
+
 .overview-strip-skeleton { gap: 16px; }
 .overview-strip-skeleton > span { height: 48px; min-height: 0; }
 .overview-strip-skeleton > span:first-child { width: 72px; height: 72px; }
@@ -2300,15 +2300,15 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-filterbar.gameplay-skeleton button { color: transparent; pointer-events: none; background-image: linear-gradient(100deg,var(--skeleton-base) 20%,var(--skeleton-glint) 42%,var(--skeleton-base) 64%); background-size: 220% 100%; animation: skeleton 1.3s linear infinite; }
 .match-skeleton.gameplay-skeleton { height: 120px; min-height: 120px; }
 @container matches-column (max-width:640px) { .match-skeleton.gameplay-skeleton { height: 202px; min-height: 202px; } }
-/* Default row counts reserve the same geometry for pending and final cards. */
-.career-column > [data-career-key="ranks"] { min-height: 450px; }
-.career-column > [data-career-key="recent-ranked"] { min-height: 209px; }
-.career-column > [data-career-key="ability"] { min-height: 358px; }
-.career-column > [data-career-key="champions"] { min-height: 565px; }
-.career-column > [data-career-key="masteries"] { min-height: 261px; }
-.career-column > [data-career-key="positions"] { min-height: 254px; }
-.career-column > [data-career-key="recent-players"] { min-height: 207px; }
-.career-column > [data-career-key="activity"] { min-height: 181px; }
+
+.career-column > [data-career-key="ranks"]:has(.career-pending) { min-height: 180px; }
+.career-column > [data-career-key="recent-ranked"]:has(.career-pending) { min-height: 100px; }
+.career-column > [data-career-key="ability"]:has(.career-pending) { min-height: 100px; }
+.career-column > [data-career-key="champions"]:has(.career-pending) { min-height: 100px; }
+.career-column > [data-career-key="masteries"]:has(.career-pending) { min-height: 100px; }
+.career-column > [data-career-key="positions"]:has(.career-pending) { min-height: 100px; }
+.career-column > [data-career-key="recent-players"]:has(.career-pending) { min-height: 100px; }
+.career-column > [data-career-key="activity"]:has(.career-pending) { min-height: 100px; }
 .career-column > .career-section:has(.career-pending) { display: flex; flex-direction: column; }
 .career-column .career-pending { flex: 1; align-content: space-evenly; }
 .match-filterbar.gameplay-skeleton > span { min-height: 0; height: 30px; width: 45%; }

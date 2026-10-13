@@ -199,17 +199,38 @@
     gameflowQueue.push(observation);
     scheduleGameflowDiagnostics();
   };
+  const localWindows=new Map();let localTimer=null;
+  const flushLocalDiagnostics=()=>{
+    if(localTimer!==null){clearTimeout(localTimer);localTimer=null;}
+    for(const [endpoint,b]of localWindows){const sorted=b.samples.sort((a,b)=>a-b),percentile=p=>sorted[Math.min(sorted.length-1,Math.ceil(sorted.length*p)-1)] || 0;
+      const body={event:'local_request_client',reason:'complete',endpoint,count:b.count,startedAt:b.at,completedAt:Date.now(),durationP50Ms:percentile(.5),durationP95Ms:percentile(.95),durationMs:b.max,responseBytes:b.bytes,httpStatus:200,errorKind:'none'},encoded=JSON.stringify(body);flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,1);
+    }localWindows.clear();
+  };
+  window.addEventListener?.('pagehide',flushLocalDiagnostics);
   let exportSequence = 0;
   window.flushFlowDiagnostics = async () => {
     // Export must not race a just-clicked filter's telemetry. Wait briefly,
     // then record remaining pending work rather than claiming a complete drain.
     void flushGameflowDiagnostics();
+    flushLocalDiagnostics();
     const deadline = Date.now() + 1000;
     while ((flowPending.size || gameflowQueue.length) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
     const body = { event: "diagnostic_delivery_client", reason: "export", requestId: ++exportSequence, transportPending: flowPending.size + gameflowQueue.length };
     await sendFlowDiagnostic(body, JSON.stringify(body), 1, 1500);
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
+    if(['client_follow_client','history_outage_ui','overview_reference_fallback','match_autoload_client','collection_new_marker','overview_reload_reason','announcement_state'].includes(event)){
+      const allowed=['from_group','to_group','search_from','search_to','applied','source','count','bound','near','requested','started','blocked_reason','latency_ms','matches_before','matches_after','id','notice_revision','durationMs'];
+      const r278={};for(const key of allowed)if(Object.hasOwn(fields,key))r278[key]=fields[key];
+      const body={event,reason,r278},encoded=JSON.stringify(body);if(flowPending.has(encoded) || flowSamples.has(encoded))return;
+      if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
+    }
+    if(event==='local_request_client' && reason==='complete' && fields.httpStatus>=200 && fields.httpStatus<300 && (!fields.errorKind || fields.errorKind==='none')){
+      const endpoint=['status','gameplay','champions','collection','pro-players','friends','image','section-loader','other','overview','live','facade','watch','rig','claim','champselect'].includes(fields.endpoint)?fields.endpoint:'other';
+      const b=localWindows.get(endpoint) || {at:Date.now(),count:0,bytes:0,max:0,samples:[]},duration=Math.max(0,Math.min(1000000,Math.floor(Number(fields.durationMs)||0)));
+      b.count++;b.bytes+=Math.max(0,Math.min(2147483648,Math.floor(Number(fields.responseBytes)||0)));b.max=Math.max(b.max,duration);if(b.samples.length<4096)b.samples.push(duration);localWindows.set(endpoint,b);
+      if(localTimer===null && typeof setTimeout==='function'){localTimer=setTimeout(flushLocalDiagnostics,60000);localTimer?.unref?.();}return;
+    }
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
     if (!["client_view_client", "ui_zoom_state", "lp_chip_render", "overview_scroll_reset", "overview_reference_expired", "overview_rerender_client", "history_search_client", "current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "collection_failure_state_shown", "overview_dirty_rescan", "summoner_copy", "overview_card_ready", "self_tab_client", "browser_cold_requests_client", "champselect_request_client"].includes(event)) return;
     if(event==='browser_cold_requests_client') {
@@ -220,7 +241,7 @@
     }
     // Sample local requests by fixed endpoint category so status polling cannot
     // hide page timings. Delivery stays bounded and sampled events never retry.
-    const sampled = event === "live_refresh_client" || event === "local_request_client";
+    const sampled = event === "live_refresh_client";
     const sampleKey = event === "local_request_client" ? event + ":" + fields.endpoint : event;
     const now = Date.now();
     if (sampled && (sampledPending.size && event !== "local_request_client" || now - (sampledAt.get(sampleKey) ?? -Infinity) < (event === "local_request_client" ? 10000 : 1000))) { increment("transportSuppressed"); return; }

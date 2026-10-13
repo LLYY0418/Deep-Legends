@@ -34,7 +34,7 @@ test('R111 automatic pagination needs downward user intent and stops when its ta
  const dom=new JSDOM('<div id="app-scroll"><main><div data-match-sentinel></div></main></div>'),w=dom.window;
  try {const root=w.document.querySelector('#app-scroll'),container=w.document.querySelector('main'),tab={data:{pagination:{hasMore:true}}},state={},calls=[],timers=[];let cb,current=container;
  const IO=class{constructor(fn){cb=fn}observe(){}disconnect(){}};
- const {bindMatchSentinel:bind}=compile('gameplay.js',['bindMatchSentinel'],{state,document:w.document,window:{IntersectionObserver:IO,requestAnimationFrame:fn=>fn()},IntersectionObserver:IO,matchObserverKey:()=> 'observer',overviewContainer:()=>current,loadOverview:(...a)=>calls.push(a),setTimeout:fn=>{timers.push(fn);return timers.length},clearTimeout:()=>{}});
+ const {bindMatchSentinel:bind}=compile('gameplay.js',['bindMatchSentinel'],{state,document:w.document,window:{IntersectionObserver:IO,requestAnimationFrame:fn=>fn()},IntersectionObserver:IO,matchObserverKey:()=> 'observer',overviewContainer:()=>current,loadOverview:(...a)=>{tab.overviewRequestToken=Number(tab.overviewRequestToken || 0)+1;calls.push(a);return Promise.resolve(true)},setTimeout:fn=>{timers.push(fn);return timers.length},clearTimeout:()=>{}});
  bind(container,tab);cb([{isIntersecting:true}]);assert.equal(timers.length,0,'short page/scroll restoration must not fetch');
  root.dispatchEvent(new w.WheelEvent('wheel',{deltaY:-10}));assert.equal(timers.length,0);
  root.dispatchEvent(new w.WheelEvent('wheel',{deltaY:10}));timers.shift()();assert.equal(calls.length,1);

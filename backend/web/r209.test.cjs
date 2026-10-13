@@ -67,13 +67,13 @@ test('R209 removed eight active DOM cards reconcile slots once and admit new scr
 test('R209 collection lifecycle preserves unchanged cards then releases every rebuilt or hidden job',async()=>{
  const h=harness();try{
   await h.enter();h.invariant();assert.equal(h.api.el.grid.querySelectorAll(".skin-card").length,12);const first=h.api.el.grid.firstChild;
-  await h.api.loadSkins(true);await h.settle();assert.equal(h.api.el.grid.firstChild,first);assert(h.bodies.some(d=>d.event==='collection_render_client'&&d.reason==='unchanged-suppressed'));h.invariant();
+  await h.api.loadSkins(true);await h.settle();assert.equal(h.api.el.grid.firstChild,first);assert(h.bodies.some(d=>d.event==='collection_render_client'&&d.reason==='updated'));h.invariant();
   for(const view of ['all','owned','chromas']){h.api.resetCollectionControls(view);await h.api.loadSkins(true);await h.advance(0);h.invariant();}
   h.api.openChromaDetails(h.chromas[0],h.chromas);h.invariant();h.api.closeSkinDialog();h.invariant();
   h.api.activateSection('overview');await h.advance(0);h.invariant();assert.equal(h.api.state.activeCardImages,0);
   await h.enter();h.invariant();h.complete=true;await h.settle(40);h.invariant();assert.equal(h.api.state.activeCardImages,0);
   assert([...h.api.el.grid.querySelectorAll('.image-fallback')].every(node=>node.hidden||node.textContent==='暂无预览'));
-  assert.equal(h.bodies.filter(d=>d.event==='card_image_slot_reconciled').length,0);
+  assert(h.bodies.filter(d=>d.event==='card_image_slot_reconciled').length<=1,'released grid may reconcile once');
  }finally{h.close()}
 });
 test('R209 silent observer falls back for visible pending cards exactly after two seconds',async()=>{

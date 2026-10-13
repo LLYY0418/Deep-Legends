@@ -23,8 +23,8 @@
     if(!ctx.active()){cancel(tab);return;}
     if(!s){s=tab.detailRecovery={round:0,timer:0,running:false,generation:0};}
     s.abort=ctx.abort;
-    if(s.timer || s.running || s.round>=delays.length)return;
-    const generation=s.generation,delay=Math.max(delays[s.round],Number(ctx.notBefore?.() || 0)-Date.now());
+    if(s.timer || s.running || !ctx.delays && s.round>=delays.length)return;
+    const generation=s.generation,delay=Math.max((ctx.delays || delays)[Math.min(s.round,(ctx.delays || delays).length-1)],Number(ctx.notBefore?.() || 0)-Date.now());
     sessions.add(tab);
     s.timer=setTimeout(async()=>{
       s.timer=0;

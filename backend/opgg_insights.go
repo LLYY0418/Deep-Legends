@@ -38,7 +38,7 @@ const (
 	opggGamesTimeSlack   = 180 * 1000 // 开局时间匹配容差（毫秒）
 	opggGamesSpanSlack   = 20         // 时长匹配容差（秒）
 	opggGamesResponseMax = 8 << 20
-	opggHistoryCacheTTL  = 30 * time.Minute
+	opggHistoryCacheTTL  = 24 * time.Hour
 	opggHistoryEmptyTTL  = 10 * time.Minute
 	opggHistoryCacheMax  = 32
 	// R127 P1-c.5：OP.GG 最新一行比 Riot 最新一场早超过这个秒数，就认定来源还没

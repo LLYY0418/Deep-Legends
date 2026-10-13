@@ -90,8 +90,15 @@ func TestR241HeadFreshnessSmallRequestNewGamesAndRecentGate(t *testing.T) {
 		t.Fatal(requests)
 	}
 	mu.Unlock()
+	a.flushSnapshotDiagnostics()
 	events := r175Events(t, a, "season_stats_head_refresh")
-	if len(events) != 2 || events[0]["skip_reason"] != "recent" || events[0]["sgp_bytes"] != float64(0) || events[0]["new_games"] != float64(0) {
+	observations := len(events)
+	for _, sum := range r175Events(t, a, "diagnostic_snapshot_summary") {
+		if sum["snapshot_event"] == "season_stats_head_refresh" {
+			observations += intNumber(sum["count"])
+		}
+	}
+	if observations != 2 || events[0]["skip_reason"] != "recent" || events[0]["sgp_bytes"] != float64(0) || events[0]["new_games"] != float64(0) {
 		t.Fatal(events)
 	}
 	t.Logf("head fixture bytes cold=%d no_new=%d new_one=%d recent=0", before, after, newBytes)

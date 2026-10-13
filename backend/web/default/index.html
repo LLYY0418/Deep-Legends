@@ -19,6 +19,7 @@
     <script src="/augment-artwork.js" defer></script>
     <script src="/section-loader.js" defer></script>
     <script src="/collection-new-items.js" defer></script>
+    <script src="/announcements-bootstrap.js" defer></script>
     <script src="/app.js" defer></script>
     <script src="/gameplay.js" defer></script>
     <script src="/friends.js" defer></script>
@@ -118,6 +119,7 @@
               <span id="friends-count" class="friends-count" hidden>0</span>
             </button>
             <button id="refresh" class="button button-primary" type="button" aria-label="重新读取" data-tooltip="重新读取"><span class="refresh-icon" aria-hidden="true">↻</span><span>重新读取</span></button>
+            <button id="announcements-button" class="icon-button control-icon-button" type="button" aria-label="公告" aria-haspopup="dialog" data-tooltip="公告"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9 21h6"/></svg></button>
             <button id="update-button" class="icon-button control-icon-button update-icon-button" type="button" aria-label="有新版本可升级" aria-haspopup="dialog" data-tooltip="有新版本可升级" hidden>
               <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path class="hex-track" d="M12 2.4 20.6 7v10L12 21.6 3.4 17V7z"/>
@@ -393,6 +395,7 @@
     </div>
 
     <button id="back-to-top" class="back-to-top control-icon-button" type="button" aria-label="返回列表顶部" data-tooltip="返回顶部" hidden><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 14 7-7 7 7M12 7v11"/></svg></button>
+    <dialog id="announcements-dialog" class="announcements-dialog" aria-labelledby="announcements-title"><header><h2 id="announcements-title">公告</h2><button type="button" data-announcements-close class="dialog-close-button control-icon-button" aria-label="关闭公告">×</button></header><div data-announcements-content></div></dialog>
     <dialog id="update-dialog" class="update-dialog" aria-labelledby="update-dialog-title">
       <div class="update-sheet">
         <div class="update-head">

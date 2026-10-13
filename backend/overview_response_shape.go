@@ -11,10 +11,13 @@ import (
 // Names and encoded lengths only. Values, identifiers and bodies never leave
 // this per-request counter. Count every frame to expose repeated stream data.
 type overviewResponseShape struct {
+	account string
+
 	Bytes, Frames, Matches, Participants int
 	Top, Match, Participant, Nested      map[string]int
 	FrameKinds                           map[string]int
 	HasTimeline, HasRaw                  bool
+	EmptyRevision                        bool
 }
 
 func newOverviewResponseShape() *overviewResponseShape {
@@ -76,6 +79,14 @@ func (s *overviewResponseShape) observe(data []byte) {
 			_ = json.Unmarshal(overview, &body)
 			top = body
 		}
+		var player struct {
+			Ref    string `json:"playerRef"`
+			Region string `json:"region"`
+			Server string `json:"serverId"`
+		}
+		if json.Unmarshal(top["player"], &player) == nil && player.Ref != "" {
+			s.account = player.Region + ":" + player.Server + ":" + player.Ref
+		}
 		s.Frames++
 		s.FrameKinds[kind]++
 		for key, value := range top {
@@ -85,6 +96,9 @@ func (s *overviewResponseShape) observe(data []byte) {
 		_ = json.Unmarshal(top["matches"], &matches)
 		s.Matches += len(matches)
 		for _, match := range matches {
+			if len(match) > 2 && (len(match["revision"]) == 0 || string(match["revision"]) == `""`) {
+				s.EmptyRevision = true
+			}
 			for key, value := range match {
 				s.Match[shapeFieldName(key)] += len(value)
 			}
@@ -154,6 +168,9 @@ func (w *overviewShapeWriter) Unwrap() http.ResponseWriter { return w.ResponseWr
 // The shared flight retains complete snapshots; only wire frames are deltas.
 // This avoids retransmitting N full participants after every single detail.
 func compactOverviewProgress(partial gameplayOverview, seen map[int64]string) gameplayOverview {
+	if seen == nil {
+		return partial
+	}
 	delta := make([]gameplayMatch, 0)
 	for _, match := range partial.Matches {
 		if revision, ok := seen[match.GameID]; !ok || revision != match.Revision {

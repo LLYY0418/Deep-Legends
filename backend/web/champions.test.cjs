@@ -1845,7 +1845,7 @@ test("structured data-source attempts are visible while cancellations stay silen
 
 test("historical rank increments refresh only the matching active overview", async () => {
 	const tab = { key: "kr", playerRef: "public-ref", data: { player: { playerRef: "public-ref" } } };
-	const state = { section: "overview" };
+	const state = { section: "overview", tabs:[tab] };
 	const scrollRoot = { scrollTop: 222, isConnected: true };
 	const calls = [];
 	const { handleOverviewIncremental } = compileFunctions(gameplayScript, ["handleOverviewIncremental"], {
@@ -4165,7 +4165,7 @@ test("overview re-entry keeps its pages for the two minute freshness window", ()
   assert.equal(shouldReloadOverview({ data: null, loadedAt: now - 1 }, now), true);
   const activateSource = functionSource(gameplayScript, "activateSection");
   assert.match(activateSource, /shouldReloadOverview\(tab\)/);
-  assert.match(activateSource, /loadOverview\(tab, true\)/);
+  assert.match(activateSource, /probeOverviewHead\(tab\)/);
 });
 
 test("R63 forced overview refresh merges its first page into already loaded pages", async () => {
@@ -6209,7 +6209,7 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		["B-4 global concurrency gate", "rankGo", "var globalMatchTiersRankSemaphore = make(chan struct{}, 4)", "// per-handler gate restored"],
 		["B-4 frontend backoff", "gameplayJS", "if (failure && Number(failure.nextRetryAt || 0) > Date.now())", "if (false)"],
 		["B-5 two-minute freshness", "gameplayJS", ">= 120_000", ">= 20_000"],
-		["B-5 preserve loaded pages", "gameplayJS", "const preserveLoadedPages = force && sameFilter && !pageWasPending && previousMatches.length > freshMatches.length;", "const preserveLoadedPages = false;"],
+		["B-5 preserve loaded pages", "gameplayJS", "const preserveLoadedPages = force && sameFilter && previousMatches.length > freshMatches.length;", "const preserveLoadedPages = false;"],
 		["B-6 preserve match DOM", "gameplayJS", "const preserveMatchList = Boolean(retainedMatchList", "const preserveMatchList = Boolean(false && retainedMatchList"],
 		["B-7 recent ranked LRU", "gameplayGo", "for len(a.recentRankedSamples) > recentRankedSampleCacheMax {", "for false {"],
 		["B-7 season snapshot LRU", "seasonGo", "for len(a.seasonQuerySnapshots) > seasonQuerySnapshotsMax {", "for false {"],

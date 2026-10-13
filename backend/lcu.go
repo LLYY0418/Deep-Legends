@@ -115,7 +115,7 @@ type LCUClient struct {
 	requestDiagnostics  map[string]*lcuRequestDiagnosticBucket
 }
 
-const lcuRequestDiagnosticWindow = 10 * time.Second
+const lcuRequestDiagnosticWindow = 60 * time.Second
 
 type lcuRequestTrace struct {
 	mu            sync.Mutex
@@ -218,6 +218,16 @@ func (c *LCUClient) setDiagnosticObserver(observe func(map[string]any)) {
 
 func (c *LCUClient) recordRequestDiagnostic(method, path string, trace *lcuRequestTrace, status int) {
 	if c == nil || trace == nil {
+		return
+	}
+	sample := trace.sample(status)
+	if status < 200 || status >= 300 || sample.durationMS > 1000 {
+		c.diagnosticMu.Lock()
+		observe := c.diagnosticObserve
+		c.diagnosticMu.Unlock()
+		if observe != nil {
+			observe(lcuRequestDiagnosticEvent(&lcuRequestDiagnosticBucket{windowStart: time.Now(), method: method, path: lcuDiagnosticPath(path), samples: []lcuRequestDiagnosticSample{sample}}))
+		}
 		return
 	}
 	now := time.Now()
@@ -339,7 +349,7 @@ func lcuRequestDiagnosticEvent(bucket *lcuRequestDiagnosticBucket) map[string]an
 
 func lcuMetricSummary(values []int64) map[string]int64 {
 	if len(values) == 0 {
-		return map[string]int64{"p50": 0, "p90": 0, "max": 0}
+		return map[string]int64{"p50": 0, "p90": 0, "p95": 0, "max": 0}
 	}
 	sorted := append([]int64(nil), values...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
@@ -347,7 +357,7 @@ func lcuMetricSummary(values []int64) map[string]int64 {
 		index := int(value*float64(len(sorted)-1) + 0.5)
 		return sorted[index]
 	}
-	return map[string]int64{"p50": percentile(0.50), "p90": percentile(0.90), "max": sorted[len(sorted)-1]}
+	return map[string]int64{"p50": percentile(0.50), "p90": percentile(0.90), "p95": percentile(.95), "max": sorted[len(sorted)-1]}
 }
 
 func lcuDiagnosticPath(value string) string {
@@ -1180,7 +1190,8 @@ func (c *LCUClient) Close() {
 // Optional status sink includes successful HTTP responses with invalid JSON.
 type lcuResponseStatusKey struct{}
 
-// One bounded row per ten-second window across every normalized LCU path.
+// Production route summaries already contain exact sample percentiles. Legacy
+// max-only rows may be packed, but cannot acquire invented percentiles.
 func lcuRequestDiagnosticWindows(events []map[string]any) []map[string]any {
 	groups := map[string][]map[string]any{}
 	order := []string{}
@@ -1194,6 +1205,55 @@ func lcuRequestDiagnosticWindows(events []map[string]any) []map[string]any {
 	result := []map[string]any{}
 	for _, key := range order {
 		rows := groups[key]
+
+		mergedRoutes := map[string]map[string]any{}
+		orderRoutes := []string{}
+		for _, row := range rows {
+			statusRaw, _ := json.Marshal(row["http_status"])
+			var statuses map[string]int
+			_ = json.Unmarshal(statusRaw, &statuses)
+			metricRaw, _ := json.Marshal(row["duration_ms"])
+			var metric map[string]int64
+			_ = json.Unmarshal(metricRaw, &metric)
+			if _, exact := metric["p50"]; exact {
+				result = append(result, row)
+				continue
+			}
+			success := len(statuses) > 0 && metric["max"] <= 1000
+			for code := range statuses {
+				if code != "200" {
+					success = false
+				}
+			}
+			if !success {
+				result = append(result, row)
+				continue
+			}
+			route := fmt.Sprint(row["method"]) + ":" + fmt.Sprint(row["path"])
+			prior := mergedRoutes[route]
+			if prior == nil {
+				copy := map[string]any{}
+				for k, v := range row {
+					copy[k] = v
+				}
+				copy["count"] = diagnosticInteger(row["count"])
+				copy["duration_ms"] = map[string]int64{"max": metric["max"]}
+				copy["http_status"] = map[string]int{"200": statuses["200"]}
+				mergedRoutes[route] = copy
+				orderRoutes = append(orderRoutes, route)
+			} else {
+				prior["count"] = prior["count"].(int) + diagnosticInteger(row["count"])
+				prior["duration_ms"].(map[string]int64)["max"] = max(prior["duration_ms"].(map[string]int64)["max"], metric["max"])
+				prior["http_status"].(map[string]int)["200"] += statuses["200"]
+			}
+		}
+		rows = nil
+		for _, route := range orderRoutes {
+			rows = append(rows, mergedRoutes[route])
+		}
+		if len(rows) == 0 {
+			continue
+		}
 		if len(rows) == 1 {
 			result = append(result, rows[0])
 			continue

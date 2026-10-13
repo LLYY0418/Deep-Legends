@@ -154,6 +154,7 @@ type riotProvider struct {
 	limitSleep       func(context.Context, time.Duration) error
 	champions        *championProvider
 
+	pageReserved         int
 	limitMu              sync.Mutex
 	limitQueue           []*riotLimitWaiter
 	shortWindow          []time.Time
@@ -1709,6 +1710,13 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		reference.PlayerRef, reference.AlternatePlayerRef = "", ""
 		reference.OPGGIdentity = false
 	}
+	if begIndex > 0 {
+		release, err := provider.reserveOverviewPage(ctx, count)
+		if err != nil {
+			return gameplayOverview{}, err
+		}
+		defer release()
+	}
 	gameName := strings.TrimSpace(reference.GameName)
 	tagLine := strings.TrimSpace(reference.TagLine)
 	resolvedScope := ""
@@ -1746,6 +1754,29 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		tagLine = account.TagLine
 	}
 	ctx = context.WithValue(ctx, riotLookupIdentityKey{}, riotLookupIdentity{gameName, tagLine, puuid, resolvedScope})
+	if overviewHeadProbe(ctx) {
+		ids, err := provider.matchIDsForOverview(ctx, puuid, 0, 5, matchFilter)
+		if err != nil {
+			return gameplayOverview{}, err
+		}
+		names, labels := a.riotChampionNames(ctx), a.riotQueueLabels(ctx)
+		matches := make([]gameplayMatch, 0, len(ids))
+		for _, id := range ids {
+			detail, err := provider.matchByID(ctx, id)
+			if err != nil {
+				return gameplayOverview{}, err
+			}
+			match := riotConvertMatch(detail, riotMatchSubjectPUUID(detail, puuid, gameName, tagLine), names, labels)
+			a.recordMatchScores("riot", match, ctx)
+			if !isCustomGameplayMatch(match) {
+				matches = append(matches, match)
+			}
+		}
+		response := gameplayOverview{Matches: matches, Pagination: riotOverviewPagination(0, len(ids), 5, matchFilter)}
+		a.publicizeOverviewReferences(&response)
+		return response, nil
+	}
+
 	phases.markSpan("account", phaseStarted, time.Now())
 	cardReference := mergeGameplayReferences(gameplayReference{PlayerRef: puuid, GameName: gameName, TagLine: tagLine, Region: provider.region()}, reference)
 	cardPlayer := Summoner{PUUID: puuid, GameName: gameName, TagLine: tagLine, ProfileIconID: reference.ProfileIconID, SummonerLevel: reference.SummonerLevel}
@@ -1829,6 +1860,9 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 			phases.markSpan("mastery", started, time.Now())
 		}()
 	}
+	if begIndex == 0 && !strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE") {
+		a.startOPGGHistoricalRanks(cardReference, gameName, tagLine, puuid, reference.Privacy)
+	}
 	identityReads.Wait()
 	reference = mergeGameplayReferences(gameplayReference{PlayerRef: puuid, GameName: gameName, TagLine: tagLine, Region: provider.region()}, reference)
 	err := idsErr
@@ -1840,7 +1874,6 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		if !strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE") {
 			started := time.Now()
 			historicalRanks = a.cachedOPGGHistoricalRanks(puuid, provider.region())
-			a.startOPGGHistoricalRanks(reference, gameName, tagLine, puuid, reference.Privacy)
 			// R127 P1-c.4：与总览并行预热 OP.GG 对局列表，平均段位不再等卡片
 			// 渲染完、滚动到可见才开始取（那一次要 1.5–3.6 秒）。
 			a.startOPGGGameTiers(gameName, tagLine, puuid, provider.region())
@@ -2092,6 +2125,9 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	// 不像本机客户端那样一次拉取 100 场样本。
 	capabilities = append(capabilities, EndpointCapability{Name: "seven-day-history", Path: "riot: 复用本页战绩样本", State: capabilityAvailable, Count: len(matches), Detail: fmt.Sprintf("基于最近 %d 场计算 30 天排位与活跃时段", len(matches))})
 	response.Ranks = ranks
+	if latest := a.cachedOPGGHistoricalRanks(puuid, provider.region()); len(latest) > 0 {
+		historicalRanks = latest
+	}
 	response.HistoricalRanks = historicalRanks
 	response.Masteries = masteries
 	// 韩服拿不到客户端个人主页背景（Riot API 无此字段），退回最高熟练度英雄原画。

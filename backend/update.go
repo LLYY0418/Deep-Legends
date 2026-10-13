@@ -180,6 +180,10 @@ type updateManager struct {
 	diagnostic         func(map[string]any)
 	ctx                context.Context
 	stop               context.CancelFunc
+	quickDownloads     bool
+	autoPredownload    bool
+	predownloading     bool
+	foregroundBusy     func() bool
 	downloadCancel     context.CancelFunc
 	downloadDone       chan struct{}
 	checkDone          chan struct{}
@@ -218,7 +222,10 @@ func (u *updateManager) recordUpdateCheck(event map[string]any) {
 }
 
 func newUpdateManager(current string, store *localStore, notify func(string, any)) *updateManager {
-	return newUpdateManagerWithTrust(current, store, notify, updateTrustKeys())
+	u := newUpdateManagerWithTrust(current, store, notify, updateTrustKeys())
+	u.quickDownloads = true
+	u.autoPredownload = true
+	return u
 }
 func newUpdateManagerWithTrust(current string, store *localStore, notify func(string, any), keys map[string]ed25519.PublicKey) *updateManager {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -481,6 +488,7 @@ func (u *updateManager) Check(force bool) bool {
 			_ = writeLocalStoreFile(u.store, "update-manifest.json", data)
 		}
 		resultState := u.status.State
+		predownload := u.autoPredownload && resultState == "available" && !u.status.ManualOnly
 		u.mu.Unlock()
 		if err == nil && u.ctx.Err() == nil {
 			u.recordUpdateCheck(map[string]any{
@@ -503,6 +511,9 @@ func (u *updateManager) Check(force bool) bool {
 			}
 		}
 		u.publish()
+		if predownload {
+			_ = u.download(true)
+		}
 	}()
 	return true
 }

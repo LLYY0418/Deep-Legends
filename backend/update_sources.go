@@ -14,7 +14,7 @@ import (
 )
 
 const updateProbeBytes int64 = 1048576
-const updateProbeTimeout = 6 * time.Second
+const updateProbeTimeout = 2 * time.Second
 const updateSlowSpeed = 150 * 1024
 
 var errUpdateSourceSlow = errors.New("下载线路速度过低")

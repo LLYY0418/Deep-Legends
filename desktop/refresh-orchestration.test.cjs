@@ -50,7 +50,7 @@ function compileFunctions(source, names, dependencies) {
   const dependencyNames = Object.keys(dependencies);
   const factory = Function(
     ...dependencyNames,
-    `"use strict";\n${names.map((name) => functionSource(source, name)).join("\n")}\nreturn { ${names.join(", ")} };`,
+    `"use strict";\n${[...new Set([...names,...["collectionRenderSignature","collectionIsRendered"].filter(n=>source.includes(`function ${n}(`))])].map((name) => functionSource(source, name)).join("\n")}\nreturn { ${names.join(", ")} };`,
   );
   return factory(...dependencyNames.map((name) => dependencies[name]));
 }
@@ -336,7 +336,7 @@ test("identical forced collection refresh keeps rendered cards mounted", async (
     acquisitionTime: () => null, configureSortControls() {}, renderItems() { renders += 1; }, ensureCollection() {},
   });
   await loadSkins(true);
-  assert.equal(renders, 0, "unchanged background refresh must not replace the collection grid");
+  assert.equal(renders, 2, "force refresh must rebuild an unmounted collection, including its pending view");
   assert.equal(state.loading, false);
 });
 

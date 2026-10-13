@@ -218,7 +218,7 @@ func TestR269SGPBackoffAndEarlyProbe(t *testing.T) {
 	}
 	healthy = true
 	now = now.Add(15 * time.Second)
-	if err := p.getJSON(context.Background(), client, "HN1", "SUMMARY", "history", "https://fixture/history?count=1", &out); err != nil {
+	if err := p.getJSON(context.WithValue(context.Background(), sgpBackgroundHistoryProbeKey{}, true), client, "HN1", "SUMMARY", "history", "https://fixture/history?count=1", &out); err != nil {
 		t.Fatal("early probe failed", err)
 	}
 	if !p.historyCircuits["HN1"].until.IsZero() {

@@ -19,7 +19,7 @@ type compactDiagnosticWindow struct {
 func (a *app) compactDiagnostic(event map[string]any, now time.Time) (map[string]any, bool) {
 	name, _ := event["event"].(string)
 	switch name {
-	case "overview_art_source", "sgp_history_circuit", "gameflow_phase_client", "browser_error_client":
+	case "client_follow_client", "history_outage_ui", "overview_reference_fallback", "match_autoload_client", "collection_new_marker", "overview_reload_reason", "announcement_state", "overview_art_source", "sgp_history_circuit", "gameflow_phase_client", "browser_error_client":
 	default:
 		return event, true
 	}
@@ -37,6 +37,11 @@ func (a *app) compactDiagnostic(event map[string]any, now time.Time) (map[string
 	for k, v := range copy {
 		signatureFields[k] = v
 	}
+	if isR278Diagnostic(name) {
+		for _, key := range []string{"count", "latency_ms", "durationMs", "matches_before", "matches_after"} {
+			delete(signatureFields, key)
+		}
+	}
 	if name == "browser_error_client" {
 		for _, k := range []string{"counts", "total", "deferred", "error_deferred", "repeat_count"} {
 			delete(signatureFields, k)
@@ -47,7 +52,7 @@ func (a *app) compactDiagnostic(event map[string]any, now time.Time) (map[string
 	}
 	raw, _ := json.Marshal(signatureFields)
 	signature := string(raw)
-	if name == "overview_art_source" || name == "browser_error_client" {
+	if isR278Diagnostic(name) || name == "overview_art_source" || name == "browser_error_client" {
 		key += "|" + riotIdentityKey(signature)
 	}
 	a.compactDiagnosticMu.Lock()

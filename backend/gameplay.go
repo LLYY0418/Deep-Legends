@@ -750,8 +750,11 @@ type lcuTeam struct {
 func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	shape := newOverviewResponseShape()
 	w = &overviewShapeWriter{w, shape}
-	defer func() { a.recordDiagnostic(shape.event()) }()
+	defer func() { a.recordOverviewShape(shape, time.Now()) }()
 	progressSeen := make(map[int64]string)
+	if r.Header.Get("X-Overview-No-Reference") == "1" {
+		progressSeen = nil
+	}
 	a.mu.RLock()
 	warmClient := a.lcu
 	a.mu.RUnlock()
@@ -1359,6 +1362,16 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	}
 	playerRef := reference.PlayerRef
 	isCurrent := (playerRef == "" || gameplayReferenceContains(reference, current.PUUID)) && !isRemoteTencentServer(client, reference.ServerID)
+	if overviewHeadProbe(ctx) {
+		if isCurrent {
+			playerRef = current.PUUID
+			reference = mergeGameplayReferences(reference, gameplayReferenceFromSummoner(current))
+		}
+		matches, capabilities, pagination := a.loadDetailedMatches(ctx, client, reference, playerRef, isCurrent, 0, 5, matchFilter, bundledChampionNames(), loadQueueLabelsContext(ctx, client))
+		response := gameplayOverview{Matches: matches, Capabilities: capabilities, Pagination: pagination}
+		a.publicizeOverviewReferences(&response)
+		return response
+	}
 	localRankRegion := reference.Region
 	if isCurrent {
 		localRankRegion = ""
@@ -1460,6 +1473,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	}
 	if begIndex == 0 {
 		a.startSeasonStatsRefresh(client, reference, player, playerRef, bundledChampionNames(), overviewFreshHistory(ctx))
+	}
+	if begIndex == 0 && isRiotRegion(reference.Region) && !strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE") {
+		a.startOPGGHistoricalRanks(reference, player.GameName, player.TagLine, playerRef, reference.Privacy)
 	}
 	backgroundCh := make(chan gameplayPlayer, 1)
 	go func() {
@@ -1740,6 +1756,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		a.publicizeOverviewReferences(&response)
 		return response
 	}
+	response.HistoricalRanks = a.cachedOPGGHistoricalRanks(playerRef, reference.Region)
 	rankResultValue := <-rankCh
 	phases.markSpan("ranks", rankResultValue.started, rankResultValue.ended)
 	rankEntry := rankResultValue.value
@@ -1748,10 +1765,6 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	ranks, rankCapability = a.applySeasonRankWinRateFallback(ranks, rankCapability, seasonProgress, seasonByQueue)
 	capabilities = append(capabilities, rankCapability)
 	response.RankMilestones = rankMilestonesForRegion(localRankRegion, rankMilestones)
-	if isRiotRegion(reference.Region) && !strings.EqualFold(strings.TrimSpace(reference.Privacy), "PRIVATE") {
-		response.HistoricalRanks = a.cachedOPGGHistoricalRanks(playerRef, reference.Region)
-		a.startOPGGHistoricalRanks(reference, player.GameName, player.TagLine, playerRef, reference.Privacy)
-	}
 	// 刷新 LP 追踪基线：下一场结算时据此计算胜点变化。
 	if isCurrent {
 		a.lpTracker.observe(playerRef, ranks, rankCapability)
@@ -2663,6 +2676,10 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 		attempts = append(attempts, DataSourceAttempt{Source: dataSourceSGP, Outcome: dataSourceDisabled, Message: "当前查询没有可用的 SGP 路由"})
 		fallbackReason = decision.Reason
 	}
+	if !isRiotRegion(clientRegion) && a.sgp != nil && a.sgp.historyCircuitCooling(serverID, "SUMMARY", false) {
+		capabilities := []EndpointCapability{{Name: "match-history", State: capabilityFailed, HistoryStatus: "official", Detail: historyServerUnavailableMessage}, {Name: "match-details", State: capabilityFailed, HistoryStatus: "official", Detail: historyServerUnavailableMessage}}
+		return nil, capabilities, filterResolution.pagination(begIndex, 0, false)
+	}
 	if len(decision.Sources) > 0 && decision.Sources[0] == dataSourceSGP {
 		infos, consumed, more, resolvedFilter, historyErr := a.loadSGPMatchHistoryPage(ctx, client, serverID, playerRef, begIndex, count, matchFilter, sgpHistoryPageOptions{NoCache: overviewFreshHistory(ctx)})
 		filterResolution = resolvedFilter
@@ -2782,7 +2799,7 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 					{Name: "match-history", Path: "sgp: /match-history-query/v1/products/lol/player/{player}/SUMMARY", State: capabilityFailed, Detail: detail, Attempts: attempts, FallbackReason: fallbackReason},
 					{Name: "match-details", Path: "sgp: 同一请求返回全部参与者", State: capabilityFailed, Detail: detail, Attempts: attempts, FallbackReason: fallbackReason},
 				}
-				if retry := a.sgp.historyRetryAfter(serverID); retry > 0 || errors.Is(historyErr, errSGPHistoryCooling) {
+				if retry := a.sgp.historyRetryAfter(serverID); retry > 0 || historyServerError(historyErr) {
 					for i := range capabilities {
 						capabilities[i].HistoryStatus = "official"
 						capabilities[i].RetryAfter = retry
@@ -3317,7 +3334,7 @@ func gameplayDisplayName(summoner Summoner) string {
 // decision. Local LCU ranked-stats is preferred because it is fast and normally
 // returns verified wins/losses; SGP is attempted only when LCU is unavailable,
 // incompatible with a remote server, or returns an unverified win/loss pair.
-func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string, tierOnly ...bool) ([]gameplayRank, *gameplayRankMilestones, EndpointCapability) {
+func (a *app) loadRanksWithFallbackRaw(ctx context.Context, client *LCUClient, playerRef string, isCurrent bool, serverID, privacy string, tierOnly ...bool) ([]gameplayRank, *gameplayRankMilestones, EndpointCapability) {
 	clientRegion, _ := clientRegionInfo(client)
 	// R127 P1-b.1：tierOnly 表示调用方只要段位/小段/胜点（平均段位），不需要
 	// 胜负场。变参形式保证既有调用点与护栏测试都不用改。
@@ -3385,6 +3402,7 @@ func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, play
 				fallbackReason = "lcu-failed"
 				continue
 			}
+			lcuMilestones = a.rememberRankMilestones(client, playerRef, serverID, milestones)
 			if len(ranks) == 0 {
 				attempts = append(attempts, DataSourceAttempt{Source: source, Outcome: dataSourceModeUnsupported, Message: "客户端未返回单双排或灵活组排"})
 				fallbackReason = "lcu-mode-unsupported"

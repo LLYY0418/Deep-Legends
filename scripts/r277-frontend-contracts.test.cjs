@@ -53,7 +53,7 @@ test('P5 decoded hero DOM retained on every structural refresh',()=>{
  const dom=new JSDOM('<dialog><div class="af-options is-hero"><button data-af-option="103"><figure class="game-icon"><img src="/decoded"></figure></button></div></dialog>'),menu=dom.window.document.querySelector('dialog'),icon=menu.querySelector('figure'),image=menu.querySelector('img');
  const api=compile(read('history-filters.js'),['retainHeroIcons'],{});
  for(let i=0;i<3;i++){api.retainHeroIcons(menu,()=>{menu.innerHTML='<div class="af-options is-hero"><button data-af-option="103"><figure class="game-icon"><img src="/placeholder"></figure></button></div>';});assert.equal(menu.querySelector('figure'),icon);assert.equal(menu.querySelector('img'),image);}
- assert(/\.af-options strong \{[^}]*font-weight: 600/.test(read('history-filters.css')));dom.window.close();
+ assert(/\.af-options strong \{[^}]*font-weight: 600/.test(read('history-filters.css')+read('history-filters-modal.css')));dom.window.close();
 });
 test('P6 collection navigation unread survives restart and visit does not mark cards read',()=>{
  const vm=require('node:vm'),data=new Map(),storage={getItem:k=>data.get(k),setItem:(k,v)=>data.set(k,v)},ctx={module:{exports:{}},exports:{}};vm.runInNewContext(read('collection-new-items.js'),ctx);

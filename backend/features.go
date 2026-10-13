@@ -73,6 +73,8 @@ type rendererPerfGroup struct {
 	MaxMS   float64 `json:"maxMs"`
 }
 type clientDiagnosticRequest struct {
+	R278 json.RawMessage `json:"r278,omitempty"`
+
 	RankedMatches   int `json:"ranked_matches,omitempty"`
 	WithDelta       int `json:"with_delta,omitempty"`
 	Chips           int `json:"chips,omitempty"`
@@ -137,6 +139,8 @@ type clientDiagnosticRequest struct {
 	PreviousGameID          int64                       `json:"previousGameId"`
 	PreviousPhase           string                      `json:"previousPhase,omitempty"`
 	ClearedRecommendations  int                         `json:"clearedRecommendations"`
+	DurationP50MS           int                         `json:"durationP50Ms,omitempty"`
+	DurationP95MS           int                         `json:"durationP95Ms,omitempty"`
 	ResponseBytes           *int64                      `json:"responseBytes,omitempty"`
 	LongtaskCount           int                         `json:"longtaskCount,omitempty"`
 	LongtaskTotalMS         float64                     `json:"longtaskTotalMs,omitempty"`
@@ -282,7 +286,14 @@ var clientDiagnosticEvents = map[string]map[string]bool{
 	"overview_scroll_reset":          {"restored": true},
 	"overview_reference_expired":     {"retry": true},
 	"overview_rerender_client":       {"render": true, "filter_modal_error": true},
-	"history_search_client":          {"done": true, "user_stop": true, "no_more": true, "outage": true, "quota": true, "error": true},
+	"client_follow_client":           {"login": true, "platform-change": true, "identity-change": true},
+	"history_outage_ui":              {"shown": true, "recovered": true},
+	"overview_reference_fallback":    {"empty-revision": true, "missing": true, "mismatch": true},
+	"match_autoload_client":          {"bound": true, "requested": true, "blocked": true, "started": true},
+	"collection_new_marker":          {"skin": true},
+	"overview_reload_reason":         {"section-return": true, "head-probe": true, "manual": true, "zoom": true, "outage-recovery": true},
+	"announcement_state":             {"shown": true, "read": true, "dismissed": true, "fetch-failed": true},
+	"history_search_client":          {"done": true, "user_stop": true, "no_more": true, "time_boundary": true, "outage": true, "quota": true, "error": true},
 	"collection_failure_state_shown": {"last_error": true, "retry_count": true, "elapsed": true},
 	"browser_error_client":           {"error": true, "unhandledrejection": true, "csp": true},
 	"self_tab_client":                {"ready": true, "removed": true, "overlay-shown": true},
@@ -379,6 +390,10 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 	if !reasons[request.Reason] {
 		a.recordClientDiagnosticRejected("unknown-reason", request.Event)
 		http.Error(w, "invalid client diagnostic", http.StatusBadRequest)
+		return
+	}
+	if isR278Diagnostic(request.Event) {
+		a.recordR278Diagnostic(w, request)
 		return
 	}
 	if request.Event == "client_view_client" || request.Event == "ui_zoom_state" {
@@ -836,6 +851,13 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		switch request.ErrorKind {
 		case "none", "http", "timeout", "network", "decode", "read", "canceled":
 			event["error_kind"] = request.ErrorKind
+		}
+		if request.Event == "local_request_client" && request.Reason == "complete" && request.Count > 0 && request.HTTPStatus >= 200 && request.HTTPStatus < 300 && request.ErrorKind == "none" {
+			event["count"] = min(1000000, request.Count)
+			event["duration_ms"] = map[string]any{"p50_ms": min(1000000, max(0, request.DurationP50MS)), "p95_ms": min(1000000, max(0, request.DurationP95MS)), "max_ms": event["duration_ms"]}
+			a.appendDiagnosticEvent(event)
+			w.WriteHeader(http.StatusNoContent)
+			return
 		}
 		// R127 P0-2：图片队列的排队/加载计时与来源类别。只记来源枚举，
 		// 不记具体资源路径，保持既有隐私口径。

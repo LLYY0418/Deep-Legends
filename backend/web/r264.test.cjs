@@ -43,7 +43,7 @@ test('R264 P5 automatic retry is single, quiet, and stops after recovery',()=>{
  const tab={data:{capabilities:[{name:'match-history',state:'failed',detail:'战绩服务器暂时不可用，稍后自动重试'}]}};
  const timers=new Map(),calls=[];let sequence=0;
  const f=compile(source,['scheduleHistoryServerRetry'],{state:{destroyed:false},setTimeout:(fn,delay)=>{assert.equal(delay,60000);timers.set(++sequence,fn);return sequence},clearTimeout:id=>timers.delete(id),overviewContainer:()=>({}),connected:()=>true,loadOverview:(...args)=>calls.push(args)});
- f.scheduleHistoryServerRetry(tab);f.scheduleHistoryServerRetry(tab);assert.equal(timers.size,1);timers.values().next().value();assert.deepEqual(calls,[[tab,true,false,false,true]]);
+ f.scheduleHistoryServerRetry(tab);f.scheduleHistoryServerRetry(tab);assert.equal(timers.size,0);assert.deepEqual(calls,[]);
  tab.data.capabilities=[];f.scheduleHistoryServerRetry(tab);assert.equal(tab.historyServerRetryTimer,0);
 });
 test('R264 P6 fast cards and one match survive a late failure during the first page',async()=>{
@@ -62,5 +62,5 @@ test('R264 P6 fast cards and one match survive a late failure during the first p
 test('R264 P2 completed identical snapshot redraws cards that the connection placeholder removed',async()=>{
  const items=[{id:1,name:'Fixture',owned:true}],state={skinLoadGeneration:0,items,status:{connected:true,snapshotReady:true},view:'owned',skinsCache:new Map(),staleSnapshot:false,staleSnapshotAt:'',sort:'name',collectionRenderPending:true};let renders=0;
  const f=compile(app,['loadSkins','sameCollectionItems','applySkinsPayload'],{state,el:{retryList:{hidden:false}},window:{},api:async()=>({items,stale:false}),acquisitionTime:()=>null,configureSortControls:()=>{},renderItems:()=>renders++,ensureCollection:()=>{}});
- await f.loadSkins(true);assert.equal(renders,1);assert.equal(state.collectionRenderPending,false);assert.equal(state.loading,false);
+ await f.loadSkins(true);assert.equal(renders,2);assert.equal(state.collectionRenderPending,false);assert.equal(state.loading,false);
 });

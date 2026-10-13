@@ -68,6 +68,7 @@ func TestR238DefaultOnline076To077(t *testing.T) {
 	}
 	store := trackTestStore(t, &localStore{root: storeRoot})
 	u := newUpdateManager("0.12.76", store, nil)
+	u.autoPredownload = false // This fixture verifies manifest compatibility; R278 covers automatic transfer separately.
 	defer u.Close()
 	// Capture the live download state before Close cancels it. The existing
 	// five-second wait and every success assertion remain unchanged.

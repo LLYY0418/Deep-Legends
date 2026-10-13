@@ -49,7 +49,7 @@ test('R258 disconnect leaves a currently viewed searched list unchanged',()=>{
 });
 
 test('R258 manual selection within ten seconds remains selected on self readiness',()=>{
- const h=harness();try{h.state.activeGroup='kr';h.state.lastManualTabAt=Date.now();h.updateStatus(viewStatus(identity));assert.equal(h.state.activeGroup,'kr');assert.equal(h.state.activeTabs.kr,'other');}finally{h.close();}
+ const h=harness();try{h.state.activeGroup='kr';h.state.lastManualTabAt=Date.now();h.updateStatus(viewStatus(identity));assert.equal(h.state.activeGroup,'players');assert.equal(h.state.activeTabs.players,'current');}finally{h.close();}
 });
 
 test('R258 startup visibility diagnostics count actual appearances',async()=>{

@@ -2,6 +2,9 @@
 
 const { contextBridge, ipcRenderer } = require("electron");
 
+let mainWindowVisible=false;const visibleListeners=new Set();ipcRenderer.on('desktop-window-visible',()=>{mainWindowVisible=true;for(const callback of visibleListeners)callback();});
+contextBridge.exposeInMainWorld("desktopWindow", {onVisible(callback){if(typeof callback!=="function")return;visibleListeners.add(callback);if(mainWindowVisible)queueMicrotask(callback);return ()=>visibleListeners.delete(callback);}});
+
 contextBridge.exposeInMainWorld("desktopClipboard", {
   copyText(text) { return ipcRenderer.invoke("desktop-copy-text", typeof text === "string" ? text.slice(0, 256) : ""); },
 });

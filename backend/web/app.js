@@ -477,7 +477,7 @@
       const snapshotChanged = !previous || previous.lastSync !== state.status.lastSync || previous.collectionAccount !== state.status.collectionAccount || previous.poolId !== state.status.poolId || previous.connected !== state.status.connected || previous.clientRegion !== state.status.clientRegion || previous.serverId !== state.status.serverId || previous.snapshotReady !== state.status.snapshotReady || previous.snapshotFallback !== state.status.snapshotFallback;
       if (loadItems || snapshotChanged) {
         state.skinsCache?.clear();
-        if (state.section === "favorites" && state.favoritesPage === "collection") await loadSkins(true);
+        if (state.section === "favorites" && state.favoritesPage === "collection") await loadSkins(loadItems);
       }
       if (state.section === "favorites" && state.favoritesPage === "account" && (loadItems || changed)) await loadAccount();
       if (state.section === "favorites" && state.favoritesPage === "pools" && (loadItems || changed)) await loadPools();
@@ -651,6 +651,13 @@
     catch (error) { if (error.name !== "RequestCancelled") showToast(error.message); }
   }
 
+  function collectionRenderSignature(items=state.items) {
+    return JSON.stringify([state.view,state.sort,state.descending,state.query,[...(state.qualitySelections || [])],Boolean(state.staleSnapshot),String(state.staleSnapshotAt || ""),state.status?.collectionAccount,items]);
+  }
+  function collectionIsRendered(signature) {
+    return state.renderedSignature===signature && Boolean(el.grid?.querySelector('[data-collection-id]')) && !el.grid.querySelector('.skeleton,.loading,.empty-state');
+  }
+
   function sameCollectionItems(left, right) {
     if (left === right) return true;
     if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
@@ -691,7 +698,7 @@
       return;
     }
     // Keep mounted cards for identical refreshes; redraw connection placeholders.
-    const keepVisible = state.items.length > 0;
+    const keepVisible = collectionIsRendered(collectionRenderSignature());
     state.loading = !keepVisible;
     if (state.loading) renderItems();
     let shouldRender = !keepVisible;
@@ -702,7 +709,7 @@
       const items = Array.isArray(payload.items) ? payload.items : [];
       const sameStaleContext = Boolean(state.staleSnapshot) === Boolean(payload.stale)
         && (!payload.stale || String(state.staleSnapshotAt || "") === String(payload.capturedAt || ""));
-      const unchanged = keepVisible && !state.collectionRenderPending && sameCollectionItems(state.items, items) && sameStaleContext;
+      const unchanged = !force && collectionIsRendered(collectionRenderSignature(items)) && keepVisible && !state.collectionRenderPending && sameCollectionItems(state.items, items) && sameStaleContext;
       window.reportFlowDiagnostic?.("collection_render_client", unchanged ? "unchanged-suppressed" : "updated", {
         view: state.view, force: Boolean(force), itemCount: items.length, keptVisible: keepVisible,
       });
@@ -863,6 +870,13 @@
     el.notice.hidden = true;
   }
 
+  function autoScanClientInstallations() {
+    if(Date.now()-Number(state.installationScanAt || 0)<30000)return;
+    state.installationScanAt=Date.now();void loadClientInstallations(true);
+  }
+  window.addEventListener('focus',autoScanClientInstallations);
+  window.addEventListener('deep-legends:overview-group',event=>{if(event.detail?.group==='kr')autoScanClientInstallations();});
+
   async function loadClientInstallations(force = false) {
     const render = () => {
       try { renderLaunchpad(); } catch (error) { reportStatusRenderFailed(error, "renderLaunchpad"); }
@@ -874,6 +888,7 @@
       render();
       return;
     }
+    state.installationScanAt=now;
     state.installationsLoaded = false;
     state.installationLoadError = "";
     state.officialLoginMessage = "";
@@ -936,10 +951,11 @@
       el.launcherList.innerHTML = '<span class="muted">正在检查 TCLS 与 Riot 客户端…</span>';
       return;
     }
-    const desiredIDs = (state.overviewGroup || "players") === "kr" ? ["riot"] : ["tcls", "wegame"];
+    const foreign=(state.overviewGroup || "players")==="kr";
+    const desiredIDs = foreign ? ["riot"] : ["tcls", "wegame"];
     const installations = desiredIDs.map(id => (state.installations || []).find(item => item.id === id && item.available) || { id, name: id === "tcls" ? "国服纯净入口" : id === "wegame" ? "WeGame" : "Riot 客户端", available: false });
-    el.officialLoginStatus.textContent = installationFailed ? `无法检查客户端安装位置：${state.installationLoadError}` : state.officialLoginMessage || (installations.some(item => item.available) ? "登录并进入大厅后会自动连接。" : "未找到可启动的英雄联盟客户端入口。");
-    if (installationFailed) {
+    el.officialLoginStatus.textContent = foreign ? "" : installationFailed ? `无法检查客户端安装位置：${state.installationLoadError}` : state.officialLoginMessage || (installations.some(item => item.available) ? "登录并进入大厅后会自动连接。" : "未找到可启动的英雄联盟客户端入口。");
+    if (installationFailed && !foreign) {
       el.launcherList.hidden = false;
       el.launcherList.innerHTML = `<div class="empty-state compact"><strong>安装位置检查失败</strong><p>${escapeHTML(state.installationLoadError)}</p><button class="text-button scan-launchers" type="button">重新检查安装位置</button></div>`;
       el.launcherList.querySelector(".scan-launchers")?.addEventListener("click", () => loadClientInstallations(true));
@@ -950,10 +966,10 @@
       const isTCLS = item.id === "tcls";
       const starting = Boolean(state.clientLaunchPending?.[item.id] || state.clientLaunchWaiting?.[item.id] || state.clientLaunchInFlight === item.id || launchedID === item.id);
       const label = starting ? "正在启动…" : isTCLS ? "国服纯净入口" : item.name;
-      const description = isTCLS ? "跳过 WeGame，直连国服客户端" : item.location || item.description || "";
+      const description = item.id==="riot" && !item.available ? "本机未安装 Riot 客户端" : isTCLS ? "跳过 WeGame，直连国服客户端" : item.location || item.description || "";
       return `<button${isTCLS ? ' id="official-login"' : ""} class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"${starting || !item.available ? " disabled" : ""}><span class="launcher-kind">${escapeHTML(isTCLS ? "L" : item.id === "wegame" ? "W" : "R")}</span><span class="launcher-card-copy"><strong>${escapeHTML(label)}</strong><small data-tooltip="${escapeHTML(description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`;
     }).join("") : "";
-    if (!installations.some(item => item.available)) {
+    if (!foreign && !installations.some(item => item.available)) {
       el.launcherList.innerHTML += '<button class="text-button scan-launchers" type="button">重新检查安装位置</button>';
       el.launcherList.querySelector(".scan-launchers")?.addEventListener("click", () => loadClientInstallations(true));
     }
@@ -1199,6 +1215,7 @@
     const acquisitionHint = state.acquisitionFallback ? " · 客户端未提供获取时间，已改按名称排列" : state.view === "all" && state.sort === "acquired" ? " · 英雄按最近获得的皮肤排列" : "";
     const staleHint = state.staleSnapshot ? ` · 历史快照${state.staleSnapshotAt ? `（${formatDateTime(state.staleSnapshotAt)}）` : ""}` : "";
     renderListMeta(label, " ", visible.length, " 款", heroCount ? [" · ", heroCount, " 位英雄"] : "", visible.length !== state.items.length ? [" · 共 ", state.items.length, " 款"] : "", acquisitionHint, staleHint);
+    state.renderedSignature=collectionRenderSignature();
     const renderKey=[state.view,state.sort,state.descending,state.query,[...state.qualitySelections].join(','),state.status?.clientRegion,state.status?.serverId,state.status?.collectionAccount].join('|');
     if(visible.length && el.grid._collectionRenderKey===renderKey && el.grid.querySelector('[data-collection-id]')){
       if(state.view==='chromas'){reconcileChromaCatalog(visible,generation);applyChromaVisibility();return;}
@@ -2672,6 +2689,7 @@
     if (name !== "favorites" && state.section === "favorites") {
       cancelRenderFrames();
       cancelPoolRenderFrames();
+      el.grid.replaceChildren();el.poolSkinGrid?.replaceChildren();state.renderedSignature="";delete el.grid._collectionRenderKey;state.collectionRenderPending=true;
       state.renderGeneration += 1;
       state.poolRenderGeneration += 1;
       cancelDeferredImages(el.grid);
@@ -2796,6 +2814,7 @@
     if (previous !== name) {
       cancelRenderFrames();
       cancelPoolRenderFrames();
+      el.grid.replaceChildren();el.poolSkinGrid?.replaceChildren();state.renderedSignature="";delete el.grid._collectionRenderKey;state.collectionRenderPending=true;
       state.renderGeneration += 1;
       state.poolRenderGeneration += 1;
       cancelDeferredImages(el.grid);
@@ -3228,7 +3247,7 @@
 
   window.desktopDiagnostics?.onError?.(message => showToast(`诊断日志保存失败：${message}`));
   let toastTimer = 0;
-  function showToast(message, duration = 3200) { clearTimeout(toastTimer); el.toast.textContent = message; el.toast.hidden = false; toastTimer = setTimeout(() => { el.toast.hidden = true; }, duration); }
+  function showToast(message, duration = 3200) { clearTimeout(toastTimer); el.toast.textContent = message; const owner=el.toast.ownerDocument;if(owner)(owner.querySelector("dialog[open]") || owner.body).appendChild(el.toast); el.toast.hidden = false; toastTimer = setTimeout(() => { el.toast.hidden = true; }, duration); }
   window.deepLegendsToast = showToast;
   function localeCompare(left, right) { return String(left || "").localeCompare(String(right || ""), "zh-CN", { numeric: true, sensitivity: "base" }); }
   const rarityKeys = { "卓越": "transcendent", "圣堂": "exalted", "神话": "mythic", "终极": "ultimate", "传说": "legendary", "限定": "limited", "史诗": "epic", "王者": "royal", "勇士": "brave", "典藏": "archive", "未分级": "unranked" };
@@ -3557,7 +3576,7 @@
 
   const RIOT_REGION_LABELS = {kr:"韩服",jp1:"日服",na1:"美服",euw1:"欧西",eun1:"欧北东",tw2:"台服",sg2:"东南亚",br1:"巴西",la1:"拉北",la2:"拉南",me1:"中东",oc1:"大洋洲",ru:"俄服",tr1:"土耳其",vn2:"越南"};
   function isRiotSearchRegion(region) { return Object.hasOwn(RIOT_REGION_LABELS, String(region || "").toLowerCase()); }
-  let searchClientPlatform = "";
+  let searchClientPlatform = "", searchClientReady=false, searchClientServer="",searchClientIdentity="";
   function searchRegion() { const region = el.playerSearchRegion.dataset.region; return region === "riot-follow" ? (state.status?.connected && isRiotSearchRegion(state.status?.clientRegion) ? state.status.clientRegion : "") : isRiotSearchRegion(region) ? region : ""; }
   function searchServerID() { return searchRegion() ? "" : (el.playerSearchRegion.dataset.serverId || ""); }
 
@@ -3622,22 +3641,24 @@
       el.playerSearchRegionLabel.textContent = selected?.querySelector("b")?.textContent?.trim() || "国服";
       return;
     }
-    const currentServerName = data?.connected ? String(data.serverName || "").trim() : "";
+    const clientOption = [...el.playerSearchRegionMenu.querySelectorAll('[data-region-option="cn"]')].find(option=>data?.serverId && option.dataset.serverId===String(data.serverId).toUpperCase());
+    const currentServerName = data?.connected ? (clientOption?.querySelector('b')?.textContent?.trim() || String(data.serverName || "").trim()) : "";
     el.playerSearchRegionLabel.textContent = currentServerName || "国服";
   }
 
   function updateSearchRegionStatus(data) {
     const platform = isRiotSearchRegion(data?.clientRegion) ? data.clientRegion : data?.clientRegion === "TENCENT" ? "cn" : "";
-    if (data?.connected && platform && platform !== searchClientPlatform) {
-      searchClientPlatform = platform;
-      if (!el.playerSearchRegion.dataset.manual) applySearchRegion(platform === "cn" ? "cn" : "riot-follow", "", false);
-    }
+    const ready=data?.clientView?data.clientView.state==='ready':Boolean(data?.connected),server=String(data?.serverId || ''),identity=String(data?.summoner?.playerRef || '');
+    const follow=ready && platform && (!searchClientReady || platform!==searchClientPlatform || server!==searchClientServer || identity && identity!==searchClientIdentity);
+    if(follow){const from=searchRegion() || el.playerSearchRegion.dataset.serverId || searchClientServer;const trigger=!searchClientReady?'login':platform!==searchClientPlatform || server!==searchClientServer?'platform-change':'identity-change';if(typeof window!=='undefined')window.reportFlowDiagnostic?.('client_follow_client',trigger,{from_group:state.overviewGroup || 'players',to_group:platform==='cn'?'players':'kr',search_from:from,search_to:platform==='cn'?server:platform,applied:true});delete el.playerSearchRegion.dataset.manual;savePreference('search-region-manual','');applySearchRegion(platform==='cn'?'cn':'riot-follow','',false);}
+    searchClientReady=ready;searchClientPlatform=ready?platform:'';searchClientServer=server;searchClientIdentity=identity;
     const riotAvailable = Boolean(data?.connected && isRiotSearchRegion(data?.clientRegion));
     el.playerSearchRiotFollowClient.disabled = !riotAvailable;
     el.playerSearchRiotFollowClient.setAttribute("aria-disabled", String(!riotAvailable));
     el.playerSearchRiotFollowStatus.textContent = riotAvailable ? `（${RIOT_REGION_LABELS[data.clientRegion]}）` : "需要外服客户端在运行";
     const serverId = data?.connected ? String(data.serverId || "").trim().toUpperCase() : "";
-    const serverName = data?.connected ? String(data.serverName || "").trim() : "";
+    const serverOption = [...el.playerSearchRegionMenu.querySelectorAll('[data-region-option="cn"]')].find(option=>serverId && option.dataset.serverId===serverId);
+    const serverName = data?.connected ? (serverOption?.querySelector('b')?.textContent?.trim() || String(data.serverName || "").trim()) : "";
     const available = Boolean(serverId && serverName);
     el.playerSearchFollowClient.disabled = !available;
     el.playerSearchFollowClient.setAttribute("aria-disabled", String(!available));
@@ -3658,7 +3679,7 @@
     }
     if (region !== "cn") setCNRegionExpanded(false);
     updateSearchRegionLabel();
-    if (manual) { el.playerSearchRegion.dataset.manual = "true"; savePreference("search-region-manual", "true"); }
+    if (manual) { el.playerSearchRegion.dataset.manual = "true";  }
     savePreference("search-region", region);
     if (region === "cn") savePreference("search-server-id", el.playerSearchRegion.dataset.serverId);
   }
@@ -3708,7 +3729,7 @@
   });
   document.addEventListener("click", (event) => { if (!event.target.closest(".player-search-region")) closeRegionMenu(); });
   el.playerSearchCnInfo.dataset.tooltip = CN_SERVER_MERGE_NOTE;
-  if (preference("search-region-manual", "") === "true") el.playerSearchRegion.dataset.manual = "true";
+
   applySearchRegion(preference("search-region", "kr"), preference("search-server-id", ""), false);
   updateSearchRegionStatus(state.status || {});
   window.addEventListener("deep-legends:status", (event) => updateSearchRegionStatus(event.detail || {}));
@@ -4089,6 +4110,9 @@
           if(detail?.type === "client-cold-window") {window.deepLegendsPerformance?.startColdRequestWindow?.(detail.processAt);return;}
           if (detail?.type === "client-view") { try { acceptClientView(detail); } catch (error) { reportStatusRenderFailed(error, "acceptClientView"); } return; }
 		  if (detail?.type === "live-player-progress") { window.dispatchEvent(new CustomEvent("deep-legends:live-player-progress", { detail })); return; }
+          if(detail?.type==='history-service-recovered'){window.dispatchEvent(new CustomEvent('deep-legends:history-service-recovered',{detail}));return;}
+          if(detail?.type==='collection-new-skins'){window.deepLegendsCollectionNewItems?.newSkins(detail);window.reportFlowDiagnostic?.('collection_new_marker','skin',{latency_ms:Math.max(0,Date.now()-Number(detail.at || Date.now())),source:'event'});return;}
+          if(detail?.type==='announcements-changed'){window.dispatchEvent(new CustomEvent('deep-legends:announcements-changed'));return;}
 		  const slices = LIVE_UPDATE_STATE_SLICES[detail?.type] || [];
 		  if (slices.includes("riot-relay-recovered")) window.dispatchEvent(new CustomEvent("deep-legends:riot-relay-recovered", {detail}));
           if (slices.includes("lp-recorded")) window.dispatchEvent(new CustomEvent("deep-legends:lp-recorded", {detail}));
@@ -4286,6 +4310,7 @@
     savePreference("update-viewed", updateUI.seen);
     el.updateButton.classList.remove("fresh");
     el.updateReadyToast.hidden = true;
+    if(document.getElementById('announcements-dialog')?.open){window.addEventListener('deep-legends:modal-idle',openUpdateDialog,{once:true});return;}
     if (!el.updateDialog.open) el.updateDialog.showModal();
     renderUpdateStatus(updateUI.status);
     void api("/api/gameplay/phase", {}, "update-gameflow", 2000).then((value) => { updateUI.phase = value.phase; renderUpdateDialog(); }).catch(() => {});

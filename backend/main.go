@@ -36,6 +36,21 @@ var buildFingerprint = "dev"
 const diagnosticDeduplicationLimit = 512
 
 type app struct {
+	snapshotDiagnosticMu      sync.Mutex
+	snapshotDiagnosticWindows map[string]*diagnosticSnapshotWindow
+	milestoneCache            milestoneCache
+
+	shapeDiagnosticMu          sync.Mutex
+	shapeDiagnosticWindows     map[string]time.Time
+	collectionSkinEventMu      sync.Mutex
+	collectionSkinEventEpoch   uint64
+	collectionSkinEventSeen    map[int64]bool
+	collectionSkinEventRunning bool
+	collectionSkinEventPending bool
+
+	announcementsOnce sync.Once
+	announcements     *announcementCache
+
 	license                         *licenseManager
 	collectionDataRetry             *time.Timer
 	collectionDataRetryCount        int
@@ -537,6 +552,10 @@ func main() {
 		return loadGameplayAugmentsFromClient(client)
 	}
 	a.sgp.observe = a.recordDiagnostic
+	a.sgp.historyRecovered = func(server string) {
+		data, _ := json.Marshal(map[string]any{"type": "history-service-recovered", "serverId": server})
+		a.broadcastEvent(string(data))
+	}
 	a.sgp.requestBytes = a.recordColdSGPBytes
 	a.liveRecommendationPrewarmer = newLiveRecommendationPrewarmer(championProvider, a.recordDiagnostic)
 	a.sgp.gatewayAccount = func(client *LCUClient) string {
@@ -599,6 +618,9 @@ func main() {
 	mux.HandleFunc("GET /api/license/status", a.authorized(a.handleLicenseStatus))
 	mux.HandleFunc("POST /api/license/activate", a.authorized(a.handleLicenseActivate))
 	mux.HandleFunc("GET /api/status", a.authorized(a.handleStatus))
+	mux.HandleFunc("POST /api/gameplay/history-head", a.authorized(a.handleGameplayHistoryHead))
+	mux.HandleFunc("GET /api/announcements", a.authorized(a.handleAnnouncements))
+	mux.HandleFunc("GET /api/announcements/image", a.authorized(a.handleAnnouncementImage))
 	mux.HandleFunc("GET /api/events", a.authorized(a.handleEvents))
 	mux.HandleFunc("GET /api/skins", a.authorized(a.handleSkins))
 	mux.HandleFunc("GET /api/pool-skins", a.authorized(a.handlePoolSkins))
@@ -703,6 +725,15 @@ func main() {
 	mux.HandleFunc("POST /api/quit", a.authorized(a.handleQuit))
 	a.registerUpdateRoutes(mux)
 	a.updates = newUpdateManager(version, a.storage, a.broadcastUpdateEvent)
+	a.updates.foregroundBusy = func() bool {
+		if a.riot == nil || a.riot.foreground == nil {
+			return false
+		}
+		s := a.riot.foreground
+		s.Lock()
+		defer s.Unlock()
+		return s.active > 0
+	}
 	a.updates.diagnostic = a.recordDiagnostic
 
 	listener, err := listenLocalUI(*listenAddress, *listenFallback)
@@ -1918,6 +1949,13 @@ func (a *app) recordDiagnostic(event map[string]any) {
 			return
 		}
 	}
+	rows, snapshotHandled := a.snapshotDiagnostics(event, time.Now(), false)
+	for _, row := range rows {
+		a.appendDiagnosticEvent(row)
+	}
+	if snapshotHandled {
+		return
+	}
 	if eventName, _ := event["event"].(string); eventName == "ranked_winrate_resolved" {
 		a.aggregateRankedWinrateDiagnostic(event, time.Now())
 		return
@@ -2075,6 +2113,12 @@ func (a *app) resetDiagnosticDeduplication() {
 	if a == nil {
 		return
 	}
+	a.snapshotDiagnosticMu.Lock()
+	a.snapshotDiagnosticWindows = nil
+	a.snapshotDiagnosticMu.Unlock()
+	a.shapeDiagnosticMu.Lock()
+	a.shapeDiagnosticWindows = nil
+	a.shapeDiagnosticMu.Unlock()
 	a.recommendationModeDiagnosticMu.Lock()
 	a.recommendationModeDiagnosticKeys = make(map[string]struct{})
 	a.recommendationModeDiagnosticMu.Unlock()

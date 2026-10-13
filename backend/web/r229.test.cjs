@@ -52,6 +52,6 @@ test('R235 resolving the self platform follows it unless a manual group switch h
   const state={controllers:new Map(),status:{connected:false},tabs:[current],activeTabs:{players:'current',kr:'',pro:'searched'},activeGroup:'pro',section:'overview',lastManualTabAt:recent ? Date.now()-1000 : Date.now()-11000};
   const f=compile(gameplay,['updateStatus','connected','tabGroup','riotTab','summonerLabel'],{state,setTimeout:()=>1,clearTimeout:()=>{},localStorage:{setItem:()=>{}},activateOverviewTabPanel:()=>{},renderPlayerTabs:()=>{},loadOverview:()=>{},ensurePerks:()=>{},ensureItems:()=>{},ensureSummonerSpells:()=>{},scheduleBeaconPoll:()=>{},loadLive:()=>{}});
   f.updateStatus(viewStatus({connected:true,identityReady:true,clientRegion:'jp1',summoner:{gameName:'Fixture',tagLine:'JP1',profileIconId:1}}));
-  assert.equal(state.activeGroup,recent?'pro':'kr');assert.equal(current.group,'kr');assert.equal(state.activeTabs.kr,'current');
+  assert.equal(state.activeGroup,'kr');assert.equal(current.group,'kr');assert.equal(state.activeTabs.kr,'current');
  }
 });

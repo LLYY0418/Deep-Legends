@@ -5,6 +5,7 @@
   else root.deepLegendsHistoryFilters = api;
 })(typeof window === 'undefined' ? globalThis : window, () => {
   'use strict';
+  if(typeof document!=='undefined'){const style=document.createElement('link');style.rel='stylesheet';style.href='/history-filters-modal.css';document.head.appendChild(style);}
   const categories = {result:'结果',hero:'英雄',position:'位置',time:'时间',coplayer:'同局玩家',multikill:'多杀',performance:'表现',duration:'对局时长'};
   const labels = {win:'胜利',loss:'失败',top:'上路',jungle:'打野',middle:'中路',bottom:'下路',utility:'辅助',today:'今天',d3:'近 3 天',d7:'近 7 天',d30:'近 30 天',3:'三杀',4:'四杀',5:'五杀',mvp:'MVP',svp:'SVP',top3:'前三',zero:'零阵亡',short:'< 20 分钟',medium:'20–30 分钟',long:'30–40 分钟',verylong:'> 40 分钟'};
   const tagLabels={damage:'输出',efficiency:'伤转率',control:'控制',heal:'治疗',shield:'护盾',tank:'承伤',kills:'击杀',participation:'参团',tower:'拆塔',gold:'经济',cs:'补兵',solo:'单杀',dive:'越塔',defense:'塔之子',advantage:'压刀',hook:'好钩'};
@@ -114,9 +115,22 @@
       return migrated;
     } catch(_) {try{storage.removeItem?.(key);}catch{}return [];}
   }
-  function savePreset(storage,name,cs) { const saved=readPresets(storage),n=String(name || '').trim().slice(0,60);if(!n || !Object.keys(normalize(cs)).length)return false;const index=saved.findIndex(p=>p.name===n);if(index<0 && saved.length>=12)return false;const item={name:n,conditions:normalize(cs)};if(index<0)saved.push(item);else saved[index]=item;try{storage.setItem(key,JSON.stringify(saved));return true;}catch(_){return false;} }
+  function savePreset(storage,name,cs) { const saved=readPresets(storage),n=String(name || '').trim().slice(0,60);if(!n || !Object.keys(normalize(cs)).length)return false;const index=saved.findIndex(p=>p.name===n);if(index>=0 || saved.length>=12)return false;const item={name:n,conditions:normalize(cs)};if(index<0)saved.push(item);else saved[index]=item;try{storage.setItem(key,JSON.stringify(saved));return true;}catch(_){return false;} }
+  function presetInlineError(menu,message) {let node=menu.querySelector('[data-af-save-error]');if(!node){node=menu.ownerDocument.createElement('p');node.setAttribute('role','alert');node.dataset.afSaveError='';menu.append(node);}node.textContent=message;}
+  function saveCurrentPreset(menu,tab,ctx) {
+    const input=menu.querySelector('[data-af-name]'),name=String(input?.value || '').trim();
+    const error=menu.querySelector('[data-af-save-error]');
+    let message='';
+    if(!name)message='请先输入名称';
+    else if(readPresets(ctx.storage).some(p=>p.name===name))message='已存在同名筛选，请使用其他名称';
+    else if(readPresets(ctx.storage).length>=12)message='最多保存 12 个常用筛选';
+    else if(!savePreset(ctx.storage,name,editing(tab)))message='保存失败，请重试';
+    if(message){if(input){input.setAttribute('aria-invalid','true');input.classList.remove('af-name-error');void input.offsetWidth;input.classList.add('af-name-error');input.focus();}if(error)error.textContent=message;return false;}
+    return true;
+  }
   function writePresets(storage,saved) {try{storage.setItem(key,JSON.stringify(saved.slice(0,12)));return true;}catch(_){return false;} }
   function blocked(tab,ctx) {
+    if(tab.advancedSearch?.boundary?.reached && tab.advancedSearch.boundary.signature===JSON.stringify(conditions(tab)))return {reason:'time_boundary',copy:'已查完当前时间条件的对局'};
     if(!tab.data?.pagination?.hasMore)return {reason:'no_more',copy:'已查完全部可查询的对局'};
     if(ctx.outage?.())return {reason:'outage',copy:'战绩服务暂时中断，恢复后可继续'};
     const seconds=Math.ceil(((ctx.quotaUntil?.() || tab.advancedSearch?.quotaUntil || 0)-Date.now())/1000);
@@ -139,7 +153,7 @@
         const failure=blocked(tab,ctx);if(failure){search.stopReason=failure.reason;break;}
         search.progress();
         const range=serverTimeRange(tab,ctx);
-        if(range.startTime && loaded && ctx.rows().some(m=>timeValue(m.createdAt)<range.startTime*1000)){tab.data.pagination.hasMore=false;search.stopReason='no_more';break;}
+        if(range.startTime && loaded && ctx.rows().some(m=>timeValue(m.createdAt)<range.startTime*1000)){search.boundary={signature:JSON.stringify(conditions(tab)),reached:true};search.stopReason='time_boundary';break;}
         if(!loaded || consumed<=0 || tab.data?.pagination?.moreError){search.stopReason='error';break;}
       }
     } catch(error) {search.stopReason=search.stopping?'user_stop':'error';}
@@ -153,7 +167,7 @@
   }
   function serverTimeRange(tab,ctx) {
     const c=conditions(tab).time;if(!c || c.not || !c.values.length)return {};
-    const now=Date.now(),today=new Date(now);today.setHours(0,0,0,0);
+    const now=ctx.now?.() ?? Date.now(),today=new Date(now);today.setHours(0,0,0,0);
     const starts={today:today.getTime(),d3:now-3*86400000,d7:now-7*86400000,d30:now-30*86400000};
     const values=c.values.map(v=>starts[v]);if(values.some(v=>!Number.isFinite(v)))return {};
     return {startTime:Math.floor(Math.min(...values)/1000),endTime:Math.floor(now/1000)};
@@ -234,7 +248,7 @@
   }
   function menuBody(tab,ctx) {
     const m=ui(tab),saved=readPresets(ctx.storage),cs=normalizedEditing(tab);
-    if(m.page==='saved')return `<div class="af-saved"><div class="af-saved-heading">已保存 ${saved.length} / 12</div><div class="af-saved-list">${saved.map((p,i)=>`<div class="af-saved-row"><div class="af-saved-copy">${m.renaming===i?`<div class="af-rename"><input data-af-rename-input="${i}" value="${escape(p.name)}" maxlength="60" aria-label="新名称"><button type="button" data-af-rename-save="${i}" aria-label="保存名称">✓</button><button type="button" data-af-rename-cancel aria-label="取消重命名">×</button></div>`:`<strong>${escape(p.name)}</strong>`}<div class="af-capsules">${capsules(p.conditions,ctx,true)}</div></div><div class="af-saved-actions"><button type="button" data-af-apply="${i}">套用</button><button type="button" data-af-rename="${i}">改名</button><button type="button" data-af-delete="${i}">删除</button></div></div>`).join('') || '<p class="af-empty">暂无常用筛选</p>'}</div><div class="af-current-conditions"><strong>当前条件</strong><div class="af-capsules">${Object.keys(cs).length?capsules(cs,ctx,true):'还没有选择条件'}</div></div><footer class="af-savebar"><input data-af-name placeholder="输入名称后保存当前条件" aria-label="常用筛选名称" maxlength="60"><button type="button" data-af-save${!Object.keys(cs).length || saved.length>=12?' disabled':''}>保存当前条件</button>${saved.length>=12?'<span>最多保存 12 个</span>':''}</footer></div>`;
+    if(m.page==='saved')return `<div class="af-saved"><div class="af-saved-heading">已保存 ${saved.length} / 12</div><div class="af-saved-list">${saved.map((p,i)=>`<div class="af-saved-row"><div class="af-saved-copy">${m.renaming===i?`<div class="af-rename"><input data-af-rename-input="${i}" value="${escape(p.name)}" maxlength="60" aria-label="新名称"><button type="button" data-af-rename-save="${i}" aria-label="保存名称">✓</button><button type="button" data-af-rename-cancel aria-label="取消重命名">×</button></div>`:`<strong>${escape(p.name)}</strong>`}<div class="af-capsules">${capsules(p.conditions,ctx,true)}</div></div><div class="af-saved-actions"><button type="button" data-af-apply="${i}">套用</button><button type="button" data-af-rename="${i}">改名</button><button type="button" data-af-delete="${i}">删除</button></div></div>`).join('') || '<p class="af-empty">暂无常用筛选</p>'}</div><div class="af-current-conditions"><header><strong>当前条件</strong><small>（请先在底部输入框输入名称后保存）</small></header><div class="af-capsules">${Object.keys(cs).length?capsules(cs,ctx,true):'还没有选择条件'}</div></div><p data-af-save-error role="alert"></p><footer class="af-savebar"><input data-af-name placeholder="输入名称后保存当前条件" aria-label="常用筛选名称" maxlength="60"><button type="button" data-af-save${!Object.keys(cs).length?' disabled':''}>保存当前条件</button>${saved.length>=12?'<span>最多保存 12 个</span>':''}</footer></div>`;
     const category=m.category || 'result',c=draft(tab,category),query=m.query.toLowerCase().trim();m.category=category;
     let opts=cachedOptions(tab,category,ctx,c).filter(o=>!query || searchOption(o,category,query,ctx));
     const compare=(a,b)=>category==='hero' && m.sort==='winrate' ? b.wins/b.count-a.wins/a.count : category==='hero' && m.sort==='recent' ? b.recent-a.recent : b.count-a.count;
@@ -343,7 +357,7 @@
     const on=(type,handler,capture=false)=>{(container._afHandlers ||= {})[type]=handler;container.addEventListener(type,handler,capture);};
     const current=()=>({t:container._afBoundTab,ctx:container._afContext()});
     const update=(t,ctx,category,c)=>{const m=ui(t);m.conditions={...editing(t),[category]:c};refresh(container,t,ctx);};
-    const rename=(t,ctx,i)=>{const saved=readPresets(ctx.storage),input=menuFor(container).querySelector(`[data-af-rename-input="${i}"]`),name=String(input?.value || '').trim().slice(0,60);if(!name){input?.focus();return;}if(saved.some((p,index)=>index!==i && p.name===name)){ctx.error?.('已有同名常用筛选');return;}if(saved[i]){saved[i].name=name;if(!writePresets(ctx.storage,saved))ctx.error?.('常用筛选保存失败');}ui(t).renaming=-1;refresh(container,t,ctx,true);};
+    const rename=(t,ctx,i)=>{const saved=readPresets(ctx.storage),input=menuFor(container).querySelector(`[data-af-rename-input="${i}"]`),name=String(input?.value || '').trim().slice(0,60);if(!name){input?.focus();return;}if(saved.some((p,index)=>index!==i && p.name===name)){presetInlineError(menuFor(container),'已有同名常用筛选');return;}if(saved[i]){saved[i].name=name;if(!writePresets(ctx.storage,saved)){presetInlineError(menuFor(container),'常用筛选保存失败');return;}}ui(t).renaming=-1;refresh(container,t,ctx,true);};
     on('click',event=>{
       const {t,ctx}=current(),m=ui(t),target=event.target.closest('[data-af-open],[data-af-close],[data-af-category],[data-af-remove],[data-af-add],[data-af-clear],[data-af-stop],[data-af-continue],[data-af-show-saved],[data-af-page],[data-af-option],[data-af-not],[data-af-setting],[data-af-sort],[data-af-more],[data-af-save],[data-af-apply],[data-af-rename],[data-af-rename-save],[data-af-rename-cancel],[data-af-delete],[data-af-capsules-more]');
       if(!target){const menu=menuFor(container);if(event.target===menu){const r=menu.getBoundingClientRect();if(event.clientX<r.left || event.clientX>r.right || event.clientY<r.top || event.clientY>r.bottom)close(t,ctx);}return;}
@@ -367,11 +381,11 @@
       else if('afSetting'in d){c[d.afSetting]=d.afValue;update(t,ctx,category,c);refresh(container,t,ctx,true);}
       else if('afRenameSave'in d)rename(t,ctx,Number(d.afRenameSave));
       else if('afRenameCancel'in d){m.renaming=-1;refresh(container,t,ctx,true);}
-      else if('afSave'in d){if(!savePreset(ctx.storage,menuFor(container).querySelector('[data-af-name]')?.value,editing(t)))ctx.error?.('常用筛选保存失败');else refresh(container,t,ctx,true);}
-      else {const saved=readPresets(ctx.storage),i=Number(d.afApply ?? d.afRename ?? d.afDelete);if('afApply'in d){m.conditions=clone(saved[i]?.conditions || {});close(t,ctx);}else if('afDelete'in d){saved.splice(i,1);if(!writePresets(ctx.storage,saved))ctx.error?.('常用筛选保存失败');refresh(container,t,ctx,true);}else if('afRename'in d){m.renaming=i;refresh(container,t,ctx,true);const input=menuFor(container).querySelector('[data-af-rename-input]');input?.focus();input?.select();}}
+      else if('afSave'in d){if(saveCurrentPreset(menuFor(container),t,ctx))refresh(container,t,ctx,true);}
+      else {const saved=readPresets(ctx.storage),i=Number(d.afApply ?? d.afRename ?? d.afDelete);if('afApply'in d){m.conditions=clone(saved[i]?.conditions || {});close(t,ctx);}else if('afDelete'in d){saved.splice(i,1);if(!writePresets(ctx.storage,saved)){presetInlineError(menuFor(container),'常用筛选保存失败');return;}refresh(container,t,ctx,true);}else if('afRename'in d){m.renaming=i;refresh(container,t,ctx,true);const input=menuFor(container).querySelector('[data-af-rename-input]');input?.focus();input?.select();}}
     });
     on('change',event=>{const {t,ctx}=current(),m=ui(t),c=clone(draft(t,m.category)),d=event.target.dataset;if('afAtleast'in d){c.atLeast=event.target.checked;update(t,ctx,m.category,c);}if('afThreshold'in d){c.thresholds ||= {};if(event.target.value==='')delete c.thresholds[d.afThreshold];else c.thresholds[d.afThreshold]=Number(event.target.value);update(t,ctx,'performance',c);}});
-    on('input',event=>{if(!event.target.matches('[data-af-query]'))return;const {t,ctx}=current(),position=event.target.selectionStart;ui(t).query=event.target.value;ui(t).limit=300;refresh(container,t,ctx,true);const input=menuFor(container).querySelector('[data-af-query]');input?.focus();input?.setSelectionRange(position,position);});
+    on('input',event=>{if(event.target.matches('[data-af-name]')){event.target.classList.remove('af-name-error');event.target.removeAttribute('aria-invalid');const error=menuFor(container).querySelector('[data-af-save-error]');if(error)error.textContent='';return;}if(!event.target.matches('[data-af-query]'))return;const {t,ctx}=current(),position=event.target.selectionStart;ui(t).query=event.target.value;ui(t).limit=300;refresh(container,t,ctx,true);const input=menuFor(container).querySelector('[data-af-query]');input?.focus();input?.setSelectionRange(position,position);});
     on('cancel',event=>{if(event.target.matches('[data-af-menu]')){event.preventDefault();const {t,ctx}=current();close(t,ctx);}},true);
     on('keydown',event=>{const {t,ctx}=current(),m=ui(t);if(event.target.matches('[data-af-rename-input]')){if(event.key==='Enter'){event.preventDefault();rename(t,ctx,Number(event.target.dataset.afRenameInput));}else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();m.renaming=-1;refresh(container,t,ctx,true);}return;}if(event.key==='Escape' && m.open){event.preventDefault();close(t,ctx);}if(event.key==='Tab' && m.open){const nodes=[...menuFor(container).querySelectorAll('button:not(:disabled):not([hidden]),input:not(:disabled):not([hidden]),[tabindex="0"]')],first=nodes[0],last=nodes.at(-1);if(event.shiftKey && event.target===first){event.preventDefault();last?.focus();}else if(!event.shiftKey && event.target===last){event.preventDefault();first?.focus();}}});
     if(!doc._afGlobal){doc._afGlobal=true;doc.addEventListener('keydown',event=>{const target=doc._afTarget;if(event.key!=='/' || event.ctrlKey || event.metaKey || event.altKey || /INPUT|TEXTAREA|SELECT/.test(event.target.tagName) || event.target.isContentEditable || !target?.container.isConnected)return;event.preventDefault();target.open(target.tab,target.context());});}
@@ -406,5 +420,5 @@
       }
     }
   }
-  return Object.freeze({blocked,serverTimeRange,categories,normalize,active,filter,options,multikill,participation,readPresets,savePreset,cancel,find,render,renderConditions,bind,refresh,decorate,empty,footer,counts});
+  return Object.freeze({blocked,serverTimeRange,categories,normalize,active,filter,options,multikill,participation,readPresets,savePreset,saveCurrentPreset,cancel,find,render,renderConditions,bind,refresh,decorate,empty,footer,counts});
 });

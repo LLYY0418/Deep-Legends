@@ -32,7 +32,13 @@ func (p *sgpProvider) historyCircuitTime() time.Time {
 	}
 	return time.Now()
 }
+
+type sgpBackgroundHistoryProbeKey struct{}
+
 func (p *sgpProvider) acquireHistoryCircuit(server, route string) (bool, error) {
+	return p.acquireHistoryProbe(server, route, false)
+}
+func (p *sgpProvider) acquireHistoryProbe(server, route string, background bool) (bool, error) {
 	if !sgpHistoryRoute(route) {
 		return false, nil
 	}
@@ -49,7 +55,7 @@ func (p *sgpProvider) acquireHistoryCircuit(server, route string) (bool, error) 
 	if c.until.IsZero() {
 		return false, nil
 	}
-	if (p.historyCircuitTime().Before(c.until) && (route != "SUMMARY" || p.historyCircuitTime().Before(c.nextProbe))) || c.probing {
+	if !background || (p.historyCircuitTime().Before(c.until) && (route != "SUMMARY" || p.historyCircuitTime().Before(c.nextProbe))) || c.probing {
 		return false, errSGPHistoryCooling
 	}
 	c.probing = true
@@ -89,7 +95,11 @@ func (p *sgpProvider) observeHistoryCircuit(server, route string, status int, pr
 			c.nextProbe = now.Add(15 * time.Second)
 			c.probing = false
 		}
-	} else if probe || c.until.IsZero() {
+	} else if status >= 200 && status < 300 && (probe || c.until.IsZero()) {
+		recovered := !c.until.IsZero() && probe && status >= 200 && status < 300
+		if recovered && p.historyRecovered != nil {
+			goSafe("sgp-history-recovered", func() { p.historyRecovered(server) })
+		}
 		if c.probeTimer != nil {
 			c.probeTimer.Stop()
 		}
@@ -109,7 +119,7 @@ func (p *sgpProvider) releaseHistoryProbe(server string, probe bool) {
 	}
 }
 
-// Status codes are evidence; a single failed source is not a dual-source outage.
+// The official SGP outage is independent of the local client fallback.
 func historyFailureStatus(err error) int {
 	var s *sgpHTTPError
 	var l *LCUHTTPError
@@ -132,7 +142,8 @@ func historyOfficialOutage(attempts []DataSourceAttempt, cooling int) bool {
 			lcu = lcu || a.Source == dataSourceLCU
 		}
 	}
-	return sgp && lcu
+	_ = lcu
+	return sgp
 }
 func (p *sgpProvider) historyRetryAfter(server string) int {
 	if p == nil {
@@ -168,7 +179,7 @@ func (p *sgpProvider) scheduleHistoryProbe(ctx context.Context, client *LCUClien
 		if _, active := client.credentials(); !active {
 			return
 		}
-		probeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 8*time.Second)
+		probeCtx, cancel := context.WithTimeout(context.WithValue(context.WithoutCancel(ctx), sgpBackgroundHistoryProbeKey{}, true), 8*time.Second)
 		defer cancel()
 		target, err := url.Parse(endpoint)
 		if err != nil {

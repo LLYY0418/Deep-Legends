@@ -1,0 +1,1 @@
+(()=>{const l=document.createElement('link');l.rel='stylesheet';l.href='/announcements.css';document.head.append(l);const s=document.createElement('script');s.src='/announcements.js';s.defer=true;document.head.append(s);})();

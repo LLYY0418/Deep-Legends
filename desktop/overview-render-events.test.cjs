@@ -205,7 +205,7 @@ test('R104 quota recovery keeps the first-load skeleton and existing matches vis
   const dependencies = {
     state: { tabs: [{ key: 'current' }], settings: { maskNames: false } },
     matchTierScope: () => 'scope', filteredMatches: (matches) => matches,
-    maskedProfileIcon: () => '', iconFigure: () => '', playerLabel: () => 'Player', riotTab: () => false,
+    assetIcon:()=>'',assetPath:()=>'',tabServerLabel:()=>'',maskedProfileIcon: () => '', iconFigure: () => '', playerLabel: () => 'Player', riotTab: () => false,
     emptyState: () => '', opggSummonerURL: () => '', loadOverview: () => {},
     matchListEmptyContent: () => 'empty', matchSentinelShouldHide: () => true,
     summonerContextChip: () => '', summonerProChip: () => '', summonerRegionChip: () => '', renderSummonerHighlights: () => '', renderOverviewStreak: () => '',
@@ -218,10 +218,10 @@ test('R104 quota recovery keeps the first-load skeleton and existing matches vis
   };
   const { renderOverviewBodyContent } = compileFunctions(gameplaySource, ['renderOverviewBodyContent'], dependencies);
   const retry = { retryAt: Date.now() + 5000, timer: 0 };
-  const emptyTab = { key: 'current', matchFilter: 'all', quotaRetry: retry, data: null, error: '' };
+  const emptyTab = { key: 'current', identity:{gameName:'Player'}, matchFilter: 'all', quotaRetry: retry, data: null, error: '' };
   renderOverviewBodyContent(container, emptyTab);
   assert.ok(container.querySelector('[data-quota-recovery]'));
-  assert.ok(container.querySelector('.gameplay-skeleton'));
+  assert.ok(container.querySelector('.summoner-strip'));assert.ok(!container.querySelector('.gameplay-skeleton'));
 
   const dataTab = {
     key: 'current', matchFilter: 'all', matchViewRevision: 0, openMatches: new Set(), quotaRetry: retry, error: '',

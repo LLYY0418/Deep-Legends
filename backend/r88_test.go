@@ -175,6 +175,7 @@ func TestR88DiagnosticContractsAndBuildMarker(t *testing.T) {
 		a := &app{storage: store}
 		w := httptest.NewRecorder()
 		a.handleClientDiagnostic(w, httptest.NewRequest("POST", "/api/diagnostics/client", strings.NewReader(body)))
+		a.flushSuccessfulRequestDiagnostics()
 		data, _ := store.readDiagnosticLog()
 		var e map[string]any
 		if w.Code != 204 || json.Unmarshal(data, &e) != nil || e["build_fingerprint"] != buildFingerprint {
@@ -195,7 +196,7 @@ func TestR88DiagnosticContractsAndBuildMarker(t *testing.T) {
 				t.Fatal(e)
 			}
 		case "local_request_client":
-			if e["started_at"] != float64(1700000000000) || e["duration_ms"] != float64(50) {
+			if e["count"] != float64(1) || e["duration_ms"].(map[string]any)["p95"] != float64(50) {
 				t.Fatal(e)
 			}
 		}

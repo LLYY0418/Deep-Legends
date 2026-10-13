@@ -9,9 +9,10 @@
    if(!record || !status?.snapshotReady)return;
    const counts=[Number(status.ownedCount),Number(status.chromaOwnedCount)];
    if(!counts.every(Number.isFinite))return;
-   if(record.ownedCounts && counts.some((n,i)=>n>record.ownedCounts[i]))record.navUnread=true;
+   if(record.ownedCounts && counts[0]>record.ownedCounts[0])record.navUnread=true;
    if(JSON.stringify(record.ownedCounts)!==JSON.stringify(counts)){record.ownedCounts=counts;persist();}
   }
+  function newSkins(detail){if(record && Number(detail?.count)>0){record.navUnread=true;persist();}}
   function hasUnread(){return record?.navUnread===true;}
   function visit(){if(record?.navUnread){record.navUnread=false;persist();}}
   function notify(){if(typeof document==='undefined')return;const button=document.getElementById('section-favorites');
@@ -32,7 +33,7 @@
    const clean=values=>Array.isArray(values)?values.filter(v=>typeof v==='string').slice(-50000):[];
    const seen=new Set(clean(prior.seen)),unread=new Set(clean(prior.unread)),read=new Set(clean(prior.read));
    for(const item of items){if(!item?.owned || item.id==null)continue;const id=String(item.id);
-    if(!initial && !read.has(id) && (item.newItem===true || !seen.has(id))){if(!unread.has(id))record.navUnread=true;unread.add(id);}
+    if(!initial && !read.has(id) && (item.newItem===true || !seen.has(id))){if(kind==='skins' && !unread.has(id))record.navUnread=true;unread.add(id);}
     seen.add(id);
    }
    record.kinds[kind]={seen:[...seen],unread:[...unread],read:[...read]};persist();
@@ -47,7 +48,7 @@
    card._newCollectionItem={owner,kind,id};
    if(!card._newCollectionBound){card._newCollectionBound=true;card.addEventListener('mouseenter',()=>{const item=card._newCollectionItem;read(item.kind,item.id,item.owner);card.classList.remove('is-new-collection-item');});}
   }
-  return Object.freeze({setAccount,update,isNew,read,decorate,hasUnread,visit});
+  return Object.freeze({setAccount,newSkins,update,isNew,read,decorate,hasUnread,visit});
  }
  return Object.freeze({create});
 });

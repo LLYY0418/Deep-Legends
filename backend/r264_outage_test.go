@@ -97,7 +97,10 @@ func TestR264HistoryCircuitSingleProbeRecoveryAndServerIsolation(t *testing.T) {
 	clock.Add(int64(61 * time.Second))
 	block.Store(true)
 	done := make(chan error, 1)
-	go func() { done <- read("HN1") }()
+	go func() {
+		var out map[string]any
+		done <- p.getJSON(context.WithValue(context.Background(), sgpBackgroundHistoryProbeKey{}, true), client, "HN1", "SUMMARY", "history", server.URL, &out)
+	}()
 	select {
 	case <-entered:
 	case <-time.After(time.Second):

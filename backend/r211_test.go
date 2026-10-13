@@ -105,9 +105,16 @@ func TestR211SGPForceSummaryFreshAndAllExpectedReusesFirstPage(t *testing.T) {
 	if response.ExpectedGamePresent == nil || !*response.ExpectedGamePresent || response.Matches[0].QueueID != 440 {
 		t.Fatal(response)
 	}
+	a.flushSnapshotDiagnostics()
 	costs := r175Events(t, a, "overview_load_cost")
-	if len(costs) != 4 {
-		t.Fatalf("missing overview costs: %d", len(costs))
+	observations := len(costs)
+	for _, sum := range r175Events(t, a, "diagnostic_snapshot_summary") {
+		if sum["snapshot_event"] == "overview_load_cost" {
+			observations += intNumber(sum["count"])
+		}
+	}
+	if observations != 4 {
+		t.Fatalf("missing overview costs: %d", observations)
 	}
 	for _, row := range costs {
 		if row["sgp_history_cache_hits"] != float64(0) {

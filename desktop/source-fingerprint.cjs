@@ -30,7 +30,7 @@ function sourceFingerprint(projectRoot = root) {
   // Include build inputs, not test fixtures or generated binaries (the latter
   // contain this fingerprint and would create a circular dependency).
   const buildInputs = [
-    "go.mod", "go.sum", "backend/prestige_chromas.json", "desktop/package.json", "desktop/package-lock.json",
+    "go.mod", "go.sum", "backend/prestige_chromas.json", "backend/announcements/announcements.json", "desktop/package.json", "desktop/package-lock.json",
     "build-desktop.sh", "build-desktop-windows.ps1", "build-windows.ps1", "scripts/build-stage.cjs", "scripts/normalize-source-line-endings.cjs", "scripts/go-test-shards.cjs",
     "desktop/source-fingerprint.cjs", "desktop/apply-portable-template.cjs", "desktop/apply-update-timing-template.cjs",
     "desktop/verify-embedded-riot-key.cjs", "desktop/verify-build-fingerprint.cjs", "desktop/release-build.cjs",

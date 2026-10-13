@@ -7,7 +7,7 @@ const { JSDOM } = require(require.resolve("jsdom", { paths: [path.join(__dirname
 const {source,ids,available,harness,renderScenarios}=require("./update-harness.cjs");
 test("real app bootstrap registers every updater element and renders every state", () => {
  const h=harness();try {
-  assert.equal(h.get("refresh").nextElementSibling.id,"update-button");
+  assert.equal(h.get("refresh").nextElementSibling.id,"announcements-button");assert.equal(h.get("announcements-button").nextElementSibling.id,"update-button");
   assert.equal(h.get("update-button").nextElementSibling.id,"quit");
   assert.equal(h.get("update-button").hidden,true);
   renderScenarios(h);

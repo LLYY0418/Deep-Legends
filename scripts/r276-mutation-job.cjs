@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:
 const {runOffline}=require('./r276-offline.cjs');
 async function main(){
  const [shard,folder]=process.argv.slice(2),out=path.resolve(folder);fs.mkdirSync(out,{recursive:true});
- const groups={'1':[269,270,271],'2':[272],'3':[273,274]};
+ const groups={'1':[269,270,271],'2':[272],'3':[273,274,278]};
  if(!groups[shard])throw Error('unknown mutation shard');
  const env={};
  if(shard==='1'){

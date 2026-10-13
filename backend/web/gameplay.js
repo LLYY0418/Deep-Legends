@@ -352,7 +352,7 @@
     const next={...stream.overview,...overview};
     if (Array.isArray(overview.matches)) next.matches=overview.matches.map(match=>{
       const key=String(match.gameId),reference=Object.keys(match).every(key=>["gameId","revision"].includes(key));
-      if(reference && Object.hasOwn(match,'revision')){const full=stream.matches.get(key);if(!full || full.revision!==match.revision)throw new Error("战绩引用不匹配，请重试补齐");return full;}
+      if(reference && Object.hasOwn(match,'revision')){const full=stream.matches.get(key);if(!full || (full.revision || '')!==(match.revision || '')){const error=new Error("战绩引用需要重新读取");error.referenceFallback=full?"mismatch":"missing";throw error;};return full;}
       stream.matches.set(key,match);return match;
     });
     stream.overview=next;
@@ -393,7 +393,7 @@
     if (!visiblePlayerGroups().includes(group)) return;
     const tab = activeTab(group);
     if (tab) selectPlayerTab(tab.key);
-    else { if(globalThis.deepLegendsHistoryFilters)cancelAdvancedMatchSearch(activeTab()); state.activeGroup = group; renderPlayerTabs(); renderOverview(group); }
+    else { if(globalThis.deepLegendsHistoryFilters)cancelAdvancedMatchSearch(activeTab()); state.activeGroup = group; if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("deep-legends:overview-group",{detail:{group}}));renderPlayerTabs(); renderOverview(group); }
   }
   function playerGroupButton() { return document.getElementById("player-group-button"); }
   function playerGroupMenu() { return document.getElementById("player-group-menu"); }
@@ -519,8 +519,9 @@
         if (shouldReloadOverview(tab) && tab.loadingMore) {
           renderOverview(group);
         } else if (tab.dirty) { renderOverview(group); scheduleDirtyOverview(tab); }
-        else if (shouldReloadOverview(tab)) loadOverview(tab, true);
+        else if (shouldReloadOverview(tab)) {renderOverview(group);if(tab.data)void probeOverviewHead(tab);else void loadOverview(tab);}
         else renderOverview(group);
+        if(tab.historyRecoveryPending && !tab.loading)retryHistoryRegion(tab,"outage-recovery");
       } else renderOverview(group);
     }
     if (name === "live") {
@@ -621,13 +622,15 @@
     current.identity = status.summoner || {};
     if (nextRegion && status.summoner?.gameName) current.riotId = {gameName:status.summoner.gameName,tagLine:status.summoner.tagLine || ""};
     try { localStorage.setItem("lol-loot-last-client-player-group", current.group); } catch (_) {}
-    if (state.followSelfPending) {
+    if (state.followSelfPending || platformChanged || identityChanged) {
+      const fromGroup=state.activeGroup;
       state.followSelfPending = false;
-      if (Date.now() - Number(state.lastManualTabAt || 0) >= 10_000) {
+      {
         if(globalThis.deepLegendsHistoryFilters && activeTab()!==current)cancelAdvancedMatchSearch(activeTab());
         state.activeGroup = current.group;
         state.activeTabs[current.group] = current.key;
       }
+      if(typeof window!=="undefined")window.reportFlowDiagnostic?.("client_follow_client",!wasReady?"login":platformChanged?"platform-change":"identity-change",{from_group:fromGroup,to_group:current.group,search_from:previous?.serverId || previous?.clientRegion || "",search_to:current.serverId || current.region,applied:true});
     }
     // Identity and its header render in this task; network cards follow independently.
     if (!wasReady) current.headerReported = false;
@@ -780,7 +783,7 @@
   }
 
   function paginationCopyFor(tab) {
-    if(matchesPending(tab) || globalThis.deepLegendsHistoryFilters?.active(tab) || !(tab.data?.matches?.length) && (tab.initialPageError || tab.error))return "";
+    if(historyServiceState(tab)?.kind==="official" || matchesPending(tab) || globalThis.deepLegendsHistoryFilters?.active(tab) || !(tab.data?.matches?.length) && (tab.initialPageError || tab.error))return "";
 	const data = tab.data || {};
 	const pagination = data.pagination || { hasMore: false };
 	if (tab.quotaRetry && tab.quotaRetry.retryAt>Date.now()) return `<span>外服查询额度恢复中，约 <b data-quota-seconds>${Math.max(0, Math.ceil((tab.quotaRetry.retryAt - Date.now()) / 1000))}</b> 秒后自动继续；已加载战绩仍可查看</span>`;
@@ -810,12 +813,13 @@
   }
 
   function matchListEmptyContent(tab, historyCapability, specialModeEmpty) {
+    if(historyServiceState(tab)?.kind==="official")return renderHistoryServiceStatus(tab);
     if (matchesPending(tab)) return renderPendingMatches();
     if (historyServiceState(tab)) return renderHistoryServiceStatus(tab);
     if(!(tab.data?.matches?.length) && (tab.initialPageError || tab.error))return `<div class="af-empty" role="alert"><strong>战绩暂不可用</strong><p>${escapeHTML(tab.initialPageError || tab.error)}</p><button type="button" data-gameplay-retry>重试</button></div>`;
     if (globalThis.deepLegendsHistoryFilters?.active(tab)) return globalThis.deepLegendsHistoryFilters.empty(tab,advancedFilterContext(tab));
 	if (historyCapability && historyCapability.state !== "available") {
-	  if (historyCapability.detail === "战绩服务器暂时不可用，稍后自动重试") return emptyState(historyCapability.detail,"",true);
+	  if (historyCapability.historyStatus === "official") return renderHistoryServiceStatus(tab);
 	  return emptyState("战绩暂时无法读取", historyCapability.detail || "客户端暂未返回该玩家的战绩，请稍后重试。", true);
 	}
 	if (tab.filterPaging || tab.loadingMore || tab.quotaRetry) {
@@ -834,11 +838,11 @@
     const sentinel = container?.querySelector("[data-match-sentinel]");
     const advanced=globalThis.deepLegendsHistoryFilters?.active(tab);
     const hasLoadedMore=advanced && filteredMatches(tab.data?.matches || [],tab).length>Number(tab.filteredVisibleCount || 20);
-	if (!sentinel || (!tab.data?.pagination?.hasMore && !hasLoadedMore) || tab.data?.pagination?.autoPaused || tab.loadingMore || tab.initialPagePending || tab.filterPaging || tab.quotaRetry || !("IntersectionObserver" in window)) return;
+	if (!sentinel || (!tab.data?.pagination?.hasMore && !hasLoadedMore) || tab.data?.pagination?.autoPaused || !("IntersectionObserver" in window)) return;
     const scrollRoot = container.closest(".player-overlay-scroll") || document.getElementById("app-scroll");
     // A restored scroll position, detail collapse, or a short first page can
     // expose the sentinel without the user asking for another 20 API calls.
-    let near = false, requested = false, pointerScrolling = false;
+    let near = false, requested = Boolean(tab.matchAutoloadRequested), pointerScrolling = false;
     let lastTop = Number(scrollRoot?.scrollTop || 0);
     const cleanup = () => {
       observer.disconnect();
@@ -850,19 +854,25 @@
     };
     const append = () => {
       if (!near || !requested || tab.appendFramePending || overviewContainer(tab) !== container) return;
-      cleanup();
-      state[observerKey] = null;
+      tab.matchAutoloadRequested=requested;
+      const blocked=tab.loading || tab.loadingMore?'loading':tab.quotaRetry?'quota':tab.data?.pagination?.autoPaused?'paused':!tab.data?'not-ready':!tab.data.pagination?.hasMore && !advanced?'no-more':'';
+      window.reportFlowDiagnostic?.('match_autoload_client',blocked?'blocked':'requested',{bound:true,near,requested,started:false,blocked_reason:blocked});
+      if(blocked)return;
       tab.appendFramePending = true;
       const schedule = window.requestAnimationFrame || ((callback) => setTimeout(callback, 0));
       schedule(() => {
         const delay = Math.max(0, Number(tab.nextAutoAppendAt || 0) - Date.now());
         clearTimeout(tab.appendTimer);
-        tab.appendTimer = setTimeout(() => {
+        tab.appendTimer = setTimeout(async () => {
           tab.appendFramePending = false;
           tab.appendTimer = 0;
           if (overviewContainer(tab) === container) {
             if(advanced) {tab.filteredVisibleCount=Number(tab.filteredVisibleCount || 20)+20;reconcileFilteredMatchList(container.querySelector('.match-list'),tab);appendOverviewMatches(tab,[]);}
-            else loadOverview(tab, false, true);
+            else {
+              const token=Number(tab.overviewRequestToken || 0),promise=loadOverview(tab,false,true);
+              if(Number(tab.overviewRequestToken || 0)!==token){window.reportFlowDiagnostic?.('match_autoload_client','started',{bound:true,near,requested:true,started:true,blocked_reason:''});requested=false;tab.matchAutoloadRequested=false;cleanup();if(state[observerKey]?.check===append)state[observerKey]=null;}
+              const started=await promise;if(started && state[observerKey]?.check===append){requested=false;tab.matchAutoloadRequested=false;}
+            }
           }
         }, delay);
       });
@@ -876,7 +886,7 @@
     };
     const onScroll = () => {
       const top = Number(scrollRoot.scrollTop || 0);
-      if (pointerScrolling && top > lastTop) { requested = true; append(); }
+      if (top > lastTop) { requested = true; append(); }
       lastTop = top;
     };
     const observer = new IntersectionObserver(entries => {
@@ -889,7 +899,8 @@
     scrollRoot?.addEventListener("keydown", onKey);
     scrollRoot?.addEventListener("scroll", onScroll, {passive:true});
     observer.observe(sentinel);
-    state[observerKey] = { disconnect: cleanup };
+    state[observerKey] = { disconnect: cleanup,check:append };
+    window.reportFlowDiagnostic?.("match_autoload_client","bound",{bound:true,near,requested,started:false});
   }
 
   function boundMatchDOM(list, tab) {
@@ -906,12 +917,12 @@
       if(Object.hasOwn(entry.dataset,'virtualMatch') || tab.openMatches?.has(entry.dataset.matchId))return;
       const rect=entry.getBoundingClientRect();if(!(rect.height>0))return;
       entry.style.minHeight=`${rect.height}px`;entry.dataset.virtualMatch='';
-      entry.replaceChildren();
+      entry.innerHTML='<div class="match-virtual-skeleton gameplay-skeleton" aria-label="正在显示对局"><span></span><span></span><span></span></div>';
     };
-    const observer=new window.IntersectionObserver(events=>{for(const event of events)event.isIntersecting?hydrate(event.target):collapse(event.target);},{root:null,rootMargin:'1600px 0px'});
+    const observer=new window.IntersectionObserver(events=>{for(const event of events)event.isIntersecting?hydrate(event.target):collapse(event.target);},{root:null,rootMargin:'2400px 0px'});
     list._virtualObserver=observer;
     for(const entry of list.querySelectorAll(':scope > .match-entry')){
-      const rect=entry.getBoundingClientRect();if(rect.bottom < -1600 || rect.top > window.innerHeight+1600)collapse(entry);
+      const rect=entry.getBoundingClientRect();if(rect.bottom < -2400 || rect.top > window.innerHeight+2400)collapse(entry);
       observer.observe(entry);
     }
   }
@@ -978,6 +989,11 @@
       const input=JSON.parse(body);delete input.playerRef;
       return await request(JSON.stringify({...input,gameName:identity.gameName,tagLine:identity.tagLine,region:tab.region || tab.data?.player?.region || ''}));
     }
+  }
+
+  function finishOverviewLoad(tab) {
+    tab.initialPagePending=false;tab.initialPageError="";tab.matchesReceived=true;tab.recentStatsReceived=true;
+    if(tab.overviewCardLoad?.ready)for(const key of ['matches','filterbar','highlights'])tab.overviewCardLoad.ready.add(key);
   }
 
   async function loadOverview(tab, force = false, append = false, manual = false, quiet = false, scanCount = 0, retryDetails = false, background = false) {
@@ -1063,7 +1079,7 @@
       tab.data = { ...tab.data, matches: tab.overviewMatchSnapshot.matches, pagination: tab.overviewMatchSnapshot.pagination };
     }
     const pageWasPending = Boolean(tab.initialPagePending);
-    const refreshSnapshot = !append && tab.data ? { matches: [...(tab.data.matches || [])], pagination: tab.data.pagination } : null;
+    const refreshSnapshot = !append && tab.data ? { matches: [...(tab.data.matches || [])], pagination: tab.data.pagination, nextBegIndex:tab.nextBegIndex } : null;
     if (!append) tab.overviewMatchSnapshot = refreshSnapshot;
     let sawPreview = false;
     const baseMatches = [...(tab.data?.matches || [])];
@@ -1120,10 +1136,15 @@
         rerenderTab(tab,"loadOverview");reportDeferredMatchesCard(tab);
       };
       const requestKey = `${append ? "overview-more" : "overview"}:${tab.key}`;
-      const requestOverview=async(requestBody)=>tab.current && connected()
-		? await api(`/api/gameplay/overview?count=${requestCount}&begIndex=${begIndex}&force=${force ? 1 : 0}&freshHistory=${manual ? 1 : 0}&matchFilter=${encodeURIComponent(tab.matchFilter || "all")}${verification.expectGameId ? `&expectGameId=${encodeURIComponent(verification.expectGameId)}` : ""}`, {onProgress}, requestKey, timeout)
-        : await api("/api/gameplay/overview", { method: "POST", body:requestBody, onProgress }, requestKey, timeout);
-      const payload=await requestOverviewWithReferenceRetry(tab,body,requestOverview);
+      const requestOverview=async(requestBody,noReference=false)=>tab.current && connected()
+		? await api(`/api/gameplay/overview?count=${requestCount}&begIndex=${begIndex}&force=${force ? 1 : 0}&freshHistory=${manual ? 1 : 0}&matchFilter=${encodeURIComponent(tab.matchFilter || "all")}${verification.expectGameId ? `&expectGameId=${encodeURIComponent(verification.expectGameId)}` : ""}`, {onProgress,headers:noReference?{"X-Overview-No-Reference":"1"}:{}}, requestKey, timeout)
+        : await api("/api/gameplay/overview", { method: "POST", body:requestBody, onProgress,headers:noReference?{"X-Overview-No-Reference":"1"}:{} }, requestKey, timeout);
+      let payload;
+      try{payload=await requestOverviewWithReferenceRetry(tab,body,requestOverview);}catch(error){
+        if(!error.referenceFallback)throw error;
+        window.reportFlowDiagnostic?.("overview_reference_fallback",error.referenceFallback,{count:1});
+        payload=await requestOverview(body,true);
+      }
       if (tab.overviewRequestToken !== requestToken) return false;
       tab.lastOverviewPageBytes=typeof TextEncoder==='function'?new TextEncoder().encode(JSON.stringify(payload)).length:encodeURIComponent(JSON.stringify(payload)).replace(/%[A-F0-9]{2}/g,'x').length;
       tab.matchesReceived=true;tab.recentStatsReceived=true;
@@ -1144,7 +1165,6 @@
 		  pagination.pauseReason = "上游连续无响应，已暂停自动查找";
         }
         tab.nextBegIndex = pagination.nextBegIndex;
-        if(scanCount>0){const range=globalThis.deepLegendsHistoryFilters?.serverTimeRange(tab,advancedFilterContext(tab));if(range?.startTime && additions.some(m=>Number(m.startedAt || m.createdAt)<range.startTime*1000))pagination.hasMore=false;}
         delete pagination.nextBegIndex;
         tab.data = { ...tab.data, matches: [...baseMatches, ...additions], pagination: { ...pagination, moreError: "" } };
         appendAdditions = additions;
@@ -1157,16 +1177,16 @@
         const freshMatches = payload.matches || [];
         const sameFilter = (previousData?.pagination?.filter || "all") === (pagination.filter || "all");
         const historyUnavailable = Array.isArray(payload.capabilities) && payload.capabilities.some(item => item.name === "match-history" && item.state === "failed");
-        const preserveLoadedPages = force && sameFilter && !pageWasPending && previousMatches.length > freshMatches.length;
+        const preserveLoadedPages = force && sameFilter && previousMatches.length > freshMatches.length;
         const preservePages = preserveLoadedPages || historyUnavailable && sameFilter && previousMatches.length > freshMatches.length;
         let mergedMatches = freshMatches;
         let mergedPagination = pagination;
         if (preservePages) {
           const freshIDs = new Set(freshMatches.map((match) => String(match.gameId)));
           mergedMatches = [...freshMatches, ...previousMatches.filter((match) => !freshIDs.has(String(match.gameId)))].slice(0, MAX_BROWSE_MATCHES);
-          mergedPagination = { ...(previousData.pagination || {}), moreError: "" };
+          mergedPagination = { ...(refreshSnapshot?.pagination || previousData.pagination || {}), moreError: "" };
         }
-        tab.nextBegIndex = preservePages ? Number(tab.nextBegIndex || Number(mergedPagination.begIndex || 0) + Number(mergedPagination.count || 0)) : pagination.nextBegIndex;
+        tab.nextBegIndex = preservePages ? Number(refreshSnapshot?.nextBegIndex ?? tab.nextBegIndex ?? (Number(mergedPagination.begIndex || 0) + Number(mergedPagination.count || 0))) : pagination.nextBegIndex;
         tab.paginationStalls = 0;
         delete mergedPagination.nextBegIndex;
         const header = { player: payload.player, profilePending: payload.profilePending,
@@ -1196,7 +1216,7 @@
         tab.paginationBackoffMs = 0;
 		tab.nextAutoAppendAt = Date.now() + AUTO_PAGE_DELAY_MS;
 	  }
-	  loaded = true;reportDeferredMatchesCard(tab);
+	  loaded = true;finishOverviewLoad(tab);reportDeferredMatchesCard(tab);
       if ((payload.pagination?.filter || tab.matchFilter || "all") === "all") tab.overviewStreak = computeOverviewStreak(tab.data?.matches || [], tab.data?.pagination?.hasMore, payload.player?.playerRef);
       if (!append) {
         tab.expectedGamePresent = payload.expectedGamePresent === true;
@@ -1432,6 +1452,21 @@
       if((tab.matchFilter || "all")==="all") {tab.overviewStreak=computeOverviewStreak(tab.data.matches,tab.data.pagination?.hasMore,tab.data.player?.playerRef);syncOverviewStreak(tab);}
     }
   }
+  function handleHistoryServiceRecovered(detail) {
+    for(const tab of [...state.tabs,...state.overlay]){
+      if(riotTab(tab) || !historyServiceState(tab) || detail?.serverId && tabServerID(tab)!==detail.serverId)continue;
+      tab.historyRecoveryPending=true;
+      if(historyRecoveryActive(tab) && !tab.loading)retryHistoryRegion(tab,'outage-recovery');
+    }
+  }
+  function retryHistoryRegion(tab,reason='manual') {
+    tab.historyRecoveryPending=false;
+    if(reason==='outage-recovery')delete tab.historyOutageReported;
+    if(reason==='outage-recovery')window.reportFlowDiagnostic?.('history_outage_ui','recovered',{source:'circuit'});
+    window.reportFlowDiagnostic?.('overview_reload_reason',reason,{matches_before:tab.data?.matches?.length || 0,matches_after:tab.data?.matches?.length || 0});
+    return loadOverview(tab,true,false,false,true,0,true);
+  }
+
   async function handleRelayRecovered() {
     for(const tab of [...(state.tabs || []),...(state.overlay || [])])if(riotTab(tab) && String(tab.error || "").includes("战绩服务暂时不可用") && !tab.loading)void loadOverview(tab,true);
   }
@@ -1440,17 +1475,18 @@
   }
   function historyServiceState(tab) {
     const capability = (tab.data?.capabilities || []).find(item => item.historyStatus === "official");
-    if (capability) return {kind:"official",seconds:Math.max(0,Math.ceil(((tab.historyRetryAt || Date.now()+1000*(capability.retryAfter || 60))-Date.now())/1000))};
+    if (capability || tab.historyFailureClass==="official") return {kind:"official"};
     if (riotTab(tab) && (tab.historyFailureClass === "relay" || [tab.error,tab.initialPageError,...(tab.data?.capabilities || []).map(item=>item.detail)].some(message=>String(message || "").includes("战绩服务暂时不可用")))) return {kind:"relay",seconds:Math.max(0,Math.ceil(((tab.historyRetryAt || 0)-Date.now())/1000))};
     return null;
   }
   function renderHistoryServiceStatus(tab,compact=false) {
     const status=historyServiceState(tab);if(!status)return "";
+    if(!tab.historyOutageReported){tab.historyOutageReported=true;if(typeof window!=='undefined')window.reportFlowDiagnostic?.('history_outage_ui','shown',{source:tab.data?.capabilities?.some(c=>c.historyStatus==='official' && !c.retryAfter)?'circuit':'fresh-503',durationMs:Math.max(0,Date.now()-Number(tab.historyWaitStarted || Date.now()))});}
     const official=status.kind==="official",title=official?"战绩服务暂时中断":"外服战绩连接较慢";
     const copy=official?"英雄联盟官方战绩服务器暂时无法返回对局数据，游戏客户端里的战绩也会受影响。恢复后会自动重新读取。":"暂时没有读取到对局，恢复后会自动补齐。";
     const waiting=Boolean(tab.loading || tab.loadingMore),disabled=waiting?' disabled aria-busy="true"':'';
     if(compact)return `<div class="service-outage-compact" role="status">${serviceOutageIcon()}<span>${title}${official?"，以下为已保存的对局":""}</span><button class="text-button" type="button" data-gameplay-retry${disabled}>${waiting?"读取中":official?"重试":"重试补齐"}</button></div>`;
-    return `<div class="service-outage" role="status"><div class="service-outage-disc">${serviceOutageIcon()}</div><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-gameplay-retry${disabled}>${waiting?"读取中":"立即重试"}</button><small data-history-countdown${status.seconds?"":" hidden"}>将在 ${status.seconds} 秒后自动重试</small></div>`;
+    return `<div class="service-outage" role="status"><div class="service-outage-disc">${serviceOutageIcon()}</div><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-gameplay-retry${disabled}>${waiting?"读取中":"立即重试"}</button></div>`;
   }
   function historyStatsPending(data,tab) {
     // 本服原始战绩可能先于聚合到达；保留此前 complete 已确认的统计。
@@ -1505,23 +1541,17 @@
     if(typeof riotTab==='function' && riotTab(tab)){
       if(tab.loading)return;
       if(tab.quotaRetry){scheduleQuotaRetry(tab);return;}
-      const schedule=()=>{if(tab.loading || tab.quotaRetry || !historyRecoveryActive(tab))return;globalThis.deepLegendsHistoryRecovery?.schedule(tab,{pending:()=>!tab.quotaRetry && (historyStatsPending(tab.data,tab) || Boolean(tab.data?.pagination?.partial || tab.initialPageError || tab.historyFailureClass)),active:()=>historyRecoveryActive(tab),notBefore:()=>Math.max(tab.quotaRetry?.retryAt || 0,tab.detailRetryNotBefore || 0),quotaBlocked:()=>Boolean(tab.quotaRetry),abort:()=>state.controllers.get(`overview:${tab.key}`)?.abort(),retry:()=>loadOverview(tab,true,false,false,true,0,true),report:round=>window.reportFlowDiagnostic?.('history_detail_recovery','round',{round})});};
+      const schedule=()=>{if(tab.loading || tab.quotaRetry || !historyRecoveryActive(tab))return;globalThis.deepLegendsHistoryRecovery?.schedule(tab,{...(tab.initialPageError?{delays:[30000,60000,120000,300000]}:{}),pending:()=>!tab.quotaRetry && (historyStatsPending(tab.data,tab) || Boolean(tab.data?.pagination?.partial || tab.initialPageError || tab.historyFailureClass)),active:()=>historyRecoveryActive(tab),notBefore:()=>Math.max(tab.quotaRetry?.retryAt || 0,tab.detailRetryNotBefore || 0),quotaBlocked:()=>Boolean(tab.quotaRetry),abort:()=>state.controllers.get(`overview:${tab.key}`)?.abort(),retry:()=>loadOverview(tab,true,false,false,true,0,true),report:round=>window.reportFlowDiagnostic?.('history_detail_recovery','round',{round})});};
       if(globalThis.deepLegendsHistoryRecovery)schedule();else if(!tab.detailRecoveryLoading && typeof document!=='undefined'){tab.detailRecoveryLoading=true;globalThis.deepLegendsSections?.load('history-recovery').then(schedule).catch(()=>{}).finally(()=>{tab.detailRecoveryLoading=false;});}
       return;
     }
-    const service = historyServiceState(tab);
-    const unavailable = service || tab.data?.capabilities?.some(item => ["match-history","match-details"].includes(item.name) && item.detail === "战绩服务器暂时不可用，稍后自动重试");
-    if(!unavailable) {clearTimeout(tab.historyServerRetryTimer);clearTimeout(tab.historyCountdownTimer);tab.historyRetryAt=0;tab.historyServerRetryTimer=0;return;}
-    if(tab.historyServerRetryTimer || tab.loading || tab.closed || state.destroyed)return;
-    const delay=service?.seconds>0?service.seconds*1000:60000;tab.historyRetryAt=Date.now()+delay;
-    const tick=()=>{const node=overviewContainer(tab)?.querySelector("[data-history-countdown]");const seconds=Math.max(0,Math.ceil((tab.historyRetryAt-Date.now())/1000));if(node){node.hidden=!seconds;node.textContent=`将在 ${seconds} 秒后自动重试`;}if(seconds && tab.historyServerRetryTimer && !tab.closed && !state.destroyed)tab.historyCountdownTimer=setTimeout(tick,1000);};
-    tab.historyServerRetryTimer=setTimeout(()=>{
-      tab.historyServerRetryTimer=0;
-      if(tab.closed || state.destroyed || tab.current && !connected())return;
-      if(overviewContainer(tab) && !tab.loading)void loadOverview(tab,true,false,false,true);
-      else scheduleHistoryServerRetry(tab);
-    },delay);
-    if(typeof document!=="undefined") {clearTimeout(tab.historyCountdownTimer);tick();}
+    clearTimeout(tab.historyServerRetryTimer);clearTimeout(tab.historyCountdownTimer);
+    tab.historyRetryAt=0;tab.historyServerRetryTimer=0;
+    if(historyServiceState(tab))return;
+    if(tab.data?.matches?.length && (tab.initialPageError || tab.data.pagination?.partial)){
+      const schedule=()=>globalThis.deepLegendsHistoryRecovery?.schedule(tab,{delays:[30000,60000,120000,300000],pending:()=>Boolean(tab.initialPageError || tab.data?.pagination?.partial),active:()=>historyRecoveryActive(tab),notBefore:()=>tab.detailRetryNotBefore || 0,abort:()=>state.controllers.get(`overview:${tab.key}`)?.abort(),retry:()=>loadOverview(tab,true,false,false,true,0,true)});
+      if(globalThis.deepLegendsHistoryRecovery)schedule();else globalThis.deepLegendsSections?.load('history-recovery').then(schedule).catch(()=>{});
+    }
   }
   function relaySlowState(tab) {
     return riotTab(tab) && [tab.error,tab.initialPageError,...(tab.data?.capabilities || []).map(item=>item.detail)].some(message=>String(message || "").includes("战绩服务暂时不可用"));
@@ -1590,13 +1620,10 @@
       return true;
     }
 
-    if (state.section !== "overview" || detail?.type !== "historical-ranks" || !Array.isArray(detail.historicalRanks)) return false;
-    const group = overviewGroupForSection(), tab = activeTab(group);
-    if (!tab?.data) return false;
-    const account = String(detail.account || "");
-    const tabAccount = String(tab.data.player?.playerRef || tab.playerRef || "");
-    if (!account || account !== tabAccount) return false;
-    if (tab.loading || tab.loadingMore) { tab.pendingHistoricalRanks = detail; return false; }
+    if (detail?.type !== "historical-ranks" || !Array.isArray(detail.historicalRanks) || !detail.account) return false;
+    const tab = state.tabs.find(item => !item.closed && String(item.data?.player?.playerRef || item.playerRef || item.identity?.playerRef || "") === String(detail.account));
+    if (!tab) return false;
+    if (!tab.data || tab.loading || tab.loadingMore) { tab.pendingHistoricalRanks = detail; return false; }
     if (JSON.stringify(tab.data.historicalRanks) === JSON.stringify(detail.historicalRanks)) return false;
     tab.data = { ...tab.data, historicalRanks: detail.historicalRanks };
     updateCareerCards(tab,"overview_incremental");
@@ -2169,6 +2196,7 @@
     // inactive player lists and the other workspaces never enter this update.
     renderOverviewBody(workspace.content, tab);
     if (tab.restoreScrollPending) restorePlayerScroll(tab);
+    if(tab.historyRecoveryPending && !tab.loading)void retryHistoryRegion(tab,"outage-recovery");
   }
 
   // renderOverviewBody 把某个玩家页签（总览页签或覆盖层条目）的总览
@@ -2286,9 +2314,9 @@
       ["activity", renderActivity(data.activityHours || [],pendingStats).replace("</section>", `${renderOverviewShareButton()}</section>`)],
     ].map(([key,markup])=> {
       const capability={ranks:'ranked-stats',masteries:'champion-mastery'}[key];
-      if(tab.loading && !data.matches?.length && capability && !data.capabilities?.some(c=>c.name===capability))return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`];
-      const titles={'recent-ranked':'近期排位',ability:'能力表现',positions:'位置偏好','recent-players':'最近一起玩',activity:'时间分布'};
-      if(!(data.matches?.length) && (tab.initialPageError || tab.error || historyServiceState(tab)) && !tab.loading && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="ability-unavailable"><strong>暂不可用</strong></div></section>`];
+      if(tab.loading && capability && !(key==='ranks'?data.ranks?.length:data.masteries?.length) && !data.capabilities?.some(c=>c.name===capability))return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`];
+      const titles={'recent-ranked':'近期排位',ability:'能力表现',positions:'位置偏好','recent-players':'最近一起玩',activity:'时间分布',...(!riotTab(tab)?{champions:'英雄统计'}:{})};
+      if((historyServiceState(tab)?.kind==="official" || !(data.matches?.length) && (tab.initialPageError || tab.error) && !tab.loading) && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="ability-unavailable"><strong>暂不可用</strong></div></section>`];
       if((pendingMatches || pendingAggregates) && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`];
       markup=markup.replace('<section',`<section data-career-key="${key}"`);
       return [key,!pendingStats && partialHistory && ['recent-ranked','ability','positions','recent-players','activity'].includes(key)?markup.replace('</h3>',`</h3><small class="history-sample-label">基于最近 ${Number(data.historyLoaded ?? data.matches?.length ?? 0)} 场</small>`):markup];
@@ -2327,7 +2355,7 @@
     } catch (error) {
       console.error("总览渲染失败", error);
       container.innerHTML = emptyState("总览渲染失败", `页面渲染时出现异常：${error?.message || error}`, true);
-      container.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadOverview(tab, true));
+      container.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => historyServiceState(tab)?retryHistoryRegion(tab):loadOverview(tab, true));
     }
   }
 
@@ -2353,8 +2381,8 @@
   }
 
   function renderSelfIdentityHeader(tab) {
-    if (!tab.current || !tab.identity) return "";
-    const player = tab.identity;
+    const player=tab.identity || tab.data?.player || tab.riotId;
+    if(!player)return "";
     return `<section class="summoner-strip">${assetIcon(assetPath("profile", player.profileIconId), tab.label, "profile", false)}<div class="summoner-strip-copy"><div><h2>${escapeHTML(tab.label)}</h2><span class="server-chip">${escapeHTML(tabServerLabel(tab))}</span></div><p class="summoner-level-row"><span>${Number(player.summonerLevel)>0?`召唤师等级 ${number(player.summonerLevel)}`:""}</span></p></div></section>`;
   }
 
@@ -2369,15 +2397,15 @@
       return;
     }
     const tierScope = matchTierScope(tab);
-    const quotaMessage = tab.quotaRetry && tab.quotaRetry.retryAt>Date.now() ? `<p role="status" data-quota-recovery>外服查询额度恢复中，约 <b data-quota-seconds>${Math.max(0, Math.ceil((tab.quotaRetry.retryAt - Date.now()) / 1000))}</b> 秒后自动重试；已加载的战绩仍可查看。</p>` : "";
+    const quotaMessage = tab.quotaRetry && tab.quotaRetry.retryAt>Date.now() ? `<p role="status" data-quota-recovery>外服查询额度恢复中，约 <b data-quota-seconds>${Math.max(0, Math.ceil((tab.quotaRetry.retryAt - Date.now()) / 1000))}</b> 秒后自动开始；${tab.data?.matches?.length?"已加载的战绩仍可查看。":""}</p>` : "";
     // 主总览和覆盖层容器都会被后续页签复用。异步结果只允许写回
     // 当前仍属于同一页签和玩家的容器。
     const sameOverview = container.dataset.matchTierScope === tierScope;
     container.dataset.matchTierScope = tierScope;
     if (!tab.data && !tab.error) {
       disposeMatchRowHeight(container);
-      container.innerHTML = quotaMessage + renderSelfIdentityHeader(tab) + (historyServiceState(tab) ? renderHistoryServiceStatus(tab) : renderOverviewPendingPage(tab));
-      container.querySelector('[data-gameplay-retry]')?.addEventListener('click',()=>loadOverview(tab,true));
+      container.innerHTML = quotaMessage + renderSelfIdentityHeader(tab) + (historyServiceState(tab) ? renderHistoryServiceStatus(tab) : tab.quotaRetry ? "" : renderOverviewPendingPage(tab));
+      container.querySelector('[data-gameplay-retry]')?.addEventListener('click',()=>historyServiceState(tab)?retryHistoryRegion(tab):loadOverview(tab,true));
       return;
     }
     if (tab.error) {
@@ -2385,7 +2413,7 @@
 
       disposeMatchRowHeight(container);
       container.innerHTML = renderSelfIdentityHeader(tab) + (tab.proMismatch ? summonerProChip(tab) : "") + (historyServiceState(tab) ? renderHistoryServiceStatus(tab) : emptyState("战绩读取失败",tab.error,true)) + opggEscape;
-      container.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadOverview(tab, true));
+      container.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => historyServiceState(tab)?retryHistoryRegion(tab):loadOverview(tab, true));
       container.querySelector("[data-open-opgg]")?.addEventListener("click", () => window.open(opggSummonerURL(tab), "_blank", "noopener"));
       return;
     }
@@ -2451,7 +2479,7 @@
       return `${typeof value}:${String(value)}`;
     }).join("|");
     const careerSections = sameOverview && container._careerSignature === careerSignature && container.querySelector(".career-column") ? "" : renderCareerSections(data, tab);
-    const stripHTML = data.profilePending && tab.loading ? `<section class="summoner-strip overview-strip-skeleton gameplay-skeleton" aria-label="正在读取召唤师"><span></span><span></span><span></span></section>` : `
+    const stripHTML = data.profilePending && tab.loading && !(player.gameName || player.displayName || tab.riotId?.gameName) ? `<section class="summoner-strip overview-strip-skeleton gameplay-skeleton" aria-label="正在读取召唤师"><span></span><span></span><span></span></section>` : `
       <section class="summoner-strip">
         ${backgroundArt}
         ${profileIcon}
@@ -2475,11 +2503,10 @@
           ${careerSections}
         </aside>
         <section class="matches-column" aria-label="最近对局">
-          ${matches.length ? renderHistoryServiceStatus(tab,true) : ""}
+
           <div class="overview-career-entry"><button class="career-dialog-trigger" type="button" aria-haspopup="dialog" aria-controls="career-dialog" data-open-career-dialog><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg><span>生涯统计</span></button></div>
           ${matchesPending(tab)?renderPendingMatchFilters(tab):renderMatchFilters(tab)}
           ${matchDetailsWarning}
-          ${tab.initialPageError && !historyServiceState(tab) ? `<div class="notice is-warning" role="alert">${relaySlowState(tab)?"":`<p>已保留前 ${number(rawMatches.length)} 场，完整战绩暂未补齐：${escapeHTML(tab.initialPageError)}</p>`}<button class="text-button" type="button" data-complete-overview>重试补齐</button></div>` : ""}
           ${riotTab(tab) ? '<div data-current-game hidden></div>' : ""}
           <div class="match-list">${preserveMatchList ? "" : (matches.length ? (globalThis.deepLegendsHistoryFilters?.active(tab)?matches.slice(0,Number(tab.filteredVisibleCount || 20)):matches).map((match) => renderMatch(match, player.playerRef, tab)).join("") : emptyMatches)}</div>
           <div class="match-pagination${tab.loadingMore ? " is-loading" : ""}" data-match-sentinel aria-live="polite"${sentinelHidden}>${paginationCopy}</div>
@@ -2949,14 +2976,15 @@
     const rows = expected.map((queue) => {
       const rank = ranks.find((item) => item.queueType === queue);
       const label = queue === "RANKED_SOLO_5x5" ? "单排/双排" : "灵活组排";
-      if (!rank || !rank.tier) return `<div class="rank-row"><span class="rank-crest is-unranked" aria-hidden="true">◇</span><div><strong>${label}</strong><small>${riotTab(tab)?"":"尚未定级或客户端未提供"}</small></div><b>${riotTab(tab)?"未定级":"Unranked"}</b></div>`;
+      if ((!rank || !rank.tier) && !rankedCapability && tab?.loading) return `<div class="rank-row gameplay-skeleton"><span></span><span></span></div>`;
+      if (!rank || !rank.tier) return `<div class="rank-row"><span class="rank-crest is-unranked" aria-hidden="true">◇</span><div><strong>${label}</strong></div><b>未定级</b></div>`;
       const recordKnown = Number(rank.winRate) >= 0;
       const collecting = !recordKnown && seasonProgress?.collecting === true;
       const record = recordKnown ? `${number(rank.wins)}胜 ${number(rank.losses)}负` : collecting ? `${number(rank.wins)}胜 · 正在统计中` : `${number(rank.wins)}胜 · 负场未提供`;
 	  const unavailableDetail = collecting ? "正在统计中" : (rankedCapability?.detail || "上游未提供负场，无法计算胜率");
 	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 <b class="win-rate-value">${percent(rank.winRate)}</b>` : collecting ? "正在统计中" : "胜率暂不可用"}</span></div></div>`;
     }).join("");
-    return `<section class="career-section rank-career-section"><header><h3>排位</h3><div class="rank-header-tools"><span>当前赛季</span>${mmr}</div></header><div class="rank-list">${rows}</div>${renderRankHistory(historicalRanks, rankMilestones)}</section>`;
+    return `<section class="career-section rank-career-section"><header><h3>排位</h3><div class="rank-header-tools"><span>当前赛季</span>${mmr}</div></header><div class="rank-list">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;
   }
 
   async function loadMayhemRating(tab, quietStart = false) {
@@ -3019,7 +3047,7 @@
     container._careerSignature=null;
     bindPlayerLinks(root,tab);bindRankHistoryControls(root);bindRankedQueueControls(root,tab);bindMayhemRatingControls(root,tab);bindOverviewShareControls(root,container,tab);
     root.querySelectorAll('[data-overview-subpage]').forEach(button=>button.addEventListener('click',()=>openOverviewSubpage(tab,button.dataset.overviewSubpage)));
-    root.querySelector('[data-gameplay-retry]')?.addEventListener('click',()=>loadOverview(tab,true));applyRenderedMetricStyles(root);prepareImages(root);
+    root.querySelector('[data-gameplay-retry]')?.addEventListener('click',()=>historyServiceState(tab)?retryHistoryRegion(tab):loadOverview(tab,true));applyRenderedMetricStyles(root);prepareImages(root);
   }
   function renderSeasonDataNote(progress, queue, games, ranks = []) {
     // R257: explicitly requested copy; keep it here when cleaning old UI notes.
@@ -5150,6 +5178,21 @@
     return true;
   }
 
+  async function probeOverviewHead(tab) {
+    if(tab.headProbeRunning || tab.loading || tab.loadingMore || !tab.data || historyServiceState(tab) || tab.quotaRetry)return;
+    tab.headProbeRunning=true;
+    const token=tab.overviewRequestToken,filter=tab.matchFilter,before=tab.data.matches?.length || 0;
+    window.reportFlowDiagnostic?.('overview_reload_reason','section-return',{matches_before:before,matches_after:before});
+    try{
+      const payload=await api('/api/gameplay/history-head',{method:'POST',body:JSON.stringify({playerRef:tab.data.player?.playerRef || tab.playerRef,serverId:tab.serverId || '',count:5,matchFilter:filter,freshHistory:true})},`head-probe:${tab.key}`,25000);
+      if(tab.closed || token!==tab.overviewRequestToken || filter!==tab.matchFilter)return;
+      const seen=new Set(tab.data.matches.map(m=>String(m.gameId))),additions=(payload.matches || []).filter(m=>!seen.has(String(m.gameId)));
+      if(additions.length){tab.data={...tab.data,matches:[...additions,...tab.data.matches]};renderFilteredMatchView(tab);}
+      tab.loadedAt=Date.now();
+      window.reportFlowDiagnostic?.('overview_reload_reason','head-probe',{matches_before:before,matches_after:tab.data.matches.length});
+    }catch(_){}finally{tab.headProbeRunning=false;}
+  }
+
   async function refreshMatchFilterHead(tab, filter, view) {
     if(tab.closed || view.refreshing)return;
     view.refreshing=true;
@@ -5608,7 +5651,7 @@
     bindPlayerLinks(container, tab);
     bindOverviewShareControls(container, container, tab);
     container.querySelector("[data-open-career-dialog]")?.addEventListener("click", (event) => openCareerDialog(container, tab, event.currentTarget));
-    container.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => loadOverview(tab, true));
+    container.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => historyServiceState(tab)?retryHistoryRegion(tab):loadOverview(tab, true));
     bindMatchFilterControls(container, tab);
     container.querySelector("[data-load-more]")?.addEventListener("click", () => loadOverview(tab, false, true, true));
     bindRankHistoryControls(container);
@@ -9203,6 +9246,7 @@
   });
 	window.addEventListener("deep-legends:overview-player", (event) => applyOverviewPlayerIdentity(event.detail?.summoner || state.status?.summoner));
   window.addEventListener("deep-legends:section", (event) => activateSection(event.detail?.name || "overview"));
+    window.addEventListener("deep-legends:history-service-recovered",event=>handleHistoryServiceRecovered(event.detail));
 	window.addEventListener("deep-legends:lp-recorded", () => {for(const tab of [...(state.tabs || []),...(state.overlay || [])])if(tab.current || tab.data?.player?.isCurrent){if(tab.loading)tab.lpRefreshPending=true;else void loadOverview(tab,true);}});
  window.addEventListener("deep-legends:overview-matches", event => handleOverviewMatches(event.detail));
 	window.addEventListener("deep-legends:riot-relay-recovered", () => { void handleRelayRecovered(); });

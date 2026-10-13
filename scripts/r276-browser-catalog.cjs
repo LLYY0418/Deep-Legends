@@ -15,6 +15,7 @@ const guards=[
  ['r269-geometry','scripts/r269-geometry.cjs','R269_GEOMETRY_OUT'],
  ['r269','scripts/r269-browser.cjs','R269_BROWSER_OUT',{R276_TRACE:'1'}],
  ['r272','scripts/r272-browser.cjs','R266_BROWSER_OUT'],
+ ['r278','scripts/r278-browser.cjs','R278_BROWSER_OUT'],
  ['r275-offline','scripts/r275-offline-browser.cjs','R275_OFFLINE_OUT']
 ];
 function selectGuards(shard,only){

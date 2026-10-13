@@ -658,6 +658,7 @@ function createMainWindow() {
   };
   mainWindow.on("resize", scheduleBoundsWrite);
   mainWindow.on("move", scheduleBoundsWrite);
+  mainWindow.on("show",()=>mainWindow?.webContents.send("desktop-window-visible"));
   mainWindow.on("focus", () => mainWindow?.flashFrame(false));
   mainWindow.on("close", () => {
     clearTimeout(boundsWriteTimer);
