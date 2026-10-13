@@ -164,6 +164,7 @@ test('R117 item set skip diagnostics execute in both rejected branches', async (
   assert.equal(apiCalls, 0, '两个拒绝分支都不得发出写请求');
 });
 function verifyR117ChromiumWiring(workflow, runner, catalog) {
+  assert.doesNotMatch(JSON.stringify(workflow),/refs\/heads\/codex\/ci-hardening-r276/,'R276 special branch must not bypass release-only acceptance');
   const quality = workflow.jobs.quality, browser = workflow.jobs['browser-main'];
   assert.ok(quality && browser, 'quality and browser-main must exist');
   const allowedJobKeys = ['name','needs','runs-on','steps','permissions','environment','container','services','outputs'];
@@ -211,11 +212,11 @@ function verifyR117ChromiumWiring(workflow, runner, catalog) {
 }
 test('R117 real Chromium guards are wired into CI and cannot silently skip',()=>{
   const yaml=require('../../desktop/node_modules/js-yaml'),base=path.join(root,'../..');
-  const workflow=yaml.load(fs.readFileSync(path.join(base,'.github/workflows/ci.yml'),'utf8'));
+  const workflow=yaml.load(fs.readFileSync(process.env.R276_CI_WORKFLOW_SOURCE||path.join(base,'.github/workflows/ci.yml'),'utf8'));
   const runner=fs.readFileSync(path.join(base,'scripts/r276-browser-job.cjs'),'utf8');
   const catalog=require('../../scripts/r276-browser-catalog.cjs');
   verifyR117ChromiumWiring(workflow,runner,catalog);
-  for(const mutate of [w=>w.jobs['browser-main'].if='false',w=>w.jobs['browser-main']['continue-on-error']=true,w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').if='false',w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').run+=' || true',w=>w.on.push['paths']=['never'],w=>delete w.on.push.branches]){
+  for(const mutate of [w=>w.jobs['browser-main'].if='false',w=>w.jobs['browser-main']['continue-on-error']=true,w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').if='false',w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').run+=' || true',w=>w.on.push['paths']=['never'],w=>delete w.on.push.branches,w=>{w.jobs['mutations-1'].if+=" || github.ref == 'refs/heads/codex/ci-hardening-r276'";}]){
     const bad=structuredClone(workflow);mutate(bad);assert.throws(()=>verifyR117ChromiumWiring(bad,runner,catalog),assert.AssertionError,'unsafe workflow mutation must FAIL');
   }
   assert.throws(()=>verifyR117ChromiumWiring(workflow,runner.replace("assert.equal(result.code,0,name+' guard failed')","void result"),catalog),assert.AssertionError,'swallowed child failure must FAIL');

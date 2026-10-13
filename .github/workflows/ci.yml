@@ -292,10 +292,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Windows setup-only guards failed" }
           node scripts/run-ci-tests.cjs node --expected-tests=2 scripts/r82-startup-ab-script.test.cjs
           if ($LASTEXITCODE -ne 0) { throw "PowerShell script guards failed" }
-      # Release and infrastructure acceptance branch pushes measure Windows;
+      # Release branch pushes measure Windows;
       # dispatch retains its explicit, default-true input.
       - name: Measure full desktop renderer tests on Windows
-        if: (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/codex/release-') || github.ref == 'refs/heads/codex/ci-hardening-r276')) || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers)
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-')) || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers)
         shell: pwsh
         env:
           R222_NODE_TIMING_OUTPUT: ${{ runner.temp }}/renderer-timings-windows.json
@@ -303,7 +303,7 @@ jobs:
           node scripts/test-renderers.cjs desktop
           if ($LASTEXITCODE -ne 0) { throw "Windows renderer test or time budget failed" }
       - uses: actions/upload-artifact@v4
-        if: always() && ((github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/codex/release-') || github.ref == 'refs/heads/codex/ci-hardening-r276')) || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers))
+        if: always() && ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-')) || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers))
         with:
           name: renderer-timings-windows
           path: ${{ runner.temp }}/renderer-timings-windows.json
@@ -401,7 +401,7 @@ jobs:
           if-no-files-found: error
 
   mutations-1:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/codex/release-') || github.ref == 'refs/heads/codex/ci-hardening-r276'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -428,7 +428,7 @@ jobs:
           if-no-files-found: error
 
   mutations-2:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/codex/release-') || github.ref == 'refs/heads/codex/ci-hardening-r276'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -455,7 +455,7 @@ jobs:
           if-no-files-found: error
 
   mutations-3:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/codex/release-') || github.ref == 'refs/heads/codex/ci-hardening-r276'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
