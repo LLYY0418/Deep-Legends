@@ -25,7 +25,7 @@ CALLBACKS = {
     "installer/dialog_windows.go": ("inline", ["uintptr", "uint32", "uintptr", "*uint16"], "SHBrowseForFolderW message LPARAM stays integer; initial is our UTF16PtrFromString allocation in browseInfo.Param; runtime.KeepAlive(initial) after modal call"),
     "installer/internal/webviewhost/surface_windows_test.go": ("inline COM fixtures", [], "COM this handle stays integer; NavigationResult supplies a live Go output allocation through comCall"),
     "installer/internal/webviewhost/settings_windows_test.go": ("fakeCOMObject.bind(callback)", ["uintptr", "(uintptr, *unsafe.Pointer)", "(uintptr, uintptr)"], "Release/Notify this and BOOL are scalars; GetCoreWebView2/GetSettings outputs are addresses of live local variables from coreFromController/configureController"),
-    "installer/internal/p11callbacktest/fixture_windows.go": ("inline PutIsVisible", ["uintptr", "uintptr"], "COM this handle and BOOL are scalars; growStack+runtime.GC while actual shell callback LPARAM remains live"),
+    "installer/internal/p11callbacktest/fixture_windows.go": ("inline native fixture callbacks", ["(uintptr, uintptr)", "(uintptr, uint32, uintptr, uintptr)"], "COM this/BOOL and parent WNDPROC message arguments are scalars; shallow GC plus native WM_SETCURSOR parent reentry while actual shellWndProc default-processing local remains live"),
     "tools/window-focus-probe/main_windows.go": ("inline", ["uintptr", "uintptr", "uintptr", "uintptr"], "Win32 WNDPROC handles, message and WPARAM/LPARAM all scalar"),
     "tools/window-focus-probe/actor_windows.go": ("inline", ["uintptr", "uintptr", "uintptr", "uintptr"], "Win32 WNDPROC handles, message and WPARAM/LPARAM all scalar"),
     "backend/riot_launcher_focus_windows.go": ("inline", ["uintptr", "uintptr"], "EnumWindows HWND plus unused LPARAM; both scalar"),
@@ -51,6 +51,8 @@ def audit(out):
             if function in {"shellWndProc", "inspectApplicationWindow"}:
                 signature = next(s for s in source.splitlines() if s.startswith("func " + function + "("))
             bindings = []
+            if relative == "installer/internal/p11callbacktest/fixture_windows.go":
+                types = ["uintptr", "uint32", "uintptr", "uintptr"] if "func(parent" in line else ["uintptr", "uintptr"]
             if relative == "installer/internal/webviewhost/surface_windows_test.go":
                 types = ["uintptr", "*int32"] if "*int32" in line else ["uintptr"]
                 if "*int32" not in line:
@@ -66,8 +68,8 @@ def audit(out):
                              sha256=hashlib.sha256(source.encode()).hexdigest()))
     rows.sort(key=lambda r: (r["path"], r["line"]))
     (out / "callback-audit.json").write_text(json.dumps(dict(callback_count=len(rows), callbacks=rows), indent=2) + "\n", encoding="utf-8")
-    if len(rows) != 14:
-        raise RuntimeError("callback inventory changed: expected 14, got %d" % len(rows))
+    if len(rows) != 15:
+        raise RuntimeError("callback inventory changed: expected 15, got %d" % len(rows))
 
 
 def main():
@@ -114,6 +116,13 @@ def main():
             raise RuntimeError(label + ": see failure log")
         return completed.stdout
 
+    def native_fixed(label, cwd=ROOT / "installer"):
+        output = run(label, ["go", "test", "-race", "-count=1", "-v", "-run", "^TestR277ShellWndProcGCStress$", ".", "./uninstall"], cwd=cwd)
+        marker = "R277_P11_NATIVE_PASS calls=1024 gc=1024 dpi=PASS default_reentry=1 default_gc=1"
+        if output.count(marker) != 2:
+            raise RuntimeError(label + ": both native shell completion markers are required")
+        results.setdefault("native_fixed_proofs", []).append(dict(label=label, shells=2, calls_per_shell=1024, gc_per_shell=1024, default_reentry_per_shell=1, default_gc_per_shell=1))
+
     try:
         audit(out)
         run("after-structural", ["go", "test", "-count=1", "-v", "-run", "^TestR277ShellCallbackScalarLPARAM$", "."])
@@ -129,7 +138,7 @@ def main():
                     run("after-compile-" + label, ["go", "test", "-c", "-o", str(temporary / (label + ".test.exe")), package], overrides=win)
                 run("after-compile-license", ["go", "test", "-tags=license", "-c", "-o", str(temporary / "license.test.exe"), "."], overrides=win)
             else:
-                run("after-native-race", ["go", "test", "-race", "-count=1", "-v", "-run", "^TestR277ShellWndProcGCStress$", ".", "./uninstall"])
+                native_fixed("after-native-race")
             copy = temporary / "installer"
             shutil.copytree(ROOT / "installer", copy)
             for relative in ["window_windows.go", "uninstall/window_windows.go"]:
@@ -152,6 +161,9 @@ def main():
                         run(label + "-windows-compile", ["go", "test", "-c", "-o", str(temporary / (label + ".test.exe")), package], cwd=copy, overrides=win)
                 finally:
                     path.write_text(fixed, encoding="utf-8")
+            run("restored-structural", ["go", "test", "-count=1", "-v", "-run", "^TestR277ShellCallbackScalarLPARAM$", "."], cwd=copy)
+            if args.native:
+                native_fixed("restored-native-race", cwd=copy)
         results["status"] = "PASS"
         results["native_limitation"] = None if args.native else "Mac local proof only: Windows callback execution, old-signature fatal GC crash, native race and real-device installer/uninstaller smoke remain pending."
     except Exception as error:

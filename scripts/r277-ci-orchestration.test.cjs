@@ -33,6 +33,8 @@ test('Windows P11 is native race/GC proof and newly declared R277 tests are meas
  assert(job.steps.some(step=>step.run?.includes('r277-installer-callbacks.py --native --out')));
  assert(job.steps.some(step=>step.run?.includes('r277-ci-proof.py --out')));
  assert(job.steps.some(step=>step.name==='Require native Windows race compiler'));
+ const callbacks=fs.readFileSync(path.join(__dirname,'r277-installer-callbacks.py'),'utf8');assert(callbacks.includes('invalid pointer found on stack'));assert(callbacks.includes('native_fixed("restored-native-race", cwd=copy)'));assert(callbacks.includes('output.count(marker) != 2'));
+ const fixture=fs.readFileSync(path.join(root,'installer/internal/p11callbacktest/fixture_windows.go'),'utf8');assert(fixture.includes('SetWindowLongPtrW'));assert(fixture.includes('default_reentry=1 default_gc=1'));assert(fixture.includes('syscall.SyscallN(callback, child, 0x0020, child, 0x60)'));
  const helper=fs.readFileSync(path.join(__dirname,'r277-ci-proof.py'),'utf8');assert(helper.includes("proof.run('r277-native-measurements', '^TestR277', race=True)"));assert(helper.includes("terminal.get(test) != 'pass'"));
 });
 test('Linux and Windows strict browser matrix cannot inherit measure-only or baseline assertions',()=>{

@@ -52,7 +52,7 @@ class EncodingTests(unittest.TestCase):
             out = Path(directory)
             installer.audit(out)
             report = json.loads((out / 'callback-audit.json').read_text(encoding='utf-8'))
-            self.assertEqual(report['callback_count'], 14)
+            self.assertEqual(report['callback_count'], 15)
 
     def test_go_snapshot_and_jsonl_with_cp1252_default(self):
         helper = load(PROOF, 'r277_encoding_proof')

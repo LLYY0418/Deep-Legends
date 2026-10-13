@@ -25,8 +25,6 @@ func growStack(depth int) byte {
 	frame[0] = byte(depth)
 	if depth > 0 {
 		frame[1] = growStack(depth - 1)
-	} else {
-		runtime.GC()
 	}
 	runtime.KeepAlive(&frame)
 	return frame[0] ^ frame[1]
@@ -34,7 +32,9 @@ func growStack(depth int) byte {
 
 // Run invokes the actual production windows.NewCallback thunk, not a Go call or
 // a lookalike signature. WM_SHOWWINDOW calls our COM visibility method before
-// DefWindowProc consumes LPARAM, keeping the old pointer argument live across GC.
+// DefWindowProc consumes LPARAM. A separate parent-window reentry probe forces
+// stack adjustment while default processing keeps a local pointer temporary live;
+// incoming arguments alone do not receive the runtime low-pointer fatal check.
 // The subprocess contains a fatal runtime error and forces invalidptr checking
 // even when the surrounding CI did not explicitly set GODEBUG.
 func Run(t *testing.T, callback uintptr, configure func(*edge.Chromium)) {
@@ -49,7 +49,7 @@ func Run(t *testing.T, callback uintptr, configure func(*edge.Chromium)) {
 		if err != nil || ctx.Err() != nil {
 			t.Fatalf("native callback GC child failed: %v (deadline: %v)", err, ctx.Err())
 		}
-		if !strings.Contains(string(output), "R277_P11_NATIVE_PASS calls=1024 gc=1024 dpi=PASS") {
+		if !strings.Contains(string(output), "R277_P11_NATIVE_PASS calls=1024 gc=1024 dpi=PASS default_reentry=1 default_gc=1") {
 			t.Fatal("native fixture completion proof missing")
 		}
 		return
@@ -82,6 +82,7 @@ func Run(t *testing.T, callback uintptr, configure func(*edge.Chromium)) {
 		}
 		calls++
 		growStack(32)
+		runtime.GC() // Shallow GC permits stack shrinking after recursion unwinds.
 		return 0
 	})
 	object := struct{ table *uintptr }{&table[0]}
@@ -124,8 +125,46 @@ func Run(t *testing.T, callback uintptr, configure func(*edge.Chromium)) {
 		t.Fatalf("WM_DPICHANGED behavior changed: got %v want %v error=%v", gotRect, rect, err)
 	}
 	syscall.SyscallN(callback, hwnd, 0x02e0, 0, 0) // Null suggested RECT remains a no-op.
+
+	// DefWindowProc forwards WM_SETCURSOR from a child to its parent. Subclass
+	// only the fixture parent: this forces actual native reentry while the
+	// production shellWndProc is suspended in its default-processing Call.
+	// With the old signature, uintptr(lParam) there retains a GC-scanned local
+	// unsafe.Pointer temporary. Unlike an incoming argument, stack adjustment
+	// validates that local and must reject the scalar 0x60. Return TRUE so the
+	// deliberately scalar hit-test value does not drive further cursor work.
+	child, _, err := user.NewProc("CreateWindowExW").Call(0,
+		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr("STATIC"))),
+		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr("R277 P11 child"))),
+		0x40000000, 0, 0, 20, 20, hwnd, 0, 0, 0)
+	if child == 0 {
+		t.Fatalf("create native child fixture window: %v", err)
+	}
+	defer user.NewProc("DestroyWindow").Call(child)
+	var previousProc uintptr
+	defaultReentry := 0
+	parentProc := windows.NewCallback(func(parent uintptr, message uint32, wParam uintptr, lParam uintptr) uintptr {
+		if message == 0x0020 && wParam == child { // WM_SETCURSOR
+			defaultReentry++
+			growStack(32)
+			runtime.GC() // After unwinding: exercise both growth and shrink adjustment.
+			return 1
+		}
+		result, _, _ := user.NewProc("CallWindowProcW").Call(previousProc, parent, uintptr(message), wParam, lParam)
+		return result
+	})
+	setProc := user.NewProc("SetWindowLongPtrW")
+	previousProc, _, err = setProc.Call(hwnd, ^uintptr(3), parentProc) // GWLP_WNDPROC = -4
+	if previousProc == 0 {
+		t.Fatalf("subclass native parent fixture: %v", err)
+	}
+	defer setProc.Call(hwnd, ^uintptr(3), previousProc)
+	gotDefault, _, _ := syscall.SyscallN(callback, child, 0x0020, child, 0x60)
+	if defaultReentry != 1 || gotDefault != 1 {
+		t.Fatalf("production default-processing reentry missing: calls=%d result=%d", defaultReentry, gotDefault)
+	}
 	runtime.KeepAlive(chromium)
 	runtime.KeepAlive(object)
 	runtime.KeepAlive(table)
-	t.Log("R277_P11_NATIVE_PASS calls=1024 gc=1024 dpi=PASS")
+	t.Log("R277_P11_NATIVE_PASS calls=1024 gc=1024 dpi=PASS default_reentry=1 default_gc=1")
 }
