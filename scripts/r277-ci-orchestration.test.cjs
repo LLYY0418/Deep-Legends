@@ -19,6 +19,12 @@ test('R277 actual mutations are independent steps with always-uploaded original 
   const upload=current.steps.find(step=>step.uses==='actions/upload-artifact@v4');assert.equal(upload.if,'always()');assert.equal(upload.with['if-no-files-found'],'error');assert(upload.with.path.includes('/history/reports/r277/ci-integration/'));assert(upload.with.path.endsWith('/**'));
  }
 });
+test('R277 job-level environment uses no unavailable runner context',()=>{
+ for(const name of ['r277-proof-linux','r277-native-windows','r277-browser-matrix']){
+  for(const value of Object.values(ci.jobs[name].env||{}))assert(!String(value).includes('runner.'),'runner context unavailable in job-level env');
+ }
+ const source=fs.readFileSync(path.join(__dirname,'r277-ci-orchestrate.cjs'),'utf8');assert(source.includes('process.env.RUNNER_TEMP'));
+});
 test('Windows P11 is native race/GC proof and newly declared R277 tests are measured',()=>{
  const job=ci.jobs['r277-native-windows'];assert.equal(job['runs-on'],'windows-latest');assert.equal(job.env.GODEBUG,'invalidptr=1');
  assert(job.steps.some(step=>step.run?.includes('r277-installer-callbacks.py --native --out')));
