@@ -1,0 +1,59 @@
+name: R276 targeted sweep-failure evidence
+on:
+  push:
+    branches: [codex/ci-hardening-r276]
+    paths:
+      - .github/workflows/r276-targeted-stress.yml
+      - scripts/r276-targeted-stress.cjs
+      - scripts/r276-targeted-stress.test.cjs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  register:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Register manual evidence workflow without stress samples
+        run: echo "Targeted evidence is registered; dispatch together with the final reference sweep."
+  targeted:
+    if: github.event_name == 'workflow_dispatch'
+    name: targeted-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare pinned update fixture and Go dependencies
+        run: |
+          node scripts/prepare-r238-update-fixture.cjs
+          go mod download
+      - name: Require native Windows race compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
+            $compiler = @('C:\mingw64\bin', 'C:\msys64\mingw64\bin') | Where-Object { Test-Path (Join-Path $_ 'gcc.exe') } | Select-Object -First 1
+            if (-not $compiler) { throw 'Windows race compiler is unavailable' }
+            $compiler | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+      - name: Verify targeted evidence harness
+        run: node --test scripts/r276-targeted-stress.test.cjs
+      - name: Run twelve identified tests with real race stress
+        run: node scripts/r276-offline.cjs -- node scripts/r276-targeted-stress.cjs "${{ runner.temp }}/targeted"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r276-targeted-${{ runner.os }}
+          path: ${{ runner.temp }}/targeted/**
+          if-no-files-found: error
