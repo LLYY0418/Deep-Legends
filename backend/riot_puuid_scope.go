@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+// Account cache transactions must return a route decision to their owner,
+// never store a lower-level relay result under a direct credential cache key.
+type riotAccountRouteBoundaryKey struct{}
+
 type riotLookupIdentityKey struct{}
 type riotLookupIdentity struct{ name, tag, puuid, scope string }
 type riotPUUIDRecovery struct {

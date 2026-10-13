@@ -154,12 +154,13 @@ type riotProvider struct {
 	limitSleep       func(context.Context, time.Duration) error
 	champions        *championProvider
 
-	limitMu     sync.Mutex
-	limitQueue  []*riotLimitWaiter
-	shortWindow []time.Time
-	longWindow  []time.Time
-	rateHosts   map[string]*riotHostRate
-	rateFlights map[riotRateScope]int
+	limitMu              sync.Mutex
+	limitQueue           []*riotLimitWaiter
+	shortWindow          []time.Time
+	longWindow           []time.Time
+	rateHosts            map[string]*riotHostRate
+	rateFlights          map[riotRateScope]int
+	quotaOverflowWindows map[string]time.Time // diagnostic dedup, never a sticky route
 
 	cacheMu          sync.Mutex
 	matchCache       map[string]*riotMatch
@@ -289,13 +290,19 @@ func riotKeyConfigured() bool { return riotKeySource() != "none" }
 
 // wait uses Riot response quotas when available, retaining conservative defaults
 // until the server advertises the key's actual regional and method limits.
-func (p *riotProvider) wait(ctx context.Context) error {
+func (p *riotProvider) wait(ctx context.Context) (resultErr error) {
+	defer func() { resultErr = riotInternalWaitError(resultErr) }()
 	defer startRiotTimingProbe(ctx, "limiter_admission")()
 	if isRiotBackground(ctx) {
 		if err := p.waitForRiotForeground(ctx); err != nil {
 			return err
 		}
 		return p.admitRiotBackground(ctx)
+	}
+	// Inspect before the FIFO as well as at its head: foreground overflow
+	// must not join a long local-quota wait owned by another request.
+	if p.tryRiotQuotaOverflow(ctx) {
+		return errRiotQuotaOverflow
 	}
 	if limit, ok := ctx.Value(riotSingleWaitKey{}).(time.Duration); ok {
 		ctx = withRiotQueueLimit(ctx, limit)
@@ -316,6 +323,9 @@ func (p *riotProvider) wait(ctx context.Context) error {
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
+		}
+		if p.tryRiotQuotaOverflow(ctx) {
+			return errRiotQuotaOverflow
 		}
 		p.limitMu.Lock()
 		if err := ctx.Err(); err != nil {
@@ -503,6 +513,10 @@ func (p *riotProvider) getLimitedRoute(ctx context.Context, host, requestPath st
 		// Reserve quota only after building the request, immediately before I/O.
 		queuedAt := time.Now()
 		if err := p.wait(ctx); err != nil {
+			accountBoundary, _ := ctx.Value(riotAccountRouteBoundaryKey{}).(bool)
+			if errors.Is(err, errRiotQuotaOverflow) && !accountBoundary {
+				return p.relayFallback(ctx, host, requestPath, query, out, responseMax)
+			}
 			return err
 		}
 		queuedDuration := time.Since(queuedAt)
@@ -915,6 +929,12 @@ type riotMatch struct {
 func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine string) (riotAccount, error) {
 	ctx = riotPinnedIdentityContext(ctx)
 	account, err := p.accountByRiotIDPinned(ctx, gameName, tagLine)
+	if errors.Is(err, errRiotQuotaOverflow) {
+		// Retry outside both account and public-identity cache flights. The
+		// relay key, persisted identity, and returned scope then agree.
+		ctx = context.WithValue(ctx, riotRouteKey{}, "relay")
+		account, err = p.accountByRiotIDPinned(ctx, gameName, tagLine)
+	}
 	_, source := riotRequestCredential(ctx)
 	if err != nil && source == "embedded" && ctx.Err() == nil {
 		var status *riotStatusError
@@ -939,6 +959,7 @@ func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine st
 	return account, err
 }
 func (p *riotProvider) accountByRiotIDPinned(ctx context.Context, gameName, tagLine string) (riotAccount, error) {
+	ctx = context.WithValue(ctx, riotAccountRouteBoundaryKey{}, true)
 	for {
 		account, err := p.loadRiotAccountFlight(ctx, gameName, tagLine)
 		if retry, waitErr := awaitRiotFlightHandoff(ctx, err); retry {
@@ -2309,7 +2330,11 @@ func riotHTTPErrorBody(err error, regions ...string) riotHTTPError {
 		body.Kind = "rate-limited"
 		body.RetryAfter = max(1, body.RetryAfter)
 	}
-	if errors.Is(err, context.DeadlineExceeded) {
+	var internal *riotInternalWaitTimeout
+	if errors.As(err, &internal) {
+		body.Kind = "internal-wait"
+		body.Error = "查询调度等待超时，请重试；已加载的战绩仍可查看"
+	} else if errors.Is(err, context.DeadlineExceeded) {
 		label := "外服"
 		if len(regions) > 0 && isRiotRegion(regions[0]) {
 			label = riotRegionLabel(regions[0])

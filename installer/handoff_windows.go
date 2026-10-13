@@ -22,6 +22,8 @@ type windowSearch struct {
 	found bool
 }
 
+// EnumWindows synchronously echoes &search from hasApplicationWindow; this is
+// always our live Go allocation, unlike a window-message LPARAM.
 func inspectApplicationWindow(hwnd uintptr, search *windowSearch) uintptr {
 	var pid uint32
 	if thread, _, _ := windowProcessID.Call(hwnd, uintptr(unsafe.Pointer(&pid))); thread == 0 || pid != search.pid {

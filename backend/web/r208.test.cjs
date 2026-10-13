@@ -13,11 +13,12 @@ const flush = () => new Promise(setImmediate);
 function harness(responses) {
   const jobs = new Map(), requests = [], toasts = [];
   let sequence = 0, now = 0;
+  class ClockDate extends Date { static now() { return now; } }
   const state = {controllers: new Map(), settings: {matchCount: 20}, tabs: [], overlay: []};
   const dom = new JSDOM('<main></main>'), root = dom.window.document.querySelector('main');
   const render = tab => { root.innerHTML = (tab.data?.matches || []).map(m => `<article>${m.gameId}</article>`).join('') + ((tab.initialPageError || tab.error) ? `<div class="notice">${tab.initialPageError || tab.error}</div>` : ''); };
   const noop = () => {};
-  const context = {globalThis:{deepLegendsHistoryRecovery:require('./history-recovery.js')},state, Headers, AbortController, TextDecoder, Uint8Array, Date, MAX_BROWSE_MATCHES: 1000, AUTO_PAGE_DELAY_MS: 400, AUTO_PAGE_MAX_BACKOFF_MS: 8000,
+  const context = {globalThis:{deepLegendsHistoryRecovery:require('./history-recovery.js')},state, Headers, AbortController, TextDecoder, Uint8Array, Date: ClockDate, MAX_BROWSE_MATCHES: 1000, AUTO_PAGE_DELAY_MS: 400, AUTO_PAGE_MAX_BACKOFF_MS: 8000,
     setTimeout: (fn, ms) => {jobs.set(++sequence, {fn, ms, at: now + ms}); return sequence;}, clearTimeout: id => jobs.delete(id),
     fetch: async (url, options) => {requests.push({url, options}); assert.ok(responses.length, 'unexpected request'); return responses.shift();},
     tabReady: () => true, riotTab: () => true, historyRecoveryActive: () => true, tabGroup: () => 'kr', rerenderTab: render, appendOverviewMatches: render, showLoadingMoreState: noop,

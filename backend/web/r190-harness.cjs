@@ -2,6 +2,7 @@
 const {read, compile, escapeHTML} = require('./r188-harness.cjs');
 const names = ['plainText','perkEffectLines','selectedRuneEffects','runeEffectTotals','renderRuneYield','renderRuneEffects','renderRuneOption','renderUnifiedRuneBoard','renderRuneStyleIcon','renderBuildAugments','normalizeAugmentRarity','augmentMetadata','augmentTooltipText','wrapAugmentIcon','augmentIconFigure','bindRuneEffectLinks','ensureAugmentDescriptions','rerenderAugmentDescriptionViews','ensureBuildData','renderBuild','buildSubject','renderBuildPlayers','isCurrentMatchParticipant','renderMatchPlayers','playerParticipantName','matchPlayerGroups','arenaGroupLabel'];
 function fixture(source = process.env.R190_SOURCE_FILE ? require('node:fs').readFileSync(process.env.R190_SOURCE_FILE,'utf8') : read('gameplay.js'), extra = {}) {
+ source=require('./r277-deferred-fixture.cjs').join(source);
  const ids = [8005,9111,9103,8017,8321,8347];
  const perks = ids.map((id,i) => ({id,name:['强攻','凯旋','传说：血统','砍倒','返现','星界洞悉'][i],iconPath:`/fixture/${id}.svg`,shortDesc:`<b>固定效果 ${id}</b>`,eogDescs:[['伤害总和：@eogvar1@','额外伤害：@eogvar2@'],['回复生命值总和：@eogvar1@','提供的额外金币总和：@eogvar2@'],['已完成的时间：@eogvar1@:@eogvar2@'],['额外伤害总和：@eogvar1@'],['返还金币总计：@eogvar1@'],['--']][i]}));
  const styles = [8000,8300].map((id,i)=>({id,name:i?'启迪':'精密',slots:(i?[[8300],[8321],[8347],[8304]]:[[8005,8008],[9111],[9103],[8017]]).map(slot=>({perks:slot.map(id=>perks.find(p=>p.id===id)||{id,name:`符文 ${id}`})}))}));

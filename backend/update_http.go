@@ -108,7 +108,7 @@ func (a *app) scheduleQuit(delay time.Duration, reason string) {
 			a.updates.Close()
 			a.mu.Lock()
 			client := a.lcu
-			a.lcu = nil
+			a.clearSnapshotLocked("软件正在退出")
 			a.mu.Unlock()
 			if client != nil {
 				client.Close()

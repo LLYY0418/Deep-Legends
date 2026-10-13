@@ -41,7 +41,7 @@ test("R86 ADD-4 retired synergy panel selector stays absent without removing sha
   check(styles);
   assert.throws(() => check(`${styles}\n.${retired} { overflow: hidden; }`), { name: "AssertionError" });
 });
-const gameplayScript = fs.readFileSync(path.join(__dirname, "gameplay.js"), "utf8");
+const gameplayScript = require("./r277-deferred-fixture.cjs").join(fs.readFileSync(path.join(__dirname, "gameplay.js"), "utf8"));
 const gameplayStyles = fs.readFileSync(path.join(__dirname, "gameplay.css"), "utf8");
 const sharedBuildStyles = fs.readFileSync(path.join(__dirname, "build-item-row.css"), "utf8");
 const friendsStyles = fs.readFileSync(path.join(__dirname, "friends.css"), "utf8");
@@ -1632,7 +1632,8 @@ test("rank history and ability comparison stay inside the shared career surface"
 	assert.match(gameplayScript, /expanded \? "收起" : "查看更多赛段段位"/);
 	assert.match(gameplayScript, /function bindRankHistoryControls\(container\)/);
 	assert.match(gameplayScript, /bindRankHistoryControls\(nodes\.careerDialogContent\)/);
-	assert.match(gameplayScript, /OP\.GG 的历史赛段记录未提供胜负场，无法核验胜率/);
+	assert.doesNotMatch(gameplayScript, /OP\.GG 的历史赛段记录未提供胜负场，无法核验胜率/);
+	assert.match(gameplayScript, /hasWinRate\?"<span>胜率<\/span>":""/);
 	assert.match(gameplayScript, /renderAbility\(abilityQueue\.ability, abilityQueue\.queueLabel/);
 	assert.match(gameplayScript, /function renderAbility\(ability, fallbackQueueLabel = "", queueSwitcher = "", sampleGames = 0, queueGames = 0\)/);
 	assert.match(gameplayScript, /ability-radar-baseline/);

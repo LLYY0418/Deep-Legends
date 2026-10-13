@@ -13,7 +13,7 @@ test('time search consumes new unique pages from loaded cursor, reaches 40/60/80
   const now=Date.parse('2026-10-11T12:00:00Z'),rows=Array.from({length:80},(_,i)=>({gameId:i+1,result:'win',createdAt:now-i*60000,participants:[{participantId:1,championId:103}]}));
   const tab={advancedConditions:{time:{values:['d30']},hero:{values:['999']}},data:{matches:rows.slice(0,20),pagination:{hasMore:true}}},calls=[],diagnostics=[];let cursor=20;
   const ctx={rows:()=>tab.data.matches,version:()=>tab.data.matches,cursor:()=>cursor,now:()=>now,subject:m=>m.participants[0],tags:()=>[],foreign:()=>foreign,isActive:()=>true,render(){},progress(){},diagnostic:(reason,fields)=>diagnostics.push({reason,...fields}),load:async n=>{calls.push({beg:cursor,count:n});const page=rows.slice(cursor,cursor+n);tab.data.matches=tab.data.matches.concat(page);cursor+=page.length;tab.data.pagination.hasMore=cursor<80;return true;}};
-  for(const expected of [40,60,80]){await af.find(tab,ctx);assert.equal(tab.data.matches.length,expected);}
+  await af.find(tab,ctx);assert.equal(tab.data.matches.length,80,'one search continues across all pages to the actual time boundary');
   assert.deepEqual(calls.map(c=>c.beg),[20,40,60]);assert.equal(tab.advancedSearch.stopReason,'no_more');assert.match(af.empty(tab,ctx),/近\s*30\s*天的\s*80\s*场|已查完可查询的\s*80\s*场/);assert.doesNotMatch(af.empty(tab,ctx),/data-af-continue/);
   assert(diagnostics.some(d=>d.exhausted===true));
  }

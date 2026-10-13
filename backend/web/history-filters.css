@@ -48,10 +48,10 @@
 .af-segment button.is-active { background: var(--primary-soft); color: var(--primary-strong); }
 .af-search { flex: 0 0 38px; width: 100%; min-width: 0; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface); font: inherit; }
 .af-options { display: flex; flex-wrap: wrap; align-content: start; gap: 8px; overflow: auto; min-height: 0; flex: 1; padding: 0 0 12px; }
-.af-options > button { position: relative; display: flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; min-height: 38px; }
+.af-options > button { position: relative; display: flex; align-items: center; gap: 7px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; min-height: 44px; }
 .af-options > button.is-active { border-color: var(--primary-strong); background: var(--primary-soft); }
 .af-options > button.is-active::after { content: '✓'; position: absolute; top: 5px; right: 5px; width: 18px; height: 18px; border-radius: 50%; background: var(--primary); color: var(--on-primary,var(--bg)); font-size: 11px; display: grid; place-items: center; }
-.af-options strong { font-size: 12px; font-weight: 500; }
+.af-options strong { font-size: 13px; font-weight: 600; }
 .af-options small { color: var(--muted); font-size: 11px; }
 .af-options.is-hero { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); }
 .af-options.is-hero > button { flex-direction: column; gap: 4px; padding: 5px 4px; border-color: transparent; min-height: 104px; }
@@ -99,7 +99,7 @@
 .af-rename button { width: 32px; border: 1px solid var(--line); border-radius: 8px; }
 .af-savebar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border: 1px dashed var(--line); border-radius: 12px; padding: 12px 14px; }
 .af-savebar button { height: 36px; padding: 0 16px; border: 1px solid var(--line); border-radius: 9px; }
-@media (max-width: 900px) {
+@media (max-width: 650px) {
  .af-columns { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr); }
  .af-categories { display: flex; gap: 6px; border-right: 0; border-bottom: 1px solid var(--line); padding: 10px 12px; }
  .af-categories > button { flex: 0 0 auto; width: auto; min-height: 40px; }

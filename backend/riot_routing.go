@@ -16,6 +16,85 @@ type riotRouteKey struct{}
 type riotPinnedCredentialKey struct{}
 type riotPinnedCredential struct{ key, source string }
 type riotFallbackAttemptKey struct{}
+
+// Preserve deadline identity for cancellation/handoff while keeping scheduler
+// timeouts distinct from an HTTP attempt that actually reached the network.
+type riotInternalWaitTimeout struct{ cause error }
+
+func (e *riotInternalWaitTimeout) Error() string { return "Riot internal scheduling wait timed out" }
+func (e *riotInternalWaitTimeout) Unwrap() error { return e.cause }
+func riotInternalWaitError(err error) error {
+	var internal *riotInternalWaitTimeout
+	if errors.Is(err, context.DeadlineExceeded) && !errors.As(err, &internal) {
+		return &riotInternalWaitTimeout{cause: err}
+	}
+	return err
+}
+
+var errRiotQuotaOverflow = errors.New("Riot local application quota overflow")
+
+// A route decision, not a reservation. It never consumes local tokens and never
+// installs a sticky relay cooldown, so the first recovered request goes direct.
+func (p *riotProvider) tryRiotQuotaOverflow(ctx context.Context) bool {
+	_, source := riotRequestCredential(ctx)
+	if ctx.Err() != nil || isRiotBackground(ctx) || source != "user" && source != "embedded" {
+		return false
+	}
+	scope, ok := ctx.Value(riotRateScopeKey{}).(riotRateScope)
+	if !ok {
+		return false
+	}
+	p.limitMu.Lock()
+	now := p.riotRateNow()
+	var until time.Time
+	if host := p.rateHosts[scope.host]; host != nil && !now.Before(host.app.cooldown) {
+		for period, window := range host.app.windows {
+			if period >= time.Minute && window.used >= window.limit && now.Before(window.reset) && window.reset.After(until) {
+				until = window.reset
+			}
+		}
+	} else if host == nil && len(p.longWindow) >= 90 {
+		// Conservative pre-header budget is also a local application window.
+		reset := p.longWindow[0].Add(2 * time.Minute)
+		if now.Before(reset) {
+			until = reset
+		}
+	}
+	p.limitMu.Unlock()
+	if until.IsZero() || !riotRelayRecentlyHealthy() {
+		return false
+	}
+	p.limitMu.Lock()
+	if p.quotaOverflowWindows == nil {
+		p.quotaOverflowWindows = make(map[string]time.Time)
+	}
+	for host, reset := range p.quotaOverflowWindows {
+		if !now.Before(reset) {
+			delete(p.quotaOverflowWindows, host)
+		}
+	}
+	emit := !p.quotaOverflowWindows[scope.host].Equal(until)
+	p.quotaOverflowWindows[scope.host] = until
+	p.limitMu.Unlock()
+	if emit {
+		// The relay uses its own server-side Secret. No direct token is forwarded.
+		p.routeRecord(map[string]any{"event": "riot_route_switch", "from": "direct", "to": "relay", "reason": "quota-overflow", "source": source, "same_credential": false})
+	}
+	return true
+}
+
+func riotRelayRecentlyHealthy() bool {
+	s := riotRelays
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.nowLocked()
+	if s.active == "" || s.lastSuccess.IsZero() || now.Sub(s.lastSuccess) >= 10*time.Minute || s.requestErrorLocked() != nil {
+		return false
+	}
+	origins := configuredRiotRelays()
+	return s.config == strings.Join(origins, "\n") && len(origins) > 0
+}
+
 type riotForegroundState struct {
 	sync.Mutex
 	active           int
@@ -55,12 +134,25 @@ func (p *riotProvider) waitForRiotForeground(ctx context.Context) error {
 		return nil
 	}
 	riotForeground := p.foreground
+	proOwned := ctx.Value(proBackgroundGateKey{}) != nil
+	bounded := isRiotBackground(ctx) && !proOwned
+	riotForeground.Lock()
+	yieldUntil := riotForeground.nowLocked().Add(3 * time.Second)
+	riotForeground.Unlock()
 	for {
+		if err := ctx.Err(); err != nil {
+			return riotInternalWaitError(err)
+		}
 		riotForeground.Lock()
 		active, until := riotForeground.active, riotForeground.resumeAt
 		now := riotForeground.nowLocked()
-		hidden := riotForeground.visibilityKnown && !riotForeground.directoryVisible
+		hidden := proOwned && riotForeground.visibilityKnown && !riotForeground.directoryVisible
 		riotForeground.Unlock()
+		// Overview verification is low priority, not directory-owned. After a
+		// bounded yield it continues through the stricter background limiter.
+		if bounded && !hidden && !now.Before(yieldUntil) {
+			return nil
+		}
 		if !hidden && active == 0 && !now.Before(until) {
 			return nil
 		}
@@ -68,12 +160,15 @@ func (p *riotProvider) waitForRiotForeground(ctx context.Context) error {
 		if !hidden && active == 0 {
 			delay = until.Sub(now)
 		}
+		if bounded {
+			delay = min(delay, yieldUntil.Sub(now))
+		}
 		wait := waitRiotDelay
 		if controlled, ok := ctx.Value(riotForegroundWaitKey{}).(func(context.Context, time.Duration) error); ok {
 			wait = controlled
 		}
 		if err := wait(ctx, delay); err != nil {
-			return err
+			return riotInternalWaitError(err)
 		}
 	}
 }
@@ -130,6 +225,11 @@ func (p *riotProvider) relayFallback(ctx context.Context, host, path string, que
 
 func (p *riotProvider) getLimited(ctx context.Context, host, path string, query url.Values, out any, max int64) error {
 	if route, _ := ctx.Value(riotRouteKey{}).(string); route != "" {
+		if route == "relay" {
+			// Explicit identity retries keep their cache owner but must use the
+			// relay's admission state, not the exhausted direct credential bucket.
+			return p.relayFallback(ctx, host, path, query, out, max)
+		}
 		return p.getScopedPUUID(ctx, host, path, query, out, max)
 	}
 	_, source := riotUserKeys.effective()
@@ -137,11 +237,17 @@ func (p *riotProvider) getLimited(ctx context.Context, host, path string, query 
 		return p.getScopedPUUID(ctx, host, path, query, out, max)
 	}
 	if isRiotBackground(ctx) {
-		return p.relayFallback(ctx, host, path, query, out, max)
+		// Background jobs retain local low-priority admission; only interactive
+		// work may overflow an exhausted application window to the relay.
+		return p.getScopedPUUID(ctx, host, path, query, out, max)
 	}
 	s := riotUserKeys
 	s.mu.Lock()
-	cooldown := time.Now().Before(s.routeUntil)
+	// The old embedded 80% hint is telemetry, not a sticky route. The actual
+	// local application limiter decides overflow for both credential sources,
+	// and permits direct I/O immediately when its controlled window recovers.
+	quotaHint := !s.quotaWindowAt.IsZero() && s.routeUntil.Equal(s.quotaWindowAt.Add(120*time.Second))
+	cooldown := time.Now().Before(s.routeUntil) && !quotaHint
 	probe := s.networkFailures >= 3 && !cooldown
 	s.mu.Unlock()
 	if cooldown {
@@ -174,6 +280,11 @@ func (p *riotProvider) getLimited(ctx context.Context, host, path string, query 
 		p.routeRecord(map[string]any{"event": "riot_route_switch", "from": "relay", "to": "direct", "reason": "probe_recovered"})
 	}
 	err := p.getScopedPUUID(ctx, host, path, query, out, max)
+	// Local quota is not an upstream rejection. Admission already checked
+	// relay health; do not let the legacy embedded 429 fallback bypass it.
+	if errors.Is(err, errThrottled) {
+		return err
+	}
 	var status *riotStatusError
 	if errors.As(err, &status) {
 		if status.puuidMismatch {
@@ -202,6 +313,10 @@ func (p *riotProvider) getLimited(ctx context.Context, host, path string, query 
 		return nil
 	}
 	if ctx.Err() != nil {
+		return err
+	}
+	var internal *riotInternalWaitTimeout
+	if errors.As(err, &internal) {
 		return err
 	}
 	// Only network/read failures switch routes; successful error responses retain their meaning.
@@ -244,13 +359,13 @@ func (p *riotProvider) observeEmbeddedQuota(header http.Header, status int) {
 		until := riotUserKeys.quotaWindowAt.Add(120 * time.Second)
 		wait := time.Until(until)
 		relay, direct := riotRouteMedianCosts()
-		useRelay := count*5 >= limit*4
-		if useRelay {
+		nearQuota := count*5 >= limit*4
+		if nearQuota {
 			riotUserKeys.routeUntil = until
 		}
 		riotUserKeys.mu.Unlock()
 		if count*5 >= limit*4 {
-			p.routeRecord(map[string]any{"event": "riot_quota_guard", "count": count, "limit": limit, "window_s": 120, "action": map[bool]string{true: "relay", false: "direct"}[useRelay], "wait_ms": wait.Milliseconds(), "relay_median_ms": relay.Milliseconds(), "direct_median_ms": direct.Milliseconds()})
+			p.routeRecord(map[string]any{"event": "riot_quota_guard", "count": count, "limit": limit, "window_s": 120, "action": "local-admission", "wait_ms": wait.Milliseconds(), "relay_median_ms": relay.Milliseconds(), "direct_median_ms": direct.Milliseconds()})
 		}
 	}
 

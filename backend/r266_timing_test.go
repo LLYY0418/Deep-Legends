@@ -87,7 +87,7 @@ func TestR266FakeServiceTimingEvidence(t *testing.T) {
 	data, _ = json.Marshal(map[string]any{"scope": "background during foreground", "new_requests": backgroundRequests.Load(), "wait_ms": waitMS})
 	fmt.Println("R266_BACKGROUND " + string(data))
 	resumed := time.Now()
-	resumeCtx, resumeCancel := context.WithTimeout(withRiotBackground(context.Background()), 6*time.Second)
+	resumeCtx, resumeCancel := context.WithTimeout(withRiotBackground(g.a.proBackgroundContext(context.Background())), 6*time.Second)
 	defer resumeCancel()
 	if err := g.a.riot.get(resumeCtx, g.a.riot.platformHost(), "/lol/status/v4/platform-data", nil, &out); err != nil {
 		t.Fatal(err)
@@ -96,7 +96,7 @@ func TestR266FakeServiceTimingEvidence(t *testing.T) {
 	if os.Getenv("R266_TIMING_BASELINE") != "1" && (resumeMS < 4900 || backgroundRequests.Load() != 1) {
 		t.Fatal("background resumed before the five-second grace period")
 	}
-	data, _ = json.Marshal(map[string]any{"scope": "background after foreground", "requests_total": backgroundRequests.Load(), "resume_ms": resumeMS})
+	data, _ = json.Marshal(map[string]any{"scope": "pro-owned background after foreground", "requests_total": backgroundRequests.Load(), "resume_ms": resumeMS})
 	fmt.Println("R266_BACKGROUND_RESUMED " + string(data))
 }
 

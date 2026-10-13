@@ -41,6 +41,9 @@ func isFriendsLCUEvent(event LCUEvent) bool {
 }
 
 func (a *app) requestRefresh() {
+	if a.currentClientView().State != "ready" {
+		a.markDisconnected("正在重新连接客户端")
+	}
 	a.mu.Lock()
 	a.manualDisconnected = false
 	a.mu.Unlock()
@@ -53,10 +56,23 @@ func (a *app) requestRefresh() {
 	}
 }
 
-func (a *app) refreshCollectionWithClient(client *LCUClient) bool {
+func (a *app) refreshCollectionWithClient(client *LCUClient, parents ...context.Context) bool {
+	parent := context.Background()
+	if len(parents) > 0 {
+		parent = parents[0]
+	}
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
 	// The HTTP request returns 202 before the probe/scan finishes. Coalesce for
 	// that entire lifetime, not just while a request occupies the queue.
 	a.mu.Lock()
+	if a.shutdownClient != nil || ctx.Err() != nil {
+		a.mu.Unlock()
+		return true
+	}
+	a.collectionProbeGeneration++
+	generation, epoch := a.collectionProbeGeneration, a.clientSessionEpoch
+	a.collectionProbeCancel, a.collectionProbeClient = cancel, client
 	a.collectionRefreshPending = true
 	if a.collectionRefreshPendingSource == "" {
 		a.collectionRefreshPendingSource = "snapshot_retry"
@@ -64,7 +80,10 @@ func (a *app) refreshCollectionWithClient(client *LCUClient) bool {
 	a.mu.Unlock()
 	defer func() {
 		a.mu.Lock()
-		a.collectionRefreshPending = false
+		if epoch == a.clientSessionEpoch && generation == a.collectionProbeGeneration {
+			a.collectionRefreshPending = false
+			a.collectionProbeCancel, a.collectionProbeClient = nil, nil
+		}
 		a.mu.Unlock()
 	}()
 	a.mu.RLock()
@@ -76,10 +95,16 @@ func (a *app) refreshCollectionWithClient(client *LCUClient) bool {
 		if probe == nil {
 			probe = waitForCollectionEndpoint
 		}
-		ready, attempts := probe(context.Background(), client, summonerID)
+		ready, attempts := probe(ctx, client, summonerID)
+		if ctx.Err() != nil {
+			return true
+		}
 		if !ready {
 			a.recordDiagnostic(map[string]any{"event": "collection_probe_exhausted", "attempts": attempts, "has_summoner_id": summonerID > 0})
 		}
+	}
+	if ctx.Err() != nil || a.clientShutdownPending(client) {
+		return true
 	}
 	if refresh != nil {
 		return refresh(client)
@@ -96,6 +121,9 @@ func waitForCollectionEndpoint(ctx context.Context, client *LCUClient, summonerI
 	started := time.Now()
 	attempts := 0
 	for {
+		if ctx.Err() != nil {
+			return false, attempts
+		}
 		attempts++
 		probeCtx, cancel := context.WithTimeout(ctx, collectionProbeTimeout)
 		err := client.RequestJSON(probeCtx, http.MethodGet, path, nil, nil)
@@ -189,7 +217,8 @@ func (a *app) runConnectionManagerWith(ctx context.Context, ops connectionLoopOp
 		backoff = minimumDiscoveryBackoff
 		a.observeColdLaunchMilestone("identity_ms", time.Now())
 		a.setSnapshotPhase(client)
-		if err := ops.session(ctx, client); err != nil && !errors.Is(err, context.Canceled) {
+		err = ops.session(ctx, client)
+		if ctx.Err() == nil {
 			a.disconnectClient(client, friendlyError(err))
 		}
 	}
@@ -211,6 +240,19 @@ func (a *app) waitForDiscovery(ctx context.Context, delay time.Duration) bool {
 func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error {
 	sessionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	client.mu.Lock()
+	client.sessionContext = sessionCtx
+	client.mu.Unlock()
+	a.mu.Lock()
+	a.clientSessionCancel, a.clientSessionCancelClient = cancel, client
+	a.mu.Unlock()
+	defer func() {
+		a.mu.Lock()
+		if a.clientSessionCancelClient == client {
+			a.cancelClientSessionLocked()
+		}
+		a.mu.Unlock()
+	}()
 	a.beginConnectionPriority(sessionCtx, client)
 	a.prefetchSelfMayhemRating(client)
 	a.goSafe("connection_manager.platform", func() { a.recordDiagnostic(clientPlatformDiagnostic(client)) })
@@ -408,10 +450,46 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 	eventRetryDelay := eventRetryInitialInterval
 	eventStreamReady := false
 	pendingScope := ""
+	collectionResults := make(chan bool, 1)
+	collectionRunning := false
+	startCollection := func() {
+		if collectionRunning || a.clientShutdownPending(client) {
+			return
+		}
+		collectionRunning = true
+		a.goSafe("connection_manager.collection", func() {
+			ok := a.refreshCollectionWithClient(client, sessionCtx)
+			select {
+			case collectionResults <- ok:
+			case <-sessionCtx.Done():
+			}
+		})
+	}
+	viewRecovery := time.NewTicker(time.Second)
+	defer viewRecovery.Stop()
 	for {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-sessionCtx.Done():
+			return sessionCtx.Err()
+		case <-viewRecovery.C:
+			a.recoverStuckClientView(client, time.Now())
+		case ok := <-collectionResults:
+			collectionRunning = false
+			if !ok {
+				return errors.New("LCU collection refresh failed")
+			}
+			a.setSnapshotPhase(client)
+			if a.snapshotReadyForClient(client) {
+				retryDelay, retryFailures = snapshotRetryInterval, 0
+			} else {
+				a.mu.RLock()
+				exhausted := a.snapshotRetryExhausted
+				a.mu.RUnlock()
+				retryFailures++
+				retryDelay = nextSnapshotRetryDelay(retryFailures, exhausted)
+			}
+			snapshotRetryTimer.Reset(retryDelay)
+			snapshotRetry = snapshotRetryTimer.C
 		case <-phaseChanges:
 			syncPhaseTimers()
 		case <-startupIdleTick:
@@ -431,13 +509,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 			collectionRequested := a.collectionRequested
 			a.mu.RUnlock()
 			if collectionRequested {
-				if !a.refreshCollectionWithClient(client) {
-					return errors.New("LCU refresh failed")
-				}
-				a.setSnapshotPhase(client)
-				retryDelay = snapshotRetryInterval
-				snapshotRetryTimer.Reset(retryDelay)
-				snapshotRetry = snapshotRetryTimer.C
+				startCollection()
 			} else if _, err := a.refreshSummonerIdentity(client); err != nil {
 				a.recordDiagnostic(map[string]any{"event": "summoner_identity_refresh_failed", "reason": safeDiagnosticReason(err)})
 			}
@@ -505,10 +577,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 			collectionRequested := a.collectionRequested
 			a.mu.RUnlock()
 			if collectionRequested {
-				if !a.refreshCollectionWithClient(client) {
-					return errors.New("LCU fallback refresh failed")
-				}
-				a.setSnapshotPhase(client)
+				startCollection()
 			} else if _, err := a.refreshSummonerIdentity(client); err != nil {
 				a.recordDiagnostic(map[string]any{"event": "summoner_identity_fallback_failed", "reason": safeDiagnosticReason(err)})
 			}
@@ -533,21 +602,8 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				snapshotRetryTimer.Reset(retryDelay)
 				continue
 			}
-			if !a.refreshCollectionWithClient(client) {
-				return errors.New("LCU snapshot retry failed")
-			}
-			a.setSnapshotPhase(client)
-			if a.snapshotReadyForClient(client) {
-				retryDelay = snapshotRetryInterval
-				retryFailures = 0
-			} else {
-				a.mu.RLock()
-				retryExhausted := a.snapshotRetryExhausted
-				a.mu.RUnlock()
-				retryFailures++
-				retryDelay = nextSnapshotRetryDelay(retryFailures, retryExhausted)
-			}
-			snapshotRetryTimer.Reset(retryDelay)
+			snapshotRetry = nil
+			startCollection()
 		case <-eventReady:
 			result := "connected"
 			if eventStreamReady {
@@ -557,6 +613,9 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 			eventRetryDelay = eventRetryInitialInterval
 			a.recordDiagnostic(map[string]any{"event": "lcu_event_stream", "result": result})
 		case err := <-eventErrors:
+			a.mu.Lock()
+			a.cancelCollectionProbeLocked(client)
+			a.mu.Unlock()
 			a.recordClientShutdownTrace(client, time.Now())
 			a.setEventStream(client, false)
 			droppedEvent, oversizeEvent := eventStreamDropDiagnostics(err)
@@ -847,6 +906,10 @@ func (a *app) markCollectionDirtyAt(now time.Time, kinds ...string) bool {
 		}
 	}
 	a.mu.Lock()
+	if a.shutdownClient != nil {
+		a.mu.Unlock()
+		return false
+	}
 	during := a.syncing
 	suppressed := !a.collectionRefreshFinishedAt.IsZero() && now.Sub(a.collectionRefreshFinishedAt) < 5*time.Second
 	if previous := a.collectionEventAt[kind]; kind != "inventory" && kind != "champions" && !previous.IsZero() && now.Sub(previous) < 30*time.Second {
@@ -975,14 +1038,6 @@ func (a *app) markDisconnected(message string) {
 	a.mu.Lock()
 	oldClient := a.lcu
 	playerRef := a.summoner.PUUID
-	if a.shutdownTimer != nil {
-		a.shutdownTimer.Stop()
-	}
-	a.shutdownClient = nil
-	a.shutdownEvents = nil
-	a.clientLastEventAt = time.Time{}
-	a.shutdownChatOfflineAt = time.Time{}
-	a.shutdownFriendsEmptyAt = time.Time{}
 	a.clearSnapshotLocked(message)
 	a.connectionState = "disconnected"
 	a.mu.Unlock()
@@ -999,12 +1054,10 @@ func (a *app) disconnectClient(client *LCUClient, message string) {
 	a.mu.Lock()
 	disconnectedCurrent := a.lcu == client
 	playerRef := a.summoner.PUUID
+	if a.shutdownClient == client {
+		a.clearClientShutdownLocked()
+	}
 	if a.lcu == client {
-		if a.shutdownTimer != nil {
-			a.shutdownTimer.Stop()
-		}
-		a.shutdownClient = nil
-		a.clientLastEventAt = time.Time{}
 		a.clearSnapshotLocked(message)
 		a.connectionState = "disconnected"
 	}

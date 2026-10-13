@@ -158,6 +158,180 @@ jobs:
         working-directory: installer
         run: go vet ./...
 
+  # R277 proofs have their own VMs/steps, outside all existing calibrated shards.
+  # No retired special-branch acceptance condition is reintroduced.
+  r277-proof-linux:
+    runs-on: ubuntu-latest
+    env:
+      PI_SCRATCH_DIR: ${{ runner.temp }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent R277 test dependencies
+        run: npm ci --prefix desktop
+      - name: Prepare R277 backend Go dependencies
+        run: go mod download
+      - name: Verify R277 orchestration and unchanged legacy budgets
+        run: node --test scripts/r277-ci-orchestration.test.cjs
+      - name: R277 CI branch-condition actual mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r277-ci-branch-mutations.cjs docs/history/reports/r277/ci-integration/linux/branch-mutations
+      - name: R277 P1 fixed and actual mutations
+        if: ${{ !cancelled() }}
+        run: python scripts/r277-client-mutations.py --out docs/history/reports/r277/ci-integration/linux/p1
+      - name: R277 real HTTP reread actual mutation
+        if: ${{ !cancelled() }}
+        run: python scripts/r277-http-refresh-proof.py --out docs/history/reports/r277/ci-integration/linux/http-reread
+      - name: R277 P9 P10 fixed and actual mutations
+        if: ${{ !cancelled() }}
+        run: python scripts/r277-wire-diagnostic-mutations.py --out docs/history/reports/r277/ci-integration/linux/p9-p10
+      - name: R277 Riot fixed and actual mutations
+        if: ${{ !cancelled() }}
+        run: python scripts/r277-riot-proof.py --out docs/history/reports/r277/ci-integration/linux/riot
+      - name: R277 credential scope actual mutations
+        if: ${{ !cancelled() }}
+        run: python scripts/r277-riot-scope-proof.py --out docs/history/reports/r277/ci-integration/linux/riot-scope
+      - name: R277 frontend and release contracts
+        if: ${{ !cancelled() }}
+        run: node scripts/r277-ci-orchestrate.cjs contracts --out docs/history/reports/r277/ci-integration/linux/frontend
+      - name: R277 initial asset budget and actual deferred asset mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r277-ci-orchestrate.cjs deferred-unit --out docs/history/reports/r277/ci-integration/linux/deferred-assets
+      - name: R277 CN score actual backend and frontend mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r277-ci-cn-score.cjs mutants --out docs/history/reports/r277/ci-integration/linux/cn-score
+      - name: R277 frontend actual unit mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r277-ci-orchestrate.cjs frontend-mutants --out docs/history/reports/r277/ci-integration/linux/frontend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r277-independent-linux-proof
+          path: docs/history/reports/r277/ci-integration/linux/**
+          if-no-files-found: error
+
+  r277-native-windows:
+    runs-on: windows-latest
+    env:
+      PI_SCRATCH_DIR: ${{ runner.temp }}
+      GODEBUG: invalidptr=1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require native Windows race compiler
+        shell: pwsh
+        run: |
+          if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
+            $compiler = @('C:\mingw64\bin', 'C:\msys64\mingw64\bin') | Where-Object { Test-Path (Join-Path $_ 'gcc.exe') } | Select-Object -First 1
+            if (-not $compiler) { throw 'Windows race compiler is unavailable' }
+            $compiler | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+      - name: Prepare native R277 Go dependencies
+        shell: pwsh
+        run: |
+          go mod download
+          if ($LASTEXITCODE -ne 0) { throw 'R277 backend dependencies failed' }
+          Push-Location installer
+          try {
+            go mod download
+            if ($LASTEXITCODE -ne 0) { throw 'R277 installer dependencies failed' }
+          } finally { Pop-Location }
+      - name: Measure every native R277 Go test including reopen and L5
+        shell: pwsh
+        run: |
+          python scripts/r277-ci-proof.py --out docs/history/reports/r277/ci-integration/native-windows/go-measurements
+          if ($LASTEXITCODE -ne 0) { throw 'Native R277 Go measurement or pass inventory failed' }
+      - name: R277 P11 native fixed PASS and both old-pointer fatal mutations
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          python scripts/r277-installer-callbacks.py --native --out docs/history/reports/r277/ci-integration/native-windows/p11
+          if ($LASTEXITCODE -ne 0) { throw 'P11 native callback race/GC regression or fatal mutation proof failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r277-native-windows-proof
+          path: docs/history/reports/r277/ci-integration/native-windows/**
+          if-no-files-found: error
+
+  r277-browser-matrix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PI_SCRATCH_DIR: ${{ runner.temp }}
+      GOCACHE: ${{ runner.temp }}/r277-browser-gocache
+      R277_MEASURE_ONLY: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install independent R277 browser dependencies
+        run: npm ci --prefix desktop
+      - name: Prepare independent R277 browser backend
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs build-browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
+      - name: R277 strict real-browser geometry and 400-match matrix
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
+      - name: R277 actual deferred asset loading CSP cache and 503 recovery
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs deferred-browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/deferred-assets"
+      - name: R277 actual CN score browser to Go HTTP transport
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: node scripts/r277-ci-cn-score.cjs browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/cn-score"
+      - name: R277 actual browser mutations
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs browser-mutants --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
+      - name: R277 Windows same-400-match before-after long-task measurement
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: node scripts/r277-perf-compare.cjs --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/p9-before-after"
+      - name: Clean only R277 browser generated executable and dedicated Go cache
+        if: always()
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs cleanup-browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r277-browser-proof-${{ matrix.os }}
+          path: docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/**
+          if-no-files-found: error
+
   windows-build:
     runs-on: windows-latest
     steps:

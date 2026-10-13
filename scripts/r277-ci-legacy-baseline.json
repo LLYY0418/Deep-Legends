@@ -1,0 +1,725 @@
+{
+  "ci_cleanup_sha": "dfd6fc2a830ea999b36b7365f6ea75e12bb06624",
+  "workflow": {
+    "name": "quality-and-windows-release",
+    "on": {
+      "push": {
+        "tags-ignore": [
+          "v*"
+        ],
+        "branches": [
+          "**"
+        ]
+      },
+      "pull_request": null,
+      "workflow_dispatch": {
+        "inputs": {
+          "measure_windows_renderers": {
+            "description": "R222 acceptance: run full desktop tests once on Windows and record budgets",
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    "permissions": {
+      "contents": "read"
+    },
+    "jobs": {
+      "quality": {
+        "runs-on": "ubuntu-latest",
+        "steps": [
+          {
+            "uses": "actions/checkout@v4"
+          },
+          {
+            "uses": "actions/setup-go@v5",
+            "with": {
+              "go-version": "1.24.13",
+              "cache": true
+            }
+          },
+          {
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install quality fixture Node dependencies",
+            "run": "npm ci --prefix desktop"
+          },
+          {
+            "name": "Verify local notes and assistant instructions are not tracked",
+            "run": "node scripts/verify-no-docs-tracked.cjs"
+          },
+          {
+            "name": "Prepare verified published update compatibility input",
+            "run": "node scripts/prepare-r238-update-fixture.cjs"
+          },
+          {
+            "name": "Prepare Go dependencies before offline tests",
+            "run": "go mod download"
+          },
+          {
+            "name": "Check formatting",
+            "shell": "bash",
+            "run": "unformatted=\"$(find . -type d \\( -name '.*' ! -name . -o -name node_modules -o -name vendor -o -name dist \\) -prune -o -type f -name '*.go' -print0 | xargs -0 gofmt -l)\"\ntest -z \"$unformatted\"\n"
+          },
+          {
+            "name": "Audit captured writes in test callbacks",
+            "run": "go run ./scripts/check-test-captures --json=\"$RUNNER_TEMP/test-capture-audit.json\""
+          },
+          {
+            "name": "R276 deterministic fixture and audit mutations",
+            "run": "python3 scripts/r276-fixture-mutations.py --out \"$RUNNER_TEMP/r276-fixture-mutations\""
+          },
+          {
+            "name": "R276 complete Hexdata restart barrier mutations",
+            "run": "python3 scripts/r276-hexdata-mutations.py --out \"$RUNNER_TEMP/r276-hexdata-mutations\""
+          },
+          {
+            "name": "R276 exact published legacy installer retry regression and mutations",
+            "run": "python3 scripts/r276-legacy-installer-retry-mutations.py --out \"$RUNNER_TEMP/r276-legacy-installer-retry-mutations\""
+          },
+          {
+            "name": "R276 native installed port-owner regression and mutations",
+            "run": "node scripts/r276-port-owner-mutations.cjs \"$RUNNER_TEMP/r276-port-owner-mutations\""
+          },
+          {
+            "name": "R276 bounded offline PowerShell fixture diagnostics",
+            "run": "node scripts/r276-powershell-fixture-mutations.cjs \"$RUNNER_TEMP/r276-powershell-fixture-mutations\""
+          },
+          {
+            "name": "R276 fresh renderer fixture isolation regression and mutations",
+            "run": "node scripts/r276-fresh-chrome-mutations.cjs \"$RUNNER_TEMP/r276-fresh-chrome-mutations\""
+          },
+          {
+            "name": "R276 recovery scope fixture regression and mutation",
+            "run": "python3 scripts/r276-recovery-scope-mutations.py --out \"$RUNNER_TEMP/r276-recovery-scope-mutations\""
+          },
+          {
+            "name": "R276 translation timeout fixture regression and mutation",
+            "run": "python3 scripts/r276-translation-fixture-mutations.py --out \"$RUNNER_TEMP/r276-translation-fixture-mutations\""
+          },
+          {
+            "name": "R276 installed demo startup navigation regression and mutations",
+            "run": "node scripts/r276-installed-demo-mutations.cjs \"$RUNNER_TEMP/r276-installed-demo-mutations\""
+          },
+          {
+            "name": "Audit browser process and directory cleanup",
+            "run": "node scripts/check-browser-cleanup.cjs --json=\"$RUNNER_TEMP/browser-cleanup-audit.json\""
+          },
+          {
+            "name": "R276 deterministic cleanup regression and mutations",
+            "run": "node scripts/r276-cleanup-mutations.cjs \"$RUNNER_TEMP/r276-cleanup-mutations\""
+          },
+          {
+            "name": "R276 precise API fault policy regression and mutations",
+            "run": "node scripts/r276-api-policy-mutations.cjs \"$RUNNER_TEMP/r276-api-policy-mutations\""
+          },
+          {
+            "name": "R276 default-timeout stress partition regression and mutations",
+            "run": "node scripts/r276-hexdata-stress-mutations.cjs \"$RUNNER_TEMP/r276-hexdata-stress-mutations\""
+          },
+          {
+            "name": "R276 filter geometry fixture regression and mutation",
+            "run": "node scripts/r276-filter-geometry-mutations.cjs \"$RUNNER_TEMP/r276-filter-geometry-mutations\""
+          },
+          {
+            "name": "R276 canceled update-probe fixture regression and mutation",
+            "run": "python3 scripts/r276-update-probe-mutations.py --out \"$RUNNER_TEMP/r276-update-probe-mutations\""
+          },
+          {
+            "name": "R276 clean quality dependency regression and mutation",
+            "run": "node scripts/r276-quality-dependency-mutations.cjs \"$RUNNER_TEMP/r276-quality-dependency-mutations\""
+          },
+          {
+            "name": "Verify sweep evidence rejects missing samples",
+            "run": "python3 scripts/r276-sweep-summary.test.py"
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "r276-test-capture-and-fixture-proof",
+              "path": "${{ runner.temp }}/browser-cleanup-audit.json\n${{ runner.temp }}/r276-cleanup-mutations/**\n${{ runner.temp }}/r276-api-policy-mutations/**\n${{ runner.temp }}/test-capture-audit.json\n${{ runner.temp }}/r276-fixture-mutations/**\n${{ runner.temp }}/r276-hexdata-mutations/**\n${{ runner.temp }}/r276-legacy-installer-retry-mutations/**\n${{ runner.temp }}/r276-port-owner-mutations/**\n${{ runner.temp }}/r276-powershell-fixture-mutations/**\n${{ runner.temp }}/r276-fresh-chrome-mutations/**\n${{ runner.temp }}/r276-installed-demo-mutations/**\n${{ runner.temp }}/r276-recovery-scope-mutations/**\n${{ runner.temp }}/r276-translation-fixture-mutations/**\n${{ runner.temp }}/r276-hexdata-stress-mutations/**\n${{ runner.temp }}/r276-filter-geometry-mutations/**\n${{ runner.temp }}/r276-update-probe-mutations/**\n${{ runner.temp }}/r276-quality-dependency-mutations/**\n",
+              "if-no-files-found": "error"
+            }
+          },
+          {
+            "name": "Vet",
+            "run": "go vet ./..."
+          },
+          {
+            "name": "Verify release license isolation",
+            "shell": "bash",
+            "run": "CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags= -buildvcs=false -o \"$RUNNER_TEMP/r233-release-public.exe\" ./backend\nnode desktop/verify-license-release.cjs \"$RUNNER_TEMP/r233-release-public.exe\"\n"
+          },
+          {
+            "name": "R252 compile shelved license code and verify corrected fixtures",
+            "run": "node scripts/r252-license-check.cjs"
+          },
+          {
+            "name": "R265 actual license embedded asset inventory guard",
+            "run": "go test ./backend -tags=license -run '^TestR265AllReleaseEmbeddedAssets$' -count=1"
+          },
+          {
+            "name": "R272 synthetic overview wire budget guard",
+            "run": "go test ./backend -run '^TestR272SyntheticOverviewWireBudget$' -count=1"
+          },
+          {
+            "name": "Verify CI test filters",
+            "run": "node scripts/verify-ci-test-filters.cjs"
+          },
+          {
+            "name": "Test with race detector",
+            "run": "node scripts/r276-offline.cjs -- go test -count=1 -race ./..."
+          },
+          {
+            "name": "Validate frontend JavaScript",
+            "run": "node --check backend/web/app.js\nnode --check backend/web/suite.js\nnode --check desktop/main.cjs\n"
+          },
+          {
+            "name": "Install desktop test dependencies",
+            "run": "npm ci --prefix desktop"
+          },
+          {
+            "name": "Calibrate runner speed before renderers",
+            "run": "node scripts/runner-calibration.cjs \"$RUNNER_TEMP/runner-calibration-before.json\""
+          },
+          {
+            "name": "Test frontend and desktop renderers",
+            "env": {
+              "R222_NODE_TIMING_OUTPUT": "${{ runner.temp }}/renderer-timings-linux.json"
+            },
+            "run": "node scripts/test-renderers.cjs all"
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "renderer-timings-linux",
+              "path": "${{ runner.temp }}/renderer-timings-linux.json"
+            }
+          },
+          {
+            "name": "Calibrate runner speed after renderers",
+            "run": "node scripts/runner-calibration.cjs \"$RUNNER_TEMP/runner-calibration-after.json\""
+          },
+          {
+            "name": "Enforce R252 renderer budget margin",
+            "run": "node scripts/renderer-budget-gate.cjs \"$RUNNER_TEMP/renderer-timings-linux.json\" \"$RUNNER_TEMP/runner-calibration-before.json\" \"$RUNNER_TEMP/runner-calibration-after.json\" \"$RUNNER_TEMP/renderer-budget-gate.json\""
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "renderer-budget-gate-linux",
+              "if-no-files-found": "ignore",
+              "path": "${{ runner.temp }}/runner-calibration-before.json\n${{ runner.temp }}/runner-calibration-after.json\n${{ runner.temp }}/renderer-budget-gate.json\n"
+            }
+          },
+          {
+            "name": "Test Riot relay Worker",
+            "run": "node --test relay/riot-worker/*.test.mjs"
+          },
+          {
+            "name": "Test installer module",
+            "working-directory": "installer",
+            "run": "go test ./..."
+          },
+          {
+            "name": "Vet installer module",
+            "working-directory": "installer",
+            "run": "go vet ./..."
+          }
+        ]
+      },
+      "windows-build": {
+        "runs-on": "windows-latest",
+        "steps": [
+          {
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "name": "R261 normal-close window bounds regression and assertion mutation",
+            "shell": "pwsh",
+            "run": "./scripts/r261-window-bounds.test.ps1"
+          },
+          {
+            "uses": "actions/setup-go@v5",
+            "with": {
+              "go-version": "1.24.13",
+              "cache": true
+            }
+          },
+          {
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22",
+              "cache": "npm",
+              "cache-dependency-path": "desktop/package-lock.json"
+            }
+          },
+          {
+            "name": "Verify local notes and assistant instructions are not tracked",
+            "run": "node scripts/verify-no-docs-tracked.cjs"
+          },
+          {
+            "name": "Prepare verified published update compatibility input",
+            "run": "node scripts/prepare-r238-update-fixture.cjs"
+          },
+          {
+            "name": "Install Windows test dependencies",
+            "run": "npm ci --prefix desktop"
+          },
+          {
+            "name": "Real default Electron first-frame license absence audit",
+            "shell": "pwsh",
+            "env": {
+              "R248_ELECTRON_OUTPUT": "${{ runner.temp }}/deep-legends-r238-default-electron"
+            },
+            "run": "node -e \"require('./scripts/r248-electron.cjs').probe({phase:'after',state:'DISABLED',frontendAssetDirectory:'default',storedBounds:{x:40,y:40,width:1050,height:750,maximized:false}}).then(r=>console.log(JSON.stringify(r.shows))).catch(e=>{console.error(e);process.exitCode=1})\"\nif ($LASTEXITCODE -ne 0) { throw \"Default first-frame audit failed\" }\n"
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "r238-default-electron-windows",
+              "path": "${{ runner.temp }}/deep-legends-r238-default-electron/**"
+            }
+          },
+          {
+            "name": "Build desktop client and checksums",
+            "shell": "pwsh",
+            "run": "$version = node -p \"require('./desktop/package.json').version\"\nif ($LASTEXITCODE -ne 0) { throw \"Unable to read desktop package version\" }\n$fakeCipher = (& go run ./backend -encrypt-riot-key 'RGAPI-00000000-0000-0000-0000-000000000000').Trim()\nif ($LASTEXITCODE -ne 0 -or -not $fakeCipher) { throw \"Fake key encryption failed\" }\n./build-desktop-windows.ps1 -Version $version -KeyMode public -SkipTestsInCI -RiotAPIKeyCipher $fakeCipher\nif ($LASTEXITCODE -ne 0) { throw \"Desktop build failed\" }\n$env:DEEP_LEGENDS_KEY_MODE='public'\nnode desktop/verify-embedded-riot-key.cjs --expect-fake\nif ($LASTEXITCODE -ne 0) { throw \"Fake embedded key verification failed\" }\n"
+          },
+          {
+            "name": "Verify checksums",
+            "shell": "pwsh",
+            "run": "Get-Content dist/desktop/SHA256SUMS-public.txt | ForEach-Object {\n  $parts = $_ -split '  ', 2\n  $actual = (Get-FileHash -Algorithm SHA256 (Join-Path dist/desktop $parts[1])).Hash.ToLowerInvariant()\n  if ($actual -ne $parts[0]) { throw \"Checksum mismatch: $($parts[1])\" }\n}\n"
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "with": {
+              "name": "deep-legends-windows-x64",
+              "path": "dist/desktop/*.exe\ndist/desktop/*.zip\ndist/desktop/SHA256SUMS-public.txt\n",
+              "if-no-files-found": "error"
+            }
+          }
+        ]
+      },
+      "windows-tests": {
+        "runs-on": "windows-latest",
+        "steps": [
+          {
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "uses": "actions/setup-go@v5",
+            "with": {
+              "go-version": "1.24.13",
+              "cache": true
+            }
+          },
+          {
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install desktop test dependencies",
+            "run": "npm ci --prefix desktop"
+          },
+          {
+            "name": "Prepare verified published update compatibility input",
+            "run": "node scripts/prepare-r238-update-fixture.cjs"
+          },
+          {
+            "name": "Prepare backend Go dependencies before offline tests",
+            "run": "go mod download"
+          },
+          {
+            "name": "Prepare installer Go dependencies before offline tests",
+            "working-directory": "installer",
+            "run": "go mod download"
+          },
+          {
+            "name": "Test full Windows backend and installer suites",
+            "shell": "pwsh",
+            "run": "$env:R276_OFFLINE_OUTPUT=\"$env:RUNNER_TEMP/r276-backend-offline.json\"\nnode scripts/r276-offline.cjs -- node scripts/run-ci-tests.cjs go backend\nif ($LASTEXITCODE -ne 0) { throw \"Windows backend tests or pass inventory failed\" }\n$env:R276_OFFLINE_OUTPUT=\"$env:RUNNER_TEMP/r276-installer-offline.json\"\nnode scripts/r276-offline.cjs -- node scripts/run-ci-tests.cjs go installer\nif ($LASTEXITCODE -ne 0) { throw \"Windows installer tests or pass inventory failed\" }\n"
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "r276-windows-offline-proof",
+              "path": "${{ runner.temp }}/r276-*-offline.json",
+              "if-no-files-found": "error"
+            }
+          },
+          {
+            "name": "R252 thirty independent R104 cold-start timelines",
+            "shell": "pwsh",
+            "run": "go test -c -o \"$env:RUNNER_TEMP/r252-r104.test.exe\" ./backend\nif ($LASTEXITCODE -ne 0) { throw \"R104 soak compilation failed\" }\npython scripts/r252-r104-soak.py --binary \"$env:RUNNER_TEMP/r252-r104.test.exe\" --output \"$env:RUNNER_TEMP/r252-r104-windows\" --iterations 30\nif ($LASTEXITCODE -ne 0) { throw \"R104 soak failure; original timelines retained\" }\n"
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "r252-r104-windows",
+              "path": "${{ runner.temp }}/r252-r104-windows/**"
+            }
+          },
+          {
+            "name": "R252 native diagnostic timestamp regression and assertion mutation",
+            "shell": "pwsh",
+            "run": "./scripts/r252-diagnostic-time.test.ps1"
+          },
+          {
+            "name": "Test Windows-only release and PowerShell guards",
+            "shell": "pwsh",
+            "env": {
+              "R82_POWERSHELL": "powershell.exe"
+            },
+            "run": "node scripts/run-ci-tests.cjs node --expected-tests=2 --test-name-pattern=\"R86 Windows release|R222 Windows\" desktop/release-quality-gates.test.cjs\nif ($LASTEXITCODE -ne 0) { throw \"Windows release gates failed\" }\nnode scripts/run-ci-tests.cjs node --expected-tests=1 --test-name-pattern=\"setup-only Windows CI skip\" scripts/setup-only-build.test.cjs\nif ($LASTEXITCODE -ne 0) { throw \"Windows setup-only guards failed\" }\nnode scripts/run-ci-tests.cjs node --expected-tests=2 scripts/r82-startup-ab-script.test.cjs\nif ($LASTEXITCODE -ne 0) { throw \"PowerShell script guards failed\" }\n"
+          },
+          {
+            "name": "Measure full desktop renderer tests on Windows",
+            "if": "(github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-')) || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers)",
+            "shell": "pwsh",
+            "env": {
+              "R222_NODE_TIMING_OUTPUT": "${{ runner.temp }}/renderer-timings-windows.json"
+            },
+            "run": "node scripts/test-renderers.cjs desktop\nif ($LASTEXITCODE -ne 0) { throw \"Windows renderer test or time budget failed\" }\n"
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always() && ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-')) || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers))",
+            "with": {
+              "name": "renderer-timings-windows",
+              "path": "${{ runner.temp }}/renderer-timings-windows.json"
+            }
+          }
+        ]
+      },
+      "windows-upgrade": {
+        "needs": "windows-build",
+        "runs-on": "windows-latest",
+        "steps": [
+          {
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "uses": "actions/setup-go@v5",
+            "with": {
+              "go-version": "1.24.13",
+              "cache": true
+            }
+          },
+          {
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install desktop test dependencies",
+            "run": "npm ci --prefix desktop"
+          },
+          {
+            "uses": "actions/download-artifact@v4",
+            "with": {
+              "name": "deep-legends-windows-x64",
+              "path": "dist/desktop"
+            }
+          },
+          {
+            "name": "Real 0.12.65/0.12.68/0.12.76 installation and candidate upgrade",
+            "shell": "pwsh",
+            "run": "$version = node -p \"require('./desktop/package.json').version\"\n./scripts/r206-real-upgrade-windows.ps1 -Setup \"dist/desktop/Deep Legends Setup $version-public.exe\"\n"
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "r206-real-upgrade-evidence",
+              "path": "${{ runner.temp }}/deep-legends-r206-real-upgrade/evidence/*",
+              "if-no-files-found": "warn"
+            }
+          }
+        ]
+      },
+      "browser-main": {
+        "runs-on": "ubuntu-latest",
+        "steps": [
+          {
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "uses": "actions/setup-go@v5",
+            "with": {
+              "go-version": "1.24.13",
+              "cache": true
+            }
+          },
+          {
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install desktop test dependencies",
+            "run": "npm ci --prefix desktop"
+          },
+          {
+            "name": "Require real Chromium",
+            "shell": "bash",
+            "run": "chrome=\"$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)\"\ntest -n \"$chrome\"\necho \"CHROME_BIN=$chrome\" >> \"$GITHUB_ENV\"\n"
+          },
+          {
+            "name": "Run isolated offline browser guards",
+            "run": "node scripts/r276-browser-job.cjs main \"$RUNNER_TEMP/r276-browser-main\""
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "chromium-guards-linux-shard-main",
+              "path": "${{ runner.temp }}/r276-browser-main/**",
+              "if-no-files-found": "error"
+            }
+          }
+        ]
+      },
+      "browser-r265": {
+        "runs-on": "ubuntu-latest",
+        "steps": [
+          {
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "uses": "actions/setup-go@v5",
+            "with": {
+              "go-version": "1.24.13",
+              "cache": true
+            }
+          },
+          {
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install desktop test dependencies",
+            "run": "npm ci --prefix desktop"
+          },
+          {
+            "name": "Require real Chromium",
+            "shell": "bash",
+            "run": "chrome=\"$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)\"\ntest -n \"$chrome\"\necho \"CHROME_BIN=$chrome\" >> \"$GITHUB_ENV\"\n"
+          },
+          {
+            "name": "Run isolated offline browser guards",
+            "run": "node scripts/r276-browser-job.cjs r265 \"$RUNNER_TEMP/r276-browser-r265\""
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "chromium-guards-linux-shard-r265",
+              "path": "${{ runner.temp }}/r276-browser-r265/**",
+              "if-no-files-found": "error"
+            }
+          }
+        ]
+      },
+      "mutations-1": {
+        "if": "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))",
+        "runs-on": "ubuntu-latest",
+        "steps": [
+          {
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "uses": "actions/setup-go@v5",
+            "with": {
+              "go-version": "1.24.13",
+              "cache": true
+            }
+          },
+          {
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install desktop test dependencies",
+            "run": "npm ci --prefix desktop"
+          },
+          {
+            "name": "Prepare Go dependencies before offline mutations",
+            "run": "go mod download"
+          },
+          {
+            "name": "Run isolated mutation shard",
+            "run": "node scripts/r276-mutation-job.cjs 1 \"$RUNNER_TEMP/r276-mutations-1\""
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "chromium-guards-linux-shard-mutations-1",
+              "path": "${{ runner.temp }}/r276-mutations-1/**",
+              "if-no-files-found": "error"
+            }
+          }
+        ]
+      },
+      "mutations-2": {
+        "if": "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))",
+        "runs-on": "ubuntu-latest",
+        "steps": [
+          {
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "uses": "actions/setup-go@v5",
+            "with": {
+              "go-version": "1.24.13",
+              "cache": true
+            }
+          },
+          {
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install desktop test dependencies",
+            "run": "npm ci --prefix desktop"
+          },
+          {
+            "name": "Prepare Go dependencies before offline mutations",
+            "run": "go mod download"
+          },
+          {
+            "name": "Run isolated mutation shard",
+            "run": "node scripts/r276-mutation-job.cjs 2 \"$RUNNER_TEMP/r276-mutations-2\""
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "chromium-guards-linux-shard-mutations-2",
+              "path": "${{ runner.temp }}/r276-mutations-2/**",
+              "if-no-files-found": "error"
+            }
+          }
+        ]
+      },
+      "mutations-3": {
+        "if": "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/release-'))",
+        "runs-on": "ubuntu-latest",
+        "steps": [
+          {
+            "uses": "actions/checkout@v4",
+            "with": {
+              "fetch-depth": 0
+            }
+          },
+          {
+            "uses": "actions/setup-go@v5",
+            "with": {
+              "go-version": "1.24.13",
+              "cache": true
+            }
+          },
+          {
+            "uses": "actions/setup-node@v4",
+            "with": {
+              "node-version": "22"
+            }
+          },
+          {
+            "name": "Install desktop test dependencies",
+            "run": "npm ci --prefix desktop"
+          },
+          {
+            "name": "Prepare Go dependencies before offline mutations",
+            "run": "go mod download"
+          },
+          {
+            "name": "Run isolated mutation shard",
+            "run": "node scripts/r276-mutation-job.cjs 3 \"$RUNNER_TEMP/r276-mutations-3\""
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "if": "always()",
+            "with": {
+              "name": "chromium-guards-linux-shard-mutations-3",
+              "path": "${{ runner.temp }}/r276-mutations-3/**",
+              "if-no-files-found": "error"
+            }
+          }
+        ]
+      },
+      "chromium-evidence": {
+        "if": "always()",
+        "needs": [
+          "browser-main",
+          "browser-r265",
+          "mutations-1",
+          "mutations-2",
+          "mutations-3"
+        ],
+        "runs-on": "ubuntu-latest",
+        "steps": [
+          {
+            "uses": "actions/download-artifact@v4",
+            "with": {
+              "pattern": "chromium-guards-linux-shard-*",
+              "merge-multiple": true,
+              "path": "evidence"
+            }
+          },
+          {
+            "uses": "actions/upload-artifact@v4",
+            "with": {
+              "name": "chromium-guards-linux",
+              "path": "evidence/**",
+              "if-no-files-found": "error"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

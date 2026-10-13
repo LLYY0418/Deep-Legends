@@ -757,8 +757,19 @@
     window.dispatchEvent(new CustomEvent("deep-legends:status", { detail: data }));
   }
 
+  function reportClientView(view, action, reason) {
+    const signature=[view?.state,view?.generation,action,reason].join('|');
+    const seen=state.clientViewDiagnostics ||= new Set();if(seen.has(signature))return;
+    seen.add(signature);if(seen.size>32)seen.delete(seen.values().next().value);
+    window.reportFlowDiagnostic?.('client_view_client',action,{state:view?.state || 'invalid',generation:Number.isSafeInteger(view?.generation)?view.generation:0,reason});
+  }
+
   function acceptClientView(view) {
-    if (view?.type !== "client-view" || !["ready", "exiting", "no-client"].includes(view.state) || !Number.isSafeInteger(view.generation) || view.generation <= Number(state.clientView?.generation || 0)) return false;
+    reportClientView(view,'received','frame');
+    const invalid=view?.type !== "client-view" || !["ready", "exiting", "no-client"].includes(view.state) || !Number.isSafeInteger(view.generation);
+    const previousGeneration=Number(state.clientView?.generation || 0);
+    if(invalid || view.generation<=previousGeneration){reportClientView(view,'rejected',invalid?'invalid-frame':view.generation<previousGeneration?'generation-rollback':'duplicate-generation');return false;}
+    reportClientView(view,'applied','new-generation');
     const previous = state.clientView;
     state.clientView = view;
     // Legacy business consumers receive the same committed presentation state;
@@ -1399,13 +1410,15 @@
 
   function cancelRenderFrames() {
     for (const frame of state.renderFrames) cancelAnimationFrame(frame);
+    for (const idle of state.renderIdleTasks || [])window.cancelIdleCallback?.(idle);state.renderIdleTasks?.clear();
     state.renderFrames.clear();
   }
 
   function queueRenderFrame(callback) {
     const frame = requestAnimationFrame(() => {
       state.renderFrames.delete(frame);
-      callback();
+      if(window.requestIdleCallback){const tasks=state.renderIdleTasks ||= new Set();const idle=window.requestIdleCallback(()=>{tasks.delete(idle);callback();},{timeout:200});tasks.add(idle);}
+      else callback();
     });
     state.renderFrames.add(frame);
   }
@@ -2944,6 +2957,9 @@
   function applyUiScale() {
     const fixed = preferredUiScale();
     const scale = fixed || autoUiScale();
+    const fields={mode:fixed?'fixed':'auto',multiplier:scale,windowWidth:window.innerWidth,windowHeight:window.innerHeight,screenWidth:window.screen.width,screenHeight:window.screen.height,devicePixelRatio:window.devicePixelRatio};
+    const signature=JSON.stringify(fields);
+    if(state.zoomDiagnosticSignature!==signature && window.reportFlowDiagnostic){state.zoomDiagnosticSignature=signature;window.reportFlowDiagnostic('ui_zoom_state','applied',fields);}
     if (scale === appliedUiScale) return scale;
     appliedUiScale = scale;
     document.documentElement.style.setProperty("--ui-zoom", String(scale));
@@ -4565,6 +4581,7 @@
       frame = requestAnimationFrame(position);
     };
 
+    window.addEventListener('deep-legends:score-parts',event=>{if(anchor && event.detail?.target===anchor)show(anchor);});
     document.addEventListener("pointerover", (event) => {
       const next = targetOf(event.target);
       if (next && next !== anchor && !pointerSuppressedPoint && next !== pointerSuppressedAnchor) show(next);

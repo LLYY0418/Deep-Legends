@@ -15,6 +15,13 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 		for reason := range reasons {
 			recorder := httptest.NewRecorder()
 			body := `{"event":"` + event + `","reason":"` + reason + `","key":"13:middle:CLASSIC:11:4-12","championId":13,"queueId":420,"position":"MID"}`
+
+			if event == "client_view_client" {
+				body = `{"event":"client_view_client","action":"applied","reason":"` + reason + `","state":"ready","generation":2,"rejectionReason":"new-generation"}`
+			}
+			if event == "ui_zoom_state" {
+				body = `{"event":"ui_zoom_state","reason":"applied","mode":"auto","multiplier":1,"windowWidth":1280,"windowHeight":900,"screenWidth":1920,"screenHeight":1080,"devicePixelRatio":1}`
+			}
 			if event == "blocking_state_client" || event == "automatic_read_client" {
 				body = `{"event":"` + event + `","reason":"` + reason + `","source":"direct"}`
 			}

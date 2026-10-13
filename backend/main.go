@@ -105,6 +105,15 @@ type app struct {
 	collectionRequested             bool
 	connectionState                 string
 	shutdownClient                  *LCUClient
+	clientSessionCancel             context.CancelFunc
+	clientSessionCancelClient       *LCUClient
+	collectionProbeCancel           context.CancelFunc
+	collectionProbeClient           *LCUClient
+	collectionProbeGeneration       uint64
+	clientViewDiagnosticState       string
+	r277ClientDiagnosticSeen        map[string]bool
+	clientViewStuckSince            time.Time
+	clientViewRecoveryAttempted     bool
 	shutdownAt                      time.Time
 	clientLastEventAt               time.Time
 	clientClose                     clientCloseTimeline
@@ -1113,6 +1122,13 @@ func (a *app) handleSkinDetails(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	// A user reread must recover the entire client session, not queue work
+	// against a pending shutdown or an identity-only stale connection.
+	if source := r.URL.Query().Get("source"); source != "collection_retry" && source != "dirty_rescan" && a.currentClientView().State != "ready" {
+		a.requestRefresh()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
 	a.mu.RLock()
 	client := a.lcu
 	connected := a.clientSessionConnectedLocked()
@@ -1429,7 +1445,7 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	}
 	a.masteries = result.Masteries
 	a.masteryCapability = result.MasteryCapability
-	a.lcu = client
+	a.replaceClientLocked(client)
 	a.mu.Unlock()
 	a.recordDiagnostic(map[string]any{"event": "identity_refresh_succeeded", "duration_ms": result.LoadPhases["total"], "load_phases_ms": result.LoadPhases, "phase_group": "identity"})
 	a.refreshSelfReadinessAsync(client)
@@ -1503,6 +1519,10 @@ func (a *app) requestCollectionRefresh(sources ...string) {
 
 func (a *app) queueCollectionRefresh(source string) {
 	a.mu.Lock()
+	if a.shutdownClient != nil {
+		a.mu.Unlock()
+		return
+	}
 	a.collectionRequested = true
 	a.manualDisconnected = false
 	coalesced := a.collectionRefreshPending
@@ -1688,7 +1708,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 	a.poolTotal = result.PoolTotal
 	a.poolMatched = result.PoolMatched
 	a.poolIssues = result.Issues
-	a.lcu = result.Client
+	a.replaceClientLocked(result.Client)
 	a.ownership = append([]OwnershipSourceStatus(nil), result.Ownership...)
 	a.catalog = result.Catalog
 	savedSnapshot := a.snapshotLocked()
@@ -1753,6 +1773,8 @@ func (a *app) clearCollectionDirtyThroughLocked(refreshStartedAt time.Time) {
 }
 
 func (a *app) clearSnapshotLocked(message string) {
+	a.clearClientShutdownLocked()
+	a.cancelClientSessionLocked()
 	a.clientSessionEpoch++
 	a.syncing = false
 	a.selfReadinessPending = false
@@ -1835,7 +1857,7 @@ func (a *app) retainClientAfterSnapshotErrorLocked(client *LCUClient, result Sna
 	a.remaining = nil
 	a.poolMatched = 0
 	a.poolIssues = nil
-	a.lcu = client
+	a.replaceClientLocked(client)
 	a.ownership = append([]OwnershipSourceStatus(nil), result.Ownership...)
 	a.catalog = result.Catalog
 	a.eventStream = false

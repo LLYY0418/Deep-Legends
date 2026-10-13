@@ -920,7 +920,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 			defer emitMu.Unlock()
 			if frame, ok := value.(map[string]any); ok && (frame["type"] == "cards" || frame["type"] == "progress") {
 				if partial, ok := frame["overview"].(gameplayOverview); ok {
-					frame["overview"] = compactOverviewProgress(partial, progressSeen)
+					frame["overview"] = overviewWireFrame(partial, frame["type"].(string), progressSeen)
 				}
 			}
 			if !streamStarted {
@@ -965,16 +965,19 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		}
 		response.Pagination.Filter = request.MatchFilter
 		if request.BegIndex > 0 {
-			respondJSON(w, riotOverviewPage{response.Player, response.Matches, response.Pagination, response.Capabilities})
+			respondJSON(w, struct {
+				riotOverviewPage
+				Matches []any `json:"matches"`
+			}{riotOverviewPage{response.Player, response.Matches, response.Pagination, response.Capabilities}, overviewListMatches(response.Matches)})
 			phases.mark("serialize")
 			return
 		}
 		a.verifyExpectedOverviewGame(r.Context(), nil, reference, request, &response)
 		// Comparison is request-local: never mutate the shared overview cache.
 		payload := struct {
-			gameplayOverview
+			overviewListWire
 			ProMismatch bool `json:"proMismatch,omitempty"`
-		}{response, proOverviewMismatch(request.ExpectedTier, response.Ranks)}
+		}{overviewWireFrame(response, "complete", progressSeen), proOverviewMismatch(request.ExpectedTier, response.Ranks)}
 		if stream {
 			emit(map[string]any{"type": "complete", "overview": payload})
 		} else {
@@ -1037,12 +1040,10 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	emit := func(kind string, value gameplayOverview) {
 		emitMu.Lock()
 		defer emitMu.Unlock()
-		if kind != "complete" {
-			value = compactOverviewProgress(value, progressSeen)
-		}
+		wire := overviewWireFrame(value, kind, progressSeen)
 		w.Header().Set("Content-Type", "application/x-ndjson")
 		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(map[string]any{"type": kind, "overview": value})
+		_ = json.NewEncoder(w).Encode(map[string]any{"type": kind, "overview": wire})
 		if flusher, ok := w.(http.Flusher); ok {
 			flusher.Flush()
 		}
@@ -1058,7 +1059,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	if stream {
 		emit("complete", response)
 	} else {
-		respondJSON(w, response)
+		respondJSON(w, overviewWireFrame(response, "complete", progressSeen))
 	}
 	phases.mark("serialize")
 }

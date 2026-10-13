@@ -5,7 +5,7 @@
 // R118 已经把「只匹配源码文本」的护栏判定为假护栏。
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
 
-const read = (file) => fs.readFileSync(path.join(process.env.R119_WEB_ROOT || __dirname, file), 'utf8');
+const read = (file) => {const source=fs.readFileSync(path.join(process.env.R119_WEB_ROOT || __dirname,file),'utf8');return file==='gameplay.js'?require('./r277-deferred-fixture.cjs').join(source):source;};
 
 function extract(file, name) {
   const source = read(file);

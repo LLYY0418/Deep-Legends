@@ -26,7 +26,8 @@ func newSummonerIdentityClient(t *testing.T, next Summoner, requests *atomic.Int
 		}
 	}))
 	t.Cleanup(server.Close)
-	return &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
+	// This fixture represents a ready Riot session, not an undiscovered client.
+	return &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client(), region: "KR", rsoPlatform: "KR"}
 }
 
 func identityTestApp(client *LCUClient, current Summoner) *app {

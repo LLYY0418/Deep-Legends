@@ -69,7 +69,10 @@
     if(tab.quotaRetry!==retry || tab.closed || ctx.state.destroyed || tab.overviewRequestToken!==retry.requestToken || tab.matchFilter!==retry.filter || ctx.state.settings.matchCount!==retry.count)return;
     if(ctx.riot(tab) && !ctx.active(tab))return;
     tab.quotaRetry=null;
-    return ctx.load(tab,!retry.append,retry.append,false,true,0,ctx.riot(tab) && !retry.append).then(loaded=>{
+    if(tab.advancedSearch?.stopReason==='user_stop')return;
+    const searching=tab.advancedSearch?.stopReason==='quota';
+    return ctx.load(tab,!retry.append,retry.append,searching,true,0,ctx.riot(tab) && !retry.append).then(loaded=>{
+      if(loaded && searching && typeof window!=='undefined')void window.deepLegendsHistoryFilters?.find(tab,tab._quotaFilterContext?.());
       if(loaded && tab.matchFilter===retry.filter && tab.data?.pagination?.filterFallback && !tab.data.pagination.serverFiltered)void ctx.filter(tab,retry.filter);
     });
   }

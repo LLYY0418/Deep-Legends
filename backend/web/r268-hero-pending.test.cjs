@@ -15,7 +15,7 @@ test('R268 empty collecting season and missing recent history show hero skeleton
  assert.equal(functions.championStatsPending([],{},waiting,{loading:false,matchesReceived:true}),true,'season collection can remain pending after recent history arrives');
  for(const progress of [waiting,undefined,{unavailable:true}]){
   const html=render([],{},progress);
-  assert.equal((html.match(/<span><\/span>/g)||[]).length,3);
+  assert.equal((html.match(/<span><\/span>/g)||[]).length,9,'eight default hero rows plus reserved summary geometry');
   assert.match(html,/career-pending gameplay-skeleton/);
   assert.doesNotMatch(html,/已统计 0 场|暂无英雄统计|—:1 KDA|全部英雄/);
  }

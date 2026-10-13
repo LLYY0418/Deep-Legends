@@ -211,7 +211,7 @@
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
     if (event === "gameflow_phase_client") { queueGameflowDiagnostic(reason, fields); return; }
-    if (!["lp_chip_render", "overview_scroll_reset", "overview_reference_expired", "overview_rerender_client", "history_search_client", "current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "collection_failure_state_shown", "overview_dirty_rescan", "summoner_copy", "overview_card_ready", "self_tab_client", "browser_cold_requests_client", "champselect_request_client"].includes(event)) return;
+    if (!["client_view_client", "ui_zoom_state", "lp_chip_render", "overview_scroll_reset", "overview_reference_expired", "overview_rerender_client", "history_search_client", "current_game_client", "watch_settings_client", "champ_select_filter_client", "champselect_dialog_client", "live_refresh_client", "local_request_client", "image_queue_slow", "card_image_stalled", "collection_card_image_state", "card_image_slot_reconciled", "card_image_observer_fallback", "arena_header_source", "live_render_rebuild", "live_roster_duplicate_dropped", "stale_team_two_dropped", "live_progress_apply", "status_render_failed", "lane_matchup_candidate_fetch", "lane_matchup_card", "renderer_perf", "blocking_state_client", "automatic_read_client", "collection_render_client", "collection_failure_state_shown", "overview_dirty_rescan", "summoner_copy", "overview_card_ready", "self_tab_client", "browser_cold_requests_client", "champselect_request_client"].includes(event)) return;
     if(event==='browser_cold_requests_client') {
       // Cumulative frames remain unsampled so a late body can amend the count.
       const body={event,reason,startedAt:Math.max(0,Math.min(1e13,Math.floor(fields.startedAt || 0))),count:Math.max(-1,Math.min(1000000,Math.floor(fields.count ?? -1))),resourceCount:Math.max(0,Math.min(1000000,Math.floor(fields.resourceCount || 0))),windowElapsed:fields.windowElapsed===true,timingAvailable:fields.timingAvailable===true};
@@ -225,6 +225,17 @@
     const now = Date.now();
     if (sampled && (sampledPending.size && event !== "local_request_client" || now - (sampledAt.get(sampleKey) ?? -Infinity) < (event === "local_request_client" ? 10000 : 1000))) { increment("transportSuppressed"); return; }
     const body = { event, reason };
+    if(event==='client_view_client'){
+      body.action=['received','applied','rejected'].includes(reason)?reason:'rejected';
+      body.reason=['frame','new-generation','generation-rollback','duplicate-generation','invalid-frame'].includes(fields.reason)?fields.reason:'invalid-frame';
+      body.state=['ready','exiting','no-client'].includes(fields.state)?fields.state:'invalid';
+      body.generation=Number.isSafeInteger(fields.generation)?Math.max(0,fields.generation):0;
+    }
+    if(event==='ui_zoom_state'){
+      body.mode=fields.mode==='fixed'?'fixed':'auto';
+      for(const key of ['multiplier','devicePixelRatio'])body[key]=Math.max(.1,Math.min(8,Number(fields[key]) || 1));
+      for(const key of ['windowWidth','windowHeight','screenWidth','screenHeight'])body[key]=Math.max(0,Math.min(100000,Math.round(Number(fields[key]) || 0)));
+    }
     if(event==='lp_chip_render')for(const k of ['ranked_matches','with_delta','chips','revision_skipped'])body[k]=Math.max(0,Math.min(1000,Math.floor(Number(fields[k])||0)));
     if(event==='overview_rerender_client'){body.renderReason=String(fields.reason || reason).slice(0,80);body.tabType=['self','cn','riot','pro'].includes(fields.tabType)?fields.tabType:'cn';body.filterRetained=fields.filterRetained===true;body.modalOpen=fields.modalOpen===true;}
     if(event==='history_search_client'){for(const k of ['scanned','hits','pages','averagePageBytes'])body[k]=Math.max(0,Math.min(16*1024*1024,Number(fields[k])||0));body.stop_reason=reason;body.durationMs=Math.max(0,Math.min(3600000,Number(fields.durationMs)||0));for(const k of ['beg_index','new_unique'])body[k]=Math.max(0,Math.min(10000,Math.floor(Number(fields[k])||0)));body.exhausted=fields.exhausted===true;if(/^\d{4}-\d{2}-\d{2}$/.test(fields.time_range||''))body.time_range=fields.time_range;}

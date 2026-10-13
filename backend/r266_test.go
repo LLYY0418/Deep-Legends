@@ -24,7 +24,7 @@ func r266Embedded(t *testing.T) (*riotKeyStore, *riotProvider, *[]map[string]any
 	c.diag = func(e map[string]any) { events = append(events, e) }
 	return s, newRiotProvider(c), &events
 }
-func TestR266EmbeddedSourceAndBackgroundRelay(t *testing.T) {
+func TestR266EmbeddedSourceAndBackgroundLocalAdmission(t *testing.T) {
 	s, p, events := r266Embedded(t)
 	direct, relay := 0, 0
 	p.champions.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
@@ -51,7 +51,7 @@ func TestR266EmbeddedSourceAndBackgroundRelay(t *testing.T) {
 	if err := p.get(withRiotBackground(context.Background()), p.platformHost(), "/lol/status/v4/platform-data", nil, &out); err != nil {
 		t.Fatal(err)
 	}
-	if direct != 1 || relay != 1 {
+	if direct != 2 || relay != 0 {
 		t.Fatalf("routes direct=%d relay=%d", direct, relay)
 	}
 	s.key = "user-fixture"
@@ -130,7 +130,7 @@ func TestR266EmbeddedRejectedAndQuota(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if status == 200 && (direct != 1 || relay != 1) || status != 200 && (direct != 1 || relay < 1) {
+			if status == 200 && (direct != 2 || relay != 0) || status != 200 && (direct != 1 || relay < 1) {
 				t.Fatalf("guard failed direct=%d relay=%d", direct, relay)
 			}
 			if (status == 401 || status == 403) && !s.embeddedRejected {

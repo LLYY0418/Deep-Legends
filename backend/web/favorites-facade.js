@@ -400,7 +400,7 @@
         if (el.grid.children[index - 1] !== card) el.grid.insertBefore(card, el.grid.children[index - 1] || null);
         completed++;
       }
-      if (index < rows.length) requestAnimationFrame(chunk);
+      if (index < rows.length) {if(window.requestIdleCallback)window.requestIdleCallback(chunk,{timeout:200});else requestAnimationFrame(chunk);}
     };
     chunk();
   }

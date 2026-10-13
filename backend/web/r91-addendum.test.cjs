@@ -8,11 +8,12 @@ const flush=()=>new Promise(setImmediate);
 const payload=(n=20,beg=0)=>({player:{playerRef:'opaque',region:'kr',gameName:'Fixture',tagLine:'KR1'},matches:Array.from({length:n},(_,i)=>({gameId:beg+i+1})),pagination:{begIndex:beg,count:n,hasMore:true}});
 function harness(responses){
  const jobs=new Map(),requests=[],toasts=[];let sequence=0,now=0;
+ class ClockDate extends Date { static now() { return now; } }
  const state={controllers:new Map(),settings:{matchCount:20},tabs:[],overlay:[]};
  const dom=new JSDOM('<main></main>'),root=dom.window.document.querySelector('main');
  const render=tab=>{root.innerHTML=`<div>${(tab.data?.matches||[]).map(m=>`<article>${m.gameId}</article>`).join('')}</div>`+(tab.error?`<div class="notice is-warning">${tab.error}</div>`:'')+(tab.initialPageError?`<div class="notice is-warning">${tab.initialPageError}</div>`:'')+(tab.data?.pagination?.moreError?`<div class="notice is-warning">${tab.data.pagination.moreError}</div>`:'');};
  const noop=()=>{};
- const context={globalThis:{deepLegendsHistoryRecovery:require('./history-recovery.js')},state,Headers,AbortController,TextDecoder,Uint8Array,Date,MAX_BROWSE_MATCHES:1000,AUTO_PAGE_DELAY_MS:400,AUTO_PAGE_MAX_BACKOFF_MS:8000,
+ const context={globalThis:{deepLegendsHistoryRecovery:require('./history-recovery.js')},state,Headers,AbortController,TextDecoder,Uint8Array,Date:ClockDate,MAX_BROWSE_MATCHES:1000,AUTO_PAGE_DELAY_MS:400,AUTO_PAGE_MAX_BACKOFF_MS:8000,
   setTimeout:(fn,ms)=>{jobs.set(++sequence,{fn,ms,at:now+ms});return sequence;},clearTimeout:id=>jobs.delete(id),
   fetch:async(url,options)=>{requests.push({url,options});const next=responses.shift();assert.ok(next,'unexpected request');return typeof next==='function'?next(options):next;},
   tabReady:()=>true,riotTab:()=>true,historyRecoveryActive:()=>true,tabGroup:()=> 'kr',rerenderTab:render,appendOverviewMatches:render,showLoadingMoreState:noop,

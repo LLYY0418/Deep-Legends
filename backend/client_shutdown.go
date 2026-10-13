@@ -127,6 +127,7 @@ func (a *app) observeClientShutdownEvent(client *LCUClient, event LCUEvent, now 
 		a.mu.Unlock()
 		return
 	}
+	a.cancelCollectionProbeLocked(client)
 	a.shutdownClient = client
 	a.beginClientCloseLocked(client, now)
 	a.shutdownAt = now

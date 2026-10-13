@@ -49,6 +49,8 @@ type browseInfo struct {
 	Image              int32
 }
 
+// lParam is message-dependent data. initial is the exact UTF-16 allocation in
+// browseInfo.Param, retained by chooseDirectory until the modal call returns.
 var browseCallback = windows.NewCallback(func(hwnd uintptr, message uint32, lParam uintptr, initial *uint16) uintptr {
 	if message == 1 && initial != nil { // BFFM_INITIALIZED / BFFM_SETSELECTIONW
 		sendMessage.Call(hwnd, 0x467, 1, uintptr(unsafe.Pointer(initial)))

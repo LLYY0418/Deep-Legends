@@ -1949,105 +1949,105 @@
     "file": "backend/r266_test.go",
     "line": 24,
     "target": "events",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: r266Embedded: the fixture constructs its relay configuration synchronously before the caller starts requests"
   },
   {
     "file": "backend/r266_test.go",
     "line": 32,
     "target": "relay",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
-    "comment": "r276-capture-safe: TestR266EmbeddedSourceAndBackgroundRelay: the audited fixture operations in this test invoke this callback serially and return before relay is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
+    "comment": "r276-capture-safe: TestR266EmbeddedSourceAndBackgroundLocalAdmission: the audited fixture operations in this test invoke this callback serially and return before relay is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 37,
     "target": "direct",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
-    "comment": "r276-capture-safe: TestR266EmbeddedSourceAndBackgroundRelay: the audited fixture operations in this test invoke this callback serially and return before direct is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
+    "comment": "r276-capture-safe: TestR266EmbeddedSourceAndBackgroundLocalAdmission: the audited fixture operations in this test invoke this callback serially and return before direct is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 76,
     "target": "relay",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266EmbeddedNetworkCircuitAndProbe: the audited fixture operations in this test invoke this callback serially and return before relay is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 78,
     "target": "direct",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266EmbeddedNetworkCircuitAndProbe: the audited fixture operations in this test invoke this callback serially and return before direct is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 113,
     "target": "relay",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266EmbeddedRejectedAndQuota: the audited fixture operations in this test invoke this callback serially and return before relay is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 115,
     "target": "direct",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266EmbeddedRejectedAndQuota: the audited fixture operations in this test invoke this callback serially and return before direct is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 153,
     "target": "event",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266RelayAttemptTimeoutIsDiagnosed: the audited fixture operations in this test invoke this callback serially and return before event is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 173,
     "target": "relay",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266EmbeddedFallbackIsOneAdditionalRequest: the audited fixture operations in this test invoke this callback serially and return before relay is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 175,
     "target": "direct",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266EmbeddedFallbackIsOneAdditionalRequest: the audited fixture operations in this test invoke this callback serially and return before direct is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 269,
     "target": "events",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266PartialSummaryAndBoundedScoreDiagnostics: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 270,
     "target": "events",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266PartialSummaryAndBoundedScoreDiagnostics: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 333,
     "target": "event",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266CompactRequestAndSpecialEventSizes: the audited fixture operations in this test invoke this callback serially and return before event is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_test.go",
     "line": 440,
     "target": "calls",
-    "source_sha256": "e9415acb92f51de689c3775c30fe4ff09c3b5ad76b5d77adcd32b9cb87bafd43",
+    "source_sha256": "ff928aecea3a20a8aad8d60aba6529ca7c9b2a6c019f9457db81b87d57d48211",
     "comment": "r276-capture-safe: TestR266IDsTimeoutHasBoundedRetry: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r266_timing_test.go",
     "line": 119,
     "target": "f.calls[\"opgg_\"+r.Method]",
-    "source_sha256": "173eaba658e583293deb65aa01626de92dda0b6fda65faace85c0937fe02d2ad",
+    "source_sha256": "d06595cb41aa3cd957fb8f423f75a1df56e4a34eaf9cc570ee0e46a3e7f0729e",
     "comment": "r276-capture-safe: r266CardTimingServer: f.calls is updated under f.mu and the fixture waits for the request completion channel before inspection"
   },
   {

@@ -41,6 +41,8 @@ type legacyWindowOperation struct {
 	show, close bool
 }
 
+// EnumWindows synchronously echoes &operation from legacyUpdateWindows, so this
+// pointer parameter is always our live allocation, never message integer data.
 var legacyUpdateWindowCallback = windows.NewCallback(func(hwnd uintptr, operation *legacyWindowOperation) uintptr {
 	var pid uint32
 	windowProcessID.Call(hwnd, uintptr(unsafe.Pointer(&pid)))

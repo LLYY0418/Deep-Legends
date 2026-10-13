@@ -3,8 +3,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path");
 const { JSDOM } = require("jsdom");
 const WEB = path.join(__dirname, "..", "backend", "web");
-const SCRIPTS = ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "favorites-facade.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
-const gameplaySource = fs.readFileSync(process.env.R104_GAMEPLAY_SOURCE || path.join(WEB, "gameplay.js"), "utf8");
+const SCRIPTS = ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "favorites-facade.js", "section-loader.js", "match-details.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
+const gameplaySource = require("../backend/web/r277-deferred-fixture.cjs").join(fs.readFileSync(process.env.R104_GAMEPLAY_SOURCE || path.join(WEB, "gameplay.js"), "utf8"));
 const suiteSource = fs.readFileSync(path.join(WEB, "suite.js"), "utf8");
 const appStyles = fs.readFileSync(path.join(WEB, "app.css"), "utf8");
 const gameplayStyles = fs.readFileSync(path.join(WEB, "gameplay.css"), "utf8");
@@ -129,10 +129,19 @@ function bootDemoApp(options = {}) {
   w.console.error = (...args) => { errors.push(args.map((value) => (value && value.stack) || String(value)).join(" ")); };
 
   for (const file of SCRIPTS) {
+    // Legacy synchronous markup assertions use a warmed real factory; dedicated
+    // deferred tests opt into the actual cold-loading state machine instead.
+    if (file === "match-details.js" && options.deferredMatchDetails) continue;
     let source = fs.readFileSync(path.join(WEB, file), "utf8");
     if (file === "suite.js" && process.env.R137_SUITE_SOURCE) source = fs.readFileSync(process.env.R137_SUITE_SOURCE, "utf8");
     if (file === "suite.js" && options.suiteSourceTransform) source = options.suiteSourceTransform(source);
     if (file === "champions.js" && options.championsSourceTransform) source = options.championsSourceTransform(source);
+    if (file === "gameplay.js" && !options.deferredMatchDetails) {
+      const factory = source.match(/matchDetailRenderer=window\.deepLegendsMatchDetails\.create\(\{([^}]+)\}\)/);
+      assert.ok(factory, "real deferred factory dependencies must exist");
+      assert.match(source, /\}\)\(\);\s*$/);
+      source = source.replace(/\}\)\(\);\s*$/, `  matchDetailRenderer=window.deepLegendsMatchDetails.create({${factory[1]}});\n})();`);
+    }
     if (file === "gameplay.js" && options.gameplaySourceTransform) source = options.gameplaySourceTransform(source);
     if (file === "app.js" && options.championRankings) {
       const originalFetch = w.fetch;

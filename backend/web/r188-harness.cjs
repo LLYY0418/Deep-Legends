@@ -2,8 +2,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const web = __dirname;
-function read(name, directory = web) { return fs.readFileSync(path.join(directory, name), 'utf8'); }
+function read(name, directory = web) { const source=fs.readFileSync(path.join(directory,name),'utf8');return name==='gameplay.js'?require('./r277-deferred-fixture.cjs').join(source):source; }
 function extract(source, name) {
+  if(source.includes('R277 deferred detail renderer: '+name))source=require('./r277-deferred-fixture.cjs').join(source);
   let start = source.indexOf(`function ${name}(`);
   if (start < 0) throw Error(`Missing function ${name}`);
   if (source.slice(start - 6, start) === 'async ') start -= 6;

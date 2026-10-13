@@ -146,8 +146,8 @@ func createShellWindow() (*shellWindow, error) {
 	return w, nil
 }
 
-// A pointer-typed LPARAM preserves syscall pointer provenance for WM_DPICHANGED.
-func shellWndProc(hwnd uintptr, message uint32, wParam uintptr, lParam unsafe.Pointer) uintptr {
+// LPARAM is message-dependent integer data, not a GC-scanned Go pointer.
+func shellWndProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) uintptr {
 	w := activeWindow
 	if w != nil {
 		switch message {
@@ -160,9 +160,14 @@ func shellWndProc(hwnd uintptr, message uint32, wParam uintptr, lParam unsafe.Po
 				}
 			}
 		case WM_DPICHANGED:
-			if lParam != nil {
-				r := (*winRect)(lParam)
-				setWindowPos.Call(hwnd, 0, uintptr(r.Left), uintptr(r.Top), uintptr(r.Right-r.Left), uintptr(r.Bottom-r.Top), 0x0014)
+			if uintptr(lParam) != 0 {
+				// Only WM_DPICHANGED supplies a RECT pointer. Copy it through Win32
+				// rather than converting a stored uintptr to unsafe.Pointer (unsafeptr).
+				var r winRect
+				var read uintptr
+				if err := windows.ReadProcessMemory(windows.CurrentProcess(), uintptr(lParam), (*byte)(unsafe.Pointer(&r)), unsafe.Sizeof(r), &read); err == nil && read == unsafe.Sizeof(r) {
+					setWindowPos.Call(hwnd, 0, uintptr(r.Left), uintptr(r.Top), uintptr(r.Right-r.Left), uintptr(r.Bottom-r.Top), 0x0014)
+				}
 			}
 			return 0
 		case 0x0003: // WM_MOVE

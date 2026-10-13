@@ -81,6 +81,7 @@ type LCUClient struct {
 	claimSettlements      claimSettlements
 	objectiveDiagnostics  objectiveDiagnostics
 	mu                    sync.RWMutex
+	sessionContext        context.Context
 	baseURL               string
 	token                 string
 	http                  *http.Client
@@ -976,6 +977,8 @@ func (c *LCUClient) GetJSONContext(ctx context.Context, path string, target any)
 // loopback LCU service. Callers remain responsible for using a fixed, reviewed
 // endpoint; arbitrary paths are never accepted from the renderer.
 func (c *LCUClient) RequestJSON(ctx context.Context, method, path string, body, target any) error {
+	ctx, finishSession := c.sessionRequestContext(ctx)
+	defer finishSession()
 	ctx, release, gateErr := c.licenseRequestContext(ctx)
 	if gateErr != nil {
 		return gateErr
@@ -1090,6 +1093,8 @@ func (c *LCUClient) GetBytes(path string) ([]byte, error) {
 }
 
 func (c *LCUClient) GetBytesContext(ctx context.Context, path string) ([]byte, error) {
+	ctx, finishSession := c.sessionRequestContext(ctx)
+	defer finishSession()
 	return c.getBytes(ctx, path, 16*1024*1024, "application/json, image/*;q=0.9, */*;q=0.1")
 }
 

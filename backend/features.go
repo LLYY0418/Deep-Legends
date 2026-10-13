@@ -174,6 +174,16 @@ type clientDiagnosticRequest struct {
 	Claiming                bool                        `json:"claiming,omitempty"`
 	Done                    int                         `json:"done,omitempty"`
 	Total                   int                         `json:"total,omitempty"`
+	ClientViewAction        string                      `json:"action"`
+	ClientViewState         string                      `json:"state"`
+	ClientViewGeneration    uint64                      `json:"generation"`
+	RejectionReason         string                      `json:"rejectionReason"`
+	ZoomMultiplier          float64                     `json:"multiplier"`
+	WindowWidth             int                         `json:"windowWidth"`
+	WindowHeight            int                         `json:"windowHeight"`
+	ScreenWidth             int                         `json:"screenWidth"`
+	ScreenHeight            int                         `json:"screenHeight"`
+	DevicePixelRatio        float64                     `json:"devicePixelRatio"`
 	Event                   string                      `json:"event"`
 	Reason                  string                      `json:"reason"`
 	Key                     string                      `json:"key,omitempty"`
@@ -266,6 +276,8 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"client_view_client":             {"received": true, "applied": true, "rejected": true, "frame": true, "new-generation": true, "generation-rollback": true, "duplicate-generation": true, "invalid-frame": true},
+	"ui_zoom_state":                  {"applied": true},
 	"lp_chip_render":                 {"render": true},
 	"overview_scroll_reset":          {"restored": true},
 	"overview_reference_expired":     {"retry": true},
@@ -367,6 +379,10 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 	if !reasons[request.Reason] {
 		a.recordClientDiagnosticRejected("unknown-reason", request.Event)
 		http.Error(w, "invalid client diagnostic", http.StatusBadRequest)
+		return
+	}
+	if request.Event == "client_view_client" || request.Event == "ui_zoom_state" {
+		a.recordR277ClientDiagnostic(w, request)
 		return
 	}
 	if request.Event == "license_window_state" {

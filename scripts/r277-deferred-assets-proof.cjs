@@ -1,0 +1,30 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),zlib=require('node:zlib'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process');
+const root=path.resolve(__dirname,'..'),web=path.join(root,'backend/web'),report=path.resolve(process.env.R277_DEFERRED_REPORT_DIR||path.join(process.env.PI_SCRATCH_DIR||os.tmpdir(),'r277-deferred-assets-proof')),scratch=process.env.PI_SCRATCH_DIR||os.tmpdir();
+const mode=process.argv[2]||'unit';assert(['unit','browser'].includes(mode),'CLI: node scripts/r277-deferred-assets-proof.cjs [unit|browser]');fs.mkdirSync(report,{recursive:true});
+const run=(args,env={},name)=>{const result=spawnSync(process.execPath,args,{cwd:root,env:{...process.env,...env},encoding:'utf8',timeout:180000});fs.writeFileSync(path.join(report,name+'.log'),result.stdout+result.stderr);return result;};
+const results=[];
+if(mode==='unit'){
+ const good=run(['--test','backend/web/r277-deferred-assets.test.cjs','desktop/startup-assets.test.cjs','backend/web/r277-cn-score.test.cjs','scripts/r277-frontend-contracts.test.cjs'],{},'proof-unit');assert.equal(good.status,0,good.stderr+good.stdout);results.push({case:'contracts',exit:0});
+ const mutations=[
+  ['rich-bodies-restored','gameplay.js',null,null,'initial production assets'],
+  ['upfront-rich-details','index.html','    <script src="/gameplay.js" defer></script>','    <script src="/gameplay.js" defer></script>\n    <script src="/match-details.js" defer></script>','initial production assets'],
+  ['retry-reset-removed','gameplay.js','        tab.matchDetailModuleError=false;\n        if(typeof ensureScoreDetails','        if(typeof ensureScoreDetails','failed deferred script'],
+  ['late-reopen-restored','gameplay.js','for(const openID of tab.openMatches)rerenderMatch(tab,openID);',"{tab.openMatches.add(String(match.gameId));rerenderMatch(tab,String(match.gameId));}",'late deferred completion'],
+ ];
+ for(const [id,file,anchor,replacement,pattern] of mutations){const dir=fs.mkdtempSync(path.join(scratch,'r277-deferred-mutant-'));try{for(const name of fs.readdirSync(web).filter(n=>/\.(js|css|html)$/.test(n)))fs.copyFileSync(path.join(web,name),path.join(dir,name));const target=path.join(dir,file),s=fs.readFileSync(target,'utf8');if(anchor===null)fs.writeFileSync(target,require('../backend/web/r277-deferred-fixture.cjs').join(s));else{assert.equal(s.split(anchor).length,2,`${id} anchor changed`);fs.writeFileSync(target,s.replace(anchor,replacement));}const killed=run(['--test','--test-reporter=tap',`--test-name-pattern=${pattern}`,'backend/web/r277-deferred-assets.test.cjs'],{R277_DEFERRED_WEB:dir},'mutant-'+id);assert.equal(killed.status,1,`${id} survived`);assert(killed.stdout.includes('not ok'));assert(!/ReferenceError:|SyntaxError:/.test(killed.stdout+killed.stderr),'mutation must fail a real assertion');results.push({case:id,status:'killed',exit:1});}finally{fs.rmSync(dir,{recursive:true,force:true});}}
+ const {JSDOM}=require('../desktop/node_modules/jsdom'),dom=new JSDOM(fs.readFileSync(path.join(web,'index.html'),'utf8'));const assets=[...dom.window.document.querySelectorAll('script[src],link[rel=stylesheet]')].map(n=>n.getAttribute('src')||n.getAttribute('href')).map(file=>({file,gzip:zlib.gzipSync(fs.readFileSync(path.join(web,file)),{level:1}).length}));dom.window.close();const total=assets.reduce((n,a)=>n+a.gzip,0);assert(total<420*1024);results.push({case:'actual-gzip',total,budget:420*1024,assets,lazyGzip:zlib.gzipSync(fs.readFileSync(path.join(web,'match-details.js')),{level:1}).length});
+}else{
+ assert(process.env.R266_BACKEND && fs.existsSync(process.env.R266_BACKEND),'browser mode requires R266_BACKEND pointing at current embedded public backend');
+ for(const fault of ['', '503']){const dir=fs.mkdtempSync(path.join(scratch,'r277-deferred-browser-'));try{const actual=run(['scripts/r277-deferred-assets-browser.cjs'],{R266_BROWSER_OUT:dir,R277_DEFERRED_FAULT:fault},'browser-'+(fault||'success'));for(const name of ['result.json','failure.json'])if(fs.existsSync(path.join(dir,name)))fs.copyFileSync(path.join(dir,name),path.join(report,'browser-'+(fault||'success')+'-'+name));assert.equal(actual.status,0,actual.stdout+actual.stderr);results.push(JSON.parse(fs.readFileSync(path.join(dir,'result.json'),'utf8')));}finally{fs.rmSync(dir,{recursive:true,force:true});}}
+ // Real Chromium recovery mutant, not a source-only check.
+ const dir=fs.mkdtempSync(path.join(scratch,'r277-deferred-browser-mutant-'));
+ try{
+   const override=path.join(dir,'web'),out=path.join(dir,'browser');fs.mkdirSync(override);
+   for(const name of fs.readdirSync(web).filter(n=>/\.(js|css)$/.test(n)))fs.copyFileSync(path.join(web,name),path.join(override,name));
+   const target=path.join(override,'gameplay.js'),source=fs.readFileSync(target,'utf8'),anchor='        tab.matchDetailModuleError=false;\n        if(typeof ensureScoreDetails';assert.equal(source.split(anchor).length,2);fs.writeFileSync(target,source.replace(anchor,'        if(typeof ensureScoreDetails'));
+   const killed=run(['scripts/r277-deferred-assets-browser.cjs'],{R266_BROWSER_OUT:out,R266_WEB_OVERRIDE:override,R277_DEFERRED_FAULT:'503'},'browser-mutant-retry');
+   assert.equal(killed.status,1,'real recovery mutant survived');const proof=JSON.parse(fs.readFileSync(path.join(out,'failure.json'),'utf8'));assert(proof.error.startsWith('timeout document.querySelector(') && proof.error.includes('.match-table'),'wrong browser mutation failure');fs.writeFileSync(path.join(report,'browser-mutant-retry-result.json'),JSON.stringify(proof,null,2));results.push({case:'retry-reset-removed',status:'killed',exit:1,browser:true});
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+}
+fs.writeFileSync(path.join(report,`proof-${mode}-result.json`),JSON.stringify({mode,host:{platform:process.platform,node:process.version},results},null,2));console.log(JSON.stringify({mode,checks:results.length}));

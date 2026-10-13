@@ -190,21 +190,47 @@ func (a *app) handleGameplayMatch(w http.ResponseWriter, r *http.Request) {
 		GameID        int64  `json:"gameId"`
 		ParticipantID int64  `json:"participantId"`
 		Region        string `json:"region"`
+		ServerID      string `json:"serverId"`
 		PlayerRef     string `json:"playerRef"`
 		Refresh       string `json:"refresh"`
 	}
-	if err := decodeJSONRequest(r, &request, 4<<10); err != nil || request.GameID <= 0 || request.ParticipantID <= 0 || !isRiotRegion(request.Region) || request.Refresh != "perk-stats" {
+	if err := decodeJSONRequest(r, &request, 4<<10); err != nil || request.GameID <= 0 || request.ParticipantID <= 0 || (request.Refresh != "perk-stats" && request.Refresh != "score-parts") {
 		http.Error(w, "查询参数无效", http.StatusBadRequest)
 		return
+	}
+	if !isRiotRegion(request.Region) {
+		if request.Refresh != "score-parts" || (request.Region != "" && !strings.EqualFold(request.Region, "cn") && !strings.EqualFold(request.Region, "TENCENT")) {
+			http.Error(w, "查询参数无效", http.StatusBadRequest)
+			return
+		}
+		a.handleCNScoreParts(w, r, request.GameID, request.ParticipantID, request.PlayerRef, request.ServerID)
+		return
+	}
+	if strings.TrimSpace(request.ServerID) != "" {
+		http.Error(w, "外服对局不能指定国服服务器", http.StatusBadRequest)
+		return
+	}
+	var scoreReference gameplayReference
+	if request.Refresh == "score-parts" && request.PlayerRef != "" {
+		var ok bool
+		scoreReference, ok = a.resolveGameplayReferenceDetails(request.PlayerRef)
+		if !ok || riotPlatform(scoreReference.Region) != riotPlatform(request.Region) || scoreReference.ServerID != "" {
+			http.Error(w, "玩家引用与服务器不一致", http.StatusBadRequest)
+			return
+		}
 	}
 	if a.riot == nil {
 		http.Error(w, "Riot 接口不可用", http.StatusConflict)
 		return
 	}
-	raw, _, err := a.riot.forPlatform(request.Region).matchByIDWithCacheMode(r.Context(), riotMatchID(request.Region, request.GameID), true)
+	raw, _, err := a.riot.forPlatform(request.Region).matchByIDWithCacheMode(r.Context(), riotMatchID(request.Region, request.GameID), request.Refresh == "perk-stats")
 	if err != nil {
 		a.recordDiagnostic(map[string]any{"event": "perk_stats_refresh_failed", "reason": safeDiagnosticReason(err)})
 		http.Error(w, "读取对局失败", http.StatusBadGateway)
+		return
+	}
+	if raw == nil || raw.Info.GameID != request.GameID {
+		http.Error(w, "对局编号与请求不一致", http.StatusBadGateway)
 		return
 	}
 	match := riotConvertMatch(raw, "", nil)
@@ -223,11 +249,95 @@ func (a *app) handleGameplayMatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "对局参与者无效", http.StatusBadRequest)
 		return
 	}
+	if request.Refresh == "score-parts" && request.PlayerRef != "" && !scoreMatchSubjectMatches(match, request.ParticipantID, scoreReference) {
+		http.Error(w, "对局参与者与玩家引用不一致", http.StatusBadRequest)
+		return
+	}
 	applyMatchScores(&match)
 	a.recordMatchScores("riot", match)
 	a.recordRiotPerkDiagnostics("riot", []*riotMatchInfo{&raw.Info}, "", request.ParticipantID)
 	a.publicizeMatchReferences(&match)
 	a.recordDiagnostic(map[string]any{"event": "perk_stats_refreshed", "game_id": request.GameID})
+	respondJSON(w, match)
+}
+
+// Cache entries are immutable game data, but authorization is never cached:
+// resolve and verify the opaque player's server and participant on every read.
+func scoreMatchSubjectMatches(match gameplayMatch, participantID int64, reference gameplayReference) bool {
+	for _, participant := range match.Participants {
+		if participant.ParticipantID == participantID {
+			return gameplayReferencesMatch(participant.reference, reference) || gameplayReferenceContains(reference, participant.PlayerRef)
+		}
+	}
+	return false
+}
+
+func (a *app) handleCNScoreParts(w http.ResponseWriter, r *http.Request, gameID, participantID int64, publicRef, requestedServer string) {
+	reference, ok := a.resolveGameplayReferenceDetails(strings.TrimSpace(publicRef))
+	serverID, serverOK := normalizeTencentServerID(reference.ServerID)
+	if !ok || isRiotRegion(reference.Region) || !serverOK || reference.PlayerRef == "" {
+		http.Error(w, "国服玩家引用无效", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(requestedServer) != "" {
+		requested, valid := normalizeTencentServerID(requestedServer)
+		if !valid || requested != serverID {
+			http.Error(w, "玩家引用与所选服务器不一致", http.StatusBadRequest)
+			return
+		}
+	}
+	client, account, err := a.gameplayClient()
+	if err != nil || clientTencentServerID(client) == "" {
+		http.Error(w, "当前没有已连接的国服客户端", http.StatusConflict)
+		return
+	}
+	reference.ServerID = serverID
+	var match gameplayMatch
+	found := false
+	// SGP overview already retained the complete roster; never re-page a player's
+	// history just to recover one game's score parts.
+	if a.sgp != nil {
+		a.sgp.mu.Lock()
+		store := a.sgp.historyGamesLocked()
+		a.sgp.mu.Unlock()
+		if info, cached := store.sgp(serverID, gameID, true); cached && info.GameID == gameID {
+			match = convertRiotMatchInfo(info, reference.PlayerRef, nil, nil, "", serverID)
+			found = true
+		}
+	}
+	if !found && serverID == clientTencentServerID(client) {
+		// cachedHistoryDetail is server-scoped, single-flight and verifies gameID.
+		game, loadErr := client.cachedHistoryDetail(r.Context(), gameID)
+		if loadErr != nil {
+			http.Error(w, "读取对局详情失败", http.StatusBadGateway)
+			return
+		}
+		if lcuRosterIncomplete(game) {
+			http.Error(w, "对局参与者不完整", http.StatusBadGateway)
+			return
+		}
+		match = normalizeGameplayMatch(game, reference, nil, nil)
+		found = true
+	}
+	if !found {
+		http.Error(w, "完整对局缓存已不可用，请重新读取该玩家战绩", http.StatusNotFound)
+		return
+	}
+	if match.GameID != gameID || !scoreMatchSubjectMatches(match, participantID, reference) {
+		http.Error(w, "对局或参与者与玩家引用不一致", http.StatusBadRequest)
+		return
+	}
+	// Do not publish a result after a client/session replacement during loading.
+	a.mu.RLock()
+	active := a.lcu == client && a.summoner.PUUID == account.PUUID && a.clientSessionConnectedLocked()
+	a.mu.RUnlock()
+	if !active {
+		http.Error(w, "客户端会话已变化", http.StatusConflict)
+		return
+	}
+	match.SubjectParticipantID = participantID
+	applyMatchScores(&match)
+	a.publicizeMatchReferences(&match)
 	respondJSON(w, match)
 }
 

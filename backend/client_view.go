@@ -53,6 +53,7 @@ func (a *app) currentClientView() clientView {
 			view.State = "ready"
 		}
 	}
+	reasons := a.clientViewReasonsLocked()
 	a.mu.RUnlock()
 	if (connected || exiting) && client != nil {
 		refRegion := view.Region
@@ -66,6 +67,11 @@ func (a *app) currentClientView() clientView {
 		a.clientViewGeneration++
 		a.clientViewSignature = string(signature)
 		view.Generation = a.clientViewGeneration
+		if view.State != a.clientViewDiagnosticState {
+			a.clientViewDiagnosticState = view.State
+			reasons["event"], reasons["state"], reasons["generation"] = "client_view_published", view.State, view.Generation
+			a.recordDiagnostic(reasons)
+		}
 		data, _ := json.Marshal(view)
 		a.broadcastEvent(string(data))
 	} else {

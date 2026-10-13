@@ -7,6 +7,7 @@
   'use strict';
   const categories = {result:'结果',hero:'英雄',position:'位置',time:'时间',coplayer:'同局玩家',multikill:'多杀',performance:'表现',duration:'对局时长'};
   const labels = {win:'胜利',loss:'失败',top:'上路',jungle:'打野',middle:'中路',bottom:'下路',utility:'辅助',today:'今天',d3:'近 3 天',d7:'近 7 天',d30:'近 30 天',3:'三杀',4:'四杀',5:'五杀',mvp:'MVP',svp:'SVP',top3:'前三',zero:'零阵亡',short:'< 20 分钟',medium:'20–30 分钟',long:'30–40 分钟',verylong:'> 40 分钟'};
+  const tagLabels={damage:'输出',efficiency:'伤转率',control:'控制',heal:'治疗',shield:'护盾',tank:'承伤',kills:'击杀',participation:'参团',tower:'拆塔',gold:'经济',cs:'补兵',solo:'单杀',dive:'越塔',defense:'塔之子',advantage:'压刀',hook:'好钩'};
   const key = 'deep-legends-history-presets-v1';
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const numeric = value => value != null && value !== '' && Number.isFinite(Number(value));
@@ -137,7 +138,8 @@
         if(search.stopping){search.stopReason='user_stop';break;}
         const failure=blocked(tab,ctx);if(failure){search.stopReason=failure.reason;break;}
         search.progress();
-        if(serverTimeRange(tab,ctx).startTime && loaded && consumed>0 && tab.data?.pagination?.hasMore){search.stopReason='done';break;}
+        const range=serverTimeRange(tab,ctx);
+        if(range.startTime && loaded && ctx.rows().some(m=>timeValue(m.createdAt)<range.startTime*1000)){tab.data.pagination.hasMore=false;search.stopReason='no_more';break;}
         if(!loaded || consumed<=0 || tab.data?.pagination?.moreError){search.stopReason='error';break;}
       }
     } catch(error) {search.stopReason=search.stopping?'user_stop':'error';}
@@ -175,7 +177,7 @@
       if(category==='hero' && s)names.set(String(s.championId),s.championName);
       if(category==='coplayer')for(const p of match.participants || [])if(p.playerRef)names.set(p.playerRef,p.gameName ? `${p.gameName}${p.tagLine?'#'+p.tagLine:''}` : p.displayName || p.summonerName || '隐藏玩家');
     }
-    const text=c.values.map(v=>names.get(v) || labels[v] || v.replace('tag:','')).join('、');
+    const text=c.values.map(v=>names.get(v) || labels[v] || (v.startsWith('tag:')?tagLabels[v.slice(4)] || '表现':v)).join('、');
     const gates=Object.entries(c.thresholds || {}).map(([name,value])=>`${{kda:'KDA',score:'评分',kp:'参团'}[name]} ≥ ${value}${name==='kp'?'%':''}`).join(' · ');
     return [text,gates,c.atLeast?'及以上':''].filter(Boolean).join(' · ');
   }
@@ -281,15 +283,27 @@
       const n=scannedCount(tab,ctx),time=timeLabel(tab),copy=time && !conditions(tab).time.not?`${labels[time]}的 ${n} 场对局中没有符合条件的对局`:`已查完可查询的 ${n} 场对局，没有符合条件的对局`;
       return `<div class="af-empty"><strong>${escape(copy)}</strong></div>`;
     }
-    return `<div class="af-empty"><strong>没有符合的对局</strong>${block?`<p data-af-blocked>${escape(block.copy)}</p>`:error?`<p>${escape(error)}</p>`:''}${button('继续往前查找',`data-af-continue${block?' disabled':''}`)}</div>`;
+    return `<div class="af-empty"><strong>没有符合的对局</strong>${block?`<p data-af-blocked>${escape(block.copy)}</p>`:error?`<p>${escape(error)}</p>`:''}${button(block?.reason==='quota'?block.copy:'继续往前查找',`data-af-continue${block?' disabled':''}`)}</div>`;
   }
   function footer() {return '';}
+  function retainHeroIcons(menu, replace) {
+    const icons=menu._afHeroIcons ||= new Map();
+    for(const button of menu.querySelectorAll('.af-options.is-hero [data-af-option]')){
+      const icon=button.querySelector('figure,.game-icon');if(icon){icons.set(button.dataset.afOption,icon);icon.remove();}
+    }
+    replace();
+    for(const button of menu.querySelectorAll('.af-options.is-hero [data-af-option]')){
+      const icon=icons.get(button.dataset.afOption);if(icon)button.querySelector('figure,.game-icon')?.replaceWith(icon);
+    }
+    while(icons.size>512)icons.delete(icons.keys().next().value);
+  }
+
   function refresh(container,tab,ctx,structure=false) {
     const m=ui(tab),menu=menuFor(container);if(!menu || menu._afOwner!==container)return;
     menu._afMenuState=m;
     menu.classList.toggle('is-saved',m.page==='saved');
     for(const node of menu.querySelectorAll('[data-af-page]')){const selected=node.dataset.afPage===m.page;node.classList.toggle('is-active',selected);node.setAttribute('aria-selected',String(selected));}
-    if(structure)menu.querySelector('.af-menu-body').innerHTML=menuBody(tab,ctx);
+    if(structure)retainHeroIcons(menu,()=>{menu.querySelector('.af-menu-body').innerHTML=menuBody(tab,ctx);});
     if(!m.open)return;
     const cs=normalizedEditing(tab),c=draft(tab,m.category),opts=new Map(cachedOptions(tab,m.category || 'result',ctx,c).map(o=>[o.value,o]));
     for(const node of menu.querySelectorAll('[data-af-option]')) {
@@ -300,6 +314,12 @@
     for(const node of menu.querySelectorAll('[data-af-not]')){const selected=(node.dataset.afNot==='true')===Boolean(c.not);node.classList.toggle('is-active',selected);node.setAttribute('aria-pressed',String(selected));}
     const preview=menu.querySelector('[data-af-preview]');if(preview)preview.innerHTML=`符合 <b>${filter(ctx.rows(),{advancedConditions:cs},ctx).length}</b> 场 · 已查 <b>${scannedCount(tab,ctx)}</b> 场`;
     const caps=menu.querySelector('[data-af-draft-capsules]');if(caps && caps._conditions!==cs){caps.innerHTML=capsules(cs,ctx)+button('+'+Object.keys(cs).length,'class="af-capsules-more" data-af-capsules-more aria-label="展开全部条件" aria-expanded="false"');caps._conditions=cs;caps._afWidths=null;caps._afMoreWidth=0;caps._afLayout='';}
+    const quota=blocked(tab,ctx);
+    let continueButton=menu.querySelector('.af-modal-footer [data-af-continue]');
+    if(quota?.reason==='quota'){
+      if(!continueButton){continueButton=menu.ownerDocument.createElement('button');continueButton.type='button';continueButton.dataset.afContinue='';menu.querySelector('.af-modal-footer')?.insertBefore(continueButton,menu.querySelector('[data-af-clear]'));}
+      continueButton.disabled=true;continueButton.textContent=quota.copy.replace('查询额度恢复中，约 ','').replace(' 秒后可继续',' 秒后继续查找');
+    }else continueButton?.remove();
     queueFooterLayout(menu);
     if(structure)ctx.prepare?.(menu);
   }

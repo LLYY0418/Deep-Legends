@@ -2293,9 +2293,31 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 [data-match-layout][data-icon-overlap] { grid-template-columns: 124px minmax(0,96px) minmax(0,1fr); }
 
 /* R272: the full-page skeleton shares the R267 luminance treatment. */
-.overview-strip-skeleton { min-height: 116px; display: grid; grid-template-columns: 72px minmax(120px,1fr) 160px; gap: 18px; align-items: center; }
-.overview-strip-skeleton > span { height: 48px; }
-.match-filterbar.gameplay-skeleton { min-height: 42px; }
+.overview-strip-skeleton { gap: 16px; }
+.overview-strip-skeleton > span { height: 48px; min-height: 0; }
+.overview-strip-skeleton > span:first-child { width: 72px; height: 72px; }
+  .match-filterbar.gameplay-skeleton { display: flex; min-height: 46px; }
+.match-filterbar.gameplay-skeleton button { color: transparent; pointer-events: none; background-image: linear-gradient(100deg,var(--skeleton-base) 20%,var(--skeleton-glint) 42%,var(--skeleton-base) 64%); background-size: 220% 100%; animation: skeleton 1.3s linear infinite; }
+.match-skeleton.gameplay-skeleton { height: 120px; min-height: 120px; }
+@container matches-column (max-width:640px) { .match-skeleton.gameplay-skeleton { height: 202px; min-height: 202px; } }
+/* Default row counts reserve the same geometry for pending and final cards. */
+.career-column > [data-career-key="ranks"] { min-height: 450px; }
+.career-column > [data-career-key="recent-ranked"] { min-height: 209px; }
+.career-column > [data-career-key="ability"] { min-height: 358px; }
+.career-column > [data-career-key="champions"] { min-height: 565px; }
+.career-column > [data-career-key="masteries"] { min-height: 261px; }
+.career-column > [data-career-key="positions"] { min-height: 254px; }
+.career-column > [data-career-key="recent-players"] { min-height: 207px; }
+.career-column > [data-career-key="activity"] { min-height: 181px; }
+.career-column > .career-section:has(.career-pending) { display: flex; flex-direction: column; }
+.career-column .career-pending { flex: 1; align-content: space-evenly; }
+.match-filterbar.gameplay-skeleton > span { min-height: 0; height: 30px; width: 45%; }
+.rank-history-row[hidden] { display: none; }
+.rank-history.no-winrate .rank-history-row, .rank-history.no-winrate .rank-history-head { grid-template-columns: 64px minmax(0,1fr); }
+.match-entry[data-virtual-match] { contain: strict; }
 [data-champselect-insight].live-player { padding-top: 13px; padding-bottom: 13px; }
 [data-champselect-insight] .live-recent-positions { margin-top: 10px; }
 [data-champselect-insight] .live-rank-title { color: var(--primary-strong); font-weight: 700; }
+
+.match-filterbar.gameplay-skeleton { gap: 8px; }
+.match-filterbar.gameplay-skeleton span { min-height: 0; background: none; animation: none; }
