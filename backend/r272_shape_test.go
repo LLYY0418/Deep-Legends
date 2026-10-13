@@ -63,14 +63,33 @@ func TestR272SyntheticOverviewWireBudget(t *testing.T) {
 			t.Errorf("%s wire=%d > budget=%d", test.name, w.Body.Len(), test.budget)
 		}
 		if test.name == "first" && os.Getenv("R272_OVERVIEW_FIXTURE") != "" {
-			for _, line := range bytes.Split(w.Body.Bytes(), []byte{'\n'}) {
-				var frame map[string]json.RawMessage
-				_ = json.Unmarshal(line, &frame)
-				if string(frame["type"]) == `"complete"` {
-					if err := os.WriteFile(os.Getenv("R272_OVERVIEW_FIXTURE"), frame["overview"], 0600); err != nil {
-						t.Fatal(err)
-					}
+			// A complete stream frame may contain references to earlier full records.
+			// Export the real non-stream serializer for standalone synthetic replay;
+			// keep the original NDJSON bytes and all wire/shape assertions unchanged.
+			fixtureRequest := httptest.NewRequest("POST", r.URL.String(), strings.NewReader(fmt.Sprintf(`{"gameName":"Fixture","tagLine":"KR1","region":"kr","begIndex":%d,"count":20}`, test.start)))
+			fixtureRequest.Header.Del("X-Overview-Cards")
+			fixtureRequest.Header.Set("Accept", "application/json")
+			fixtureResponse := httptest.NewRecorder()
+			f.a.handleGameplayOverview(fixtureResponse, fixtureRequest)
+			var page struct {
+				Matches []gameplayMatch `json:"matches"`
+			}
+			if fixtureResponse.Code != http.StatusOK {
+				t.Fatalf("browser fixture status=%d body=%s", fixtureResponse.Code, fixtureResponse.Body.String())
+			}
+			if err := json.Unmarshal(fixtureResponse.Body.Bytes(), &page); err != nil {
+				t.Fatal(err)
+			}
+			if len(page.Matches) != 20 {
+				t.Fatalf("browser fixture matches=%d", len(page.Matches))
+			}
+			for _, match := range page.Matches {
+				if len(match.Participants) != 10 || match.Revision == "" {
+					t.Fatal("browser fixture must contain full match records, not stream references")
 				}
+			}
+			if err := os.WriteFile(os.Getenv("R272_OVERVIEW_FIXTURE"), fixtureResponse.Body.Bytes(), 0600); err != nil {
+				t.Fatal(err)
 			}
 		}
 		shape := newOverviewResponseShape()

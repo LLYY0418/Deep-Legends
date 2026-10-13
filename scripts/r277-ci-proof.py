@@ -45,7 +45,7 @@ class Proof:
             shutil.copytree(ROOT / 'backend', self.root / 'backend', ignore=shutil.ignore_patterns('node_modules', '__pycache__'))
             # Fail closed on empty filtered selections, including newly added R277 tests.
             self.tests = sorted(set(re.findall(r'^func (Test\w+)\(t \*testing\.T\)', '\n'.join(
-                p.read_text() for p in (self.root / 'backend').glob('*_test.go')), re.MULTILINE)))
+                p.read_text(encoding="utf-8") for p in (self.root / 'backend').glob('*_test.go')), re.MULTILINE)))
             self.persist()
             return self
         except Exception as error:
@@ -53,7 +53,7 @@ class Proof:
             raise
 
     def persist(self):
-        (self.out / 'result.json').write_text(json.dumps(self.result, indent=2) + '\n')
+        (self.out / 'result.json').write_text(json.dumps(self.result, indent=2) + '\n', encoding="utf-8")
 
     def run(self, label, pattern, race=False, expected_fail=()):
         command = ['go', 'test', './backend', '-count=1', '-timeout=180s', '-json', '-run', pattern]
@@ -64,9 +64,9 @@ class Proof:
         selected = [test for test in self.tests if re.search(pattern, test)]
         if not selected:
             raise RuntimeError('empty Go test selection: ' + label)
-        with log.open('w') as stdout, stderr.open('w') as errors:
+        with log.open('w', encoding="utf-8") as stdout, stderr.open('w', encoding="utf-8") as errors:
             process = subprocess.run(command, cwd=self.root, env=self.env, stdout=stdout, stderr=errors, timeout=self.timeout)
-        events = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
+        events = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
         terminal = {row['Test']: row['Action'] for row in events if row.get('Test') and row['Action'] in {'pass', 'fail', 'skip'}}
         elapsed = {row['Test']: row.get('Elapsed') for row in events if row.get('Test') and row['Action'] in {'pass', 'fail', 'skip'}}
         row = {'label': label, 'command': command, 'exit': process.returncode, 'selected': selected,
@@ -105,7 +105,7 @@ class Proof:
         if error:
             self.result['error'] = str(error)
         try:
-            with (self.out / 'cache-clean.log').open('w') as log:
+            with (self.out / 'cache-clean.log').open('w', encoding="utf-8") as log:
                 subprocess.run(['go', 'clean', '-cache', '-testcache'], cwd=ROOT, env=self.env,
                                stdout=log, stderr=subprocess.STDOUT, check=True)
         finally:

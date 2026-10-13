@@ -40,6 +40,15 @@ test('P4 skeleton uses final strip grid and filter spans cannot inherit 126px bl
  assert(!/\.overview-strip-skeleton \{[^}]*min-height: 116px/.test(css));assert.match(css,/\.match-filterbar\.gameplay-skeleton > span \{[^}]*min-height: 0/);
  assert.match(game,/if \(tab.loading && rawMatches.length/);
 });
+test('P4 retained filter controls lose skeleton state on empty failure and restore it on retry',()=>{
+ const dom=new JSDOM('<div class="match-filterbar gameplay-skeleton" aria-label="正在读取筛选"><button data-af-open>筛选</button></div>'),bar=dom.window.document.querySelector('div'),button=bar.firstElementChild;
+ const api=compile(game,['syncMatchFilterPending','matchesPending'],{}),tab={loading:true,data:{matches:[],pagination:{partial:true}},overviewCardLoad:{ready:new Set()}};
+ api.syncMatchFilterPending(bar,tab);assert(bar.classList.contains('gameplay-skeleton'));
+ tab.loading=false;tab.initialPageError='战绩服务暂时不可用';api.syncMatchFilterPending(bar,tab);
+ assert(!bar.classList.contains('gameplay-skeleton'));assert(!bar.hasAttribute('aria-label'));assert.equal(bar.firstElementChild,button);
+ tab.loading=true;tab.initialPageError='';api.syncMatchFilterPending(bar,tab);assert(bar.classList.contains('gameplay-skeleton'));assert.equal(bar.getAttribute('aria-label'),'正在读取筛选');assert.equal(bar.firstElementChild,button);
+ dom.window.close();
+});
 test('P5 decoded hero DOM retained on every structural refresh',()=>{
  const dom=new JSDOM('<dialog><div class="af-options is-hero"><button data-af-option="103"><figure class="game-icon"><img src="/decoded"></figure></button></div></dialog>'),menu=dom.window.document.querySelector('dialog'),icon=menu.querySelector('figure'),image=menu.querySelector('img');
  const api=compile(read('history-filters.js'),['retainHeroIcons'],{});

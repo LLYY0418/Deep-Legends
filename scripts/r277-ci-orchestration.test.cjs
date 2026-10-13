@@ -25,6 +25,9 @@ test('R277 job-level environment uses no unavailable runner context',()=>{
  }
  const source=fs.readFileSync(path.join(__dirname,'r277-ci-orchestrate.cjs'),'utf8');assert(source.includes('process.env.RUNNER_TEMP'));
 });
+test('R277 Python proof I/O works with simulated Windows cp1252 defaults',()=>{
+ const result=require('node:child_process').spawnSync(process.platform==='win32'?'python':'python3',[path.join(__dirname,'r277-python-encoding.test.py'),'-v'],{cwd:root,encoding:'utf8'});assert.equal(result.status,0,(result.stdout||'')+(result.stderr||''));
+});
 test('Windows P11 is native race/GC proof and newly declared R277 tests are measured',()=>{
  const job=ci.jobs['r277-native-windows'];assert.equal(job['runs-on'],'windows-latest');assert.equal(job.env.GODEBUG,'invalidptr=1');
  assert(job.steps.some(step=>step.run?.includes('r277-installer-callbacks.py --native --out')));

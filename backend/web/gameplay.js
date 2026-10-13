@@ -2336,6 +2336,12 @@
     return Array.from({length:rows[key] || 3},()=>'<span></span>').join('');
   }
 
+  function syncMatchFilterPending(filterbar, tab) {
+    const pending=matchesPending(tab);
+    filterbar.classList.toggle('gameplay-skeleton',pending);
+    if(pending)filterbar.setAttribute('aria-label','正在读取筛选');else filterbar.removeAttribute('aria-label');
+  }
+
   function renderPendingMatchFilters(tab = {matchFilter:'all'}) {
     return renderMatchFilters(tab).replace('class="match-filterbar"','class="match-filterbar gameplay-skeleton" aria-label="正在读取筛选"');
   }
@@ -2484,7 +2490,7 @@
     if (tab.loading && rawMatches.length && !matchesPending(tab)) {
       container.insertAdjacentHTML("beforeend", '<div class="overview-refreshing" role="status"><span class="mini-loading" aria-hidden="true"></span><span>正在刷新最新战绩，当前内容仍可查看</span></div>');
     }
-    if (retainedFilterbar) container.querySelector(".match-filterbar")?.replaceWith(retainedFilterbar);
+    if (retainedFilterbar) {syncMatchFilterPending(retainedFilterbar,tab);container.querySelector(".match-filterbar")?.replaceWith(retainedFilterbar);}
     bindOverviewContent(container, tab);
     applyRenderedMetricStyles(container);
     if (preserveMatchList) {
@@ -5559,7 +5565,7 @@
       if(candidate.matches('[data-match-tag-pinned]')){
         const entry=node.closest('.match-entry'),match=tab.data?.matches?.find(m=>String(m.gameId)===entry?.dataset.matchId),subject=match && matchSubject(match,tab.data?.player?.playerRef);
         const record=match && readMatchScores(match).get(Number(subject?.participantId));
-        if(record){const template=document.createElement('template');template.innerHTML=scoreChip(record);node.dataset.scoreParticipant=String(subject.participantId);node.dataset.tooltipScore=template.content.firstElementChild.dataset.tooltipScore;node.dataset.tooltip=`本局评分 · 全场第 ${record.rank || '—'}`;node.tabIndex=0;}
+        if(record){const template=document.createElement('template');template.innerHTML=scoreChip(record);node.dataset.scoreParticipant=String(subject.participantId);node.dataset.tooltipScore=template.content.firstElementChild.dataset.tooltipScore;node.dataset.tooltip ||= `本局评分 · 全场第 ${record.rank || '—'}`;node.tabIndex=0;}
       }
       const load=()=>{const entry=node.closest('.match-entry'),match=tab.data?.matches?.find(m=>String(m.gameId)===entry?.dataset.matchId);void ensureScoreDetails(match,tab);};
       node.addEventListener('pointerenter',load);node.addEventListener('focus',load);

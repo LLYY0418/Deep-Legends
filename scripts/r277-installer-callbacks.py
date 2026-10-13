@@ -39,7 +39,7 @@ def audit(out):
                              cwd=ROOT, check=True, stdout=subprocess.PIPE).stdout.decode()
     for name in sorted(set(listing.split("\0")) - {""}):
         path = ROOT / name
-        source = path.read_text()
+        source = path.read_text(encoding="utf-8")
         relative = path.relative_to(ROOT).as_posix()
         for number, line in enumerate(source.splitlines(), 1):
             if not re.search(r"(?:windows|syscall)\.NewCallback\(", line):
@@ -65,7 +65,7 @@ def audit(out):
                              argument_source_and_pointer_proof=proof, dynamic_bindings=bindings,
                              sha256=hashlib.sha256(source.encode()).hexdigest()))
     rows.sort(key=lambda r: (r["path"], r["line"]))
-    (out / "callback-audit.json").write_text(json.dumps(dict(callback_count=len(rows), callbacks=rows), indent=2) + "\n")
+    (out / "callback-audit.json").write_text(json.dumps(dict(callback_count=len(rows), callbacks=rows), indent=2) + "\n", encoding="utf-8")
     if len(rows) != 14:
         raise RuntimeError("callback inventory changed: expected 14, got %d" % len(rows))
 
@@ -94,15 +94,15 @@ def main():
         log_path = out / (label + ".log")
         try:
             completed = subprocess.run(command, cwd=cwd, env={**env, **(overrides or {})},
-                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=300)
+                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=300, encoding="utf-8")
         except subprocess.TimeoutExpired as error:
             output = error.stdout or ""
             if isinstance(output, bytes):
                 output = output.decode(errors="replace")
-            log_path.write_text("COMMAND: " + " ".join(command) + "\n" + output + "\nTIMEOUT (not mutation proof)\n")
+            log_path.write_text("COMMAND: " + " ".join(command) + "\n" + output + "\nTIMEOUT (not mutation proof)\n", encoding="utf-8")
             results["runs"].append(dict(label=label, command=command, timeout=True))
             raise
-        log_path.write_text("COMMAND: " + " ".join(command) + "\n" + completed.stdout)
+        log_path.write_text("COMMAND: " + " ".join(command) + "\n" + completed.stdout, encoding="utf-8")
         row = dict(label=label, command=command, exit_code=completed.returncode,
                    expected_failure=expect_failure, seconds=round(time.monotonic() - started, 3))
         results["runs"].append(row)
@@ -134,12 +134,12 @@ def main():
             shutil.copytree(ROOT / "installer", copy)
             for relative in ["window_windows.go", "uninstall/window_windows.go"]:
                 path = copy / relative
-                fixed = path.read_text()
+                fixed = path.read_text(encoding="utf-8")
                 anchor = "func shellWndProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) uintptr {"
                 if fixed.count(anchor) != 1:
                     raise RuntimeError("unexpected signature anchor: " + relative)
                 try:
-                    path.write_text(fixed.replace(anchor, anchor.replace("lParam uintptr", "lParam unsafe.Pointer")))
+                    path.write_text(fixed.replace(anchor, anchor.replace("lParam uintptr", "lParam unsafe.Pointer")), encoding="utf-8")
                     label = "mutation-" + ("uninstall" if relative.startswith("uninstall/") else "installer")
                     run(label + "-structural", ["go", "test", "-count=1", "-v", "-run", "^TestR277ShellCallbackScalarLPARAM$", "."], cwd=copy, expect_failure=True,
                         markers=("parameter 3 must be uintptr", "FAIL"))
@@ -151,7 +151,7 @@ def main():
                     else:
                         run(label + "-windows-compile", ["go", "test", "-c", "-o", str(temporary / (label + ".test.exe")), package], cwd=copy, overrides=win)
                 finally:
-                    path.write_text(fixed)
+                    path.write_text(fixed, encoding="utf-8")
         results["status"] = "PASS"
         results["native_limitation"] = None if args.native else "Mac local proof only: Windows callback execution, old-signature fatal GC crash, native race and real-device installer/uninstaller smoke remain pending."
     except Exception as error:
@@ -162,7 +162,7 @@ def main():
         try:
             run("cache-clean", ["go", "clean", "-cache", "-testcache"])
         finally:
-            (out / "results.json").write_text(json.dumps(results, indent=2) + "\n")
+            (out / "results.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

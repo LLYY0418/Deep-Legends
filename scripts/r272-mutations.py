@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='r272-mutants-') as temp:
  target=temp/'lp-frontend.js';target.write_text(source.replace(before,''));run('lp-frontend',js,{'R272_GAMEPLAY_SOURCE':str(target)},True)
 
  overlay('credential-scoped-details',[('backend/riot_api.go','key := "riot-match-v4|" + matchID','key := "riot-match-v4|" + riotCredentialScope(ctx) + "|" + matchID')],'^TestR272DetailDiskCrossCredential$')
- overlay('lost-embedded-80-guard',[('backend/riot_routing.go','useRelay := count*5 >= limit*4','useRelay := count >= limit')],'^TestR272Embedded80GuardAndUserIsolation$')
+ overlay('lost-embedded-80-guard',[('backend/riot_routing.go','nearQuota := count*5 >= limit*4','nearQuota := count >= limit')],'^TestR272Embedded80GuardAndUserIsolation$')
  overlay('remakes-counted-as-missing',[('backend/match_score.go','if m.Result == "remake" {','if false && m.Result == "remake" {')],'^TestR272ScoreBatchRemakesDistinctFromMissing$')
  overlay('old-15s-total',[('backend/aramkit_rating.go','aramkitRatingTotalTimeout  = 45 * time.Second','aramkitRatingTotalTimeout  = 15 * time.Second')],'^TestR272MayhemContinuousAndIdleBody$/continuous_beyond_old15s')
  overlay('lost-postgame-refresh',[('backend/gameplay_refresh.go','a.scheduleCollectionEventRefresh(0)','// discarded postgame inventory')],'^TestR272CollectionEventAndPostgame$/InProgress')

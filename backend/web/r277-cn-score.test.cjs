@@ -12,6 +12,7 @@ for(const [kind,options] of [['cn',{}],['self',{current:true}],['riot',{region:'
  const h=fixture({...options,badge:trigger==='badge'});try{
   h.api.bindScoreDetails(h.root,h.tab);h.api.bindMatchEntryControls(h.root,h.tab,()=>{});assert.equal(h.requests.length,0);
   const score=h.root.querySelector('[data-score-participant]');assert(score,'visible score badge must bind lazy details');
+  if(trigger==='badge')assert.equal(score.dataset.tooltip,'评分排名','lazy parts must preserve the native placement description');
   if(trigger!=='expand')score.dispatchEvent(new h.dom.window.Event('pointerenter'));else h.root.querySelector('button').click();
   await new Promise(setImmediate);assert.equal(h.requests.length,1);assert.equal(h.requests[0].refresh,'score-parts');assert.equal(h.requests[0].serverId,options.serverId??'HN10');assert.equal(h.requests[0].playerRef,options.playerRef??'opaque-cn');assert.equal(h.requests[0].participantId,1);assert.equal(h.match.participants[0].score.parts.length,1);
   score.dispatchEvent(new h.dom.window.Event('focus'));await new Promise(setImmediate);assert.equal(h.requests.length,1);assert(JSON.parse(score.dataset.tooltipScore).parts.length);
