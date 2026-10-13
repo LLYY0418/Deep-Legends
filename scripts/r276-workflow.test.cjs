@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const root=path.resolve(__dirname,'..'),ci=fs.readFileSync(path.join(root,'.github/workflows/ci.yml'),'utf8');
+const root=path.resolve(__dirname,'..'),ci=fs.readFileSync(process.env.R276_CI_WORKFLOW_SOURCE||path.join(root,'.github/workflows/ci.yml'),'utf8');
 function job(source,name){const start=source.indexOf('\n  '+name+':\n');assert(start>=0,name+' missing');const tail=source.slice(start+5),match=/\n  \S[^\n]*:\n/.exec(tail);return source.slice(start,match?start+5+match.index:undefined);}
 function condition(expression,event,ref,input){return vm.runInNewContext(expression,{github:{event_name:event,ref},inputs:{measure_windows_renderers:input},startsWith:(value,prefix)=>value.startsWith(prefix),always:()=>true},{timeout:100,codeGeneration:{strings:false,wasm:false}});}
 test('R276 complete CI excludes v tags while the unchanged release workflow keeps them',()=>{
@@ -46,4 +46,9 @@ test('R276 restart race stress is part of both sweeps, never a separate CI trigg
  assert.equal(require('./r276-hexdata-stress.cjs').tests.length,10);
  assert.match(job(ci,'quality'),/scripts\/r276-hexdata-mutations\.py/);
  const browserJob=fs.readFileSync(path.join(root,'scripts/r276-browser-job.cjs'),'utf8');assert.match(browserJob,/census\.requireClean\(report,name\)/);assert.match(browserJob,/selected\.filter\(row=>row\[0\]!=='r275-offline'\)/);
+});
+
+test('R276 quality prepares locked Node modules before the real geometry fixture',()=>{
+ const quality=job(ci,'quality'),install=quality.indexOf('run: npm ci --prefix desktop'),geometry=quality.indexOf('run: node scripts/r276-filter-geometry-mutations.cjs');
+ assert(install>=0&&geometry>install,'quality must install locked Node dependencies before geometry fixture');
 });

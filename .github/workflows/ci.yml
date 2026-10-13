@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install quality fixture Node dependencies
+        run: npm ci --prefix desktop
       - name: Verify local notes and assistant instructions are not tracked
         run: node scripts/verify-no-docs-tracked.cjs
       - name: Prepare verified published update compatibility input
@@ -70,6 +72,8 @@ jobs:
         run: node scripts/r276-filter-geometry-mutations.cjs "$RUNNER_TEMP/r276-filter-geometry-mutations"
       - name: R276 canceled update-probe fixture regression and mutation
         run: python3 scripts/r276-update-probe-mutations.py --out "$RUNNER_TEMP/r276-update-probe-mutations"
+      - name: R276 clean quality dependency regression and mutation
+        run: node scripts/r276-quality-dependency-mutations.cjs "$RUNNER_TEMP/r276-quality-dependency-mutations"
       - name: Verify sweep evidence rejects missing samples
         run: python3 scripts/r276-sweep-summary.test.py
       - uses: actions/upload-artifact@v4
@@ -93,6 +97,7 @@ jobs:
             ${{ runner.temp }}/r276-hexdata-stress-mutations/**
             ${{ runner.temp }}/r276-filter-geometry-mutations/**
             ${{ runner.temp }}/r276-update-probe-mutations/**
+            ${{ runner.temp }}/r276-quality-dependency-mutations/**
           if-no-files-found: error
       - name: Vet
         run: go vet ./...
