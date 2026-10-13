@@ -47,3 +47,46 @@ test('R276 all four installed probes use the same real-resource demo readiness',
  for(const n of [265,266,269,272]){const source=fs.readFileSync(path.join(__dirname,`r${n}-persisted-ui.cjs`),'utf8');assert(source.includes("require('./r276-installed-demo.cjs')"));assert(source.includes('navigateInstalledDemo({call,until,click,origin})'));assert(source.includes('for(let n=0;n<200;n++)'));assert(source.includes('waitInstalledStartup({until})'));}
  const source=fs.readFileSync(path.join(__dirname,'r276-installed-demo.cjs'),'utf8');assert(!source.includes('Fetch.fulfillRequest'));assert(!source.includes('localStorage.setItem'));
 });
+
+async function installedDemoPrelude(){
+ let source;
+ await navigateInstalledDemo({marker:777,origin:'http://127.0.0.1:12345',call:async(method,params)=>{if(method==='Page.addScriptToEvaluateOnNewDocument')source=params.source;},until:async()=>{},click:async()=>{}});
+ assert(source);return source;
+}
+async function synchronizedFetchFixture(delegate){
+ const timers=[],window={fetch:delegate};
+ const context=vm.createContext({window,location:{href:'http://127.0.0.1:12345/?demo',origin:'http://127.0.0.1:12345'},URL,Reflect,Promise,setTimeout(fn,ms){assert.equal(ms,10);timers.push(fn);}});
+ vm.runInContext(await installedDemoPrelude(),context);
+ const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
+ const release=async exported=>{window.deepLegendsMatchCards=exported;for(const timer of timers.splice(0))timer();await flush();};
+ return {window,flush,release,timers};
+}
+test('installed demo holds the actual status Response until gameplay export, without changing bytes',async()=>{
+ const response=new Response(JSON.stringify({clientView:{type:'client-view',state:'ready',generation:1}})),f=await synchronizedFetchFixture(()=>Promise.resolve(response));let delivered=false;
+ const result=f.window.fetch('/api/status');result.then(()=>{delivered=true;});await f.flush();
+ assert.equal(delivered,false,'actual status must not be delivered before gameplay listeners/export');
+ await f.release({live:{state:{status:null}}});assert.equal(await result,response,'preserve actual Response identity');assert.equal((await response.json()).clientView.state,'ready');
+});
+test('installed demo synchronizes reassigned runtime/demo fetch with stable native fallback',async()=>{
+ const nativeResponse=new Response('native'),statusResponse=new Response('actual-demo-status');let nativeCalls=0;
+ const f=await synchronizedFetchFixture(()=>{nativeCalls++;return Promise.resolve(nativeResponse);}),nativeFetch=f.window.fetch.bind(f.window);let finish;
+ const ready=new Promise(resolve=>{finish=resolve;});f.window.fetch=(...args)=>ready.then(()=>f.window.fetch(...args));
+ const pending=f.window.fetch('/api/status');f.window.fetch=(input,init)=>input==='/api/status'?Promise.resolve(statusResponse):nativeFetch(input,init);finish();let delivered=false;pending.then(()=>{delivered=true;});await f.flush();assert.equal(delivered,false);
+ assert.equal(await f.window.fetch('/api/other'),nativeResponse,'native fallback must not recurse into newly assigned demo fetch');assert.equal(nativeCalls,1);
+ await f.release({mount(){}});assert.equal(await pending,statusResponse,'older export without live state also releases transport');
+});
+test('installed demo recognizes Request and URL status inputs, but preserves other-origin/path promises',async()=>{
+ const response=new Response('status'),original=Promise.resolve(response),f=await synchronizedFetchFixture(()=>original);
+ for(const input of ['https://example.invalid/api/status','/api/champions'])assert.equal(f.window.fetch(input),original);
+ const requests=[new Request('http://127.0.0.1:12345/api/status'),new URL('http://127.0.0.1:12345/api/status')];let delivered=0;
+ const pending=requests.map(input=>f.window.fetch(input).then(r=>{delivered++;return r;}));await f.flush();assert.equal(delivered,0);
+ await f.release({mount(){}});for(const result of pending)assert.equal(await result,response);
+});
+test('installed demo preserves cancellation while the real status Response awaits gameplay',async()=>{
+ for(const useRequest of [false,true]){
+  const controller=new AbortController(),reason=new Error('controlled status cancellation'),response=new Response('status'),f=await synchronizedFetchFixture(()=>Promise.resolve(response));
+  const input=useRequest?new Request('http://127.0.0.1:12345/api/status',{signal:controller.signal}):'/api/status';
+  const pending=f.window.fetch(input,useRequest?undefined:{signal:controller.signal});pending.catch(()=>{});
+  await f.flush();assert(f.timers.length>0);controller.abort(reason);await f.release({mount(){}});await assert.rejects(pending,error=>error===reason);
+ }
+});

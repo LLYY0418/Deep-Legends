@@ -9,6 +9,7 @@ function run(name,file,negative){
 try{
  run('baseline');
  for(const [name,needle,value] of [
+  ['status-before-gameplay-export','while (!window.deepLegendsMatchCards)', 'while (false)'],
   ['initial-load-not-awaited',"if(!(document.readyState==='complete' && window.deepLegendsMatchCards && !!document.querySelector('#setting-default-page + .app-select')))return false;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return document.readyState==='complete' && !!document.querySelector('#setting-default-page + .app-select');","return !!document.querySelector('#setting-default-page + .app-select');"],
   ['removed-legacy-connected-field',"window.deepLegendsMatchCards.live.state.status?.clientView?.state === 'ready'",'window.deepLegendsMatchCards.live.state.status?.connected'],
   ['default-frame-not-drained','await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));',''],
