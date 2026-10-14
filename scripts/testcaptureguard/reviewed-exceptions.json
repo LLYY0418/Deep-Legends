@@ -1366,23 +1366,23 @@
   },
   {
     "file": "backend/r196_test.go",
-    "line": 227,
+    "line": 236,
     "target": "head",
-    "source_sha256": "a9c32629b4138c26d1fe4ccfbf049e694b6bf2dad524d877c59e5015fa583530",
+    "source_sha256": "05a37633d188e034545da615a2515025150161a94382774afb6bf9c74ff086c0",
     "comment": "r276-capture-safe: TestR196SlowSourceSwitchResumesAndHashes: the audited fixture operations in this test invoke this callback serially and return before head is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r196_test.go",
-    "line": 284,
+    "line": 293,
     "target": "downloads",
-    "source_sha256": "a9c32629b4138c26d1fe4ccfbf049e694b6bf2dad524d877c59e5015fa583530",
+    "source_sha256": "05a37633d188e034545da615a2515025150161a94382774afb6bf9c74ff086c0",
     "comment": "r276-capture-safe: TestR196AllSlowStayFastest: the audited fixture operations in this test invoke this callback serially and return before downloads is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r196_test.go",
-    "line": 308,
+    "line": 317,
     "target": "checked",
-    "source_sha256": "a9c32629b4138c26d1fe4ccfbf049e694b6bf2dad524d877c59e5015fa583530",
+    "source_sha256": "05a37633d188e034545da615a2515025150161a94382774afb6bf9c74ff086c0",
     "comment": "r276-capture-safe: TestR196PreferredSourcePersistedAndCheckedFirst: the audited fixture operations in this test invoke this callback serially and return before checked is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

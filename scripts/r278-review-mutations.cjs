@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..'),out=path.resolve(process.argv[2]);fs.mkdirSync(out,{recursive:true});
-const tests=['backend/web/r278-claude-fixes.test.cjs','desktop/renderer-script-cache.test.cjs'];
+const tests=['backend/web/r278-claude-fixes.test.cjs','desktop/renderer-script-cache.test.cjs','backend/web/r278-measured-topbar.test.cjs'];
 const rows=[];
 function run(name,env={},negative=false,pattern){
  const args=['--test','--test-reporter=tap',...(pattern?['--test-name-pattern='+pattern]:[]),...tests];
@@ -14,6 +14,9 @@ function run(name,env={},negative=false,pattern){
 }
 run('baseline');
 const cases=[
+ ['measured-compact-disabled','backend/web/app.js','if (topbarOverflows(bar)) next = Math.min(5, level + 1);','if (false) next = Math.min(5, level + 1);','R278_CLAUDE_APP_SOURCE','measured compact controller'],
+ ['corrupt-search-follow-removed','backend/web/app.js','if(follow){const from=','if(false){const from=','R278_CLAUDE_APP_SOURCE','approved corrupt contract'],
+ ['official-countdown-restored','backend/web/gameplay.js','const copy=official?"英雄联盟官方战绩服务器暂时无法返回对局数据，游戏客户端里的战绩也会受影响。恢复后会自动重新读取。"','const copy=official?"英雄联盟官方战绩服务器暂时无法返回对局数据，游戏客户端里的战绩也会受影响。恢复后会自动重新读取。2 秒后自动重试"','R278_CONTRACT_GAMEPLAY_SOURCE','approved official-auto contract'],
  ['query-pointer-pan-removed','backend/web/app.js',"      if (event.buttons || !max()) return;",'      return;','R278_CLAUDE_APP_SOURCE','query viewport pans'],
  ['follow-writes-saved-preferences','backend/web/app.js','    if (manual) {\n      el.playerSearchRegion.dataset.manual', '    savePreference("search-region", region);\n    if (manual) {\n      el.playerSearchRegion.dataset.manual','R278_CLAUDE_APP_SOURCE','startup and client following'],
  ['empty-name-message-restored','backend/web/history-filters.js',"if(error){error.textContent='';error.hidden=true;}return false;","if(error){error.textContent='请先输入名称';error.hidden=false;}return false;",'R278_CLAUDE_FILTER_MODULE','empty name only'],

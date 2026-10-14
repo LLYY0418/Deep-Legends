@@ -27,6 +27,13 @@ async function waitForInstalledTarget({port,phase,out,now=Date.now,sleep=ms=>new
   fs.writeFileSync(path.join(out,`r265-cdp-${phase}.json`),JSON.stringify({phase,port,limitMs:30000,elapsedMs:now()-started,polls:polls+Number(!!target),ready:!!target,observations},null,2));
  }
 }
+function assertCorruptControls(actual,before,follow) {
+ const other=controls=>Object.fromEntries(Object.entries(controls).filter(([key])=>!['searchRegion','searchServer'].includes(key)));
+ assert.deepEqual(other(actual),other(before));
+ assert.equal(actual.searchRegion,'cn','P1 corrupt demo login must follow the CN client');
+ assert.equal(follow.label,'艾欧尼亚','P1 corrupt demo login must show the client server name');
+ assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 corrupt demo must record search client_follow_client login');
+}
 async function probe({port,phase,out}){
  assert(Number.isInteger(port)&&port>0&&port<65536);assert(['write-settings','write-presets','read','restart','corrupt'].includes(phase));fs.mkdirSync(out,{recursive:true});
  const target=await waitForInstalledTarget({port,phase,out});
@@ -44,7 +51,7 @@ async function probe({port,phase,out}){
  const until=async expression=>{for(let n=0;n<200;n++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw Error('installed UI condition timeout: '+expression+' '+JSON.stringify(await evaluate("({page:document.querySelector('#overview-content')?.textContent.slice(0,800),live:!document.querySelector('#live-panel')?.hidden,section:document.querySelector('.sidebar-nav-button.is-active')?.id})")))};
  const click=selector=>evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
  const choose=async(id,value)=>{await click(`#${id} + .app-select [data-app-select-trigger]`);await click(`#${id} + .app-select [data-native-select-value="${value}"]`);assert.equal(await evaluate(`document.getElementById(${JSON.stringify(id)}).value`),value);};
- const snapshot=()=>evaluate(`(()=>{const storage=Object.fromEntries(Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)]));return {preferences:Object.fromEntries(${JSON.stringify(keys)}.map(k=>[k,localStorage.getItem(k)])),presets:localStorage.getItem(${JSON.stringify(presetKey)}),storage,controls:{defaultPage:document.querySelector('#setting-default-page').value,defaultFilter:document.querySelector('#setting-default-match-filter').value,matchCount:document.querySelector('#setting-match-count').value,maskNames:document.querySelector('#setting-mask-names').checked,scale:document.querySelector('#setting-ui-scale').value,searchRegion:document.querySelector('#player-search-region').dataset.region,searchServer:document.querySelector('#player-search-region').dataset.serverId}}})()`);
+ const snapshot=()=>evaluate(`(()=>{const storage=Object.fromEntries(Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)]));return {searchFollow:{label:document.querySelector('#player-search-region-label').textContent,events:window.__r265FollowEvents||[]},preferences:Object.fromEntries(${JSON.stringify(keys)}.map(k=>[k,localStorage.getItem(k)])),presets:localStorage.getItem(${JSON.stringify(presetKey)}),storage,controls:{defaultPage:document.querySelector('#setting-default-page').value,defaultFilter:document.querySelector('#setting-default-match-filter').value,matchCount:document.querySelector('#setting-match-count').value,maskNames:document.querySelector('#setting-mask-names').checked,scale:document.querySelector('#setting-ui-scale').value,searchRegion:document.querySelector('#player-search-region').dataset.region,searchServer:document.querySelector('#player-search-region').dataset.serverId}}})()`);
  const save=(name,data)=>fs.writeFileSync(path.join(out,name),JSON.stringify(data,null,2));
  const shot=async name=>{const png=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,name),Buffer.from(png.data,'base64'));};
  const demo=async origin=>require('./r276-installed-demo.cjs').navigateInstalledDemo({call,until,click,origin});
@@ -79,7 +86,7 @@ async function probe({port,phase,out}){
    save('079-format-presets-before.json',{phase,resourceFixtureApplied:true,scope:'preset data format compatibility; published 079 cannot save presets without its missing same-tag script',resourceProof,...data});await shot('079-format-preset.png');
   }else{
    const before=JSON.parse(fs.readFileSync(path.join(out,'079-unmodified-settings-before.json'),'utf8')),presets=JSON.parse(fs.readFileSync(path.join(out,'079-format-presets-before.json'),'utf8'));
-   assert.equal(initial.defaultPage,'live');if(phase!=='corrupt')assert(initial.liveVisible,'candidate must start on the UI-written 079 default page');const data=await snapshot();assert.deepEqual(data.preferences,before.preferences);assert.deepEqual(data.controls,before.controls);
+   assert.equal(initial.defaultPage,'live');if(phase!=='corrupt')assert(initial.liveVisible,'candidate must start on the UI-written 079 default page');const data=await snapshot();assert.deepEqual(data.preferences,before.preferences);if(phase==='corrupt')assertCorruptControls(data.controls,before.controls,data.searchFollow);else assert.deepEqual(data.controls,before.controls);
    if(phase==='read'){
     assert.equal(data.presets,presets.presets);assert.deepEqual(JSON.parse(data.presets),JSON.parse(presets.presets));save('079-to-080-preferences-comparison.json',{equal:true,resourceFixtureApplied:false,settingsBefore:before.preferences,settingsAfter:data.preferences,presetContentOrderNamesEqual:true,presetScope:presets.scope});await shot('080-actual-default-page.png');
     await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R265 79 格式兼容夹具')");await click('[data-af-apply="0"]');await until("document.querySelector('[data-af-conditions]')?.textContent.includes('胜利')");
@@ -88,11 +95,11 @@ async function probe({port,phase,out}){
    }else if(phase==='restart'){
     const renamed=JSON.parse(fs.readFileSync(path.join(out,'080-preset-renamed-before-restart.json'),'utf8'));assert.equal(data.presets,renamed.presets);await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R265 80 重命名后保存')");save('080-restart-preset-proof.json',{resourceFixtureApplied:false,restartRetained:true,...await snapshot()});await shot('080-restart-preset.png');
    }else{
-    await evaluate("localStorage.setItem('deep-legends-history-presets-v1','{corrupt-r265')");await demo(initial.origin);await openSaved();await until("localStorage.getItem('deep-legends-history-presets-v1')===null");const after=await snapshot();assert.deepEqual(after.preferences,before.preferences);assert.deepEqual(after.controls,before.controls);assert(await evaluate("document.querySelector('dialog[data-af-menu]:modal .af-saved .af-empty')?.textContent.includes('暂无常用筛选')"));save('080-corrupt-preset-proof.json',{resourceFixtureApplied:false,corruptFixtureDropped:true,otherSettingsUnchanged:true,...after});await shot('080-corrupt-preset.png');
+    await evaluate("localStorage.setItem('deep-legends-history-presets-v1','{corrupt-r265')");await demo(initial.origin);await openSaved();await until("localStorage.getItem('deep-legends-history-presets-v1')===null");const after=await snapshot();assert.deepEqual(after.preferences,before.preferences);assertCorruptControls(after.controls,before.controls,after.searchFollow);assert(await evaluate("document.querySelector('dialog[data-af-menu]:modal .af-saved .af-empty')?.textContent.includes('暂无常用筛选')"));save('080-corrupt-preset-proof.json',{resourceFixtureApplied:false,corruptFixtureDropped:true,otherSettingsUnchanged:true,...after});await shot('080-corrupt-preset.png');
    }
   }
   console.log(JSON.stringify({phase,passed:true,resourceFixtureApplied:phase==='write-presets'}));
  }finally{ws.close()}
 }
-module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget};
+module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget,assertCorruptControls};
 if(require.main===module){const [port,phase,out]=process.argv.slice(2);probe({port:Number(port),phase,out}).catch(e=>{console.error(e);process.exitCode=1});}

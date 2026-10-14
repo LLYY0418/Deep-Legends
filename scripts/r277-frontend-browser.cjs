@@ -10,4 +10,5 @@ replace("'*/gameplay.css*','*/demo-data.js*'", "'*/gameplay.css*','*/app.css*','
 replace('reconcileFilteredMatchList,renderLiveInsights,fitMatchTags}', 'reconcileFilteredMatchList,renderLiveInsights,fitMatchTags,renderOverviewPendingPage,renderOverview,renderOverviewBody,updateClientView,renderHistoricalRanks,bindRankHistoryControls,appendOverviewMatches}');
 replace('window.__r266App={state,renderItems};', 'window.__r266App={state,renderItems,acceptClientView,applySearchRegion};');
 replace("if(args[0]==='overview_card_ready')__r266CardEvents.push(args[2]);", "if(args[0]==='overview_card_ready')__r266CardEvents.push(args[2]);(window.__r277FlowEvents ||= []).push(args);");
+replace('{error:e.message,currentCase,clickEvidence,results,errors,violations}', '{error:e.message,topbar:e.topbarGeometry,currentCase,clickEvidence,results,errors,violations}');
 const m=new Module(__filename,module);m.filename=__filename;m.paths=module.paths;m._compile(source,__filename);

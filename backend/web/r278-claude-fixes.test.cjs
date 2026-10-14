@@ -48,14 +48,14 @@ test('R278 review: announcement assets are requested only on opening and modal w
   link.onload();await flush();const script=w.document.querySelector('script');assert.equal(script.getAttribute('src'),'/announcements.js');w.eval(fs.readFileSync(__dirname+'/announcements.js','utf8'));assert.equal(dialog.open,false,'module evaluation alone cannot open modal');script.onload();await flush();assert.equal(dialog.open,true);
  }finally{w.close()}
 });
-test('R278 P7: automatic sidebar collapse follows effective frame width without writing saved preference',()=>{
- const dom=new JSDOM('<main class="app-frame"></main><button id="toggle"></button><button id="setting"></button>');
+test('R278 P7: automatic sidebar collapse follows measured compact level without writing saved preference',()=>{
+ const dom=new JSDOM('<main class="app-frame"></main><header class="topbar" data-topbar-compact="0"></header><button id="toggle"></button><button id="setting"></button>');
  try{
   const d=dom.window.document,frame=d.querySelector('main');let width=1920,saved='expanded';Object.defineProperty(frame,'clientWidth',{get:()=>width});
   const f=compile(app,['applySidebar'],{document:d,window:dom.window,preference:()=>saved,el:{sidebarToggle:d.querySelector('#toggle'),settingsSidebarToggle:d.querySelector('#setting')}});
   f.applySidebar();assert.equal(d.documentElement.dataset.sidebar,'expanded');
-  width=450;f.applySidebar();assert.equal(d.documentElement.dataset.sidebar,'collapsed');assert.equal(d.querySelector('#toggle').getAttribute('aria-expanded'),'false');assert.equal(saved,'expanded');
-  width=1920;f.applySidebar();assert.equal(d.documentElement.dataset.sidebar,'expanded');assert.equal(d.querySelector('#toggle').getAttribute('aria-expanded'),'true');
+  width=450;d.querySelector("header").dataset.topbarCompact="4";f.applySidebar();assert.equal(d.documentElement.dataset.sidebar,'collapsed');assert.equal(d.querySelector('#toggle').getAttribute('aria-expanded'),'false');assert.equal(saved,'expanded');
+  width=1920;d.querySelector("header").dataset.topbarCompact="0";f.applySidebar();assert.equal(d.documentElement.dataset.sidebar,'expanded');assert.equal(d.querySelector('#toggle').getAttribute('aria-expanded'),'true');
   saved='collapsed';f.applySidebar();assert.equal(d.documentElement.dataset.sidebar,'collapsed');
  }finally{dom.window.close()}
 });

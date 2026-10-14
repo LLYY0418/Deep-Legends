@@ -23,12 +23,12 @@ test('R277 release CI has no special R276 branch conditions',()=>{
 test('R276 mutation gates run every dispatch and release push, preserving ordinary branch policy',()=>{
  for(const name of ['mutations-1','mutations-2','mutations-3']){
   const block=job(ci,name),expression=block.match(/\n    if: ([^\n]+)/)[1];
-  for(const [event,ref,want] of [['push','refs/heads/codex/release-0.12.84',true],['push','refs/heads/codex/ci-hardening-r276',false],['push','refs/heads/codex/other',false],['pull_request','refs/pull/1/merge',false],['workflow_dispatch','refs/heads/codex/ci-hardening-r276',true]])assert.equal(condition(expression,event,ref,false),want,name);
+  for(const [event,ref,want] of [['push','refs/heads/codex/release-0.12.84',true],['push','refs/heads/codex/probe-0.12.85-1',true],['push','refs/heads/codex/ci-hardening-r276',false],['push','refs/heads/codex/other',false],['pull_request','refs/pull/1/merge',false],['workflow_dispatch','refs/heads/codex/ci-hardening-r276',true]])assert.equal(condition(expression,event,ref,false),want,name);
  }
 });
 test('R276 Windows acceptance pushes and default-true dispatch really measure',()=>{
  const block=job(ci,'windows-tests'),expression=block.match(/- name: Measure full desktop renderer tests on Windows\s+if: ([^\n]+)/)[1];
- for(const [event,ref,input,want] of [['push','refs/heads/codex/release-0.12.84',false,true],['push','refs/heads/codex/ci-hardening-r276',false,false],['workflow_dispatch','refs/heads/feature',true,true],['workflow_dispatch','refs/heads/feature',false,false],['push','refs/tags/v0.12.83',false,false]])assert.equal(condition(expression,event,ref,input),want);
+ for(const [event,ref,input,want] of [['push','refs/heads/codex/release-0.12.84',false,true],['push','refs/heads/codex/probe-0.12.85-1',false,true],['push','refs/heads/codex/ci-hardening-r276',false,false],['workflow_dispatch','refs/heads/feature',true,true],['workflow_dispatch','refs/heads/feature',false,false],['push','refs/tags/v0.12.83',false,false]])assert.equal(condition(expression,event,ref,input),want);
  assert.match(ci,/measure_windows_renderers:[\s\S]*?default: true/);
 });
 test('R276 separate VMs preserve browser, mutation, upgrade and artifact gates',()=>{

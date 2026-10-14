@@ -6,7 +6,14 @@ test('R277 independent jobs leave every legacy shard, timing budget and branch g
  // Exact CI-only baseline, hashed independently of HEAD and available in shallow CI clones.
  const bytes=fs.readFileSync(path.join(__dirname,'r277-ci-legacy-baseline.json'));assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'),'d44263b1cd692a9c25bcc1fab52a1f95b77ebca90f66e81ff6a7000b6918d256');
  const baseline=JSON.parse(bytes);assert.equal(baseline.ci_cleanup_sha,'dfd6fc2a830ea999b36b7365f6ea75e12bb06624');const old=baseline.workflow;
- for(const [name,job] of Object.entries(old.jobs))assert.deepEqual(ci.jobs[name],job,`legacy ${name} must not change`);
+ const normalized=JSON.parse(JSON.stringify(ci.jobs));
+ const probeGate="(startsWith(github.ref, 'refs/heads/codex/release-') || startsWith(github.ref, 'refs/heads/codex/probe-0.12.85-'))";
+ let gates=0;for(const name of ['mutations-1','mutations-2','mutations-3','windows-tests']){
+  const job=normalized[name];const replace=value=>{assert(value.includes(probeGate));gates++;return value.replace(probeGate,"startsWith(github.ref, 'refs/heads/codex/release-')");};
+  if(name!=='windows-tests')job.if=replace(job.if);else for(const step of job.steps)if(step.if?.includes(probeGate))step.if=replace(step.if);
+ }
+ assert.equal(gates,5,'only the five approved complete probe gates may change');
+ for(const [name,job] of Object.entries(old.jobs))assert.deepEqual(normalized[name],job,`legacy ${name} must not change outside approved R278 probe gates`);
  assert.deepEqual(ci.on,old.on);assert.equal((ciText.match(/startsWith\(github.ref, 'refs\/heads\/codex\/release-'\)/g)||[]).length,5);
  assert(!ciText.includes("github.ref == 'refs/heads/codex/ci-hardening-r276'"));
 });
