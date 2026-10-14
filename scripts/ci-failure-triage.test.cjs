@@ -120,3 +120,8 @@ test("log shapes: file budget lines and bare error lines are kept, structured fa
   assert.equal(budget.category, "watchdog");
   assert.equal(budget.inDiff, true);
 });
+
+test("GitHub log decoration: ##[error] lines are read as error lines", () => {
+  const rows = parseLog("##[error]AssertionError [ERR_ASSERTION]: boom\n##[error]Process completed with exit code 1.\n", "l");
+  assert.deepEqual(rows.map((r) => r.name), ["AssertionError [ERR_ASSERTION]: boom", "Process completed with exit code 1."]);
+});

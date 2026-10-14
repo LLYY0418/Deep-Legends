@@ -69,7 +69,7 @@ function parseLog(text, evidence) {
     } else if ((m = /^File exceeded (\d+)s: (.*)$/.exec(line))) {
       const file = /"file":"([^"]+)"/.exec(m[2]);
       rows.push({ kind: "node-test", name: file ? file[1] : "(file budget)", file: relFile(file ? file[1] : ""), message: line.slice(0, 600), evidence });
-    } else if ((m = /^(AssertionError[^\n]{0,160}|(?:Type|Range|Reference)?Error: [^\n]{0,200})$/.exec(line))) {
+    } else if ((m = /^(?:##\[error\])?(AssertionError[^\n]{0,160}|(?:Type|Range|Reference)?Error: [^\n]{0,200}|Process completed with exit code \d+\.?)$/.exec(line))) {
       rows.push({ kind: "error-line", name: m[1].slice(0, 100), file: "", message: m[1], evidence });
     } else if (/^panic: /.test(line)) {
       rows.push({ kind: "go-test", name: "(panic)", file: "", message: lines.slice(i, i + 4).join("\n").slice(0, 600), evidence });
