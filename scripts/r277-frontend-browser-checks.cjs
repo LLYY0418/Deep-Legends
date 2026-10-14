@@ -1,10 +1,12 @@
 'use strict';
 const assert=require('node:assert/strict');
 module.exports=async({evaluate,until,click,call,shot,ready,results})=>{
+ let sampledTopbar;
  try {
- const settle=async()=>{await evaluate('document.fonts.ready');await until("document.querySelector('.topbar').dataset.topbarSettled==='true'");await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
-  const geometry=await evaluate("(()=>{const n=document.querySelector('.player-search');return {scrollWidth:n.scrollWidth,clientWidth:n.clientWidth,level:document.querySelector('.topbar').dataset.topbarCompact}})()");assert(geometry.scrollWidth<=geometry.clientWidth+1,'player-search must not overflow internally '+JSON.stringify(geometry));
- };
+ const {settleTopbar,waitViewport}=require('./lib/topbar-settle.cjs');
+ const pageCall=call;
+ call=async(method,params)=>{const result=await pageCall(method,params);if(method==='Emulation.setDeviceMetricsOverride')await waitViewport({evaluate,width:params.width});return result;};
+ const settle=async()=>{sampledTopbar=await settleTopbar({evaluate});};
  await evaluate("window.__r277Tab=document.querySelector('#overview-content')._overviewViewTab;window.__r277Data=structuredClone(__r277Tab.data);window.__r277Historical=structuredClone(__r277Data.historicalRanks||[]);__r277Data.historicalRanks=[];delete __r277Data.rankMilestones;for(const key of ['championStats','seasonChampionStats'])if(__r277Data[key]?.length)__r277Data[key]=Array.from({length:8},(_,i)=>({...__r277Data[key][0],championId:103+i,championName:'默认英雄 '+i}));true");
  // P4 exact rectangles: initial page shell vs final fixture for three player contexts.
  const rects="(()=>{const c=document.querySelector('#overview-content'),r=n=>{if(!n)return null;const b=n.getBoundingClientRect();return {top:b.top,height:b.height,width:b.width}};return {strip:r(c.querySelector('.summoner-strip')),filter:r(c.querySelector('.match-filterbar')),match:r(c.querySelector('.match-entry,.match-skeleton')),cards:[...c.querySelectorAll('.career-column > section')].map(n=>({key:n.dataset.careerKey,...r(n)})),text:c.textContent}})()";
@@ -157,7 +159,9 @@ module.exports=async({evaluate,until,click,call,shot,ready,results})=>{
 
  } catch(error) {
   try {
+   const failureSample=error.topbarSample || error.pageWaitSnapshot || sampledTopbar;
    error.topbarGeometry=await evaluate("(()=>{const bar=document.querySelector('.topbar'),rect=n=>n.getBoundingClientRect().toJSON(),item=n=>{const c=getComputedStyle(n);return {id:n.id,class:n.className,rect:rect(n),clientWidth:n.clientWidth,scrollWidth:n.scrollWidth,flex:c.flex,minWidth:c.minWidth,font:c.font,fontFamily:c.fontFamily}};return {width:bar.clientWidth,rect:rect(bar),level:bar.dataset.topbarCompact,settled:bar.dataset.topbarSettled,font:getComputedStyle(bar).fontFamily,children:[...bar.children].map(item),search:[...bar.querySelector('.player-search').children].map(item),buttons:[...bar.querySelectorAll('button')].filter(n=>n.getBoundingClientRect().width).map(item),query:item(bar.querySelector('.player-search-query')),queryLeft:bar.querySelector('.player-search-query').scrollLeft,panTrace:window.__r278PanTrace}})()");
+   error.topbarGeometry.failureSample=failureSample;
    await call('DOM.enable');await call('CSS.enable');const root=await call('DOM.getDocument');const nodes=await call('DOM.querySelectorAll',{nodeId:root.root.nodeId,selector:'#player-search-region-short,#player-search-region-label,#current-section-title,#refresh span'});error.topbarGeometry.platformFonts=[];for(const nodeId of nodes.nodeIds)error.topbarGeometry.platformFonts.push(...(await call('CSS.getPlatformFontsForNode',{nodeId})).fonts);
   } catch(diagnosticError) { if(error.topbarGeometry)error.topbarGeometry.diagnosticError=diagnosticError.message; }
   throw error;

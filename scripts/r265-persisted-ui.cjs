@@ -62,7 +62,9 @@ async function probe({port,phase,out}){
  };
  const openSaved=async()=>{await openFilter();await click('[data-af-page="saved"]');};
  try{
-  await call('Page.enable');await call('Runtime.enable');await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
+  await call('Page.enable');await call('Runtime.enable');
+  if(phase==='read'||phase==='restart')await evaluate("(()=>{window.__r265FollowEvents ||= [];window.__r265FollowCaptureStartedMs=performance.now();const wrap=fn=>function(...args){if(args[0]==='client_follow_client')window.__r265FollowEvents.push({event:args[0],trigger:args[1],fields:args[2],searchUI:new Error().stack.includes('updateSearchRegionStatus'),loadedMs:performance.now()});return fn?.apply(this,args);};let report=wrap(window.reportFlowDiagnostic);Object.defineProperty(window,'reportFlowDiagnostic',{configurable:true,get(){return report},set(fn){report=wrap(fn)}});return true})()");
+  await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
   const initial=await evaluate("({origin:location.origin,defaultPage:document.querySelector('#setting-default-page').value,liveVisible:!document.querySelector('#live-panel').hidden})");
   if(phase==='write-settings'){
    // No Fetch interception, no missing-script repair in this phase.
@@ -86,7 +88,12 @@ async function probe({port,phase,out}){
    save('079-format-presets-before.json',{phase,resourceFixtureApplied:true,scope:'preset data format compatibility; published 079 cannot save presets without its missing same-tag script',resourceProof,...data});await shot('079-format-preset.png');
   }else{
    const before=JSON.parse(fs.readFileSync(path.join(out,'079-unmodified-settings-before.json'),'utf8')),presets=JSON.parse(fs.readFileSync(path.join(out,'079-format-presets-before.json'),'utf8'));
-   assert.equal(initial.defaultPage,'live');if(phase!=='corrupt')assert(initial.liveVisible,'candidate must start on the UI-written 079 default page');const data=await snapshot();assert.deepEqual(data.preferences,before.preferences);if(phase==='corrupt')assertCorruptControls(data.controls,before.controls,data.searchFollow);else assert.deepEqual(data.controls,before.controls);
+   assert.equal(initial.defaultPage,'live');if(phase!=='corrupt')assert(initial.liveVisible,'candidate must start on the UI-written 079 default page');const data=await snapshot();
+   if(phase==='read'||phase==='restart'){
+    const name=`080-${phase}-before-controls.json`,record={phase,sampledAt:new Date().toISOString(),...data};save(name,record);
+    try{record.clientStatus=await evaluate("(async()=>{const r=await fetch('/api/status'),s=await r.json();return {captureStartedMs:window.__r265FollowCaptureStartedMs,httpStatus:r.status,connected:s.connected??null,clientRegion:s.clientRegion??null,platform:s.platform??null,serverId:s.serverId??null,clientViewState:s.clientView?.state??null,clientViewRegion:s.clientView?.region??null,clientViewServerId:s.clientView?.serverId??null,loadedMs:performance.now()};})()");}catch(error){record.clientStatus={diagnosticError:error.message};}save(name,record);
+   }
+   assert.deepEqual(data.preferences,before.preferences);if(phase==='corrupt')assertCorruptControls(data.controls,before.controls,data.searchFollow);else assert.deepEqual(data.controls,before.controls);
    if(phase==='read'){
     assert.equal(data.presets,presets.presets);assert.deepEqual(JSON.parse(data.presets),JSON.parse(presets.presets));save('079-to-080-preferences-comparison.json',{equal:true,resourceFixtureApplied:false,settingsBefore:before.preferences,settingsAfter:data.preferences,presetContentOrderNamesEqual:true,presetScope:presets.scope});await shot('080-actual-default-page.png');
     await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R265 79 格式兼容夹具')");await click('[data-af-apply="0"]');await until("document.querySelector('[data-af-conditions]')?.textContent.includes('胜利')");

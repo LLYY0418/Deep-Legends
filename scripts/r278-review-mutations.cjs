@@ -14,7 +14,8 @@ function run(name,env={},negative=false,pattern){
 }
 run('baseline');
 const cases=[
- ['measured-compact-disabled','backend/web/app.js','if (topbarOverflows(bar)) next = Math.min(5, level + 1);','if (false) next = Math.min(5, level + 1);','R278_CLAUDE_APP_SOURCE','measured compact controller'],
+ ['measured-compact-disabled','backend/web/app.js','if (topbarOverflows(bar) || level < minimumLevel) next = Math.min(5, level + 1);','if (false) next = Math.min(5, level + 1);','R278_CLAUDE_APP_SOURCE','measured compact controller'],
+ ['compact-width-floor-removed','backend/web/app.js','const minimumLevel = logicalWidth <= 600 ? 3 : 0;','const minimumLevel = 0;','R278_CLAUDE_APP_SOURCE','logical width floor'],
  ['corrupt-search-follow-removed','backend/web/app.js','if(follow){const from=','if(false){const from=','R278_CLAUDE_APP_SOURCE','approved corrupt contract'],
  ['official-countdown-restored','backend/web/gameplay.js','const copy=official?"英雄联盟官方战绩服务器暂时无法返回对局数据，游戏客户端里的战绩也会受影响。恢复后会自动重新读取。"','const copy=official?"英雄联盟官方战绩服务器暂时无法返回对局数据，游戏客户端里的战绩也会受影响。恢复后会自动重新读取。2 秒后自动重试"','R278_CONTRACT_GAMEPLAY_SOURCE','approved official-auto contract'],
  ['query-pointer-pan-removed','backend/web/app.js',"      if (event.buttons || !max()) return;",'      return;','R278_CLAUDE_APP_SOURCE','query viewport pans'],

@@ -3082,7 +3082,8 @@
   }
 
   function applySidebar() {
-    const collapsed = preference("sidebar", "expanded") === "collapsed" || Number(document.querySelector(".topbar")?.dataset.topbarCompact || 0) >= 4;
+    const width = document.querySelector(".app-frame")?.clientWidth || window.innerWidth;
+    const collapsed = preference("sidebar", "expanded") === "collapsed" || width <= 820 || Number(document.querySelector(".topbar")?.dataset.topbarCompact || 0) >= 4;
     document.documentElement.dataset.sidebar = collapsed ? "collapsed" : "expanded";
     el.sidebarToggle.setAttribute("aria-expanded", String(!collapsed));
     el.sidebarToggle.setAttribute("aria-label", collapsed ? "展开侧边栏" : "收起侧边栏");
@@ -3822,8 +3823,11 @@
       frame = 0;
       const level = Number(bar.dataset.topbarCompact);
       let next = level;
-      if (topbarOverflows(bar)) next = Math.min(5, level + 1);
-      else if (level) {
+      const bounds = bar.getBoundingClientRect(), scale = bounds.width / bar.offsetWidth || 1;
+      const logicalWidth = bounds.width / scale;
+      const minimumLevel = logicalWidth <= 600 ? 3 : 0;
+      if (topbarOverflows(bar) || level < minimumLevel) next = Math.min(5, level + 1);
+      else if (level && (level > 3 || logicalWidth > 616)) {
         // Probe only the next wider state off-screen, reserving 16 logical px.
         // The live bar changes at most one level per frame; failed probes never flash.
         const probe = bar.cloneNode(true);
@@ -4814,6 +4818,7 @@
   }
   applyAppearance();
   applySidebar();
+  if (typeof ResizeObserver === "function") new ResizeObserver(applySidebar).observe(document.querySelector(".app-frame"));
   setupTopbarCompact();
   void setupUiScaleSetting();
   setupUpdateEvents();
