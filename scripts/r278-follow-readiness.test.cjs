@@ -38,3 +38,19 @@ test('R278 repeated navigation errors fail at the idle window with the original 
 test('R278 readiness preserves arbitrary CDP errors and product assertion failures',async()=>{
  for(const error of [Error(JSON.stringify({code:-32000,message:'Inspected target crashed'})),new assert.AssertionError({message:'product invariant'})])await assert.rejects(waitForFollowedClient({evaluate:async()=>{throw error;},phase:'read'}),e=>e===error);
 });
+
+async function startupTransportFixture(){
+ const frames=[],response=new Response(JSON.stringify({clientView:{state:'ready'}})),other=Promise.resolve(new Response('other')),window={fetch:input=>input==='/api/status'?Promise.resolve(response):other,EventSource:class{constructor(){throw Error('synthetic demo must not subscribe to real backend client events')}}};
+ const context=vm.createContext({window,performance:{now:()=>0},location:{href:'http://127.0.0.1:12345/',origin:'http://127.0.0.1:12345'},URL,Reflect,Promise,requestAnimationFrame:fn=>frames.push(fn)});
+ vm.runInContext(followCapturePrelude(),context);
+ const flush=async()=>{for(let i=0;i<15;i++)await Promise.resolve();};
+ return {window,frames,response,other,flush,release:async()=>{window.deepLegendsMatchCards={live:{state:{}}};for(const frame of frames.splice(0))frame();await flush();}};
+}
+test('R278 startup demo response cannot arrive before gameplay listeners and retains actual Response',async()=>{
+ const f=await startupTransportFixture();let received=false;const pending=f.window.fetch('/api/status');pending.then(()=>received=true);await f.flush();assert.equal(received,false,'startup status must wait for gameplay listeners');assert.equal(f.window.fetch('/api/other'),f.other);await f.release();assert.equal(await pending,f.response);assert.equal((await f.response.json()).clientView.state,'ready');
+});
+test('R278 startup demo isolates real backend SSE and preserves reassigned fetch plus cancellation',async()=>{
+ const f=await startupTransportFixture();assert.doesNotThrow(()=>new f.window.EventSource('/api/events').close());
+ const controller=new AbortController(),reason=Error('controlled startup abort');f.window.fetch=()=>Promise.resolve(f.response);
+ const pending=f.window.fetch('/api/status',{signal:controller.signal});pending.catch(()=>{});await f.flush();assert(f.frames.length>0);controller.abort(reason);await f.release();await assert.rejects(pending,error=>error===reason);
+});

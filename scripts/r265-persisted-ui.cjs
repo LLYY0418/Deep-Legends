@@ -46,7 +46,22 @@ function assertReadControls(actual,before,follow) {
  assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 read must record search client_follow_client login');
 }
 function followCapturePrelude() {
- return `(()=>{window.__r265FollowEvents=[];window.__r265FollowCaptureStartedMs=performance.now();const wrap=fn=>function(...args){if(args[0]==='client_follow_client')window.__r265FollowEvents.push({event:args[0],trigger:args[1],fields:args[2],searchUI:new Error().stack.includes('updateSearchRegionStatus'),loadedMs:performance.now()});return fn?.apply(this,args);};let report=wrap(window.reportFlowDiagnostic);Object.defineProperty(window,'reportFlowDiagnostic',{configurable:true,get(){return report},set(fn){report=wrap(fn)}});return true})()`;
+ return `(()=>{window.__r265FollowEvents=[];window.__r265FollowCaptureStartedMs=performance.now();const wrap=fn=>function(...args){if(args[0]==='client_follow_client')window.__r265FollowEvents.push({event:args[0],trigger:args[1],fields:args[2],searchUI:new Error().stack.includes('updateSearchRegionStatus'),loadedMs:performance.now()});return fn?.apply(this,args);};let report=wrap(window.reportFlowDiagnostic);Object.defineProperty(window,'reportFlowDiagnostic',{configurable:true,get(){return report},set(fn){report=wrap(fn)}});return true})();window.EventSource=class{addEventListener(){}close(){}};(()=>{
+ // Same installed-demo transport synchronization as the other upgrade phases.
+ // Preserve the real fetch, Response, bytes and cancellation; suppress live SSE
+ // only in this synthetic demo fixture, which already supplies client status.
+ if(typeof window.fetch!=='function')return;
+ const wrap=delegate=>function(...args){
+  const result=Reflect.apply(delegate,window,args),input=args[0],url=new URL(typeof input==='string'?input:input?.url||input,location.href);
+  if(url.origin!==location.origin||url.pathname!=='/api/status')return result;
+  return Promise.resolve(result).then(async response=>{
+   const signal=args[1]?.signal||input?.signal;
+   while(!window.deepLegendsMatchCards){if(signal?.aborted)throw signal.reason;await new Promise(requestAnimationFrame);}
+   if(signal?.aborted)throw signal.reason;return response;
+  });
+ };
+ let current=wrap(window.fetch);Object.defineProperty(window,'fetch',{configurable:true,enumerable:true,get:()=>current,set:delegate=>{current=wrap(delegate)}});
+})()`;
 }
 function clientFrameSnapshot() {
  const status=window.deepLegendsMatchCards?.live?.state?.status,client=status?.clientView,search=document.querySelector('#player-search-region');
@@ -112,7 +127,10 @@ async function probe({port,phase,out}){
    await call('Page.reload',{ignoreCache:false});
    try{await waitForFollowedClient({evaluate,phase});}
    catch(error){
-    save(`080-${phase}-client-stalled.json`,{phase,error:error.message,method:error.cdpMethod,snapshot:error.pageWaitSnapshot});
+    const record={phase,error:error.message,method:error.cdpMethod,snapshot:error.pageWaitSnapshot};
+    save(`080-${phase}-client-stalled.json`,record);
+    try{record.clientStatus=await evaluate("(async()=>{const response=await fetch('/api/status'),raw=await response.json(),rendered=window.deepLegendsMatchCards?.live?.state?.status;const client=s=>({connected:s?.connected??null,region:s?.clientRegion??null,server:s?.serverId??null,state:s?.clientView?.state??null});return {httpStatus:response.status,demoEnabled:localStorage.getItem('lol-loot-demo')==='1',captureStartedMs:window.__r265FollowCaptureStartedMs,raw:client(raw),rendered:client(rendered),events:window.__r265FollowEvents||[]};})()");}catch(diagnosticError){record.diagnosticError={message:diagnosticError.message,method:diagnosticError.cdpMethod};}
+    save(`080-${phase}-client-stalled.json`,record);
     try{await shot(`080-${phase}-client-stalled.png`);}catch(screenshotError){save(`080-${phase}-client-stalled-screenshot-error.json`,{phase,error:screenshotError.message,method:screenshotError.cdpMethod});}
     throw error;
    }

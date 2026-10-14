@@ -21,13 +21,13 @@ function readTopbar(){
 async function waitViewport({evaluate,width,...options}){
  return waitForPage({evaluate,...options,label:'viewport width '+width,sample:`(async()=>{await new Promise(r=>requestAnimationFrame(r));const snapshot=(${readTopbar})();return {done:window.innerWidth===${JSON.stringify(width)},progress:window.innerWidth,snapshot};})()`});
 }
-async function settleTopbar({evaluate,...options}){
+async function settleTopbar({evaluate,sample,...options}){
  await evaluate('document.fonts.ready');
  try{
-  const value=await waitForPage({evaluate,...options,label:'topbar stable across three frames',sample:`(async()=>{const read=${readTopbar};let previous;for(let frame=0;frame<3;frame++){await new Promise(r=>requestAnimationFrame(r));const snapshot=read(),progress=[snapshot.level,snapshot.sidebar,snapshot.settled],key=JSON.stringify(progress);if(snapshot.settled!=='true'||previous!==undefined&&key!==previous)return {done:false,progress,snapshot};previous=key;if(frame===2)return {done:true,progress,snapshot};}})()`});
+  const value=await waitForPage({evaluate,...options,label:'topbar stable across three frames',sample:`(async()=>{const read=${readTopbar};let previous;for(let frame=0;frame<3;frame++){await new Promise(r=>requestAnimationFrame(r));const snapshot=read(),progress=[snapshot.level,snapshot.sidebar,snapshot.settled],key=JSON.stringify(progress);if(snapshot.settled!=='true'||previous!==undefined&&key!==previous)return {done:false,progress,snapshot};previous=key;if(frame===2)return {done:true,progress,snapshot,sample:${sample ? `(${sample})` : 'null'}};}})()`});
   const geometry=value.snapshot;
   try{assert(geometry.scrollWidth<=geometry.clientWidth+1,'player-search must not overflow internally '+JSON.stringify(geometry));}catch(error){error.topbarSample=geometry;throw error;}
-  return geometry;
+  return sample ? {...geometry,sample:value.sample} : geometry;
  }catch(error){error.topbarSample ||= error.pageWaitSnapshot;throw error;}
 }
 module.exports={settleTopbar,waitViewport,readTopbar,waitForPage};
