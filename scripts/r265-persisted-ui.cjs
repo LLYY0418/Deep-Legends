@@ -52,11 +52,20 @@ function clientFrameSnapshot() {
  const status=window.deepLegendsMatchCards?.live?.state?.status,client=status?.clientView,search=document.querySelector('#player-search-region');
  return {ready:client?.state==='ready'&&Number.isFinite(window.__r265FollowCaptureStartedMs),region:status?.clientRegion??client?.region??null,server:status?.serverId??client?.serverId??null,searchRegion:search?.dataset.region,searchServer:search?.dataset.serverId,label:document.querySelector('#player-search-region-label')?.textContent,loadedMs:performance.now()};
 }
+function navigationPending(error) {
+ let protocol;try{protocol=JSON.parse(error.message);}catch{return false;}
+ return protocol.code===-32000&&['Inspected target navigated or closed','Not attached to an active page','Execution context was destroyed.','Cannot find context with specified id','Cannot find default execution context'].includes(protocol.message);
+}
 async function waitForFollowedClient({evaluate,phase,now=Date.now,noProgressMs=20000,totalMs=120000}) {
  const started=now();
  return require('./lib/topbar-settle.cjs').waitForPage({now,noProgressMs,label:phase+' ready client stable across three frames',evaluate:async expression=>{
   if(now()-started>=totalMs)throw Error(phase+' client readiness total limit reached');
-  return evaluate(expression);
+  try{return await evaluate(expression);}
+  catch(error){
+   if(!navigationPending(error))throw error;
+   const protocol=JSON.parse(error.message);await new Promise(setImmediate);
+   return {done:false,progress:['navigation-pending',protocol.message],snapshot:{state:'navigation-pending',message:protocol.message,method:error.cdpMethod||'Runtime.evaluate'}};
+  }
  },sample:`(async()=>{const read=${clientFrameSnapshot};let previous;for(let frame=0;frame<3;frame++){await new Promise(r=>requestAnimationFrame(r));const snapshot=read(),progress=[snapshot.ready,snapshot.region,snapshot.server,snapshot.searchRegion,snapshot.searchServer,snapshot.label],key=JSON.stringify(progress);if(!snapshot.ready||previous!==undefined&&key!==previous)return {done:false,progress,snapshot};previous=key;if(frame===2)return {done:true,progress,snapshot};}})()`});
 }
 function assertRestartControls(actual,before,follow) {
@@ -77,7 +86,7 @@ async function probe({port,phase,out}){
  const ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{ws.addEventListener('open',resolve,{once:true});ws.addEventListener('error',reject,{once:true})});
  let sequence=0,intercept=null;const pending=new Map(),resourceProof=[];
  ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(pending.has(m.id)){const [ok,no]=pending.get(m.id);pending.delete(m.id);m.error?no(Error(JSON.stringify(m.error))):ok(m.result);}else if(m.method==='Fetch.requestPaused')void intercept?.(m.params).catch(e=>resourceProof.push({error:e.message}));});
- const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++sequence,timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method))},15000);pending.set(id,[r=>{clearTimeout(timer);resolve(r)},e=>{clearTimeout(timer);reject(e)}]);ws.send(JSON.stringify({id,method,params}));});
+ const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++sequence,timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method))},15000);pending.set(id,[r=>{clearTimeout(timer);resolve(r)},e=>{clearTimeout(timer);e.cdpMethod=method;reject(e)}]);ws.send(JSON.stringify({id,method,params}));});
  const evaluate=async expression=>{const v=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(v.exceptionDetails)throw Error(JSON.stringify(v.exceptionDetails));return v.result.value;};
  const until=async expression=>{for(let n=0;n<200;n++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw Error('installed UI condition timeout: '+expression+' '+JSON.stringify(await evaluate("({page:document.querySelector('#overview-content')?.textContent.slice(0,800),live:!document.querySelector('#live-panel')?.hidden,section:document.querySelector('.sidebar-nav-button.is-active')?.id})")))};
  const click=selector=>evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
@@ -102,7 +111,11 @@ async function probe({port,phase,out}){
    await evaluate('delete window.__r265FollowCaptureStartedMs;true');
    await call('Page.reload',{ignoreCache:false});
    try{await waitForFollowedClient({evaluate,phase});}
-   catch(error){save(`080-${phase}-client-stalled.json`,{phase,error:error.message,snapshot:error.pageWaitSnapshot});await shot(`080-${phase}-client-stalled.png`);throw error;}
+   catch(error){
+    save(`080-${phase}-client-stalled.json`,{phase,error:error.message,method:error.cdpMethod,snapshot:error.pageWaitSnapshot});
+    try{await shot(`080-${phase}-client-stalled.png`);}catch(screenshotError){save(`080-${phase}-client-stalled-screenshot-error.json`,{phase,error:screenshotError.message,method:screenshotError.cdpMethod});}
+    throw error;
+   }
   }
   await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
   const initial=await evaluate("({origin:location.origin,defaultPage:document.querySelector('#setting-default-page').value,liveVisible:!document.querySelector('#live-panel').hidden})");
