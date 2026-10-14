@@ -79,3 +79,20 @@ test('R278 logical width floor keeps compact level three through sixteen pixels 
   assert.equal(d.querySelectorAll('header').length,1,'measurement copies must be removed');
  }finally{dom.window.close()}
 });
+
+test('R278 approved restart contract follows startup login despite saved manual preference',()=>{
+ const dom=new JSDOM(fs.readFileSync(__dirname+'/index.html','utf8')),d=dom.window.document,events=[];
+ try{
+  const el=Object.fromEntries([...d.querySelectorAll('[id]')].map(n=>[n.id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()),n]));
+  const saved={'search-region':'cn','search-server-id':'HN1','search-region-manual':'true'},writes=[];
+  const status={connected:true,clientView:{state:'ready'},clientRegion:'TENCENT',serverId:'HN1',summoner:{playerRef:'fixture'}};
+  dom.window.reportFlowDiagnostic=(event,trigger,fields)=>events.push({event,trigger,fields,searchUI:new Error().stack.includes('updateSearchRegionStatus')});
+  const f=compile(app,['applySearchRegion','updateSearchRegionLabel','updateSearchRegionStatus'],{el,state:{overviewGroup:'players',status},document:d,window:dom.window,isRiotSearchRegion:r=>r==='kr',setCNRegionExpanded(){},savePreference:(key,value)=>{writes.push([key,value]);saved[key]=value},searchRegion:()=>el.playerSearchRegion.dataset.region});
+  f.applySearchRegion(saved['search-region'],saved['search-server-id'],false);el.playerSearchRegion.dataset.manual=saved['search-region-manual'];f.updateSearchRegionStatus(status);
+  const before={defaultPage:'live',defaultFilter:'solo',matchCount:'20',scale:'1.25',maskNames:true,searchRegion:'cn',searchServer:'HN1'},actual={...before,searchRegion:el.playerSearchRegion.dataset.region,searchServer:el.playerSearchRegion.dataset.serverId},follow={label:el.playerSearchRegionLabel.textContent,events};
+  const {assertRestartControls}=require('../../scripts/r265-persisted-ui.cjs');assertRestartControls(actual,before,follow);
+  assert.deepEqual(saved,{'search-region':'cn','search-server-id':'HN1','search-region-manual':'true'});assert.deepEqual(writes,[]);
+  assert.throws(()=>assertRestartControls({...actual,scale:'1'},before,follow),assert.AssertionError);
+  assert.throws(()=>assertRestartControls(actual,before,{...follow,events:[]}),/restart must record search client_follow_client login/);
+ }finally{dom.window.close()}
+});

@@ -34,6 +34,11 @@ function assertCorruptControls(actual,before,follow) {
  assert.equal(follow.label,'艾欧尼亚','P1 corrupt demo login must show the client server name');
  assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 corrupt demo must record search client_follow_client login');
 }
+function assertRestartControls(actual,before,follow) {
+ assert.deepEqual(actual,{...before,searchServer:''},'P1 restart startup must follow the ready client');
+ assert.equal(follow.label,'艾欧尼亚','P1 restart login must show the client server name');
+ assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 restart must record search client_follow_client login');
+}
 async function probe({port,phase,out}){
  assert(Number.isInteger(port)&&port>0&&port<65536);assert(['write-settings','write-presets','read','restart','corrupt'].includes(phase));fs.mkdirSync(out,{recursive:true});
  const target=await waitForInstalledTarget({port,phase,out});
@@ -93,7 +98,7 @@ async function probe({port,phase,out}){
     const name=`080-${phase}-before-controls.json`,record={phase,sampledAt:new Date().toISOString(),...data};save(name,record);
     try{record.clientStatus=await evaluate("(async()=>{const r=await fetch('/api/status'),s=await r.json();return {captureStartedMs:window.__r265FollowCaptureStartedMs,httpStatus:r.status,connected:s.connected??null,clientRegion:s.clientRegion??null,platform:s.platform??null,serverId:s.serverId??null,clientViewState:s.clientView?.state??null,clientViewRegion:s.clientView?.region??null,clientViewServerId:s.clientView?.serverId??null,loadedMs:performance.now()};})()");}catch(error){record.clientStatus={diagnosticError:error.message};}save(name,record);
    }
-   assert.deepEqual(data.preferences,before.preferences);if(phase==='corrupt')assertCorruptControls(data.controls,before.controls,data.searchFollow);else assert.deepEqual(data.controls,before.controls);
+   assert.deepEqual(data.preferences,before.preferences);if(phase==='corrupt')assertCorruptControls(data.controls,before.controls,data.searchFollow);else if(phase==='restart')assertRestartControls(data.controls,before.controls,data.searchFollow);else assert.deepEqual(data.controls,before.controls);
    if(phase==='read'){
     assert.equal(data.presets,presets.presets);assert.deepEqual(JSON.parse(data.presets),JSON.parse(presets.presets));save('079-to-080-preferences-comparison.json',{equal:true,resourceFixtureApplied:false,settingsBefore:before.preferences,settingsAfter:data.preferences,presetContentOrderNamesEqual:true,presetScope:presets.scope});await shot('080-actual-default-page.png');
     await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R265 79 格式兼容夹具')");await click('[data-af-apply="0"]');await until("document.querySelector('[data-af-conditions]')?.textContent.includes('胜利')");
@@ -108,5 +113,5 @@ async function probe({port,phase,out}){
   console.log(JSON.stringify({phase,passed:true,resourceFixtureApplied:phase==='write-presets'}));
  }finally{ws.close()}
 }
-module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget,assertCorruptControls};
+module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget,assertCorruptControls,assertRestartControls};
 if(require.main===module){const [port,phase,out]=process.argv.slice(2);probe({port:Number(port),phase,out}).catch(e=>{console.error(e);process.exitCode=1});}
