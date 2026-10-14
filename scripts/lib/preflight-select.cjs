@@ -199,7 +199,7 @@ function select(index, rawChanges, options = {}) {
   for (const { file, status } of changes) {
     const reasonsBefore = nodeSelected.size + goFiles.size + guards.size;
     let covered = false;
-    const isDoc = /\.md$/.test(file) || file.startsWith("docs/");
+    const isDoc = /\.md$/.test(file);
     if (!isDoc) docsOnly = false;
 
     if (NODE_TEST_RE.test(file)) { addNode(file, "测试文件本身被改动"); covered = true; }
@@ -258,7 +258,7 @@ function select(index, rawChanges, options = {}) {
   const broad = ratio > broadRatio;
   const onlyDocs = docsOnly && changes.length > 0;
   // Doc-only changes with no referencing gate are fine; do not call them "unmapped".
-  const reallyUnmapped = onlyDocs ? [] : unmapped.filter((file) => !(/\.md$/.test(file) || file.startsWith("docs/")));
+  const reallyUnmapped = onlyDocs ? [] : unmapped.filter((file) => !(/\.md$/.test(file)));
 
   return {
     changed: changes,

@@ -23,7 +23,7 @@ const synthetic = {
   "scripts/lone-tool.cjs": "// not referenced by anything",
   "scripts/ci-only.py": "# run directly by CI",
   ".github/workflows/ci.yml": "steps:\n  - run: python3 scripts/ci-only.py\n",
-  "docs/NOTES.md": "notes",
+  "NOTES.md": "notes",
   "backend/alpha.go": "package main\nfunc computeAlphaScore() int { return 1 }\ntype alphaThing struct{}\nfunc (a alphaThing) available() bool { return true }\n",
   "backend/alpha_test.go": "package main\nfunc TestAlpha(t *testing.T) {}\n",
   "backend/beta_test.go": "package main\nfunc TestBeta(t *testing.T) { computeAlphaScore() }\n",
@@ -61,7 +61,7 @@ test("Go: same-name test plus tests that use a function defined in the changed f
 });
 
 test("documentation-only changes need nothing and are not reported as unmapped", () => {
-  const selection = select(repo(synthetic), ["docs/NOTES.md"]);
+  const selection = select(repo(synthetic), ["NOTES.md"]);
   assert.deepEqual(selection.nodeTests, []);
   assert.deepEqual(selection.unmapped, []);
   assert.equal(selection.recommendProbe, false);
