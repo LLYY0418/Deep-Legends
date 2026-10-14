@@ -58,3 +58,15 @@ test("every triage step is failure-only, uses the facts-only tool, and sits befo
     assert.ok(index < upload, `${name}: triage.json must be written before the evidence upload`);
   }
 });
+
+test("triage-legacy digests the hash-pinned legacy jobs without touching them, and cannot fail the run", () => {
+  const job = ci.jobs["triage-legacy"];
+  const legacy = ["quality", "windows-build", "windows-tests", "windows-upgrade", "browser-main", "browser-r265", "mutations-1", "mutations-2", "mutations-3"];
+  assert.deepEqual([...job.needs].sort(), [...legacy].sort());
+  for (const name of legacy) assert.ok(job.if.includes(`needs.${name}.result == 'failure'`), `${name} failure must trigger the digest`);
+  assert.match(job.if, /always\(\)/);
+  assert.deepEqual(job.permissions, { contents: "read", actions: "read" });
+  const digest = job.steps.find((s) => s.run?.includes("ci-failure-triage.cjs"));
+  assert.ok(digest.run.includes("exit 0") && digest.run.includes("set +e"), "advisory step must always end green");
+  assert.ok(!job.steps.some((s) => s["continue-on-error"]));
+});

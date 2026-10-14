@@ -66,6 +66,11 @@ function parseLog(text, evidence) {
       const detail = lines.slice(i + 1, i + 14).join("\n");
       const located = /location: '([^']+?):\d+:\d+'/.exec(detail);
       rows.push({ kind: "node-test", name: m[1], file: relFile(located ? located[1] : ""), message: detail.slice(0, 600), evidence });
+    } else if ((m = /^File exceeded (\d+)s: (.*)$/.exec(line))) {
+      const file = /"file":"([^"]+)"/.exec(m[2]);
+      rows.push({ kind: "node-test", name: file ? file[1] : "(file budget)", file: relFile(file ? file[1] : ""), message: line.slice(0, 600), evidence });
+    } else if ((m = /^(AssertionError[^\n]{0,160}|(?:Type|Range|Reference)?Error: [^\n]{0,200})$/.exec(line))) {
+      rows.push({ kind: "error-line", name: m[1].slice(0, 100), file: "", message: m[1], evidence });
     } else if (/^panic: /.test(line)) {
       rows.push({ kind: "go-test", name: "(panic)", file: "", message: lines.slice(i, i + 4).join("\n").slice(0, 600), evidence });
     }
@@ -124,6 +129,8 @@ function triage(options, readers = {}) {
   const changed = options.changed !== undefined ? options.changed : changedSet(options.base);
   const seen = new Set();
   const failures = [];
+  // Structured rows (test cases, Go tests, guards) first; raw error lines only fill what is left.
+  rows.sort((x, y) => (x.kind === "error-line") - (y.kind === "error-line"));
   for (const row of rows) {
     const key = `${row.kind}|${row.file}|${row.name}`;
     if (seen.has(key)) continue;
@@ -149,8 +156,19 @@ function markdown(report) {
   return lines.join("\n");
 }
 
+// GitHub workflow-command lines (visible through the check-run annotations API, 10 per step at most).
+function escapeData(value) { return String(value).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A"); }
+function escapeProperty(value) { return escapeData(value).replace(/:/g, "%3A").replace(/,/g, "%2C"); }
+function annotations(report, limit = 10) {
+  return report.failures.slice(0, limit).map((f) => {
+    const diff = f.inDiff === null ? "unknown" : f.inDiff ? "yes" : "no";
+    const detail = `category=${f.category}; file=${f.file || "unknown"}; in-diff=${diff}; ${String(f.message).replace(/\s+/g, " ").slice(0, 300)}`;
+    return `::error title=${escapeProperty(`triage ${f.kind}: ${f.name}`.slice(0, 120))}::${escapeData(detail)}`;
+  });
+}
+
 function parseArgs(argv) {
-  const options = { job: "", base: "", log: [], json: [], evidence: [], out: "", summary: process.env.GITHUB_STEP_SUMMARY || "" };
+  const options = { job: "", base: "", log: [], json: [], evidence: [], out: "", summary: process.env.GITHUB_STEP_SUMMARY || "", annotate: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const take = () => argv[++i] || "";
@@ -161,6 +179,7 @@ function parseArgs(argv) {
     else if (arg === "--evidence") options.evidence.push(take());
     else if (arg === "--out") options.out = take();
     else if (arg === "--summary") options.summary = take();
+    else if (arg === "--annotate") options.annotate = true;
     else throw new Error(`unknown option: ${arg}`);
   }
   return options;
@@ -174,6 +193,7 @@ if (require.main === module) {
     const text = markdown(report);
     if (options.summary) fs.appendFileSync(options.summary, text);
     else process.stdout.write(text);
+    if (options.annotate) for (const line of annotations(report)) console.log(line);
   } catch (error) {
     // Triage is advisory: it must never turn a red job into a different red or hide the original failure.
     console.error(`ci-failure-triage: ${error.message}`);
@@ -181,4 +201,4 @@ if (require.main === module) {
   process.exitCode = 0;
 }
 
-module.exports = { classify, parseLog, parseRendererJson, parseFailureJson, triage, markdown, parseArgs, relFile };
+module.exports = { annotations, classify, parseLog, parseRendererJson, parseFailureJson, triage, markdown, parseArgs, relFile };

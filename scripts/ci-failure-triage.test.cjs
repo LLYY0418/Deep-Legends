@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path"), os = require("node:os");
-const { classify, parseLog, triage, markdown, parseArgs, relFile } = require("./ci-failure-triage.cjs");
+const { annotations, classify, parseLog, triage, markdown, parseArgs, relFile } = require("./ci-failure-triage.cjs");
 
 test("categories: wait timeout, watchdog, assertion, crash and other are told apart", () => {
   assert.equal(classify("full app did not mount: no observable progress for 15000 ms; last progress {\"nodes\":3}"), "wait-timeout");
@@ -96,7 +96,27 @@ test("end to end: the CLI exits 0 even for a red job and writes triage.json", ()
 });
 
 test("argument parsing and path normalisation", () => {
-  assert.deepEqual(parseArgs(["--job", "q", "--log", "a", "--log", "b", "--evidence", "d", "--base", "origin/main", "--out", "o", "--summary", "s"]), { job: "q", base: "origin/main", log: ["a", "b"], json: [], evidence: ["d"], out: "o", summary: "s" });
+  assert.deepEqual(parseArgs(["--job", "q", "--log", "a", "--log", "b", "--evidence", "d", "--base", "origin/main", "--out", "o", "--summary", "s", "--annotate"]), { job: "q", base: "origin/main", log: ["a", "b"], json: [], evidence: ["d"], out: "o", summary: "s", annotate: true });
   assert.equal(relFile("C:\\w\\desktop\\a.test.cjs"), "desktop/a.test.cjs");
   assert.equal(relFile("/runner/work/repo/scripts/x.cjs"), "scripts/x.cjs");
+});
+
+test("annotations: one ::error line per failure, escaped, capped at 10, no newlines inside", () => {
+  const failures = Array.from({ length: 12 }, (_, i) => ({ kind: "node-test", name: `case ${i}: a,b`, file: "scripts/x.test.cjs", inDiff: i % 2 === 0, category: "assertion", message: `line1\nline2 100%` }));
+  const lines = annotations({ failures });
+  assert.equal(lines.length, 10);
+  for (const line of lines) {
+    assert.match(line, /^::error title=triage node-test%3A case \d+%3A a%2Cb::category=assertion; file=scripts\/x\.test\.cjs; in-diff=(yes|no); line1 line2 100%25$/);
+    assert.ok(!/\n/.test(line));
+  }
+  assert.match(annotations({ failures: [{ kind: "go-test", name: "T", file: null, inDiff: null, category: "other", message: "m" }] })[0], /file=unknown; in-diff=unknown/);
+});
+
+test("log shapes: file budget lines and bare error lines are kept, structured failures sort first", () => {
+  const log = ["Error: browser guard exploded", "File exceeded 90s: {\"file\":\"desktop/pro-players.test.cjs\",\"duration_ms\":120000}", "FAIL a case: AssertionError: x"].join("\n");
+  const report = triage({ job: "j", log: ["l"], changed: new Set(["desktop/pro-players.test.cjs"]) }, { text: () => log });
+  assert.deepEqual(report.failures.map((f) => f.kind), ["node-test", "node-test", "error-line"]);
+  const budget = report.failures.find((f) => f.file === "desktop/pro-players.test.cjs");
+  assert.equal(budget.category, "watchdog");
+  assert.equal(budget.inDiff, true);
 });
