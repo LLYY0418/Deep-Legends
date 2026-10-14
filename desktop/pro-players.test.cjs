@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
+const { runRendererScript } = require("./renderer-script-cache.cjs");
 const WEB = path.join(__dirname, "..", "backend", "web");
 const PRO_CSS = fs.readFileSync(path.join(WEB, "pro-players.css"), "utf8");
 const GAMEPLAY_CSS = fs.readFileSync(path.join(WEB, "gameplay.css"), "utf8");
@@ -16,8 +17,22 @@ function fixture() {
     ] }, { key: `${code}/missing`, name: `${code} Missing`, position: "top", status: "missing", accounts: [] },
   ] })), playerCount: 12, accountCount: 12, missingCount: 6, warnings: [], fetchedAt: "2026-09-08T11:00:00Z", rosterVerifiedAt: "2026-09-08" };
 }
+let compactProSource = "", compactProHTML = "";
+function proPageHTML(source) {
+  if (source !== compactProSource) {
+    const parsed = new JSDOM(source);
+    try {
+      const panel = parsed.window.document.getElementById("pro-players-panel");
+      assert.ok(panel, "real pro page markup must exist");
+      compactProHTML = `<!doctype html><html><head></head><body><main>${panel.outerHTML}${parsed.window.document.getElementById("pro-players-return").outerHTML}</main></body></html>`;
+      compactProSource = source;
+    } finally { parsed.window.close(); }
+  }
+  return compactProHTML;
+}
 function boot(t, { full = false, response = async () => fixture(), overviewStatus = 200, proMismatch = false, diagnosticsBridge, seasonSummary, currentGame, demoCurrentGame = false, noMatches = false, spellCatalog = async () => ({spells: [{id: 4, name: "闪现"}, {id: 11, name: "惩戒"}]}) } = {}) {
-  const dom = new JSDOM(fs.readFileSync(process.env.R102_INDEX_SOURCE || path.join(WEB, "index.html"), "utf8"), { url: demoCurrentGame ? "http://localhost/?demo=current-game" : "http://localhost/?demo", runScripts: "outside-only", pretendToBeVisual: true });
+  const sourceHTML = fs.readFileSync(process.env.R102_INDEX_SOURCE || path.join(WEB, "index.html"), "utf8");
+  const dom = new JSDOM(full ? sourceHTML : proPageHTML(sourceHTML), { url: demoCurrentGame ? "http://localhost/?demo=current-game" : "http://localhost/?demo", runScripts: "outside-only", pretendToBeVisual: true });
   const w = dom.window, requests = [], errors = [];
  w.document.hasFocus=()=>true;
   t.after(() => w.close());
@@ -66,7 +81,7 @@ function boot(t, { full = false, response = async () => fixture(), overviewStatu
         return reply;
       };
     }
-    w.eval(fs.readFileSync(file === "pro-players.js" && (process.env.R102_PRO_SOURCE || process.env.R97_PRO_PLAYERS_SOURCE) || path.join(WEB, file), "utf8"));
+    runRendererScript(dom, fs.readFileSync(file === "pro-players.js" && (process.env.R102_PRO_SOURCE || process.env.R97_PRO_PLAYERS_SOURCE) || path.join(WEB, file), "utf8"), file);
   }
   if (full) w.document.dispatchEvent(new w.Event("DOMContentLoaded", { bubbles: true }));
   const section = () => w.dispatchEvent(new w.CustomEvent("deep-legends:section", { detail: { name: "pro-players" } }));

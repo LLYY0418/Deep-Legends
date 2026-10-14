@@ -27,9 +27,9 @@ test('R223 default KR, foreign follow including Brazil, and persistent manual se
   f.applySearchRegion('kr','',false);assert.equal(f.searchRegion(),'kr');assert.equal(f.el.playerSearchRiotFollowClient.disabled,true);
   f.state.status={connected:true,clientRegion:'br1'};f.updateSearchRegionStatus(f.state.status);
   assert.equal(f.searchRegion(),'br1');assert.equal(f.el.playerSearchRiotFollowClient.disabled,false);assert.equal(f.el.playerSearchRegionLabel.textContent,'巴西');
-  f.applySearchRegion('jp1');assert.notEqual(f.preferences.get('search-region-manual'),'true');assert.equal(f.el.playerSearchRegionLabel.textContent,'日服');
+  f.applySearchRegion('jp1');assert.equal(f.preferences.get('search-region-manual'),'true');assert.equal(f.el.playerSearchRegionLabel.textContent,'日服');
   f.state.status={connected:true,clientRegion:'TENCENT',serverId:'HN10',sgpReady:true,serverName:'黑色玫瑰'};f.updateSearchRegionStatus(f.state.status);
-  assert.equal(f.searchRegion(),'');assert.equal(f.searchServerID(),'');assert.equal(f.el.playerSearchRiotFollowClient.disabled,true);assert.equal(f.el.playerSearchFollowClient.disabled,false);
+  assert.equal(f.searchRegion(),'');assert.equal(f.searchServerID(),'');assert.equal(f.el.playerSearchRiotFollowClient.disabled,true);assert.equal(f.preferences.get('search-region'),'jp1');assert.equal(f.preferences.get('search-region-manual'),'true');assert.equal(f.el.playerSearchFollowClient.disabled,false);
   f.state.status={connected:true,clientRegion:''};f.updateSearchRegionStatus(f.state.status);assert.equal(f.el.playerSearchFollowClient.disabled,true);
  }finally {f.dom.window.close();}
 });

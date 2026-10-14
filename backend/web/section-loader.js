@@ -2,7 +2,7 @@
   "use strict";
 
   const modules = { favorites: ["favorites-facade"], champions: ["champions"], "pro-players": ["pro-players"], suite: ["champions", "suite"], settings: ["champions", "cache-controls"], live: ["live-arena"] };
-  const styles = { champions: ["champions"], "pro-players": ["pro-players"], suite: ["champions", "suite"], settings: ["champions"], "live-arena": ["live-arena"] };
+  const styles = { champions: ["champions"], "pro-players": ["pro-players"], suite: ["champions", "suite"], settings: ["champions"], "live-arena": ["live-arena"], announcements: ["announcements"] };
   const flights = new Map(), ready = new Set(), callbacks = new Map(), snapshots = new Map();
   const styleFlights = new Map(), styleReady = new Set();
   let current = "overview", navigation = {}, generation = 0;

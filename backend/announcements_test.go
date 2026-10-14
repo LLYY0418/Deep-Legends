@@ -63,12 +63,12 @@ func TestR278P12ActualBuildHasAnnouncementUI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, token := range []string{`id="announcements-button"`, `id="announcements-dialog"`, `src="/announcements-bootstrap.js"`} {
+	for _, token := range []string{`id="announcements-button"`, `id="announcements-dialog"`, `src="/app.js"`} {
 		if !strings.Contains(string(html), token) {
 			t.Fatalf("actual build lacks %s", token)
 		}
 	}
-	for _, name := range []string{"announcements-bootstrap.js", "announcements.js", "announcements.css"} {
+	for _, name := range []string{"announcements.js", "announcements.css"} {
 		if data, err := embedded.ReadFile("web/" + name); err != nil || len(data) == 0 {
 			t.Fatalf("runtime asset absent %s", name)
 		}

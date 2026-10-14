@@ -2314,10 +2314,10 @@
       ["activity", renderActivity(data.activityHours || [],pendingStats).replace("</section>", `${renderOverviewShareButton()}</section>`)],
     ].map(([key,markup])=> {
       const capability={ranks:'ranked-stats',masteries:'champion-mastery'}[key];
-      if(tab.loading && capability && !(key==='ranks'?data.ranks?.length:data.masteries?.length) && !data.capabilities?.some(c=>c.name===capability))return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`];
+      if(tab.loading && key!=='ranks' && capability && !data.masteries?.length && !data.capabilities?.some(c=>c.name===capability))return [key,`<section data-career-key="${key}" class="career-section ${key}-section${key==='champions'?' champion-performance':''}"><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`];
       const titles={'recent-ranked':'近期排位',ability:'能力表现',positions:'位置偏好','recent-players':'最近一起玩',activity:'时间分布',...(!riotTab(tab)?{champions:'英雄统计'}:{})};
-      if((historyServiceState(tab)?.kind==="official" || !(data.matches?.length) && (tab.initialPageError || tab.error) && !tab.loading) && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="ability-unavailable"><strong>暂不可用</strong></div></section>`];
-      if((pendingMatches || pendingAggregates) && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section"><header><h3>${titles[key]}</h3></header><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`];
+      if((historyServiceState(tab)?.kind==="official" || !(data.matches?.length) && (tab.initialPageError || tab.error) && !tab.loading) && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section${key==='champions'?' champion-performance':''}"><header><h3>${titles[key]}</h3></header><div class="ability-unavailable"><strong>暂不可用</strong></div></section>`];
+      if((pendingMatches || pendingAggregates) && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section${key==='champions'?' champion-performance':''}"><header><h3>${titles[key]}</h3></header><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`];
       markup=markup.replace('<section',`<section data-career-key="${key}"`);
       return [key,!pendingStats && partialHistory && ['recent-ranked','ability','positions','recent-players','activity'].includes(key)?markup.replace('</h3>',`</h3><small class="history-sample-label">基于最近 ${Number(data.historyLoaded ?? data.matches?.length ?? 0)} 场</small>`):markup];
     });
@@ -2360,7 +2360,8 @@
   }
 
   function renderCareerPendingRows(key) {
-    const rows={ranks:7,champions:9,masteries:5,positions:5,'recent-players':4,'recent-ranked':3,ability:3,activity:3};
+    if(key==='ranks')return '<div class="rank-row gameplay-skeleton"><span class="rank-crest"></span><div><span></span><span></span></div><div class="rank-record"><span></span><span></span></div></div>'.repeat(2);
+    const rows={champions:9,masteries:5,positions:5,'recent-players':4,'recent-ranked':3,ability:3,activity:3};
     return Array.from({length:rows[key] || 3},()=>'<span></span>').join('');
   }
 
@@ -2377,7 +2378,11 @@
   function renderOverviewPendingPage(tab) {
     const cards=['ranks','recent-ranked','ability','champions','masteries','positions','recent-players','activity'];
     const titles={ranks:'排位','recent-ranked':'近期排位',ability:'能力表现',champions:'英雄胜率',masteries:'英雄熟练度',positions:'位置胜率','recent-players':'近期同局玩家',activity:'活跃时段'};
-    return `<section class="summoner-strip overview-strip-skeleton gameplay-skeleton" aria-label="正在读取召唤师"><span></span><span></span><span></span></section><div class="overview-layout"><aside class="career-column">${cards.map(key=>`<section data-career-key="${key}" class="career-section"><header><h3>${titles[key]}</h3></header><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`).join('')}</aside><section class="matches-column"><div class="overview-career-entry"><button class="career-dialog-trigger" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg><span>生涯统计</span></button></div>${typeof renderPendingMatchFilters==='function'?renderPendingMatchFilters(tab):'<div class="match-filterbar gameplay-skeleton"><span></span><span></span></div>'}<div class="match-list">${renderPendingMatches()}</div></section></div>`;
+    // A known card keeps its measured geometry only while showing placeholders.
+    const previous=tab?.data && typeof nodes!=='undefined' ? [nodes.overviewContent,nodes.playerOverlayContent].find(node=>node?._overviewViewTab===tab) : null;
+    const heights=previous ? [...previous.querySelectorAll('.career-column>[data-career-key]')].filter(node=>node.dataset.careerKey!=='ranks').map(node=>[node.dataset.careerKey,node.getBoundingClientRect().height]) : [];
+    if(heights.length)window.requestAnimationFrame(()=>{if(previous._overviewViewTab!==tab)return;for(const [key,height] of heights){const card=previous.querySelector(`[data-career-key="${key}"]`);if(height>0 && card?.querySelector('.career-pending'))card.style.height=`${height}px`;}});
+    return `<section class="summoner-strip overview-strip-skeleton gameplay-skeleton" aria-label="正在读取召唤师"><span></span><span></span><span></span></section><div class="overview-layout"><aside class="career-column">${cards.map(key=>key==='ranks'?`<section data-career-key="ranks" class="career-section rank-career-section"><header><h3>排位</h3><div class="rank-header-tools"><span>当前赛季</span>${typeof renderRankMMRPopover==='function'?renderRankMMRPopover(tab):''}</div></header><div class="rank-list career-pending">${renderCareerPendingRows(key)}</div></section>`:`<section data-career-key="${key}" class="career-section${key==='champions'?' champion-performance':''}"><header><h3>${titles[key]}</h3></header><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`).join('')}</aside><section class="matches-column"><div class="overview-career-entry"><button class="career-dialog-trigger" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg><span>生涯统计</span></button></div>${typeof renderPendingMatchFilters==='function'?renderPendingMatchFilters(tab):'<div class="match-filterbar gameplay-skeleton"><span></span><span></span></div>'}<div class="match-list">${renderPendingMatches()}</div></section></div>`;
   }
 
   function renderSelfIdentityHeader(tab) {
@@ -2503,7 +2508,7 @@
           ${careerSections}
         </aside>
         <section class="matches-column" aria-label="最近对局">
-
+          ${matches.length ? renderHistoryServiceStatus(tab,true) : ""}
           <div class="overview-career-entry"><button class="career-dialog-trigger" type="button" aria-haspopup="dialog" aria-controls="career-dialog" data-open-career-dialog><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg><span>生涯统计</span></button></div>
           ${matchesPending(tab)?renderPendingMatchFilters(tab):renderMatchFilters(tab)}
           ${matchDetailsWarning}
@@ -2976,7 +2981,7 @@
     const rows = expected.map((queue) => {
       const rank = ranks.find((item) => item.queueType === queue);
       const label = queue === "RANKED_SOLO_5x5" ? "单排/双排" : "灵活组排";
-      if ((!rank || !rank.tier) && !rankedCapability && tab?.loading) return `<div class="rank-row gameplay-skeleton"><span></span><span></span></div>`;
+      if ((!rank || !rank.tier) && !rankedCapability && tab?.loading) return `<div class="rank-row gameplay-skeleton"><span class="rank-crest"></span><div><span></span><span></span></div><div class="rank-record"><span></span><span></span></div></div>`;
       if (!rank || !rank.tier) return `<div class="rank-row"><span class="rank-crest is-unranked" aria-hidden="true">◇</span><div><strong>${label}</strong></div><b>未定级</b></div>`;
       const recordKnown = Number(rank.winRate) >= 0;
       const collecting = !recordKnown && seasonProgress?.collecting === true;
@@ -2984,7 +2989,7 @@
 	  const unavailableDetail = collecting ? "正在统计中" : (rankedCapability?.detail || "上游未提供负场，无法计算胜率");
 	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 <b class="win-rate-value">${percent(rank.winRate)}</b>` : collecting ? "正在统计中" : "胜率暂不可用"}</span></div></div>`;
     }).join("");
-    return `<section class="career-section rank-career-section"><header><h3>排位</h3><div class="rank-header-tools"><span>当前赛季</span>${mmr}</div></header><div class="rank-list">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;
+    return `<section class="career-section rank-career-section"><header><h3>排位</h3><div class="rank-header-tools"><span>当前赛季</span>${mmr}</div></header><div class="rank-list${rows.includes('gameplay-skeleton')?' career-pending':''}">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;
   }
 
   async function loadMayhemRating(tab, quietStart = false) {

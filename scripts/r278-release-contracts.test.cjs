@@ -7,6 +7,6 @@ test('R278 P15 version and Chinese changelog match the release worklist',()=>{
 });
 
 test('R278 P12 public and dormant license entry points both include announcement runtime',()=>{
- for(const name of ['backend/web/default/index.html','backend/web/index.html']){const html=fs.readFileSync(name.endsWith('default/index.html')?(process.env.R278_DEFAULT_HTML || path.join(root,name)):path.join(root,name),'utf8');for(const token of ['id="announcements-button"','id="announcements-dialog"','/announcements-bootstrap.js'])assert(html.includes(token),name+' '+token)}
+ for(const name of ['backend/web/default/index.html','backend/web/index.html']){const html=fs.readFileSync(name.endsWith('default/index.html')?(process.env.R278_DEFAULT_HTML || path.join(root,name)):path.join(root,name),'utf8');for(const token of ['id="announcements-button"','id="announcements-dialog"','/app.js'])assert(html.includes(token),name+' '+token);assert(!html.includes('/announcements-bootstrap.js'),'bootstrap must stay out of first screen')}
  assert(fs.readFileSync(path.join(root,'desktop/source-fingerprint.cjs'),'utf8').includes('backend/announcements/announcements.json'));
 });

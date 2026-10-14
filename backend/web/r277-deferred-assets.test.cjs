@@ -6,7 +6,11 @@ const read=name=>fs.readFileSync(path.join(web,name),'utf8');
 function initialAssets(){const dom=new JSDOM(read('index.html'));try{return [...dom.window.document.querySelectorAll('script[src],link[rel=stylesheet]')].map(n=>n.getAttribute('src') || n.getAttribute('href'));}finally{dom.window.close();}}
 test('initial production assets remain below original 420KiB gzip level-one budget',()=>{
  const assets=initialAssets();assert(!assets.includes('/match-details.js'),'rich module cannot enter the initial request set');
- const total=assets.reduce((n,file)=>n+zlib.gzipSync(read(file),{level:1}).length,0);assert(total<420*1024,`initial gzip=${total}`);
+ const total=assets.reduce((n,file)=>n+zlib.gzipSync(read(file),{level:1}).length,0);
+ if(process.env.R277_INITIAL_GZIP_REPORT)fs.writeFileSync(process.env.R277_INITIAL_GZIP_REPORT,JSON.stringify({total,budget:420*1024}));
+ assert(total<420*1024,`initial gzip=${total}`);
+ assert(!/function matchTableRows\(/.test(read('gameplay.js')),'rich table rows cannot enter initial production asset');
+ for(const name of ['renderMatchOverview','renderTeamAnalysis','renderRuneEffects'])assert(read('gameplay.js').includes('R277 deferred detail renderer: '+name),name+' rich body cannot enter initial production asset');
 });
 async function fixture(){
  const {bootDemoApp}=require('../../desktop/overview-render-helpers.cjs'),{waitForOverview}=require('../../desktop/renderer-wait.cjs');

@@ -10,7 +10,7 @@ helper = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(helper)
 
 CASES = [
-    ('p9-double-full', 'backend/overview_wire.go', [('if revision, ok := seen[match.GameID]; ok && revision == match.Revision {', 'if revision, ok := seen[match.GameID]; false && ok && revision == match.Revision {')], 'TestR277OverviewWireSingleFullRecordAndLazyScores'),
+    ('p9-double-full', 'backend/overview_wire.go', [('if revision, ok := seen[match.GameID]; ok && match.Revision != "" && revision == match.Revision {', 'if revision, ok := seen[match.GameID]; false && ok && match.Revision != "" && revision == match.Revision {')], 'TestR277OverviewWireSingleFullRecordAndLazyScores'),
     ('p9-score-parts', 'backend/overview_wire.go', [('Score *overviewListScore `json:"score,omitempty"`', 'Score *matchScore `json:"score,omitempty"`'), ('players[i].Score = &overviewListScore{p.Score.Value, p.Score.Rank, p.Score.Total, p.Score.Badge}', 'players[i].Score = p.Score')], 'TestR277OverviewWireSingleFullRecordAndLazyScores'),
     ('p10-no-dedup', 'backend/r277_client_diagnostics.go', [('duplicate := a.r277ClientDiagnosticSeen[string(signature)]', 'duplicate := false')], 'TestR277NewClientDiagnosticsAcceptedAndDeduplicated'),
     ('p10-no-zoom-event', 'backend/features.go', [('"ui_zoom_state":                  {"applied": true},', '')], 'TestR277NewClientDiagnosticsAcceptedAndDeduplicated'),

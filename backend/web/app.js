@@ -3082,7 +3082,8 @@
   }
 
   function applySidebar() {
-    const collapsed = preference("sidebar", "expanded") === "collapsed";
+    const width = document.querySelector(".app-frame")?.clientWidth || window.innerWidth;
+    const collapsed = preference("sidebar", "expanded") === "collapsed" || width <= 820;
     document.documentElement.dataset.sidebar = collapsed ? "collapsed" : "expanded";
     el.sidebarToggle.setAttribute("aria-expanded", String(!collapsed));
     el.sidebarToggle.setAttribute("aria-label", collapsed ? "展开侧边栏" : "收起侧边栏");
@@ -3650,7 +3651,7 @@
     const platform = isRiotSearchRegion(data?.clientRegion) ? data.clientRegion : data?.clientRegion === "TENCENT" ? "cn" : "";
     const ready=data?.clientView?data.clientView.state==='ready':Boolean(data?.connected),server=String(data?.serverId || ''),identity=String(data?.summoner?.playerRef || '');
     const follow=ready && platform && (!searchClientReady || platform!==searchClientPlatform || server!==searchClientServer || identity && identity!==searchClientIdentity);
-    if(follow){const from=searchRegion() || el.playerSearchRegion.dataset.serverId || searchClientServer;const trigger=!searchClientReady?'login':platform!==searchClientPlatform || server!==searchClientServer?'platform-change':'identity-change';if(typeof window!=='undefined')window.reportFlowDiagnostic?.('client_follow_client',trigger,{from_group:state.overviewGroup || 'players',to_group:platform==='cn'?'players':'kr',search_from:from,search_to:platform==='cn'?server:platform,applied:true});delete el.playerSearchRegion.dataset.manual;savePreference('search-region-manual','');applySearchRegion(platform==='cn'?'cn':'riot-follow','',false);}
+    if(follow){const from=searchRegion() || el.playerSearchRegion.dataset.serverId || searchClientServer;const trigger=!searchClientReady?'login':platform!==searchClientPlatform || server!==searchClientServer?'platform-change':'identity-change';if(typeof window!=='undefined')window.reportFlowDiagnostic?.('client_follow_client',trigger,{from_group:state.overviewGroup || 'players',to_group:platform==='cn'?'players':'kr',search_from:from,search_to:platform==='cn'?server:platform,applied:true});delete el.playerSearchRegion.dataset.manual;applySearchRegion(platform==='cn'?'cn':'riot-follow','',false);}
     searchClientReady=ready;searchClientPlatform=ready?platform:'';searchClientServer=server;searchClientIdentity=identity;
     const riotAvailable = Boolean(data?.connected && isRiotSearchRegion(data?.clientRegion));
     el.playerSearchRiotFollowClient.disabled = !riotAvailable;
@@ -3679,9 +3680,12 @@
     }
     if (region !== "cn") setCNRegionExpanded(false);
     updateSearchRegionLabel();
-    if (manual) { el.playerSearchRegion.dataset.manual = "true";  }
-    savePreference("search-region", region);
-    if (region === "cn") savePreference("search-server-id", el.playerSearchRegion.dataset.serverId);
+    if (manual) {
+      el.playerSearchRegion.dataset.manual = "true";
+      savePreference("search-region", region);
+      savePreference("search-region-manual", "true");
+      if (region === "cn") savePreference("search-server-id", el.playerSearchRegion.dataset.serverId);
+    }
   }
 
   function visibleRegionMenuEntries() {
@@ -3734,8 +3738,79 @@
   updateSearchRegionStatus(state.status || {});
   window.addEventListener("deep-legends:status", (event) => updateSearchRegionStatus(event.detail || {}));
 
+  function initAnnouncements() {
+    const button = document.getElementById('announcements-button');
+    if (!button) return;
+    let data = null, phase = 'unknown', visible = !window.desktopWindow, loading = false, stopped = false, manual = false;
+    const active = new Set(['ChampSelect','GameStart','InProgress','Reconnect']);
+    const busy = () => document.querySelector('dialog[open],[aria-modal="true"]:not(dialog):not([hidden]),[role="dialog"]:not(dialog):not([hidden])') || document.activeElement?.matches('input,textarea,select,[contenteditable="true"]') || document.documentElement.dataset.license === 'enabled' && !document.getElementById('license-overlay')?.hidden;
+    async function pump() {
+      if (stopped || loading || !data) return;
+      let read = [];
+      try { read = JSON.parse(localStorage.getItem('deep-legends-announcements-read-v1') || '[]'); } catch (_) {}
+      if (!Array.isArray(read)) read = [];
+      const unread = (data.announcements || []).filter(n => (!n.expiresAt || Date.parse(n.expiresAt)>Date.now()) && !read.includes(n.id+':'+n.revision));
+      button.classList.toggle('has-announcement-unread', Boolean(unread.length));
+      button.dataset.tooltip = unread.length ? '公告：'+unread[0].summary : '公告';
+      if (!manual && (phase === 'unknown' || active.has(phase) || !unread.some(n => n.popup))) return;
+      if (!visible || document.hidden || busy()) return;
+      loading = true;
+      try {
+        await window.deepLegendsSections.load('announcements');
+        if (stopped) return;
+        const mounted = window.deepLegendsAnnouncements.mount(window, {...data, phase, visible});
+        stop();
+        if (manual) mounted.open();
+      } catch (_) { loading = false; }
+    }
+    const click = () => { manual = true; if (data) void pump(); else void load(); };
+    const flow = event => { phase = event.detail?.phase || 'None'; void pump(); };
+    const focus = () => queueMicrotask(pump);
+    button.addEventListener('click', click);
+    window.addEventListener('deep-legends:gameflow', flow);
+    window.addEventListener('deep-legends:modal-idle', pump);
+    document.addEventListener('focusout', focus);
+    document.addEventListener('visibilitychange', pump);
+    const observer = new MutationObserver(entries => { if (entries.some(e => e.target.matches('dialog,[aria-modal],[role="dialog"],#license-overlay'))) void pump(); });
+    observer.observe(document.body, {subtree:true,attributes:true,attributeFilter:['open','hidden']});
+    window.desktopWindow?.onVisible(() => { visible = true; void pump(); });
+    async function load() {
+      if (stopped) return;
+      try { data = await api('/api/announcements', {}, 'announcements', 4000); if (!Array.isArray(data?.announcements)) data = {announcements:[]}; void pump(); } catch (_) {}
+    }
+    const changed = () => void load();
+    window.addEventListener('deep-legends:announcements-changed', changed);
+    const timer = setInterval(load, 3600000);
+    function stop() {
+      stopped = true; clearInterval(timer); observer.disconnect(); button.removeEventListener('click', click);
+      window.removeEventListener('deep-legends:gameflow', flow); window.removeEventListener('deep-legends:modal-idle', pump); window.removeEventListener('deep-legends:announcements-changed', changed);
+      document.removeEventListener('focusout', focus); document.removeEventListener('visibilitychange', pump);
+    }
+    window.addEventListener('beforeunload', stop, {once:true});
+    void api('/api/gameplay/phase', {}, 'announcements-phase', 2000).then(result => { if (phase==='unknown') phase=result?.phase || 'None'; }).catch(() => { if (phase==='unknown') phase='None'; }).finally(load);
+  }
+
+  initAnnouncements();
+
+  function setupSearchQueryViewport() {
+    const view = el.playerSearchName.closest('.player-search-query');
+    if (!view) return;
+    const move = left => view.scrollTo({left});
+    const max = () => Math.max(0, view.scrollWidth - view.clientWidth);
+    view.addEventListener('mousemove', event => {
+      if (event.buttons || !max()) return;
+      const rect = view.getBoundingClientRect();
+      move(max() * Math.max(0, Math.min(1, ((event.clientX - rect.left) / rect.width - .2) / .7)));
+    });
+    view.addEventListener('mouseleave', () => move(document.activeElement === el.playerSearchTag ? max() : 0));
+    view.addEventListener('focusin', event => move(event.target === el.playerSearchTag ? max() : 0));
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => move(document.activeElement === el.playerSearchTag && el.playerSearchTag.value ? max() : 0)).observe(view);
+  }
+
+  setupSearchQueryViewport();
   function updateSearchClear() {
     el.playerSearchClear.hidden = !el.playerSearchName.value.trim() && !el.playerSearchTag.value.trim();
+    if (el.playerSearchClear.hidden) el.playerSearchName.closest?.('.player-search-query')?.scrollTo?.({left: 0});
   }
   el.playerSearchClear.addEventListener("click", () => {
     el.playerSearchName.value = "";
@@ -4680,6 +4755,7 @@
   }
   applyAppearance();
   applySidebar();
+  if (typeof ResizeObserver === "function") new ResizeObserver(applySidebar).observe(document.querySelector(".app-frame"));
   void setupUiScaleSetting();
   setupUpdateEvents();
   setupBackendLifecycle();

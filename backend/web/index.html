@@ -19,7 +19,6 @@
     <script src="/augment-artwork.js" defer></script>
     <script src="/section-loader.js" defer></script>
     <script src="/collection-new-items.js" defer></script>
-    <script src="/announcements-bootstrap.js" defer></script>
     <script src="/app.js" defer></script>
     <script src="/gameplay.js" defer></script>
     <script src="/friends.js" defer></script>
@@ -121,9 +120,11 @@
               </div>
             </div>
             <div class="player-search-fields">
+              <div class="player-search-query"><div class="player-search-query-track">
               <input id="player-search-name" type="text" placeholder="玩家名称" autocomplete="off" spellcheck="false" maxlength="40" aria-label="玩家名称">
               <span class="player-search-hash" aria-hidden="true">#</span>
               <input id="player-search-tag" type="text" placeholder="编号" autocomplete="off" spellcheck="false" maxlength="12" aria-label="Riot ID 编号">
+              </div></div>
               <button id="player-search-clear" class="player-search-button player-search-clear" type="button" aria-label="清空搜索内容" data-tooltip="清空" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg></button>
               <button id="player-search-go" class="player-search-button" type="button" aria-label="搜索玩家" data-tooltip="搜索玩家"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
             </div>

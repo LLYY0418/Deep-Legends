@@ -50,9 +50,9 @@ test('R278 P10 cached data cannot suppress an unmounted or loading collection',(
  const dom=new JSDOM('<main><div class="loading">加载中</div></main>');try{const f=compile(app,['collectionIsRendered'],{el:{grid:dom.window.document.querySelector('main')},state:{items:[{id:1}],renderedSignature:'old'}});assert.equal(f.collectionIsRendered('old'),false);}finally{dom.window.close()}
  assert.doesNotMatch(source,/else if \(shouldReloadOverview\(tab\)\) loadOverview\(tab, true\)/);
 });
-test('R278 P11 empty preset name is inline error; duplicate names do not overwrite',()=>{
+test('R278 P11 empty preset name only marks placeholder; duplicate names do not overwrite',()=>{
  let raw='[]';const storage={getItem:()=>raw,setItem:(k,v)=>raw=v};assert(af.savePreset(storage,'one',{hero:{values:['103']}}));assert.equal(af.savePreset(storage,'one',{hero:{values:['86']}}),false);
- const dom=new JSDOM('<footer><input data-af-name><p data-af-save-error></p></footer>');try{const input=dom.window.document.querySelector('input'),f=af.saveCurrentPreset;assert.equal(typeof f,'function');f(dom.window.document.querySelector('footer'),{}, {storage,error:()=>assert.fail('must not toast')});assert.equal(input.getAttribute('aria-invalid'),'true');assert.equal(dom.window.document.activeElement,input);}finally{dom.window.close()}
+ const dom=new JSDOM('<footer><input data-af-name><p data-af-save-error></p></footer>');try{const input=dom.window.document.querySelector('input'),f=af.saveCurrentPreset;assert.equal(typeof f,'function');f(dom.window.document.querySelector('footer'),{}, {storage,error:()=>assert.fail('must not toast')});assert.equal(input.getAttribute('aria-invalid'),'true');assert.equal(dom.window.document.activeElement,input);assert.equal(dom.window.document.querySelector('[data-af-save-error]').textContent,'');}finally{dom.window.close()}
 });
 
 test('R278 P4 foreign launcher omits scan action and CN retains it only when both entries missing',()=>{

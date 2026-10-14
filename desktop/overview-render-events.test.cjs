@@ -13,7 +13,7 @@ const { JSDOM } = require("jsdom");
 
 const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, suiteStyles, functionSource, compileFunctions, collapsedBeaconStyles, bootDemoApp, settled, installWindowCleanup, visitTool, bootLiveTab } = require("./overview-render-helpers.cjs");
 
-const { waitForOverview } = require("./renderer-wait.cjs");
+const { waitForOverview, waitForRender } = require("./renderer-wait.cjs");
 
 installWindowCleanup(test);
 
@@ -28,7 +28,7 @@ test("R86 hero search preserves input and coalesces five keystrokes (including b
     try {
       await waitForOverview(w, 17);
       w.document.querySelector('[data-section="champions"]').click();
-      await settled();
+      await waitForRender(w, () => w.document.querySelector('[data-champion-search]') && w.document.querySelector('[data-champion-results] [data-champion-row]'), "champion search and rows did not become ready");
       const input = w.document.querySelector('[data-champion-search]');
       assert.ok(input);
       input.focus();
@@ -167,7 +167,7 @@ test('R87 P9 external champselect events preserve modal scroll, input and compos
       let shows=0;
       w.HTMLDialogElement.prototype.showModal=function(){shows++;this.setAttribute('open','');this.querySelector('button')?.focus();};
       w.HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
-      await settled();w.document.querySelector('[data-section="suite"]').click();await visitTool(w,'champselect');
+      await waitForOverview(w, 17);w.document.querySelector('[data-section="suite"]').click();await visitTool(w,'champselect');
       const root=w.document.querySelector('#suite-champselect-root');
       root.querySelector('[data-cs-open-dialog="pick"]').click();await new Promise(r=>setTimeout(r,40));
       const modal=root.querySelector('.cs-dialog'), input=modal.querySelector('[data-cs-dialog-search]');

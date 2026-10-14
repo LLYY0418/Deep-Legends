@@ -2301,7 +2301,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-skeleton.gameplay-skeleton { height: 120px; min-height: 120px; }
 @container matches-column (max-width:640px) { .match-skeleton.gameplay-skeleton { height: 202px; min-height: 202px; } }
 
-.career-column > [data-career-key="ranks"]:has(.career-pending) { min-height: 180px; }
+.rank-row.gameplay-skeleton span { height: 18px; min-height: 18px; }
+.rank-row.gameplay-skeleton .rank-crest { height: 44px; min-height: 44px; }
+.rank-row.gameplay-skeleton > div { display: grid; gap: 8px; }
 .career-column > [data-career-key="recent-ranked"]:has(.career-pending) { min-height: 100px; }
 .career-column > [data-career-key="ability"]:has(.career-pending) { min-height: 100px; }
 .career-column > [data-career-key="champions"]:has(.career-pending) { min-height: 100px; }

@@ -8,8 +8,14 @@ const cases=[
  ['p8-binding','gameplay.js','function bindRankHistoryControls(container) {','function bindRankHistoryControls(container) { return;','0 !== 3'],
  ['p9-full-render','gameplay.js','    const list = container.querySelector(".match-list");\n    if (list && additions.length','    const list = container.querySelector(".match-list");\n    if(list && additions.length)list.innerHTML=(tab.data.matches || []).map(match=>renderMatch(match,tab.data.player.playerRef,tab)).join("");\n    if (list && additions.length','sample.sameList && sample.sameFirst'],
 ];
+cases.push(['p7-auto-sidebar','app.js',
+ ' || width <= 820;', ';', 'automatic sidebar collapse']);
+cases.push(['p7-refresh-label','app.css',
+ '@container topbar (max-width: 600px) {\n  #refresh { --refresh-size: 42px; --refresh-padding: 0; --refresh-label-display: none; }\n',
+ '@container topbar (max-width: 600px) {\n', 'refresh label must hide in narrow topbar']);
+cases.push(['p7-region-ellipsis','app.css','  .player-search-region > button span { max-width: 2em; text-overflow: clip; }\n','','compact region must not use ellipsis']);
 const results=[];
-for(const [id,file,anchor,replacement,expected] of cases){
+for(const [id,file,anchor,replacement,expected] of cases.filter(c=>!process.env.R278_BROWSER_MUTANT_ONLY || c[0]===process.env.R278_BROWSER_MUTANT_ONLY)){
  const temp=fs.mkdtempSync(path.join(scratch,'r277-frontend-browser-mutant-')),override=path.join(temp,'web'),out=path.join(temp,'output');fs.mkdirSync(override);
  try{
   for(const name of fs.readdirSync(web).filter(n=>/\.(css|js)$/.test(n)))fs.copyFileSync(path.join(web,name),path.join(override,name));

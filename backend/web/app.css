@@ -359,6 +359,7 @@ html[data-license="pending"] .skip-link, html[data-license="pending"] .startup-l
 
 .player-search { display: flex; min-width: 0; flex: 0 1 390px; align-items: center; gap: 6px; margin-right: 10px; -webkit-app-region: no-drag; }
 .player-search-fields { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; padding: 0 2px 0 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; }
+.player-search-query, .player-search-query-track { display: contents; }
 .player-search-fields:focus-within { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
 .player-search-fields input { min-width: 0; min-height: 36px; padding: 0; overflow: hidden; color: var(--ink); background: transparent; border: 0; outline: 0; font-size: 12.5px; font-weight: 700; text-overflow: ellipsis; }
 #player-search-name { flex: 1 1 96px; }
@@ -419,6 +420,8 @@ html[data-license="pending"] .skip-link, html[data-license="pending"] .startup-l
 .button, .icon-button, .text-button, .tab, .section-tab, .skin-card { border: 0; transition: background-color 180ms ease-out, color 180ms ease-out, transform 180ms ease-out, border-color 180ms ease-out; }
 .button:active, .icon-button:active, .text-button:active { transform: translateY(1px); }
 .button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 14px; border-radius: 10px; font-weight: 650; }
+#refresh { width: var(--refresh-size,auto); flex: 0 0 var(--refresh-size,auto); padding-inline: var(--refresh-padding,14px); }
+#refresh .refresh-icon + span { display: var(--refresh-label-display,inline); }
 .button-primary { color: var(--on-primary); background: var(--primary); }
 .button-primary:hover { background: color-mix(in oklab, var(--primary) 86%, white); }
 .button-secondary { color: var(--ink); background: var(--surface-strong); }
@@ -928,9 +931,7 @@ body[data-suite-confirm-open] .toast { bottom: calc(18px + var(--suite-confirm-c
   .sidebar-brand-copy, .section-tab > span:not(.live-beacon), .connection span:last-child { display: none; }
   .sidebar-brand, .section-tab, .connection { justify-content: center; padding-inline: 0; }
   .window-drag { display: none; }
-  .topbar { padding-right: 140px; }
-  #refresh { width: 42px; flex: 0 0 42px; justify-content: center; padding: 0; }
-  #refresh .refresh-icon + span { display: none; }
+  .topbar { padding-right: 140px; --refresh-size: 42px; --refresh-padding: 0; --refresh-label-display: none; }
 }
 @media (max-width: 620px) {
   .brand span { display: none; }
@@ -1217,10 +1218,18 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 #section-favorites.has-collection-unread::after { content: ''; position: absolute; top:50%; right:10px; transform:translateY(-50%); width: 7px; height: 7px; border-radius: 50%; background: var(--primary-strong); box-shadow: 0 0 0 2px var(--sidebar-bg); animation: none; }
 
 @container topbar (max-width: 600px) {
+  #refresh { --refresh-size: 42px; --refresh-padding: 0; --refresh-label-display: none; }
   .window-drag { flex: 0 1 26px; }
   .window-drag span, .topbar-actions .friends-toggle-label { display: none; }
   .player-search { flex: 1 1 200px; }
   .player-search-region > button { max-width: 72px; padding-inline: 6px; }
+  .player-search-region > button span { max-width: 2em; text-overflow: clip; }
+  .player-search-query { display: flex; flex: 1; min-width: 0; overflow: hidden; scroll-behavior: smooth; }
+  .player-search-query-track { display: flex; align-items: center; width: calc(100% + 66px); flex: 0 0 auto; }
+  .player-search-query-track #player-search-name { flex: 0 0 calc(100% - 66px); }
+  .player-search-query-track .player-search-hash { display: block; flex: 0 0 14px; padding: 0; }
+  .player-search-query-track #player-search-tag { flex: 0 0 52px; }
+
 
 }
 @container topbar (max-width: 400px) {
@@ -1243,3 +1252,8 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 }
 
 .toast{z-index:2147483646}.match-virtual-skeleton{display:flex;gap:16px;padding:20px}.match-virtual-skeleton span{height:48px;flex:1}
+
+
+#announcements-button{position:relative;flex:0 0 auto}#announcements-button.has-announcement-unread:after{content:'';position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--danger)}
+
+@media (prefers-reduced-motion: reduce) { .player-search-query { scroll-behavior: auto; } }

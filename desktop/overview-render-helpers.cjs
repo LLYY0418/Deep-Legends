@@ -2,6 +2,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path");
 const { JSDOM } = require("jsdom");
+const { runRendererScript } = require("./renderer-script-cache.cjs");
 const WEB = path.join(__dirname, "..", "backend", "web");
 const SCRIPTS = ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "favorites-facade.js", "section-loader.js", "match-details.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
 const gameplaySource = require("../backend/web/r277-deferred-fixture.cjs").join(fs.readFileSync(process.env.R104_GAMEPLAY_SOURCE || path.join(WEB, "gameplay.js"), "utf8"));
@@ -148,7 +149,7 @@ function bootDemoApp(options = {}) {
       w.fetch = (url, ...args) => String(url).startsWith("/api/champions/rankings")
         ? Promise.resolve(new w.Response(JSON.stringify({ rows: options.championRankings }))) : originalFetch(url, ...args);
     }
-    w.eval(source);
+    runRendererScript(dom, source, file);
     if (file === "demo-data.js" && options.friendsPayload) {
       const demoFetch = w.fetch;
       w.fetch = (input, init) => {
