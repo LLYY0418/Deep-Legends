@@ -1,0 +1,38 @@
+name: p5-demo
+on:
+  push:
+    branches: ['codex/probe-r279-p5demo']
+permissions:
+  contents: read
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/ci-lean-r279
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: base strict step (made to fail on purpose)
+        id: r277_strict
+        shell: bash
+        run: |
+          mkdir -p ev/strict
+          echo '{"scenario":"p7-1280-1.75","error":"{\"width\":1280,\"zoom\":1.75} overlap assertion failed"}' > ev/strict/failure.json
+          exit 1
+      - name: deferred (independent, keeps running)
+        if: ${{ !cancelled() }}
+        run: echo deferred-ran
+      - name: mutations (must be SKIPPED, not red)
+        if: ${{ !cancelled() && steps.r277_strict.outcome == 'success' }}
+        run: |
+          echo MUTANTS-RAN
+          exit 1
+      - name: triage
+        if: failure()
+        shell: bash
+        run: |
+          node scripts/ci-failure-triage.cjs --job demo --base origin/main --evidence ev --out ev/triage.json
+          cat ev/triage.json
