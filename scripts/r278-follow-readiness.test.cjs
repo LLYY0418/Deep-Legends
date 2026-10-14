@@ -54,3 +54,13 @@ test('R278 startup demo isolates real backend SSE and preserves reassigned fetch
  const controller=new AbortController(),reason=Error('controlled startup abort');f.window.fetch=()=>Promise.resolve(f.response);
  const pending=f.window.fetch('/api/status',{signal:controller.signal});pending.catch(()=>{});await f.flush();assert(f.frames.length>0);controller.abort(reason);await f.release();await assert.rejects(pending,error=>error===reason);
 });
+
+test('R278 published 080 081 082 candidate controls enforce P1 while retaining all other settings',()=>{
+ for(const n of [266,269,272]){
+  const check=require(process.env['R278_UPGRADE_SOURCE_'+n]||('./r'+n+'-persisted-ui.cjs')).assertUpgradeControls;
+  check({...before,searchServer:''},before,follow);
+  assert.throws(()=>check(before,before,follow),/manual server override/);
+  assert.throws(()=>check({...before,searchServer:'',scale:'2'},before,follow),assert.AssertionError);
+  assert.throws(()=>check({...before,searchServer:''},before,{...follow,events:[]}),/client_follow_client login/);
+ }
+});

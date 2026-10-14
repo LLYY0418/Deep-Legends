@@ -89,6 +89,23 @@ function assertRestartControls(actual,before,follow) {
  assert.equal(follow.label,'艾欧尼亚','P1 restart login must show the client server name');
  assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 restart must record search client_follow_client login');
 }
+async function prepareFollowedStartup({call,evaluate,until,phase,save,shot,evidencePrefix='080'}) {
+   // Complete the real loadURL before reloading this same installed document.
+   // Capture startup diagnostics before app initialization, including early login.
+   await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
+   await call('Page.addScriptToEvaluateOnNewDocument',{source:followCapturePrelude()});
+   await evaluate('delete window.__r265FollowCaptureStartedMs;true');
+   await call('Page.reload',{ignoreCache:false});
+   try{const stable=await waitForFollowedClient({evaluate,phase});save(`${evidencePrefix}-${phase}-client-ready.json`,{phase,...stable.snapshot});}
+   catch(error){
+    const record={phase,error:error.message,method:error.cdpMethod,snapshot:error.pageWaitSnapshot};
+    save(`${evidencePrefix}-${phase}-client-stalled.json`,record);
+    try{record.clientStatus=await evaluate("(async()=>{const response=await fetch('/api/status'),raw=await response.json(),rendered=window.deepLegendsMatchCards?.live?.state?.status;const client=s=>({connected:s?.connected??null,region:s?.clientRegion??null,server:s?.serverId??null,state:s?.clientView?.state??null});return {httpStatus:response.status,demoEnabled:localStorage.getItem('lol-loot-demo')==='1',captureStartedMs:window.__r265FollowCaptureStartedMs,raw:client(raw),rendered:client(rendered),events:window.__r265FollowEvents||[]};})()");}catch(diagnosticError){record.diagnosticError={message:diagnosticError.message,method:diagnosticError.cdpMethod};}
+    save(`${evidencePrefix}-${phase}-client-stalled.json`,record);
+    try{await shot(`${evidencePrefix}-${phase}-client-stalled.png`);}catch(screenshotError){save(`${evidencePrefix}-${phase}-client-stalled-screenshot-error.json`,{phase,error:screenshotError.message,method:screenshotError.cdpMethod});}
+    throw error;
+   }
+}
 async function probe({port,phase,out}){
  assert(Number.isInteger(port)&&port>0&&port<65536);assert(['write-settings','write-presets','read','restart','corrupt'].includes(phase));fs.mkdirSync(out,{recursive:true});
  const target=await waitForInstalledTarget({port,phase,out});
@@ -119,21 +136,7 @@ async function probe({port,phase,out}){
  try{
   await call('Page.enable');await call('Runtime.enable');
   if(phase==='read'||phase==='restart'){
-   // Complete the real loadURL before reloading this same installed document.
-   // Capture startup diagnostics before app initialization, including early login.
-   await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
-   await call('Page.addScriptToEvaluateOnNewDocument',{source:followCapturePrelude()});
-   await evaluate('delete window.__r265FollowCaptureStartedMs;true');
-   await call('Page.reload',{ignoreCache:false});
-   try{await waitForFollowedClient({evaluate,phase});}
-   catch(error){
-    const record={phase,error:error.message,method:error.cdpMethod,snapshot:error.pageWaitSnapshot};
-    save(`080-${phase}-client-stalled.json`,record);
-    try{record.clientStatus=await evaluate("(async()=>{const response=await fetch('/api/status'),raw=await response.json(),rendered=window.deepLegendsMatchCards?.live?.state?.status;const client=s=>({connected:s?.connected??null,region:s?.clientRegion??null,server:s?.serverId??null,state:s?.clientView?.state??null});return {httpStatus:response.status,demoEnabled:localStorage.getItem('lol-loot-demo')==='1',captureStartedMs:window.__r265FollowCaptureStartedMs,raw:client(raw),rendered:client(rendered),events:window.__r265FollowEvents||[]};})()");}catch(diagnosticError){record.diagnosticError={message:diagnosticError.message,method:diagnosticError.cdpMethod};}
-    save(`080-${phase}-client-stalled.json`,record);
-    try{await shot(`080-${phase}-client-stalled.png`);}catch(screenshotError){save(`080-${phase}-client-stalled-screenshot-error.json`,{phase,error:screenshotError.message,method:screenshotError.cdpMethod});}
-    throw error;
-   }
+   await prepareFollowedStartup({call,evaluate,until,phase,save,shot});
   }
   await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
   const initial=await evaluate("({origin:location.origin,defaultPage:document.querySelector('#setting-default-page').value,liveVisible:!document.querySelector('#live-panel').hidden})");
@@ -179,5 +182,5 @@ async function probe({port,phase,out}){
   console.log(JSON.stringify({phase,passed:true,resourceFixtureApplied:phase==='write-presets'}));
  }finally{ws.close()}
 }
-module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget,assertCorruptControls,assertRestartControls,assertReadControls,assertFollowControls,followCapturePrelude,waitForFollowedClient};
+module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget,assertCorruptControls,assertRestartControls,assertReadControls,assertFollowControls,followCapturePrelude,waitForFollowedClient,prepareFollowedStartup};
 if(require.main===module){const [port,phase,out]=process.argv.slice(2);probe({port:Number(port),phase,out}).catch(e=>{console.error(e);process.exitCode=1});}
