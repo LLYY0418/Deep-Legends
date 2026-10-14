@@ -15,6 +15,12 @@ on:
 permissions:
   contents: read
 
+# R279: a newer push to a codex/probe-* branch cancels the run it supersedes. Every other ref (main, release
+# branches, pull requests, dispatches elsewhere) gets a group unique to the run, so nothing else is ever cancelled or queued.
+concurrency:
+  group: ${{ startsWith(github.ref, 'refs/heads/codex/probe-') && format('probe-{0}', github.ref) || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/heads/codex/probe-') }}
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -212,6 +218,10 @@ jobs:
       - name: R277 frontend actual unit mutations
         if: ${{ !cancelled() }}
         run: node scripts/r277-ci-orchestrate.cjs frontend-mutants --out docs/history/reports/r277/ci-integration/linux/frontend
+      - name: R279 failure triage (facts only, never changes the result)
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-proof-linux --base origin/main --evidence "docs/history/reports/r277/ci-integration/linux" --out "docs/history/reports/r277/ci-integration/linux/triage.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -266,6 +276,10 @@ jobs:
         run: |
           python scripts/r277-installer-callbacks.py --native --out docs/history/reports/r277/ci-integration/native-windows/p11
           if ($LASTEXITCODE -ne 0) { throw 'P11 native callback race/GC regression or fatal mutation proof failed' }
+      - name: R279 failure triage (facts only, never changes the result)
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-native-windows --base origin/main --evidence "docs/history/reports/r277/ci-integration/native-windows" --out "docs/history/reports/r277/ci-integration/native-windows/triage.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -298,6 +312,7 @@ jobs:
         shell: bash
         run: node scripts/r277-ci-orchestrate.cjs build-browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
       - name: R277 strict real-browser geometry and 400-match matrix
+        id: r277_strict
         shell: bash
         run: node scripts/r277-ci-orchestrate.cjs browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
       - name: R277 actual deferred asset loading CSP cache and 503 recovery
@@ -308,8 +323,10 @@ jobs:
         if: ${{ !cancelled() }}
         shell: bash
         run: node scripts/r277-ci-cn-score.cjs browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/cn-score"
+      # R279: mutations only mean something when the base strict step passed; otherwise a base failure would be
+      # reported a second time as a "wrong failure" of every mutant. Skipped (not red) when the base step failed.
       - name: R277 actual browser mutations
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.r277_strict.outcome == 'success' }}
         shell: bash
         run: node scripts/r277-ci-orchestrate.cjs browser-mutants --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
       - name: R277 Windows same-400-match before-after long-task measurement
@@ -320,6 +337,10 @@ jobs:
         if: always()
         shell: bash
         run: node scripts/r277-ci-orchestrate.cjs cleanup-browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
+      - name: R279 failure triage (facts only, never changes the result)
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-browser-matrix-${{ matrix.os }} --base origin/main --evidence "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/triage.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

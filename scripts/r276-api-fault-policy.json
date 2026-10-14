@@ -9,32 +9,32 @@
     "assertions": [
       {
         "file": "desktop/r100-browser.cjs",
-        "line": 78,
-        "source_sha256": "aec2d66c9d04b5e366d31672ad8ec8f073a6e427ff65eac5aadc3163eaba546a",
+        "line": 79,
+        "source_sha256": "634ee624fa6c3ad7095c0e09ec647fe3d8b21e583f24b8031f9033fa59960dee",
         "snippet": "assert.equal(await evaluate('document.body.classList.contains(\"is-fatal\")'),false,'poll failure must not be a fatal page');"
       },
       {
         "file": "desktop/r100-browser.cjs",
-        "line": 79,
-        "source_sha256": "aec2d66c9d04b5e366d31672ad8ec8f073a6e427ff65eac5aadc3163eaba546a",
+        "line": 80,
+        "source_sha256": "634ee624fa6c3ad7095c0e09ec647fe3d8b21e583f24b8031f9033fa59960dee",
         "snippet": "assert.equal(await evaluate('document.querySelector(\"#local-status-recovery\").hidden'),false);"
       },
       {
         "file": "desktop/r100-browser.cjs",
-        "line": 80,
-        "source_sha256": "aec2d66c9d04b5e366d31672ad8ec8f073a6e427ff65eac5aadc3163eaba546a",
+        "line": 81,
+        "source_sha256": "634ee624fa6c3ad7095c0e09ec647fe3d8b21e583f24b8031f9033fa59960dee",
         "snippet": "assert.equal(await evaluate('document.querySelector(\"#content\").textContent'),'已加载的战绩');"
       },
       {
         "file": "desktop/r100-browser.cjs",
-        "line": 82,
-        "source_sha256": "aec2d66c9d04b5e366d31672ad8ec8f073a6e427ff65eac5aadc3163eaba546a",
+        "line": 83,
+        "source_sha256": "634ee624fa6c3ad7095c0e09ec647fe3d8b21e583f24b8031f9033fa59960dee",
         "snippet": "assert.equal(await evaluate('document.querySelector(\"#local-status-recovery\").hidden'),true);"
       },
       {
         "file": "desktop/r100-browser.cjs",
-        "line": 83,
-        "source_sha256": "aec2d66c9d04b5e366d31672ad8ec8f073a6e427ff65eac5aadc3163eaba546a",
+        "line": 84,
+        "source_sha256": "634ee624fa6c3ad7095c0e09ec647fe3d8b21e583f24b8031f9033fa59960dee",
         "snippet": "assert.deepEqual(await evaluate('window.__statusRenderFailures'),[],'status fixture must execute every production dependency');"
       }
     ]

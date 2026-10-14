@@ -28,6 +28,7 @@ const ordered = files.slice().sort((a,b) => {
 const groups = [{ name: "shared-pool", files: ordered, concurrency }];
 const summaries = [];
 let failed = false;
+const failures = [];
 (async () => {
   const start = performance.now();
   await Promise.all(groups.map(async group => {
@@ -38,6 +39,7 @@ let failed = false;
       if (event.type === "test:pass" && !fileNames.has(data.name)) console.log(`PASS ${data.name}`);
       if (event.type === "test:fail") {
         failed = true;
+        failures.push({ file: data.file ? path.relative(root, data.file).replaceAll(path.sep, "/") : "", name: data.name, message: String(data.details.error?.stack || data.details.error).slice(0, 600) });
         console.error(`FAIL ${data.name}: ${data.details.error?.stack || data.details.error}`);
         if (data.details.error?.cause) console.error(data.details.error.cause);
       }
@@ -58,7 +60,7 @@ let failed = false;
   const summary = { success: summaries.length === groups.length && summaries.every(group => group.summary?.success), counts, duration_ms };
   if (!summary.success || !withinBudgets(process.platform,timings,summary.duration_ms) || timings.length !== files.length || new Set(timings.map(row => row.file)).size !== files.length) failed = true;
   const result = { scope, platform: process.platform, concurrency, groups: summaries,
-    file_budget_ms, suite_budget_ms: suiteBudget, files: timings, cases, summary, success: !failed };
+    file_budget_ms, suite_budget_ms: suiteBudget, files: timings, cases, failures, summary, success: !failed };
   if (process.env.R222_NODE_TIMING_OUTPUT) fs.writeFileSync(process.env.R222_NODE_TIMING_OUTPUT, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));
   process.exitCode = failed ? 1 : 0;
