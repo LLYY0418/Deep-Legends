@@ -34,7 +34,33 @@ function assertCorruptControls(actual,before,follow) {
  assert.equal(follow.label,'艾欧尼亚','P1 corrupt demo login must show the client server name');
  assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 corrupt demo must record search client_follow_client login');
 }
+function assertFollowControls(actual,before,follow) {
+ const other=controls=>Object.fromEntries(Object.entries(controls).filter(([key])=>!['searchRegion','searchServer'].includes(key)));
+ assert.deepEqual(other(actual),other(before));
+ assert.equal(actual.searchRegion,'cn','P1 startup follows the ready CN client');
+ assert.equal(actual.searchServer,'','P1 startup follows the client without a manual server override');
+ assert.equal(follow.label,'艾欧尼亚','P1 startup shows the ready client server name');
+}
+function assertReadControls(actual,before,follow) {
+ assertFollowControls(actual,before,follow);
+ assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 read must record search client_follow_client login');
+}
+function followCapturePrelude() {
+ return `(()=>{window.__r265FollowEvents=[];window.__r265FollowCaptureStartedMs=performance.now();const wrap=fn=>function(...args){if(args[0]==='client_follow_client')window.__r265FollowEvents.push({event:args[0],trigger:args[1],fields:args[2],searchUI:new Error().stack.includes('updateSearchRegionStatus'),loadedMs:performance.now()});return fn?.apply(this,args);};let report=wrap(window.reportFlowDiagnostic);Object.defineProperty(window,'reportFlowDiagnostic',{configurable:true,get(){return report},set(fn){report=wrap(fn)}});return true})()`;
+}
+function clientFrameSnapshot() {
+ const status=window.deepLegendsMatchCards?.live?.state?.status,client=status?.clientView,search=document.querySelector('#player-search-region');
+ return {ready:client?.state==='ready'&&Number.isFinite(window.__r265FollowCaptureStartedMs),region:status?.clientRegion??client?.region??null,server:status?.serverId??client?.serverId??null,searchRegion:search?.dataset.region,searchServer:search?.dataset.serverId,label:document.querySelector('#player-search-region-label')?.textContent,loadedMs:performance.now()};
+}
+async function waitForFollowedClient({evaluate,phase,now=Date.now,noProgressMs=20000,totalMs=120000}) {
+ const started=now();
+ return require('./lib/topbar-settle.cjs').waitForPage({now,noProgressMs,label:phase+' ready client stable across three frames',evaluate:async expression=>{
+  if(now()-started>=totalMs)throw Error(phase+' client readiness total limit reached');
+  return evaluate(expression);
+ },sample:`(async()=>{const read=${clientFrameSnapshot};let previous;for(let frame=0;frame<3;frame++){await new Promise(r=>requestAnimationFrame(r));const snapshot=read(),progress=[snapshot.ready,snapshot.region,snapshot.server,snapshot.searchRegion,snapshot.searchServer,snapshot.label],key=JSON.stringify(progress);if(!snapshot.ready||previous!==undefined&&key!==previous)return {done:false,progress,snapshot};previous=key;if(frame===2)return {done:true,progress,snapshot};}})()`});
+}
 function assertRestartControls(actual,before,follow) {
+ assertFollowControls(actual,before,follow);
  assert.deepEqual(actual,{...before,searchServer:''},'P1 restart startup must follow the ready client');
  assert.equal(follow.label,'艾欧尼亚','P1 restart login must show the client server name');
  assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 restart must record search client_follow_client login');
@@ -68,7 +94,16 @@ async function probe({port,phase,out}){
  const openSaved=async()=>{await openFilter();await click('[data-af-page="saved"]');};
  try{
   await call('Page.enable');await call('Runtime.enable');
-  if(phase==='read'||phase==='restart')await evaluate("(()=>{window.__r265FollowEvents ||= [];window.__r265FollowCaptureStartedMs=performance.now();const wrap=fn=>function(...args){if(args[0]==='client_follow_client')window.__r265FollowEvents.push({event:args[0],trigger:args[1],fields:args[2],searchUI:new Error().stack.includes('updateSearchRegionStatus'),loadedMs:performance.now()});return fn?.apply(this,args);};let report=wrap(window.reportFlowDiagnostic);Object.defineProperty(window,'reportFlowDiagnostic',{configurable:true,get(){return report},set(fn){report=wrap(fn)}});return true})()");
+  if(phase==='read'||phase==='restart'){
+   // Complete the real loadURL before reloading this same installed document.
+   // Capture startup diagnostics before app initialization, including early login.
+   await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
+   await call('Page.addScriptToEvaluateOnNewDocument',{source:followCapturePrelude()});
+   await evaluate('delete window.__r265FollowCaptureStartedMs;true');
+   await call('Page.reload',{ignoreCache:false});
+   try{await waitForFollowedClient({evaluate,phase});}
+   catch(error){save(`080-${phase}-client-stalled.json`,{phase,error:error.message,snapshot:error.pageWaitSnapshot});await shot(`080-${phase}-client-stalled.png`);throw error;}
+  }
   await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
   const initial=await evaluate("({origin:location.origin,defaultPage:document.querySelector('#setting-default-page').value,liveVisible:!document.querySelector('#live-panel').hidden})");
   if(phase==='write-settings'){
@@ -98,7 +133,7 @@ async function probe({port,phase,out}){
     const name=`080-${phase}-before-controls.json`,record={phase,sampledAt:new Date().toISOString(),...data};save(name,record);
     try{record.clientStatus=await evaluate("(async()=>{const r=await fetch('/api/status'),s=await r.json();return {captureStartedMs:window.__r265FollowCaptureStartedMs,httpStatus:r.status,connected:s.connected??null,clientRegion:s.clientRegion??null,platform:s.platform??null,serverId:s.serverId??null,clientViewState:s.clientView?.state??null,clientViewRegion:s.clientView?.region??null,clientViewServerId:s.clientView?.serverId??null,loadedMs:performance.now()};})()");}catch(error){record.clientStatus={diagnosticError:error.message};}save(name,record);
    }
-   assert.deepEqual(data.preferences,before.preferences);if(phase==='corrupt')assertCorruptControls(data.controls,before.controls,data.searchFollow);else if(phase==='restart')assertRestartControls(data.controls,before.controls,data.searchFollow);else assert.deepEqual(data.controls,before.controls);
+   assert.deepEqual(data.preferences,before.preferences);if(phase==='corrupt')assertCorruptControls(data.controls,before.controls,data.searchFollow);else if(phase==='restart')assertRestartControls(data.controls,before.controls,data.searchFollow);else assertReadControls(data.controls,before.controls,data.searchFollow);
    if(phase==='read'){
     assert.equal(data.presets,presets.presets);assert.deepEqual(JSON.parse(data.presets),JSON.parse(presets.presets));save('079-to-080-preferences-comparison.json',{equal:true,resourceFixtureApplied:false,settingsBefore:before.preferences,settingsAfter:data.preferences,presetContentOrderNamesEqual:true,presetScope:presets.scope});await shot('080-actual-default-page.png');
     await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R265 79 格式兼容夹具')");await click('[data-af-apply="0"]');await until("document.querySelector('[data-af-conditions]')?.textContent.includes('胜利')");
@@ -113,5 +148,5 @@ async function probe({port,phase,out}){
   console.log(JSON.stringify({phase,passed:true,resourceFixtureApplied:phase==='write-presets'}));
  }finally{ws.close()}
 }
-module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget,assertCorruptControls,assertRestartControls};
+module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget,assertCorruptControls,assertRestartControls,assertReadControls,assertFollowControls,followCapturePrelude,waitForFollowedClient};
 if(require.main===module){const [port,phase,out]=process.argv.slice(2);probe({port:Number(port),phase,out}).catch(e=>{console.error(e);process.exitCode=1});}

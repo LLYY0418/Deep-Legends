@@ -30,4 +30,4 @@ async function settleTopbar({evaluate,...options}){
   return geometry;
  }catch(error){error.topbarSample ||= error.pageWaitSnapshot;throw error;}
 }
-module.exports={settleTopbar,waitViewport,readTopbar};
+module.exports={settleTopbar,waitViewport,readTopbar,waitForPage};

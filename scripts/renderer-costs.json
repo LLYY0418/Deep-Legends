@@ -215,6 +215,8 @@
   "scripts/r277-frontend-contracts.test.cjs": 4406,
   "scripts/r277-l5-replay.test.cjs": 68,
   "scripts/r277-release-contracts.test.cjs": 54,
+  "scripts/r278-follow-readiness.test.cjs": 1000,
+  "scripts/r278-progress-runner.test.cjs": 1000,
   "scripts/r278-release-contracts.test.cjs": 48,
   "scripts/r278-topbar-settle.test.cjs": 1000,
   "scripts/r82-startup-ab-report.test.cjs": 181,

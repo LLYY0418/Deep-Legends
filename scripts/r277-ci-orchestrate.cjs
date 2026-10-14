@@ -22,7 +22,7 @@ function browserMutationCommand(){
  assert(fs.readFileSync(file,'utf8').includes('process.env.R277_REPORT_DIR'),'native mutation output support required');
  return [file];
 }
-function main(args){
+async function main(args){
  const {mode,out,backend}=parse([...args]);fs.mkdirSync(out,{recursive:true});
  const scratch=process.env.PI_SCRATCH_DIR||process.env.RUNNER_TEMP||os.tmpdir();
  if(backend){const relative=path.relative(path.resolve(scratch),backend);assert(relative&&!relative.startsWith('..')&&!path.isAbsolute(relative),'browser executable must be scratch-owned, never a released installer');}
@@ -48,7 +48,14 @@ function main(args){
     env.R266_BROWSER_OUT=path.join(out,'strict-browser');
     run('strict-browser',process.execPath,['scripts/r277-frontend-browser.cjs'],180000);
    }else if(mode==='deferred-browser'){env.R277_DEFERRED_REPORT_DIR=out;run('deferred-browser',process.execPath,['scripts/r277-deferred-assets-proof.cjs','browser']);}
-   else run('browser-mutants',process.execPath,browserMutationCommand(),600000);
+   else {
+    const command=browserMutationCommand(),source=fs.readFileSync(command[0],'utf8'),ids=[...source.matchAll(/\['(p\d+-[^']+)'/g)].map(match=>match[1]);
+    let child;
+    try{child=await require('./lib/progress-child.cjs').runProgressChild({command:process.execPath,args:command,cwd:root,env,directory:out,logFile:path.join(out,'browser-mutants.log'),ids});}
+    catch(error){result.runs.push({label:'browser-mutants',command:[process.execPath,...command],exit:null,error:error.message,progress:error.progressSnapshot});persist();throw error;}
+    result.runs.push({label:'browser-mutants',command:[process.execPath,...command],exit:child.exit,progress:child.progress});persist();
+    assert.equal(child.exit,0,'browser-mutants failed; original log retained');
+   }
   }
   if(mode==='cleanup-browser')run('cache-clean','go',['clean','-cache','-testcache']);
   result.status='PASS';
@@ -59,4 +66,4 @@ function main(args){
  }
 }
 module.exports={parse,chrome,browserMutationCommand};
-if(require.main===module){try{main(process.argv.slice(2));}catch(error){console.error(error.stack);process.exitCode=1;}}
+if(require.main===module)main(process.argv.slice(2)).catch(error=>{console.error(error.stack);process.exitCode=1;});
