@@ -539,7 +539,7 @@ func (p *riotProvider) getLimitedRoute(ctx context.Context, host, requestPath st
 		p.beginRiotRateRequest(scope)
 		requestedAt := time.Now()
 		var responseTTFB atomic.Int64
-		attemptContext, cancelAttempt := context.WithTimeout(ctx, riotAttemptBudget(requestPath))
+		attemptContext, cancelAttempt := context.WithTimeout(withNetworkTrace(ctx), riotAttemptBudget(requestPath))
 		request = request.WithContext(attemptContext)
 		{
 			request = request.WithContext(httptrace.WithClientTrace(request.Context(), &httptrace.ClientTrace{GotFirstResponseByte: func() {
@@ -601,9 +601,14 @@ func (p *riotProvider) getLimitedRoute(ctx context.Context, host, requestPath st
 			p.observeRiotRate(scope, response.Header, response.StatusCode)
 		}
 		body, readErr := readLimited(response.Body, responseMax)
+		if readErr != nil {
+			if trace, ok := attemptContext.Value(networkTraceKey{}).(*networkTrace); ok {
+				trace.stage = "body"
+			}
+		}
 		riotRequestEvent(p.champions.diag, attemptContext, map[bool]string{true: "relay", false: "direct"}[source == "relay"], riotRelayRequestCategory(requestPath), entry, response.StatusCode, time.Duration(responseTTFB.Load()), time.Since(requestedAt), queuedDuration, len(body), attempt+1)
 		if source == "embedded" {
-			p.observeEmbeddedQuota(response.Header, response.StatusCode)
+			p.observeEmbeddedQuota(response.Header, response.StatusCode, ctx)
 		}
 		response.Body.Close()
 		cancelAttempt()
@@ -2357,6 +2362,12 @@ type riotHTTPError struct {
 
 func riotHTTPErrorBody(err error, regions ...string) riotHTTPError {
 	body := riotHTTPError{Error: err.Error(), Kind: "http"}
+	var proxyErr *proxyConnectionError
+	if errors.As(err, &proxyErr) {
+		body.Error = proxyErr.Error()
+	} else if strings.Contains(err.Error(), "无法连接 Riot") || networkErrorStage(err) != "headers" || strings.Contains(err.Error(), "https://") || strings.Contains(err.Error(), "dial tcp") || strings.Contains(err.Error(), "proxyconnect") {
+		body.Error = "无法连接 Riot 官方接口，请检查网络后重试"
+	}
 	var statusErr *riotStatusError
 	if errors.As(err, &statusErr) {
 		body.RetryAfter = statusErr.retryAfter

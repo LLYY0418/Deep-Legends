@@ -87,7 +87,7 @@ test('R265 partial sample boundaries and all five dependent cards; complete samp
   if(partial){data.pagination.partial=false;data.capabilities=[{name:'match-history',state:'failed'}];assert.deepEqual(new Map(f.careerSectionEntries(data,tab)),cards,'capability-only failure keeps partial titles and labels');}
   for(const key of ['recent-ranked','ability','positions','recent-players','activity']){
    const html=cards.get(key);
-   if(weak){assert.match(html,/战绩未读全/);assert.doesNotMatch(html,/暂无重复同场玩家|activity-cell|基于最近/);}
+   if(weak){assert.match(html,/career-pending/);assert.doesNotMatch(html,/战绩未读全/);assert.doesNotMatch(html,/暂无重复同场玩家|activity-cell|基于最近/);}
    else if(partial)assert.match(html,new RegExp(`基于最近 ${k} 场`));
    else assert.doesNotMatch(html,/基于最近/);
   }
@@ -105,7 +105,7 @@ test('R265 partial card headers have one sample description and restore complete
  for(const partial of [true,false]){
   const recent=f.renderRecentRanked(stats,420,'',partial),positions=f.renderPositionStats([{position:'top',games:7,share:100}],420,'','单双排',7,partial),players=f.renderRecentPlayers([{games:7}],{},false,partial);
   if(partial){assert.match(recent,/<h3>近期排位<\/h3>/);assert.doesNotMatch(recent,/近 7 场排位/);assert.doesNotMatch(positions,/近 7 场/);assert.doesNotMatch(players,/最近 30 天/);}
-  else{assert.match(recent,/<h3>近 7 场排位<\/h3>/);assert.match(positions,/近 7 场/);assert.match(players,/最近 30 天/);}
+  else{assert.match(recent,/<h3>近期排位<\/h3>/);assert.match(recent,/近 7 场/);assert.match(positions,/近 7 场/);assert.match(players,/最近 30 天/);}
  }
 });
 test('R265 final incremental frame keeps the running marker until completion render finishes',async()=>{

@@ -219,8 +219,8 @@
     await sendFlowDiagnostic(body, JSON.stringify(body), 1, 1500);
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
-    if(['client_follow_client','history_outage_ui','overview_reference_fallback','match_autoload_client','collection_new_marker','overview_reload_reason','announcement_state'].includes(event)){
-      const allowed=['from_group','to_group','search_from','search_to','applied','source','count','bound','near','requested','started','blocked_reason','latency_ms','matches_before','matches_after','id','notice_revision','durationMs'];
+    if(['match_virtual_client','pool_render_client','history_outage_retry','client_follow_client','history_outage_ui','overview_reference_fallback','match_autoload_client','collection_new_marker','overview_reload_reason','announcement_state'].includes(event)){
+      const allowed=['view','item_count','rendered_cards','result','duration_ms','collapsed','hydrated','height_mismatch_max_px','zoom','from_group','to_group','search_from','search_to','applied','source','count','bound','near','requested','started','blocked_reason','latency_ms','matches_before','matches_after','id','notice_revision','durationMs'];
       const r278={};for(const key of allowed)if(Object.hasOwn(fields,key))r278[key]=fields[key];
       const body={event,reason,r278},encoded=JSON.stringify(body);if(flowPending.has(encoded) || flowSamples.has(encoded))return;
       if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;

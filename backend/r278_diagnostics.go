@@ -10,7 +10,7 @@ import (
 
 func isR278Diagnostic(event string) bool {
 	switch event {
-	case "client_follow_client", "history_outage_ui", "overview_reference_fallback", "match_autoload_client", "collection_new_marker", "overview_reload_reason", "announcement_state":
+	case "match_virtual_client", "pool_render_client", "history_outage_retry", "client_follow_client", "history_outage_ui", "overview_reference_fallback", "match_autoload_client", "collection_new_marker", "overview_reload_reason", "announcement_state":
 		return true
 	}
 	return false
@@ -27,6 +27,20 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 	event := map[string]any{"event": r.Event, "reason": r.Reason}
 	for key, value := range fields {
 		switch key {
+		case "view", "result":
+			v, ok := value.(string)
+			if !ok || !(v == "owned" || v == "remaining" || v == "unowned" || v == "recovered" || v == "still_down") {
+				http.Error(w, "invalid state", 400)
+				return
+			}
+			event[key] = v
+		case "zoom", "height_mismatch_max_px":
+			v, ok := value.(float64)
+			if !ok || v < 0 || v > 100000 {
+				http.Error(w, "invalid geometry", 400)
+				return
+			}
+			event[key] = v
 		case "from_group", "to_group":
 			if s, ok := value.(string); ok && (s == "players" || s == "kr" || s == "pro") {
 				event[key] = s
@@ -70,7 +84,7 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 				return
 			}
 			event[key] = v
-		case "count", "latency_ms", "matches_before", "matches_after", "durationMs":
+		case "collapsed", "hydrated", "item_count", "rendered_cards", "duration_ms", "count", "latency_ms", "matches_before", "matches_after", "durationMs":
 			v, ok := value.(float64)
 			if !ok || v < 0 || v > 3600000 {
 				http.Error(w, "invalid metric", 400)

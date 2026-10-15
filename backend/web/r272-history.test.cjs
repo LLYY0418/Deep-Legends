@@ -33,5 +33,5 @@ test('arrived matches keep aggregate cards pending until their own real statisti
  const deps={historyStatsPending:()=>true,rankedQueueData:()=>({queueId:420,positions:[]}),riotRegion:()=>false,rankedQueueSwitcher:()=>'',renderRanks:plain,renderRecentRanked:plain,renderAbility:plain,renderChampionStats:()=>'<section class="career-pending"></section>',championStatsPending:()=>true,renderMasteries:plain,renderPositionStats:plain,renderRecentPlayers:plain,renderActivity:plain,renderOverviewShareButton:()=>'',number:String};
  const f=compile(source,['careerSectionEntries','matchesPending'],deps),keys=['recent-ranked','ability','positions','recent-players','activity'];
  for(const [key,html] of f.careerSectionEntries(data,tab))if(keys.includes(key)){assert.match(html,/career-pending/,key);assert.doesNotMatch(html,/战绩未读全/,key);}
- tab.recentStatsReceived=true;data.historyRequested=20;for(const [key,html] of f.careerSectionEntries(data,tab))if(keys.includes(key))assert.doesNotMatch(html,/career-pending/,key);
+ tab.recentStatsReceived=true;data.historyRequested=20;deps.historyStatsPending=()=>false;const ready=compile(source,['careerSectionEntries','matchesPending'],deps);for(const [key,html] of ready.careerSectionEntries(data,tab))if(keys.includes(key))assert.doesNotMatch(html,/career-pending/,key);
 });

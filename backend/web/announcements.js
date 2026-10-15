@@ -21,7 +21,12 @@
   const present=()=>notices.filter(n=>!n.expiresAt || Date.parse(n.expiresAt)>Date.now());
   const badge=()=>{const unread=present().filter(n=>!read.isRead(n));button.classList.toggle('has-announcement-unread',Boolean(unread.length));button.dataset.tooltip=unread.length?`公告：${unread[0].summary}`:'公告';};
   const busy=()=>doc.querySelector('dialog[open]:not(#announcements-dialog),[aria-modal="true"]:not(dialog):not([hidden]),[role="dialog"]:not(dialog):not([hidden])') || doc.activeElement?.matches('input,textarea,select,[contenteditable="true"]') || !doc.getElementById('license-overlay')?.hidden && doc.documentElement.dataset.license==='enabled';
-  function render(){const content=dialog.querySelector('[data-announcements-content]');content.innerHTML=present().map(n=>{const days=Math.max(0,Math.floor((Date.now()-Date.parse(n.updatedAt))/86400000)),relative=days?`${days} 天前`:'今天',full=new Date(n.updatedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'});return `<article><h3>${escape(n.title)}</h3><p class="announcement-meta"><time title="北京时间 ${escape(full)}">更新于 ${relative}</time> · ${escape(n.summary)}</p><div class="announcement-markdown">${markdown(n.content,n.images || [])}</div><footer><button type="button" data-announcement-read="${escape(n.id)}">${read.isRead(n)?'关闭':'已读'}</button></footer></article>`;}).join('') || '<p>暂无公告</p>';}
+  function render(){const content=dialog.querySelector('[data-announcements-content]');content.innerHTML=present().map(n=>{
+   const first=String(n.content || '').trimStart().split('\n')[0],heading=/^#{1,3}\s+(.+?)\s*$/.exec(first);
+   const body=heading && heading[1]===n.title?markdown(n.content,n.images || []):`<h3>${escape(n.title)}</h3>${markdown(n.content,n.images || [])}`;
+   return `<article><div class="announcement-markdown">${body}</div><footer><button type="button" class="${read.isRead(n)?'text-button':'button button-primary'}" data-announcement-read="${escape(n.id)}">${read.isRead(n)?'关闭':'已读'}</button></footer></article>`;
+  }).join('') || '<p>暂无公告</p>';}
+
   function show(){if(stopped || !visible || doc.hidden || busy())return false;render();dialog.showModal();for(const n of present())report(n,'shown');return true;}
   function pump(){badge();if(dialog.open || !visible || doc.hidden || busy())return;if(manualPending){manualPending=false;show();return;}if(phase==='unknown' || active.has(phase))return;const next=present().find(n=>n.popup && !read.isRead(n) && !attempted.has(n.id+':'+n.revision));if(next && show())for(const n of present())attempted.add(n.id+':'+n.revision);}
   function dismiss(){if(!dialog.open)return;for(const n of present())report(n,'dismissed');dialog.close();badge();w.dispatchEvent(new w.CustomEvent('deep-legends:modal-idle'));}

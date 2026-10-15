@@ -83,7 +83,7 @@ func r177StarterRequest(t *testing.T, a *app, keys ...int) map[string]json.RawMe
 }
 
 func TestR177StarterForegroundReserve(t *testing.T) {
-	a, calls := r177StarterApp(t, 40, 200)
+	a, calls := r177StarterApp(t, 75, 200)
 	ctx := withRiotBackground(r110RateContext(riotClusterHost, "/lol/match/v5/matches/KR_1/timeline"))
 	if err := a.riot.wait(ctx); !errors.Is(err, errThrottled) {
 		t.Fatalf("background reserve changed: %v", err)

@@ -82,7 +82,7 @@ func (p *riotProvider) scopedRiotDelay(ctx context.Context, now time.Time, consu
 			}
 			limit := window.limit
 			if background && period >= time.Minute {
-				limit = max(1, limit/3)
+				limit = max(1, limit*7/10+1)
 			}
 			if window.used >= limit {
 				delay = max(delay, window.reset.Sub(now))

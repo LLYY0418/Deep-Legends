@@ -9,7 +9,7 @@ const mutations=[
  ['p3-ticker','gameplay.js','if(seconds>0)tab.quotaCountdownTimer=setTimeout','if(false)tab.quotaCountdownTimer=setTimeout','P3 active quota'],
  ['p3-mapping','history-filters.js',"advantage:'压刀'","advantage:undefined",'P3 all tag'],
  ['p3-stopped','history-recovery.js',"if(tab.advancedSearch?.stopReason==='user_stop')return;","if(false)return;",'P3 quota automatically'],
- ['p4-height','gameplay.css','.overview-strip-skeleton { gap: 16px; }','.overview-strip-skeleton { gap: 16px; min-height: 116px; }','P4 skeleton'],
+ ['p4-height','gameplay.css','.is-pending-strip .game-icon.is-summoner-avatar{border-radius:50%}','.summoner-strip.is-pending-strip{height:116px!important;min-height:116px!important}.is-pending-strip .game-icon.is-summoner-avatar{border-radius:50%}','P4 skeleton'],
  ['p4-retained-filter','gameplay.js',"filterbar.classList.toggle('gameplay-skeleton',pending);","filterbar.classList.toggle('gameplay-skeleton',true);",'P4 retained filter'],
  ['p4-zero','gameplay.js','if(pending)return `<section class="career-section champion-performance">','if(false)return `<section class="career-section champion-performance">','P4 pending champion'],
  ['p5-reuse','history-filters.js','const icon=icons.get(button.dataset.afOption);','const icon=null;','P5 decoded'],
@@ -17,7 +17,7 @@ const mutations=[
  ['p7-nowrap','app.css','.topbar button { white-space: nowrap; flex-shrink: 0; }','.topbar button { flex-shrink: 0; }','P7 top'],
  ['p8-binding','gameplay.js','function bindRankHistoryControls(container) {','function bindRankHistoryControls(container) { return;','P8 history binding'],
  ['p9-reference','gameplay.js','return full;}','return match;}','P9 complete references'],
- ['p9-collapse','gameplay.js','const rect=entry.getBoundingClientRect();if(!(rect.height>0))return;','return;const rect=entry.getBoundingClientRect();if(!(rect.height>0))return;','P9 distant'],
+ ['p9-collapse','gameplay.js',"entry.style.minHeight=`${height}px`;entry.dataset.virtualMatch='';","continue;entry.style.minHeight=`${height}px`;entry.dataset.virtualMatch='';",'P9 distant'],
  ['p10-dedup','app.js','if(state.zoomDiagnosticSignature!==signature && window.reportFlowDiagnostic)','if(window.reportFlowDiagnostic)','P10 actual zoom'],
  ['p10-transport','runtime.js','"client_view_client", "ui_zoom_state", "lp_chip_render"','"client_view_client", "lp_chip_render"','diagnostic transport'],
 ];

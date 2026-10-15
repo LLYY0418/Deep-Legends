@@ -62,7 +62,7 @@ test('R109 retained artwork is observed again and loaded class follows the new p
 test('R109 missing rank distinguishes loading, unavailable and verified unranked',()=>{
  const ui=compile(['renderSummonerHighlights'],{highestCurrentRank:()=>null,escapeHTML:String,number:String});
  const render=status=>ui.renderSummonerHighlights([],[],status);
- assert.match(render({pending:true,capabilities:[]}),/正在读取/);
+ assert.match(render({pending:true,capabilities:[]}),/is-pending-highlight/);
  assert.match(render({pending:false,capabilities:[{name:'ranked-stats',state:'failed'}]}),/暂不可用/);
  assert.doesNotMatch(render({pending:false,capabilities:[{name:'ranked-stats',state:'failed'}]}),/未定级/);
  assert.match(render({pending:false,capabilities:[{name:'ranked-stats',state:'available'}]}),/未定级/);

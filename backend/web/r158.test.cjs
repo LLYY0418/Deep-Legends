@@ -8,19 +8,11 @@ const { JSDOM } = require('../../desktop/node_modules/jsdom');
 const flush = () => new Promise(setImmediate);
 
 const source = fs.readFileSync(path.join(__dirname, 'gameplay.js'), 'utf8');
-function extract(name) {
-  const start = source.indexOf(`function ${name}(`);
-  assert.ok(start >= 0, name);
-  let depth = 0;
-  for (let i = source.indexOf('{', start); i < source.length; i++) {
-    if (source[i] === '{') depth++;
-    if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
-  }
-  assert.fail(`unbalanced ${name}`);
-}
+function extract(name) {return require('./r188-harness.cjs').extract(source,name);}
+
 function compile(names, deps) {
   names = require("./r211-harness-support.cjs").expand(source, names, deps);
-  return Function(...Object.keys(deps), names.map(extract).join('\n') + `\nreturn {${names.join(',')}}`)(...Object.values(deps));
+  return Function(...Object.keys(deps), require('./r220-harness-support.cjs').prelude(source,{...deps,...Object.fromEntries(names.map(n=>[n,true]))})+names.map(extract).join('\n') + `\nreturn {${names.join(',')}}`)(...Object.values(deps));
 }
 
 function overviewFixture(realQueue = false) {

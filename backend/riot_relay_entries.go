@@ -359,7 +359,21 @@ func (m *riotRelayEntryManager) client(base *http.Client, e riotRelayEntry) *htt
 	if c := m.clients[base][e.Label]; c != nil {
 		return c
 	}
-	transport, ok := base.Transport.(*http.Transport)
+	copy := *base
+	if owner, ok := base.Transport.(*automaticNetworkTransport); ok {
+		copy.Transport = &mappedNetworkTransport{owner: owner, proxy: relayEntryTransport(owner.proxy, e), direct: relayEntryTransport(owner.direct, e)}
+	} else {
+		copy.Transport = relayEntryTransport(base.Transport, e)
+	}
+	copy.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	m.clients[base][e.Label] = &copy
+	return &copy
+}
+
+type riotDetailSlotsKey struct{}
+
+func relayEntryTransport(raw http.RoundTripper, e riotRelayEntry) http.RoundTripper {
+	transport, ok := raw.(*http.Transport)
 	if !ok {
 		transport = http.DefaultTransport.(*http.Transport)
 	}
@@ -381,11 +395,6 @@ func (m *riotRelayEntryManager) client(base *http.Client, e riotRelayEntry) *htt
 		}
 		return dial(ctx, network, address)
 	}
-	copy := *base
-	copy.Transport = t
-	copy.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	m.clients[base][e.Label] = &copy
-	return &copy
-}
 
-type riotDetailSlotsKey struct{}
+	return t
+}

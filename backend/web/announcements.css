@@ -1,1 +1,11 @@
-.announcements-dialog{width:min(680px,calc(100vw - 32px));max-height:85vh;padding:20px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:12px}.announcements-dialog>header{display:flex;align-items:center;justify-content:space-between}.announcements-dialog h2{margin:0}.announcements-dialog [data-announcements-content]{max-height:60vh;overflow:auto}.announcement-meta{font-size:12px;color:var(--muted)}.announcement-markdown{font-size:13px;line-height:1.6}.announcement-markdown h2{font-size:16px}.announcement-markdown h3,.announcement-markdown h4{font-size:14px}.announcement-markdown ul{padding-left:20px}.announcement-markdown img{max-width:100%}.announcement-markdown a{color:var(--accent)}.announcements-dialog article+article{border-top:1px solid var(--line);margin-top:16px;padding-top:16px}.announcements-dialog footer{text-align:right}.announcements-dialog::backdrop{background:rgb(0 0 0 / .55)}
+.announcements-dialog{width:min(680px,calc(100vw - 32px));max-height:85vh;padding:0;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.announcements-dialog>header{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line)}
+.announcements-dialog>header h2{margin:0;font-size:14px}
+.announcements-dialog [data-announcements-content]{max-height:60vh;overflow:auto;padding:14px}
+.announcement-markdown{font-size:13px;line-height:1.6}
+.announcement-markdown :is(h2,h3,h4){margin:14px 0 4px;color:var(--primary-strong);font-size:14px}
+.announcement-markdown :is(h2,h3,h4):first-child{margin-top:0}
+.announcement-markdown p{margin:4px 0}.announcement-markdown ul{margin:4px 0 0;padding-left:20px}
+.announcement-markdown img{max-width:100%}.announcement-markdown a{color:var(--accent)}
+.announcements-dialog article+article{border-top:1px solid var(--line);margin-top:16px;padding-top:16px}
+.announcements-dialog footer{display:flex;justify-content:flex-end;margin-top:14px}.announcements-dialog::backdrop{background:rgb(0 0 0 / .55)}

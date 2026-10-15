@@ -595,12 +595,36 @@ func main() {
 		log.Printf("Deep Legends %s 自检通过：奖池 %d 条，哈希 %s", version, len(builtInPool.Names), builtInPool.Hash[:12])
 		return
 	}
+	riotUserKeys.verified = func() { a.broadcastEvent("riot-key-updated") }
+	championProvider.networkRecovered = a.recoverExternalNetwork
 	championProvider.diag = func(event map[string]any) {
 		a.recordDiagnostic(event)
+		if event["event"] == "network_proxy_state" {
+			a.broadcastEvent(`{"type":"network-proxy-state"}`)
+		}
 		if event["event"] == "riot-relay-recovered" {
 			a.broadcastEvent(`{"type":"riot-relay-recovered"}`)
 		}
 	}
+	if rt, ok := championProvider.httpClient().Transport.(*automaticNetworkTransport); ok {
+		rt.emit(map[bool]string{true: "direct", false: "ok"}[rt.proxyURL == ""])
+		for group := range networkProbeURLs {
+			rt.probeGroup(group)
+		}
+	}
+	go func() {
+		defer recoverPanic("automaticNetworkMeasurements")
+		ticker := time.NewTicker(30 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			client := championProvider.httpClient()
+			if rt, ok := client.Transport.(*automaticNetworkTransport); ok {
+				for group := range networkProbeURLs {
+					rt.probeGroup(group)
+				}
+			}
+		}
+	}()
 	mux := http.NewServeMux()
 	// Go 内置的 MIME 表里没有 .woff2，缺省会回落到按内容嗅探出的
 	// application/octet-stream。我们对所有响应都加了 X-Content-Type-Options: nosniff，

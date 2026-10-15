@@ -206,7 +206,7 @@
 		const label = document.createElement("label");
 		label.className = "app-select-search";
 		label.dataset.appSelectSearch = "";
-		label.innerHTML = '<svg class="app-select-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><span class="sr-only">搜索选项</span><input type="search" placeholder="搜索中文、拼音、英文、缩写或外号" autocomplete="off" data-app-select-search-input>';
+		label.innerHTML = '<svg class="function-icon app-select-search-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-5681797753"/></svg><span class="sr-only">搜索选项</span><input type="search" placeholder="搜索中文、拼音、英文、缩写或外号" autocomplete="off" data-app-select-search-input>';
 		menu.insertBefore(label, optionsRoot);
 	  }
 	  root.classList.add("has-search");
@@ -258,7 +258,7 @@
 	  const signature = nativeSelectOptionsSignature(options);
 	  const buttons = [...optionsRoot.querySelectorAll('[role="menuitemradio"]')];
 	  if (root._nativeSelectOptionsSignature !== signature || buttons.length !== options.length) {
-		optionsRoot.innerHTML = options.map((option) => `<button type="button" role="menuitemradio" aria-checked="${option === selected}" data-native-select-value="${escapeHTML(option.value)}" ${option.disabled ? "disabled" : ""}><span>${escapeHTML(option.textContent.trim())}</span><span class="app-select-check" aria-hidden="true">✓</span></button>`).join("");
+		optionsRoot.innerHTML = options.map((option) => `<button type="button" role="menuitemradio" aria-checked="${option === selected}" data-native-select-value="${escapeHTML(option.value)}" ${option.disabled ? "disabled" : ""}><span>${escapeHTML(option.textContent.trim())}</span><span class="app-select-check" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-check"/></svg></span></button>`).join("");
 		root._nativeSelectOptionsSignature = signature;
 		filterNativeSelectMenu(root, root.querySelector("[data-app-select-search-input]")?.value || "");
 		return;
@@ -282,7 +282,7 @@
 	  if (!label) return;
 	  const root = document.createElement("div");
 	  root.className = "app-select native-select-menu";
-	  root.innerHTML = `<button class="app-select-trigger" type="button" aria-haspopup="menu" aria-expanded="false" data-app-select-trigger><span></span></button><div class="app-select-menu" role="menu" data-app-select-menu hidden><div class="app-select-options" data-app-select-options></div><div class="app-select-empty" data-app-select-empty hidden>没有匹配项</div></div>`;
+	  root.innerHTML = `<button class="app-select-trigger" type="button" aria-haspopup="menu" aria-expanded="false" data-app-select-trigger><span></span><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></button><div class="app-select-menu" role="menu" data-app-select-menu hidden><div class="app-select-options" data-app-select-options></div><div class="app-select-empty" data-app-select-empty hidden>没有匹配项</div></div>`;
 	  select.classList.add("sr-only");
 	  select.tabIndex = -1;
 	  select.setAttribute("aria-hidden", "true");
@@ -967,7 +967,7 @@
       const starting = Boolean(state.clientLaunchPending?.[item.id] || state.clientLaunchWaiting?.[item.id] || state.clientLaunchInFlight === item.id || launchedID === item.id);
       const label = starting ? "正在启动…" : isTCLS ? "国服纯净入口" : item.name;
       const description = item.id==="riot" && !item.available ? "本机未安装 Riot 客户端" : isTCLS ? "跳过 WeGame，直连国服客户端" : item.location || item.description || "";
-      return `<button${isTCLS ? ' id="official-login"' : ""} class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"${starting || !item.available ? " disabled" : ""}><span class="launcher-kind">${escapeHTML(isTCLS ? "L" : item.id === "wegame" ? "W" : "R")}</span><span class="launcher-card-copy"><strong>${escapeHTML(label)}</strong><small data-tooltip="${escapeHTML(description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`;
+      return `<button${isTCLS ? ' id="official-login"' : ""} class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"${starting || !item.available ? " disabled" : ""}><span class="launcher-kind">${escapeHTML(isTCLS ? "L" : item.id === "wegame" ? "W" : "R")}</span><span class="launcher-card-copy"><strong>${escapeHTML(label)}</strong><small data-tooltip="${escapeHTML(description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(description)}</small></span><span class="launcher-arrow" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></span></button>`;
     }).join("") : "";
     if (!foreign && !installations.some(item => item.available)) {
       el.launcherList.innerHTML += '<button class="text-button scan-launchers" type="button">重新检查安装位置</button>';
@@ -1227,7 +1227,7 @@
     if (!visible.length) {
       if (!state.status?.connected) {
         el.listMeta.textContent = "";
-        el.grid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true">◆</span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会自动展示皮肤与炫彩收藏。</p></div>';
+        el.grid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-diamond"/></svg></span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会自动展示皮肤与炫彩收藏。</p></div>';
         return;
       }
       const message = state.view === "chromas" && !state.showUnownedChromas ? "当前没有已拥有的炫彩；可打开“显示未获取”查看完整目录。" : state.view === "chromas" && !state.showPrestigeChromas ? "当前没有符合条件的普通炫彩；可打开“显示臻彩”查看臻彩目录。" : "没有符合当前筛选条件的皮肤。";
@@ -1546,7 +1546,7 @@
     button.type = "button";
     window.deepLegendsCollectionNewItems?.decorate(button,'chromas',chroma.id);
     button.setAttribute("aria-label", `${chroma.owned ? "已拥有" : "未获取"}，查看 ${chroma.name}`);
-    button.innerHTML = `<span class="chroma-mini-art"><img alt="" loading="lazy" decoding="async">${chroma.isPrestige ? '<span class="chroma-prestige-badge">臻彩</span>' : ""}${chroma.owned ? "" : '<span class="chroma-mini-lock" aria-hidden="true">🔒</span>'}</span><span class="chroma-mini-name">${escapeHTML(chromaDisplayName(chroma))}</span>`;
+    button.innerHTML = `<span class="chroma-mini-art"><img alt="" loading="lazy" decoding="async">${chroma.isPrestige ? '<span class="chroma-prestige-badge">臻彩</span>' : ""}${chroma.owned ? "" : '<span class="chroma-mini-lock" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-shape-239c83edeb"/></svg></span>'}</span><span class="chroma-mini-name">${escapeHTML(chromaDisplayName(chroma))}</span>`;
     const image = button.querySelector("img");
     const fallback = document.createElement("span");
     fallback.className = "image-fallback";
@@ -1610,8 +1610,8 @@
 
   function localImageSources(paths) { return paths.map((path) => `/api/image?path=${encodeURIComponent(path)}`); }
   function navigationIcon(direction) {
-    const path = direction === "previous" ? "m15 5-7 7 7 7" : "m9 5 7 7-7 7";
-    return `<svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
+    const icon = direction === "previous" ? "previous" : "next";
+    return `<svg class="control-icon function-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-${icon}"/></svg>`;
   }
   function ordinaryChromaImageSources(chroma) {
     return [...new Set(localImageSources([chroma.tilePath, chroma.chromaPath, chroma.splashPath].filter(Boolean)))];
@@ -2284,7 +2284,7 @@
         el.accountLiveState.textContent = "等待客户端";
         el.accountLiveState.className = "state-chip";
       }
-      el.accountContent.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true">◉</span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会按类别展示战利品、皮肤物品和待领取奖励。</p></div>';
+      el.accountContent.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-user"/></svg></span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会按类别展示战利品、皮肤物品和待领取奖励。</p></div>';
       return;
     }
     if (!el.accountContent._accountMarkup) el.accountContent.innerHTML = '<div class="account-loading"><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line"></div></div>';
@@ -2470,7 +2470,7 @@
       if (requestSeq !== state.poolCatalogRequestSeq || state.destroyed) return;
       const nextItems = Array.isArray(payload.items) ? payload.items : [];
       const signature = JSON.stringify(nextItems);
-      shouldRender = !hadContent || signature !== state.poolCatalogSignature;
+      shouldRender = !hadContent || state.poolRenderPending || !el.poolSkinGrid.querySelector(".skin-card") || signature !== state.poolCatalogSignature;
       state.poolItems = nextItems;
       state.poolCatalogSignature = signature;
       state.poolCatalogLoaded = true;
@@ -2520,7 +2520,7 @@
     }
     if (!state.status?.connected) {
       el.poolListMeta.textContent = "";
-      el.poolSkinGrid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true">⬡</span><strong>等待英雄联盟客户端</strong><p>登录并进入大厅后，三合一奖池目录、清单上传与本地历史会自动开放。</p></div>';
+      el.poolSkinGrid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-hexagon"/></svg></span><strong>等待英雄联盟客户端</strong><p>登录并进入大厅后，三合一奖池目录、清单上传与本地历史会自动开放。</p></div>';
       return;
     }
     if (!state.status?.calculationOK) {
@@ -2559,7 +2559,9 @@
       el.poolSkinGrid.append(section);
       for (const skin of skins) tasks.push(() => grid.append(makeSkinCard(skin, { locked: !skin.owned, poolState: !skin.owned, detailItems: displayOrder })));
     }
+    state.poolRenderPending=false;
     runRenderTasks(tasks, generation, "poolRenderGeneration");
+    window.reportFlowDiagnostic?.("pool_render_client","render",{view:state.poolView,item_count:visible.length,rendered_cards:visible.length,reason:"catalog-or-invalidated"});
   }
 
   async function selectPool(id) {
@@ -2573,7 +2575,10 @@
   }
 
   function renderRiotKeySettings(data) {
-    if (el.settingRiotKeyState) el.settingRiotKeyState.textContent = ["embedded", "relay"].includes(data.source) && data.status !== "invalid" ? "使用内置服务" : { configured: "已配置", unconfigured: "未配置", invalid: "无效" }[data.status] || "未配置";
+    if (el.settingRiotKeyState) el.settingRiotKeyState.textContent = ["embedded", "relay"].includes(data.source) && data.status !== "invalid" ? "使用内置服务" : { configured: "已配置", unverified:"已保存，暂未验证", unconfigured: "未配置", invalid: "无效" }[data.status] || "未配置";
+    state.riotHasUserKey=data.hasUserKey ?? ["user","personal"].includes(data.source);
+    if(el.settingRiotKeyInput)el.settingRiotKeyInput.placeholder=state.riotHasUserKey?"已保存，粘贴新的 Key 可替换":"粘贴 Riot API Key";
+    if(el.settingRiotKeyClear)el.settingRiotKeyClear.disabled=!state.riotHasUserKey;
   }
   async function loadRiotKeySettings() {
     if (!el.settingRiotKeyState || state.riotKeyPending) return;
@@ -2593,7 +2598,7 @@
       el.settingRiotKeyReveal.setAttribute("aria-label", "显示 Riot Key");
       if (data.result !== "invalid") window.dispatchEvent(new CustomEvent("deep-legends:riot-key-updated"));
     } catch (error) { if (error.name !== "RequestCancelled") showToast(error.message); }
-    finally { state.riotKeyPending = false; el.settingRiotKeySave.disabled = el.settingRiotKeyClear.disabled = false; }
+    finally { state.riotKeyPending = false; el.settingRiotKeySave.disabled=false;el.settingRiotKeyClear.disabled=!state.riotHasUserKey; }
   }
   el.settingRiotKeySave?.addEventListener("click", () => void saveRiotKeySettings());
   el.settingRiotKeyClear?.addEventListener("click", () => void saveRiotKeySettings(true));
@@ -2689,7 +2694,7 @@
     if (name !== "favorites" && state.section === "favorites") {
       cancelRenderFrames();
       cancelPoolRenderFrames();
-      el.grid.replaceChildren();el.poolSkinGrid?.replaceChildren();state.renderedSignature="";delete el.grid._collectionRenderKey;state.collectionRenderPending=true;
+      el.grid.replaceChildren();el.poolSkinGrid?.replaceChildren();state.poolCatalogSignature="";state.poolRenderPending=true;state.renderedSignature="";delete el.grid._collectionRenderKey;state.collectionRenderPending=true;
       state.renderGeneration += 1;
       state.poolRenderGeneration += 1;
       cancelDeferredImages(el.grid);
@@ -2735,6 +2740,7 @@
       if (previousSection !== "settings") activateSettingsPage("appearance");
       loadPrivacy();
       void loadRiotKeySettings();
+      void loadChampionNetworkStatus();
       loadDiagnostics();
     }
     if (state.status) renderNotice(state.status);
@@ -2814,7 +2820,7 @@
     if (previous !== name) {
       cancelRenderFrames();
       cancelPoolRenderFrames();
-      el.grid.replaceChildren();el.poolSkinGrid?.replaceChildren();state.renderedSignature="";delete el.grid._collectionRenderKey;state.collectionRenderPending=true;
+      el.grid.replaceChildren();el.poolSkinGrid?.replaceChildren();state.poolCatalogSignature="";state.poolRenderPending=true;state.renderedSignature="";delete el.grid._collectionRenderKey;state.collectionRenderPending=true;
       state.renderGeneration += 1;
       state.poolRenderGeneration += 1;
       cancelDeferredImages(el.grid);
@@ -3154,8 +3160,10 @@
     el.settingProxyMode.value = status.mode || "auto";
     el.settingProxyUrl.value = status.url || "";
     el.settingProxyUrlWrap.hidden = el.settingProxyMode.value !== "manual";
-    el.settingProxyState.textContent = `当前：${status.active || "未检测到代理，将直接连接"}`;
+    el.settingProxyState.textContent = status.active || "直连";
   }
+
+  async function loadChampionNetworkStatus(){try{renderChampionNetwork(await api("/api/champions/network",{},"champion-network-state",5000));}catch{}}
 
   async function setupChampionNetwork() {
     el.settingProxyMode.addEventListener("change", () => {
@@ -3442,7 +3450,7 @@
         applyChromaGroupClasses(stack,parent.items);updateChromaSummary(stack.querySelector('.chroma-stack-summary'),parent.items);stack.querySelector('header strong').textContent=parent.name;
         const cards=stack.querySelector('.chroma-stack-cards'),mounted=new Map([...cards.children].map(card=>[card.dataset.collectionId,card])),ids=new Set(parent.items.map(item=>String(item.id)));
         for(const [cardID,card] of mounted)if(!ids.has(cardID)){cancelDeferredImages(card);card.remove();}
-        parent.items.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.id));if(!card){card=makeChromaMiniCard(item,parent.items);mounted.set(String(item.id),card);}card._collectionSkin=item;card._collectionCandidates=parent.items;card.classList.toggle('is-owned',Boolean(item.owned));card.classList.toggle('is-locked',!item.owned);card.setAttribute('aria-label',`${item.owned?'已拥有':'未获取'}，查看 ${item.name}`);card.querySelector('.chroma-mini-lock')?.remove();if(!item.owned)card.querySelector('.chroma-mini-art').insertAdjacentHTML('beforeend','<span class="chroma-mini-lock" aria-hidden="true">🔒</span>');window.deepLegendsCollectionNewItems?.decorate(card,'chromas',item.id);if(cards.children[index]!==card)cards.insertBefore(card,cards.children[index] || null);cards.dispatchEvent(new Event('scroll'));return 1;}));
+        parent.items.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.id));if(!card){card=makeChromaMiniCard(item,parent.items);mounted.set(String(item.id),card);}card._collectionSkin=item;card._collectionCandidates=parent.items;card.classList.toggle('is-owned',Boolean(item.owned));card.classList.toggle('is-locked',!item.owned);card.setAttribute('aria-label',`${item.owned?'已拥有':'未获取'}，查看 ${item.name}`);card.querySelector('.chroma-mini-lock')?.remove();if(!item.owned)card.querySelector('.chroma-mini-art').insertAdjacentHTML('beforeend','<span class="chroma-mini-lock" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-shape-239c83edeb"/></svg></span>');window.deepLegendsCollectionNewItems?.decorate(card,'chromas',item.id);if(cards.children[index]!==card)cards.insertBefore(card,cards.children[index] || null);cards.dispatchEvent(new Event('scroll'));return 1;}));
       }
     }
     runRenderTasks(tasks,generation,'renderGeneration',40);
@@ -3470,15 +3478,15 @@
   function lootCategorySlug(category) { return ({ "材料": "material", "宝箱": "chest", "英雄": "champion", "皮肤": "skin", "小小英雄": "companion", "永恒星碑": "eternal", "表情": "emote", "守卫": "ward", "图标": "icon" })[category] || "material"; }
   function lootCategoryIcon(category) {
     const paths = {
-      "宝箱": '<path d="M4 4h16l2 6v10H2V10l2-6Zm2 2-1 4h14l-1-4H6Zm-2 6v6h16v-6h-6v3h-4v-3H4Z"/>',
-      "材料": '<path d="M6 3h12l3 5-3 13H6L3 8l3-5Zm2 3L6 9l2 9h8l2-9-2-3H8Zm1 4h6v2H9v-2Z"/>',
-      "英雄": '<path d="m12 2 7 4v6c0 4.7-3 8-7 10-4-2-7-5.3-7-10V6l7-4Zm0 3L8 7.3v4.5c0 3 1.6 5.3 4 6.9 2.4-1.6 4-3.9 4-6.9V7.3L12 5Zm-3 4h6l-1 6h-4L9 9Z"/>',
-      "皮肤": '<path d="M4 5.5 8.5 3 12 5l3.5-2L20 5.5V13c0 4.4-3.7 7.3-8 9-4.3-1.7-8-4.6-8-9V5.5Zm3 2V13c0 2.6 2 4.5 5 5.9 3-1.4 5-3.3 5-5.9V7.5l-1.5-.8L12 9 8.5 6.7 7 7.5Zm1.5 3.5 2 1 1.5-1.5 1.5 1.5 2-1v3.5l-3.5 2-3.5-2V11Z"/>',
-      "小小英雄": '<path d="M12 2c4.4 0 8 3.1 8 7 0 2.3-1.2 4.2-3.1 5.5L18 20l-4-2-2 4-2-4-4 2 1.1-5.5A6.7 6.7 0 0 1 4 9c0-3.9 3.6-7 8-7Zm-3 6a1.4 1.4 0 1 0 0 2.8A1.4 1.4 0 0 0 9 8Zm6 0a1.4 1.4 0 1 0 0 2.8A1.4 1.4 0 0 0 15 8Zm-6 5c.8 1.2 1.8 1.8 3 1.8s2.2-.6 3-1.8H9Z"/>',
-      "永恒星碑": '<path d="M13 2c.3 3-1.4 4.6-2.9 6.1C8.5 9.7 7 11.2 7 14a5 5 0 0 0 10 0c0-2.1-.9-4.2-2.7-6.4.2 2.6-.6 4.1-2.3 5.4.4-3.6-1.2-6.1 1-11Zm-1 18a3 3 0 0 1-3-3c0-1.3.7-2.4 1.7-3.5.2 1.7.8 2.8 1.8 3.5.6-1 .9-2 .7-3.4 1.1 1.2 1.8 2.3 1.8 3.4a3 3 0 0 1-3 3Z"/>',
-      "表情": '<path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20ZM8.5 8A1.5 1.5 0 1 0 8.5 11a1.5 1.5 0 0 0 0-3Zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm-8 6c.9 2 2.4 3 4.5 3s3.6-1 4.5-3h-9Z"/>',
-      "守卫": '<path d="M12 2 7 7v5l-3 4 5 1 3 5 3-5 5-1-3-4V7l-5-5Zm0 4 2 2v5l1 1.5-2 .5-1 2-1-2-2-.5 1-1.5V8l2-2Z"/>',
-      "图标": '<path d="M12 2a7 7 0 0 1 4.7 12.2A9.5 9.5 0 0 1 21 22H3a9.5 9.5 0 0 1 4.3-7.8A7 7 0 0 1 12 2Zm0 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 11c-2.4 0-4.5 1.1-5.8 3h11.6A7 7 0 0 0 12 16Z"/>',
+      "宝箱": "<use href=\"#dl-icon-key-0af0a5992b\"/>",
+      "材料": "<use href=\"#dl-icon-key-f58efcfbd7\"/>",
+      "英雄": "<use href=\"#dl-icon-key-428fb77e75\"/>",
+      "皮肤": "<use href=\"#dl-icon-key-92b65543ef\"/>",
+      "小小英雄": "<use href=\"#dl-icon-key-f3326853f7\"/>",
+      "永恒星碑": "<use href=\"#dl-icon-key-3a1a25b9f4\"/>",
+      "表情": "<use href=\"#dl-icon-key-9881ea50fc\"/>",
+      "守卫": "<use href=\"#dl-icon-key-b20a737253\"/>",
+      "图标": "<use href=\"#dl-icon-key-a149777c59\"/>",
     };
     return `<svg viewBox="0 0 24 24" focusable="false">${paths[category] || paths["材料"]}</svg>`;
   }
@@ -4245,6 +4253,7 @@
 	  if (typeof event.data === "string" && event.data.startsWith("{")) {
 		try {
 		  const detail = JSON.parse(event.data);
+          if(detail?.type === "network-proxy-state"){void loadChampionNetworkStatus();return;}
           if(detail?.type === "client-cold-window") {window.deepLegendsPerformance?.startColdRequestWindow?.(detail.processAt);return;}
           if (detail?.type === "client-view") { try { acceptClientView(detail); } catch (error) { reportStatusRenderFailed(error, "acceptClientView"); } return; }
 		  if (detail?.type === "live-player-progress") { window.dispatchEvent(new CustomEvent("deep-legends:live-player-progress", { detail })); return; }
@@ -4377,7 +4386,7 @@
       updateUI.announced = current.latest;
     }
     el.updateButton.querySelector(".dot").hidden = !(current.state === "ready" || current.state === "available" && updateUI.seen !== current.latest);
-    el.updateButton.querySelector(".hex-progress").setAttribute("stroke-dashoffset", String(59 * (1 - percent / 100)));
+    el.updateButton.style.setProperty("--update-progress-offset", String(59 * (1 - percent / 100)));
     const tooltip = manual ? `有新版本 ${current.latest}` : busy ? `正在下载新版本 ${percent}%` : ready ? "新版本已下载，点击升级" : `有新版本 ${current.latest}`;
     el.updateButton.dataset.tooltip = tooltip;
     el.updateButton.setAttribute("aria-label", tooltip);

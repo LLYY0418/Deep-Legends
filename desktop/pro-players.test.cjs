@@ -216,7 +216,7 @@ test("统一总览按国服、韩服、职业分组，同一账号跨组隔离�
  assert.equal(d.querySelector('#pro-players-return').hidden,true);
  root.scrollTop=220;choose('pro');await tick();
  assert.equal(root.scrollTop,410);assert.equal(d.querySelector('#player-tabs [aria-selected="true"]').dataset.playerTab,proKey);
- assert.equal(d.querySelector('#pro-players-return').textContent.trim(),'返回职业选手 →');
+ assert.equal(d.querySelector('#pro-players-return').textContent.trim(),'返回职业选手');
  d.querySelector('#pro-players-return').click();await tick();
  assert.equal(d.querySelector('#pro-players-panel').hidden,false);assert.equal(root.scrollTop,123);assert.equal(search.value,'one');assert.equal(d.activeElement.dataset.proAccount,account.dataset.proAccount);
  d.querySelector('#pro-players-home').click();await tick();

@@ -29,7 +29,7 @@ test("existing SSE drives progress and persists it across close/reopen without p
   h.streams[0].emit("update:status",{...available,state:"downloading"});
   h.streams[0].emit("update:progress",{receivedBytes:42,totalBytes:100,bytesPerSecond:10,etaSeconds:6});
   assert.equal(h.get("update-progress-percent").textContent,"42%");
-  assert.ok(Math.abs(Number(h.get("update-button").querySelector(".hex-progress").getAttribute("stroke-dashoffset"))-59*.58)<1e-9);
+  assert.ok(Math.abs(Number(h.get("update-button").style.getPropertyValue("--update-progress-offset"))-59*.58)<1e-9);
   h.get("update-button").click();h.get("update-dialog-close").click();h.get("update-button").click();
   assert.equal(h.get("update-progress-percent").textContent,"42%");
   assert.equal(h.requests.some(([url])=>url.startsWith("/api/update/")),false,"opening/closing must not poll or cancel");

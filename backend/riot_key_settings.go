@@ -32,6 +32,9 @@ type riotKeyStore struct {
 	routeUntil       time.Time
 	quotaWindowAt    time.Time
 	probing          bool
+	unverified       bool
+	migrationResult  string
+	verified         func()
 }
 
 var riotUserKeys = &riotKeyStore{}
@@ -65,6 +68,7 @@ func loadRiotKeyStore(store *localStore) *riotKeyStore {
 		return s
 	}
 	s.key = strings.TrimSpace(string(plain))
+	_ = s.migrateEmbedded(nil)
 	return s
 }
 
@@ -128,6 +132,9 @@ func riotKeyState() string {
 	if key == "" && source != "relay" {
 		return "unconfigured"
 	}
+	if source == "user" && riotUserKeys.unverified {
+		return "unverified"
+	}
 	return "configured"
 }
 
@@ -137,12 +144,21 @@ func (s *riotKeyStore) observe(key string, status int) {
 		return
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	wasUnverified := s.unverified
 	if status == http.StatusUnauthorized || status == http.StatusForbidden {
 		s.invalidKey = key
 	}
+	if status == http.StatusOK {
+		s.unverified = false
+	}
 	if status == http.StatusOK && s.invalidKey == key {
 		s.invalidKey = ""
+	}
+	notify := wasUnverified && status == http.StatusOK
+	callback := s.verified
+	s.mu.Unlock()
+	if notify && callback != nil {
+		callback()
 	}
 }
 
@@ -198,19 +214,34 @@ func (s *riotKeyStore) save(ctx context.Context, client *http.Client, key string
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return result, s.writeLocked(key)
+	err = s.writeLocked(key)
+	if err == nil {
+		s.unverified = result == "network_error"
+	}
+	return result, err
 }
 
 func (s *riotKeyStore) migrateEmbedded(record func(map[string]any)) error {
 	s.mu.Lock()
 	result := "skipped_no_embedded"
+	if s.migrationResult != "" {
+		result = s.migrationResult
+	}
 	var err error
 	if s.exists {
 		result = "skipped_exists"
-	} else if key := riotEmbeddedKey(); key != "" {
-		err = s.writeLocked(key)
-		result = "ok"
-		if err != nil {
+	}
+	if embedded := riotEmbeddedKey(); embedded != "" && s.key != "" && subtle.ConstantTimeCompare([]byte(s.key), []byte(embedded)) == 1 {
+		err = os.Remove(filepath.Join(s.store.root, riotUserKeyFile))
+		if err == nil || os.IsNotExist(err) {
+			s.key = ""
+			s.exists = false
+			s.rejected = false
+			s.unverified = false
+			result = "dropped_builtin_copy"
+			s.migrationResult = result
+			err = nil
+		} else {
 			result = "failed"
 		}
 	}
@@ -238,7 +269,7 @@ func (a *app) handleRiotKeySettings(w http.ResponseWriter, r *http.Request) {
 		}
 		result, err = riotUserKeys.save(r.Context(), a.championDataProvider().httpClient(), input.Key)
 		if result != "" {
-			a.recordDiagnostic(map[string]any{"event": "riot_key_saved", "result": result})
+			a.recordDiagnostic(map[string]any{"event": "riot_key_saved", "result": result, "hasUserKey": riotHasUserKey()})
 		}
 	case http.MethodDelete:
 		riotUserKeys.mu.Lock()
@@ -261,7 +292,7 @@ func (a *app) handleRiotKeySettings(w http.ResponseWriter, r *http.Request) {
 		a.recordDiagnostic(map[string]any{"event": "riot_credential_switch", "same_credential": same})
 		a.broadcastEvent("riot-key-updated")
 	}
-	respondJSON(w, map[string]any{"status": riotKeyState(), "source": riotKeySource(), "result": result})
+	respondJSON(w, map[string]any{"status": riotKeyState(), "source": riotKeySource(), "result": result, "hasUserKey": riotHasUserKey()})
 }
 
 func (a *app) clearRiotCredentialFailures() {
@@ -276,4 +307,10 @@ func (a *app) clearRiotCredentialFailures() {
 		p.specialistRecent = make(map[string]specialistRecentSummaryCacheEntry)
 		p.specialistMu.Unlock()
 	}
+}
+
+func riotHasUserKey() bool {
+	riotUserKeys.mu.Lock()
+	defer riotUserKeys.mu.Unlock()
+	return riotUserKeys.key != ""
 }

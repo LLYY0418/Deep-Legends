@@ -83,5 +83,5 @@ test('R257 assertions kill always-visible, wrong-stream and inverted official-to
 });
 test('R257 copy respects existing static wording guards and reuses R241 styling',()=>{
  const {extract}=require('./r188-harness.cjs'),body=extract(source,'renderSeasonDataNote');assert.doesNotMatch(body,/统计口径|上游公布的/);
- const css=read('gameplay.css');assert.match(source,/panel.className="match-tags-popover season-data-note-popover"/);assert.match(css,/season-data-note svg \{ width:16px; height:16px/);assert.match(css,/champion-table-title \{ display:flex; align-items:center; gap:8px/);assert.match(css,/season-data-note-popover \{[^}]*width:288px/);
+ const css=read('gameplay.css');assert.match(source,/panel.className="match-tags-popover season-data-note-popover"/);assert.match(read("app.css"),/--icon-sm:14px/);assert.match(css,/champion-table-title \{ display:flex; align-items:center; gap:8px/);assert.match(css,/season-data-note-popover \{[^}]*width:288px/);
 });

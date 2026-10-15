@@ -49,7 +49,7 @@
       const fame = Number(player.arenaFame?.level) > 0 ? player.arenaFame : null;
       if (!fame) return '';
       const tier = tiers[String(fame.tier || '').toUpperCase()] || '';
-      return `<span class="arena-fame${tier}" data-tooltip="${h.escapeHTML(`斗魂等级 ${h.number(fame.level)} · 名望 ${h.number(fame.fame)}`)}" data-tooltip-size="compact"><svg class="arena-fame-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 13.5 4.6v6.8L8 14.5 2.5 11.4V4.6Z"/><path class="arena-fame-blades" d="m5.4 5.4 5.2 5.2M10.6 5.4 5.4 10.6"/></svg><b>${h.number(fame.level)}级</b><span class="arena-fame-divider" aria-hidden="true">·</span><span>${h.number(fame.fame)} 名望</span></span>`;
+      return `<span class="arena-fame${tier}" data-tooltip="${h.escapeHTML(`斗魂等级 ${h.number(fame.level)} · 名望 ${h.number(fame.fame)}`)}" data-tooltip-size="compact"><svg class="function-icon arena-fame-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-91b16449a6"/></svg><b>${h.number(fame.level)}级</b><span class="arena-fame-divider" aria-hidden="true">·</span><span>${h.number(fame.fame)} 名望</span></span>`;
     }
     if (!player.soloRank && !player.flexRank) return span(legacyCopy, true);
     const queue = (label, value) => `${h.escapeHTML(label)} ${value?.tier ? `<b class="live-rank-title">${h.escapeHTML(h.rankTitle(value))}</b> ${h.escapeHTML(h.number(value.leaguePoints))} LP` : '未定级'}`;
@@ -145,7 +145,7 @@
     dialog.className = 'career-dialog live-match-dialog';
     dialog.setAttribute('aria-labelledby', 'live-match-dialog-title');
     dialog.setAttribute('aria-describedby', 'live-match-dialog-context');
-    dialog.innerHTML = '<section class="career-dialog-sheet"><header class="career-dialog-head"><div><h2 id="live-match-dialog-title">对局详情</h2><p id="live-match-dialog-context"></p></div><button class="dialog-close-button control-icon-button" type="button" aria-label="关闭对局详情" data-tooltip="关闭" data-close-live-match><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div class="live-match-dialog-content"></div></section>';
+    dialog.innerHTML = '<section class="career-dialog-sheet"><header class="career-dialog-head"><div><h2 id="live-match-dialog-title">对局详情</h2><p id="live-match-dialog-context"></p></div><button class="dialog-close-button control-icon-button" type="button" aria-label="关闭对局详情" data-tooltip="关闭" data-close-live-match><svg class="control-icon function-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-a6e644b804"/></svg></button></header><div class="live-match-dialog-content"></div></section>';
     document.body.append(dialog);
     const entry = { dialog, title: dialog.querySelector('#live-match-dialog-title'), context: dialog.querySelector('#live-match-dialog-context'), content: dialog.querySelector('.live-match-dialog-content'), opener: null, view: null, token: 0 };
     dialog.querySelector('[data-close-live-match]').addEventListener('click', () => dialog.close());

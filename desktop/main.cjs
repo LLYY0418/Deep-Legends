@@ -7,7 +7,7 @@
 // Recording it here is the only way to tell that cost apart from our own.
 const startupMarks = { jsEntry: Date.now() };
 
-const { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, session, shell } = require("electron");
+const { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, session, shell, powerMonitor } = require("electron");
 const { spawn } = require("node:child_process");
 const http = require("node:http");
 const fs = require("node:fs");
@@ -260,8 +260,8 @@ function reportStartupPhases() {
 
 function titleBarOverlay(theme, dimmed = modalOpen, scale = currentUiScale) {
   const dark = theme ? theme === "dark" : nativeTheme.shouldUseDarkColors;
-  // CSS topbar is 56px; the native overlay takes DIP, so it includes zoom.
-  const height = Math.round(56 * scale);
+  // The topbar and native controls both stay at 56 DIP at every content zoom.
+  const height = 56;
   if (dimmed) return { color: dark ? "#05070B" : "#8a8a8a", symbolColor: "#ffffff", height };
   return { color: dark ? "#0B0E14" : "#ffffff", symbolColor: dark ? "#E8EAF0" : "#24211f", height };
 }
@@ -537,13 +537,16 @@ function reportLicenseWindowState(value) {
 
 // 系统代理解析不再阻塞后端启动：后端就绪后异步解析并下发，
 // 英雄数据的联网请求在拿到结果前按“系统/环境代理”规则直连。
+let lastSystemProxy;
+let proxyPushPending=false;
 async function pushSystemProxy() {
+ if(proxyPushPending || !backendReady)return;proxyPushPending=true;
   loadDeferredModules();
   let proxy = "";
   try {
     proxy = await resolveSystemProxy(session.defaultSession, "https://lol-api-champion.op.gg/");
   } catch (_) {}
-  if (!backendReady) return;
+  if (!backendReady || proxy===lastSystemProxy) {proxyPushPending=false;return;}
   const body = JSON.stringify({ proxy });
   const request = http.request(`${backendReady.baseUrl}/api/system-proxy`, {
     method: "POST",
@@ -553,8 +556,8 @@ async function pushSystemProxy() {
       "Content-Length": Buffer.byteLength(body),
     },
     timeout: 3000,
-  }, (response) => response.resume());
-  request.once("error", (error) => appendDesktopLog(`系统代理下发失败：${error.message}`));
+  }, (response) => {if(response.statusCode===200)lastSystemProxy=proxy;proxyPushPending=false;response.resume();});
+  request.once("error", (error) => {proxyPushPending=false;appendDesktopLog(`系统代理下发失败：${error.message}`);});
   request.once("timeout", () => request.destroy());
   request.end(body);
 }
@@ -659,7 +662,7 @@ function createMainWindow() {
   mainWindow.on("resize", scheduleBoundsWrite);
   mainWindow.on("move", scheduleBoundsWrite);
   mainWindow.on("show",()=>mainWindow?.webContents.send("desktop-window-visible"));
-  mainWindow.on("focus", () => mainWindow?.flashFrame(false));
+  mainWindow.on("focus", () => {mainWindow?.flashFrame(false);void pushSystemProxy();});
   mainWindow.on("close", () => {
     clearTimeout(boundsWriteTimer);
     persistBounds();
@@ -916,6 +919,8 @@ async function shutdownBackend() {
 }
 
 app.whenReady().then(() => {
+ powerMonitor.on("resume",()=>void pushSystemProxy());
+ const proxyTimer=setInterval(()=>void pushSystemProxy(),60000);proxyTimer.unref();
   if (!hasInstanceLock) return;
   startupMarks.appReady = Date.now();
   recordRelaunchCompletion();

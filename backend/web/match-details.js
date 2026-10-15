@@ -93,7 +93,7 @@ function renderTeamAnalysis(match, tab) {
     const sortButton = (team = "", currentMetric = metricFor(team)) => {
       const label = currentMetric === "damageTaken" ? "承伤" : "伤害";
       const next = currentMetric === "damageTaken" ? "伤害" : "承伤";
-      return `<button class="damage-sort-toggle" type="button" data-damage-sort="${currentMetric}" data-game-id="${match.gameId}" data-team="${escapeHTML(team)}" aria-label="当前按${label}排序，切换为按${next}排序" data-tooltip="当前按${label}排序\n点击切换为按${next}排序"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h11M8 12h8M8 18h5M4 4v16m0 0-2.5-2.5M4 20l2.5-2.5"/></svg><span>${label}</span></button>`;
+      return `<button class="damage-sort-toggle" type="button" data-damage-sort="${currentMetric}" data-game-id="${match.gameId}" data-team="${escapeHTML(team)}" aria-label="当前按${label}排序，切换为按${next}排序" data-tooltip="当前按${label}排序\n点击切换为按${next}排序"><svg class="function-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-aacd87806b"/></svg><span>${label}</span></button>`;
     };
     const damageRow = (item, index, tone, rowMetric, peak) => {
       const value = Math.max(0, Number(item[rowMetric]) || 0);
@@ -160,7 +160,7 @@ function renderTeamAnalysis(match, tab) {
 function renderItemRoute(timeline) {
     const groups = timeline?.itemGroups || [];
     if (!groups.length) return "";
-    return `<div class="timeline-route">${groups.map((group) => `<div class="timeline-group"><div class="timeline-group-items">${(group.events || []).map((event) => `<span class="timeline-item${event.sold ? " is-sold" : ""}"${event.sold ? ' data-tooltip="已出售" data-tooltip-size="compact"' : ""}>${itemIconFigure(event.itemId, "slot")}</span>`).join("")}</div><small>${number(group.minute)}分</small></div>`).join('<span class="timeline-arrow" aria-hidden="true">›</span>')}</div>`;
+    return `<div class="timeline-route">${groups.map((group) => `<div class="timeline-group"><div class="timeline-group-items">${(group.events || []).map((event) => `<span class="timeline-item${event.sold ? " is-sold" : ""}"${event.sold ? ' data-tooltip="已出售" data-tooltip-size="compact"' : ""}>${itemIconFigure(event.itemId, "slot")}</span>`).join("")}</div><small>${number(group.minute)}分</small></div>`).join('<span class="timeline-arrow" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></span>')}</div>`;
   }
 
 function skillPrioritySummary(order) {

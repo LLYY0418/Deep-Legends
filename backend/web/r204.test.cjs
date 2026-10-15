@@ -19,7 +19,7 @@ test('R204 dialog-restored pointer focus hides tooltip while keyboard and hover 
  const tooltip=doc.querySelector('[role="tooltip"]');button.dispatchEvent(new w.FocusEvent('focusin',{bubbles:true}));assert.equal(tooltip.hidden,true);button.dispatchEvent(new w.Event('pointerover',{bubbles:true}));assert.equal(tooltip.hidden,false);button.dispatchEvent(new w.FocusEvent('focusout',{bubbles:true}));keyboard=true;button.dispatchEvent(new w.FocusEvent('focusin',{bubbles:true}));assert.equal(tooltip.hidden,false);dom.window.close();
 });
 test('R204 update icon and close controls use shared sizes',()=>{
- const css=fs.readFileSync(path.join(__dirname,'app.css'),'utf8');assert.match(css,/\.update-icon-button \.control-icon \{ width: 24px; height: 24px/);assert.match(css,/\.update-icon-button \{[^}]*min-width: 36px; min-height: 36px/);assert.match(css,/stroke-width: 1\.6/);assert.match(css,/stroke-width: 1\.8/);
+ const css=fs.readFileSync(path.join(__dirname,'app.css'),'utf8');assert.match(css,/--icon-stroke:1.75/);assert.match(css,/--topbar-control-size:40px/);assert.match(css,/--control-icon-size:var\(--icon-md\)/);
  const doc=new JSDOM(html).window.document;for(const id of ['update-dialog-close','skin-dialog-close'])assert(doc.getElementById(id).classList.contains('dialog-close-button'));assert(doc.getElementById('career-dialog-close').classList.contains('dialog-close-button'));
 });
 test('R204 incremental roster rejects old requests/games/phases and shows a ready player before others',()=>{

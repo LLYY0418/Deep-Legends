@@ -351,7 +351,7 @@ test("演示数据下总览页渲染出真实内容，且渲染期没有异常",
 	const recentSection = overview.querySelector(".recent-ranked-section");
 	const abilitySection = overview.querySelector(".ability-section");
 	const positionSection = overview.querySelector(".position-list")?.closest(".career-section");
-	for (const [label, section] of [["近 20 场排位", recentSection], ["能力表现", abilitySection], ["位置偏好", positionSection]]) {
+	for (const [label, section] of [["近期排位", recentSection], ["能力表现", abilitySection], ["位置偏好", positionSection]]) {
 		assert.ok(section, `${label} 缺少分区`);
 		const header = section.querySelector(":scope > header");
 		assert.ok(header, `${label} 缺少标题栏`);
@@ -360,7 +360,7 @@ test("演示数据下总览页渲染出真实内容，且渲染期没有异常",
 		assert.deepEqual(buttons.map((button) => button.textContent), ["单双排", "灵活组排"], `${label} 的队列页签被删掉了`);
 		assert.deepEqual(buttons.map((button) => button.classList.contains("is-active")), [true, false], `${label} 的默认选中态不对`);
 	}
-	assert.equal(recentSection.querySelector("h3")?.textContent, "近 20 场排位");
+	assert.equal(recentSection.querySelector("h3")?.textContent, "近期排位");
 	assert.match(abilitySection.querySelector(".ability-meta > span")?.textContent || "", /14 场样本/);
 	assert.equal(positionSection.querySelector(".career-sample-label")?.textContent, "近 20 场");
 	assert.doesNotMatch(overview.querySelector(".recent-ranked-section > header")?.textContent || "", /实际\s*20\s*场/);

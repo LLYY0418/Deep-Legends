@@ -6,7 +6,7 @@ const compile=(source,names,deps)=>compileSource(source.replace(/^[ \t]*\/\/.*$/
 const app=fs.readFileSync(path.join(__dirname,'app.js'),'utf8'),gameplay=fs.readFileSync(path.join(__dirname,'gameplay.js'),'utf8');
 test('R206 relay settings and unavailable rune service show built-in state and retry',()=>{
  const el={settingRiotKeyState:{textContent:''}};
- compile(app,['renderRiotKeySettings'],{el}).renderRiotKeySettings({source:'relay',status:'configured'});
+ compile(app,['renderRiotKeySettings'],{el,state:{}}).renderRiotKeySettings({source:'relay',status:'configured'});
  assert.equal(el.settingRiotKeyState.textContent,'使用内置服务');
  const state={live:{},specialistRuneFailures:new Map([['fixture',{reason:'riot-relay-unavailable'}]])};
  const f=compile(gameplay,['renderRuneSourceSection'],{state,escapeHTML,specialistRequestTarget:()=>({key:'fixture'}),specialistRuneFailure:v=>v});

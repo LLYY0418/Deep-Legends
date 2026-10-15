@@ -218,6 +218,15 @@ jobs:
           name: r277-independent-linux-proof
           path: docs/history/reports/r277/ci-integration/linux/**
           if-no-files-found: error
+      # Requested P13 Linux measurement is evidence only, not a new release gate.
+      - name: R280 Linux stream measurement (record only)
+        run: node scripts/r280-ci-measurements.cjs "${{ runner.temp }}/r280"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r280-regression-measurements-linux
+          path: ${{ runner.temp }}/r280/**
+          if-no-files-found: warn
 
   r277-native-windows:
     runs-on: windows-latest

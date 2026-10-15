@@ -254,12 +254,12 @@ test("R116-E rankedQueueData labels the mayhem tab and marks lanes as not applic
 test("R116-E card headings stay truthful once mayhem games are counted", () => {
   const { renderRecentRanked } = compileFunctions(gameplayScript, ["renderRecentRanked"], renderDependencies);
   const solo = renderRecentRanked({ games: 7, wins: 4, losses: 3, positions: [] }, 420, "SWITCH");
-  assert.match(solo, /近 7 场排位/);
+  assert.match(solo, /近期排位/);assert.match(solo,/近 7 场/);
   assert.match(solo, /位置胜率/);
   assert.doesNotMatch(solo, /海克斯大乱斗/);
 
   const mayhem = renderRecentRanked({ games: 7, wins: 4, losses: 3, queueLabel: "海克斯大乱斗", positions: [] }, 2300, "SWITCH");
-  assert.match(mayhem, /近 7 场海斗/);
+  assert.match(mayhem, /近期海斗/);
   assert.doesNotMatch(mayhem, /场排位/, "a mayhem card must not call itself ranked");
   // R128 §2.3-B：海斗没有分路，这一格整块不渲染——既不写「位置数据不足」，
   // 也不再留一句口径解释占位。
@@ -268,7 +268,8 @@ test("R116-E card headings stay truthful once mayhem games are counted", () => {
   assert.doesNotMatch(mayhem, /recent-ranked-positions/);
 
   const empty = renderRecentRanked({ games: 0 }, 2300, "SWITCH");
-  assert.match(empty, /近 0 场海斗/);
+  assert.match(empty, /近期海斗/);
+  assert.match(empty, /近 0 场/);
   assert.match(empty, /当前样本未发现海克斯大乱斗对局/);
   assert.doesNotMatch(empty, /基于|最多统计/);
   // 队列名解析不出来时不许默默写「单双排」。

@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..'),web=path.join(root,'backend/web'),report
 assert(process.env.R266_BACKEND && fs.existsSync(process.env.R266_BACKEND),'R266_BACKEND must name the project browser fixture backend');
 fs.mkdirSync(report,{recursive:true});
 const cases=[
- ['p4-height','gameplay.css','.overview-strip-skeleton { gap: 16px; }','.overview-strip-skeleton { gap: 16px; min-height: 116px; }','"key":"strip"'],
+ ['p4-height','gameplay.css','.is-pending-strip .game-icon.is-summoner-avatar{border-radius:50%}','.summoner-strip.is-pending-strip{height:116px!important;min-height:116px!important}.is-pending-strip .game-icon.is-summoner-avatar{border-radius:50%}','"key":"strip"'],
  ['p8-binding','gameplay.js','function bindRankHistoryControls(container) {','function bindRankHistoryControls(container) { return;','0 !== 3'],
  ['p9-full-render','gameplay.js','    const list = container.querySelector(".match-list");\n    if (list && additions.length','    const list = container.querySelector(".match-list");\n    if(list && additions.length)list.innerHTML=(tab.data.matches || []).map(match=>renderMatch(match,tab.data.player.playerRef,tab)).join("");\n    if (list && additions.length','sample.sameList && sample.sameFirst'],
 ];

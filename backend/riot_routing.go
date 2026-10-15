@@ -201,7 +201,11 @@ func riotRequestEvent(record func(map[string]any), ctx context.Context, route, c
 	if category == "other" || category == "spectator" {
 		category = "summoner"
 	}
-	record(map[string]any{"event": "riot_request", "route": route, "category": category, "entry": entry, "status": status, "ttfb_ms": ttfb.Milliseconds(), "total_ms": total.Milliseconds(), "bytes": bytes, "queued_ms": queued.Milliseconds(), "attempt": attempt, "cancelled": ctx.Err() != nil, "cancel_reason": riotCancelReason(ctx), "foreground": !isRiotBackground(ctx)})
+	proxy, stage := "none", ""
+	if trace, ok := ctx.Value(networkTraceKey{}).(*networkTrace); ok {
+		proxy, stage = trace.proxy, trace.stage
+	}
+	record(map[string]any{"proxy": proxy, "error_stage": stage, "event": "riot_request", "route": route, "category": category, "entry": entry, "status": status, "ttfb_ms": ttfb.Milliseconds(), "total_ms": total.Milliseconds(), "bytes": bytes, "queued_ms": queued.Milliseconds(), "attempt": attempt, "cancelled": ctx.Err() != nil, "cancel_reason": riotCancelReason(ctx), "foreground": !isRiotBackground(ctx)})
 }
 func (p *riotProvider) routeRecord(event map[string]any) {
 	if p.champions != nil && p.champions.diag != nil {
@@ -301,7 +305,7 @@ func (p *riotProvider) getLimited(ctx context.Context, host, path string, query 
 			s.mu.Lock()
 			s.routeUntil = time.Now().Add(time.Duration(status.retryAfter) * time.Second)
 			s.mu.Unlock()
-			p.routeRecord(map[string]any{"event": "riot_quota_guard", "action": "relay", "window_s": status.retryAfter})
+			p.routeRecord(map[string]any{"event": "riot_quota_guard", "priority": riotPriority(ctx), "action": "relay", "window_s": status.retryAfter})
 			return p.relayFallback(ctx, host, path, query, out, max)
 		}
 		return err
@@ -332,7 +336,11 @@ func (p *riotProvider) getLimited(ctx context.Context, host, path string, query 
 	p.routeRecord(map[string]any{"event": "riot_route_switch", "from": "direct", "to": "relay", "reason": "network"})
 	return p.relayFallback(ctx, host, path, query, out, max)
 }
-func (p *riotProvider) observeEmbeddedQuota(header http.Header, status int) {
+func (p *riotProvider) observeEmbeddedQuota(header http.Header, status int, contexts ...context.Context) {
+	ctx := context.Background()
+	if len(contexts) > 0 {
+		ctx = contexts[0]
+	}
 	_, source := riotUserKeys.effective()
 	if source != "embedded" {
 		return
@@ -365,7 +373,7 @@ func (p *riotProvider) observeEmbeddedQuota(header http.Header, status int) {
 		}
 		riotUserKeys.mu.Unlock()
 		if count*5 >= limit*4 {
-			p.routeRecord(map[string]any{"event": "riot_quota_guard", "count": count, "limit": limit, "window_s": 120, "action": "local-admission", "wait_ms": wait.Milliseconds(), "relay_median_ms": relay.Milliseconds(), "direct_median_ms": direct.Milliseconds()})
+			p.routeRecord(map[string]any{"event": "riot_quota_guard", "priority": riotPriority(ctx), "count": count, "limit": limit, "window_s": 120, "action": "local-admission", "wait_ms": wait.Milliseconds(), "relay_median_ms": relay.Milliseconds(), "direct_median_ms": direct.Milliseconds()})
 		}
 	}
 
@@ -391,4 +399,11 @@ func riotRouteMedianCosts() (time.Duration, time.Duration) {
 		return time.Duration(values[len(values)/2] * float64(time.Millisecond))
 	}
 	return median("A", 8*time.Second), median("direct", 500*time.Millisecond)
+}
+
+func riotPriority(ctx context.Context) string {
+	if isRiotBackground(ctx) {
+		return "background"
+	}
+	return "foreground"
 }

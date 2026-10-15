@@ -37,7 +37,7 @@ test('P3 active quota ticker updates 103 seconds and tears down when inactive',(
  now+=10000;active=true;api.scheduleQuotaCountdown(tab);assert.equal(events.at(-1),'10','resume reads real remaining time');
 });
 test('P4 skeleton uses final strip grid and filter spans cannot inherit 126px blocks',()=>{
- assert(!/\.overview-strip-skeleton \{[^}]*min-height: 116px/.test(css));assert.match(css,/\.match-filterbar\.gameplay-skeleton > span \{[^}]*min-height: 0/);
+ assert(!/\.summoner-strip\.is-pending-strip\{[^}]*height:116px/.test(css));assert.match(css,/\.match-filterbar\.gameplay-skeleton > span \{[^}]*min-height: 0/);
  assert.match(game,/if \(tab.loading && rawMatches.length/);
 });
 test('P4 retained filter controls lose skeleton state on empty failure and restore it on retry',()=>{
@@ -72,12 +72,13 @@ test('P9 complete references resolve request-local full records and queues remai
  const final=api.resolveOverviewFrame(stream,{player:{playerRef:'a'},matches:[{gameId:12,revision:'r1'}]});assert.equal(final.matches[0],match);assert.equal(final.rankedQueues.solo.games,3);
  assert.throws(()=>api.resolveOverviewFrame(stream,{matches:[{gameId:12,revision:'wrong'}]}),/引用/);
 });
-test('P9 distant 400-match rows bound rich DOM and remain recoverable',()=>{
- const dom=new JSDOM('<div class="match-list"></div>'),list=dom.window.document.querySelector('div'),state={};let observer;
+test('P9 distant 400-match rows bound rich DOM after a frame and remain recoverable',()=>{
+ const dom=new JSDOM('<div class="match-list"></div>'),list=dom.window.document.querySelector('div'),state={},observers=[],frames=[];
  const tab={data:{matches:Array.from({length:400},(_,i)=>({gameId:i}))},openMatches:new Set()};
  for(let i=0;i<400;i++){const e=dom.window.document.createElement('article');e.className='match-entry';e.dataset.matchId=String(i);e.innerHTML='<div>'+ '<span>detail</span>'.repeat(200)+'</div>';e.getBoundingClientRect=()=>({top:i*120,bottom:i*120+120,height:120});list.append(e);}
- const api=compile(game,['boundMatchDOM'],{window:{innerHeight:900,IntersectionObserver:class{constructor(cb){this.cb=cb;observer=this;}observe(){}disconnect(){}}},document:dom.window.document,state,renderMatch:m=>`<article class="match-entry" data-match-id="${m.gameId}"><div>${'<span>detail</span>'.repeat(200)}</div></article>`,bindOverviewContent(){},applyRenderedMetricStyles(){},prepareImages(){},cancelDeferredImages(){}});
- api.boundMatchDOM(list,tab);assert(list.querySelectorAll('*').length<25000);assert(list.querySelectorAll('[data-virtual-match]').length>300);const row=list.lastElementChild;observer.cb([{target:row,isIntersecting:true}]);assert(row.children.length);dom.window.close();
+ const api=compile(game,['boundMatchDOM'],{window:{IntersectionObserver:class{constructor(cb,options){this.cb=cb;this.options=options;observers.push(this);}observe(){}disconnect(){}}},document:dom.window.document,state,getComputedStyle:dom.window.getComputedStyle,requestAnimationFrame:fn=>{frames.push(fn);return frames.length},cancelAnimationFrame(){},renderMatch:m=>`<article class="match-entry" data-match-id="${m.gameId}"><div>${'<span>detail</span>'.repeat(200)}</div></article>`,bindOverviewContent(){},applyRenderedMetricStyles(){},prepareImages(){}});
+ api.boundMatchDOM(list,tab);observers.find(o=>o.options.rootMargin==='3200px 0px').cb([...list.children].slice(30).map(target=>({target,isIntersecting:false})));frames.shift()();
+ assert(list.querySelectorAll('*').length<25000);assert(list.querySelectorAll('[data-virtual-match]').length>300);const row=list.lastElementChild;observers.find(o=>o.options.rootMargin==='2400px 0px').cb([{target:row,isIntersecting:true}]);frames.shift()();assert(!row.hasAttribute('data-virtual-match'));assert.equal(row.querySelectorAll('span').length,200);dom.window.close();
 });
 test('P10 actual zoom multiplier and dimensions are diagnostic dedup key',()=>{
  const vm=require('node:vm'),{extract}=require('../backend/web/r188-harness.cjs'),events=[],style={setProperty(){}},state={},window={innerWidth:900,innerHeight:700,screen:{width:1920,height:1080},devicePixelRatio:1.5,reportFlowDiagnostic:(...e)=>events.push(e)};

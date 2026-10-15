@@ -144,7 +144,7 @@ func TestR104ExactDirectoryMatchAvoidsRiotAndMissFallsBack(t *testing.T) {
 	}
 }
 
-func TestR104BackgroundAdmissionYieldsAtThirtyOrForegroundQueue(t *testing.T) {
+func TestR104BackgroundAdmissionYieldsAboveSeventyPercentOrForegroundQueue(t *testing.T) {
 	now := time.Unix(1000, 0)
 	p := &riotProvider{limitNow: func() time.Time { return now }}
 	release, err := p.enterRiotLimitQueue(context.Background())
@@ -155,14 +155,14 @@ func TestR104BackgroundAdmissionYieldsAtThirtyOrForegroundQueue(t *testing.T) {
 		t.Fatalf("foreground queue error=%v", err)
 	}
 	release()
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 64; i++ {
 		p.longWindow = append(p.longWindow, now)
 	}
 	if err := p.wait(withRiotBackground(context.Background())); !errors.Is(err, errThrottled) {
-		t.Fatalf("shared occupancy 30 must yield: %v", err)
+		t.Fatalf("shared occupancy above 70 percent must yield: %v", err)
 	}
 	// Foreground can still use reserved long-window capacity.
-	if err := p.wait(context.Background()); err != nil || len(p.longWindow) != 31 {
+	if err := p.wait(context.Background()); err != nil || len(p.longWindow) != 65 {
 		t.Fatalf("foreground reserve: %v %d", err, len(p.longWindow))
 	}
 	p.longWindow = nil
@@ -386,7 +386,7 @@ func TestR104RefreshDiagnosticsCountRequestsAndBudgetSkips(t *testing.T) {
 	// A second, uncached identity must be denied without going to transport.
 	now := time.Now()
 	p.limitMu.Lock()
-	for len(p.longWindow) < 30 {
+	for len(p.longWindow) < 64 {
 		p.longWindow = append(p.longWindow, now)
 	}
 	p.limitMu.Unlock()

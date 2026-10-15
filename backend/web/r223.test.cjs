@@ -61,7 +61,7 @@ test('R223 foreign tabs display region badges and metadata keeps the name-side r
  try {
   const f=compile(gameplay,['renderPlayerTabWorkspace','tabServerLabel','tabServerID','riotTab'],{state,document:dom.window.document,overviewWorkspace:()=>({tabs}),tabGroup:()=> 'kr',connected:()=>true,escapeHTML,CN_SERVER_LABELS:{},assetPath:()=>'',assetIcon:()=>'',prepareImages:()=>{},requestAnimationFrame:fn=>fn(),updatePlayerTabScrollControls:()=>{}});
   f.renderPlayerTabWorkspace('kr');assert.deepEqual([...tabs.querySelectorAll('.player-tab-region')].map(e=>e.textContent),['日服','巴西']);
-  const render=extract(gameplay,'renderOverviewBodyContent');assert.match(render,/summoner-name-meta[^\n]+\$\{playerTag\}\$\{regionChip\}/);assert.doesNotMatch(render,/summoner-level-row[^\n]+\$\{regionChip\}/);
+  const render=extract(gameplay,'renderSummonerStrip');assert.match(render,/summoner-name-meta[^\n]+\$\{meta\}/);assert.doesNotMatch(render,/summoner-level-row[^\n]+\$\{regionChip\}/);
   assert.match(gameplay,/kr: "外服"/);assert.match(fs.readFileSync(path.join(__dirname,'pro-players.js'),'utf8'),/韩服/);
  }finally {dom.window.close();}
 });

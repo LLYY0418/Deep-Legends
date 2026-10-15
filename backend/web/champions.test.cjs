@@ -947,7 +947,7 @@ test("arena narrow layout moves the champion list into an accessible dialog", ()
   assert.match(script, /<dialog class="mayhem-tier-dialog arena-tier-dialog"/);
   assert.match(script, /aria-controls="arena-tier-dialog" data-open-arena-tiers/);
   assert.equal((script.match(/class="button button-primary tier-trigger"/g) || []).length, 2);
-  assert.match(script, /class="icon-button control-icon-button tier-dialog-close"[^>]+aria-label="关闭英雄梯度"[^>]*><svg class="control-icon"/);
+  assert.match(script, /class="icon-button control-icon-button tier-dialog-close"[^>]+aria-label="关闭英雄梯度"[^>]*><svg class="control-icon function-icon"/);
   assert.match(script, /function mountArenaTierDialog\(\)/);
   assert.match(script, /function openArenaTierDialog\(trigger\)/);
   assert.match(script, /function closeArenaTierDialog\(restoreFocus = true\)/);
@@ -1771,7 +1771,7 @@ test("career ranked queue switches use one recent sample and ignore season scan 
 	assert.doesNotMatch(gameplayScript, /function renderSeasonProgressBadge/);
 	const entries = functionSource(gameplayScript, "careerSectionEntries");
 	assert.doesNotMatch(entries, /render(?:RecentRanked|Ability|PositionStats)\([^\n]*seasonStatsProgress/);
-	assert.match(entries, /renderChampionStats\(championRows, championOverall, championProgress,championStatsPending\(championRows,championOverall,championProgress,tab\)\)/);
+	assert.match(entries, /renderChampionStats\(championRows, championOverall, championProgress,[^\n]*championStatsPending\(championRows,championOverall,championProgress,tab\)\)/);
 	assert.match(entries, /const championProgress = opggSeason[\s\S]*: data\.seasonStatsProgress/);
 });
 
@@ -2192,7 +2192,7 @@ test("player tab avatars have no tooltip while overflowing names retain their ow
     assert.equal(avatar.alt, "", "adjacent player name already labels this tab");
     assert.doesNotMatch(tabs.innerHTML, /profile 17/);
     const name = tabs.querySelector(".player-tab-name");
-    assert.equal(name.dataset.tooltip, state.tabs[0].label);
+    assert.equal(name.dataset.tooltip, state.tabs[0].label+" · 国服");
     assert.equal(name.dataset.tooltipOverflow, "self");
     assert.equal(tabs.querySelector(".player-tab").getAttribute("role"), "tab");
   } finally { dom.window.close(); }
@@ -2381,7 +2381,7 @@ test("top search and player navigation preserve the selected Chinese server", ()
   assert.match(appScript, /window\.addEventListener\("deep-legends:status"[^\n]+updateSearchRegionStatus/);
   assert.match(appScript, /savePreference\("search-server-id"/);
   assert.match(appScript, /detail: \{ gameName, tagLine, region, serverId, source: "search" \}/);
-  assert.match(html, /id="player-search-go"[^>]*>[\s\S]*?<path d="M5 12h14"\/><path d="m12 5 7 7-7 7"\/>/);
+  assert.match(html, /id="player-search-go"[^>]*>[\s\S]*?<use href="\/icons.svg#dl-icon-/);
   assert.match(appStyles, /#player-search-go\s*\{[^}]*background:\s*var\(--primary\)/s);
   assert.match(appScript, /for \(const input of \[el\.playerSearchName, el\.playerSearchTag\]\)[\s\S]*event\.key === "Enter"[\s\S]*submitPlayerSearch\(\)/);
   assert.match(appScript, /playerSearchGo\.addEventListener\("click", submitPlayerSearch\)/);
@@ -6576,7 +6576,7 @@ test("R58 mutation probes reject stale-roster and Arena fallback regressions", (
 	);
 });
 
-// 「过去 30 天排位」整块已删除：它与「近 20 场排位」共用同一批 20 场详情战绩，
+// 「过去 30 天排位」整块已删除：它与「近期排位」共用同一批 20 场详情战绩，
 // 只是把落在 30 天内的那部分再算一次胜率/KDA，窗口还不精确（会标「以上」）。
 test("the duplicated 30-day ranked card is gone from every layer", () => {
 	for (const source of [gameplayScript, gameplayStyles, demoScript]) {
@@ -6591,9 +6591,9 @@ test("the duplicated 30-day ranked card is gone from every layer", () => {
 // 与右边高亮的页签重复。页签本身已经把当前队列表达清楚了。
 test("ranked queue switchers drop the redundant text label", () => {
 	const toolbars = gameplayScript.match(/<div class="career-section-tools">[\s\S]*?<\/div>/g) || [];
-	assert.equal(toolbars.length, 6, "近 20 场排位、能力表现和位置偏好各只有数据态与空态");
+	assert.equal(toolbars.length, 7, "包含同结构骨架头部的队列切换器");
 	for (const toolbar of toolbars) {
-		assert.equal(toolbar, '<div class="career-section-tools">${tools}</div>');
+		assert.match(toolbar,/rankedQueueSwitcher|\$\{tools\}/);
 	}
 	// 页签本体必须还在，否则就不是「去掉提示」而是把切换功能一起删了。
 	assert.match(gameplayScript, /class="ranked-queue-button[\s\S]*?data-ranked-queue="440"[\s\S]*?灵活组排/);

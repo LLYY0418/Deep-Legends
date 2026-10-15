@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const championNetworkSettingsFile = "champion-network.json"
@@ -83,6 +84,8 @@ func saveChampionNetworkSettings(store *localStore, settings championNetworkSett
 	return atomicWriteFile(filepath.Join(store.root, championNetworkSettingsFile), data, 0o600)
 }
 
+func getenvSystemProxy() string { return os.Getenv("DEEP_LEGENDS_SYSTEM_PROXY") }
+
 func championProxyFor(settings championNetworkSettings) (func(*http.Request) (*url.URL, error), string, error) {
 	settings, err := validateChampionNetworkSettings(settings)
 	if err != nil {
@@ -95,7 +98,7 @@ func championProxyFor(settings championNetworkSettings) (func(*http.Request) (*u
 	if settings.Mode == "auto" {
 		proxyAddress = strings.TrimSpace(os.Getenv("DEEP_LEGENDS_SYSTEM_PROXY"))
 		if proxyAddress == "" {
-			return http.ProxyFromEnvironment, "系统/环境代理（未检测到时直连）", nil
+			return nil, "直连", nil
 		}
 	}
 	parsed, err := url.Parse(proxyAddress)
@@ -123,6 +126,7 @@ func (a *app) handleSystemProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	if proxy == "" {
 		_ = os.Unsetenv("DEEP_LEGENDS_SYSTEM_PROXY")
+		a.refreshAutomaticNetworkProxy("")
 		respondJSON(w, map[string]any{"ok": true, "proxy": ""})
 		return
 	}
@@ -131,6 +135,7 @@ func (a *app) handleSystemProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = os.Setenv("DEEP_LEGENDS_SYSTEM_PROXY", proxy)
+	a.refreshAutomaticNetworkProxy(proxy)
 	respondJSON(w, map[string]any{"ok": true, "proxy": proxy})
 }
 
@@ -163,4 +168,87 @@ func (a *app) handleChampionNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, provider.networkStatus())
+}
+
+func (a *app) refreshAutomaticNetworkProxy(raw string) {
+	p := a.champions
+	if p == nil {
+		return
+	}
+	p.clientMu.RLock()
+	client := p.client
+	p.clientMu.RUnlock()
+	if client != nil {
+		if t, ok := client.Transport.(*automaticNetworkTransport); ok && t.settings.Mode == "auto" {
+			t.refreshProxy(raw)
+			for group := range networkProbeURLs {
+				t.probeGroup(group)
+			}
+		}
+	}
+}
+func (a *app) recoverExternalNetwork() {
+	riotRelays.mu.Lock()
+	riotRelays.nextTry = time.Time{}
+	riotRelays.failures = 0
+	riotRelays.networkFailures = 0
+	manager := riotRelays.entryManager
+	riotRelays.mu.Unlock()
+	if manager != nil {
+		manager.mu.Lock()
+		for _, entry := range manager.runtime {
+			entry.until = time.Time{}
+			entry.consecutive = 0
+			entry.backoffs = 0
+		}
+		manager.mu.Unlock()
+	}
+	riotUserKeys.mu.Lock()
+	if riotUserKeys.networkFailures > 0 {
+		riotUserKeys.networkFailures = 0
+		riotUserKeys.routeUntil = time.Time{}
+	}
+	riotUserKeys.mu.Unlock()
+	clearRiotAccountNetworkFailures(a.riot, map[*riotProvider]bool{})
+	if p := a.champions; p != nil && p.hexdata != nil {
+		h := p.hexdata
+		h.mu.Lock()
+		h.state.Circuits = map[string]hexdataCircuitState{}
+		h.saveStateLocked()
+		h.mu.Unlock()
+	}
+	if c := a.mayhemRatings; c != nil {
+		c.mu.Lock()
+		for key, item := range c.cache {
+			if !item.outcome.response.Available && item.outcome.response.UnavailableReason != "未收录" {
+				delete(c.cache, key)
+			}
+		}
+		c.mu.Unlock()
+	}
+	a.recordDiagnostic(map[string]any{"event": "network_proxy_recovered"})
+	a.broadcastEvent(`{"type":"riot-relay-recovered"}`)
+}
+
+func clearRiotAccountNetworkFailures(p *riotProvider, seen map[*riotProvider]bool) {
+	if p == nil || seen[p] {
+		return
+	}
+	seen[p] = true
+	p.accountMu.Lock()
+	for key, item := range p.accountCache {
+		if item.err != nil {
+			delete(p.accountCache, key)
+		}
+	}
+	p.accountMu.Unlock()
+	p.platformMu.Lock()
+	children := []*riotProvider{p.relayProvider}
+	for _, child := range p.platforms {
+		children = append(children, child)
+	}
+	p.platformMu.Unlock()
+	for _, child := range children {
+		clearRiotAccountNetworkFailures(child, seen)
+	}
 }

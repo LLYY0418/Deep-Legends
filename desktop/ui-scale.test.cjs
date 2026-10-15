@@ -150,9 +150,9 @@ function harness({source=mainSource, stored, width=1920, height=1080}={}) {
 
 test("titlebar, minimum size, reload, resize and display events run through the real main module", () => {
   const h=harness();
-  assert.equal(h.probe.titleBarOverlay("dark",false,2).height,112);
-  assert.equal(h.probe.titleBarOverlay("dark",false,1.25).height,70);
-  assert.equal(h.probe.titleBarOverlay("light",true,2).height,112);
+  assert.equal(h.probe.titleBarOverlay("dark",false,2).height, 56);
+  assert.equal(h.probe.titleBarOverlay("dark",false,1.25).height, 56);
+  assert.equal(h.probe.titleBarOverlay("light",true,2).height, 56);
   h.window.webContents.emit("did-finish-load");
   assert.deepEqual(h.scales(),[1]);assert.deepEqual(h.minimum,[[780,600]]);
   assert.deepEqual(h.zoom,[],"the shell must never zoom the page itself");
@@ -162,16 +162,16 @@ test("titlebar, minimum size, reload, resize and display events run through the 
   h.tick(1);assert.deepEqual(h.scales(),[]);
   h.window.bounds={width:3840,height:2160};h.window.emit("resize");
   h.tick(299);assert.deepEqual(h.scales(),[]);h.tick(1);
-  assert.deepEqual(h.scales(),[2]);assert.deepEqual(h.minimum.at(-1),[1560,1200]);assert.equal(h.overlays.at(-1).height,112);
+  assert.deepEqual(h.scales(),[2]);assert.deepEqual(h.minimum.at(-1),[1560,1200]);assert.equal(h.overlays.at(-1).height, 56);
   h.window.webContents.emit("did-finish-load");h.window.webContents.emit("did-finish-load");
   assert.deepEqual(h.scales(),[2,2,2],"reload must reapply even at the same step");
   h.window.bounds={width:2560,height:1440};h.screen.emit("display-metrics-changed");
   assert.equal(h.scales().at(-1),1.33);
-  h.nativeTheme.emit("updated",{notAScale:true});assert.equal(h.overlays.at(-1).height,74);
-  h.ipcMain.emit("desktop-modal",{},true);assert.equal(h.overlays.at(-1).height,74);
+  h.nativeTheme.emit("updated",{notAScale:true});assert.equal(h.overlays.at(-1).height, 56);
+  h.ipcMain.emit("desktop-modal",{},true);assert.equal(h.overlays.at(-1).height, 56);
   // 渲染进程汇报的倍率是权威：外壳按它同步标题栏与最小尺寸。
   h.ipcMain.emit("desktop-scale-applied",{sender:h.window.webContents},2);
-  assert.equal(h.scales().at(-1),2);assert.equal(h.overlays.at(-1).height,112);
+  assert.equal(h.scales().at(-1),2);assert.equal(h.overlays.at(-1).height, 56);
   h.ipcMain.emit("desktop-scale-applied",{sender:{isDestroyed:()=>false,getURL:()=>"https://untrusted.invalid/"}},2.5);
   assert.equal(h.scales().at(-1),2,"untrusted senders cannot move the shell chrome");
   // 必须用 getContentBounds：getBounds 含边框（+30/+60），会把倍率算大。
@@ -199,7 +199,7 @@ test("IPC restores independent preferences, normalizes fixed values and rejects 
 });
 
 test("main behavior guards reject titlebar, minimum size, trust, reload, debounce and export mutants", () => {
-  function titleGuard(source){const h=harness({source});assert.equal(h.probe.titleBarOverlay("dark",false,2).height,112);}
+  function titleGuard(source){const h=harness({source});assert.equal(h.probe.titleBarOverlay("dark",false,2).height, 56);}
   function minimumGuard(source){const h=harness({source});h.set("fixed",2);assert.deepEqual(h.minimum.at(-1),[1560,1200]);}
   function trustGuard(source){const h=harness({source});const writes=h.writes.length;h.window.url="https://untrusted.invalid/";h.set("fixed",2);h.window.url="http://127.0.0.1:8787/";assert.equal(h.get().mode,"auto");assert.equal(h.writes.length,writes);}
   function reloadGuard(source){const h=harness({source});h.window.webContents.emit("did-finish-load");h.window.webContents.emit("did-finish-load");assert.deepEqual(h.scales(),[1,1]);}
@@ -209,7 +209,7 @@ test("main behavior guards reject titlebar, minimum size, trust, reload, debounc
   for(const guard of [titleGuard,minimumGuard,trustGuard,reloadGuard,resizeGuard,appliedGuard,noPageZoomGuard])guard(mainSource);
   assert.throws(()=>appliedGuard(mainSource.replace('ipcMain.on("desktop-scale-applied", (event, scale) => {\n    if (!isTrustedRenderer(event.sender) || event.sender !== mainWindow?.webContents) return;','ipcMain.on("desktop-scale-applied", (event, scale) => {')));
   assert.throws(()=>noPageZoomGuard(mainSource.replace("  currentUiScale = scale;\n  syncTitleBar(scale);","  currentUiScale = scale;\n  window.webContents.setZoomFactor(scale);\n  syncTitleBar(scale);")));
-  assert.throws(()=>titleGuard(mainSource.replace("Math.round(56 * scale)","56")));
+  assert.throws(()=>titleGuard(mainSource.replace("const height = 56;","const height = Math.round(56 * scale);")));
   assert.throws(()=>minimumGuard(mainSource.replace("window.setMinimumSize(Math.round(780 * scale), Math.round(600 * scale));","")));
   assert.throws(()=>trustGuard(mainSource.replace('ipcMain.on("desktop-scale-set", (event, mode, value) => {\n    if (!isTrustedRenderer(event.sender)) return;', 'ipcMain.on("desktop-scale-set", (event, mode, value) => {')));
   assert.throws(()=>reloadGuard(mainSource.replace('mainWindow.webContents.on("did-finish-load",', 'mainWindow.webContents.once("did-finish-load",')));

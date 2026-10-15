@@ -10,7 +10,7 @@ test('three recovery rounds keep exactly one keyed activity section and share bu
 });
 test('async career data updates its card while retaining scrolled match list',()=>{
  const dom=new JSDOM('<main><aside class="career-column"><section data-career-key="champions">pending</section></aside><div class="match-list"><article>match</article></div></main>'),root=dom.window.document.querySelector('main'),list=root.querySelector('.match-list'),entry=list.firstChild;let fullRenders=0;const noop=()=>{};
- const deps={document:dom.window.document,overviewContainer:()=>root,careerSectionEntries:()=>[['champions','<section data-career-key="champions">ready</section>']],rerenderTab:()=>{fullRenders++;root.innerHTML='reset';},bindPlayerLinks:noop,bindRankHistoryControls:noop,bindRankedQueueControls:noop,bindMayhemRatingControls:noop,bindOverviewShareControls:noop,applyRenderedMetricStyles:noop,prepareImages:noop};
+ const deps={document:dom.window.document,overviewContainer:()=>root,careerSectionEntries:()=>[['champions','<section data-career-key="champions">ready</section>']],rerenderTab:()=>{fullRenders++;root.innerHTML='reset';},bindOverviewContent:noop,bindPlayerLinks:noop,bindRankHistoryControls:noop,bindRankedQueueControls:noop,bindMayhemRatingControls:noop,bindOverviewShareControls:noop,applyRenderedMetricStyles:noop,prepareImages:noop};
  const fn=compile(source,['updateCareerCards'],deps).updateCareerCards;fn({data:{}},'opgg_season');assert(root.querySelector('[data-career-key="champions"]'),'async update must keep career card');assert.equal(root.querySelector('[data-career-key="champions"]').textContent,'ready');assert.equal(root.querySelector('.match-list'),list);assert.equal(list.firstChild,entry);assert.equal(fullRenders,0);dom.window.close();
 });
 

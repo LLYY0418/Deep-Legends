@@ -15,7 +15,7 @@ function functionSource(source, name) {
   let start = source.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `${name} source not found`);
   if (source.slice(Math.max(0, start - 6), start) === "async ") start -= 6;
-  const bodyStart = source.indexOf("{", start);
+  const bodyStart = source.indexOf(") {", start)+2;
   let depth = 0;
   let quote = "";
   let escaped = false;

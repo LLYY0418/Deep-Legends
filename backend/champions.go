@@ -89,6 +89,7 @@ type championProvider struct {
 	client                *http.Client
 	network               championNetworkSettings
 	activeProxy           string
+	networkRecovered      func()
 	cache                 *championDataCache
 	diag                  func(event map[string]any)
 	mu                    sync.Mutex
@@ -719,11 +720,12 @@ func newChampionHTTPClient(proxy func(*http.Request) (*url.URL, error)) *http.Cl
 }
 
 func (p *championProvider) setNetworkSettings(settings championNetworkSettings) error {
-	proxy, active, err := championProxyFor(settings)
+	_, active, err := championProxyFor(settings)
 	if err != nil {
 		return err
 	}
-	client := newChampionHTTPClient(proxy)
+	client := newChampionHTTPClient(nil)
+	client.Transport = newAutomaticNetworkTransport(settings, p)
 	p.clientMu.Lock()
 	previous := p.client
 	p.client, p.network, p.activeProxy = client, settings, active
@@ -737,7 +739,13 @@ func (p *championProvider) setNetworkSettings(settings championNetworkSettings) 
 func (p *championProvider) networkStatus() championNetworkStatus {
 	p.clientMu.RLock()
 	defer p.clientMu.RUnlock()
-	return championNetworkStatus{championNetworkSettings: p.network, Active: p.activeProxy}
+	active := p.activeProxy
+	if p.client != nil {
+		if t, ok := p.client.Transport.(*automaticNetworkTransport); ok {
+			active = t.active()
+		}
+	}
+	return championNetworkStatus{championNetworkSettings: p.network, Active: active}
 }
 
 func (a *app) championDataProvider() *championProvider {

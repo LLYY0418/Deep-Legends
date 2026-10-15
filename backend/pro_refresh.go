@@ -39,8 +39,8 @@ func (p *riotProvider) admitRiotBackground(ctx context.Context) error {
 	}
 	p.shortWindow = pruneTimestamps(p.shortWindow, now.Add(-time.Second))
 	p.longWindow = pruneTimestamps(p.longWindow, now.Add(-2*time.Minute))
-	// 30 is shared instantaneous occupancy, NOT a separate background token bucket.
-	if len(p.limitQueue) > 0 || len(p.shortWindow) >= 15 || len(p.longWindow) >= 30 {
+	// Reserve the final thirty percent of the shared window for interactive work.
+	if len(p.limitQueue) > 0 || len(p.shortWindow) >= 15 || len(p.longWindow)*10 > 90*7 {
 		if cost := proRefreshCostFromContext(ctx); cost != nil {
 			cost.skipped.Add(1)
 		}

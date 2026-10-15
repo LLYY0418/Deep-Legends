@@ -1018,7 +1018,7 @@
     "file": "backend/r104_test.go",
     "line": 135,
     "target": "calls",
-    "source_sha256": "8d170c1ecb91ee3c98751163bda4f5d1cfef5ca9884ff210abd69098580c3a77",
+    "source_sha256": "8eb493e32d670057a441300b9f3de80336d3cd2ce20f469918ac4e62980d1a5b",
     "comment": "r276-capture-safe: TestR104ExactDirectoryMatchAvoidsRiotAndMissFallsBack: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
@@ -1256,7 +1256,7 @@
     "file": "backend/r177_test.go",
     "line": 274,
     "target": "now",
-    "source_sha256": "f7684b0cb1d61fdb9b4362eb8b889bdf61a3cbb7193170059b08c43e40730c62",
+    "source_sha256": "6803e1049a50373dcb103dc4ca2dd2d9cfb8385853ff43dea381c7b8bf91f954",
     "comment": "r276-capture-safe: TestR177StarterShortQueueWaitIsObserved: the audited fixture operations in this test invoke this callback serially and return before now is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
@@ -1452,7 +1452,7 @@
     "file": "backend/r204_key_test.go",
     "line": 142,
     "target": "event",
-    "source_sha256": "75120920aaa2d522431fa4ff0125fede3df6e17487b73d08dc78554de0096503",
+    "source_sha256": "be9fe0d20f89e1544e5708c5f7abb9cd78ade3309ca934d6138f8cdfc5edf833",
     "comment": "r276-capture-safe: TestR204KeyMigration: the audited fixture operations in this test invoke this callback serially and return before event is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

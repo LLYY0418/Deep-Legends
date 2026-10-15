@@ -61,10 +61,11 @@ const trackedHTTP = {
 const context = vm.createContext({ __dirname: desktop, URL, Buffer, console,
   Date: class extends Date { static now() { return now; } },
   process: { on() {}, platform: "win32", env: {}, resourcesPath: "/synthetic/resources", getCreationTime: () => 900 },
+  setInterval(){return {unref(){}}},
   setTimeout(fn, delay) { const id = ++timerID; timers.set(id, { fn, delay }); return id; },
   clearTimeout(id) { timers.delete(id); }, setImmediate,
   require(name) {
-    if (name === "electron") return { app, BrowserWindow: Window, ipcMain, screen, nativeTheme, dialog: {}, shell: {},
+    if (name === "electron") return { app, powerMonitor:new EventEmitter(), BrowserWindow: Window, ipcMain, screen, nativeTheme, dialog: {}, shell: {},
       session: { defaultSession: { setPermissionCheckHandler() {}, setPermissionRequestHandler() {} } } };
     if (name === "node:http") return trackedHTTP;
     if (name === "node:fs") return {

@@ -21,7 +21,7 @@ function harness(text = source) {
     isDestroyed() { return this.destroyed; }
     close() { this.destroyed = true; this.visible = false; this.emit("closed"); }
   }
-  const electron = { app, BrowserWindow: Window, ipcMain: new EventEmitter(), nativeTheme: new EventEmitter(),
+  const electron = { app, powerMonitor:new EventEmitter(), BrowserWindow: Window, ipcMain: new EventEmitter(), nativeTheme: new EventEmitter(),
     dialog: { showMessageBox: () => Promise.resolve() }, shell: {},
     session: { defaultSession: { setPermissionCheckHandler() {}, setPermissionRequestHandler() {} } } };
   electron.ipcMain.handle = () => {};
@@ -30,6 +30,7 @@ function harness(text = source) {
     process: { on() {}, platform: "win32", env: {}, resourcesPath: "/test/resources", getCreationTime: () => 900 },
     setTimeout(fn, delay) { const id = ++timerID; timers.set(id, { fn, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
+    setInterval(){return {unref(){}}},
     require(name) {
       if (name === "electron") return electron;
       if (name === "node:fs") return { readFileSync: () => Buffer.from("logo"), existsSync: () => true, mkdirSync() {}, appendFileSync() {} };

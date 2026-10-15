@@ -64,7 +64,7 @@ func TestR110MethodQuotaAndShared429Cooldown(t *testing.T) {
 func TestR110OutOfOrderCountsKeepReservationsAndBackgroundYields(t *testing.T) {
 	now := time.Now()
 	p := &riotProvider{limitNow: func() time.Time { return now }}
-	r110Advertise(p, "asia", "/method", "100:120", "29:120")
+	r110Advertise(p, "asia", "/method", "100:120", "69:120")
 	ctx := r110RateContext("asia", "/method")
 	for i := 0; i < 6; i++ {
 		if err := p.wait(ctx); err != nil {
@@ -75,7 +75,7 @@ func TestR110OutOfOrderCountsKeepReservationsAndBackgroundYields(t *testing.T) {
 	if err := p.admitRiotBackground(ctx); !errors.Is(err, errThrottled) {
 		t.Fatal("background used foreground reserve", err)
 	}
-	for i := 35; i < 100; i++ {
+	for i := 75; i < 100; i++ {
 		if err := p.wait(ctx); err != nil {
 			t.Fatal(err)
 		}

@@ -6,7 +6,7 @@ const path = require("node:path");
 const root = __dirname;
 const cssFiles = fs.readdirSync(root).filter((name) => name.endsWith(".css"));
 const cssText = cssFiles.map((name) => fs.readFileSync(path.join(root, name), "utf8")).join("\n");
-const sourceFiles = fs.readdirSync(root).filter((name) => /\.(?:js|html)$/.test(name) && !name.endsWith(".test.cjs"));
+const sourceFiles = fs.readdirSync(root).filter((name) => (/\.(?:js|html)$/.test(name) || name==="icons.svg") && !name.endsWith(".test.cjs"));
 const sourceText = sourceFiles.map((name) => fs.readFileSync(path.join(root, name), "utf8")).join("\n");
 const hexText = `${cssText}\n${sourceText}`;
 const classes = new Set([...cssText.matchAll(/\.([A-Za-z_][\w-]*)/g)].map((match) => match[1]));

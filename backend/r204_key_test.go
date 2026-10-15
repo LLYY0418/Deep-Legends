@@ -80,7 +80,7 @@ func TestR204KeySaveAndClear(t *testing.T) {
 			if status == 0 {
 				want = "network_error"
 			}
-			if effectiveKey, _ := riotUserKeys.effective(); result != want || effectiveKey != key || riotKeyState() != "configured" {
+			if effectiveKey, _ := riotUserKeys.effective(); result != want || effectiveKey != key || riotKeyState() != map[bool]string{true: "unverified", false: "configured"}[status == 0] {
 				t.Fatal("accepted credential unavailable")
 			}
 			reloaded := loadRiotKeyStore(s.store)
@@ -119,7 +119,7 @@ func TestR204KeyMigration(t *testing.T) {
 	for _, kind := range []string{"embedded", "user", "public", "cleared"} {
 		t.Run(kind, func(t *testing.T) {
 			s := r204KeyFixture(t)
-			want := "ok"
+			want := "skipped_no_embedded"
 			riotEmbeddedKey = func() string { return "fixture-embedded" }
 			if kind == "user" || kind == "cleared" {
 				s.mu.Lock()
@@ -145,8 +145,8 @@ func TestR204KeyMigration(t *testing.T) {
 			if event["result"] != want {
 				t.Fatal(event)
 			}
-			if kind == "embedded" && loadRiotKeyStore(s.store).key != "fixture-embedded" {
-				t.Fatal("migration unavailable after restart")
+			if kind == "embedded" && loadRiotKeyStore(s.store).key != "" {
+				t.Fatal("migration must not create a user key")
 			}
 			if kind == "user" && s.key != r204FixtureKey {
 				t.Fatal("migration overwrote user")

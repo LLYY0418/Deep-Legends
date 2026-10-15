@@ -5,7 +5,7 @@ const source=fs.readFileSync(process.env.R266_GAMEPLAY_SOURCE || __dirname+'/gam
 test('R266 P3 pending streamed matches show five skeletons; arrived zero shows empty',async()=>{
  const tab={loading:true,data:{player:{},matches:[]},overviewCardLoad:{ready:new Set()}};
  const f=compile(source,['matchesPending','renderPendingMatches','matchListEmptyContent','matchSentinelShouldHide'],{historyServiceState:()=>null,emptyState:(title,copy)=>title+copy,globalThis:{},advancedFilterContext:()=>{}});
- for(const at of [0,500,1000,1400]){if(at)await new Promise(r=>setTimeout(r,at===500?500:at===1000?500:400));const html=f.matchListEmptyContent(tab,null,'');assert.equal((html.match(/class="match-skeleton gameplay-skeleton"/g)||[]).length,5);assert(!/没有符合|共 0 场|战绩未读全/.test(html));assert(f.matchSentinelShouldHide(tab,false));}
+ for(const at of [0,500,1000,1400]){if(at)await new Promise(r=>setTimeout(r,at===500?500:at===1000?500:400));const html=f.matchListEmptyContent(tab,null,'');assert.equal((html.match(/class="match-entry match-pending match-skeleton"/g)||[]).length,5);assert(!/没有符合|共 0 场|战绩未读全/.test(html));assert(f.matchSentinelShouldHide(tab,false));}
  tab.matchesReceived=true;tab.loading=false;assert.match(f.matchListEmptyContent(tab,null,''),/没有符合条件的对局/);
 });
 test('R266 P4 new session resets previous collection clock; failure reason belongs to current session',()=>{

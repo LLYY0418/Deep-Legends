@@ -7,7 +7,7 @@
 }
 .friends-toggle:active { transform: translateY(1px); }
 .friends-toggle:hover { color: var(--ink); background: var(--surface-strong); border-color: var(--hex-line); }
-.friends-toggle svg { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.friends-toggle svg {   flex-shrink: 0; fill: none; stroke: currentColor;  stroke-linecap: round; stroke-linejoin: round; }
 .friends-toggle[aria-expanded="true"] { color: var(--primary-strong); background: var(--primary-soft); border-color: color-mix(in oklab, var(--primary) 46%, var(--line)); }
 .friends-toggle[disabled] { opacity: .5; cursor: not-allowed; }
 .friends-toggle[disabled]:hover { color: var(--muted); background: var(--surface); border-color: var(--line); transform: none; }
@@ -36,7 +36,7 @@
 
 .friends-search { display: flex; align-items: center; gap: 8px; margin: 0 14px 8px 16px; padding: 0 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .friends-search:focus-within { border-color: var(--focus); }
-.friends-search svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--muted); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.friends-search svg {   flex-shrink: 0; color: var(--muted); fill: none; stroke: currentColor;  stroke-linecap: round; }
 .friends-search input { flex: 1; min-width: 0; padding: 7px 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; }
 .friends-search input:focus { outline: none; }
 
@@ -84,7 +84,7 @@
 
 /* 空态与骨架 */
 .friends-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 44px 22px; color: var(--muted); font-size: 12px; line-height: 1.7; text-align: center; }
-.friends-empty svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+.friends-empty svg {   fill: none; stroke: currentColor;  stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
 .friends-empty .text-button { font-size: 12px; }
 .friends-skeleton { display: grid; gap: 10px; padding: 12px 8px; }
 .friends-skeleton span { display: block; height: 44px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--surface) 82%, var(--ink)); opacity: .35; animation: friends-pulse 1.4s ease-in-out infinite; }
