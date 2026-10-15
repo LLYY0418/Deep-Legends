@@ -2,15 +2,19 @@
 const fs=require('node:fs'),path=require('node:path');
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
 const web=__dirname;
+const {waitFor}=require('../../scripts/lib/wait-progress.cjs');
 const scripts=['runtime.js','demo-data.js','license-ui.js','app.js','favorites-facade.js','section-loader.js','gameplay.js','champions.js','friends.js','suite.js'];
-async function until(check, message='fixture did not settle', timeout=5000){
- const end=Date.now()+timeout;
- while(Date.now()<end){if(check())return;await new Promise(r=>setTimeout(r,10));}
- throw Error(message);
+// R279 P3: the old fixed 5000 ms window failed whenever five jsdom workers shared two CPUs ("full app did
+// not mount"). Wait while the fixture keeps making progress (DOM growth, fetches); fail only after
+// `timeout` (never less than 15 s) without any, or after the hard ceiling.
+const activity={w:null,fetches:0};
+async function until(check, message='fixture did not settle', timeout=5000, progress){
+ await waitFor(()=>check(),{label:message,idleMs:Math.max(timeout,15000),hardMs:120000,progress:progress||(()=>({nodes:activity.w?.document.getElementsByTagName('*').length,fetches:activity.fetches}))});
 }
 async function boot(){
  const dom=new JSDOM(fs.readFileSync(path.join(web,'index.html'),'utf8'),{url:'http://127.0.0.1:1/?demo',runScripts:'outside-only',pretendToBeVisual:true});
  const w=dom.window,errors=[],observers=new Set(),NativeObserver=w.MutationObserver;
+ activity.w=w;activity.fetches=0;
  w.MutationObserver=class extends NativeObserver{constructor(callback){super(callback);observers.add(this)}};
  w.onerror=(_message,_source,_line,_column,error)=>errors.push(String(error?.stack||_message));
  w.addEventListener('unhandledrejection',event=>errors.push(String(event.reason?.stack||event.reason)));
@@ -19,7 +23,7 @@ async function boot(){
  w.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
  w.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
  w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.Element.prototype.scrollTo=()=>{};
- Object.assign(w,{structuredClone:globalThis.structuredClone,fetch:(input,init)=>String(input).startsWith("/api/diagnostics/client")?Promise.resolve(new globalThis.Response("{}")):globalThis.fetch(input,init),Response:globalThis.Response,Headers:globalThis.Headers,Request:globalThis.Request});
+ Object.assign(w,{structuredClone:globalThis.structuredClone,fetch:(input,init)=>{activity.fetches++;return String(input).startsWith("/api/diagnostics/client")?Promise.resolve(new globalThis.Response("{}")):globalThis.fetch(input,init);},Response:globalThis.Response,Headers:globalThis.Headers,Request:globalThis.Request});
  require('../../desktop/license-render-fixture.cjs').installLicenseRenderFixture(w);
  const append=w.document.head.append.bind(w.document.head);
  w.document.head.append=node=>{const result=append(node);if(node.tagName==='SCRIPT' && node.getAttribute('src')==='/match-details.js')queueMicrotask(()=>{try{w.eval(fs.readFileSync(path.join(web,'match-details.js'),'utf8'));node.onload();}catch(error){errors.push(String(error));node.onerror();}});return result;};

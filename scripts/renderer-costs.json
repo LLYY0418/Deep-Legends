@@ -217,6 +217,7 @@
   "scripts/r277-release-contracts.test.cjs": 54,
   "scripts/r278-follow-readiness.test.cjs": 1000,
   "scripts/r278-progress-runner.test.cjs": 1000,
+  "scripts/r278-r192-wait.test.cjs": 1000,
   "scripts/r278-release-contracts.test.cjs": 48,
   "scripts/r278-topbar-settle.test.cjs": 1000,
   "scripts/r82-startup-ab-report.test.cjs": 181,
@@ -225,5 +226,6 @@
   "scripts/renderer-budget-gate.test.cjs": 10523,
   "scripts/setup-only-build.test.cjs": 12454,
   "scripts/verify-ci-test-filters.test.cjs": 19764,
-  "scripts/verify-no-docs-tracked.test.cjs": 468
+  "scripts/verify-no-docs-tracked.test.cjs": 468,
+  "scripts/wait-progress.test.cjs": 1000
 }

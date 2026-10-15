@@ -117,7 +117,9 @@ func TestR180MergedLatestSameQueueAndDedup(t *testing.T) {
 	ref := r161Ref(1)
 	f.a.setQueueFilterCapability("HN1", "flex:q_440", queueFilterCapabilityUnsupported)
 	scope := f.a.liveHistoryFreshnessForGame(f.c, 180, 440)
+	observedFrom := time.Now()
 	result := f.load(ref, false, scope, 100, 2)
+	observedUntil := time.Now()
 	selected := recentMatchesForPlayer(result.Matches, ref, 10, 440)
 	if len(selected) != 10 || selected[0].GameID != 112 || selected[9].GameID != 103 {
 		t.Fatalf("latest ten: %#v", selected)
@@ -142,9 +144,10 @@ func TestR180MergedLatestSameQueueAndDedup(t *testing.T) {
 		t.Fatal("different id schemes")
 	}
 	events := r175Events(t, f.a, "live_history_freshness")
-	if len(events) != 1 || events[0]["missing_newer_in_queue"] != nil || events[0]["missing_newer_any"] != nil || events[0]["slot"] != float64(2) || events[0]["team"] != float64(100) || events[0]["shown_newest_age_min"] != float64(8) || events[0]["lcu_newest_queue_age_min"] != nil || events[0]["sgp_newest_queue_age_min"] != float64(8) {
+	if len(events) != 1 || events[0]["missing_newer_in_queue"] != nil || events[0]["missing_newer_any"] != nil || events[0]["slot"] != float64(2) || events[0]["team"] != float64(100) || events[0]["lcu_newest_queue_age_min"] != nil {
 		t.Fatal(events)
 	}
+	r278AssertCaptureAges(t, events[0], f.created(12), observedFrom, observedUntil)
 	encoded, _ := json.Marshal(events)
 	for _, s := range []string{ref, "playerRef", "puuid", "gameId", "game_id", "matchId"} {
 		if strings.Contains(string(encoded), s) {
@@ -237,15 +240,18 @@ func TestR180SourceFailuresAndSelf(t *testing.T) {
 			}
 			return transport.RoundTrip(r)
 		})
+		observedFrom := time.Now()
 		got := f.load(ref, true, scope, 100, 0)
+		observedUntil := time.Now()
 		again := f.load(ref, true, scope, 100, 0)
 		if f.sgpCalls.Load() != 1 || f.lcuCalls.Load() != 1 || !reflect.DeepEqual(got, again) || got.Source != "lcu+sgp" || recentMatchesForPlayer(got.Matches, ref, 10, 440)[0].GameID != 112 {
 			t.Fatal(got, f.sgpCalls.Load())
 		}
 		events := r175Events(t, f.a, "live_history_freshness")
-		if len(events) != 1 || events[0]["is_current"] != true || events[0]["shown_newest_age_min"] != float64(8) || events[0]["sgp_newest_queue_age_min"] != float64(8) {
+		if len(events) != 1 || events[0]["is_current"] != true {
 			t.Fatal(events)
 		}
+		r278AssertCaptureAges(t, events[0], f.created(12), observedFrom, observedUntil)
 	})
 }
 func TestR180PollingFlightsAndExpiry(t *testing.T) {
