@@ -1,6 +1,7 @@
 'use strict';
 // Real R267 page/guards, with backend HTTP(S) upstreams sent to a rejecting
-// loopback proxy. Browser-side nonlocal requests retain their original block.
+// loopback manual proxy (automatic mode may fall back since R280).
+// Browser-side nonlocal requests retain their original block.
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
 const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const root=path.resolve(__dirname,'..'),out=path.resolve(process.env.R275_OFFLINE_OUT||path.join(os.tmpdir(),'r275-offline'));
@@ -15,6 +16,7 @@ async function main(){
  const env={...process.env,HTTP_PROXY:address,HTTPS_PROXY:address,ALL_PROXY:address,http_proxy:address,https_proxy:address,NO_PROXY:'127.0.0.1,localhost',no_proxy:'127.0.0.1,localhost',DEEP_LEGENDS_SYSTEM_PROXY:address,RIOT_API_KEY:'RGAPI-00000000-0000-0000-0000-000000000000'};
  const data=fs.mkdtempSync(path.join(os.tmpdir(),'r275-control-'));
  try{
+  fs.writeFileSync(path.join(data,'champion-network.json'),JSON.stringify({mode:'manual',url:address}));
   backend=spawn(binary,['--desktop'],{cwd:root,env:{...env,LOL_LOOT_DATA_DIR:data},stdio:['ignore','pipe','pipe']});
   const ready=await new Promise((resolve,reject)=>{let text='';const timer=setTimeout(()=>reject(Error('offline control backend timeout')),20000);backend.on('error',reject);backend.stdout.on('data',chunk=>{text+=chunk;for(const line of text.split('\n'))try{const row=JSON.parse(line.replace(/^LOOT_READY /,''));if(row.baseUrl){clearTimeout(timer);resolve(row);}}catch{}});});
   const asset='/latest/plugins/rcp-fe-lol-collections/global/default/images/item-element/crest-and-banner-mastery-10.png';
@@ -27,7 +29,7 @@ async function main(){
   // Compile a temporary in-memory variant under the real script filename so
   // every page assertion, backend and network guard remains identical.
   const code=`const fs=require('node:fs'),Module=require('node:module');const filename=${JSON.stringify(path.join(root,'scripts/r267-browser.cjs'))};let source=fs.readFileSync(filename,'utf8');${name==='no-champion-fixture'?`source=source.replace("['/api/image','/api/champion-asset'].includes(pathname)","pathname==='/api/image'");`:name==='no-spells-fixture'?`source=source.replace("pathname==='/api/gameplay/summoner-spells'","pathname==='/disabled-spell-fixture'");`:''}const m=new Module(filename,module);m.filename=filename;m.paths=Module._nodeModulePaths(require('node:path').dirname(filename));m._compile(source,filename);`;
-  const exitCode=await run(process.execPath,['-e',code],{...env,R267_BROWSER_OUT:folder},path.join(out,name+'.log'));
+  const exitCode=await run(process.execPath,['-e',code],{...env,R267_MANUAL_PROXY:address,R267_BROWSER_OUT:folder},path.join(out,name+'.log'));
   assert.equal(exitCode,mutant?1:0,name+' unexpected result');
   if(mutant){const failure=JSON.parse(fs.readFileSync(path.join(folder,'failure.json'),'utf8'));assert.ok(failure.errors.some(row=>JSON.stringify(row).includes(name==='no-champion-fixture'?'champion-asset':'summoner-spells')),'mutant failed outside the intended network guard');}
   else{const result=JSON.parse(fs.readFileSync(path.join(folder,'result.json'),'utf8'));assert.equal(result.errors.length,0);assert.equal(result.violations.length,0);}

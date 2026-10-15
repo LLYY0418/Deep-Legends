@@ -1271,3 +1271,5 @@ span:has(>.function-icon){display:inline-flex;align-items:center;justify-content
 .function-icon[hidden],.setting-riot-key-reveal[aria-pressed="false"] .riot-key-eye-closed,.setting-riot-key-reveal[aria-pressed="true"] .riot-key-eye-open{display:none!important}
 
 .chroma-mini-lock>.function-icon{width:var(--icon-sm)!important;height:var(--icon-sm)!important;min-width:var(--icon-sm);flex-basis:var(--icon-sm)!important}
+
+.af-capsule .af-capsule-remove>.function-icon{width:var(--icon-sm)!important;height:var(--icon-sm)!important;min-width:var(--icon-sm);flex-basis:var(--icon-sm)!important}

@@ -809,7 +809,7 @@
     const line='<span class="skeleton-line"></span>',square='<span class="skeleton-square"></span>';
     const roster='<div class="match-team-list">'+Array.from({length:5},()=>'<div class="match-player">'+square+line+'</div>').join('')+'</div>';
     const row=`<article class="match-entry match-pending match-skeleton" aria-hidden="true"><div class="match-summary">
-      <div class="match-result-meta">${line.repeat(4)}</div>
+      <div class="match-result-meta">${line.repeat(3)}</div>
       <div data-match-layout class="match-main"><div class="match-champion"><span class="game-icon is-large is-pending"></span><div class="match-loadout-mini">${square.repeat(4)}</div></div><div class="match-kda"><strong>${line}</strong><small>${line}</small></div><div data-match-metrics class="match-stats">${line.repeat(3)}</div><div class="match-build"><div class="match-items">${Array.from({length:8},()=>'<span class="item-slot is-empty"></span>').join('')}</div><div class="match-badges"><span class="match-tags-collection"><button data-match-tags-more hidden></button></span></div></div></div>
       <div class="match-players">${roster.repeat(2)}</div><div class="match-actions">${square.repeat(2)}</div>
     </div></article>`;

@@ -196,7 +196,7 @@
   }
   const button=(text,attribute,selected=false)=>`<button type="button" ${attribute}${selected?' class="is-active" aria-pressed="true"':' aria-pressed="false"'}>${text}</button>`;
   function capsules(cs,ctx,readonly=false) {
-    return Object.entries(cs).map(([category,c])=>`<span class="af-capsule${c.not?' is-not':''}">${readonly?`<span>${categories[category]} <i>|</i> ${c.not?'<em>不是</em> ':''}${escape(summary(category,c,ctx))}</span>`:button(`${categories[category]} <i>|</i> ${c.not?'<em>不是</em> ':''}${escape(summary(category,c,ctx))}`,`data-af-category="${category}"`)+`<button type="button" data-af-remove="${category}" aria-label="删除${categories[category]}条件"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-close"/></svg></button>`}</span>`).join('');
+    return Object.entries(cs).map(([category,c])=>`<span class="af-capsule${c.not?' is-not':''}">${readonly?`<span>${categories[category]} <i>|</i> ${c.not?'<em>不是</em> ':''}${escape(summary(category,c,ctx))}</span>`:button(`${categories[category]} <i>|</i> ${c.not?'<em>不是</em> ':''}${escape(summary(category,c,ctx))}`,`data-af-category="${category}"`)+`<button type="button" class="af-capsule-remove" data-af-remove="${category}" aria-label="删除${categories[category]}条件"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-close"/></svg></button>`}</span>`).join('');
   }
   function optionCount(o,hero) {
     const winrate=Math.round(100*o.wins/o.count);
