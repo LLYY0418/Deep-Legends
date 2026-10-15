@@ -23,3 +23,18 @@ for(const [file,env]of [['r277-frontend-browser.cjs',{}],['r277-deferred-assets-
 test('mutation: breaking the legacy declaration must fail the actual deferred 503 adapter',()=>{
  assert.throws(()=>compileAdapter('r277-deferred-assets-browser.cjs',{R277_DEFERRED_FAULT:'503'},s=>s.replace('let currentCase,clickEvidence;','let currentCase,clickEvidence,extra;')),/Unexpected browser harness anchor: let currentCase,clickEvidence;/);
 });
+
+// Exercise the extracted consumer with the real shared watchdog and a virtual
+// clock as well, so the compatibility stubs above cannot mask broken wiring.
+test('real R265 page watchdog retains held-fetch diagnostics after exactly 10s idle',async()=>{
+ const {waitForPage,PAGE_PROGRESS_EXPRESSION}=require('./lib/wait-progress.cjs');
+ const {PausedRequests,timeoutDiagnostic}=require('./fetch-paused-diagnostics.cjs');
+ let time=0,polls=0,sleeps=0;const tracker=new PausedRequests(()=>time);tracker.attach('raw-session','raw-target');
+ tracker.enter({requestId:'raw-request',networkId:'raw-request',resourceType:'Script',request:{url:'http://localhost/demo-data.js?token=SECRET'}},'raw-session');
+ const source=fs.readFileSync(path.join(__dirname,'r265-browser.cjs'),'utf8'),start=source.indexOf('const until=async expr=>'),end=source.indexOf('\n  const click=',start);
+ const evaluate=async expr=>{if(expr===PAGE_PROGRESS_EXPRESSION)return {ready:'complete'};if(expr==='fixtureReady'){polls++;return false;}return {ready:'complete'};};
+ const until=vm.runInNewContext(source.slice(start,end)+'until',{pausedRequests:tracker,timeoutDiagnostic,JSON,Promise,Error,evaluate,
+  waitForPage:(evaluate,expr,options)=>waitForPage(evaluate,expr,{...options,now:()=>time,sleep:async ms=>{assert.equal(ms,50);time+=ms;sleeps++;}})});
+ await assert.rejects(until('fixtureReady'),error=>{assert.match(error.message,/timeout fixtureReady/);assert.match(error.message,/demo-data.js/);assert.match(error.message,/"dwellMs":10000/);assert.doesNotMatch(error.message,/SECRET|raw-request|raw-session|raw-target/);return true;});
+ assert.equal(time,10000);assert.equal(sleeps,200);assert.equal(polls,201,'shared watchdog rechecks the condition at the idle boundary');
+});
