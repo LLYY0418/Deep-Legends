@@ -1,0 +1,66 @@
+name: Windows browser quick probe
+# Diagnostic only: not release acceptance, no Go suite, mutation shards or upgrade chain.
+# Manual only: avoid automatically duplicating the complete push CI.
+on:
+  # Called once by R279 acceptance; it does not create an automatic push trigger.
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Candidate branch or SHA to inspect
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix desktop
+      - name: Real Chrome and native stage collection proof
+        shell: pwsh
+        run: |
+          $chrome = node -e "process.stdout.write(require('./scripts/r277-ci-orchestrate.cjs').chrome(process.env))"
+          "CHROME_BIN=$chrome" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          ./scripts/r279-upgrade-stages.test.ps1
+      - name: Main browser guards collect independent failures
+        shell: bash
+        run: node scripts/r276-browser-job.cjs main "$RUNNER_TEMP/r279-quick/main"
+      - name: R265 browser guards
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: node scripts/r276-browser-job.cjs r265 "$RUNNER_TEMP/r279-quick/r265"
+      - name: Build strict public fixture
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs build-browser --backend "$RUNNER_TEMP/r279-quick/public.exe" --out "$RUNNER_TEMP/r279-quick/strict"
+      - name: Full Windows strict matrix
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs browser --backend "$RUNNER_TEMP/r279-quick/public.exe" --out "$RUNNER_TEMP/r279-quick/strict"
+      - name: Failure facts
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job windows-browser-quick --evidence "$RUNNER_TEMP/r279-quick" --out "$RUNNER_TEMP/r279-quick/triage.json" --annotate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r279-windows-browser-quick
+          path: ${{ runner.temp }}/r279-quick/**
+          if-no-files-found: error

@@ -59,7 +59,7 @@ const failures = [];
   for (const group of summaries) for (const [name, count] of Object.entries(group.summary?.counts || {})) counts[name] = (counts[name] || 0) + count;
   const summary = { success: summaries.length === groups.length && summaries.every(group => group.summary?.success), counts, duration_ms };
   if (!summary.success || !withinBudgets(process.platform,timings,summary.duration_ms) || timings.length !== files.length || new Set(timings.map(row => row.file)).size !== files.length) failed = true;
-  const result = { scope, platform: process.platform, concurrency, groups: summaries,
+  const result = { scope, platform: process.platform, runner: require("./lib/runner-diagnostics.cjs").runnerMetadata(), timingComparison: require("./lib/runner-diagnostics.cjs").timingComparison(timings,costs), concurrency, groups: summaries,
     file_budget_ms, suite_budget_ms: suiteBudget, files: timings, cases, failures, summary, success: !failed };
   if (process.env.R222_NODE_TIMING_OUTPUT) fs.writeFileSync(process.env.R222_NODE_TIMING_OUTPUT, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));

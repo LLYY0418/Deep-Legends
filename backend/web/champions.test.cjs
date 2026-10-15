@@ -293,7 +293,9 @@ function assertR46Contracts({
 	assert.match(goSource, /Augments\s+\[\]championMetricRow\s+`json:"augments"`/);
 	assert.doesNotMatch(goSource, /Augments\s+\[\]championMetricRow\s+`json:"augments,omitempty"`/);
 
-	assert.equal((appCSS.match(/\.section-tab > span:not\(\.live-beacon\)/g) || []).length, 2);
+	assert.equal((appCSS.match(/\.section-tab > span:not\(\.live-beacon\)/g) || []).length, 1);
+	assert.doesNotMatch(appCSS, /@media \(max-width:\s*820px\)/);
+	assert.match(appScript, /topbarCompact \|\| 0\) >= 4/);
 	const refreshDelay = functionSource(js, "liveRefreshDelayMs");
 	assert.match(refreshDelay, /normalized === "ChampSelect"\) return 3_000/);
 	assert.doesNotMatch(refreshDelay, /return 20_000/);
@@ -3353,7 +3355,11 @@ test("player-name tooltips are gated by the actual ellipsized text", () => {
   assert.match(friendsScript, /data-tooltip-overflow="\.friend-game-name"/);
   assert.match(friendsStyles, /\.friend-game-name[^}]+text-overflow:\s*ellipsis/);
   assert.match(gameplayScript, /const label = \(named\?\.textContent \|\| button\.dataset\.tooltip \|\| ""\)\.trim\(\)/);
-  assert.doesNotMatch(`${html}\n${appScript}\n${script}\n${gameplayScript}\n${friendsScript}`, /\stitle="|\.title\s*=/);
+  const regionTitle = "el.playerSearchRegion.title = name;";
+  assert.equal(appScript.split(regionTitle).length, 2, "only the approved full region name has a native title");
+  assert.match(functionSource(appScript, "updateSearchRegionLabel"), /el\.playerSearchRegion\.title = name;/);
+  assert.match(functionSource(appScript, "updateSearchRegionLabel"), /setAttribute\("aria-label", name\)/);
+  assert.doesNotMatch(`${html}\n${appScript.replace(regionTitle, "")}\n${script}\n${gameplayScript}\n${friendsScript}`, /\stitle="|\.title\s*=/);
 });
 
 test("champion detail tooltips include static numerical metadata and player aliases", () => {

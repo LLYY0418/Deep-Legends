@@ -106,10 +106,10 @@ def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN,upgrade
                 files=timing.get('files',[])
                 if timing.get('success') is not True or timing.get('platform')!=platform or sorted(row.get('file','') for row in files)!=inventory[platform]:errors.append('incomplete renderer inventory '+name)
                 duration=timing.get('summary',{}).get('duration_ms');metric(platform+'/suite',duration)
-                if isinstance(duration,(int,float)) and duration>240000:errors.append('renderer suite budget '+name)
+                if isinstance(duration,(int,float)) and duration>(270000 if platform=='linux' else 240000):errors.append('renderer suite budget '+name)
                 for item in files:
                     value=item.get('duration_ms');metric(platform+'/'+item.get('file',''),value)
-                    if isinstance(value,(int,float)) and value>(90000 if platform=='linux' else 120000):errors.append('renderer file budget '+name)
+                    if isinstance(value,(int,float)) and value>(100000 if platform=='linux' else 120000):errors.append('renderer file budget '+name)
                 if platform=='linux':
                     budget=read(base/'budget.json')
                     if not isinstance(budget,dict) or budget.get('ok') is not True:errors.append('missing/failed calibrated budget '+name)

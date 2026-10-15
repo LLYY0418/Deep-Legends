@@ -192,7 +192,7 @@ function select(index, rawChanges, options = {}) {
   const windowsOnly = new Set();
   const ciOnly = new Map();
   const unmapped = [];
-  const staticGates = new Set();
+  const staticGates = new Set(["verify-no-docs-tracked"]);
   let webLayerTouched = false;
   let docsOnly = true;
 
@@ -260,7 +260,10 @@ function select(index, rawChanges, options = {}) {
   // Doc-only changes with no referencing gate are fine; do not call them "unmapped".
   const reallyUnmapped = onlyDocs ? [] : unmapped.filter((file) => !(/\.md$/.test(file)));
 
+  const scopeWarnings=changes.some(c=>/^(backend\/web\/(app\.(js|css)|index.html)|desktop\/main.cjs)$/.test(c.file))&&changes.some(c=>/^(backend\/web\/(app.js|gameplay.js|runtime.js)|desktop\/main.cjs)$/.test(c.file))?["布局与设置代码可能同时受影响：建议独立提交，按实际diff核验；不强制拆版本"]:[];
+  if(changes.some(c=>c.file.startsWith("scripts/")||c.file.startsWith(".github/workflows/")))staticGates.add("pinned-contracts");
   return {
+    scopeWarnings,
     changed: changes,
     nodeTests: [...nodeSelected].map(([file, reasons]) => ({ file, reasons })).sort((a, b) => a.file.localeCompare(b.file)),
     goTestFiles: [...goFiles].map(([file, reason]) => ({ file, reason })).sort((a, b) => a.file.localeCompare(b.file)),

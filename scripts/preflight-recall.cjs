@@ -18,6 +18,7 @@ function covers(selection, expression) {
   if (expression === "windows-only") return selection.windowsOnly.includes(WINDOWS_ONLY_NOTE);
   const [kind, ...rest] = expression.split(":");
   const value = rest.join(":");
+  if (kind === "gate") return selection.staticGates.includes(value);
   if (kind === "guard") return selection.browserGuards.some((g) => g.name === value);
   if (kind === "node") return selection.nodeTests.some((t) => t.file === value);
   if (kind === "script") return selection.relatedScripts.some((s) => s.file === value) || selection.nodeTests.some((t) => t.file === value);
@@ -26,14 +27,15 @@ function covers(selection, expression) {
 
 function evaluate(index = loadIndex()) {
   const bySet = new Map();
-  for (const [id, set] of Object.entries(dataset.changeSets)) bySet.set(id, select(index, set.changed));
+  const selectionTimes=new Map();
+  for (const [id, set] of Object.entries(dataset.changeSets)){const started=performance.now();bySet.set(id, select(index, set.changed));selectionTimes.set(id,performance.now()-started);}
   const rows = dataset.cases.map((entry) => {
     const selection = bySet.get(entry.changeSet);
     const missing = entry.mustSelect.filter((expression) => !covers(selection, expression));
     return { id: entry.id, changeSet: entry.changeSet, failure: entry.failure, mustSelect: entry.mustSelect, missing, ok: missing.length === 0 };
   });
   const sets = [...bySet].map(([id, s]) => ({
-    id, changedFiles: s.changed.length, nodeSelected: s.nodeTests.length, nodeTotal: index.nodeTests.length,
+    id, selection_ms:selectionTimes.get(id), changedFiles: s.changed.length, nodeSelected: s.nodeTests.length, nodeTotal: index.nodeTests.length,
     nodeRatio: s.ratio, goTestFiles: s.goTestFiles.length, goTotal: index.goTests.length, guards: s.browserGuards.length,
     relatedScripts: s.relatedScripts.length, unmapped: s.unmapped, recommendProbe: s.recommendProbe,
   }));

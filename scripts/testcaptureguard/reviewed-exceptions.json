@@ -1268,16 +1268,16 @@
   },
   {
     "file": "backend/r180_test.go",
-    "line": 401,
+    "line": 407,
     "target": "progressCount",
-    "source_sha256": "be0841353a31f3768072d0866b2b5dbe4862f5824b14435ff125c525b6c06d23",
+    "source_sha256": "52f23aa1f844397f628d83f8cda4860b284c189f00cd091734e5074b79942d28",
     "comment": "r276-capture-safe: TestR180RealRosterStageDiagnostics: loadGameplayLive serializes progress callbacks under progressMu and joins all roster workers before the counters are read"
   },
   {
     "file": "backend/r180_test.go",
-    "line": 412,
+    "line": 418,
     "target": "earlyHistory",
-    "source_sha256": "be0841353a31f3768072d0866b2b5dbe4862f5824b14435ff125c525b6c06d23",
+    "source_sha256": "52f23aa1f844397f628d83f8cda4860b284c189f00cd091734e5074b79942d28",
     "comment": "r276-capture-safe: TestR180RealRosterStageDiagnostics: loadGameplayLive serializes progress callbacks under progressMu and joins all roster workers before the counters are read"
   },
   {
@@ -1366,23 +1366,23 @@
   },
   {
     "file": "backend/r196_test.go",
-    "line": 227,
+    "line": 236,
     "target": "head",
-    "source_sha256": "a9c32629b4138c26d1fe4ccfbf049e694b6bf2dad524d877c59e5015fa583530",
+    "source_sha256": "05a37633d188e034545da615a2515025150161a94382774afb6bf9c74ff086c0",
     "comment": "r276-capture-safe: TestR196SlowSourceSwitchResumesAndHashes: the audited fixture operations in this test invoke this callback serially and return before head is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r196_test.go",
-    "line": 284,
+    "line": 293,
     "target": "downloads",
-    "source_sha256": "a9c32629b4138c26d1fe4ccfbf049e694b6bf2dad524d877c59e5015fa583530",
+    "source_sha256": "05a37633d188e034545da615a2515025150161a94382774afb6bf9c74ff086c0",
     "comment": "r276-capture-safe: TestR196AllSlowStayFastest: the audited fixture operations in this test invoke this callback serially and return before downloads is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r196_test.go",
-    "line": 308,
+    "line": 317,
     "target": "checked",
-    "source_sha256": "a9c32629b4138c26d1fe4ccfbf049e694b6bf2dad524d877c59e5015fa583530",
+    "source_sha256": "05a37633d188e034545da615a2515025150161a94382774afb6bf9c74ff086c0",
     "comment": "r276-capture-safe: TestR196PreferredSourcePersistedAndCheckedFirst: the audited fixture operations in this test invoke this callback serially and return before checked is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

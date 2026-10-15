@@ -5,8 +5,8 @@ const assert = require("node:assert/strict");
 const { evaluate } = require("./renderer-budget-gate.cjs");
 const { calibrate, workload, loadJSDOM } = require("./runner-calibration.cjs");
 
-const reference = { workload_version: 1, iterations: 40, concurrency: 5, checksum: 49440, reference_ms: 4000, margin_budget_ms: 192000, hard_budget_ms: 240000 };
-const timings = duration => ({ success: true, scope: "all", platform: "linux", concurrency: 5, file_budget_ms:90000,suite_budget_ms:240000,files:[{file:"fixture.test.cjs",duration_ms:89000}],summary: { duration_ms: duration } });
+const reference = { workload_version: 1, iterations: 40, concurrency: 5, checksum: 49440, reference_ms: 4000, margin_budget_ms: 192000, hard_budget_ms: 270000 };
+const timings = duration => ({ success: true, scope: "all", platform: "linux", concurrency: 5, file_budget_ms:100000,suite_budget_ms:270000,files:[{file:"fixture.test.cjs",duration_ms:89000}],summary: { duration_ms: duration } });
 const calibration = median => ({ workload_version: 1, iterations: 40, concurrency: 5, checksum: 49440, median_ms: median });
 
 test("same commit on a 1.6x slower runner passes when it is within margin at reference speed", () => {
@@ -30,10 +30,10 @@ test("a faster runner makes the check stricter, not looser", () => {
   assert.equal(Math.round(result.normalized_ms), 300000);
 });
 
-test("the absolute 240s suite budget is never scaled", () => {
-  const result = evaluate(timings(241000), [calibration(12000), calibration(12000)], reference);
+test("the absolute 270s suite budget is never scaled", () => {
+  const result = evaluate(timings(270001), [calibration(12000), calibration(12000)], reference);
   assert.equal(result.ok, false);
-  assert.match(result.failures.join("\n"), /absolute 240000ms budget/);
+  assert.match(result.failures.join("\n"), /absolute 270000ms budget/);
 });
 
 test("calibration must run the exact reference workload before and after the suite", () => {
@@ -121,4 +121,17 @@ test("every observed CI run of 7d5e7b31 passes at the committed reference on all
   }
 });
 
-test("R275 Linux timing artifacts reject relaxed or missing file budgets",()=>{for(const changed of [{file_budget_ms:120000},{suite_budget_ms:300000},{files:[]},{files:[{duration_ms:91000}]}])assert.equal(evaluate({...timings(120000),...changed},[calibration(4000),calibration(4000)],reference).ok,false);});
+test("R275 Linux timing artifacts reject relaxed or missing file budgets",()=>{for(const changed of [{file_budget_ms:120000},{suite_budget_ms:300000},{files:[]},{files:[{duration_ms:100001}]}])assert.equal(evaluate({...timings(120000),...changed},[calibration(4000),calibration(4000)],reference).ok,false);});
+
+
+test("R278 Linux raw/file exact limits pass and one millisecond over fails", () => {
+  const calibrated = [calibration(12000), calibration(12000)];
+  const exact = { ...timings(270000), files: [{ file: "fixture.test.cjs", duration_ms: 100000 }] };
+  assert.equal(evaluate(exact, calibrated, reference).ok, true);
+  const suite = evaluate({ ...exact, summary: { duration_ms: 270001 } }, calibrated, reference);
+  assert.equal(suite.ok, false);
+  assert.deepEqual(suite.failures, ["raw renderer suite 270001ms exceeds the absolute 270000ms budget"]);
+  const file = evaluate({ ...exact, files: [{ file: "fixture.test.cjs", duration_ms: 100001 }] }, calibrated, reference);
+  assert.equal(file.ok, false);
+  assert.deepEqual(file.failures, ["missing or over-budget Linux file timings"]);
+});

@@ -77,18 +77,23 @@ function staticGates(selection, base) {
   const gates = [];
   const jsFiles = selection.changed.map((c) => c.file).filter((f) => /\.(?:cjs|js|mjs)$/.test(f) && fs.existsSync(path.join(root, f)));
   const goFiles = selection.changed.map((c) => c.file).filter((f) => /\.go$/.test(f) && fs.existsSync(path.join(root, f)));
+  gates.push({label:"显式暂存隔离",command:process.execPath,args:["scripts/r279-staged-gates.cjs"]});
   gates.push({ label: "git diff --check", command: "git", args: ["diff", "--check", base] });
   gates.push({ label: "本地笔记与助手指令未被跟踪", command: process.execPath, args: ["scripts/verify-no-docs-tracked.cjs"] });
   for (const file of jsFiles) gates.push({ label: `语法检查 ${file}`, command: process.execPath, args: ["--check", file] });
-  if (goFiles.length) gates.push({ label: "gofmt", command: "sh", args: ["-c", `test -z "$(gofmt -l ${goFiles.map((f) => JSON.stringify(f)).join(" ")})"`] });
+  if (goFiles.length) gates.push({ label: "gofmt", command: process.execPath, args: ["scripts/r279-static-go.cjs",...goFiles] });
   if (selection.staticGates.includes("go-vet-backend")) gates.push({ label: "go vet ./backend", command: "go", args: ["vet", "./backend"] });
   const testsOrWorkflowsTouched = selection.changed.some((c) => /\.test\.[cm]js$|_test\.go$|^\.github\/workflows\//.test(c.file));
   if (testsOrWorkflowsTouched) gates.push({ label: "CI 测试过滤器校验", command: process.execPath, args: ["scripts/verify-ci-test-filters.cjs"] });
+  if(selection.staticGates.includes("pinned-contracts"))gates.push({label:"pinned-contracts",command:process.execPath,args:["scripts/pinned-contracts-check.cjs"]});
+  if(selection.webLayerTouched)gates.push({label:"首屏产物预算",command:process.execPath,args:["--test","--test-name-pattern=initial production assets","backend/web/r277-deferred-assets.test.cjs"]});
   return gates;
 }
 
 function printSummary(base, selection, total) {
   console.log(`基线：${base}`);
+  for(const warning of selection.scopeWarnings||[])console.log("⚠ "+warning);
+  if(selection.webLayerTouched)console.log("完整浏览器命令：node scripts/r276-browser-job.cjs main <out>；node scripts/r276-browser-job.cjs r265 <out>；r277-ci-orchestrate build-browser / browser <scratch backend>");
   console.log(`改动文件 ${selection.changed.length} 个；Node 测试 ${selection.nodeTests.length}/${total.node}（${Math.round(selection.ratio * 100)}%）；Go 测试文件 ${selection.goTestFiles.length}/${total.go}（${selection.goTestNames.length} 个用例）；浏览器守卫 ${selection.browserGuards.length} 个`);
   if (selection.nodeTests.length) {
     console.log("\n选中的 Node 测试：");
@@ -157,24 +162,25 @@ async function main() {
       report.results.push(result);
       if (!result.ok) exitCode = 1;
     }
-    if (selection.nodeTests.length) {
+    if(selection.broad)report.results.push({label:"关联测试范围过宽",status:"deferred-to-CI",note:"仅本地静态门禁，关联测试由完整CI执行；不是测试通过证据"});
+    if (exitCode===0 && !selection.broad && selection.nodeTests.length) {
       const result = run(`Node 测试（${selection.nodeTests.length} 个文件，并发 ${parallel}）`, process.execPath, ["--test", `--test-concurrency=${parallel}`, ...selection.nodeTests.map((t) => t.file)]);
       report.results.push(result);
       if (!result.ok) exitCode = 1;
     }
-    if (selection.goTestNames.length) {
+    if (exitCode===0 && !selection.broad && selection.goTestNames.length) {
       const pattern = `^(${selection.goTestNames.join("|")})$`;
       const result = run(`Go 测试（${selection.goTestNames.length} 个用例，-race）`, "go", ["test", "-race", "-count=1", "-run", pattern, "./backend"]);
       report.results.push(result);
       if (!result.ok) exitCode = 1;
     }
-    if (options.browsers && selection.browserGuards.length) {
+    if (exitCode===0 && options.browsers && selection.browserGuards.length) {
       for (const result of runBrowsers(selection)) { report.results.push(result); if (!result.ok) exitCode = 1; }
     }
-    console.log(`\n${exitCode === 0 ? "快速预检通过" : "快速预检有失败"}。注意：这不是发版证据；完整验证以 probe / release 分支上的 CI 为准。`);
+    console.log(`\n${exitCode === 0 ? (selection.broad?"静态预检通过，范围过宽的关联测试延后到CI":"快速预检通过") : "快速预检有失败"}。注意：这不是发版证据；完整验证以 probe / release 分支上的 CI 为准。`);
     if (selection.browserGuards.length && !options.browsers) console.log("浏览器守卫未在本地运行（加 --browsers 可运行）；它们在 CI 的 browser-main / browser-r265 / R277 matrix 里一定会跑。");
   }
-  if (options.json) { fs.mkdirSync(path.dirname(path.resolve(options.json)), { recursive: true }); fs.writeFileSync(options.json, JSON.stringify(report, null, 2) + "\n"); }
+  if (options.json) { fs.mkdirSync(path.dirname(path.resolve(options.json)), { recursive: true }); fs.writeFileSync(options.json, JSON.stringify(report, null, 2) + "\n");fs.writeFileSync(path.join(path.dirname(path.resolve(options.json)),"preflight-static-gates.json"),JSON.stringify({automaticStaging:false,gates:staticGates(selection,base)},null,2)+"\n"); }
   return exitCode;
 }
 

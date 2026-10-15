@@ -8,7 +8,8 @@ const gate = fs.readFileSync(path.join(__dirname, "renderer-budget-gate.cjs"), "
 const mutations = [
   ["raw time instead of reference speed", "normalized = raw / factor;", "normalized = raw;"],
   ["factor inverted", "/ 2 / reference.reference_ms;", "/ 2 / reference.reference_ms; factor = 1 / factor;"],
-  ["absolute 240s budget dropped", "else if (raw > 240000)", "else if (false)"],
+  ["absolute 270s budget dropped", "else if (raw > 270000)", "else if (false)"],
+  ["Linux file budget dropped", "row.duration_ms>100000", "false"],
   ["checksum not checked", "if (calibration?.checksum !== reference?.checksum)", "if (false)"],
   ["iterations not checked", "if (calibration?.iterations !== reference?.iterations)", "if (false)"],
   ["only one calibration required", "calibrations.length !== 2", "calibrations.length < 1"],

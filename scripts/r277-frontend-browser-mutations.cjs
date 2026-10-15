@@ -9,11 +9,12 @@ const cases=[
  ['p9-full-render','gameplay.js','    const list = container.querySelector(".match-list");\n    if (list && additions.length','    const list = container.querySelector(".match-list");\n    if(list && additions.length)list.innerHTML=(tab.data.matches || []).map(match=>renderMatch(match,tab.data.player.playerRef,tab)).join("");\n    if (list && additions.length','sample.sameList && sample.sameFirst'],
 ];
 cases.push(['p7-auto-sidebar','app.js',
- ' || width <= 820;', ';', 'automatic sidebar collapse']);
+ ' || width <= 820 || Number(document.querySelector(".topbar")?.dataset.topbarCompact || 0) >= 4;', ';', 'automatic sidebar collapse']);
 cases.push(['p7-refresh-label','app.css',
- '@container topbar (max-width: 600px) {\n  #refresh { --refresh-size: 42px; --refresh-padding: 0; --refresh-label-display: none; }\n',
- '@container topbar (max-width: 600px) {\n', 'refresh label must hide in narrow topbar']);
-cases.push(['p7-region-ellipsis','app.css','  .player-search-region > button span { max-width: 2em; text-overflow: clip; }\n','','compact region must not use ellipsis']);
+ '--refresh-padding: 0; --refresh-label-display: none; }',
+ '--refresh-padding: 0; --refresh-label-display: inline; }', 'refresh label must hide in narrow topbar']);
+cases.push(['p7-region-three-characters','app.js','Array.from(name).slice(0, 2).join("")','Array.from(name).slice(0, 3).join("")','compact region must show two characters']);
+cases.push(['p7-compact-floor','app.js','const minimumLevel = logicalWidth <= 600 ? 3 : 0;','const minimumLevel = 0;','compact region must show two characters']);
 const results=[];
 for(const [id,file,anchor,replacement,expected] of cases.filter(c=>!process.env.R278_BROWSER_MUTANT_ONLY || c[0]===process.env.R278_BROWSER_MUTANT_ONLY)){
  const temp=fs.mkdtempSync(path.join(scratch,'r277-frontend-browser-mutant-')),override=path.join(temp,'web'),out=path.join(temp,'output');fs.mkdirSync(override);

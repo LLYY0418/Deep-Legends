@@ -21,6 +21,21 @@ class SummaryTests(unittest.TestCase):
         self.timing['files']=[];self.assertFalse(self.result()['success'])
     def test_budget_rejected(self):
         self.timing['files'][0]['duration_ms']=120001;self.assertFalse(self.result()['success'])
+    def test_windows_suite_boundary_preserved(self):
+        self.timing['summary']['duration_ms']=240000;self.assertTrue(self.result()['success'])
+        self.timing['summary']['duration_ms']=240001;self.assertFalse(self.result()['success'])
+    def test_linux_budget_boundaries(self):
+        kind='linux-renderers';name=kind+'-0'
+        self.rows=[dict(kind=kind,index=0,iteration=0,label=label,job=name,run='1',sha='fixture-sha',duration_ms=100,exitCode=0,signatures=[]) for label in ['calibration-before','renderers','calibration-after','budget']]
+        self.jobs=[dict(jobs=[dict(name=name,conclusion='success',html_url='https://github.com/fixture/repo/actions/runs/1/job/2')])]
+        self.timing.update(platform='linux');self.timing['files'][0]['duration_ms']=100000
+        (self.folder/'0/budget.json').write_text(json.dumps(dict(ok=True,normalized_ms=190000)))
+        for duration,file_time,want in [(270000,100000,True),(270001,100000,False),(270000,100001,False)]:
+            with self.subTest(duration=duration,file=file_time):
+                self.timing['summary']['duration_ms']=duration;self.timing['files'][0]['duration_ms']=file_time
+                (self.folder/'samples.json').write_text(json.dumps(self.rows));(self.folder/'0/renderer-timings.json').write_text(json.dumps(self.timing))
+                result=module.summarize(self.root,self.jobs,'fixture/repo',1,inventory={'linux':['desktop/fixture.test.cjs'],'win32':[]},catalog=[],plan=[(kind,0,1)])
+                self.assertEqual(result['success'],want)
     def test_failure_signature_and_job_link(self):
         self.rows[0].update(exitCode=1,signatures=['fixture assertion']);result=self.result();self.assertFalse(result['success']);self.assertEqual(result['failures'][0]['count'],1);self.assertEqual(result['failures'][0]['fraction'],1);self.assertEqual(result['failures'][0]['jobLinks'],[self.jobs[0]['jobs'][0]['html_url']])
     def test_nonfinite_metric_rejected(self):

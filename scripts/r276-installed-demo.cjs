@@ -5,7 +5,7 @@ async function waitInstalledStartup({until}){
  await until(`(async()=>{if(!(document.readyState==='complete' && window.deepLegendsMatchCards && !!document.querySelector('#setting-default-page + .app-select')))return false;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return document.readyState==='complete' && !!document.querySelector('#setting-default-page + .app-select');})()`);
 }
 async function navigateInstalledDemo({call,until,click,origin,marker=Date.now()}){
- await call('Page.addScriptToEvaluateOnNewDocument',{source:`window.__r265ProbeLoad=${marker};window.EventSource=class{addEventListener(){}close(){}};(() => {
+ await call('Page.addScriptToEvaluateOnNewDocument',{source:`window.__r265ProbeLoad=${marker};window.__r265FollowEvents=[];(()=>{let report;Object.defineProperty(window,'reportFlowDiagnostic',{configurable:true,get(){return report},set(fn){report=function(...args){if(args[0]==='client_follow_client')window.__r265FollowEvents.push({event:args[0],trigger:args[1],fields:args[2],searchUI:new Error().stack.includes('updateSearchRegionStatus')});return fn?.apply(this,args);};}});})();window.EventSource=class{addEventListener(){}close(){}};(() => {
   // Test-helper synchronization only: preserve transport, bytes, and Response.
   const wrap = delegate => function(...args) {
     const result = Reflect.apply(delegate, window, args);

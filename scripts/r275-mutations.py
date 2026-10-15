@@ -4,8 +4,8 @@ import argparse,json,os,pathlib,subprocess,tempfile
 parser=argparse.ArgumentParser();parser.add_argument('--out',required=True);a=parser.parse_args()
 root=pathlib.Path(__file__).resolve().parents[1];out=pathlib.Path(a.out).resolve();out.mkdir(parents=True,exist_ok=True)
 cases=[
- ('windows-90','scripts/renderer-budgets.cjs','120000:90000','90000:90000','R275_BUDGET_HELPER','desktop/renderer-budgets.test.cjs'),
- ('linux-120','scripts/renderer-budgets.cjs','120000:90000','120000:120000','R275_BUDGET_HELPER','desktop/renderer-budgets.test.cjs'),
+ ('windows-90','scripts/renderer-budgets.cjs',"platform==='win32'?120000","platform==='win32'?90000",'R275_BUDGET_HELPER','desktop/renderer-budgets.test.cjs'),
+ ('linux-120','scripts/renderer-budgets.cjs',"platform==='linux'?100000","platform==='linux'?120000",'R275_BUDGET_HELPER','desktop/renderer-budgets.test.cjs'),
  ('dispatch-false','.github/workflows/ci.yml','default: true','default: false','R275_WORKFLOW','desktop/renderer-budgets.test.cjs'),
  ('startup-no-retry','scripts/chrome-test-launcher.cjs',"result.result!=='timeout'||attempt===2","true",'R275_CHROME_HELPER','desktop/chrome-test-launcher.test.cjs'),
  ('startup-retry-all','scripts/chrome-test-launcher.cjs',"result.result!=='timeout'||attempt===2","attempt===2",'R275_CHROME_HELPER','desktop/chrome-test-launcher.test.cjs'),
@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='r275-mutants-') as tmp:
   (out/(name+'-FAIL.log')).write_bytes(r.stdout)
   assert r.returncode!=0,(name,'mutation survived')
   log=r.stdout.decode(errors='replace')
-  expected={'windows-90':'win32 119000','linux-120':'linux 91000','dispatch-false':'default: true','startup-no-retry':'Chrome startup timeout attempt 1','startup-retry-all':'early Chrome exit fails immediately without retry','fetch-no-entry':'request-1'}[name]
+  expected={'windows-90':'win32 119000','linux-120':'linux 100001','dispatch-false':'default: true','startup-no-retry':'Chrome startup timeout attempt 1','startup-retry-all':'early Chrome exit fails immediately without retry','fetch-no-entry':'request-1'}[name]
   assert expected in log and not any(x in log for x in ['SyntaxError','MODULE_NOT_FOUND','EPERM']),(name,'wrong failure signature')
   # The unmodified helper must pass the same full test file.
   r2=subprocess.run(['node','--test',test],cwd=root,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)

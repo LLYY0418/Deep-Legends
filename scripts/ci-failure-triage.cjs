@@ -45,6 +45,7 @@ function parseRendererJson(data, evidence) {
 }
 
 function parseFailureJson(data, evidence) {
+  if(Array.isArray(data.failures)&&data.failures.length)return data.failures.flatMap(f=>parseFailureJson({...f,failures:undefined,scenario:f.name||f.scenario},evidence));
   const message = data.error || data.message || data.reason || "";
   if (!message && !data.scenario && !data.case) return [];
   return [{ kind: "guard", name: data.scenario || data.case || data.name || path.basename(path.dirname(evidence)), file: relFile(data.file || data.script || ""), message: String(message).slice(0, 600), evidence }];
@@ -82,7 +83,7 @@ function readJson(file) { try { return JSON.parse(fs.readFileSync(file, "utf8"))
 
 function collect(options, readers = {}) {
   const rows = [];
-  const evidenceFiles = [];
+  const evidenceFiles = [],timingInputs=[];
   const walk = (dir) => {
     const out = [];
     if (!fs.existsSync(dir)) return out;
@@ -104,16 +105,18 @@ function collect(options, readers = {}) {
   for (const file of jsonFiles) {
     const data = (readers.json || readJson)(file);
     if (!data) continue;
+    if(data.timingComparison)timingInputs.push(data);
     const parsed = path.basename(file) === "failure.json" ? parseFailureJson(data, file) : parseRendererJson(data, file);
     if (parsed.length) { rows.push(...parsed); evidenceFiles.push(file); }
   }
   for (const file of logFiles) {
     let text = "";
     try { text = (readers.text || ((f) => fs.readFileSync(f, "utf8")))(file); } catch (_) { continue; }
+    timingInputs.push(...require("./lib/runner-diagnostics.cjs").timingReportsFromLog(text));
     const parsed = parseLog(text, file);
     if (parsed.length) { rows.push(...parsed); evidenceFiles.push(file); }
   }
-  return { rows, evidenceFiles };
+  return { rows, evidenceFiles, timingInputs };
 }
 
 function changedSet(base) {
@@ -125,7 +128,7 @@ function changedSet(base) {
 }
 
 function triage(options, readers = {}) {
-  const { rows, evidenceFiles } = collect(options, readers);
+  const { rows, evidenceFiles, timingInputs } = collect(options, readers);
   const changed = options.changed !== undefined ? options.changed : changedSet(options.base);
   const seen = new Set();
   const failures = [];
@@ -141,11 +144,13 @@ function triage(options, readers = {}) {
       category: classify(row.message), message: String(row.message || "").slice(0, 400), evidence: row.evidence,
     });
   }
-  return { job: options.job || "", base: options.base || null, failureCount: failures.length, failures, evidenceFiles, note: "仅事实汇总：不判断根因，不引用 CI-KNOWN-ISSUES，不改变作业结果。" };
+  return { runner: timingInputs[0]?.runner||null, timingComparisons:timingInputs.map(d=>d.timingComparison), job: options.job || "", base: options.base || null, failureCount: failures.length, failures, evidenceFiles, note: "仅事实汇总：不判断根因，不引用 CI-KNOWN-ISSUES，不改变作业结果。" };
 }
 
 function markdown(report) {
   const lines = [`### CI 失败分诊（${report.job || "job"}）`, "", `- 失败项：${report.failureCount}`, `- 对比基线：${report.base || "未提供"}`];
+  for(const c of report.timingComparisons||[])lines.push(`- 耗时分布：${c.kind==='uniform-slowdown'?'均匀变慢':c.kind}；中位比${c.medianRatio}；异常文件${c.outliers?.map(f=>f.file).join(',')||'无'}（不推断原因）`);
+  if(report.runner)lines.push(`- Runner：${JSON.stringify(report.runner)}`);
   if (!report.failureCount) lines.push("- 没有在给定的日志/证据里找到可解析的失败项（请看原始日志）。");
   for (const f of report.failures.slice(0, 40)) {
     const diff = f.inDiff === null ? "未知" : f.inDiff ? "是" : "否";

@@ -39,7 +39,7 @@
       "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
     },
     "desktop/pro-players-layout.cjs": {
-      "sleep": 3,
+      "sleep": 2,
       "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
     },
     "desktop/pro-runes-render.test.cjs": {

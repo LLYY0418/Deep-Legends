@@ -3083,12 +3083,13 @@
 
   function applySidebar() {
     const width = document.querySelector(".app-frame")?.clientWidth || window.innerWidth;
-    const collapsed = preference("sidebar", "expanded") === "collapsed" || width <= 820;
+    const collapsed = preference("sidebar", "expanded") === "collapsed" || width <= 820 || Number(document.querySelector(".topbar")?.dataset.topbarCompact || 0) >= 4;
     document.documentElement.dataset.sidebar = collapsed ? "collapsed" : "expanded";
     el.sidebarToggle.setAttribute("aria-expanded", String(!collapsed));
     el.sidebarToggle.setAttribute("aria-label", collapsed ? "展开侧边栏" : "收起侧边栏");
     el.sidebarToggle.dataset.tooltip = collapsed ? "展开侧边栏" : "收起侧边栏";
     el.settingsSidebarToggle.textContent = collapsed ? "展开侧边栏" : "收起侧边栏";
+    document.querySelector(".topbar")?.dispatchEvent(new window.Event("topbar-layout"));
   }
 
   function toggleSidebar() {
@@ -3626,25 +3627,29 @@
   }
 
   function updateSearchRegionLabel(data = state.status) {
+    const name = (() => {
     if (el.playerSearchRegion.dataset.region === "riot-follow") {
       const region = data?.connected ? data.clientRegion : "";
-      el.playerSearchRegionLabel.textContent = isRiotSearchRegion(region) ? RIOT_REGION_LABELS[region] : "外服";
-      return;
+      return isRiotSearchRegion(region) ? RIOT_REGION_LABELS[region] : "外服";
     }
     if (isRiotSearchRegion(el.playerSearchRegion.dataset.region)) {
-      el.playerSearchRegionLabel.textContent = RIOT_REGION_LABELS[el.playerSearchRegion.dataset.region];
-      return;
+      return RIOT_REGION_LABELS[el.playerSearchRegion.dataset.region];
     }
     const serverId = el.playerSearchRegion.dataset.serverId || "";
     if (serverId) {
       const selected = [...el.playerSearchRegionMenu.querySelectorAll('[data-region-option="cn"]')]
         .find((option) => option.dataset.serverId === serverId);
-      el.playerSearchRegionLabel.textContent = selected?.querySelector("b")?.textContent?.trim() || "国服";
-      return;
+      return selected?.querySelector("b")?.textContent?.trim() || "国服";
     }
     const clientOption = [...el.playerSearchRegionMenu.querySelectorAll('[data-region-option="cn"]')].find(option=>data?.serverId && option.dataset.serverId===String(data.serverId).toUpperCase());
     const currentServerName = data?.connected ? (clientOption?.querySelector('b')?.textContent?.trim() || String(data.serverName || "").trim()) : "";
-    el.playerSearchRegionLabel.textContent = currentServerName || "国服";
+    return currentServerName || "国服";
+    })();
+    el.playerSearchRegionLabel.textContent = name;
+    el.playerSearchRegion.ownerDocument.querySelector("#player-search-region-short").textContent = Array.from(name).slice(0, 2).join("");
+    el.playerSearchRegion.title = name;
+    el.playerSearchRegion.setAttribute("aria-label", name);
+    el.playerSearchRegion.closest(".topbar")?.dispatchEvent(new el.playerSearchRegion.ownerDocument.defaultView.Event("topbar-layout"));
   }
 
   function updateSearchRegionStatus(data) {
@@ -3792,6 +3797,63 @@
 
   initAnnouncements();
 
+  function topbarOverflows(bar) {
+    const bounds = bar.getBoundingClientRect();
+    const style = getComputedStyle(bar), scale = bounds.width / bar.offsetWidth || 1;
+    const left = bounds.left + parseFloat(style.paddingLeft) * scale;
+    const right = bounds.right - parseFloat(style.paddingRight) * scale;
+    if ([...bar.children].some(n => { const b = n.getBoundingClientRect(); return b.width && (b.left < left - 1 || b.right > right + 1); })) return true;
+    const search = bar.querySelector('.player-search');
+    if (search.scrollWidth > search.clientWidth + 1) return true;
+    const buttons = [...bar.querySelectorAll('.player-search-region > button,.player-search-fields > button,.topbar-actions > button')].map(n => n.getBoundingClientRect()).filter(b => b.width && b.height);
+    return buttons.some((a, i) => buttons.slice(i + 1).some(b => Math.min(a.right,b.right) - Math.max(a.left,b.left) > .5 && Math.min(a.bottom,b.bottom) - Math.max(a.top,b.top) > .5));
+  }
+
+  function setupTopbarCompact() {
+    const bar = document.querySelector('.topbar');
+    if (!bar) return;
+    let frame = 0;
+    bar.dataset.topbarCompact = '0';
+    const schedule = () => {
+      if (frame) return;
+      bar.dataset.topbarSettled = 'false';
+      frame = requestAnimationFrame(measure);
+    };
+    const measure = () => {
+      frame = 0;
+      const level = Number(bar.dataset.topbarCompact);
+      let next = level;
+      const bounds = bar.getBoundingClientRect(), scale = bounds.width / bar.offsetWidth || 1;
+      const logicalWidth = bounds.width / scale;
+      const minimumLevel = logicalWidth <= 600 ? 3 : 0;
+      if (topbarOverflows(bar) || level < minimumLevel) next = Math.min(5, level + 1);
+      else if (level && (level > 3 || logicalWidth > 616)) {
+        // Probe only the next wider state off-screen, reserving 16 logical px.
+        // The live bar changes at most one level per frame; failed probes never flash.
+        const probe = bar.cloneNode(true);
+        let width = bar.offsetWidth - 16;
+        if (level === 4 && preference('sidebar','expanded') !== 'collapsed') width -= parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-expanded-width')) - document.querySelector('.sidebar').clientWidth;
+        probe.dataset.topbarCompact = String(level - 1);
+        probe.inert = true; probe.setAttribute('aria-hidden','true');
+        probe.style.cssText = `position:fixed;left:-10000px;top:0;visibility:hidden;width:${Math.max(0,width)}px;zoom:1;`;
+        bar.parentElement.append(probe);
+        try { if (!topbarOverflows(probe)) next--; } finally { probe.remove(); }
+      }
+      if (next !== level) {
+        bar.dataset.topbarCompact = String(next);
+        applySidebar();
+        schedule();
+      } else bar.dataset.topbarSettled = 'true';
+    };
+    bar.addEventListener('topbar-layout', schedule);
+    bar.addEventListener('input', schedule);
+    window.addEventListener('resize', schedule, {passive:true});
+    if (typeof ResizeObserver === 'function') new ResizeObserver(schedule).observe(bar);
+    new MutationObserver(schedule).observe(document.documentElement,{attributes:true,attributeFilter:['style','data-sidebar']});
+    document.fonts?.ready.then(schedule);
+    schedule();
+  }
+
   function setupSearchQueryViewport() {
     const view = el.playerSearchName.closest('.player-search-query');
     if (!view) return;
@@ -3811,6 +3873,7 @@
   function updateSearchClear() {
     el.playerSearchClear.hidden = !el.playerSearchName.value.trim() && !el.playerSearchTag.value.trim();
     if (el.playerSearchClear.hidden) el.playerSearchName.closest?.('.player-search-query')?.scrollTo?.({left: 0});
+    document.querySelector(".topbar")?.dispatchEvent(new window.Event("topbar-layout"));
   }
   el.playerSearchClear.addEventListener("click", () => {
     el.playerSearchName.value = "";
@@ -4756,6 +4819,7 @@
   applyAppearance();
   applySidebar();
   if (typeof ResizeObserver === "function") new ResizeObserver(applySidebar).observe(document.querySelector(".app-frame"));
+  setupTopbarCompact();
   void setupUiScaleSetting();
   setupUpdateEvents();
   setupBackendLifecycle();

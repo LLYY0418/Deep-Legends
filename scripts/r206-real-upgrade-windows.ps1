@@ -5,6 +5,7 @@ $env:RIOT_API_KEY = 'RGAPI-00000000-0000-0000-0000-000000000000'
 . (Join-Path $PSScriptRoot 'r252-diagnostic-time.ps1')
 . (Join-Path $PSScriptRoot 'r261-window-bounds.ps1')
 . (Join-Path $PSScriptRoot 'r271-installer-diagnostics.ps1')
+. (Join-Path $PSScriptRoot 'r279-upgrade-stages.ps1')
 # The candidate is whatever desktop/package.json declares, so a version bump
 # needs no edits here.
 $candidateVersion = (& node -p "require('./desktop/package.json').version").Trim()
@@ -326,10 +327,14 @@ try {
         return $debugPort
     }
     $debugPort=Start-R265DebugApp
+    Invoke-R279UpgradeStage -Name 'write-settings' -DependsOn @() -Output (Join-Path $evidence 'r279-upgrade-stages.json') -Action {
     node scripts/r265-persisted-ui.cjs $debugPort write-settings $evidence *> (Join-Path $evidence '079-unmodified-settings-write.log')
     if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '079-unmodified-settings-write.log'); throw 'Unmodified published 079 UI did not write settings' }
+    }
+    Invoke-R279UpgradeStage -Name 'write-presets' -DependsOn @('write-settings') -Output (Join-Path $evidence 'r279-upgrade-stages.json') -Action {
     node scripts/r265-persisted-ui.cjs $debugPort write-presets $evidence *> (Join-Path $evidence '079-format-presets-write.log')
     if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '079-format-presets-write.log'); throw 'Same-tag missing-resource fixture did not save preset format' }
+    }
     $actual079Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '079-normal-close.json')
     Stop-InstalledApp -ObserveOnly
     $actual079Files=@{}
@@ -345,15 +350,22 @@ try {
     Wait-R265InstallerLaunch
     Stop-InstalledApp
     $debugPort=Start-R265DebugApp
+    Invoke-R279UpgradeStage -Name 'read' -DependsOn @('write-presets') -Output (Join-Path $evidence 'r279-upgrade-stages.json') -Action {
     node scripts/r265-persisted-ui.cjs $debugPort read $evidence *> (Join-Path $evidence '080-actual-ui-read.log')
     if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '080-actual-ui-read.log'); throw 'Actual 079 UI-written preferences changed after candidate upgrade' }
+    }
     $actual080Bounds=Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '080-normal-close.json')
     Stop-InstalledApp -ObserveOnly
     $debugPort=Start-R265DebugApp
+    Invoke-R279UpgradeStage -Name 'restart' -DependsOn @('read') -Output (Join-Path $evidence 'r279-upgrade-stages.json') -Action {
     node scripts/r265-persisted-ui.cjs $debugPort restart $evidence *> (Join-Path $evidence '080-preset-restart.log')
     if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '080-preset-restart.log'); throw 'Renamed preset was not retained after candidate restart' }
+    }
+    Invoke-R279UpgradeStage -Name 'corrupt' -DependsOn @('write-presets') -Output (Join-Path $evidence 'r279-upgrade-stages.json') -Action {
+        $debugPort=Start-R265DebugApp
     node scripts/r265-persisted-ui.cjs $debugPort corrupt $evidence *> (Join-Path $evidence '080-corrupt-preset.log')
     if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '080-corrupt-preset.log'); throw 'Corrupt preset damaged other settings or was not discarded' }
+    }
     Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '080-second-normal-close.json') | Out-Null
     Stop-InstalledApp -ObserveOnly
     $actual079Comparisons=@()
@@ -364,8 +376,10 @@ try {
         Copy-Item $file (Join-Path $evidence ("080-actual-after-"+(Split-Path $file -Leaf))) -Force
     }
     $actual079Comparisons | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $evidence '079-to-080-persistent-files.json')
+    if (-not @($script:R279UpgradeStages | Where-Object { $_.status -ne 'passed' }).Count) {
     @{upgrade_from='0.12.79';upgrade_to=$candidateVersion;key_mode='public';setup079_sha256='cabacc1b4e8bc8dcf51469e1d1e84f0ef6ff8f82090084bf0c3fd6b0bb794d96';settings_written_by='unmodified published 079 renderer UI';preset_scope='format compatibility only: published 079 cannot save presets; exact same-tag missing-script fixture used only before upgrade';preset_script_sha256='74699f9576ccd8686fce0e95c38b718b96718baa46bd68e9068cf947f7ea38f3';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;persisted_files_equal=$true;preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
     Get-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
+    }
     $r266Evidence=Join-Path $evidence '080-to-081'
     New-Item -ItemType Directory -Force $r266Evidence | Out-Null
     # Additional, independent published 0.12.80 -> candidate chain. Preferences
@@ -551,6 +565,7 @@ try {
     }
     Remove-Item Env:R272_LEGACY_SCALE
 
+    Assert-R279UpgradeStages
 } catch {
     # Capture before final cleanup, including foreign install paths/port owners.
     Save-R265State 'r265-failure-processes-and-ports.json' | Out-Null

@@ -81,12 +81,15 @@ func TestR196ProbeSelectsFastMirror(t *testing.T) {
 	u.mirrors = []string{"", "https://fast.test/", "https://html.test/"}
 	events := &r196Events{probeCompleted: make(chan struct{}, 3)}
 	u.diagnostic = events.record
+	allProbesStarted := make(chan struct{})
 	var starts atomic.Int32
 	var selected string
 	var mu sync.Mutex
 	u.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 		if r.Header.Get("Range") == "bytes=0-1048575" {
-			starts.Add(1)
+			if starts.Add(1) == 3 {
+				close(allProbesStarted)
+			}
 			if _, ok := r.Context().Deadline(); !ok {
 				t.Error("probe lacks deadline")
 			}
@@ -94,11 +97,17 @@ func TestR196ProbeSelectsFastMirror(t *testing.T) {
 				return r196Response([]byte("<html>error</html>")), nil
 			}
 			response := r196Response(data)
-			rate := int64(2 * 1024 * 1024)
 			if r.URL.Host == "github.com" {
-				rate = 5 * 1024
+				response.Body = &r196PacedBody{r.Context(), data, 5 * 1024}
+			} else {
+				// R278 P13 caps probes at two seconds. Gate arrival instead of
+				// requiring 1,024 scheduler timers to model the fast route.
+				select {
+				case <-allProbesStarted:
+				case <-r.Context().Done():
+					return nil, r.Context().Err()
+				}
 			}
-			response.Body = &r196PacedBody{r.Context(), data, rate}
 			return response, nil
 		}
 		mu.Lock()

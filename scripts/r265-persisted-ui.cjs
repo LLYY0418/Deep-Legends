@@ -28,6 +28,91 @@ async function waitForInstalledTarget({port,phase,out,now=Date.now,sleep=ms=>new
   fs.writeFileSync(path.join(out,`r265-cdp-${phase}.json`),JSON.stringify({phase,port,limitMs:30000,elapsedMs:now()-started,polls:polls+Number(!!target),ready:!!target,observations},null,2));
  }
 }
+function assertCorruptControls(actual,before,follow) {
+ const other=controls=>Object.fromEntries(Object.entries(controls).filter(([key])=>!['searchRegion','searchServer'].includes(key)));
+ assert.deepEqual(other(actual),other(before));
+ assert.equal(actual.searchRegion,'cn','P1 corrupt demo login must follow the CN client');
+ assert.equal(follow.label,'艾欧尼亚','P1 corrupt demo login must show the client server name');
+ assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 corrupt demo must record search client_follow_client login');
+}
+function assertFollowControls(actual,before,follow) {
+ const other=controls=>Object.fromEntries(Object.entries(controls).filter(([key])=>!['searchRegion','searchServer'].includes(key)));
+ assert.deepEqual(other(actual),other(before));
+ assert.equal(actual.searchRegion,'cn','P1 startup follows the ready CN client');
+ assert.equal(actual.searchServer,'','P1 startup follows the client without a manual server override');
+ assert.equal(follow.label,'艾欧尼亚','P1 startup shows the ready client server name');
+}
+function assertReadControls(actual,before,follow) {
+ assertFollowControls(actual,before,follow);
+ assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 read must record search client_follow_client login');
+}
+function assertPhaseControls(phase,actual,before,follow) {
+ if(phase==='corrupt')return assertCorruptControls(actual,before,follow);
+ if(phase==='restart')return assertRestartControls(actual,before,follow);
+ if(phase==='read')return assertReadControls(actual,before,follow);
+ throw Error('unknown controls phase '+phase);
+}
+function followCapturePrelude() {
+ return `(()=>{window.__r265FollowEvents=[];window.__r265FollowCaptureStartedMs=performance.now();const wrap=fn=>function(...args){if(args[0]==='client_follow_client')window.__r265FollowEvents.push({event:args[0],trigger:args[1],fields:args[2],searchUI:new Error().stack.includes('updateSearchRegionStatus'),loadedMs:performance.now()});return fn?.apply(this,args);};let report=wrap(window.reportFlowDiagnostic);Object.defineProperty(window,'reportFlowDiagnostic',{configurable:true,get(){return report},set(fn){report=wrap(fn)}});return true})();window.EventSource=class{addEventListener(){}close(){}};(()=>{
+ // Same installed-demo transport synchronization as the other upgrade phases.
+ // Preserve the real fetch, Response, bytes and cancellation; suppress live SSE
+ // only in this synthetic demo fixture, which already supplies client status.
+ if(typeof window.fetch!=='function')return;
+ const wrap=delegate=>function(...args){
+  const result=Reflect.apply(delegate,window,args),input=args[0],url=new URL(typeof input==='string'?input:input?.url||input,location.href);
+  if(url.origin!==location.origin||url.pathname!=='/api/status')return result;
+  return Promise.resolve(result).then(async response=>{
+   const signal=args[1]?.signal||input?.signal;
+   while(!window.deepLegendsMatchCards){if(signal?.aborted)throw signal.reason;await new Promise(requestAnimationFrame);}
+   if(signal?.aborted)throw signal.reason;return response;
+  });
+ };
+ let current=wrap(window.fetch);Object.defineProperty(window,'fetch',{configurable:true,enumerable:true,get:()=>current,set:delegate=>{current=wrap(delegate)}});
+})()`;
+}
+function clientFrameSnapshot() {
+ const status=window.deepLegendsMatchCards?.live?.state?.status,client=status?.clientView,search=document.querySelector('#player-search-region');
+ return {ready:client?.state==='ready'&&Number.isFinite(window.__r265FollowCaptureStartedMs),region:status?.clientRegion??client?.region??null,server:status?.serverId??client?.serverId??null,searchRegion:search?.dataset.region,searchServer:search?.dataset.serverId,label:document.querySelector('#player-search-region-label')?.textContent,loadedMs:performance.now()};
+}
+function navigationPending(error) {
+ let protocol;try{protocol=JSON.parse(error.message);}catch{return false;}
+ return protocol.code===-32000&&['Inspected target navigated or closed','Not attached to an active page','Execution context was destroyed.','Cannot find context with specified id','Cannot find default execution context'].includes(protocol.message);
+}
+async function waitForFollowedClient({evaluate,phase,now=Date.now,noProgressMs=20000,totalMs=120000}) {
+ const started=now();
+ return require('./lib/topbar-settle.cjs').waitForPage({now,noProgressMs,label:phase+' ready client stable across three frames',evaluate:async expression=>{
+  if(now()-started>=totalMs)throw Error(phase+' client readiness total limit reached');
+  try{return await evaluate(expression);}
+  catch(error){
+   if(!navigationPending(error))throw error;
+   const protocol=JSON.parse(error.message);await new Promise(setImmediate);
+   return {done:false,progress:['navigation-pending',protocol.message],snapshot:{state:'navigation-pending',message:protocol.message,method:error.cdpMethod||'Runtime.evaluate'}};
+  }
+ },sample:`(async()=>{const read=${clientFrameSnapshot};let previous;for(let frame=0;frame<3;frame++){await new Promise(r=>requestAnimationFrame(r));const snapshot=read(),progress=[snapshot.ready,snapshot.region,snapshot.server,snapshot.searchRegion,snapshot.searchServer,snapshot.label],key=JSON.stringify(progress);if(!snapshot.ready||previous!==undefined&&key!==previous)return {done:false,progress,snapshot};previous=key;if(frame===2)return {done:true,progress,snapshot};}})()`});
+}
+function assertRestartControls(actual,before,follow) {
+ assertFollowControls(actual,before,follow);
+ assert.deepEqual(actual,{...before,searchServer:''},'P1 restart startup must follow the ready client');
+ assert.equal(follow.label,'艾欧尼亚','P1 restart login must show the client server name');
+ assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 restart must record search client_follow_client login');
+}
+async function prepareFollowedStartup({call,evaluate,until,phase,save,shot,evidencePrefix='080'}) {
+   // Complete the real loadURL before reloading this same installed document.
+   // Capture startup diagnostics before app initialization, including early login.
+   await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
+   await call('Page.addScriptToEvaluateOnNewDocument',{source:followCapturePrelude()});
+   await evaluate('delete window.__r265FollowCaptureStartedMs;true');
+   await call('Page.reload',{ignoreCache:false});
+   try{const stable=await waitForFollowedClient({evaluate,phase});save(`${evidencePrefix}-${phase}-client-ready.json`,{phase,...stable.snapshot});}
+   catch(error){
+    const record={phase,error:error.message,method:error.cdpMethod,snapshot:error.pageWaitSnapshot};
+    save(`${evidencePrefix}-${phase}-client-stalled.json`,record);
+    try{record.clientStatus=await evaluate("(async()=>{const response=await fetch('/api/status'),raw=await response.json(),rendered=window.deepLegendsMatchCards?.live?.state?.status;const client=s=>({connected:s?.connected??null,region:s?.clientRegion??null,server:s?.serverId??null,state:s?.clientView?.state??null});return {httpStatus:response.status,demoEnabled:localStorage.getItem('lol-loot-demo')==='1',captureStartedMs:window.__r265FollowCaptureStartedMs,raw:client(raw),rendered:client(rendered),events:window.__r265FollowEvents||[]};})()");}catch(diagnosticError){record.diagnosticError={message:diagnosticError.message,method:diagnosticError.cdpMethod};}
+    save(`${evidencePrefix}-${phase}-client-stalled.json`,record);
+    try{await shot(`${evidencePrefix}-${phase}-client-stalled.png`);}catch(screenshotError){save(`${evidencePrefix}-${phase}-client-stalled-screenshot-error.json`,{phase,error:screenshotError.message,method:screenshotError.cdpMethod});}
+    throw error;
+   }
+}
 async function probe({port,phase,out}){
  assert(Number.isInteger(port)&&port>0&&port<65536);assert(['write-settings','write-presets','read','restart','corrupt'].includes(phase));fs.mkdirSync(out,{recursive:true});
  const target=await waitForInstalledTarget({port,phase,out});
@@ -40,12 +125,12 @@ async function probe({port,phase,out}){
  const ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{ws.addEventListener('open',resolve,{once:true});ws.addEventListener('error',reject,{once:true})});
  let sequence=0,intercept=null;const pending=new Map(),resourceProof=[];
  ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(pending.has(m.id)){const [ok,no]=pending.get(m.id);pending.delete(m.id);m.error?no(Error(JSON.stringify(m.error))):ok(m.result);}else if(m.method==='Fetch.requestPaused')void intercept?.(m.params).catch(e=>resourceProof.push({error:e.message}));});
- const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++sequence,timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method))},15000);pending.set(id,[r=>{clearTimeout(timer);resolve(r)},e=>{clearTimeout(timer);reject(e)}]);ws.send(JSON.stringify({id,method,params}));});
+ const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++sequence,timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method))},15000);pending.set(id,[r=>{clearTimeout(timer);resolve(r)},e=>{clearTimeout(timer);e.cdpMethod=method;reject(e)}]);ws.send(JSON.stringify({id,method,params}));});
  const evaluate=async expression=>{const v=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(v.exceptionDetails)throw Error(JSON.stringify(v.exceptionDetails));return v.result.value;};
  const until=async expression=>{if(await waitForPage(evaluate,expression,{idleMs:20000,hardMs:120000,intervalMs:100}))return;throw Error('installed UI condition timeout: '+expression+' '+JSON.stringify(await evaluate("({page:document.querySelector('#overview-content')?.textContent.slice(0,800),live:!document.querySelector('#live-panel')?.hidden,section:document.querySelector('.sidebar-nav-button.is-active')?.id})")))};
  const click=selector=>evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
  const choose=async(id,value)=>{await click(`#${id} + .app-select [data-app-select-trigger]`);await click(`#${id} + .app-select [data-native-select-value="${value}"]`);assert.equal(await evaluate(`document.getElementById(${JSON.stringify(id)}).value`),value);};
- const snapshot=()=>evaluate(`(()=>{const storage=Object.fromEntries(Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)]));return {preferences:Object.fromEntries(${JSON.stringify(keys)}.map(k=>[k,localStorage.getItem(k)])),presets:localStorage.getItem(${JSON.stringify(presetKey)}),storage,controls:{defaultPage:document.querySelector('#setting-default-page').value,defaultFilter:document.querySelector('#setting-default-match-filter').value,matchCount:document.querySelector('#setting-match-count').value,maskNames:document.querySelector('#setting-mask-names').checked,scale:document.querySelector('#setting-ui-scale').value,searchRegion:document.querySelector('#player-search-region').dataset.region,searchServer:document.querySelector('#player-search-region').dataset.serverId}}})()`);
+ const snapshot=()=>evaluate(`(()=>{const storage=Object.fromEntries(Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)]));return {searchFollow:{label:document.querySelector('#player-search-region-label').textContent,events:window.__r265FollowEvents||[]},preferences:Object.fromEntries(${JSON.stringify(keys)}.map(k=>[k,localStorage.getItem(k)])),presets:localStorage.getItem(${JSON.stringify(presetKey)}),storage,controls:{defaultPage:document.querySelector('#setting-default-page').value,defaultFilter:document.querySelector('#setting-default-match-filter').value,matchCount:document.querySelector('#setting-match-count').value,maskNames:document.querySelector('#setting-mask-names').checked,scale:document.querySelector('#setting-ui-scale').value,searchRegion:document.querySelector('#player-search-region').dataset.region,searchServer:document.querySelector('#player-search-region').dataset.serverId}}})()`);
  const save=(name,data)=>fs.writeFileSync(path.join(out,name),JSON.stringify(data,null,2));
  const shot=async name=>{const png=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,name),Buffer.from(png.data,'base64'));};
  const demo=async origin=>require('./r276-installed-demo.cjs').navigateInstalledDemo({call,until,click,origin});
@@ -56,7 +141,11 @@ async function probe({port,phase,out}){
  };
  const openSaved=async()=>{await openFilter();await click('[data-af-page="saved"]');};
  try{
-  await call('Page.enable');await call('Runtime.enable');await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
+  await call('Page.enable');await call('Runtime.enable');
+  if(phase==='read'||phase==='restart'||phase==='corrupt'){
+   await prepareFollowedStartup({call,evaluate,until,phase,save,shot});
+  }
+  await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
   const initial=await evaluate("({origin:location.origin,defaultPage:document.querySelector('#setting-default-page').value,liveVisible:!document.querySelector('#live-panel').hidden})");
   if(phase==='write-settings'){
    // No Fetch interception, no missing-script repair in this phase.
@@ -80,7 +169,12 @@ async function probe({port,phase,out}){
    save('079-format-presets-before.json',{phase,resourceFixtureApplied:true,scope:'preset data format compatibility; published 079 cannot save presets without its missing same-tag script',resourceProof,...data});await shot('079-format-preset.png');
   }else{
    const before=JSON.parse(fs.readFileSync(path.join(out,'079-unmodified-settings-before.json'),'utf8')),presets=JSON.parse(fs.readFileSync(path.join(out,'079-format-presets-before.json'),'utf8'));
-   assert.equal(initial.defaultPage,'live');if(phase!=='corrupt')assert(initial.liveVisible,'candidate must start on the UI-written 079 default page');const data=await snapshot();assert.deepEqual(data.preferences,before.preferences);assert.deepEqual(data.controls,before.controls);
+   assert.equal(initial.defaultPage,'live');if(phase!=='corrupt')assert(initial.liveVisible,'candidate must start on the UI-written 079 default page');const data=await snapshot();
+   if(phase==='read'||phase==='restart'){
+    const name=`080-${phase}-before-controls.json`,record={phase,sampledAt:new Date().toISOString(),...data};save(name,record);
+    try{record.clientStatus=await evaluate("(async()=>{const r=await fetch('/api/status'),s=await r.json();return {captureStartedMs:window.__r265FollowCaptureStartedMs,httpStatus:r.status,connected:s.connected??null,clientRegion:s.clientRegion??null,platform:s.platform??null,serverId:s.serverId??null,clientViewState:s.clientView?.state??null,clientViewRegion:s.clientView?.region??null,clientViewServerId:s.clientView?.serverId??null,loadedMs:performance.now()};})()");}catch(error){record.clientStatus={diagnosticError:error.message};}save(name,record);
+   }
+   assert.deepEqual(data.preferences,before.preferences);assertPhaseControls(phase,data.controls,before.controls,data.searchFollow);
    if(phase==='read'){
     assert.equal(data.presets,presets.presets);assert.deepEqual(JSON.parse(data.presets),JSON.parse(presets.presets));save('079-to-080-preferences-comparison.json',{equal:true,resourceFixtureApplied:false,settingsBefore:before.preferences,settingsAfter:data.preferences,presetContentOrderNamesEqual:true,presetScope:presets.scope});await shot('080-actual-default-page.png');
     await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R265 79 格式兼容夹具')");await click('[data-af-apply="0"]');await until("document.querySelector('[data-af-conditions]')?.textContent.includes('胜利')");
@@ -89,11 +183,11 @@ async function probe({port,phase,out}){
    }else if(phase==='restart'){
     const renamed=JSON.parse(fs.readFileSync(path.join(out,'080-preset-renamed-before-restart.json'),'utf8'));assert.equal(data.presets,renamed.presets);await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R265 80 重命名后保存')");save('080-restart-preset-proof.json',{resourceFixtureApplied:false,restartRetained:true,...await snapshot()});await shot('080-restart-preset.png');
    }else{
-    await evaluate("localStorage.setItem('deep-legends-history-presets-v1','{corrupt-r265')");await demo(initial.origin);await openSaved();await until("localStorage.getItem('deep-legends-history-presets-v1')===null");const after=await snapshot();assert.deepEqual(after.preferences,before.preferences);assert.deepEqual(after.controls,before.controls);assert(await evaluate("document.querySelector('dialog[data-af-menu]:modal .af-saved .af-empty')?.textContent.includes('暂无常用筛选')"));save('080-corrupt-preset-proof.json',{resourceFixtureApplied:false,corruptFixtureDropped:true,otherSettingsUnchanged:true,...after});await shot('080-corrupt-preset.png');
+    await evaluate("localStorage.setItem('deep-legends-history-presets-v1','{corrupt-r265')");await demo(initial.origin);await openSaved();await until("localStorage.getItem('deep-legends-history-presets-v1')===null");const after=await snapshot();assert.deepEqual(after.preferences,before.preferences);assertCorruptControls(after.controls,before.controls,after.searchFollow);assert(await evaluate("document.querySelector('dialog[data-af-menu]:modal .af-saved .af-empty')?.textContent.includes('暂无常用筛选')"));save('080-corrupt-preset-proof.json',{resourceFixtureApplied:false,corruptFixtureDropped:true,otherSettingsUnchanged:true,...after});await shot('080-corrupt-preset.png');
    }
   }
   console.log(JSON.stringify({phase,passed:true,resourceFixtureApplied:phase==='write-presets'}));
  }finally{ws.close()}
 }
-module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget};
+module.exports={assertPhaseControls,probe,scriptSHA,tagSHA,waitForInstalledTarget,assertCorruptControls,assertRestartControls,assertReadControls,assertFollowControls,followCapturePrelude,waitForFollowedClient,prepareFollowedStartup};
 if(require.main===module){const [port,phase,out]=process.argv.slice(2);probe({port:Number(port),phase,out}).catch(e=>{console.error(e);process.exitCode=1});}

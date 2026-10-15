@@ -1,5 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs');
+const {waitOutcome}=require('./lib/wait-progress.cjs');
 module.exports=async({evaluate,until,click,call,shot,ready,results,errors})=>{
  const fixture=JSON.parse(fs.readFileSync(process.env.R272_OVERVIEW_FIXTURE||'/tmp/r272-overview.json','utf8'));
  assert.equal(fixture.matches.length,20,'standalone replay requires 20 full records');for(const match of fixture.matches){assert.equal(match.participants?.length,10,'complete stream references cannot be replayed without preceding full frames');assert(match.revision);}
@@ -16,6 +17,14 @@ module.exports=async({evaluate,until,click,call,shot,ready,results,errors})=>{
  await evaluate("window.__r272Root=document.querySelector('#overview-content');window.__r272Tab=__r272Root._overviewViewTab;window.__r272List=__r272Root.querySelector('.match-list');window.__r272Entry=__r272List.firstElementChild;window.__r272Tab.data.pagination.hasMore=true;window.__r272Expire=true;window.dispatchEvent(new CustomEvent('deep-legends:riot-key-updated'));document.querySelector('#app-scroll').scrollTop=1200;window.__r272Scroll=document.querySelector('#app-scroll').scrollTop;true");
  await evaluate("__r266Game.updateCareerCards(__r272Tab,'opgg_season');__r266Game.loadOverview(__r272Tab,false,true,true);true");await until('!__r272Tab.loadingMore');
  assert(await evaluate("__r272List===document.querySelector('.match-list') && __r272Entry===__r272List.firstElementChild && document.querySelector('#app-scroll').scrollTop>0"));results.push({r272:'append-career-retains-scroll'});
+ // The preceding assertion protects scroll retention; the LP scenario samples visible rich rows.
+ await evaluate("__r272Entry.scrollIntoView({block:'start'});true");
+ let lpViewport;
+ const lpReady=await waitOutcome(async()=>{
+  lpViewport=await evaluate("(()=>{const root=document.querySelector('#app-scroll').getBoundingClientRect(),entries=[...__r272List.querySelectorAll('.match-entry')].slice(0,4).map(e=>{const r=e.getBoundingClientRect();return {id:e.dataset.matchId,virtual:e.hasAttribute('data-virtual-match'),visible:r.bottom>root.top&&r.top<root.bottom};});return {ready:entries.length===4&&entries.every(e=>!e.virtual&&e.visible),connected:__r272List.isConnected,entries};})()");
+  return lpViewport.ready;
+ },{idleMs:15000,hardMs:60000,intervalMs:50,progress:()=>lpViewport});
+ if(!lpReady.ok)throw Error(`R272 LP rows ready: ${lpReady.reason}; waited ${lpReady.ms} ms; last progress ${lpReady.progress}`);
  await evaluate("(()=>{const t=__r272Tab;t.data.matches=t.data.matches.map((m,i)=>({...m,queueId:i<4?420:i===4?450:440,result:i===5?'remake':m.result,lpDelta:i<4?[-22,-22,-23,36][i]:i<6?12:undefined}));__r266Game.reconcileFilteredMatchList(__r272List,t);return true})()");
  assert.deepEqual(await evaluate("[...__r272List.querySelectorAll('.lp-delta')].map(n=>n.textContent)"),['−22 LP','−22 LP','−23 LP','+36 LP']);results.push({r272:'actual-lp-chip-render',chips:4});
  for(const rank of [1,2,5,10]) {
