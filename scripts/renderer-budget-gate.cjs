@@ -5,10 +5,10 @@
 // runner and 209.4s on another, every file slower by the same ~1.6x, so a raw
 // 192s line failed or passed by the luck of the runner draw.
 //
-// Rules (none of the budgets is changed):
-//  - the raw suite must still finish within the absolute 240s budget;
+// R278: user-approved Linux raw/file limits; reference-speed margin stays fixed.
+//  - the raw suite must still finish within the absolute 270s Linux budget;
 //  - the suite time converted to the reference runner speed must stay within
-//    192s (20% margin under 240s). factor = measured calibration / reference
+//    192s (the original 20% margin under 240s). factor = measured calibration / reference
 //    calibration; on a faster runner factor < 1 and the check gets stricter.
 //  - calibrations must run the exact reference workload (version, iterations,
 //    concurrency, checksum) before and after the suite.
@@ -23,16 +23,16 @@ function evaluate(timings, calibrations, reference) {
   const warnings = [];
   if (!finitePositive(reference?.reference_ms)) failures.push("reference_ms is not set; collect CI calibrations first");
   if (reference?.margin_budget_ms !== 192000) failures.push(`margin budget must stay 192000ms, got ${reference?.margin_budget_ms}`);
-  if (reference?.hard_budget_ms !== 240000) failures.push(`hard budget must stay 240000ms, got ${reference?.hard_budget_ms}`);
+  if (reference?.hard_budget_ms !== 270000) failures.push(`hard budget must stay 270000ms, got ${reference?.hard_budget_ms}`);
   if (!timings || timings.success !== true) failures.push("renderer suite did not succeed");
   if (timings?.scope !== "all") failures.push(`renderer scope must be all, got ${timings?.scope}`);
   if (timings?.platform !== "linux") failures.push(`renderer platform must be linux, got ${timings?.platform}`);
-  if(timings?.file_budget_ms!==90000)failures.push("Linux file budget must stay 90000ms");
-  if(timings?.suite_budget_ms!==240000)failures.push("suite budget must stay 240000ms");
-  if(!Array.isArray(timings?.files)||!timings.files.length||timings.files.some(row=>!finitePositive(row.duration_ms)||row.duration_ms>90000))failures.push("missing or over-budget Linux file timings");
+  if(timings?.file_budget_ms!==100000)failures.push("Linux file budget must stay 100000ms");
+  if(timings?.suite_budget_ms!==270000)failures.push("suite budget must stay 270000ms");
+  if(!Array.isArray(timings?.files)||!timings.files.length||timings.files.some(row=>!finitePositive(row.duration_ms)||row.duration_ms>100000))failures.push("missing or over-budget Linux file timings");
   const raw = timings?.summary?.duration_ms;
   if (!finitePositive(raw)) failures.push("renderer duration_ms missing");
-  else if (raw > 240000) failures.push(`raw renderer suite ${raw}ms exceeds the absolute 240000ms budget`);
+  else if (raw > 270000) failures.push(`raw renderer suite ${raw}ms exceeds the absolute 270000ms budget`);
 
   if (!Array.isArray(calibrations) || calibrations.length !== 2) failures.push("exactly two calibrations (before and after the suite) are required");
   const medians = [];
@@ -57,7 +57,7 @@ function evaluate(timings, calibrations, reference) {
     }
   }
   return { ok: failures.length === 0, failures, warnings, raw_ms: raw ?? null, factor, normalized_ms: normalized, calibration_medians_ms: medians,
-    reference_ms: reference?.reference_ms ?? null, margin_budget_ms: 192000, hard_budget_ms: 240000 };
+    reference_ms: reference?.reference_ms ?? null, margin_budget_ms: 192000, hard_budget_ms: 270000 };
 }
 
 module.exports = { evaluate };
