@@ -1261,13 +1261,13 @@ span:has(>.function-icon){display:inline-flex;align-items:center;justify-content
 #dl-icons .hex-progress{stroke-dashoffset:var(--update-progress-offset,59)}
 .topbar #update-button{width:var(--topbar-control-size);background:var(--surface-strong);border:1px solid var(--line);border-radius:10px}
 .app-select-trigger:after{display:none!important}
-.app-select-trigger>.function-icon{width:var(--icon-sm)!important;height:var(--icon-sm)!important;min-width:var(--icon-sm);margin-left:auto;transform:rotate(90deg)}
-.app-select-trigger[aria-expanded="true"]>.function-icon{transform:rotate(-90deg)}
+.app-select-trigger>.function-icon:last-child{width:var(--icon-sm)!important;height:var(--icon-sm)!important;min-width:var(--icon-sm);margin-left:auto;transform:rotate(90deg)}
+.app-select-trigger[aria-expanded="true"]>.function-icon:last-child{transform:rotate(-90deg)}
 .function-icon{flex:0 0 var(--icon-md)!important}
 .sidebar .function-icon,.suite-tab-icon .function-icon{flex-basis:var(--icon-lg)!important}
 :is(.gameplay-empty,.friends-empty,.service-outage-disc,.suite-offline-mark) .function-icon{flex-basis:var(--icon-hero)!important}
 :is(.player-tab-close,.player-tab-placeholder,.player-tab-self,.rank-mmr-trigger,.season-data-note,.quality-option,.multikill-tag) .function-icon,.function-icon.mastery-mark{flex-basis:var(--icon-sm)!important;width:var(--icon-sm)!important;height:var(--icon-sm)!important;min-width:var(--icon-sm)}
-.app-select-trigger>.function-icon{flex-basis:var(--icon-sm)!important}
+.app-select-trigger>.function-icon:last-child{flex-basis:var(--icon-sm)!important}
 .function-icon[hidden],.setting-riot-key-reveal[aria-pressed="false"] .riot-key-eye-closed,.setting-riot-key-reveal[aria-pressed="true"] .riot-key-eye-open{display:none!important}
 
 .chroma-mini-lock>.function-icon{width:var(--icon-sm)!important;height:var(--icon-sm)!important;min-width:var(--icon-sm);flex-basis:var(--icon-sm)!important}

@@ -264,7 +264,7 @@
   function searchOption(o,category,query,ctx) {return o.label.toLowerCase().includes(query) || category==='hero' && ctx.heroSearch?.(query,o.value,o.label)>0;}
   function render(tab,context) {
     const ctx=context(),m=ui(tab),n=Object.keys(conditions(tab)).length;
-    return `<div class="af-select app-select${n?' is-active':''}" data-af-root><button class="app-select-trigger" type="button" data-af-open aria-haspopup="dialog" aria-expanded="${m.open}"><svg class="function-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-7a448332b5"/></svg><span>筛选</span>${n?`<b>${n}</b>`:''}</button></div>`;
+    return `<div class="af-select app-select${n?' is-active':''}" data-af-root><button class="app-select-trigger" type="button" data-af-open aria-haspopup="dialog" aria-expanded="${m.open}"><svg class="function-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-7a448332b5"/></svg><span>筛选</span>${n?`<b>${n}</b>`:''}<svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></button></div>`;
   }
   function menuFor(container) {return container?._afDialog || null;}
   function ensureMenu(container,tab,ctx) {

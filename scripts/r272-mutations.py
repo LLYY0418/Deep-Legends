@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='r272-mutants-') as temp:
  javascript('index-career-patch','backend/web/history-recovery.js',"const old=[...column.children].find(node=>node.dataset.careerKey===key);","const old=[...column.children][entries.findIndex(entry=>entry[0]===key)];",'R272_RECOVERY_SOURCE')
  javascript('lost-server-invalidation','backend/web/app.js',' || state.collectionScope!==scope','', 'R272_APP_SOURCE')
  javascript('old-server-response-accepted','backend/web/app.js','collectionAccount!==[state.status?.clientRegion,state.status?.serverId,state.status?.collectionAccount].join("|")','false', 'R272_APP_SOURCE')
- javascript('matches-prematurely-ready-aggregates','backend/web/gameplay.js','(tab.initialPagePending || !data.matches?.length) && !tab.recentStatsReceived','!data.matches?.length && !tab.recentStatsReceived', 'R272_GAMEPLAY_SOURCE')
+ javascript('matches-prematurely-ready-aggregates','backend/web/gameplay.js','(pendingMatches || pendingAggregates || pendingStats) && titles[key]','pendingMatches && titles[key]', 'R272_GAMEPLAY_SOURCE')
  run('restored-go-target',['go','test','./backend','-run','^TestR272LPRevisionAndDeltaFrames$','-count=1','-v']);run('restored-js',js)
  assert '--- PASS: TestR272LPRevisionAndDeltaFrames' in (args.out/'restored-go-target.log').read_text()
 

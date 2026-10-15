@@ -1867,8 +1867,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .current-game-identity small, .current-game-rank small { color: var(--muted); font-size: 12px; }
 .current-game-badges { grid-area: badges; display: flex; align-items: center; align-self: center; justify-self: start; justify-content: flex-start; gap: 3px; padding-inline: 0; margin-inline-start: 2px; min-width: var(--cg-badges-w); }
 .current-game-position, .current-game-position img { width: 17px; height: 17px; display: block; }
-.current-game-streak, .current-game-streak svg { display: block; width: 17px; height: 17px; flex: 0 0 17px; }
-.current-game-streak svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.current-game-streak, .current-game-streak svg { display: block; width: var(--icon-md); height: var(--icon-md); flex: 0 0 var(--icon-md); }
+.current-game-streak svg { fill: none; stroke: currentColor; stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
 .current-game-streak.is-win { color: var(--success); } .current-game-streak.is-loss { color: var(--danger); }
 .current-game-rank { grid-area: rank; display: flex; align-items: center; justify-self: start; width: 100%; gap: 8px; min-width: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
 .current-game-rank > img, .current-game-rank .rank-crest-icon { width: 24px; height: 24px; object-fit: contain; }

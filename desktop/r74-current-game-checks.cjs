@@ -50,7 +50,7 @@ exports.verify = async ({evaluate,width,theme}) => {
  assert.equal(m.streaks.length,2);
  for(const streak of m.streaks) {
   assert.ok(streak.svg,'streak must use SVG');
-  assert.equal(streak.svg.width,17);assert.equal(streak.svg.height,17);
+  assert.equal(streak.svg.width,18);assert.equal(streak.svg.height,18);
   assert.ok(Math.abs(streak.svg.width-streak.position.width)<=1);
   assert.equal(streak.label,streak.tip);assert.match(streak.label,/^最近处于连[胜败]状态$/);
  }
