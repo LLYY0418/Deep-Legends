@@ -2346,6 +2346,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .match-pending [data-match-layout][data-icon-overlap]{grid-template-columns:124px minmax(0,96px) minmax(0,1fr)}
 /* Manual placeholders own row geometry; native intrinsic placeholders must not add a second estimate. */
 .match-list[data-match-virtualizer]>.match-entry{content-visibility:visible;contain-intrinsic-size:none}
+.match-list[data-match-virtualizer]>.match-entry[data-virtual-match]{content-visibility:hidden}
 .career-column>[data-career-key="ranks"]{overflow:visible}
 
 .career-column>.rank-career-section{display:flex;flex-direction:column}

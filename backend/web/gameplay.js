@@ -941,7 +941,7 @@
     const near=new window.IntersectionObserver(events=>{for(const e of events)if(e.isIntersecting)queue(e.target,true);},{root,rootMargin:'2400px 0px'});
     const far=new window.IntersectionObserver(events=>{for(const e of events)if(!e.isIntersecting)queue(e.target,false);},{root,rootMargin:'3200px 0px'});
     list._virtualObserver={disconnect(){near.disconnect();far.disconnect();if(frame)cancelAnimationFrame(frame);pending.clear();}};
-    for(const entry of list.querySelectorAll(':scope > .match-entry')){near.observe(entry);far.observe(entry);}
+    for(const entry of list.querySelectorAll(':scope > .match-entry:not(.match-pending)')){near.observe(entry);far.observe(entry);}
   }
 
   function appendOverviewMatches(tab, additions, reconciled = false) {
@@ -2582,6 +2582,7 @@
     const renderedList = container.querySelector(".match-list");
     if (renderedList) {
       renderedList._matchData = new Map(rawMatches.map(match => [String(match.gameId), match]));
+      if(!preserveMatchList)boundMatchDOM(renderedList,tab);
       if(!preserveMatchList)window.reportFlowDiagnostic?.('lp_chip_render','render',{ranked_matches:matches.filter(m=>[420,440].includes(Number(m.queueId))).length,with_delta:matches.filter(m=>m.lpDelta!=null).length,chips:renderedList.querySelectorAll('.lp-delta').length,revision_skipped:0});
     }
     container._matchListMatches = rawMatches;
