@@ -4,6 +4,7 @@
 const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
 const {serveStaticAPI}=require('../scripts/r276-browser-api-fixtures.cjs');
+const {waitOutcome}=require('../scripts/lib/wait-progress.cjs');
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -23,6 +24,11 @@ async function main(){
  const {sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});
  const call=(m,p)=>send(m,p,sessionId);
  const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+ const waitForDOM=async(label,expression)=>{
+  let last;
+  const outcome=await waitOutcome(async()=>{last=await evaluate(expression);return last.ready;},{idleMs:15000,hardMs:60000,intervalMs:50,progress:()=>last});
+  if(!outcome.ok)throw Error(`${label}: ${outcome.reason}; waited ${outcome.ms} ms; last progress ${outcome.progress}`);
+ };
  await call('Page.enable');
  server=require('node:http').createServer((req,res)=>{
    const pathname=new URL(req.url,'http://localhost').pathname;
@@ -35,9 +41,9 @@ async function main(){
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});
  await call('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/?demo'});
- await evaluate(`new Promise(resolve=>{const timer=setInterval(()=>{const app=document.querySelector('#app-frame');if(app&&!app.hasAttribute('inert')){clearInterval(timer);resolve();}},50);setTimeout(()=>{clearInterval(timer);resolve();},5000);})`);
+ await waitForDOM('app-frame ready',`(()=>{const app=document.querySelector('#app-frame');return {ready:!!app&&!app.hasAttribute('inert'),present:!!app,inert:app?app.hasAttribute('inert'):null};})()`);
 
- await evaluate(`new Promise(resolve=>{const t=setInterval(()=>{if(document.querySelector('#overview-content .summoner-strip')){clearInterval(t);resolve();}},30);setTimeout(()=>{clearInterval(t);resolve();},8000);})`);
+ await waitForDOM('overview summoner strip ready',`(()=>{const overview=document.querySelector('#overview-content');const strips=document.querySelectorAll('#overview-content .summoner-strip').length;return {ready:strips>0,overview:!!overview,strips,busy:overview?.getAttribute('aria-busy')??null};})()`);
  // R79: the production artwork now wraps an img; retain the intrinsic-size guard.
  // Force a loaded 1215x717 image: jsdom cannot reproduce intrinsic image sizing.
  await evaluate(`(()=>{const img=document.querySelector('#overview-content .summoner-strip-art img');if(!img)throw Error('missing production banner');img.removeAttribute('srcset');img.src='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1215" height="717"><rect width="1215" height="717" fill="#648cba"/></svg>');return img.decode();})()`);

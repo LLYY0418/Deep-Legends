@@ -4,6 +4,7 @@
 const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
 const {serveStaticAPI}=require('../scripts/r276-browser-api-fixtures.cjs');
+const {waitOutcome}=require('../scripts/lib/wait-progress.cjs');
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -23,6 +24,11 @@ async function main(){
  const {sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});
  const call=(m,p)=>send(m,p,sessionId);
  const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+ const waitForDOM=async(label,expression)=>{
+  let last;
+  const outcome=await waitOutcome(async()=>{last=await evaluate(expression);return last.ready;},{idleMs:15000,hardMs:60000,intervalMs:50,progress:()=>last});
+  if(!outcome.ok)throw Error(`${label}: ${outcome.reason}; waited ${outcome.ms} ms; last progress ${outcome.progress}`);
+ };
  await call('Page.enable');
  // Use the production shell and every production stylesheet. Fixtures have no
  // personal IDs, no network dependency, long account names and missing rows.
@@ -39,9 +45,9 @@ async function main(){
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});
  await call('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/?demo'});
- await evaluate(`new Promise(resolve=>{const timer=setInterval(()=>{const app=document.querySelector('#app-frame');if(app&&!app.hasAttribute('inert')){clearInterval(timer);resolve();}},50);setTimeout(()=>{clearInterval(timer);resolve();},5000);})`);
+ await waitForDOM('app-frame ready',`(()=>{const app=document.querySelector('#app-frame');return {ready:!!app&&!app.hasAttribute('inert'),present:!!app,inert:app?app.hasAttribute('inert'):null};})()`);
  await evaluate(`window.dispatchEvent(new CustomEvent('deep-legends:navigate',{detail:{section:'pro-players'}}))`);
- await evaluate(`new Promise(resolve=>{const timer=setInterval(()=>{if(document.querySelectorAll('.pro-table').length===6){clearInterval(timer);resolve();}},30);setTimeout(()=>{clearInterval(timer);resolve();},5000);})`);
+ await waitForDOM('pro-player six tables ready',`(()=>{const tables=document.querySelectorAll('.pro-table').length;return {ready:tables===6,tables,pending:document.querySelectorAll('.pro-pending').length,players:document.querySelectorAll('.pro-player-meta').length};})()`);
  await evaluate(`new Promise(r=>setTimeout(r,400))`);
  // R79: only one overview action remains in production. Add a second real
  // button clone to retain the original two-action alignment stress assertion.
