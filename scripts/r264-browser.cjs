@@ -50,6 +50,7 @@ const intercept=` const scenario=window.__r264Scenario;
 `;
 async function start(){
  fs.mkdirSync(out,{recursive:true});
+ if(process.env.R276_OFFLINE_PROXY){fs.mkdirSync(path.join(temp,'data'),{recursive:true});fs.writeFileSync(path.join(temp,'data','champion-network.json'),JSON.stringify({mode:'manual',url:process.env.R276_OFFLINE_PROXY}));}
  backend=spawn(process.env.R264_BACKEND||'/private/tmp/r264-baseline-public',['--desktop'],{cwd:root,env:{...process.env,LOL_LOOT_DATA_DIR:path.join(temp,'data')},stdio:['ignore','pipe','pipe']});
  const ready=await new Promise((resolve,reject)=>{let data='';const timer=setTimeout(()=>reject(Error('Backend startup timeout')),20000);backend.once('error',reject);backend.stdout.on('data',c=>{data+=c;for(const line of data.split('\n')){try{const value=JSON.parse(line.replace(/^LOOT_READY /,''));if(value.baseUrl){clearTimeout(timer);resolve(value);return}}catch{}}});backend.once('exit',code=>reject(Error('Backend exited '+code)));});
  const csp=(await fetch(ready.bootstrapUrl)).headers.get('content-security-policy');assert(csp?.includes("script-src 'self'") && !csp.includes('unsafe-inline'));
