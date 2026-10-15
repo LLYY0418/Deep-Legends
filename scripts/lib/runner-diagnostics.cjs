@@ -15,6 +15,11 @@ function timingReportsFromLog(text){
  const reports=[];
  for(const match of text.matchAll(/"scope"\s*:\s*"(?:all|desktop)"/g)){
   const start=text.lastIndexOf('{',match.index);if(start<0)continue;
+  // GitHub treats workflow commands inside test names as annotations and can
+  // strip the JSON line prefix in `cases`. Runner/file metadata precedes that
+  // untrusted section; decode its complete prefix without inventing case data.
+  const casesAt=text.slice(start).search(/\n\s*"cases"\s*:/);
+  if(casesAt>=0){try{const header=JSON.parse(text.slice(start,start+casesAt)+'\n"cases":[]}');if(header.runner&&header.timingComparison){reports.push({...header,logMetadataOnly:true});continue;}}catch{}}
   let depth=0,string=false,escaped=false;
   for(let i=start;i<text.length;i++){
    const c=text[i];if(string){if(escaped)escaped=false;else if(c==='\\')escaped=true;else if(c==='"')string=false;continue;}

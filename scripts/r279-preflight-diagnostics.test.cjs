@@ -23,3 +23,12 @@ test('legacy printed renderer JSON reaches the triage summary without changing i
  const {timingReportsFromLog}=require('./lib/runner-diagnostics.cjs');assert.deepEqual(timingReportsFromLog(log),[data]);
  const {triage,markdown}=require('./ci-failure-triage.cjs');const report=triage({log:['legacy.log'],changed:null},{text:()=>log});assert.equal(report.runner.cpu_model,'fixture CPU');assert.match(markdown(report),/均匀变慢/);
 });
+
+test('real GitHub command decoration inside a case name cannot erase runner timing metadata',()=>{
+ const data={scope:'all',runner:{cpu_model:'AMD EPYC fixture'},timingComparison:{kind:'mixed',medianRatio:1,ratios:[],outliers:[]},files:[{file:'backend/web/r117.test.cjs',duration_ms:1}],cases:[{file:'scripts/ci-failure-triage.test.cjs',name:'GitHub log decoration: ##[error] lines are read as error lines'}],success:false};
+ const raw=JSON.stringify(data,null,2);const decorated=raw.replace(/.*"name": "GitHub log decoration: /,'');
+ assert.throws(()=>JSON.parse(decorated),'actual log shape is not complete JSON');
+ const {timingReportsFromLog}=require('./lib/runner-diagnostics.cjs');const reports=timingReportsFromLog(decorated);
+ assert.equal(reports.length,1);assert.equal(reports[0].runner.cpu_model,data.runner.cpu_model);assert.deepEqual(reports[0].files,data.files);assert.equal(reports[0].logMetadataOnly,true);
+ const {triage}=require('./ci-failure-triage.cjs');const report=triage({log:['legacy.log'],changed:null},{text:()=>decorated});assert.equal(report.runner.cpu_model,data.runner.cpu_model);assert.equal(report.timingComparisons.length,1);
+});

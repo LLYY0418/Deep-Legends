@@ -48,7 +48,8 @@ function parseFailureJson(data, evidence) {
   if(Array.isArray(data.failures)&&data.failures.length)return data.failures.flatMap(f=>parseFailureJson({...f,failures:undefined,scenario:f.name||f.scenario},evidence));
   const message = data.error || data.message || data.reason || "";
   if (!message && !data.scenario && !data.case) return [];
-  return [{ kind: "guard", name: data.scenario || data.case || data.name || path.basename(path.dirname(evidence)), file: relFile(data.file || data.script || ""), message: String(message).slice(0, 600), evidence }];
+  const located=/(?:\(|\s)((?:[\w./\\:-]*?)(?:backend|desktop|scripts)[\w./\\-]*\.(?:cjs|js)):\d+/.exec(data.stack||message);
+  return [{ kind: "guard", name: data.scenario || data.case || data.name || path.basename(path.dirname(evidence)), file: relFile(data.file || data.script || located?.[1] || ""), message: String(data.stack || message).slice(0, 600), evidence }];
 }
 
 function parseLog(text, evidence) {

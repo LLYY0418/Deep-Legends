@@ -27,3 +27,11 @@ test('layout failure retains sidebar, viewport and every table geometry',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../desktop/pro-players-layout.cjs'),'utf8');
  for(const field of ['captureFailure','failure.json','innerWidth','sidebar:','level:','settled:','loadedMs:','font:','scrollWidth:t.scrollWidth','parentClientWidth:t.parentElement.clientWidth'])assert(source.includes(field),field);
 });
+
+test('Windows geometry diagnosis preserves CSS mutation rules and computed minimum width',()=>{
+ const pro=fs.readFileSync(path.join(__dirname,'../desktop/pro-players-layout.cjs'),'utf8');
+ for(const text of ['cssRules','minWidth:getComputedStyle(t).minWidth','offsetWidth:t.offsetWidth','failure.png','userAgent:navigator.userAgent','dpr:devicePixelRatio'])assert(pro.includes(text),text);
+ const harness=fs.readFileSync(path.join(__dirname,'r266-browser.cjs'),'utf8');
+ assert(harness.indexOf("currentCase={case:'r266-matrix'")<harness.indexOf('assert.equal(overlaps.length,0'));
+ assert(harness.includes('if(!process.env.R266_MATRIX_BASELINE)assert.equal(overlaps.length,0'),'original published baseline condition remains bound to its assertion');assert(harness.includes('diagnostic=await diagnoseFailure?.()'));assert(harness.includes("captureFailure=()=>shot('failure')"));
+});

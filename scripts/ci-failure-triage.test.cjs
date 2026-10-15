@@ -135,3 +135,11 @@ test('released baseline is resolved from the candidate ancestry; stale main is n
  const report=triage({base:'release-base',json:['x'],changed:new Set()},{exec:()=> 'v0.12.85\n',json:()=>({failures:[{file:'backend/web/app.js',name:'old product',message:'x'}]})});
  assert.equal(report.base,'v0.12.85');assert.equal(report.failures[0].inDiff,false);
 });
+
+test('failure JSON retains the actual assertion file from Linux and Windows stacks',()=>{
+ const {parseFailureJson}=require('./ci-failure-triage.cjs');
+ for(const stack of ['Error: bad\n    at run (/home/runner/work/repo/scripts/r272-browser-checks.cjs:33:558)',String.raw`Error: bad
+    at run (D:\a\repo\scripts\r272-browser-checks.cjs:33:558)`]){
+  assert.equal(parseFailureJson({error:'bad',stack},'failure.json')[0].file,'scripts/r272-browser-checks.cjs');
+ }
+});

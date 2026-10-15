@@ -19,6 +19,7 @@ const simple = [
   { file: "scripts/r272-persisted-ui.cjs", original: 20000, wrapped: false, error: /^installed UI condition timeout: /, expression: "document.title" },
 ];
 const diagnostic = [
+  { file: "scripts/r265-browser.cjs", original: 10000 },
   { file: "scripts/r264-browser.cjs", original: 5000 },
   { file: "scripts/r266-browser.cjs", original: 5000 },
   { file: "scripts/r267-browser.cjs", original: 5000 },

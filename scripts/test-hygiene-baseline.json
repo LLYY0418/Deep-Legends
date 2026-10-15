@@ -76,7 +76,6 @@
     },
     "scripts/r265-browser.cjs": {
       "sleep": 8,
-      "poll": 1,
       "reason": "存量：真浏览器守卫里的固定稳定间隔与轮询，登记后只减不增，后续按 wait-progress 迁移"
     },
     "scripts/r269-browser-checks.cjs": {

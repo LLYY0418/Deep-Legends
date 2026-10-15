@@ -1,4 +1,5 @@
 'use strict';
+const {waitForPage}=require('./lib/wait-progress.cjs');
 const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 const {r265API}=require('./r276-browser-api-fixtures.cjs');
@@ -8,7 +9,7 @@ const pausedRequests=new PausedRequests();
 // are explicitly synthetic; this does not claim real Windows or LCU evidence.
 const {spawn,execFileSync}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=process.env.R265_BROWSER_OUT || path.join(os.tmpdir(),'r265-browser'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'r265-browser-'));
-const errors=[],violations=[],results=[],closed=new Set(),canceled=new Set();let backend,chrome,ws;
+const errors=[],violations=[],results=[],closed=new Set(),canceled=new Set();let backend,chrome,ws,captureFailure;
 const fixture=`
  const r265LoadedStatistics=window.__r265LoadedStatistics;
  const r265Sample=(data,k)=>{
@@ -82,9 +83,10 @@ async function main(){
   const {targetId}=await send('Target.createTarget',{url:'about:blank'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true}),call=(m,p)=>send(m,p,sessionId);
   pausedRequests.attach(sessionId,targetId);
   const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
-  const until=async expr=>{for(let i=0;i<200;i++){if(await evaluate(expr))return;await new Promise(r=>setTimeout(r,50));}throw timeoutDiagnostic('timeout '+expr+' '+JSON.stringify(await evaluate("({url:location.pathname,ready:document.readyState,hidden:document.hidden,section:document.querySelector('[data-section].is-active')?.dataset.section,body:document.body.textContent.slice(0,300),view:document.querySelector('#overview-content')?.textContent.slice(0,1200),demo:document.body.classList.contains('is-demo'),gameplay:!!window.deepLegendsGameplay,requests:window.__r265RecoveryRequests,styles:[...document.querySelectorAll('link[rel=stylesheet]')].map(n=>new URL(n.href).pathname)})")),pausedRequests);};
+  const until=async expr=>{if(await waitForPage(evaluate,expr,{idleMs:10000,hardMs:60000}))return;throw timeoutDiagnostic('timeout '+expr+' '+JSON.stringify(await evaluate("({userAgent:navigator.userAgent,scripts:[...document.scripts].map(n=>({path:n.src?new URL(n.src).pathname:'inline',async:n.async,defer:n.defer})),resources:performance.getEntriesByType('resource').filter(n=>/\\.(?:js|css)(?:[?]|$)/.test(n.name)).map(n=>({path:new URL(n.name).pathname,start:n.startTime,end:n.responseEnd})),runtime:!!window.deepLegendsRuntime,demoReady:typeof window.deepLegendsDemoReady,toast:typeof window.deepLegendsToast,launchHidden:document.querySelector('#client-launchpad')?.hidden,appInert:document.querySelector('#app-frame')?.inert,url:location.pathname,ready:document.readyState,hidden:document.hidden,section:document.querySelector('[data-section].is-active')?.dataset.section,body:document.body.textContent.slice(0,300),view:document.querySelector('#overview-content')?.textContent.slice(0,1200),demo:document.body.classList.contains('is-demo'),gameplay:!!window.deepLegendsGameplay,requests:window.__r265RecoveryRequests,styles:[...document.querySelectorAll('link[rel=stylesheet]')].map(n=>new URL(n.href).pathname)})")),pausedRequests);};
   const click=s=>evaluate(`document.querySelector(${JSON.stringify(s)}).click()`),frame=()=>evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
   const shot=async name=>{await frame();const v=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(v.data,'base64'));};
+  captureFailure=()=>shot('failure');
   await send('Target.activateTarget',{targetId});for(const m of ['Network.enable','Page.enable','Runtime.enable'])await call(m);await call('Runtime.addBinding',{name:'r265CSP'});
   await call('Page.addScriptToEvaluateOnNewDocument',{source:"localStorage.clear();window.EventSource=class{addEventListener(){}close(){}};document.addEventListener('securitypolicyviolation',e=>r265CSP(JSON.stringify({directive:e.effectiveDirective,blockedURI:e.blockedURI})));window.__r265LoadedStatistics="+JSON.stringify(loadedStats)});
   await call('Fetch.enable',{patterns:[{urlPattern:'*'}]});await call('Emulation.setDeviceMetricsOverride',{width,height:scenario?1100:1900,deviceScaleFactor:1,mobile:false});
@@ -175,4 +177,4 @@ async function main(){
  assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(violations.length,0,JSON.stringify(violations));
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({host:{platform:process.platform,node:process.version},csp,scope:'real Chromium; public production binary/CSP; synthetic API/image fixtures',results,errors,violations},null,2));console.log(JSON.stringify({cases:results.length,screenshots:fs.readdirSync(out).filter(f=>f.endsWith('.png')).length,errors:errors.length}));
 }
-main().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,pendingFetch:pausedRequests.snapshot(),results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[tmp]}));
+main().catch(async e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,stack:e.stack,pendingFetch:pausedRequests.snapshot(),results,errors,violations},null,2));try{await captureFailure?.();}catch(screenshotError){console.error('failure screenshot unavailable: '+screenshotError.message);}console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[tmp]}));

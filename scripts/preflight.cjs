@@ -145,7 +145,8 @@ async function main() {
     console.log("用法：node scripts/preflight.cjs [--base <ref>] [--list] [--json <file>] [--files a,b,c] [--browsers]\n  --list      只显示选择结果，不执行\n  --files     手动指定改动文件（逗号分隔），用于回放历史改动\n  --browsers  同时运行选中的真浏览器守卫（需要本机 Chrome 与 Go）");
     return 0;
   }
-  const base = options.files.length ? "(手动指定文件)" : resolveBase(options.base);
+  const gateBase = resolveBase(options.base);
+  const base = options.files.length ? "(手动指定文件)" : gateBase;
   const changes = options.files.length ? options.files.map((file) => ({ file, status: "M" })) : changedFiles(base);
   const index = loadIndex();
   const selection = select(index, changes);
@@ -153,11 +154,11 @@ async function main() {
   if (!changes.length) { console.log("没有改动，无需预检。"); return 0; }
   printSummary(base, selection, total);
 
-  const report = { base, generatedAt: new Date().toISOString(), totals: total, selection, results: [] };
+  const report = { base, gateBase, generatedAt: new Date().toISOString(), totals: total, selection, results: [] };
   let exitCode = 0;
   if (!options.list) {
     const parallel = Math.max(1, Math.min(os.availableParallelism?.() ?? os.cpus().length, 6));
-    for (const gate of staticGates(selection, base)) {
+    for (const gate of staticGates(selection, gateBase)) {
       const result = run(gate.label, gate.command, gate.args);
       report.results.push(result);
       if (!result.ok) exitCode = 1;
@@ -180,7 +181,7 @@ async function main() {
     console.log(`\n${exitCode === 0 ? (selection.broad?"静态预检通过，范围过宽的关联测试延后到CI":"快速预检通过") : "快速预检有失败"}。注意：这不是发版证据；完整验证以 probe / release 分支上的 CI 为准。`);
     if (selection.browserGuards.length && !options.browsers) console.log("浏览器守卫未在本地运行（加 --browsers 可运行）；它们在 CI 的 browser-main / browser-r265 / R277 matrix 里一定会跑。");
   }
-  if (options.json) { fs.mkdirSync(path.dirname(path.resolve(options.json)), { recursive: true }); fs.writeFileSync(options.json, JSON.stringify(report, null, 2) + "\n");fs.writeFileSync(path.join(path.dirname(path.resolve(options.json)),"preflight-static-gates.json"),JSON.stringify({automaticStaging:false,gates:staticGates(selection,base)},null,2)+"\n"); }
+  if (options.json) { fs.mkdirSync(path.dirname(path.resolve(options.json)), { recursive: true }); fs.writeFileSync(options.json, JSON.stringify(report, null, 2) + "\n");fs.writeFileSync(path.join(path.dirname(path.resolve(options.json)),"preflight-static-gates.json"),JSON.stringify({automaticStaging:false,gates:staticGates(selection,gateBase)},null,2)+"\n"); }
   return exitCode;
 }
 
