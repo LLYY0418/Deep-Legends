@@ -362,7 +362,6 @@ try {
     if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '080-preset-restart.log'); throw 'Renamed preset was not retained after candidate restart' }
     }
     Invoke-R279UpgradeStage -Name 'corrupt' -DependsOn @('write-presets') -Output (Join-Path $evidence 'r279-upgrade-stages.json') -Action {
-        $debugPort=Start-R265DebugApp
     node scripts/r265-persisted-ui.cjs $debugPort corrupt $evidence *> (Join-Path $evidence '080-corrupt-preset.log')
     if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $evidence '080-corrupt-preset.log'); throw 'Corrupt preset damaged other settings or was not discarded' }
     }
@@ -379,6 +378,12 @@ try {
     if (-not @($script:R279UpgradeStages | Where-Object { $_.status -ne 'passed' }).Count) {
     @{upgrade_from='0.12.79';upgrade_to=$candidateVersion;key_mode='public';setup079_sha256='cabacc1b4e8bc8dcf51469e1d1e84f0ef6ff8f82090084bf0c3fd6b0bb794d96';settings_written_by='unmodified published 079 renderer UI';preset_scope='format compatibility only: published 079 cannot save presets; exact same-tag missing-script fixture used only before upgrade';preset_script_sha256='74699f9576ccd8686fce0e95c38b718b96718baa46bd68e9068cf947f7ea38f3';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;persisted_files_equal=$true;preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
     Get-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
+    }
+    # Subsequent chains use the same real profile and assert that corrupt removed presets.
+    # Do not run those dependent chains on contaminated state or turn it into another failure.
+    if (@($script:R279UpgradeStages | Where-Object { $_.name -eq 'corrupt' -and $_.status -eq 'passed' }).Count -eq 0) {
+        Invoke-R279UpgradeStage -Name 'later-shared-profile-chains' -DependsOn @('corrupt') -Output (Join-Path $evidence 'r279-upgrade-stages.json') -Action {}
+        Assert-R279UpgradeStages
     }
     $r266Evidence=Join-Path $evidence '080-to-081'
     New-Item -ItemType Directory -Force $r266Evidence | Out-Null

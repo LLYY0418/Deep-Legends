@@ -14,7 +14,7 @@ const assert = require('node:assert/strict');
 const root=path.resolve(__dirname,'..'), web=path.join(root,'backend','web');
 const chrome=process.env.CHROME_BIN || (process.platform==='darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r73-layout-'));
-let proc,ws,server;
+let proc,ws,server,captureFailure;
 async function main(){
  const launched=await launchChrome({executable:chrome,args:['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${temp}`,'about:blank'],directory:process.env.R73_SCREENSHOT_DIR||path.join(os.tmpdir(),'pro-players-layout')});
  proc=launched.child;const url=launched.endpoint;
@@ -25,6 +25,12 @@ async function main(){
  const {sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});
  const call=(m,p)=>send(m,p,sessionId);
  const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+ captureFailure=async error=>{
+  const directory=process.env.R73_SCREENSHOT_DIR||path.join(os.tmpdir(),'pro-players-layout');
+  fs.mkdirSync(directory,{recursive:true});
+  let snapshot;try{snapshot=await evaluate(`(()=>{const bar=document.querySelector('.topbar'),search=document.querySelector('.player-search');return {innerWidth,sidebar:document.documentElement.dataset.sidebar,level:bar?.dataset.topbarCompact,settled:bar?.dataset.topbarSettled,loadedMs:performance.now(),font:getComputedStyle(document.body).fontFamily,search:{scrollWidth:search?.scrollWidth,clientWidth:search?.clientWidth},tables:[...document.querySelectorAll('.pro-table')].map(t=>({scrollWidth:t.scrollWidth,parentClientWidth:t.parentElement.clientWidth}))};})()`);}catch(diagnosticError){snapshot={diagnosticError:diagnosticError.message};}
+  fs.writeFileSync(path.join(directory,'failure.json'),JSON.stringify({file:'desktop/pro-players-layout.cjs',scenario:'pro-players-layout',error:error.stack||String(error),snapshot},null,2)+'\n');
+ };
  const waitForDOM=async(label,expression)=>{
   let last;
   const outcome=await waitOutcome(async()=>{last=await evaluate(expression);return last.ready;},{idleMs:15000,hardMs:60000,intervalMs:50,progress:()=>last});
@@ -93,10 +99,12 @@ async function main(){
  // The same geometry assertions must observe the specified broken CSS.
  const mutate=async text=>evaluate(`(()=>{let s=document.querySelector('#mutation');if(!s){s=document.createElement('style');s.id='mutation';document.head.append(s);}s.textContent=${JSON.stringify(text)};})()`);
  await call('Emulation.setDeviceMetricsOverride',{width:820,height:1100,deviceScaleFactor:1,mobile:false});
+ await waitViewport({evaluate,width:820});await settleTopbar({evaluate});
  await mutate('.pro-table { min-width:770px !important; }');
  assert.ok(await evaluate(`[...document.querySelectorAll('.pro-table')].some(t=>t.scrollWidth-t.parentElement.clientWidth>1)`),'min-width mutant survived');
  await mutate('');
  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+ await waitViewport({evaluate,width:1440});await settleTopbar({evaluate});
  await mutate('.pro-col-account { width:auto !important; }');
  console.log('width-deletion mutant text gaps',await evaluate(`[...document.querySelectorAll('.pro-account-line')].map(e=>{const r=document.createRange();r.selectNodeContents(e);return e.parentElement.parentElement.getBoundingClientRect().right-14-Math.min(e.getBoundingClientRect().right,r.getBoundingClientRect().right);})`));
  await mutate('.pro-account-name { white-space:normal; overflow-wrap:anywhere; }');
@@ -104,4 +112,4 @@ async function main(){
  assert.ok(brokenHeights.length>2,'nowrap mutant survived');
  console.log('Chromium overflow/row-height/indent guards and their mutants PASS; strict short-name density remains a documented specification conflict.');
 }
-main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[proc],sockets:[ws],servers:[server],directories:[temp]}));
+main().catch(async e=>{console.error(e);try{await captureFailure?.(e);}catch(diagnosticError){console.error(diagnosticError);}process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[proc],sockets:[ws],servers:[server],directories:[temp]}));

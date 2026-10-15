@@ -10,7 +10,7 @@
     },
     {
       "file": "desktop/r100-browser.cjs",
-      "snippet": "assert.equal(await evaluate('document.querySelector(\"#content\").textContent'),'已加载的战绩');"
+      "snippet": "assert.equal(await evaluate('document.querySelector(\"#content\").textContent'),'\u5df2\u52a0\u8f7d\u7684\u6218\u7ee9');"
     },
     {
       "file": "desktop/r100-browser.cjs",
@@ -27,6 +27,7 @@
     "scripts/r276-installed-demo.test.cjs",
     "scripts/r277-ci-orchestration.test.cjs",
     "scripts/r276-workflow.test.cjs",
-    "scripts/ci-lean-workflow.test.cjs"
+    "scripts/ci-lean-workflow.test.cjs",
+    "backend/web/r117.test.cjs"
   ]
 }

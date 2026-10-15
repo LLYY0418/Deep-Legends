@@ -11,3 +11,13 @@ async function runFixture(codes){
 }
 test('actual browser runner collects independent failures and accounts for dependency/census',async()=>{const result=await runFixture({'one.cjs':1,'last.cjs':1});assert.deepEqual(result.ran,['one.cjs','last.cjs']);assert.equal(result.rows.length,3);assert.equal(result.rows[1].status,'skipped-dependency-failed');assert.equal(result.rows[2].status,'failed');assert.equal(result.census.guards.length,3);});
 test('actual browser runner remains red when the last guard passes',async()=>{const result=await runFixture({'one.cjs':1});assert.equal(result.rows[2].status,'passed');assert.equal(result.rows[0].status,'failed');});
+
+test('Windows default fixture binary retains the executable suffix',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'r276-browser-job.cjs'),'utf8');
+ const expression=/const binary=([^;]+);/.exec(source)[1];
+ const choose=platform=>vm.runInNewContext(expression,{process:{env:{},platform},path,out:'/runner/fixture'});
+ assert.equal(path.basename(choose('win32')),'r264-public.exe');
+ assert.equal(path.basename(choose('darwin')),'r264-public');
+ const mutant=expression.replace("process.platform==='win32'?'r264-public.exe':'r264-public'","'r264-public'");
+ assert.throws(()=>assert.equal(path.basename(vm.runInNewContext(mutant,{process:{env:{},platform:'win32'},path,out:'/runner/fixture'})),'r264-public.exe'));
+});

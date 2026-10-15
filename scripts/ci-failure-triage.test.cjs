@@ -125,3 +125,13 @@ test("GitHub log decoration: ##[error] lines are read as error lines", () => {
   const rows = parseLog("##[error]AssertionError [ERR_ASSERTION]: boom\n##[error]Process completed with exit code 1.\n", "l");
   assert.deepEqual(rows.map((r) => r.name), ["AssertionError [ERR_ASSERTION]: boom", "Process completed with exit code 1."]);
 });
+
+test('released baseline is resolved from the candidate ancestry; stale main is not assumed',()=>{
+ const {resolveBase}=require('./ci-failure-triage.cjs');
+ let args;assert.equal(resolveBase('release-base',(_,a)=>{args=a;return 'v0.12.85\n';}),'v0.12.85');
+ assert.deepEqual(args,['describe','--tags','--match','v*','--abbrev=0']);
+ assert.equal(resolveBase('release-base',()=>{throw Error('tag unavailable');}),null);
+ assert.equal(resolveBase('explicit-ref'),'explicit-ref');
+ const report=triage({base:'release-base',json:['x'],changed:new Set()},{exec:()=> 'v0.12.85\n',json:()=>({failures:[{file:'backend/web/app.js',name:'old product',message:'x'}]})});
+ assert.equal(report.base,'v0.12.85');assert.equal(report.failures[0].inDiff,false);
+});

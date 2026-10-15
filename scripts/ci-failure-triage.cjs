@@ -119,6 +119,11 @@ function collect(options, readers = {}) {
   return { rows, evidenceFiles, timingInputs };
 }
 
+function resolveBase(base,exec=cp.execFileSync) {
+  if(base!=='release-base')return base||null;
+  try{return exec('git',['describe','--tags','--match','v*','--abbrev=0'],{cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim()||null;}catch(_){return null;}
+}
+
 function changedSet(base) {
   if (!base) return null;
   try {
@@ -129,7 +134,8 @@ function changedSet(base) {
 
 function triage(options, readers = {}) {
   const { rows, evidenceFiles, timingInputs } = collect(options, readers);
-  const changed = options.changed !== undefined ? options.changed : changedSet(options.base);
+  const base=resolveBase(options.base,readers.exec);
+  const changed = options.changed !== undefined ? options.changed : changedSet(base);
   const seen = new Set();
   const failures = [];
   // Structured rows (test cases, Go tests, guards) first; raw error lines only fill what is left.
@@ -144,7 +150,7 @@ function triage(options, readers = {}) {
       category: classify(row.message), message: String(row.message || "").slice(0, 400), evidence: row.evidence,
     });
   }
-  return { runner: timingInputs[0]?.runner||null, timingComparisons:timingInputs.map(d=>d.timingComparison), job: options.job || "", base: options.base || null, failureCount: failures.length, failures, evidenceFiles, note: "仅事实汇总：不判断根因，不引用 CI-KNOWN-ISSUES，不改变作业结果。" };
+  return { runner: timingInputs[0]?.runner||null, timingComparisons:timingInputs.map(d=>d.timingComparison), job: options.job || "", base, failureCount: failures.length, failures, evidenceFiles, note: "仅事实汇总：不判断根因，不引用 CI-KNOWN-ISSUES，不改变作业结果。" };
 }
 
 function markdown(report) {
@@ -206,4 +212,4 @@ if (require.main === module) {
   process.exitCode = 0;
 }
 
-module.exports = { annotations, classify, parseLog, parseRendererJson, parseFailureJson, triage, markdown, parseArgs, relFile };
+module.exports = { resolveBase, annotations, classify, parseLog, parseRendererJson, parseFailureJson, triage, markdown, parseArgs, relFile };

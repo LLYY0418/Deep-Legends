@@ -7,7 +7,7 @@ const {collectIndependent,requirePassed}=require('./lib/collect-independent.cjs'
 async function main(){
  const [shard='all',output=process.env.RUNNER_TEMP||'/tmp/r276-browser']=process.argv.slice(2);
  const root=path.resolve(__dirname,'..'),out=path.resolve(output);fs.mkdirSync(out,{recursive:true});
- const binary=process.env.R276_PUBLIC_BACKEND||path.join(out,'r264-public');
+ const binary=process.env.R276_PUBLIC_BACKEND||path.join(out,process.platform==='win32'?'r264-public.exe':'r264-public');
  if(!fs.existsSync(binary))require('./r276-public-fixture.cjs').build(binary);
  const fixture=path.join(out,'r272-overview.json');
  fs.mkdirSync(path.join(out,'r272-shape'),{recursive:true});
@@ -18,7 +18,9 @@ async function main(){
  if(only?.includes('r269-geometry')&&!only.includes('r266-matrix'))only.push('r266-matrix');
  const selected=selectGuards(shard,only);
  const rows=[],apiRows=[];
- const tasks=selected.map(([name,file,key,extra={}])=>({name,dependsOn:name==='r269-geometry'?['r266-matrix']:[],run:async()=>{
+ const tasks=[];
+ for(const [name,file,key,extra={}] of selected){
+ tasks.push({name,dependsOn:name==='r269-geometry'?['r266-matrix']:[],run:async()=>{
   const folder=/^r\d+$/.test(name)?name+'-browser':name;
   const directory=path.join(out,folder),start=performance.now();fs.mkdirSync(directory,{recursive:true});
   const env={...extra,[key]:directory,R272_OVERVIEW_FIXTURE:fixture,R269_GEOMETRY_CURRENT:path.join(out,'r266-matrix')};
@@ -36,7 +38,8 @@ async function main(){
   const classified=census.classify(report,name);apiRows[apiRows.length-1].assertedFaults=classified.assertedFaults;apiRows[apiRows.length-1].otherFailures=classified.otherFailures;apiRows[apiRows.length-1].canceled=classified.canceled;apiRows[apiRows.length-1].canceledCount=classified.canceledCount;
   fs.writeFileSync(path.join(out,'api-census.json'),JSON.stringify({shard,excluded:['r275-offline negative subprocesses'],guards:apiRows},null,2)+'\n');
   census.requireClean(report,name);
- }}));
+ }});
+ }
  rows.push(...await collectIndependent(tasks,{onResult:(row,all)=>{
   if(row.status!=='passed'&&row.name!=='r275-offline'&&!apiRows.some(r=>r.guard===row.name))apiRows.push({guard:row.name,status:row.status,error:row.error,dependencies:row.dependencies});
   fs.writeFileSync(path.join(out,'browser-job.json'),JSON.stringify(all,null,2)+'\n');
