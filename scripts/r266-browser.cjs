@@ -11,7 +11,8 @@ const {spawn}=require('node:child_process'),fs=require('node:fs'),path=require('
 const root=path.resolve(__dirname,'..'),out=process.env.R266_BROWSER_OUT||path.join(os.tmpdir(),'deep-legends-r266-browser');
 const closedSessions=new Set(), canceledRequests=new Set();let canceledInterceptions=0;
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r266-browser-')),errors=[],violations=[],results=[];let backend,chrome,ws;
-let currentCase,clickEvidence,diagnoseFailure,captureFailure;
+let currentCase,clickEvidence;
+let diagnoseFailure,captureFailure;
 let releaseFilters;const filterGate=process.env.R269_CHECKS?new Promise(resolve=>releaseFilters=resolve):null;
 const saved={
  'lol-loot-default-match-filter':'solo','lol-loot-mask-names':'true',

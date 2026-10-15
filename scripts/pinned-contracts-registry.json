@@ -28,6 +28,7 @@
     "scripts/r277-ci-orchestration.test.cjs",
     "scripts/r276-workflow.test.cjs",
     "scripts/ci-lean-workflow.test.cjs",
-    "backend/web/r117.test.cjs"
+    "backend/web/r117.test.cjs",
+    "scripts/r279-harness-adapters.test.cjs"
   ]
 }
