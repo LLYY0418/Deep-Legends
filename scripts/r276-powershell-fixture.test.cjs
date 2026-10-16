@@ -17,3 +17,7 @@ test('R276 nonzero script completion is returned to the original business assert
  const result={status:2,stdout:'R271_STAGE helper-loaded 1ms',stderr:'ASSERTION FAILED: original contract'};
  assert.equal(runFixture('pwsh',[],{execute:()=>result}),result);
 });
+
+test('R276 PowerShell infrastructure errors retain status and termination signal',()=>{
+ assert.throws(()=>runFixture('pwsh',[],{execute:()=>({status:null,signal:'SIGTERM',error:Object.assign(Error('spawnSync pwsh ETIMEDOUT'),{code:'ETIMEDOUT'})})}),/ETIMEDOUT[\s\S]*status=null signal=SIGTERM/);
+});

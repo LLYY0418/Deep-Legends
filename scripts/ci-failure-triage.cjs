@@ -58,7 +58,12 @@ function parseLog(text, evidence) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     let m;
-    if ((m = /^FAIL (.+?): (.*)$/.exec(line))) {
+    if (line.startsWith('R279_MUTATION_FAILURE ')) {
+      try {
+        const detail=JSON.parse(line.slice('R279_MUTATION_FAILURE '.length));
+        if(detail.schemaVersion===1 && detail.name && detail.file && detail.message)rows.push({kind:'mutation',name:detail.name,file:relFile(detail.file),message:[detail.message,detail.lastStage].filter(Boolean).join('; '),evidence:detail.evidence||evidence,line:detail.line,errorCode:detail.errorCode,lastStage:detail.lastStage,exitCode:detail.exitCode});
+      } catch (_) { /* Malformed advisory details do not hide the original log. */ }
+    } else if ((m = /^FAIL (.+?): (.*)$/.exec(line))) {
       const detail = [m[2], ...lines.slice(i + 1, i + 6)].join("\n");
       const located = /(?:\(|\s|')((?:[\w./\\:-]*?)(?:backend|desktop|scripts)[\w./\\-]*\.(?:cjs|js)):\d+/.exec(detail);
       rows.push({ kind: "node-test", name: m[1], file: relFile(located ? located[1] : ""), message: detail.slice(0, 600), evidence });
@@ -174,6 +179,7 @@ function triage(options, readers = {}) {
       kind: row.kind, name: row.name, file: row.file || null,
       inDiff: row.file && changed ? changed.has(row.file) : null,
       category: classify(row.message), message: String(row.message || "").slice(0, 400), evidence: row.evidence,
+      ...(row.kind==='mutation'?{line:row.line,errorCode:row.errorCode,lastStage:row.lastStage,exitCode:row.exitCode}:{}),
     });
   }
   return { runner: timingInputs[0]?.runner||null, timingComparisons:timingInputs.map(d=>d.timingComparison), job: options.job || "", base, failureCount: failures.length, failures, expectedNegatives, evidenceFiles, note: "仅事实汇总：不判断根因，不引用 CI-KNOWN-ISSUES，不改变作业结果。" };

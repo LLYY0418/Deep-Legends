@@ -201,3 +201,13 @@ test('the verified missing champion fixture may return either observed 400 or 40
   d.errors[0].text='Failed to load resource: the server responded with a status of 400 (Bad Request)';d.error=JSON.stringify(d.errors)+'\n\n1 !== 0\n';
   const r=f.report();assert.equal(r.failureCount,1);assert.equal(r.expectedNegatives.length,2);assert.equal(r.failures[0].name,'r266-browser');
 });
+
+
+test('R271 mutation wrapper preserves the original timeout location, stage and log in annotations',()=>{
+ const detail={schemaVersion:1,name:'baseline',file:'/runner/repo/backend/web/r271.test.cjs',line:28,errorCode:'ETIMEDOUT',message:'ETIMEDOUT',lastStage:'R271_STAGE event-query-start 1458ms',exitCode:1,evidence:'r271-mutations/baseline.log'};
+ const log='R279_MUTATION_FAILURE '+JSON.stringify(detail)+'\nAssertionError: baseline\n';
+ const report=triage({job:'mutations-1',log:['job.log'],changed:new Set()},{text:()=>log});
+ const failure=report.failures.find(f=>f.kind==='mutation');assert(failure);assert.equal(failure.file,'backend/web/r271.test.cjs');assert.equal(failure.line,28);assert.equal(failure.category,'wait-timeout');assert.equal(failure.errorCode,'ETIMEDOUT');assert.equal(failure.lastStage,detail.lastStage);assert.equal(failure.evidence,detail.evidence);assert.equal(failure.inDiff,false);
+ assert(annotations(report).some(line=>line.includes('event-query-start')&&line.includes('backend/web/r271.test.cjs')));assert(report.failures.some(f=>f.name==='AssertionError: baseline'));
+ const malformed=parseLog('R279_MUTATION_FAILURE {bad\nError: original failure','job.log');assert(malformed.some(f=>f.name==='Error: original failure'));
+});
