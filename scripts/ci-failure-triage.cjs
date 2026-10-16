@@ -82,9 +82,32 @@ function parseLog(text, evidence) {
 
 function readJson(file) { try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch (_) { return null; } }
 
+// A negative control is expected only after its real wrapper and fixed control
+// completed successfully. Keep incomplete or unrelated failures in the red list.
+function verifiedOfflineNegative(data, file, json) {
+  const name=path.basename(path.dirname(file));
+  const endpoint={'no-champion-fixture':'/api/champion-asset','no-spells-fixture':'/api/gameplay/summoner-spells'}[name];
+  const offline=path.dirname(path.dirname(file));
+  if(!endpoint || path.basename(offline)!=='r275-offline')return null;
+  const parentEvidence=path.join(path.dirname(offline),'browser-job.json'),proofEvidence=path.join(offline,'result.json'),fixedEvidence=path.join(offline,'fixed','result.json');
+  try {
+    const parent=json(parentEvidence),proof=json(proofEvidence),fixed=json(fixedEvidence);
+    if(!Array.isArray(parent)||!parent.some(r=>r.name==='r275-offline'&&r.status==='passed'&&r.exitCode===0))return null;
+    if(proof?.blockedUpstreamControl!==true||proof.championMutant!=='FAIL'||proof.spellsMutant!=='FAIL'||proof.fixed!=='PASS')return null;
+    if(!Array.isArray(fixed?.errors)||fixed.errors.length||!Array.isArray(fixed.violations)||fixed.violations.length)return null;
+    if(!Array.isArray(data.errors)||!data.errors.length||!Array.isArray(data.violations)||data.violations.length||data.failures?.length)return null;
+    if(data.error!==JSON.stringify(data.errors)+'\n\n'+data.errors.length+' !== 0\n')return null;
+    if(!data.errors.every(e=>{
+      const url=new URL(e.url);
+      return e.source==='network'&&e.level==='error'&&/status of (?:400|404)\b/.test(e.text)&&['127.0.0.1','localhost','[::1]'].includes(url.hostname)&&url.pathname===endpoint;
+    }))return null;
+    return {name,evidence:file,parentEvidence,proofEvidence,fixedEvidence,reason:'parent guard passed; both target negative controls failed; fixed control clean; only intended network 400/404 assertion'};
+  } catch (_) { return null; }
+}
+
 function collect(options, readers = {}) {
   const rows = [];
-  const evidenceFiles = [],timingInputs=[];
+  const evidenceFiles = [],timingInputs=[],expectedNegatives=[];
   const walk = (dir) => {
     const out = [];
     if (!fs.existsSync(dir)) return out;
@@ -107,6 +130,8 @@ function collect(options, readers = {}) {
     const data = (readers.json || readJson)(file);
     if (!data) continue;
     if(data.timingComparison)timingInputs.push(data);
+    const expected=path.basename(file)==="failure.json"&&verifiedOfflineNegative(data,file,readers.json||readJson);
+    if(expected){expectedNegatives.push(expected);evidenceFiles.push(file);continue;}
     const parsed = path.basename(file) === "failure.json" ? parseFailureJson(data, file) : parseRendererJson(data, file);
     if (parsed.length) { rows.push(...parsed); evidenceFiles.push(file); }
   }
@@ -117,7 +142,7 @@ function collect(options, readers = {}) {
     const parsed = parseLog(text, file);
     if (parsed.length) { rows.push(...parsed); evidenceFiles.push(file); }
   }
-  return { rows, evidenceFiles, timingInputs };
+  return { rows, evidenceFiles, timingInputs, expectedNegatives };
 }
 
 function resolveBase(base,exec=cp.execFileSync) {
@@ -134,7 +159,7 @@ function changedSet(base) {
 }
 
 function triage(options, readers = {}) {
-  const { rows, evidenceFiles, timingInputs } = collect(options, readers);
+  const { rows, evidenceFiles, timingInputs, expectedNegatives } = collect(options, readers);
   const base=resolveBase(options.base,readers.exec);
   const changed = options.changed !== undefined ? options.changed : changedSet(base);
   const seen = new Set();
@@ -151,12 +176,13 @@ function triage(options, readers = {}) {
       category: classify(row.message), message: String(row.message || "").slice(0, 400), evidence: row.evidence,
     });
   }
-  return { runner: timingInputs[0]?.runner||null, timingComparisons:timingInputs.map(d=>d.timingComparison), job: options.job || "", base, failureCount: failures.length, failures, evidenceFiles, note: "仅事实汇总：不判断根因，不引用 CI-KNOWN-ISSUES，不改变作业结果。" };
+  return { runner: timingInputs[0]?.runner||null, timingComparisons:timingInputs.map(d=>d.timingComparison), job: options.job || "", base, failureCount: failures.length, failures, expectedNegatives, evidenceFiles, note: "仅事实汇总：不判断根因，不引用 CI-KNOWN-ISSUES，不改变作业结果。" };
 }
 
 function markdown(report) {
   const lines = [`### CI 失败分诊（${report.job || "job"}）`, "", `- 失败项：${report.failureCount}`, `- 对比基线：${report.base || "未提供"}`];
   for(const c of report.timingComparisons||[])lines.push(`- 耗时分布：${c.kind==='uniform-slowdown'?'均匀变慢':c.kind}；中位比${c.medianRatio}；异常文件${c.outliers?.map(f=>f.file).join(',')||'无'}（不推断原因）`);
+  if(report.expectedNegatives?.length)lines.push(`- 已验证预期负例：${report.expectedNegatives.length}（原始证据保留，不计入故障清单）`);
   if(report.runner)lines.push(`- Runner：${JSON.stringify(report.runner)}`);
   if (!report.failureCount) lines.push("- 没有在给定的日志/证据里找到可解析的失败项（请看原始日志）。");
   for (const f of report.failures.slice(0, 40)) {

@@ -143,3 +143,61 @@ test('failure JSON retains the actual assertion file from Linux and Windows stac
   assert.equal(parseFailureJson({error:'bad',stack},'failure.json')[0].file,'scripts/r272-browser-checks.cjs');
  }
 });
+
+
+function offlineTriageFixture() {
+  const main=path.resolve('/fixture/main'),offline=path.join(main,'r275-offline');
+  const files=new Map();
+  files.set(path.join(main,'browser-job.json'),[{name:'r275-offline',status:'passed',exitCode:0}]);
+  files.set(path.join(offline,'result.json'),{blockedUpstreamControl:true,championMutant:'FAIL',spellsMutant:'FAIL',fixed:'PASS'});
+  files.set(path.join(offline,'fixed/result.json'),{errors:[],violations:[]});
+  for(const [name,endpoint] of [['no-champion-fixture','/api/champion-asset'],['no-spells-fixture','/api/gameplay/summoner-spells']]){
+    const errors=[{source:'network',level:'error',text:'Failed to load resource: the server responded with a status of 404 (Not Found)',url:'http://127.0.0.1:1234'+endpoint}];
+    files.set(path.join(offline,name,'failure.json'),{error:JSON.stringify(errors)+'\n\n1 !== 0\n',errors,violations:[]});
+  }
+  const real=path.join(main,'r266-browser/failure.json');files.set(real,{error:'click long tasks 171',stack:'AssertionError: click long tasks 171\n at run (/work/scripts/r266-browser.cjs:117:124)'});
+  const json=[...files.keys()].filter(f=>f.endsWith('failure.json'));
+  return {files,main,offline,json,real,report:()=>triage({job:'quick',json,changed:new Set()},{json:f=>files.get(f)||null})};
+}
+
+test('verified offline negative controls stay visible as expected evidence while the actual failure stays red',()=>{
+  const f=offlineTriageFixture(),r=f.report();
+  assert.equal(r.failureCount,1,'expected offline negative controls must not inflate actual failures');
+  assert.equal(r.failures[0].name,'r266-browser');
+  assert.equal(r.expectedNegatives.length,2);
+  assert.deepEqual(r.expectedNegatives.map(n=>n.name).sort(),['no-champion-fixture','no-spells-fixture']);
+  assert(r.expectedNegatives.every(n=>n.evidence.endsWith('failure.json')&&n.parentEvidence.endsWith('browser-job.json')));
+  assert.equal(annotations(r).length,1);assert.match(annotations(r)[0],/r266-browser/);
+  assert.match(markdown(r),/已验证预期负例：2/);
+});
+
+test('unverified negative controls and unrelated errors must remain failures',async t=>{
+  const variants=[
+    ['missing parent',f=>f.files.delete(path.join(f.main,'browser-job.json'))],
+    ['failed parent',f=>f.files.get(path.join(f.main,'browser-job.json'))[0].status='failed'],
+    ['parent exit1',f=>f.files.get(path.join(f.main,'browser-job.json'))[0].exitCode=1],
+    ['missing terminal proof',f=>f.files.delete(path.join(f.offline,'result.json'))],
+    ['fixed failed',f=>f.files.get(path.join(f.offline,'result.json')).fixed='FAIL'],
+    ['mutant survived',f=>f.files.get(path.join(f.offline,'result.json')).spellsMutant='PASS'],
+    ['control absent',f=>f.files.get(path.join(f.offline,'result.json')).blockedUpstreamControl=false],
+    ['missing fixed result',f=>f.files.delete(path.join(f.offline,'fixed/result.json'))],
+    ['fixed has errors',f=>f.files.get(path.join(f.offline,'fixed/result.json')).errors.push({text:'TypeError'})],
+    ['fixed CSP failure',f=>f.files.get(path.join(f.offline,'fixed/result.json')).violations.push({blockedURI:'x'})],
+    ['unrelated error',f=>{for(const n of ['no-champion-fixture','no-spells-fixture'])f.files.get(path.join(f.offline,n,'failure.json')).errors.push({text:'TypeError: unrelated'});}],
+    ['wrong endpoint',f=>{for(const n of ['no-champion-fixture','no-spells-fixture'])f.files.get(path.join(f.offline,n,'failure.json')).errors[0].url='http://127.0.0.1:1234/api/other';}],
+    ['wrong status',f=>{for(const n of ['no-champion-fixture','no-spells-fixture'])f.files.get(path.join(f.offline,n,'failure.json')).errors[0].text='Failed to load resource: the server responded with a status of 500';}],
+    ['unexpected assertion',f=>{for(const n of ['no-champion-fixture','no-spells-fixture'])f.files.get(path.join(f.offline,n,'failure.json')).error='TypeError: unrelated';}],
+    ['negative CSP failure',f=>{for(const n of ['no-champion-fixture','no-spells-fixture'])f.files.get(path.join(f.offline,n,'failure.json')).violations.push({blockedURI:'x'});}],
+    ['untrusted host',f=>{for(const n of ['no-champion-fixture','no-spells-fixture'])f.files.get(path.join(f.offline,n,'failure.json')).errors[0].url='http://example.invalid/api/champion-asset';}],
+    ['empty errors',f=>{for(const n of ['no-champion-fixture','no-spells-fixture'])f.files.get(path.join(f.offline,n,'failure.json')).errors=[];}],
+    ['malformed errors',f=>{for(const n of ['no-champion-fixture','no-spells-fixture'])f.files.get(path.join(f.offline,n,'failure.json')).errors=null;}],
+  ];
+  for(const [name,change] of variants)await t.test(name,()=>{const f=offlineTriageFixture();change(f);if(name!=='unexpected assertion')for(const n of ['no-champion-fixture','no-spells-fixture']){const d=f.files.get(path.join(f.offline,n,'failure.json'));if(Array.isArray(d.errors))d.error=JSON.stringify(d.errors)+'\n\n'+d.errors.length+' !== 0\n';}const r=f.report();assert.equal(r.failureCount,3,'unverified or unrelated failures must never be suppressed');assert.equal(r.expectedNegatives.length,0);});
+});
+
+
+test('the verified missing champion fixture may return either observed 400 or 404 on its exact endpoint',()=>{
+  const f=offlineTriageFixture(),d=f.files.get(path.join(f.offline,'no-champion-fixture','failure.json'));
+  d.errors[0].text='Failed to load resource: the server responded with a status of 400 (Bad Request)';d.error=JSON.stringify(d.errors)+'\n\n1 !== 0\n';
+  const r=f.report();assert.equal(r.failureCount,1);assert.equal(r.expectedNegatives.length,2);assert.equal(r.failures[0].name,'r266-browser');
+});
