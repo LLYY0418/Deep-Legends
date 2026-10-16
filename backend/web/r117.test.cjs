@@ -193,7 +193,7 @@ function verifyR117ChromiumWiring(workflow, runner, catalog) {
     assert.ok(Object.hasOwn(triggers,name), 'push/PR must run default guards');
     const spec=triggers[name];
     if(spec!=null){assert.equal(typeof spec,'object');for(const filter of ['branches-ignore','paths','paths-ignore','tags'])assert.equal(spec[filter],undefined);
-      assert.deepEqual(spec.branches,name==='push'?['**']:undefined,'every branch push must remain eligible');
+      assert.deepEqual(spec.branches,name==='push'?['**','!codex/diagnostic-r279-*']:undefined,'every existing branch push remains eligible; only the approved diagnostic prefix is separate');
       assert.deepEqual(spec['tags-ignore'],name==='push'?['v*']:undefined,'only audited v-tag exclusion is permitted');}
   }
   const noShell=(node)=>{if(!node||typeof node!=='object')return;for(const [key,value] of Object.entries(node)){assert.notEqual(key,'shell','defaults cannot replace fail-fast shells');noShell(value);}};
@@ -216,7 +216,7 @@ test('R117 real Chromium guards are wired into CI and cannot silently skip',()=>
   const runner=fs.readFileSync(path.join(base,'scripts/r276-browser-job.cjs'),'utf8');
   const catalog=require('../../scripts/r276-browser-catalog.cjs');
   verifyR117ChromiumWiring(workflow,runner,catalog);
-  for(const mutate of [w=>w.jobs['browser-main'].if='false',w=>w.jobs['browser-main']['continue-on-error']=true,w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').if='false',w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').run+=' || true',w=>w.on.push['paths']=['never'],w=>delete w.on.push.branches,w=>{w.jobs['mutations-1'].if+=" || github.ref == 'refs/heads/codex/ci-hardening-r276'";}]){
+  for(const mutate of [w=>w.jobs['browser-main'].if='false',w=>w.jobs['browser-main']['continue-on-error']=true,w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').if='false',w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').run+=' || true',w=>w.on.push['paths']=['never'],w=>delete w.on.push.branches,w=>w.on.push.branches.push('!codex/release-*'),w=>{w.jobs['mutations-1'].if+=" || github.ref == 'refs/heads/codex/ci-hardening-r276'";}]){
     const bad=structuredClone(workflow);mutate(bad);assert.throws(()=>verifyR117ChromiumWiring(bad,runner,catalog),assert.AssertionError,'unsafe workflow mutation must FAIL');
   }
   assert.throws(()=>verifyR117ChromiumWiring(workflow,runner.replace("assert.equal(result.code,0,name+' guard failed')","void result"),catalog),assert.AssertionError,'swallowed child failure must FAIL');

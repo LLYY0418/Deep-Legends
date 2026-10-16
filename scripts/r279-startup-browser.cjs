@@ -1,0 +1,17 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),Module=require('node:module');
+const filename=path.join(process.cwd(),'scripts/r265-browser.cjs');let source=fs.readFileSync(filename,'utf8');
+const readyMark="window.__r279StartupEvents?.push({type:'gameplay-listeners-ready',at:performance.now(),hasStatus:!!state.status,readyState:document.readyState});";
+const delay=Number(process.env.R279_STARTUP_DELAY??1000);
+if(!Number.isFinite(delay)||delay<0)throw Error('invalid startup delay');
+const needle="   else if(url.pathname==='/demo-data.js')";
+if(source.split(needle).length!==2)throw Error('startup diagnostic anchor changed');
+source=source.replace(needle,`   else if(url.pathname==='/gameplay.js'){if(${delay})await new Promise(r=>setTimeout(r,${delay}));let body=await(await fetch(request.url)).text();if(process.env.R279_STARTUP_REPLAY_MUTANT)body=body.replace('  restoreCommittedClientStatus();','');body=body.replace(/\\}\\)\\(\\);\\s*$/,${JSON.stringify(readyMark)}+'})();');await fulfill(body,'text/javascript');}\n`+needle);
+const init='window.__r279StartupEvents=[];for(const type of ["deep-legends:license","deep-legends:status","deep-legends:client-view"])window.addEventListener(type,e=>__r279StartupEvents.push({type,at:performance.now(),readyState:document.readyState,active:e.detail?.active,view:e.detail?.clientView?.state,generation:e.detail?.clientView?.generation}));';
+source=source.replace('source:"localStorage.clear();','source:'+JSON.stringify(init).slice(0,-1)+'localStorage.clear();');
+source=source.replace('({userAgent:navigator.userAgent,','({startupEvents:window.__r279StartupEvents,startupHidden:document.getElementById(\'startup-loading\')?.hidden,userAgent:navigator.userAgent,');
+source=source.replace('const errors=[],violations=[],results=[],', 'const startupRuns=[];const errors=[],violations=[],results=[],');
+const startupSnapshot="({events:window.__r279StartupEvents,ready:document.readyState,view:document.getElementById('overview-content')?._overviewViewTab?.data?.matches?.length})";
+source=source.replace('async close(){closed.add(sessionId);', 'async close(){startupRuns.push(await evaluate('+JSON.stringify(startupSnapshot)+'));closed.add(sessionId);');
+source=source.replace('results,errors,violations},null,2)', 'startupRuns,results,errors,violations},null,2)');
+const m=new Module(filename,module);m.filename=filename;m.paths=Module._nodeModulePaths(path.dirname(filename));m._compile(source,filename);

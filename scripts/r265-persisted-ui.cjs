@@ -1,4 +1,5 @@
 'use strict';
+const {waitForPage}=require('./lib/wait-progress.cjs');
 // CDP controls the actual installed program. Only the separately recorded 079
 // preset-format fixture may supply the exact missing resource from its tag.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
@@ -44,6 +45,12 @@ function assertFollowControls(actual,before,follow) {
 function assertReadControls(actual,before,follow) {
  assertFollowControls(actual,before,follow);
  assert(follow.events.some(e=>e.searchUI&&e.event==='client_follow_client'&&e.trigger==='login'&&e.fields?.to_group==='players'&&e.fields?.search_to==='HN1'&&e.fields?.applied),'P1 read must record search client_follow_client login');
+}
+function assertPhaseControls(phase,actual,before,follow) {
+ if(phase==='corrupt')return assertCorruptControls(actual,before,follow);
+ if(phase==='restart')return assertRestartControls(actual,before,follow);
+ if(phase==='read')return assertReadControls(actual,before,follow);
+ throw Error('unknown controls phase '+phase);
 }
 function followCapturePrelude() {
  return `(()=>{window.__r265FollowEvents=[];window.__r265FollowCaptureStartedMs=performance.now();const wrap=fn=>function(...args){if(args[0]==='client_follow_client')window.__r265FollowEvents.push({event:args[0],trigger:args[1],fields:args[2],searchUI:new Error().stack.includes('updateSearchRegionStatus'),loadedMs:performance.now()});return fn?.apply(this,args);};let report=wrap(window.reportFlowDiagnostic);Object.defineProperty(window,'reportFlowDiagnostic',{configurable:true,get(){return report},set(fn){report=wrap(fn)}});return true})();window.EventSource=class{addEventListener(){}close(){}};(()=>{
@@ -120,7 +127,7 @@ async function probe({port,phase,out}){
  ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(pending.has(m.id)){const [ok,no]=pending.get(m.id);pending.delete(m.id);m.error?no(Error(JSON.stringify(m.error))):ok(m.result);}else if(m.method==='Fetch.requestPaused')void intercept?.(m.params).catch(e=>resourceProof.push({error:e.message}));});
  const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++sequence,timer=setTimeout(()=>{pending.delete(id);reject(Error('CDP timeout '+method))},15000);pending.set(id,[r=>{clearTimeout(timer);resolve(r)},e=>{clearTimeout(timer);e.cdpMethod=method;reject(e)}]);ws.send(JSON.stringify({id,method,params}));});
  const evaluate=async expression=>{const v=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(v.exceptionDetails)throw Error(JSON.stringify(v.exceptionDetails));return v.result.value;};
- const until=async expression=>{for(let n=0;n<200;n++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100));}throw Error('installed UI condition timeout: '+expression+' '+JSON.stringify(await evaluate("({page:document.querySelector('#overview-content')?.textContent.slice(0,800),live:!document.querySelector('#live-panel')?.hidden,section:document.querySelector('.sidebar-nav-button.is-active')?.id})")))};
+ const until=async expression=>{if(await waitForPage(evaluate,expression,{idleMs:20000,hardMs:120000,intervalMs:100}))return;throw Error('installed UI condition timeout: '+expression+' '+JSON.stringify(await evaluate("({page:document.querySelector('#overview-content')?.textContent.slice(0,800),live:!document.querySelector('#live-panel')?.hidden,section:document.querySelector('.sidebar-nav-button.is-active')?.id})")))};
  const click=selector=>evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
  const choose=async(id,value)=>{await click(`#${id} + .app-select [data-app-select-trigger]`);await click(`#${id} + .app-select [data-native-select-value="${value}"]`);assert.equal(await evaluate(`document.getElementById(${JSON.stringify(id)}).value`),value);};
  const snapshot=()=>evaluate(`(()=>{const storage=Object.fromEntries(Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)]));return {searchFollow:{label:document.querySelector('#player-search-region-label').textContent,events:window.__r265FollowEvents||[]},preferences:Object.fromEntries(${JSON.stringify(keys)}.map(k=>[k,localStorage.getItem(k)])),presets:localStorage.getItem(${JSON.stringify(presetKey)}),storage,controls:{defaultPage:document.querySelector('#setting-default-page').value,defaultFilter:document.querySelector('#setting-default-match-filter').value,matchCount:document.querySelector('#setting-match-count').value,maskNames:document.querySelector('#setting-mask-names').checked,scale:document.querySelector('#setting-ui-scale').value,searchRegion:document.querySelector('#player-search-region').dataset.region,searchServer:document.querySelector('#player-search-region').dataset.serverId}}})()`);
@@ -135,7 +142,7 @@ async function probe({port,phase,out}){
  const openSaved=async()=>{await openFilter();await click('[data-af-page="saved"]');};
  try{
   await call('Page.enable');await call('Runtime.enable');
-  if(phase==='read'||phase==='restart'){
+  if(phase==='read'||phase==='restart'||phase==='corrupt'){
    await prepareFollowedStartup({call,evaluate,until,phase,save,shot});
   }
   await require('./r276-installed-demo.cjs').waitInstalledStartup({until});
@@ -167,7 +174,7 @@ async function probe({port,phase,out}){
     const name=`080-${phase}-before-controls.json`,record={phase,sampledAt:new Date().toISOString(),...data};save(name,record);
     try{record.clientStatus=await evaluate("(async()=>{const r=await fetch('/api/status'),s=await r.json();return {captureStartedMs:window.__r265FollowCaptureStartedMs,httpStatus:r.status,connected:s.connected??null,clientRegion:s.clientRegion??null,platform:s.platform??null,serverId:s.serverId??null,clientViewState:s.clientView?.state??null,clientViewRegion:s.clientView?.region??null,clientViewServerId:s.clientView?.serverId??null,loadedMs:performance.now()};})()");}catch(error){record.clientStatus={diagnosticError:error.message};}save(name,record);
    }
-   assert.deepEqual(data.preferences,before.preferences);if(phase==='corrupt')assertCorruptControls(data.controls,before.controls,data.searchFollow);else if(phase==='restart')assertRestartControls(data.controls,before.controls,data.searchFollow);else assertReadControls(data.controls,before.controls,data.searchFollow);
+   assert.deepEqual(data.preferences,before.preferences);assertPhaseControls(phase,data.controls,before.controls,data.searchFollow);
    if(phase==='read'){
     assert.equal(data.presets,presets.presets);assert.deepEqual(JSON.parse(data.presets),JSON.parse(presets.presets));save('079-to-080-preferences-comparison.json',{equal:true,resourceFixtureApplied:false,settingsBefore:before.preferences,settingsAfter:data.preferences,presetContentOrderNamesEqual:true,presetScope:presets.scope});await shot('080-actual-default-page.png');
     await demo(initial.origin);await openSaved();await until("document.querySelector('.af-saved-row,.af-preset')?.textContent.includes('R265 79 格式兼容夹具')");await click('[data-af-apply="0"]');await until("document.querySelector('[data-af-conditions]')?.textContent.includes('胜利')");
@@ -182,5 +189,5 @@ async function probe({port,phase,out}){
   console.log(JSON.stringify({phase,passed:true,resourceFixtureApplied:phase==='write-presets'}));
  }finally{ws.close()}
 }
-module.exports={probe,scriptSHA,tagSHA,waitForInstalledTarget,assertCorruptControls,assertRestartControls,assertReadControls,assertFollowControls,followCapturePrelude,waitForFollowedClient,prepareFollowedStartup};
+module.exports={assertPhaseControls,probe,scriptSHA,tagSHA,waitForInstalledTarget,assertCorruptControls,assertRestartControls,assertReadControls,assertFollowControls,followCapturePrelude,waitForFollowedClient,prepareFollowedStartup};
 if(require.main===module){const [port,phase,out]=process.argv.slice(2);probe({port:Number(port),phase,out}).catch(e=>{console.error(e);process.exitCode=1});}

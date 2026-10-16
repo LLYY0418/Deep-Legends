@@ -1,0 +1,367 @@
+{
+  "version": 1,
+  "note": "R279 P2 recall dataset. Changed-file lists are recorded from real history so the check runs on a depth-1 CI checkout. Regenerate/verify with: node scripts/preflight-recall.cjs --verify-git",
+  "changeSets": {
+    "r278-first-push": {
+      "from": "26e10179c6d92432c4928dd614da8bfaf2f016ca",
+      "to": "62a20bfe212838bd45c9d5177fc8a6035c6b575d",
+      "changed": [
+        "CHANGELOG.md",
+        "backend/announcements.go",
+        "backend/announcements/announcements.json",
+        "backend/announcements_test.go",
+        "backend/collection_skin_events.go",
+        "backend/connection_manager.go",
+        "backend/diagnostic_snapshots.go",
+        "backend/disabled_build_test.go",
+        "backend/embedded_assets.go",
+        "backend/features.go",
+        "backend/gameplay.go",
+        "backend/lcu.go",
+        "backend/main.go",
+        "backend/opgg_insights.go",
+        "backend/overview_history_head_http.go",
+        "backend/overview_response_shape.go",
+        "backend/overview_wire.go",
+        "backend/quality_test.go",
+        "backend/r211_test.go",
+        "backend/r238_update_test.go",
+        "backend/r241_test.go",
+        "backend/r264_outage_classification_test.go",
+        "backend/r264_outage_test.go",
+        "backend/r269_diagnostics.go",
+        "backend/r269_test.go",
+        "backend/r278_diagnostics.go",
+        "backend/r278_diagnostics_replay_test.go",
+        "backend/r278_diagnostics_test.go",
+        "backend/r278_skin_test.go",
+        "backend/r278_test.go",
+        "backend/r278_update_test.go",
+        "backend/r88_test.go",
+        "backend/rank_milestone_cache.go",
+        "backend/request_diagnostic_summary.go",
+        "backend/riot_api.go",
+        "backend/riot_page_budget.go",
+        "backend/sgp_api.go",
+        "backend/sgp_history_circuit.go",
+        "backend/update.go",
+        "backend/update_download.go",
+        "backend/update_parallel.go",
+        "backend/update_sources.go",
+        "backend/web/announcements-bootstrap.js",
+        "backend/web/announcements.css",
+        "backend/web/announcements.js",
+        "backend/web/app.css",
+        "backend/web/app.js",
+        "backend/web/champions.test.cjs",
+        "backend/web/collection-new-items.js",
+        "backend/web/default/index.html",
+        "backend/web/gameplay.css",
+        "backend/web/gameplay.js",
+        "backend/web/history-filters-modal.css",
+        "backend/web/history-filters.css",
+        "backend/web/history-filters.js",
+        "backend/web/history-recovery.js",
+        "backend/web/index.html",
+        "backend/web/r100.test.cjs",
+        "backend/web/r111.test.cjs",
+        "backend/web/r203.test.cjs",
+        "backend/web/r209.test.cjs",
+        "backend/web/r211-harness-support.cjs",
+        "backend/web/r220-harness-support.cjs",
+        "backend/web/r220-region.test.cjs",
+        "backend/web/r223.test.cjs",
+        "backend/web/r229.test.cjs",
+        "backend/web/r258-filters.test.cjs",
+        "backend/web/r258.test.cjs",
+        "backend/web/r264-outage-ui.test.cjs",
+        "backend/web/r264.test.cjs",
+        "backend/web/r278-announcements.test.cjs",
+        "backend/web/r278.test.cjs",
+        "backend/web/r88.test.cjs",
+        "backend/web/runtime.js",
+        "backend/web/update.test.cjs",
+        "desktop/build-fingerprint.test.cjs",
+        "desktop/main.cjs",
+        "desktop/overview-render-events.test.cjs",
+        "desktop/package-lock.json",
+        "desktop/package.json",
+        "desktop/preload.cjs",
+        "desktop/refresh-orchestration.test.cjs",
+        "desktop/source-fingerprint.cjs",
+        "scripts/r276-browser-catalog.cjs",
+        "scripts/r276-mutation-job.cjs",
+        "scripts/r277-frontend-contracts.test.cjs",
+        "scripts/r277-release-contracts.test.cjs",
+        "scripts/r278-browser.cjs",
+        "scripts/r278-mutations.py",
+        "scripts/r278-release-contracts.test.cjs",
+        "scripts/testcaptureguard/reviewed-exceptions.json"
+      ]
+    },
+    "r278-second-push": {
+      "to": "f59c4e7207011e853c78ad845a9cf8d025081068",
+      "changed": [
+        "CHANGELOG.md",
+        "backend/announcements_test.go",
+        "backend/embedded_assets.go",
+        "backend/web/announcements-bootstrap.js",
+        "backend/web/announcements.css",
+        "backend/web/announcements.js",
+        "backend/web/app.css",
+        "backend/web/app.js",
+        "backend/web/default/index.html",
+        "backend/web/gameplay.css",
+        "backend/web/gameplay.js",
+        "backend/web/history-filters-modal.css",
+        "backend/web/history-filters.css",
+        "backend/web/history-filters.js",
+        "backend/web/index.html",
+        "backend/web/r223.test.cjs",
+        "backend/web/r277-deferred-assets.test.cjs",
+        "backend/web/r278-claude-fixes.test.cjs",
+        "backend/web/r278.test.cjs",
+        "backend/web/section-loader.js",
+        "desktop/overview-render-events.test.cjs",
+        "desktop/overview-render-helpers.cjs",
+        "desktop/pro-players.test.cjs",
+        "desktop/renderer-script-cache.cjs",
+        "desktop/renderer-script-cache.test.cjs",
+        "scripts/r266-browser.cjs",
+        "scripts/r276-browser-api-fixtures.cjs",
+        "scripts/r276-browser-fixture-mutations.cjs",
+        "scripts/r277-deferred-assets-proof.cjs",
+        "scripts/r277-frontend-browser-checks.cjs",
+        "scripts/r277-frontend-browser-mutations.cjs",
+        "scripts/r277-frontend-browser.cjs",
+        "scripts/r277-frontend-contracts.test.cjs",
+        "scripts/r277-wire-diagnostic-mutations.py",
+        "scripts/r278-mutations.py",
+        "scripts/r278-release-contracts.test.cjs",
+        "scripts/r278-review-mutations.cjs",
+        "scripts/renderer-costs.json",
+        "scripts/renderer-speedup-mutations.cjs"
+      ],
+      "from": "62a20bfe212838bd45c9d5177fc8a6035c6b575d"
+    },
+    "r278-product-edit-cycle": {
+      "note": "product files edited in the measured-topbar cycle; the six renderer failures came from unchanged old tests",
+      "changed": [
+        "backend/web/app.css",
+        "backend/web/app.js",
+        "backend/web/index.html",
+        "backend/web/default/index.html"
+      ],
+      "base": "f59c4e7207011e853c78ad845a9cf8d025081068"
+    },
+    "r278-probe-1": {
+      "from": "f59c4e7207011e853c78ad845a9cf8d025081068",
+      "to": "124e5220e04eb5c0ed19022ea498757763ee2c7a",
+      "changed": [
+        ".github/workflows/ci.yml",
+        "backend/r196_test.go",
+        "backend/web/app.css",
+        "backend/web/app.js",
+        "backend/web/champions.test.cjs",
+        "backend/web/default/index.html",
+        "backend/web/index.html",
+        "backend/web/r278-claude-fixes.test.cjs",
+        "backend/web/r278-measured-topbar.test.cjs",
+        "scripts/r264-browser.cjs",
+        "scripts/r265-persisted-ui.cjs",
+        "scripts/r276-installed-demo.cjs",
+        "scripts/r276-workflow.test.cjs",
+        "scripts/r277-ci-orchestration.test.cjs",
+        "scripts/r277-frontend-browser-checks.cjs",
+        "scripts/r277-frontend-browser-mutations.cjs",
+        "scripts/r277-frontend-browser.cjs",
+        "scripts/r278-approved-contracts.cjs",
+        "scripts/r278-review-mutations.cjs",
+        "scripts/renderer-costs.json",
+        "scripts/testcaptureguard/reviewed-exceptions.json"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "first-screen-stylesheet-count",
+      "changeSet": "r278-first-push",
+      "failure": "desktop/r117-browser.cjs:55 首屏样式表数量",
+      "mustSelect": [
+        "guard:r117"
+      ],
+      "source": "push 38450022393"
+    },
+    {
+      "id": "skeleton-height",
+      "changeSet": "r278-first-push",
+      "failure": "scripts/r277-frontend-browser-checks.cjs:17 骨架高度",
+      "mustSelect": [
+        "guard:r277-strict"
+      ],
+      "source": "push 38450022393"
+    },
+    {
+      "id": "official-interrupt-button",
+      "changeSet": "r278-first-push",
+      "failure": "scripts/r265-browser.cjs:162 官方中断按钮 [data-gameplay-retry]",
+      "mustSelect": [
+        "guard:r265"
+      ],
+      "source": "push 38450022393"
+    },
+    {
+      "id": "announcement-focus",
+      "changeSet": "r278-first-push",
+      "failure": "scripts/r266-browser.cjs:119 公告焦点/af-menu 隐藏",
+      "mustSelect": [
+        "guard:r266"
+      ],
+      "source": "push 38450022393"
+    },
+    {
+      "id": "p9-mutation-anchor",
+      "changeSet": "r278-first-push",
+      "failure": "P9 double-full 变异锚点 backend/overview_wire.go",
+      "mustSelect": [
+        "script:scripts/r277-wire-diagnostic-mutations.py"
+      ],
+      "source": "push 38450022393"
+    },
+    {
+      "id": "deferred-mutation-survived",
+      "changeSet": "r278-first-push",
+      "failure": "scripts/r277-deferred-assets-proof.cjs:15 rich-bodies-restored 变异存活",
+      "mustSelect": [
+        "script:scripts/r277-deferred-assets-proof.cjs"
+      ],
+      "source": "push 38450022393"
+    },
+    {
+      "id": "real-upgrade-search-prefs",
+      "changeSet": "r278-first-push",
+      "failure": "scripts/r265-persisted-ui.cjs:82 真实升级后搜索偏好",
+      "mustSelect": [
+        "windows-only"
+      ],
+      "source": "push 38450022393"
+    },
+    {
+      "id": "windows-header-overlap",
+      "changeSet": "r278-second-push",
+      "failure": "1280px/175% 搜索提交按钮与好友按钮重叠（仅 Windows 暴露）",
+      "mustSelect": [
+        "guard:r277-strict"
+      ],
+      "source": "push 38512773183"
+    },
+    {
+      "id": "linux-two-char-region",
+      "changeSet": "r278-second-push",
+      "failure": "大区名只显示两字断言（Linux 无中文字体）",
+      "mustSelect": [
+        "guard:r277-strict"
+      ],
+      "source": "push 38512773183"
+    },
+    {
+      "id": "official-auto-countdown",
+      "changeSet": "r278-second-push",
+      "failure": "scripts/r264-browser.cjs:145 等待“2 秒”倒计时",
+      "mustSelect": [
+        "guard:r264"
+      ],
+      "source": "push 38512773183"
+    },
+    {
+      "id": "corrupt-controls-search-server",
+      "changeSet": "r278-second-push",
+      "failure": "scripts/r265-persisted-ui.cjs corrupt 阶段 searchServer",
+      "mustSelect": [
+        "windows-only"
+      ],
+      "source": "push 38512773183"
+    },
+    {
+      "id": "old-fixed-820-selector-count",
+      "changeSet": "r278-product-edit-cycle",
+      "failure": "backend/web/champions.test.cjs 固定 820 选择器计数",
+      "mustSelect": [
+        "node:backend/web/champions.test.cjs"
+      ],
+      "source": "local renderer 223 files"
+    },
+    {
+      "id": "old-global-title-ban",
+      "changeSet": "r278-product-edit-cycle",
+      "failure": "backend/web/champions.test.cjs 全局 title 禁令",
+      "mustSelect": [
+        "node:backend/web/champions.test.cjs"
+      ],
+      "source": "local renderer 223 files"
+    },
+    {
+      "id": "old-sidebar-214px",
+      "changeSet": "r278-product-edit-cycle",
+      "failure": "侧栏 214px 原断言（champions + r150）",
+      "mustSelect": [
+        "node:backend/web/champions.test.cjs",
+        "node:backend/web/r150.test.cjs"
+      ],
+      "source": "local renderer 223 files"
+    },
+    {
+      "id": "old-r117-undefined-variable",
+      "changeSet": "r278-product-edit-cycle",
+      "failure": "backend/web/r117-style.test.cjs 未定义 CSS 变量门禁",
+      "mustSelect": [
+        "node:backend/web/r117-style.test.cjs"
+      ],
+      "source": "local renderer 223 files"
+    },
+    {
+      "id": "probe1-pro-layout",
+      "failure": "pro-players-layout 820px overflow",
+      "changeSet": "r278-probe-1",
+      "mustSelect": [
+        "guard:pro-players-layout"
+      ],
+      "source": "R278 probe-1 / staged gate incident"
+    },
+    {
+      "id": "probe1-player-search",
+      "failure": "r277 player-search internal overflow",
+      "changeSet": "r278-probe-1",
+      "mustSelect": [
+        "guard:r277-strict"
+      ],
+      "source": "R278 probe-1 / staged gate incident"
+    },
+    {
+      "id": "probe1-upgrade-restart",
+      "failure": "windows-upgrade restart controls",
+      "changeSet": "r278-probe-1",
+      "mustSelect": [
+        "windows-only"
+      ],
+      "source": "R278 probe-1 / staged gate incident"
+    },
+    {
+      "id": "staged-isolation",
+      "failure": "verify-no-docs-tracked before staging missed new source",
+      "changeSet": "r278-probe-1",
+      "mustSelect": [
+        "gate:verify-no-docs-tracked"
+      ],
+      "source": "R278 probe-1 / staged gate incident",
+      "note": "召回只证明门禁被选择；暂存顺序由staged-gates坏情况测试验证"
+    }
+  ],
+  "notSelectable": [
+    {
+      "id": "linux-suite-time-over-240s",
+      "source": "push 38450022393 / 38450060717",
+      "reason": "性能预算失败（套件耗时），由 CI 校准门禁测量，不属于“改动→测试”的选择问题"
+    }
+  ]
+}

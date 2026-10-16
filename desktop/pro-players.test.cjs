@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
+const { waitOutcome } = require("../scripts/lib/wait-progress.cjs");
 const { runRendererScript } = require("./renderer-script-cache.cjs");
 const WEB = path.join(__dirname, "..", "backend", "web");
 const PRO_CSS = fs.readFileSync(path.join(WEB, "pro-players.css"), "utf8");
@@ -351,18 +352,17 @@ test("玩家页签各自保留纵向位置，跨页面返回也不串位", async
   await tick(180);
   const open = (name) => w.dispatchEvent(new w.CustomEvent("deep-legends:open-player", {detail:{gameName:name,tagLine:"KR1",region:"kr",source:"search"}}));
   const ready = async (name) => {
-    const deadline = Date.now() + 20000;
-    while (Date.now() < deadline) {
+    // R279: wait while the page keeps changing; fail only after 20 s without any DOM progress (hard ceiling 120 s).
+    let key = "";
+    const outcome = await waitOutcome(() => {
       const tab = d.querySelector('#player-tabs [aria-selected="true"]');
-      if (tab?.textContent.includes(name) && !tab.querySelector('.mini-loading') && d.querySelector('#overview-content .summoner-strip')) {
-        // Scroll restoration runs in rAF after the loaded content is rendered.
-        // A fixed delay can expire in the skeleton phase under suite contention.
-        await new Promise(resolve => w.requestAnimationFrame(() => w.requestAnimationFrame(resolve)));
-        return tab.dataset.playerTab;
-      }
-      await tick(20);
-    }
-    assert.fail(`player ${name} did not finish loading`);
+      if (tab?.textContent.includes(name) && !tab.querySelector('.mini-loading') && d.querySelector('#overview-content .summoner-strip')) { key = tab.dataset.playerTab; return true; }
+      return false;
+    }, { idleMs: 20000, hardMs: 120000, intervalMs: 20, progress: () => `${d.getElementsByTagName("*").length}:${(d.body.textContent || "").length}` });
+    if (!outcome.ok) assert.fail(`player ${name} did not finish loading (${outcome.reason}; ${outcome.progress})`);
+    // Scroll restoration runs in rAF after the loaded content is rendered.
+    await new Promise(resolve => w.requestAnimationFrame(() => w.requestAnimationFrame(resolve)));
+    return key;
   };
   open("First"); const firstKey = await ready("First");
   const root=d.getElementById("app-scroll");

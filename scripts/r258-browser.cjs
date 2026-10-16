@@ -1,4 +1,5 @@
 'use strict';
+const {waitForPage}=require('./lib/wait-progress.cjs');
 const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
@@ -37,7 +38,7 @@ async function main(){
  async function page(theme,ratingFail=false,foreign=false,arena=false,startup=false){const {targetId}=await send('Target.createTarget',{url:'about:blank'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true}),call=(m,p)=>send(m,p,sessionId);
   await call('Page.enable');await call('Page.addScriptToEvaluateOnNewDocument',{source:'window.__r258Streams=[];window.EventSource=class {constructor(){window.__r258Streams.push(this)}addEventListener(){}close(){}};try { localStorage.clear(); } catch (_) {} window.__r241LongTasks=[];new PerformanceObserver(list=>window.__r241LongTasks.push(...list.getEntries().map(e=>({start:e.startTime,duration:e.duration})))).observe({type:"longtask",buffered:true});'});await call('Runtime.enable');await call('Fetch.enable',{patterns:[{urlPattern:'*'}]});await call('Emulation.setDeviceMetricsOverride',{width:1500,height:1100,deviceScaleFactor:1,mobile:false});
   const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value};
-  const until=async expression=>{for(let i=0;i<200;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,100))}throw Error('timeout '+expression)};
+  const until=async expression=>{if(await waitForPage(evaluate,expression,{idleMs:20000,hardMs:120000,intervalMs:100}))return;throw Error('timeout '+expression)};
   const shot=async name=>{if(guardOnly)return;const s=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,theme+'-'+name+'.png'),Buffer.from(s.data,'base64'))};
   await call('Page.navigate',{url:origin+'/?demo&section=overview'});
   await until(`window.__r258SetStatus && document.querySelector('#client-launchpad:not([hidden])')`);

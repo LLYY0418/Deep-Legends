@@ -1,18 +1,16 @@
 'use strict';
 const assert=require('node:assert/strict');
 // A repeated state, including a repeating cycle, is not new progress.
-async function waitForPage({evaluate,sample,label='page condition',noProgressMs=20000,now=Date.now}){
- const seen=new Set();let progressedAt=now();
- for(;;){
-  const value=await evaluate(sample);
-  if(value.done)return value;
-  const key=JSON.stringify(value.progress),time=now();
-  if(!seen.has(key)){seen.add(key);progressedAt=time;}
-  else if(time-progressedAt>=noProgressMs){
-   const error=new Error(`${label}: no new progress for ${noProgressMs}ms ${JSON.stringify(value.snapshot??value.progress)}`);
-   error.pageWaitSnapshot=value.snapshot;throw error;
-  }
- }
+async function waitForPage({evaluate,sample,label='page condition',noProgressMs=20000,totalMs=120000,now=Date.now}){
+ let value;const seen=new Set();let lastProgress='initial';
+ const outcome=await require('./wait-progress.cjs').waitOutcome(async()=>{
+  value=await evaluate(sample);const key=JSON.stringify(value.progress);
+  if(!seen.has(key)){seen.add(key);lastProgress=key;}
+  return value.done;
+ },{label,idleMs:noProgressMs,hardMs:totalMs,now,sleep:()=>Promise.resolve(),progress:()=>lastProgress});
+ if(outcome.ok)return value;
+ const error=new Error(`${label}: ${outcome.reason==='stalled'?'no new progress':'total limit'} for ${outcome.ms}ms ${JSON.stringify(value?.snapshot??value?.progress)}`);
+ error.pageWaitSnapshot=value?.snapshot;error.code=outcome.reason==='stalled'?'WAIT_STALLED':'WAIT_HARD_LIMIT';throw error;
 }
 function readTopbar(){
  const bar=document.querySelector('.topbar'),search=document.querySelector('.player-search');

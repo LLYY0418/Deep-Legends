@@ -1,6 +1,7 @@
 // Real Chromium layout guard. No jsdom measurements or external npm dependency.
 // CHROME_BIN=/path/to/chrome node desktop/pro-players-layout.cjs
 'use strict';
+const {settleTopbar,waitViewport}=require('../scripts/lib/topbar-settle.cjs');
 const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
 const {serveStaticAPI}=require('../scripts/r276-browser-api-fixtures.cjs');
@@ -13,7 +14,7 @@ const assert = require('node:assert/strict');
 const root=path.resolve(__dirname,'..'), web=path.join(root,'backend','web');
 const chrome=process.env.CHROME_BIN || (process.platform==='darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r73-layout-'));
-let proc,ws,server;
+let proc,ws,server,captureFailure,mutationEvidence;const mutationHistory=[];
 async function main(){
  const launched=await launchChrome({executable:chrome,args:['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${temp}`,'about:blank'],directory:process.env.R73_SCREENSHOT_DIR||path.join(os.tmpdir(),'pro-players-layout')});
  proc=launched.child;const url=launched.endpoint;
@@ -24,6 +25,14 @@ async function main(){
  const {sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});
  const call=(m,p)=>send(m,p,sessionId);
  const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+ captureFailure=async error=>{
+  const directory=process.env.R73_SCREENSHOT_DIR||path.join(os.tmpdir(),'pro-players-layout');
+  fs.mkdirSync(directory,{recursive:true});
+  let snapshot;try{snapshot=await evaluate(`(()=>{const bar=document.querySelector('.topbar'),search=document.querySelector('.player-search');return {innerWidth,sidebar:document.documentElement.dataset.sidebar,level:bar?.dataset.topbarCompact,settled:bar?.dataset.topbarSettled,loadedMs:performance.now(),font:getComputedStyle(document.body).fontFamily,userAgent:navigator.userAgent,dpr:devicePixelRatio,viewport:{width:visualViewport?.width,scale:visualViewport?.scale},mutation:{text:document.querySelector('#mutation')?.textContent,rules:[...(document.querySelector('#mutation')?.sheet?.cssRules||[])].map(r=>r.cssText)},search:{scrollWidth:search?.scrollWidth,clientWidth:search?.clientWidth},tables:[...document.querySelectorAll('.pro-table')].map(t=>({scrollWidth:t.scrollWidth,parentClientWidth:t.parentElement.clientWidth,offsetWidth:t.offsetWidth,rectWidth:t.getBoundingClientRect().width,minWidth:getComputedStyle(t).minWidth,width:getComputedStyle(t).width,zoom:getComputedStyle(t).zoom,display:getComputedStyle(t).display}))};})()`);}catch(diagnosticError){snapshot={diagnosticError:diagnosticError.message};}
+  try{await call('DOM.enable');await call('CSS.enable');const {root}=await call('DOM.getDocument'),{nodeId}=await call('DOM.querySelector',{nodeId:root.nodeId,selector:'.pro-table'});fs.writeFileSync(path.join(directory,'matched-styles.json'),JSON.stringify(await call('CSS.getMatchedStylesForNode',{nodeId}),null,2)+'\n');}catch(error){snapshot.matchedStylesError=error.message;}
+  fs.writeFileSync(path.join(directory,'failure.json'),JSON.stringify({file:'desktop/pro-players-layout.cjs',scenario:'pro-players-layout',error:error.stack||String(error),mutationEvidence,snapshot},null,2)+'\n');
+  const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(directory,'failure.png'),Buffer.from(shot.data,'base64'));
+ };
  const waitForDOM=async(label,expression)=>{
   let last;
   const outcome=await waitOutcome(async()=>{last=await evaluate(expression);return last.ready;},{idleMs:15000,hardMs:60000,intervalMs:50,progress:()=>last});
@@ -60,7 +69,7 @@ async function main(){
  await evaluate(`(()=>{localStorage.setItem('lol-loot-ui-scale','1');const s=document.getElementById('setting-ui-scale');s.value='1';s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
  for(const width of [820,1100,1440,1920]){
   await call('Emulation.setDeviceMetricsOverride',{width,height:1100,deviceScaleFactor:1,mobile:false});
-  await evaluate(`new Promise(r=>setTimeout(r,250))`);
+  await waitViewport({evaluate,width});await settleTopbar({evaluate});
   const measurements=await evaluate(`(()=>{const tables=[...document.querySelectorAll('.pro-table')];return {overflow:tables.map(t=>t.scrollWidth-t.parentElement.clientWidth),heights:[...new Set(tables.flatMap(t=>[...t.querySelectorAll('td')].filter(e=>getComputedStyle(e).display!=='none').map(e=>Math.round(e.getBoundingClientRect().height))))],gap:[...document.querySelectorAll('.pro-account-line')].map(e=>{const range=document.createRange();range.selectNodeContents(e);return e.parentElement.parentElement.getBoundingClientRect().right-14-Math.min(e.getBoundingClientRect().right,range.getBoundingClientRect().right);}),indent:[getComputedStyle(document.querySelector('.pro-pending')).paddingLeft,getComputedStyle(document.querySelector('.pro-player-meta')).paddingLeft]};})()`);
   console.log(width,measurements);
   if(width===820)assert.ok(measurements.overflow.every(n=>n<=1),'820px horizontal overflow');
@@ -90,12 +99,17 @@ async function main(){
  assert.notEqual(themeColors.lp,themeColors.ladder,'LP and ladder need distinct theme colors');
  if(process.env.R73_SCREENSHOT_DIR){const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(process.env.R73_SCREENSHOT_DIR,'pro-players-light.png'),Buffer.from(shot.data,'base64'));}
  // The same geometry assertions must observe the specified broken CSS.
- const mutate=async text=>evaluate(`(()=>{let s=document.querySelector('#mutation');if(!s){s=document.createElement('style');s.id='mutation';document.head.append(s);}s.textContent=${JSON.stringify(text)};})()`);
+ const mutate=async text=>{
+  mutationEvidence=await evaluate(`new Promise(resolve=>{let s=document.querySelector('#mutation');if(!s){s=document.createElement('style');s.id='mutation';document.head.append(s);}s.textContent=${JSON.stringify(text)};const samples=[],sample=()=>{const tables=[...document.querySelectorAll('.pro-table')];samples.push({at:performance.now(),sheet:{disabled:s.sheet?.disabled,media:s.sheet?.media?.mediaText,connected:s.isConnected,rules:[...(s.sheet?.cssRules||[])].map(r=>r.cssText)},tables:tables.map(t=>({connected:t.isConnected,matches:t.matches('.pro-table'),inline:t.style.cssText,minWidth:getComputedStyle(t).minWidth,scrollWidth:t.scrollWidth,parentClientWidth:t.parentElement.clientWidth}))});if(samples.length===4)resolve(samples);else requestAnimationFrame(sample);};sample();})`);
+  mutationHistory.push({css:text,samples:mutationEvidence});const directory=process.env.R73_SCREENSHOT_DIR||path.join(os.tmpdir(),'pro-players-layout');fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(path.join(directory,'mutation-evidence.json'),JSON.stringify(mutationHistory,null,2)+'\n');
+ };
  await call('Emulation.setDeviceMetricsOverride',{width:820,height:1100,deviceScaleFactor:1,mobile:false});
+ await waitViewport({evaluate,width:820});await settleTopbar({evaluate});
  await mutate('.pro-table { min-width:770px !important; }');
  assert.ok(await evaluate(`[...document.querySelectorAll('.pro-table')].some(t=>t.scrollWidth-t.parentElement.clientWidth>1)`),'min-width mutant survived');
  await mutate('');
  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+ await waitViewport({evaluate,width:1440});await settleTopbar({evaluate});
  await mutate('.pro-col-account { width:auto !important; }');
  console.log('width-deletion mutant text gaps',await evaluate(`[...document.querySelectorAll('.pro-account-line')].map(e=>{const r=document.createRange();r.selectNodeContents(e);return e.parentElement.parentElement.getBoundingClientRect().right-14-Math.min(e.getBoundingClientRect().right,r.getBoundingClientRect().right);})`));
  await mutate('.pro-account-name { white-space:normal; overflow-wrap:anywhere; }');
@@ -103,4 +117,4 @@ async function main(){
  assert.ok(brokenHeights.length>2,'nowrap mutant survived');
  console.log('Chromium overflow/row-height/indent guards and their mutants PASS; strict short-name density remains a documented specification conflict.');
 }
-main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[proc],sockets:[ws],servers:[server],directories:[temp]}));
+main().catch(async e=>{console.error(e);try{await captureFailure?.(e);}catch(diagnosticError){console.error(diagnosticError);}process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[proc],sockets:[ws],servers:[server],directories:[temp]}));

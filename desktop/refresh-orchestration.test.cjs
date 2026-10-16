@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
+const { waitOutcome } = require("../scripts/lib/wait-progress.cjs");
 
 const WEB = process.env.DEEP_LEGENDS_WEB_ROOT || path.join(__dirname, "..", "backend", "web");
 const SCRIPTS = ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "gameplay.js"];
@@ -102,12 +103,10 @@ function bootDemoApp({ withEventSource = false, observeCollectionState = false }
 }
 
 async function waitFor(predicate, message, timeout = 5000) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    if (predicate()) return;
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-  assert.fail(message);
+  // R279: the window is never shorter than the old fixed one, but a slow (CPU-oversubscribed) run gets 15 s of
+  // patience instead of 5 s, and a hard ceiling still ends a livelock.
+  const outcome = await waitOutcome(predicate, { idleMs: Math.max(timeout, 15000), hardMs: 120000, intervalMs: 20 });
+  if (!outcome.ok) assert.fail(`${message} (${outcome.reason}, ${outcome.ms} ms)`);
 }
 
 // Demo startup is fixture preparation. Keep the behavior waits below at 5s,

@@ -1,0 +1,43 @@
+{
+  "apiAssertions": [
+    {
+      "file": "desktop/r100-browser.cjs",
+      "snippet": "assert.equal(await evaluate('document.body.classList.contains(\"is-fatal\")'),false,'poll failure must not be a fatal page');"
+    },
+    {
+      "file": "desktop/r100-browser.cjs",
+      "snippet": "assert.equal(await evaluate('document.querySelector(\"#local-status-recovery\").hidden'),false);"
+    },
+    {
+      "file": "desktop/r100-browser.cjs",
+      "snippet": "assert.equal(await evaluate('document.querySelector(\"#content\").textContent'),'已加载的战绩');"
+    },
+    {
+      "file": "desktop/r100-browser.cjs",
+      "snippet": "assert.equal(await evaluate('document.querySelector(\"#local-status-recovery\").hidden'),true);"
+    },
+    {
+      "file": "desktop/r100-browser.cjs",
+      "snippet": "assert.deepEqual(await evaluate('window.__statusRenderFailures'),[],'status fixture must execute every production dependency');"
+    }
+  ],
+  "legacyBaselineSha": "d44263b1cd692a9c25bcc1fab52a1f95b77ebca90f66e81ff6a7000b6918d256",
+  "tests": [
+    "scripts/r276-api-fault-policy.test.cjs",
+    "scripts/r276-installed-demo.test.cjs",
+    "scripts/r277-ci-orchestration.test.cjs",
+    "scripts/r276-workflow.test.cjs",
+    "scripts/ci-lean-workflow.test.cjs",
+    "backend/web/r117.test.cjs",
+    "scripts/r279-harness-adapters.test.cjs",
+    "desktop/fetch-paused-diagnostics.test.cjs",
+    "desktop/fetch-paused-integration.test.cjs",
+    "scripts/r276-filter-geometry-fixture.test.cjs",
+    "scripts/r271-mutation-verdict.test.cjs",
+    "scripts/preflight-cost.test.cjs",
+    "scripts/r279-diagnostic-shards.test.cjs",
+    "scripts/r279-ci-routing.test.cjs",
+    "scripts/r279-quick-workflow.test.cjs",
+    "scripts/release-plan.test.cjs"
+  ]
+}

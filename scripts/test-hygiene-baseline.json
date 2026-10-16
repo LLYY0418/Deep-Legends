@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "note": "存量计时债务登记表，只减不增。新增 sleep/轮询/墙钟断言必须使用 scripts/lib/wait-progress.cjs。",
+  "files": {
+    "backend/web/r127.test.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "backend/web/r206-collection-image.test.cjs": {
+      "wall": 1,
+      "reason": "存量：jsdom 内 Date.now()-started<100 固定墙钟阈值断言（CPU 争抢下有误报风险）；按规则不删除、不放宽，后续应改为与耗时无关的断言并保留“坏情况必须失败”的变异"
+    },
+    "desktop/diagnostics-1042-render.cjs": {
+      "sleep": 2,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/diagnostics-1555-layout.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/diagnostics-2244-render.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/installer-shell.test.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/overview-render-career.test.cjs": {
+      "sleep": 6,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/overview-render-events.test.cjs": {
+      "sleep": 3,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/overview-render-helpers.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/pro-players-layout.cjs": {
+      "sleep": 2,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/pro-runes-render.test.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/r100-browser.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/r117-browser.cjs": {
+      "sleep": 5,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/r140-banner-layout.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/refresh-orchestration.test.cjs": {
+      "sleep": 5,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/specialist-overview-render.test.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "desktop/startup-visibility.test.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "scripts/r264-browser.cjs": {
+      "wall": 1,
+      "reason": "存量：产品时序契约（自助标签关闭≤300ms、恢复≤1s）本身就是墙钟断言，属于性能契约而非等待，保留"
+    },
+    "scripts/r265-browser.cjs": {
+      "sleep": 8,
+      "reason": "存量：真浏览器守卫里的固定稳定间隔与轮询，登记后只减不增，后续按 wait-progress 迁移"
+    },
+    "scripts/r269-browser-checks.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    },
+    "scripts/r82-startup-ab-report.cjs": {
+      "sleep": 1,
+      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+    }
+  }
+}

@@ -44,7 +44,7 @@ test('R276 old controls-only probe deterministically loses its click to the real
  await assert.rejects(f.until("document.querySelector('.match-list .match-entry')"),/installed UI condition timeout:[\s\S]*"live":true/);assert.equal(f.proof.defaultRestores,1);
 });
 test('R276 all four installed probes use the same real-resource demo readiness',()=>{
- for(const n of [265,266,269,272]){const source=fs.readFileSync(path.join(__dirname,`r${n}-persisted-ui.cjs`),'utf8');assert(source.includes("require('./r276-installed-demo.cjs')"));assert(source.includes('navigateInstalledDemo({call,until,click,origin})'));assert(source.includes('for(let n=0;n<200;n++)'));assert(source.includes('waitInstalledStartup({until})'));}
+ for(const n of [265,266,269,272]){const source=fs.readFileSync(path.join(__dirname,`r${n}-persisted-ui.cjs`),'utf8');assert(source.includes("require('./r276-installed-demo.cjs')"));assert(source.includes('navigateInstalledDemo({call,until,click,origin})'));{const wait=/waitForPage\(evaluate,expression,\{idleMs:(\d+),hardMs:(\d+),intervalMs:100\}\)/.exec(source);assert(wait,'R279: until must wait through waitForPage');assert(Number(wait[1])>=200*100,'R279: the wait window must stay at least the original 200x100ms');assert(Number(wait[2])>Number(wait[1]));}assert(source.includes('waitInstalledStartup({until})'));}
  const source=fs.readFileSync(path.join(__dirname,'r276-installed-demo.cjs'),'utf8');assert(!source.includes('Fetch.fulfillRequest'));assert(!source.includes('localStorage.setItem'));
 });
 

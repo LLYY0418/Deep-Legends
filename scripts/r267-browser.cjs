@@ -1,4 +1,5 @@
 'use strict';
+const {waitForPage}=require('./lib/wait-progress.cjs');
 const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 // Real public backend and its CSP/assets, with explicit synthetic API fixtures.
@@ -49,7 +50,7 @@ async function start(){
  for(const theme of ['dark','light']){
   const {targetId}=await send('Target.createTarget',{url:'about:blank'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true}),call=(m,p)=>send(m,p,sessionId);
   const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
-  const until=async expression=>{for(let i=0;i<100;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,50));}throw Error('timeout '+expression+' '+await evaluate("JSON.stringify({loading:document.querySelector('#overview-content')?._overviewViewTab?.loading,html:document.querySelector('#overview-content')?.textContent.slice(0,600)})"));};
+  const until=async expression=>{if(await waitForPage(evaluate,expression,{idleMs:15000,hardMs:90000}))return;throw Error('timeout '+expression+' '+await evaluate("JSON.stringify({loading:document.querySelector('#overview-content')?._overviewViewTab?.loading,html:document.querySelector('#overview-content')?.textContent.slice(0,600)})"));};
   const click=selector=>evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
   const frames=()=>evaluate('new Promise(resolve=>{let remaining=4;const frame=()=>--remaining?requestAnimationFrame(frame):resolve();requestAnimationFrame(frame)})');
   const shot=async name=>{const r=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false}),buffer=Buffer.from(r.data,'base64');fs.writeFileSync(path.join(out,`${theme}-${name}.png`),buffer);return buffer;};

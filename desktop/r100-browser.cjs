@@ -1,6 +1,7 @@
 // Real Chromium layout guard. No jsdom measurements or external npm dependency.
 // CHROME_BIN=/path/to/chrome node desktop/r100-browser.cjs
 'use strict';
+const {waitForPage}=require('../scripts/lib/wait-progress.cjs');
 const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
 const {spawn} = require('node:child_process');
@@ -54,7 +55,7 @@ async function main(){
  });
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  await call('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/'});
- for(let i=0;i<100;i++){if(await evaluate('typeof deepLegendsStatusRecovery==="function"'))break;await new Promise(r=>setTimeout(r,25));}
+ await waitForPage(evaluate,'typeof deepLegendsStatusRecovery==="function"',{idleMs:15000,hardMs:60000,intervalMs:25});
  await evaluate(`window.state={section:'gameplay',statusRequestToken:0,controllers:new Map()};window.STATUS_INTERVAL=10000;
  window.scheduleStatus=()=>{};window.clearDisconnectedClientState=()=>{};window.updateReadingOverlay=()=>{};window.renderStatus=()=>{};window.loadClientInstallations=async()=>{};
  document.body.insertAdjacentHTML('afterbegin','<div id="connection"><span></span></div><div id="notice" hidden></div><div id="launchpad"></div>');
