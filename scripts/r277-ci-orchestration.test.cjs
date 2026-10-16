@@ -14,7 +14,7 @@ test('R277 independent jobs leave every legacy shard, timing budget and branch g
  }
  assert.equal(gates,5,'only the five approved complete probe gates may change');
  for(const [name,job] of Object.entries(old.jobs))assert.deepEqual(normalized[name],job,`legacy ${name} must not change outside approved R278 probe gates`);
- assert.deepEqual(ci.on,old.on);assert.equal((ciText.match(/startsWith\(github.ref, 'refs\/heads\/codex\/release-'\)/g)||[]).length,5);
+ assert.deepEqual(ci.on,require('./lib/ci-routing.cjs').fullTriggers(old.on),'only the newly authorized diagnostic push prefix may leave full CI; PR/dispatch/tag/release behavior stays exact');assert.equal((ciText.match(/startsWith\(github.ref, 'refs\/heads\/codex\/release-'\)/g)||[]).length,5);
  assert(!ciText.includes("github.ref == 'refs/heads/codex/ci-hardening-r276'"));
 });
 test('R277 actual mutations are independent steps with always-uploaded original failures',()=>{

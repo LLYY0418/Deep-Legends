@@ -18,9 +18,29 @@ const guards=[
  ['r278','scripts/r278-browser.cjs','R278_BROWSER_OUT'],
  ['r275-offline','scripts/r275-offline-browser.cjs','R275_OFFLINE_OUT']
 ];
+const diagnosticShards={
+ 'diagnostic-r266':['r266'],
+ 'diagnostic-offline':['r275-offline'],
+ 'diagnostic-r265':['r265'],
+ 'diagnostic-main-a':['r100','r117','current-game-layout','overview-banner-layout','pro-players-layout','r258','r264','r267'],
+ 'diagnostic-main-b':['r266-matrix','r269-geometry','r269','r272','r278']
+};
+function verifyDiagnosticShards(shards=diagnosticShards){
+ const assert=require('node:assert/strict'),all=Object.values(shards).flat();
+ assert.deepEqual([...all].sort(),guards.map(row=>row[0]).sort(),'diagnostic shards must cover every guard exactly once');
+ assert.equal(new Set(all).size,all.length,'diagnostic shards cannot duplicate a guard');
+ const dependency=Object.values(shards).find(rows=>rows.includes('r269-geometry'));
+ assert(dependency.includes('r266-matrix')&&dependency.indexOf('r266-matrix')<dependency.indexOf('r269-geometry'),'matrix must run before its geometry dependent in the same VM');
+ return true;
+}
+verifyDiagnosticShards();
 function selectGuards(shard,only){
+ if(Object.hasOwn(diagnosticShards,shard)){
+  if(only)throw Error('diagnostic partitions cannot be focused or omitted');
+  return diagnosticShards[shard].map(name=>guards.find(row=>row[0]===name));
+ }
  if(!['all','main','r265'].includes(shard))throw Error('unknown browser shard '+shard);
  if(only)for(const name of only)if(!guards.some(row=>row[0]===name))throw Error('unknown focused browser guard '+name);
  return guards.filter(row=>(!only||only.includes(row[0]))&&(shard==='all'||(shard==='r265'?row[0]==='r265':row[0]!=='r265')));
 }
-module.exports={guards,selectGuards};
+module.exports={guards,selectGuards,diagnosticShards,verifyDiagnosticShards};

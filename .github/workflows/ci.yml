@@ -3,7 +3,7 @@ name: quality-and-windows-release
 on:
   push:
     tags-ignore: ['v*']
-    branches: ['**']
+    branches: ['**', '!codex/diagnostic-r279-*']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -728,13 +728,3 @@ jobs:
           name: triage-legacy
           if-no-files-found: ignore
           path: ${{ runner.temp }}/triage/**
-
-  # One-time acceptance of the new reusable quick workflow, only for this work item.
-  # Future release/probe pushes do not duplicate the full CI automatically.
-  r279-windows-probe-acceptance:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/ci-lean-r279'
-    permissions:
-      contents: read
-    uses: ./.github/workflows/probe-windows-browser.yml
-    with:
-      ref: ${{ github.sha }}

@@ -12,6 +12,7 @@ const fs = require("node:fs"), path = require("node:path"), os = require("node:o
 const cp = require("node:child_process");
 const { buildIndex, select, R277_STRICT } = require("./lib/preflight-select.cjs");
 const root = path.resolve(__dirname, "..");
+const {planExecution}=require("./lib/preflight-cost.cjs");
 
 function git(args, options = {}) {
   return cp.execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...options });
@@ -25,6 +26,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--list") options.list = true;
+    else if (arg === "--full") options.full = true;
     else if (arg === "--browsers") options.browsers = true;
     else if (arg === "--help" || arg === "-h") options.help = true;
     else if (arg === "--base") options.base = argv[++i] || "";
@@ -142,7 +144,7 @@ function runBrowsers(selection) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
-    console.log("用法：node scripts/preflight.cjs [--base <ref>] [--list] [--json <file>] [--files a,b,c] [--browsers]\n  --list      只显示选择结果，不执行\n  --files     手动指定改动文件（逗号分隔），用于回放历史改动\n  --browsers  同时运行选中的真浏览器守卫（需要本机 Chrome 与 Go）");
+    console.log("用法：node scripts/preflight.cjs [--base <ref>] [--list] [--json <file>] [--files a,b,c] [--browsers]\n  --list      只显示选择结果，不执行\n  --files     手动指定改动文件（逗号分隔），用于回放历史改动\n  --browsers  按成本决策运行浏览器守卫，过重时明确延后CI\n  --full      显式执行全部已选关联验证（可与--browsers一起使用）");
     return 0;
   }
   const gateBase = resolveBase(options.base);
@@ -154,32 +156,39 @@ async function main() {
   if (!changes.length) { console.log("没有改动，无需预检。"); return 0; }
   printSummary(base, selection, total);
 
-  const report = { base, gateBase, generatedAt: new Date().toISOString(), totals: total, selection, results: [] };
+  const parallel = Math.max(1, Math.min(os.availableParallelism?.() ?? os.cpus().length, 6));
+  const execution=planExecution(selection,{workers:parallel,goNamesByFile:index.goTestNames,full:Boolean(options.full),browsers:options.browsers});
+  console.log(`成本估算：Node worker约${Math.round(execution.estimate.nodeWorkerMs/1000)}s，已测文件成本占比${Math.round(execution.estimate.nodeFileCostShare*100)}%；未知Node成本${execution.estimate.unknownNodeFiles.length}文件；Go ${execution.estimate.goCases}用例（无耗时档案）；浏览器串行约${execution.estimate.browserSerialMs===null?"未知":Math.round(execution.estimate.browserSerialMs/1000)+"s"}。估算不是预算或通过证据。`);
+  if(execution.deferAssociated)console.log(`关联验证延后CI：${execution.reasons.join("; ")}；直接改动测试仍回归。`);
+  if(execution.deferBrowser)console.log("浏览器工作量超出本地反馈目标，保留完整清单交Windows诊断/CI；显式 --full --browsers 可本地完整执行。");
+  const report = { base, gateBase, generatedAt: new Date().toISOString(), totals: total, selection, execution, results: [] };
   let exitCode = 0;
   if (!options.list) {
-    const parallel = Math.max(1, Math.min(os.availableParallelism?.() ?? os.cpus().length, 6));
     for (const gate of staticGates(selection, gateBase)) {
       const result = run(gate.label, gate.command, gate.args);
       report.results.push(result);
       if (!result.ok) exitCode = 1;
     }
-    if(selection.broad)report.results.push({label:"关联测试范围过宽",status:"deferred-to-CI",note:"仅本地静态门禁，关联测试由完整CI执行；不是测试通过证据"});
-    if (exitCode===0 && !selection.broad && selection.nodeTests.length) {
-      const result = run(`Node 测试（${selection.nodeTests.length} 个文件，并发 ${parallel}）`, process.execPath, ["--test", `--test-concurrency=${parallel}`, ...selection.nodeTests.map((t) => t.file)]);
+    if(exitCode!==0){
+      for(const [label,selected] of [["Node回归",execution.nodeTests.map(row=>row.file)],["Go回归",execution.goTestNames],["浏览器",options.browsers&&!execution.deferBrowser?selection.browserGuards.map(row=>row.name):[]]])if(selected.length)report.results.push({label,status:"skipped-static-gate-failed",selected,note:"前置门禁失败，未执行且不算通过；修复前置后必须重新执行"});
+    }
+    if(execution.deferAssociated||execution.deferBrowser)report.results.push({label:"成本感知关联验证",status:"deferred-to-CI",note:"完整选择清单保留；直接修改测试回归，其余关联验证由CI执行，未执行不算通过",deferred:execution.deferred});
+    if (exitCode===0 && execution.nodeTests.length) {
+      const result = run(`Node 测试（${execution.nodeTests.length} 个文件，并发 ${parallel}）`, process.execPath, ["--test", `--test-concurrency=${parallel}`, ...execution.nodeTests.map((t) => t.file)]);
       report.results.push(result);
       if (!result.ok) exitCode = 1;
     }
-    if (exitCode===0 && !selection.broad && selection.goTestNames.length) {
-      const pattern = `^(${selection.goTestNames.join("|")})$`;
-      const result = run(`Go 测试（${selection.goTestNames.length} 个用例，-race）`, "go", ["test", "-race", "-count=1", "-run", pattern, "./backend"]);
+    if (exitCode===0 && execution.goTestNames.length) {
+      const pattern = `^(${execution.goTestNames.join("|")})$`;
+      const result = run(`Go 测试（${execution.goTestNames.length} 个用例，-race）`, "go", ["test", "-race", "-count=1", "-run", pattern, "./backend"]);
       report.results.push(result);
       if (!result.ok) exitCode = 1;
     }
-    if (exitCode===0 && options.browsers && selection.browserGuards.length) {
+    if (exitCode===0 && options.browsers && !execution.deferBrowser && selection.browserGuards.length) {
       for (const result of runBrowsers(selection)) { report.results.push(result); if (!result.ok) exitCode = 1; }
     }
-    console.log(`\n${exitCode === 0 ? (selection.broad?"静态预检通过，范围过宽的关联测试延后到CI":"快速预检通过") : "快速预检有失败"}。注意：这不是发版证据；完整验证以 probe / release 分支上的 CI 为准。`);
-    if (selection.browserGuards.length && !options.browsers) console.log("浏览器守卫未在本地运行（加 --browsers 可运行）；它们在 CI 的 browser-main / browser-r265 / R277 matrix 里一定会跑。");
+    console.log(`\n${exitCode === 0 ? (execution.deferAssociated||execution.deferBrowser?"本地已执行预检通过，其余关联验证明确延后CI":"快速预检通过") : "快速预检有失败"}。注意：这不是发版证据；完整验证以 probe / release 分支上的 CI 为准。`);
+    if (selection.browserGuards.length && (!options.browsers||execution.deferBrowser)) console.log("浏览器守卫未在本地运行（加 --browsers 查看成本决策，--full --browsers 显式完整运行）；它们在 CI 的 browser-main / browser-r265 / R277 matrix 里一定会跑。");
   }
   if (options.json) { fs.mkdirSync(path.dirname(path.resolve(options.json)), { recursive: true }); fs.writeFileSync(options.json, JSON.stringify(report, null, 2) + "\n");fs.writeFileSync(path.join(path.dirname(path.resolve(options.json)),"preflight-static-gates.json"),JSON.stringify({automaticStaging:false,gates:staticGates(selection,gateBase)},null,2)+"\n"); }
   return exitCode;
