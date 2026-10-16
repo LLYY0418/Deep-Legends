@@ -45,11 +45,16 @@ function fileTokens(text) {
 }
 
 // Build once per run. `files` are repo-relative posix paths; `read(file)` returns text.
-function buildIndex({ files, read, guards = [] }) {
-  const all = files.map(normalize);
-  const fileSet = new Set(all);
+function buildIndex({ files, read, guards = [], historicalFiles = [], readHistorical }) {
+  // Historical paths only participate in dependency analysis. They must never
+  // become executable tests, scripts or workflow entry points.
+  const all = [...new Set(files.map(normalize))];
+  const currentFiles = new Set(all);
+  const historical = new Set(historicalFiles.map(normalize));
+  const analysisFiles = [...new Set([...all, ...historical])];
+  const fileSet = new Set(analysisFiles);
   const byBase = new Map();
-  for (const file of all) {
+  for (const file of analysisFiles) {
     const base = posix.basename(file);
     if (!byBase.has(base)) byBase.set(base, []);
     byBase.get(base).push(file);
@@ -58,7 +63,12 @@ function buildIndex({ files, read, guards = [] }) {
   const text = (file) => {
     if (!textCache.has(file)) {
       let value = "";
-      try { value = read(file) || ""; } catch (_) { value = ""; }
+      if (historical.has(file) && !currentFiles.has(file)) {
+        // Missing baseline content is a failed analysis, not an empty helper.
+        value = readHistorical(file) || "";
+      } else {
+        try { value = read(file) || ""; } catch (_) { value = ""; }
+      }
       textCache.set(file, value);
     }
     return textCache.get(file);
@@ -114,7 +124,7 @@ function buildIndex({ files, read, guards = [] }) {
     }
   }
 
-  const goSources = all.filter((file) => GO_SOURCE_RE.test(file) && !GO_TEST_RE.test(file));
+  const goSources = analysisFiles.filter((file) => GO_SOURCE_RE.test(file) && !GO_TEST_RE.test(file));
   const goTests = all.filter((file) => GO_TEST_RE.test(file));
   const declared = new Map();
   for (const file of goSources) declared.set(file, goDeclarations(text(file)));

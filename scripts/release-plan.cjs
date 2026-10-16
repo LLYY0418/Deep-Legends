@@ -4,7 +4,11 @@ const cp=require('node:child_process');
 const policy=require('./release-validation-policy.json');
 // These scripts change the produced binary/package, unlike test-only orchestration.
 const releaseInputs=new Set(['go.mod','go.sum','scripts/build-stage.cjs','scripts/normalize-source-line-endings.cjs','scripts/build-license-staging.cjs','scripts/make-release.cjs']);
+// This exact helper is imported exclusively by the two installer callback tests.
+// A regression test guards its callers; other files in installer/internal stay product.
+const testOnlyInputs=new Set(['installer/internal/p11callbacktest/fixture_windows.go']);
 function productFile(file){
+ if(testOnlyInputs.has(file))return false;
  if(releaseInputs.has(file)||/^build[^/]*\.(?:sh|ps1|cjs)$/.test(file))return true;
  if(!/^(backend|desktop|installer|relay\/riot-worker)\//.test(file))return false;
  if(/_test\.go$|\.test\.[cm]?js$|-harness\.cjs$|-layout\.cjs$|-browser\.cjs$/.test(file))return false;

@@ -16,7 +16,8 @@ function references(index){
   for(const key of ['source','sources'])add(item,'repository',value[key]);
  }
  add('currentRepairEvidence','report',index.currentRepairEvidence);
- for(const key of ['formalProof','measurements','diagnostic','independentReview'])add('currentAcceptance.'+key,'report',index.currentAcceptance?.[key]);
+ for(const acceptance of ['currentAcceptance','previousAcceptance'])
+  for(const key of ['formalProof','measurements','diagnostic','independentReview'])add(acceptance+'.'+key,'report',index[acceptance]?.[key]);
  return rows;
 }
 function checkIndex(index,{reportRoot,repositoryRoot}){

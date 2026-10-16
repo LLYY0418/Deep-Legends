@@ -128,3 +128,91 @@ test('actual Python failures return nonzero rather than being reported as select
   assert.equal(result[0].ok,false);assert.notEqual(result[0].status,0);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+
+// Build a real index after staging removals, rather than retaining deleted files
+// in a synthetic current-file list.
+function deletedRepository(action, check) {
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'r279-deleted-index-'));
+ const git=(...args)=>cp.execFileSync('git',args,{cwd:dir,encoding:'utf8'});
+ try {
+  fs.mkdirSync(path.join(dir,'scripts'));fs.mkdirSync(path.join(dir,'backend'));
+  const files={
+   'scripts/old.test.cjs':'// removed direct test\n',
+   'scripts/dependent.test.cjs':"require('./old.test.cjs');\n",
+   'scripts/helper.cjs':"module.exports=require('./leaf.cjs');\n",
+   'scripts/leaf.cjs':'module.exports=1;\n',
+   'scripts/transitive.test.cjs':"require('./helper.cjs');\n",
+   'backend/old.go':'package main\nfunc DeletedFeature() {}\n',
+   'backend/survivor_test.go':'package main\nfunc TestSurvivor(t *testing.T) { DeletedFeature() }\n'
+  };
+  for(const [file,text] of Object.entries(files))fs.writeFileSync(path.join(dir,file),text);
+  git('init','-q');git('add','.');git('-c','user.name=R279 fixture','-c','user.email=r279@example.invalid','commit','-qm','base');
+  action({dir,git});
+  const api=require('./preflight.cjs'),changes=api.changedFiles('HEAD',dir);
+  const index=api.loadIndex('HEAD',dir,changes),selection=select(index,changes);
+  check({dir,git,index,selection,changes});
+ } finally {fs.rmSync(dir,{recursive:true,force:true});}
+}
+function selectedAndDeferred(selection,index,full) {
+ const costs=Object.fromEntries(selection.nodeTests.map(row=>[row.file,1]));
+ const plan=planExecution(selection,{costs,full,goNamesByFile:index.goTestNames});
+ return [...plan.nodeTests,...plan.deferred.nodeTests].map(row=>row.file).sort();
+}
+test('staged and unstaged deletion retain surviving dependencies using the real Git index',()=>{
+ for(const staged of [false,true])deletedRepository(({dir,git})=>{
+  if(staged)git('rm','-q','scripts/old.test.cjs','scripts/helper.cjs','scripts/leaf.cjs','backend/old.go');
+  else for(const f of ['scripts/old.test.cjs','scripts/helper.cjs','scripts/leaf.cjs','backend/old.go'])fs.rmSync(path.join(dir,f));
+ },({index,selection})=>{
+  assert.deepEqual(selection.nodeTests.map(row=>row.file),['scripts/dependent.test.cjs','scripts/transitive.test.cjs']);
+  assert.deepEqual(selection.goTestNames,['TestSurvivor']);
+  assert(!index.nodeTests.includes('scripts/old.test.cjs'),'historical tests are analysis-only');
+  assert(!selection.relatedScripts.some(row=>row.file==='scripts/helper.cjs'),'historical helpers are not execution targets');
+  for(const full of [false,true])assert.deepEqual(selectedAndDeferred(selection,index,full),['scripts/dependent.test.cjs','scripts/transitive.test.cjs']);
+ });
+});
+test('staged Unicode rename selects the new test and surviving references to its old path',()=>{
+ deletedRepository(({git})=>git('mv','scripts/old.test.cjs','scripts/新.test.cjs'),({index,selection,changes})=>{
+  assert(changes.some(row=>row.file==='scripts/old.test.cjs'&&row.status==='D'));
+  assert.deepEqual(selection.nodeTests.map(row=>row.file),['scripts/dependent.test.cjs','scripts/新.test.cjs']);
+  for(const full of [false,true])assert.deepEqual(selectedAndDeferred(selection,index,full),['scripts/dependent.test.cjs','scripts/新.test.cjs']);
+ });
+});
+test('historical helper content preserves transitive edges and unreadable history fails explicitly',()=>{
+ const files={'scripts/live.test.cjs':"require('./removed.cjs')"};
+ const historical={'scripts/removed.cjs':"require('./deep.cjs')",'scripts/deep.cjs':"require('./removed.cjs')"};
+ const options={files:Object.keys(files),read:f=>files[f],historicalFiles:Object.keys(historical),readHistorical:f=>historical[f],guards:[]};
+ const index=buildIndex(options),s=select(index,[{file:'scripts/deep.cjs',status:'D'}]);
+ assert.deepEqual(s.nodeTests.map(row=>row.file),['scripts/live.test.cjs']);
+ assert.throws(()=>buildIndex({...options,readHistorical:()=>{throw Error('historical dependency unavailable');}}),/historical dependency unavailable/);
+ const m=mutant('preflight.cjs','historicalFiles, readHistorical','historicalFiles: [], readHistorical');
+ deletedRepository(({git})=>git('rm','-q','scripts/old.test.cjs'),({dir,changes})=>{
+  const broken=select(m.loadIndex('HEAD',dir,changes),changes);
+  assert.throws(()=>assert(broken.nodeTests.some(row=>row.file==='scripts/dependent.test.cjs')),{name:'AssertionError'});
+ });
+});
+test('historical acceptance references are checked and cannot disappear behind the current proof',()=>{
+ const {checkIndex}=require('./r279-evidence-index.cjs'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'r279-history-proof-'));
+ try{
+  fs.writeFileSync(path.join(dir,'current.json'),'{}');
+  const index={schema:2,items:{},currentAcceptance:{formalProof:'current.json'},previousAcceptance:{formalProof:'missing.json'}};
+  assert.equal(checkIndex(index,{reportRoot:dir,repositoryRoot:dir}).ok,false);
+  for(const bad of ['../missing.json','/missing.json','C:\\missing.json','missing.json; claimed pass']){
+   const unsafe=structuredClone(index);unsafe.previousAcceptance.formalProof=bad;
+   assert.throws(()=>checkIndex(unsafe,{reportRoot:dir,repositoryRoot:dir}),{name:'AssertionError'});
+  }
+  const m=mutant('r279-evidence-index.cjs',"['currentAcceptance','previousAcceptance']","['currentAcceptance']");
+  assert.throws(()=>assert.equal(m.checkIndex(index,{reportRoot:dir,repositoryRoot:dir}).ok,false),{name:'AssertionError'});
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('only the proven test-only installer fixture is excluded from product rounds',()=>{
+ const fixture='installer/internal/p11callbacktest/fixture_windows.go';
+ assert.equal(releasePlan([fixture]).acceptance.rounds.length,2);
+ for(const production of ['installer/internal/webviewhost/host_windows.go','installer/internal/p11callbacktest/new_runtime.go'])assert.equal(releasePlan([production]).acceptance.rounds.length,3);
+ const files=cp.execFileSync('git',['ls-files','installer'],{cwd:root,encoding:'utf8'}).split('\n').filter(f=>f.endsWith('.go')&&f!==fixture);
+ const callers=files.filter(f=>fs.readFileSync(path.join(root,f),'utf8').includes('/internal/p11callbacktest"'));
+ assert.deepEqual(callers,['installer/r277_callback_windows_test.go','installer/uninstall/r277_callback_windows_test.go']);
+ assert(callers.every(f=>f.endsWith('_test.go')),'test-only exception must never become reachable from production');
+ const m=mutant('release-plan.cjs','testOnlyInputs.has(file)','false');
+ assert.throws(()=>assert.equal(m.releasePlan([fixture]).acceptance.rounds.length,2),{name:'AssertionError'});
+});

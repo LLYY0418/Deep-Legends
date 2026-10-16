@@ -58,10 +58,12 @@ function changedFiles(base, cwd = root) {
   return [...changes].map(([file, statusCode]) => ({ file, status: statusCode }));
 }
 
-function loadIndex() {
-  const files = git(["ls-files", "-co", "--exclude-standard", "-z"]).split("\0").filter(Boolean);
+function loadIndex(base = "HEAD", cwd = root, changes = changedFiles(base, cwd)) {
+  const files = git(["ls-files", "-co", "--exclude-standard", "-z"], {cwd}).split("\0").filter(file => file && fs.existsSync(path.join(cwd, file)));
+  const historicalFiles = changes.filter(change => change.status === "D").map(change => change.file);
+  const readHistorical = file => git(["show", `${base}:${file}`], {cwd, stdio:["ignore","pipe","pipe"]});
   const { guards } = require("./r276-browser-catalog.cjs");
-  return buildIndex({ files, read: (file) => fs.readFileSync(path.join(root, file), "utf8"), guards: guards.map((row) => row[0]) });
+  return buildIndex({ files, historicalFiles, readHistorical, read: file => fs.readFileSync(path.join(cwd, file), "utf8"), guards: guards.map(row => row[0]) });
 }
 
 function run(label, command, args, options = {}) {
@@ -170,7 +172,7 @@ async function main() {
   const gateBase = resolveBase(options.base);
   const base = options.files.length ? "(手动指定文件)" : gateBase;
   const changes = options.files.length ? options.files.map((file) => ({ file, status: "M" })) : changedFiles(base);
-  const index = loadIndex();
+  const index = loadIndex(gateBase, root, changes);
   const selection = select(index, changes);
   const total = { node: index.nodeTests.length, go: index.goTests.length };
   if (!changes.length) { console.log("没有改动，无需预检。"); return 0; }
@@ -228,4 +230,4 @@ if (require.main === module) {
   main().then((code) => { process.exitCode = code; }, (error) => { console.error(error.stack || error); process.exitCode = 2; });
 }
 
-module.exports = { parseArgs, resolveBase, changedFiles, staticGates, runScriptTests };
+module.exports = { parseArgs, resolveBase, changedFiles, loadIndex, staticGates, runScriptTests };
