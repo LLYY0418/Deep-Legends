@@ -17,12 +17,17 @@ function releasePlan(files){
   sweep:'diagnostic only; use directed repeat and bad-case proofs for infrastructure changes',
   targets:policy.targets};
 }
+function candidateFiles(base, cwd=process.cwd()){
+ const git=args=>cp.execFileSync('git',args,{cwd,encoding:'utf8',maxBuffer:64*1024*1024}).split('\0').filter(Boolean);
+ // Include both sides of renames and untracked additions; NUL preserves exact path names.
+ return [...new Set([...git(['diff', '--name-only', '--no-renames', '-z', base, '--']), ...git(['ls-files', '--others', '--exclude-standard', '-z'])])];
+}
 function main(args){
  for(let i=0;i<args.length;i++){const arg=args[i];if(arg==='--help')continue;if(!['--base','--files'].includes(arg)||!args[++i]||args[i].startsWith('--'))throw Error('Expected --base <ref> or --files <list>');}
  if(args.includes('--help')){console.log('node scripts/release-plan.cjs [--base <ref>] [--files file1,file2]\nPrints the versioned local/diagnostic/formal plan. No staging, push, dispatch or release action is performed.');return;}
  const value=flag=>args.includes(flag)?args[args.indexOf(flag)+1]:null;
- const files=value('--files')?.split(',').filter(Boolean)||cp.execFileSync('git',['diff','--name-only',value('--base')||require('./preflight.cjs').resolveBase('')],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
+ const files=value('--files')?.split(',').filter(Boolean)||candidateFiles(value('--base')||require('./preflight.cjs').resolveBase(''));
  console.log(JSON.stringify(releasePlan(files),null,2));
 }
-module.exports={releasePlan,productFile};
+module.exports={releasePlan,productFile,candidateFiles};
 if(require.main===module)try{main(process.argv.slice(2));}catch(error){console.error(error.message);process.exitCode=1;}
