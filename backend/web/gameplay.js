@@ -937,6 +937,10 @@
         }else{
           if(Object.hasOwn(entry.dataset,'virtualMatch') || tab.openMatches?.has(entry.dataset.matchId) || !(height>0))continue;
           entry.style.minHeight=`${height}px`;entry.dataset.virtualMatch='';
+          for(const tags of entry.querySelectorAll('.match-tags-collection')) {
+            tags._tagObserver?.disconnect();delete tags._tagObserver;
+            if(tags._tagFitFrame){cancelAnimationFrame(tags._tagFitFrame);tags._tagFitFrame=0;}
+          }
           entry.innerHTML='<div class="match-virtual-skeleton gameplay-skeleton" aria-label="正在显示对局"><span></span><span></span><span></span></div>';stats.collapsed++;
         }
       }
@@ -4187,6 +4191,11 @@
       if(onlyNew && collection._tagObserver)continue;
       const popup=bindMatchTagsPopover(collection);
       const fit=()=>{
+        if(collection.isConnected===false) {
+          collection._tagObserver?.disconnect();
+          delete collection._tagObserver;
+          return;
+        }
         if(typeof collection.checkVisibility==="function" && !collection.checkVisibility({contentVisibilityAuto:true}))return;
         // Tag and icon grids can resize independently. Keep their caches separate.
         const width=collection.clientWidth;if(!width)return;

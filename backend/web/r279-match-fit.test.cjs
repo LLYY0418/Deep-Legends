@@ -48,3 +48,41 @@ test('mutation: synchronous observer writes must fail the error-free correction 
  const broken=source.replace(anchor,'new ResizeObserver(fit)');
  assert.notEqual(broken,source);assert.throws(()=>run(broken,true,true),/icon correction must run outside ResizeObserver delivery/);
 });
+
+function detachedObserverScenario(source) {
+ const observers=[],frames=[];
+ const collection={isConnected:true,clientWidth:100,checkVisibility(){return this.isConnected;},closest:()=>null,querySelectorAll:()=>[],querySelector:()=>null};
+ class ResizeObserver{constructor(callback){this.callback=callback;this.disconnected=false;observers.push(this)}observe(){}disconnect(){this.disconnected=true}}
+ const f=compile(source,['fitMatchTags'],{ResizeObserver,requestAnimationFrame:fn=>{frames.push(fn);return frames.length},bindMatchTagsPopover:()=>({anchor:null})});
+ const root={querySelectorAll:()=>[collection]};f.fitMatchTags(root);
+ assert.equal(observers.length,1);collection.isConnected=false;observers[0].callback();while(frames.length)frames.shift()();
+ assert.equal(observers[0].disconnected,true,'detached tag observer must disconnect instead of retaining virtualized card nodes');
+ assert.equal(collection._tagObserver,undefined,'detached observer reference must be released');
+ collection.isConnected=true;f.fitMatchTags(root,true);assert.equal(observers.length,2,'restored cached card must acquire a fresh geometry observer');
+}
+test('virtualized or removed tag collections release their observer and cached cards can rebind',()=>detachedObserverScenario(source));
+test('mutation: retaining observations on detached cards must fail the lifecycle target',()=>{
+ const broken=source.replace('if(collection.isConnected===false) {','if(false) {');
+ assert.notEqual(broken,source);assert.throws(()=>detachedObserverScenario(broken),/detached tag observer must disconnect/);
+});
+
+function virtualizationCleanupScenario(source) {
+ const frames=[],observers=[],canceled=[];let disconnected=false,removedAfterCleanup=false;
+ const tag={_tagObserver:{disconnect(){disconnected=true}},_tagFitFrame:123};
+ const entry={isConnected:true,currentCSSZoom:1,dataset:{matchId:'one'},style:{},getBoundingClientRect:()=>({height:120}),hasAttribute:()=>false,querySelectorAll:()=>[tag],set innerHTML(value){assert(disconnected,'virtualization must release tag observations before replacing card children');removedAfterCleanup=true;}};
+ const list={dataset:{},closest:()=>({}),querySelectorAll:()=>[entry]};
+ class IntersectionObserver{constructor(callback,options){this.callback=callback;this.options=options;observers.push(this)}observe(){}disconnect(){}}
+ const f=compile(source,['boundMatchDOM'],{window:{IntersectionObserver},document:{},requestAnimationFrame:fn=>{frames.push(fn);return frames.length},cancelAnimationFrame:id=>canceled.push(id),Date:{now:()=>0}});
+ f.boundMatchDOM(list,{openMatches:new Set()});observers.find(o=>o.options.rootMargin==='3200px 0px').callback([{target:entry,isIntersecting:false}]);while(frames.length)frames.shift()();
+ assert(removedAfterCleanup);assert.equal(tag._tagObserver,undefined);assert.equal(tag._tagFitFrame,0);assert.deepEqual(canceled,[123]);
+}
+test('virtualization releases hidden-card tag observations even without a ResizeObserver delivery',()=>virtualizationCleanupScenario(source));
+test('mutation: retaining hidden-card observations must fail before virtualization replaces DOM',()=>{
+ const cleanup=`          for(const tags of entry.querySelectorAll('.match-tags-collection')) {
+            tags._tagObserver?.disconnect();delete tags._tagObserver;
+            if(tags._tagFitFrame){cancelAnimationFrame(tags._tagFitFrame);tags._tagFitFrame=0;}
+          }
+`;
+ const broken=source.replace(cleanup,'');assert.notEqual(broken,source);
+ assert.throws(()=>virtualizationCleanupScenario(broken),/virtualization must release tag observations/);
+});
