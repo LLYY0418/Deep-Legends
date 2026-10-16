@@ -17,6 +17,12 @@ import (
 )
 
 const riotUserKeyFile = "riot-user-key.dat"
+const riotUserKeyStatePrefix = "deep-legends-riot-key-v1\n"
+
+type persistedRiotKey struct {
+	Key        string `json:"key"`
+	Unverified bool   `json:"unverified"`
+}
 
 // Credentials never enter a response, diagnostic, cache key, or error string.
 // An empty file remembers an explicit clear, so upgrade migration cannot undo it.
@@ -67,23 +73,36 @@ func loadRiotKeyStore(store *localStore) *riotKeyStore {
 		s.rejected = true
 		return s
 	}
-	s.key = strings.TrimSpace(string(plain))
+	value := string(plain)
+	if strings.HasPrefix(value, riotUserKeyStatePrefix) {
+		var saved persistedRiotKey
+		if json.Unmarshal([]byte(strings.TrimPrefix(value, riotUserKeyStatePrefix)), &saved) != nil || saved.Key == "" {
+			s.rejected = true
+			return s
+		}
+		s.key, s.unverified = saved.Key, saved.Unverified
+	} else {
+		// Existing installations stored only the protected credential.
+		s.key = strings.TrimSpace(value)
+	}
 	_ = s.migrateEmbedded(nil)
 	return s
 }
 
 func (s *riotKeyStore) effective() (string, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.effectiveLocked()
+}
+
+func (s *riotKeyStore) effectiveLocked() (string, string) {
 	if value := strings.TrimSpace(os.Getenv("RIOT_API_KEY")); value != "" {
 		return value, "env"
 	}
-	s.mu.Lock()
-	value := s.key
-	rejected := s.embeddedRejected
-	s.mu.Unlock()
-	if value != "" {
-		return value, "user"
+	if s.key != "" {
+		return s.key, "user"
 	}
-	if value := riotEmbeddedKey(); value != "" && !rejected {
+	if value := riotEmbeddedKey(); value != "" && !s.embeddedRejected {
 		return value, "embedded"
 	}
 	if len(configuredRiotRelays()) > 0 {
@@ -139,16 +158,20 @@ func riotKeyState() string {
 }
 
 func (s *riotKeyStore) observe(key string, status int) {
-	current, _ := s.effective()
+	s.mu.Lock()
+	current, source := s.effectiveLocked()
 	if key == "" || current != key {
+		s.mu.Unlock()
 		return
 	}
-	s.mu.Lock()
-	wasUnverified := s.unverified
+	wasUnverified := source == "user" && s.unverified
 	if status == http.StatusUnauthorized || status == http.StatusForbidden {
 		s.invalidKey = key
 	}
-	if status == http.StatusOK {
+	if status == http.StatusOK && wasUnverified {
+		// Keep the credential and its verification state in one atomic,
+		// protected payload. A late response cannot certify a replacement key.
+		_ = s.writeStateLocked(key, false)
 		s.unverified = false
 	}
 	if status == http.StatusOK && s.invalidKey == key {
@@ -163,13 +186,18 @@ func (s *riotKeyStore) observe(key string, status int) {
 }
 
 func (s *riotKeyStore) writeLocked(key string) error {
+	return s.writeStateLocked(key, false)
+}
+
+func (s *riotKeyStore) writeStateLocked(key string, unverified bool) error {
 	if s.store == nil {
 		return errors.New("本地存储不可用")
 	}
 	var data []byte
 	var err error
 	if key != "" {
-		data, err = protectRiotUserKey([]byte(key))
+		plain, _ := json.Marshal(persistedRiotKey{Key: key, Unverified: unverified})
+		data, err = protectRiotUserKey(append([]byte(riotUserKeyStatePrefix), plain...))
 		if err != nil {
 			return errors.New("Riot Key 保存失败")
 		}
@@ -178,6 +206,7 @@ func (s *riotKeyStore) writeLocked(key string) error {
 		return errors.New("Riot Key 保存失败")
 	}
 	s.key, s.exists, s.rejected, s.invalidKey = key, true, false, ""
+	s.unverified = key != "" && unverified
 	return nil
 }
 
@@ -214,10 +243,7 @@ func (s *riotKeyStore) save(ctx context.Context, client *http.Client, key string
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	err = s.writeLocked(key)
-	if err == nil {
-		s.unverified = result == "network_error"
-	}
+	err = s.writeStateLocked(key, result == "network_error")
 	return result, err
 }
 

@@ -224,12 +224,12 @@
 
   function renderEmpty(icon, text, retry) {
     const icons = {
-      disconnected: "<use href=\"#dl-icon-key-47488b09cd\"/>",
-      search: "<use href=\"#dl-icon-key-ebcfe82f6c\"/>",
-      empty: "<use href=\"#dl-icon-key-24db67bd4a\"/>",
+      disconnected: "<use href=\"/icons.svg#dl-icon-key-47488b09cd\"/>",
+      search: "<use href=\"/icons.svg#dl-icon-key-ebcfe82f6c\"/>",
+      empty: "<use href=\"/icons.svg#dl-icon-key-24db67bd4a\"/>",
     };
     el.list.setAttribute("aria-busy", "false");
-    el.list.innerHTML = `<div class="friends-empty"><svg viewBox="0 0 24 24" aria-hidden="true">${icons[icon] || icons.empty}</svg><span>${text}</span>${retry ? '<button id="friends-retry" class="text-button" type="button">重试</button>' : ""}</div>`;
+    el.list.innerHTML = `<div class="friends-empty"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true">${icons[icon] || icons.empty}</svg><span>${text}</span>${retry ? '<button id="friends-retry" class="text-button" type="button">重试</button>' : ""}</div>`;
   }
 
   function renderFriendRow(friend, offlineSection) {
@@ -267,7 +267,7 @@
         ? `${section.total}`
         : `<b>${section.online}</b> / ${section.total}`;
       parts.push(`<button class="friends-group-head${section.offline ? " is-offline-group" : ""}" type="button" data-group-key="${section.key}" aria-expanded="${String(!collapsed)}">
-        <span class="friends-group-arrow" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>
+        <span class="friends-group-arrow" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24"><use href="/icons.svg#dl-icon-chevron-right"/></svg></span>
         <span>${escapeHTML(section.name)}</span>
         <span class="friends-group-count">${count}</span>
       </button>`);

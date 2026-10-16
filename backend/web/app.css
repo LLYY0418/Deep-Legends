@@ -1273,3 +1273,5 @@ span:has(>.function-icon){display:inline-flex;align-items:center;justify-content
 .chroma-mini-lock>.function-icon{width:var(--icon-sm)!important;height:var(--icon-sm)!important;min-width:var(--icon-sm);flex-basis:var(--icon-sm)!important}
 
 .af-capsule .af-capsule-remove>.function-icon{width:var(--icon-sm)!important;height:var(--icon-sm)!important;min-width:var(--icon-sm);flex-basis:var(--icon-sm)!important}
+
+:is(.loot-category-icon,.loot-art) .function-icon{width:var(--icon-hero)!important;height:var(--icon-hero)!important;min-width:var(--icon-hero);flex-basis:var(--icon-hero)!important}

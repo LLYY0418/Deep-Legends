@@ -252,8 +252,8 @@ func TestR280RecoveryClearsFailuresAndBroadcastsOnce(t *testing.T) {
 	rt := p.client.Transport.(*automaticNetworkTransport)
 	rt.failed = true
 	rt.recover = a.recoverExternalNetwork
-	rt.markSuccess()
-	rt.markSuccess()
+	rt.markSuccess(rt.generation)
+	rt.markSuccess(rt.generation)
 	if len(events) != 1 || !strings.Contains(<-events, "riot-relay-recovered") {
 		t.Fatal("recovery event count")
 	}

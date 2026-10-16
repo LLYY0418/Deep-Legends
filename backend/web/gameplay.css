@@ -2322,6 +2322,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .summoner-highlight.is-pending-highlight .skeleton-square{width:64px;height:64px}
 .summoner-highlight.is-pending-highlight figcaption .skeleton-line{width:80px}
 .career-pending .recent-ranked-content{width:100%;display:flex}
+.career-pending .recent-ranked-ring{border-radius:50%}
 .career-pending .recent-ranked-ring::before{display:none}
 .career-pending .ability-radar-wrap{width:100%;aspect-ratio:320/275}
 .career-pending:has(.recent-ranked-content),.career-pending:has(.ability-radar-wrap){display:block;padding:0}

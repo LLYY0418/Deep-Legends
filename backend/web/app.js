@@ -3478,17 +3478,17 @@
   function lootCategorySlug(category) { return ({ "材料": "material", "宝箱": "chest", "英雄": "champion", "皮肤": "skin", "小小英雄": "companion", "永恒星碑": "eternal", "表情": "emote", "守卫": "ward", "图标": "icon" })[category] || "material"; }
   function lootCategoryIcon(category) {
     const paths = {
-      "宝箱": "<use href=\"#dl-icon-key-0af0a5992b\"/>",
-      "材料": "<use href=\"#dl-icon-key-f58efcfbd7\"/>",
-      "英雄": "<use href=\"#dl-icon-key-428fb77e75\"/>",
-      "皮肤": "<use href=\"#dl-icon-key-92b65543ef\"/>",
-      "小小英雄": "<use href=\"#dl-icon-key-f3326853f7\"/>",
-      "永恒星碑": "<use href=\"#dl-icon-key-3a1a25b9f4\"/>",
-      "表情": "<use href=\"#dl-icon-key-9881ea50fc\"/>",
-      "守卫": "<use href=\"#dl-icon-key-b20a737253\"/>",
-      "图标": "<use href=\"#dl-icon-key-a149777c59\"/>",
+      "宝箱": "<use href=\"/icons.svg#dl-icon-key-0af0a5992b\"/>",
+      "材料": "<use href=\"/icons.svg#dl-icon-key-f58efcfbd7\"/>",
+      "英雄": "<use href=\"/icons.svg#dl-icon-key-428fb77e75\"/>",
+      "皮肤": "<use href=\"/icons.svg#dl-icon-key-92b65543ef\"/>",
+      "小小英雄": "<use href=\"/icons.svg#dl-icon-key-f3326853f7\"/>",
+      "永恒星碑": "<use href=\"/icons.svg#dl-icon-key-3a1a25b9f4\"/>",
+      "表情": "<use href=\"/icons.svg#dl-icon-key-9881ea50fc\"/>",
+      "守卫": "<use href=\"/icons.svg#dl-icon-key-b20a737253\"/>",
+      "图标": "<use href=\"/icons.svg#dl-icon-key-a149777c59\"/>",
     };
-    return `<svg viewBox="0 0 24 24" focusable="false">${paths[category] || paths["材料"]}</svg>`;
+    return `<svg class="function-icon" viewBox="0 0 24 24" focusable="false">${paths[category] || paths["材料"]}</svg>`;
   }
   function playerName(summoner) { const name = summoner.gameName || summoner.displayName || "当前召唤师"; return `${name}${summoner.tagLine ? `#${summoner.tagLine}` : ""}`; }
   function rewardStatusLabel(value) { return ({ PENDING_SELECTION: "待选择", PENDING: "待领取", CREATED: "待处理" })[String(value || "").toUpperCase()] || value || "待处理"; }

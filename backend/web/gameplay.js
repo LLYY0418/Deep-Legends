@@ -1085,6 +1085,7 @@
     clearTimeout(tab.quotaRetry?.timer);
     tab.quotaRetry = null;
     const requestToken = Number(tab.overviewRequestToken || 0) + 1;
+    cancelOverviewProgress(tab);
     tab.overviewRequestToken = requestToken;
     tab.detailRetryRunning=retryDetails;
     tab.error = "";
@@ -1303,6 +1304,7 @@
 	} finally {
 	  const reloadAfterAppend = tab.overviewRequestToken === requestToken && append && tab.reloadAfterAppend;
       if (tab.overviewRequestToken === requestToken) {
+        cancelOverviewProgress(tab);
         if (!append) {delete tab.overviewMatchSnapshot;clearTimeout(tab.historyWaitTimer);}
         tab.loading = false;
       if(tab.lpRefreshPending){tab.lpRefreshPending=false;queueMicrotask(()=>{if(!tab.closed)void loadOverview(tab,true);});}
@@ -1534,6 +1536,7 @@
     return !tab.closed && !state.destroyed && !document.hidden && (tab.overlay ? state.overlay.at(-1)===tab && !nodes.playerOverlay.hidden : state.section==='overview' && !state.overlay.length) && Boolean(overviewContainer(tab));
   }
   function cancelHistoryRecovery(tab) {
+    cancelOverviewProgress(tab);
     globalThis.deepLegendsHistoryRecovery?.cancel(tab);
     clearTimeout(tab?.quotaCountdownTimer);if(tab)tab.quotaCountdownTimer=0;
     clearTimeout(tab?.searchCountdownTimer);
@@ -2247,6 +2250,7 @@
     }
     if (container._overviewViewTab === tab) return;
     const previous = container._overviewViewTab;
+    cancelOverviewProgress(previous);
     if (previous && (!previous.closed || previous.current) && (state.tabs.includes(previous) || state.overlay.includes(previous))) {
       const content = container.ownerDocument.createDocumentFragment();
       while (container.firstChild) content.appendChild(container.firstChild);
@@ -2424,19 +2428,35 @@
 
   function renderSelfIdentityHeader(tab) {return renderSummonerStrip(null,tab,true);}
 
-  function patchOverviewProgress(tab) {
+  function cancelOverviewProgress(tab) {
+    if(!tab)return;
+    if(tab.progressFrame)cancelAnimationFrame(tab.progressFrame);
+    tab.progressFrame=0;
+    tab.progressFrameGeneration=Number(tab.progressFrameGeneration || 0)+1;
+  }
+
+  function patchOverviewProgress(tab, requestToken = tab.overviewRequestToken) {
+    if(tab.closed || state.destroyed || tab.overviewRequestToken!==requestToken)return;
     const container=overviewContainer(tab);
+    if(!container || container._overviewViewTab!==tab || tab.overlay && (state.overlay.at(-1)!==tab || nodes.playerOverlay.hidden)){
+      tab.overviewProgressPending=true;
+      return;
+    }
+    if(tab.overviewSubpage || tab.advancedMenu?.open){tab.overviewProgressPending=true;tab.overviewRenderDeferred=true;return;}
     if(!container?.querySelector('.overview-layout')){rerenderTab(tab,'stream-first');return;}
     const template=document.createElement('template'),strip=renderSummonerStrip(tab.data,tab);
-    if(container._stripHTML!==strip){template.innerHTML=strip;const fresh=template.content.firstElementChild;container.querySelector('.summoner-strip')?.replaceWith(fresh);container._stripHTML=strip;bindOverviewContent(fresh,tab);prepareImages(fresh);}
+    if(container._stripHTML!==strip){template.innerHTML=strip;const fresh=template.content.firstElementChild;container.querySelector('.summoner-strip')?.replaceWith(fresh);container._stripHTML=strip;bindOverviewContent(fresh,tab,container);prepareImages(fresh);}
     updateCareerCards(tab,'stream');
     const list=container.querySelector('.match-list');reconcileFilteredMatchList(list,tab);
     syncMatchFilterPending(container.querySelector('.match-filterbar'),tab);
     reportOverviewCardReady(container,tab);reportDeferredMatchesCard(tab);
+    tab.overviewProgressPending=false;
   }
   function scheduleOverviewProgress(tab) {
     if(tab.progressFrame)return;
-    tab.progressFrame=requestAnimationFrame(()=>{tab.progressFrame=0;if(!tab.closed && !state.destroyed)patchOverviewProgress(tab);});
+    const requestToken=tab.overviewRequestToken;
+    const generation=tab.progressFrameGeneration=Number(tab.progressFrameGeneration || 0)+1;
+    tab.progressFrame=requestAnimationFrame(()=>{if(tab.progressFrameGeneration!==generation)return;tab.progressFrame=0;patchOverviewProgress(tab,requestToken);});
   }
 
   function renderOverviewBodyContent(container, tab) {
@@ -3085,7 +3105,7 @@
       if(old)old.replaceWith(fresh);else root.append(fresh);changed.push(fresh);
     }
     container._careerSignature=null;
-    for(const fresh of changed){bindOverviewContent(fresh,tab);applyRenderedMetricStyles(fresh);prepareImages(fresh);}
+    for(const fresh of changed){bindOverviewContent(fresh,tab,container);applyRenderedMetricStyles(fresh);prepareImages(fresh);}
   }
 
   function renderSeasonDataNote(progress, queue, games, ranks = []) {
@@ -3529,6 +3549,8 @@
 
   function bindOverviewShareControls(root, container, tab) {
     for (const button of root?.querySelectorAll("[data-generate-overview-share]") || []) {
+      if(button._overviewShareBound)continue;
+      button._overviewShareBound=true;
       button.addEventListener("click", () => generateOverviewShare(container, tab));
     }
   }
@@ -5669,7 +5691,7 @@
     }
   }
 
-  function bindOverviewContent(container, tab) {
+  function bindOverviewContent(container, tab, overview = container) {
     bindScoreDetails(container,tab);
     requestAnimationFrame(()=>{if(container.isConnected)fitMatchTags(container,true);});
     setTimeout(()=>hydrateVisibleMatchTags(container,tab),0);
@@ -5680,7 +5702,7 @@
     container.querySelector("[data-complete-overview]")?.addEventListener("click", () => loadOverview(tab, true, false, true, true));
     const rerender = () => rerenderTab(tab,"bindOverviewContent");
     bindPlayerLinks(container, tab);
-    bindOverviewShareControls(container, container, tab);
+    bindOverviewShareControls(container, overview, tab);
     container.querySelector("[data-open-career-dialog]")?.addEventListener("click", (event) => openCareerDialog(container, tab, event.currentTarget));
     container.querySelector("[data-gameplay-retry]")?.addEventListener("click", () => historyServiceState(tab)?retryHistoryRegion(tab):loadOverview(tab, true));
     bindMatchFilterControls(container, tab);

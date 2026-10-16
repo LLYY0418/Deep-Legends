@@ -20,6 +20,7 @@ async function run(){await withBrowser(async({page,results,errors})=>{
   const heights=await p.evaluate("[...document.querySelectorAll('.match-entry')].slice(0,5).map((n,i)=>({before:__r280OriginalHeights[i],after:n.getBoundingClientRect().height,collapsed:n.hasAttribute('data-virtual-match')}))");for(const h of heights){assert(h.collapsed);assert(Math.abs(h.before-h.after)<=1,'placeholder height '+JSON.stringify(h));}
   results.push({kind:'virtualization',zoom,samples,heights});
  }
+ await require('./r280-progress-share-checks.cjs')(p,results);
  // Match the real wire contract: stable revisions, a pending page, then ten deltas.
  await p.evaluate("(()=>{const t=__r278Game.activeTab(),c=document.getElementById('overview-content');document.documentElement.style.setProperty('--ui-zoom','1');document.documentElement.dataset.uiScale='1';document.getElementById('app-scroll').scrollTop=0;c.querySelector('.match-list')?._virtualObserver?.disconnect();c.replaceChildren();delete c.dataset.matchTierScope;t.current=false;t.region='kr';__r278Game.state.activeGroup='kr';__r278Game.state.activeTabs.kr=t.key;__r278Game.renderPlayerTabWorkspace('kr');t.loading=true;t.initialPagePending=true;t.matchesReceived=false;t.recentStatsReceived=false;t.data={...__r280Overview,player:{...__r280Overview.player,region:'kr'},matches:[],historyRequested:0,pagination:{count:10,partial:true}};__r278Game.renderOverviewBodyContent(c,t);return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()");
  let perf;

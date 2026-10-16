@@ -86,6 +86,8 @@ type automaticNetworkTransport struct {
 	proxy, direct     http.RoundTripper
 	until             time.Time
 	failed, recovered bool
+	recovering        bool
+	generation        uint64
 	recoveryPending   bool
 	count             int
 	choices           map[string]networkChoice
@@ -162,6 +164,8 @@ func (t *automaticNetworkTransport) refreshProxy(raw string) {
 	t.recoveryPending = t.failed
 	t.recovered = false
 	t.proxyURL = raw
+	t.generation++
+	t.recovering = false
 	t.until = time.Time{}
 	t.failed = false
 	t.choices = map[string]networkChoice{}
@@ -175,9 +179,9 @@ func (t *automaticNetworkTransport) CloseIdleConnections() {
 		}
 	}
 }
-func (t *automaticNetworkTransport) markSuccess() {
+func (t *automaticNetworkTransport) markSuccess(generation uint64) {
 	t.mu.Lock()
-	notify := (t.failed || t.recoveryPending) && !t.recovered
+	notify := t.generation == generation && (t.failed || t.recoveryPending) && !t.recovered
 	if notify {
 		t.recovered = true
 		t.recoveryPending = false
@@ -213,10 +217,24 @@ func (t *automaticNetworkTransport) roundTripRoutes(r *http.Request, proxyRoute,
 	trace, _ := r.Context().Value(networkTraceKey{}).(*networkTrace)
 	t.mu.Lock()
 	raw := t.proxyURL
-	skip := t.now().Before(t.until)
+	generation := t.generation
+	skip := t.now().Before(t.until) || t.failed && t.recovering
+	recovery := t.settings.Mode == "auto" && raw != "" && t.failed && !skip
+	if recovery {
+		t.recovering = true
+	}
 	choice := t.choices[networkGroup(r.URL.Hostname())]
 	t.mu.Unlock()
-	if t.settings.Mode == "direct" || raw == "" || skip || choice.direct {
+	if recovery {
+		defer func() {
+			t.mu.Lock()
+			if t.generation == generation {
+				t.recovering = false
+			}
+			t.mu.Unlock()
+		}()
+	}
+	if t.settings.Mode == "direct" || raw == "" || skip || choice.direct && !recovery {
 		if trace != nil && raw != "" {
 			trace.proxy = "fallback-direct"
 		}
@@ -225,7 +243,7 @@ func (t *automaticNetworkTransport) roundTripRoutes(r *http.Request, proxyRoute,
 			trace.stage = networkErrorStage(err)
 		}
 		if err == nil {
-			t.markSuccess()
+			t.markSuccess(generation)
 		}
 		return res, err
 	}
@@ -246,14 +264,19 @@ func (t *automaticNetworkTransport) roundTripRoutes(r *http.Request, proxyRoute,
 			return nil, &proxyConnectionError{proxy.Host, err}
 		}
 		t.mu.Lock()
-		t.until = t.now().Add(time.Minute)
-		if !t.failed {
-			t.recovered = false
+		current := t.generation == generation
+		if current {
+			t.until = t.now().Add(time.Minute)
+			if !t.failed {
+				t.recovered = false
+			}
+			t.failed = true
+			t.count++
 		}
-		t.failed = true
-		t.count++
 		t.mu.Unlock()
-		t.emit("unreachable")
+		if current {
+			t.emit("unreachable")
+		}
 		if r.Body != nil && r.GetBody == nil {
 			return nil, err
 		}
@@ -271,21 +294,27 @@ func (t *automaticNetworkTransport) roundTripRoutes(r *http.Request, proxyRoute,
 			trace.proxy = "fallback-direct"
 		}
 		res, err = directRoute.RoundTrip(retry)
-		if err == nil {
-			t.markSuccess()
+		if err == nil && current {
+			t.markSuccess(generation)
 		}
 	} else if err == nil {
 		t.mu.Lock()
-		wasFailed := t.failed
+		current := t.generation == generation
+		wasFailed := current && t.failed
 		if wasFailed {
 			t.failed = false
 			t.until = time.Time{}
+			t.recovering = false
+			t.generation++
+			t.choices = map[string]networkChoice{}
 		}
 		t.mu.Unlock()
 		if wasFailed && t.recover != nil {
 			t.recover()
 		}
-		t.emit("ok")
+		if current {
+			t.emit("ok")
+		}
 	}
 	if trace != nil {
 		trace.stage = networkErrorStage(err)
@@ -308,6 +337,7 @@ func (t *automaticNetworkTransport) probeGroup(group string) {
 	c.probing = true
 	t.choices[group] = c
 	raw := t.proxyURL
+	generation := t.generation
 	endpoint := t.probes[group]
 	t.mu.Unlock()
 	if endpoint == "" {
@@ -319,9 +349,10 @@ func (t *automaticNetworkTransport) probeGroup(group string) {
 	go func() {
 		defer recoverPanic("automaticNetworkTransport.probeGroup")
 		type result struct {
-			direct   bool
-			duration time.Duration
-			ok       bool
+			direct      bool
+			duration    time.Duration
+			ok          bool
+			proxyFailed bool
 		}
 		ch := make(chan result, 2)
 		for _, direct := range []bool{false, true} {
@@ -346,28 +377,43 @@ func (t *automaticNetworkTransport) probeGroup(group string) {
 				if res != nil {
 					res.Body.Close()
 				}
-				outcome = result{d, time.Since(start), ok}
+				proxy, _ := url.Parse(raw)
+				outcome = result{direct: d, duration: time.Since(start), ok: ok, proxyFailed: !d && proxyConnectFailed(err, proxy)}
 			}(direct)
 		}
 		a, b := <-ch, <-ch
+		proxyFailed := a.proxyFailed || b.proxyFailed
 		winner := a
 		if !a.ok || b.ok && b.duration < a.duration {
 			winner = b
 		}
 		t.mu.Lock()
-		if t.proxyURL == raw && winner.ok {
+		current := t.proxyURL == raw && t.generation == generation
+		if current && winner.ok {
 			t.choices[group] = networkChoice{direct: winner.ok && winner.direct, at: t.now()}
-		} else {
+		} else if current {
 			delete(t.choices, group)
 		}
+		if current && proxyFailed {
+			if !t.failed {
+				t.recovered = false
+			}
+			t.failed = true
+			if t.until.IsZero() {
+				t.until = t.now().Add(time.Minute)
+			}
+		}
 		t.mu.Unlock()
-		if winner.ok {
-			if winner.direct {
+		if current && proxyFailed {
+			t.emit("unreachable")
+		}
+		if winner.ok && current {
+			if !proxyFailed && winner.direct {
 				t.emit("direct")
-			} else {
+			} else if !proxyFailed {
 				t.emit("ok")
 			}
-			t.markSuccess()
+			t.markSuccess(generation)
 		}
 	}()
 }

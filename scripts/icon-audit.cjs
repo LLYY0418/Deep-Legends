@@ -11,14 +11,18 @@ function audit(){
   if(![14,18,22,40].includes(size))issues.push('size '+size);
   if(style.strokeWidth!=='1.75px' || u?.vectorEffect!=='non-scaling-stroke')issues.push('stroke '+style.strokeWidth+' '+u?.vectorEffect);
   if(!use?.getAttribute('href')?.startsWith('/icons.svg#dl-icon-'))issues.push('source '+n.outerHTML);
+  const reference=use?.getAttribute('href')?.split('#')[1],drawing=n.getBBox();
+  if(!window.__r280SpriteIDs?.has(reference))issues.push('reference '+reference);
+  if(!(drawing.width>0 && drawing.height>0))issues.push('empty drawing '+reference);
   const prior=groups.get(key);if(prior && (Math.abs(prior.width-r.width)>.5 || Math.abs(prior.height-r.height)>.5))issues.push('unequal '+key+' '+n.outerHTML.slice(0,180));groups.set(key,r);
-  return {module:module(n),size,width:r.width,height:r.height,stroke:style.strokeWidth,vector:u?.vectorEffect};});
+  return {module:module(n),size,width:r.width,height:r.height,stroke:style.strokeWidth,vector:u?.vectorEffect,reference,drawing:{width:drawing.width,height:drawing.height}};});
  for(const button of document.querySelectorAll('button[aria-label]'))if(visible(button) && /^[^\p{L}\p{N}\s]$/u.test(button.textContent.trim()) && !button.querySelector('svg'))issues.push('text icon '+button.outerHTML);
  for(const svg of document.querySelectorAll('svg'))if(visible(svg) && !svg.classList.contains('function-icon') && !svg.matches('.ability-radar,.tier-badge,.multikill-badge,.score-sparkline') && !svg.closest('.mk-tag,.score-sparkline,.tier-badge'))issues.push('uncatalogued '+svg.outerHTML.slice(0,150));
  return {count:icons.length,rows,issues};
 }
 async function run(){await withBrowser(async({page,out,results,errors})=>{
  const p=await page('dark');await p.until("document.querySelector('.match-entry') && !__r278Game.activeTab().loading");
+ await p.evaluate("fetch('/icons.svg').then(r=>r.text()).then(xml=>{__r280SpriteIDs=new Set([...new DOMParser().parseFromString(xml,'image/svg+xml').querySelectorAll('symbol[id]')].map(n=>n.id));})");
  for(const zoom of [1,1.4,2]){
   await p.evaluate(`document.documentElement.style.setProperty('--ui-zoom','${zoom}');document.documentElement.dataset.uiScale='${zoom}'`);
   for(const section of ['overview','champions','live','favorites','suite','settings']){
@@ -41,6 +45,22 @@ async function run(){await withBrowser(async({page,out,results,errors})=>{
    if(zoom===2)await p.shot('icons-'+name);assert.deepEqual(report.issues,[],name+' '+JSON.stringify(report.issues));await p.evaluate(close);
   }
   await p.call('Emulation.setDeviceMetricsOverride',{width:1500,height:1100,deviceScaleFactor:1.75,mobile:false});
+  await p.evaluate("(()=>{const a=__r278App;window.__r280Account={summoner:__r280Overview.player,account:{loot:['材料','宝箱','英雄','皮肤','小小英雄','永恒星碑','表情','守卫','图标'].map((category,i)=>({category,lootId:'review-'+i,displayName:category,count:1})),rewards:[],capabilities:[]}};a.activateSection('favorites');a.activateFavoritesPage('account');return a.loadAccount();})()");
+  await p.until("document.querySelectorAll('.loot-category-icon').length===9");
+  await p.evaluate("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
+  const loot=await p.evaluate('('+audit.toString()+')()');results.push({zoom,section:'collection-account',...loot});assert.deepEqual(loot.issues,[],'collection-account '+JSON.stringify(loot.issues));
+  if(zoom===2)await p.shot('icons-collection-account');
+  await p.evaluate("window.__r280FriendsPayload={groups:[],friends:[]};__r280Friends.setOpen(true)");
+  await p.until("!__r280Friends.state.loading");
+  for(const empty of ['disconnected','search','empty']){
+   await p.evaluate(`(()=>{const f=__r280Friends;f.state.connected=${empty!=='disconnected'};f.state.filter='${empty==='search'?'no-match':''}';f.state.friends=[];f.state.groups=[];f.state.loading=false;f.state.error='';f.state.stale=false;f.render();return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()`);
+   const report=await p.evaluate('('+audit.toString()+')()');results.push({zoom,section:'friends-'+empty,...report});assert.deepEqual(report.issues,[],empty+' '+JSON.stringify(report.issues));
+   if(zoom===2)await p.shot('icons-friends-'+empty);
+  }
+  await p.evaluate("__r280Friends.state.connected=true;__r280Friends.state.filter='';window.__r280FriendsPayload=null;__r280Friends.loadFriends('audit')");
+  await p.until("!__r280Friends.state.loading && document.querySelector('.friends-group-head')");
+  const populated=await p.evaluate('('+audit.toString()+')()');results.push({zoom,section:'friends-populated',...populated});assert.deepEqual(populated.issues,[],'friends-populated '+JSON.stringify(populated.issues));
+  await p.evaluate("__r280Friends.setOpen(false);__r278App.activateFavoritesPage('collection')");
  }
  // Both mutations must be detected in the actual browser.
  await p.evaluate("document.querySelector('.topbar .function-icon').style.setProperty('stroke-width','2.2','important')");
