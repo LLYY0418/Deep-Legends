@@ -10,6 +10,8 @@ module.exports=async({evaluate,until,click,call,shot,ready,results})=>{
    let snapshot=error.topbarSample||error.pageWaitSnapshot||sampledTopbar;
    try{snapshot={...snapshot,current:await evaluate("(()=>{const b=document.querySelector('.topbar');return {level:b?.dataset.topbarCompact,settled:b?.dataset.topbarSettled,sidebar:document.documentElement.dataset.sidebar,loadedMs:performance.now(),viewport:innerWidth,font:b&&getComputedStyle(b).fontFamily}})()")};}catch{}
    caseStatus.set(key,'failed');failures.push({...context,status:'failed',error:error.message,stack:error.stack,snapshot});
+   // Deliberate mutants need their first real assertion, while the baseline collects every independent failure.
+   if(process.env.R277_MUTATION_PROBE==='1'){error.failures=[...failures];throw error;}
    try{await evaluate("(()=>{if(window.__r278DispatchSearch)window.dispatchEvent=__r278DispatchSearch;if(window.__r277NativeIdle)window.requestIdleCallback=__r277NativeIdle;return true})()");}catch{}
   }
  };
