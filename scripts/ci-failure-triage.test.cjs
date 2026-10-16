@@ -222,3 +222,27 @@ test("real Go failure keeps its preceding diagnostic instead of the following te
   assert.equal(classify(rows[0].message), "wait-timeout");
   assert.doesNotMatch(rows[0].message, /TestNext/);
 });
+
+test('Go bare filenames resolve through tracked sources instead of assuming the backend package', () => {
+  const rows=parseLog('=== RUN   TestGuard\n    guard_test.go:9: controlled assertion failure\n--- FAIL: TestGuard (0.01s)', 'job.log');
+  assert.equal(rows[0].file,'scripts/testcaptureguard/guard_test.go');
+  assert.equal(rows[0].line,9);
+});
+test('Go unknown filenames remain unknown rather than inventing a backend path', () => {
+  const rows=parseLog('=== RUN   TestMissing\n    not_a_tracked_fixture_test.go:7: controlled assertion failure\n--- FAIL: TestMissing (0.01s)', 'job.log');
+  assert.equal(rows[0].file,'');
+  assert.match(rows[0].message,/not_a_tracked_fixture_test.go:7/);
+});
+
+test('Go Windows absolute source paths keep both the repository file and line', () => {
+  const rows=parseLog('=== RUN   TestWindowsPath\n    C:\\work tree\\repo\\backend\\r196_test.go:9: controlled failure\n--- FAIL: TestWindowsPath (0.01s)', 'job.log');
+  assert.equal(rows[0].file,'backend/r196_test.go');
+  assert.equal(rows[0].line,9);
+});
+
+test('Go silent failures cannot borrow the following test diagnostic', () => {
+  const rows=parseLog('=== RUN   TestSilent\n--- FAIL: TestSilent (0.01s)\n=== RUN   TestNext\n    guard_test.go:20: unrelated next test diagnostic\n--- PASS: TestNext (0.01s)', 'job.log');
+  assert.equal(rows[0].file,'');
+  assert.match(rows[0].message,/TestSilent/);
+  assert.doesNotMatch(rows[0].message,/TestNext|guard_test\.go|unrelated/);
+});

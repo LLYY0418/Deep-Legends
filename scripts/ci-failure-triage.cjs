@@ -35,6 +35,17 @@ function relFile(file) {
   return cut >= 0 ? normalised.slice(cut) : normalised.replace(/^\.\//, "");
 }
 
+// A bare Go filename does not identify a package. Resolve only a unique
+// tracked source; missing/ambiguous sources stay unknown in the facts summary.
+function goSourceFile(file) {
+  file=relFile(file);
+  if(file.includes('/'))return file;
+  try {
+    const files=cp.execFileSync('git',['ls-files','--','**/'+file,file],{cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore']}).split(/\r?\n/).filter(Boolean);
+    return files.length===1?files[0]:'';
+  } catch (_) { return ''; }
+}
+
 // Parsers return [{kind, name, file, message, evidence}]
 function parseRendererJson(data, evidence) {
   const rows = [];
@@ -70,11 +81,13 @@ function parseLog(text, evidence) {
     } else if ((m = /^\s*--- FAIL: (\w+)/.exec(line))) {
       // go test prints t.Fatal diagnostics before --- FAIL, not after it.
       let start = i;
-      while (start > 0 && !/^\s*(?:=== RUN|--- (?:PASS|FAIL|SKIP):)/.test(lines[start - 1])) start--;
-      const before = lines.slice(start, i).filter((s) => /^\s+\S+_test\.go:\d+:/.test(s));
-      const detail = (before.length ? before : lines.slice(i + 1, i + 6)).join("\n").slice(0, 600);
-      const located = /(?:^|\s)([\w./\-]+_test\.go):(\d+):/.exec(detail);
-      const file = located ? (located[1].includes("/") ? relFile(located[1]) : "backend/" + located[1]) : "";
+      while (start > 0 && !/^\s*(?:=== |--- )/.test(lines[start - 1])) start--;
+      const before = lines.slice(start, i).filter((s) => /^\s+.+_test\.go:\d+:/.test(s));
+      const after=[];
+      for(let at=i+1;at<Math.min(lines.length,i+6)&&!/^\s*(?:=== |--- |not ok |panic:)/.test(lines[at]);at++)after.push(lines[at]);
+      const detail = (before.length ? before : after).join("\n").slice(0, 600) || line.trim();
+      const located = /^\s*(.+?_test\.go):(\d+):/m.exec(detail);
+      const file = located ? goSourceFile(located[1]) : "";
       rows.push({ kind: "go-test", name: m[1], file, message: detail, evidence, ...(located ? { line: Number(located[2]) } : {}) });
     } else if ((m = /^not ok \d+ - (.+)$/.exec(line))) {
       const detail = lines.slice(i + 1, i + 14).join("\n");
