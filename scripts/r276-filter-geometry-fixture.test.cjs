@@ -11,7 +11,7 @@ function fixture(){
  dom.window.requestAnimationFrame=callback=>{frames.push(callback);return frames.length;};Object.defineProperty(document,'fonts',{value:{ready:Promise.resolve()}});
  const source=fs.readFileSync(path.join(__dirname,'../backend/web/gameplay.js'),'utf8');const begin=source.indexOf('  function fitMatchTags('),end=source.indexOf('\n  function matchTagsBackgroundAllowed',begin);assert(begin>=0&&end>begin);
  const ResizeObserver=class{constructor(callback){this.callback=callback;observers.push(this);}observe(node){this.node=node;}};
- const fit=new Function('bindMatchTagsPopover','ResizeObserver',source.slice(begin,end)+'\nreturn fitMatchTags;')(()=>({anchor:null,close(){}}),ResizeObserver);
+ const fit=new dom.window.Function('bindMatchTagsPopover','ResizeObserver',source.slice(begin,end)+'\nreturn fitMatchTags;')(()=>({anchor:null,close(){}}),ResizeObserver);
  for(const node of document.querySelectorAll('.match-tags-collection'))Object.defineProperty(node,'clientWidth',{get:()=>document.body.style.overflow==='hidden'?136:120});
  for(const tag of document.querySelectorAll('[data-match-tag]'))tag.getBoundingClientRect=()=>({width:30});
  fit(root); // Real production fit/ResizeObserver callback, without source edits.
@@ -26,7 +26,7 @@ function fixture(){
  return {dom,root,arm,frame,evaluate,get mutations(){return mutations},get details(){return details},get changes(){return changes},get pendingFrame(){return frames.length>0}};
 }
 test('old observer includes fourteen real tag-fit writes from modal scroll-lock',async t=>{
- const h=fixture();t.after(()=>h.dom.window.close());h.arm();await h.frame();h.dom.window.document.querySelector('[data-af-option="103"]').click();await Promise.resolve();assert.equal(h.mutations,14);assert(h.details.every(n=>n==='match-tags-more'));assert.equal(h.changes,0);
+ const h=fixture();t.after(()=>h.dom.window.close());h.arm();await h.frame();await h.frame();h.dom.window.document.querySelector('[data-af-option="103"]').click();await Promise.resolve();assert.equal(h.mutations,14);assert(h.details.every(n=>n==='match-tags-more'));assert.equal(h.changes,0);
 });
 test('settled geometry keeps the original zero draft mutations and applies only on close',async t=>{
  const h=fixture();t.after(()=>h.dom.window.close());let done=false;
