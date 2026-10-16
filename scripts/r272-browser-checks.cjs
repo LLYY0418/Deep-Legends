@@ -12,7 +12,14 @@ module.exports=async({evaluate,until,click,call,shot,ready,results,errors})=>{
   await evaluate('new Promise(r=>setTimeout(r,Math.max(0,800-(performance.now()-__r272Start))))');await shot('r272-'+theme+'-'+(region||'cn')+'-skeleton');
   await evaluate('new Promise(r=>setTimeout(r,Math.max(0,1600-(performance.now()-__r272Start))))');await until("document.querySelector('#overview-content')._overviewViewTab?.data?.matches.length===20 && !document.querySelector('#overview-content')._overviewViewTab.loading");
   const samples=await evaluate('__r272Samples');assert.equal(samples.length,4);for(const sample of samples){assert.doesNotMatch(sample.text,/没有符合条件的对局|已展示全部可查询战绩|已统计 0 场|0\.00:1/);assert(sample.pending>0,JSON.stringify({region,at:sample.at,pending:sample.pending}));delete sample.text;}
+  try {
   const perf=await evaluate("(()=>{const tasks=__r272Tasks.filter(t=>t.start>=__r272Start);return {total:tasks.reduce((n,t)=>n+t.duration,0),max:Math.max(0,...tasks.map(t=>t.duration)),requests:__r272Requests.slice(-1)}})()");assert.equal(perf.requests[0].cards,'1');assert.equal(perf.requests[0].accept,'application/x-ndjson');assert(perf.total<=800,JSON.stringify(perf));assert(perf.max<=200,JSON.stringify(perf));results.push({r272:'cards-real-decoder',region,theme,samples,perf});await evaluate('window.__r272Start=0');
+  } catch(error) {
+   if(error.code!=='ERR_ASSERTION')throw error;
+   // Collect only after the original assertion failed; do not extend or filter its window.
+   let snapshot;try {snapshot=await evaluate("(()=>{const startedAt=window.__r272Start;return {sample:'after-failure',startedAt,observedAt:performance.now(),tasks:__r272Tasks.filter(t=>t.start>=startedAt).map(t=>({...t,offset:t.start-startedAt})),readyState:document.readyState,fontStatus:document.fonts.status};})()");} catch(diagnosticError) {snapshot={sample:'unavailable',error:String(diagnosticError)};}
+   results.push({r272:'cards-performance-failure',theme,region,samples,error:String(error),errorCode:error.code,snapshot});throw error;
+  }
  }
  await evaluate("window.__r272Root=document.querySelector('#overview-content');window.__r272Tab=__r272Root._overviewViewTab;window.__r272List=__r272Root.querySelector('.match-list');window.__r272Entry=__r272List.firstElementChild;window.__r272Tab.data.pagination.hasMore=true;window.__r272Expire=true;window.dispatchEvent(new CustomEvent('deep-legends:riot-key-updated'));document.querySelector('#app-scroll').scrollTop=1200;window.__r272Scroll=document.querySelector('#app-scroll').scrollTop;true");
  await evaluate("__r266Game.updateCareerCards(__r272Tab,'opgg_season');__r266Game.loadOverview(__r272Tab,false,true,true);true");await until('!__r272Tab.loadingMore');
