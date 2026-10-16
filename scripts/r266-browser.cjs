@@ -118,9 +118,8 @@ async function start(){
     const keepTrace=process.env.R276_TRACE || clickEvidence.listMutations>0 || clickEvidence.tasks.reduce((n,t)=>n+t.duration,0)>100;
     if(keepTrace)fs.writeFileSync(path.join(out,`${theme}-${width}-click-evidence.json`),JSON.stringify(clickEvidence,null,2));
     const finished=new Promise(resolve=>{const handler=e=>{const m=JSON.parse(e.data);if(m.method==='Tracing.tracingComplete'){ws.removeEventListener('message',handler);resolve(m.params.stream);}};ws.addEventListener('message',handler);});
-    await send('Tracing.end');const stream=await finished;let trace='';
-    for(;;){const part=await send('IO.read',{handle:stream});trace+=part.base64Encoded?Buffer.from(part.data,'base64').toString():part.data;if(part.eof)break;}
-    await send('IO.close',{handle:stream});if(keepTrace)fs.writeFileSync(path.join(out,`${theme}-${width}-click-trace.json`),trace);
+    await send('Tracing.end');const stream=await finished;
+    const trace=await require('./lib/cdp-trace.cjs').readTraceStream(send,stream,keepTrace);if(keepTrace)fs.writeFileSync(path.join(out,`${theme}-${width}-click-trace.json`),trace);
   }
   assert.equal(await evaluate('__r266ListMutations'),0);const clickTasks=clickEvidence.tasks.reduce((n,t)=>n+t.duration,0);assert(clickTasks<=100,'click long tasks '+clickTasks);
   for(const id of [238,157,875,145])await click('[data-af-option="'+id+'"]');assert.equal(await evaluate('__r266ListMutations'),0);for(const id of [157,875,145])await click('[data-af-option="'+id+'"]');

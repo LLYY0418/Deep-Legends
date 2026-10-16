@@ -59,9 +59,14 @@ async function run(){await withBrowser(async({page,out,results,errors})=>{
   }
   await p.evaluate("__r280Friends.state.connected=true;__r280Friends.state.filter='';window.__r280FriendsPayload=null;__r280Friends.loadFriends('audit')");
   await p.until("!__r280Friends.state.loading && document.querySelector('.friends-group-head')");
+  await p.evaluate("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
   const populated=await p.evaluate('('+audit.toString()+')()');results.push({zoom,section:'friends-populated',...populated});assert.deepEqual(populated.issues,[],'friends-populated '+JSON.stringify(populated.issues));
   await p.evaluate("__r280Friends.setOpen(false);__r278App.activateFavoritesPage('collection')");
  }
+ // A missing sprite must still fail after waiting for its rendering frame.
+ await p.evaluate("window.__r280Glyph=document.querySelector('.topbar .function-icon use');window.__r280GlyphHref=__r280Glyph.getAttribute('href');__r280Glyph.setAttribute('href','/icons.svg#dl-icon-missing');new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
+ assert((await p.evaluate('('+audit.toString()+')()')).issues.some(s=>s.startsWith('empty drawing')));
+ await p.evaluate("__r280Glyph.setAttribute('href',__r280GlyphHref);new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
  // Both mutations must be detected in the actual browser.
  await p.evaluate("document.querySelector('.topbar .function-icon').style.setProperty('stroke-width','2.2','important')");
  assert((await p.evaluate('('+audit.toString()+')()')).issues.some(s=>s.startsWith('stroke')));

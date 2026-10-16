@@ -48,3 +48,24 @@ test('mutation: synchronous observer writes must fail the error-free correction 
  const broken=source.replace(anchor,'new ResizeObserver(fit)');
  assert.notEqual(broken,source);assert.throws(()=>run(broken,true,true),/icon correction must run outside ResizeObserver delivery/);
 });
+
+function tagBatchTarget(source){
+ let dirty=false,flushes=0,width=35;
+ const read=()=>{if(dirty){flushes++;dirty=false;}};
+ const flag=initial=>{let value=initial;return {get hidden(){return value},set hidden(next){if(value!==next)dirty=true;value=next}};};
+ const collections=Array.from({length:20},()=>{
+  const items=Array.from({length:3},(_,i)=>Object.assign(flag(false),{getBoundingClientRect(){read();return {width:20}},hasAttribute:()=>i===0}));
+  const more=Object.assign(flag(true),{setAttribute(){}});
+  return {get clientWidth(){read();return width},checkVisibility:()=>true,closest:()=>null,querySelectorAll:()=>items,querySelector:()=>more,items,more};
+ });
+ const f=compile(source,['fitMatchTags'],{bindMatchTagsPopover:()=>({anchor:null})}),container={querySelectorAll:()=>collections};
+ f.fitMatchTags(container);assert(collections.every(c=>c.items.slice(1).every(n=>n.hidden)));
+ width=100;dirty=false;flushes=0;f.fitMatchTags(container);
+ assert(collections.every(c=>c.items.every(n=>!n.hidden)&&c.more.hidden),'wider rows must restore every fitting tag');
+ assert(flushes<=2,'a list resize must batch tag writes before measuring, observed layout flushes='+flushes);
+}
+
+test('fitting resized tag rows batches layout reads across the retained list',()=>tagBatchTarget(source));
+test('mutation: fitting each row separately must fail the layout batching target',()=>{
+ const broken=source.replace('batch(fits);','for(const job of fits)batch([job]);');assert.notEqual(broken,source);assert.throws(()=>tagBatchTarget(broken),/observed layout flushes/);
+});

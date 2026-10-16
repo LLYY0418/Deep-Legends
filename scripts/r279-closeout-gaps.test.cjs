@@ -216,3 +216,14 @@ test('only the proven test-only installer fixture is excluded from product round
  const m=mutant('release-plan.cjs','testOnlyInputs.has(file)','false');
  assert.throws(()=>assert.equal(m.releasePlan([fixture]).classification,'test-infrastructure'),{name:'AssertionError'});
 });
+
+test('discovered renderer tests retain script fixture CI entry points with exact workflow scope',()=>{
+ const files={'backend/web/unit.test.cjs':"runFixture('pwsh',['scripts/unit.test.ps1'])",'desktop/desktop.test.cjs':"runFixture('pwsh',['scripts/desktop.test.ps1'])",'scripts/unit.test.ps1':'','scripts/desktop.test.ps1':'','.github/workflows/full.yml':'run: node scripts/test-renderers.cjs all','.github/workflows/desktop.yml':'run: node scripts/test-renderers.cjs desktop'};
+ const index=buildIndex({files:Object.keys(files),read:f=>files[f],guards:[]});
+ const selected=select(index,['scripts/unit.test.ps1','scripts/desktop.test.ps1']);
+ assert.deepEqual(selected.scriptTests.find(t=>t.file==='scripts/unit.test.ps1').workflows,['full.yml']);
+ assert.deepEqual(selected.scriptTests.find(t=>t.file==='scripts/desktop.test.ps1').workflows,['desktop.yml','full.yml']);
+ const bad={...files,'.github/workflows/full.yml':'run: node scripts/other-runner.cjs all'};
+ const broken=select(buildIndex({files:Object.keys(bad),read:f=>bad[f],guards:[]}),['scripts/unit.test.ps1']);
+ assert.deepEqual(broken.scriptTests[0].workflows,[],'an unrelated runner must never authorize deferred coverage');
+});

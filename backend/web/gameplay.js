@@ -4183,28 +4183,35 @@
   }
 
   function fitMatchTags(container, onlyNew = false) {
-    for(const collection of container.querySelectorAll(".match-tags-collection")) {
-      if(onlyNew && collection._tagObserver)continue;
-      const popup=bindMatchTagsPopover(collection);
-      const fit=()=>{
-        if(typeof collection.checkVisibility==="function" && !collection.checkVisibility({contentVisibilityAuto:true}))return;
-        // Tag and icon grids can resize independently. Keep their caches separate.
-        const width=collection.clientWidth;if(!width)return;
+    const fits=[];
+    const batch=jobs=>{
+      const measured=[];
+      for(const {collection,popup} of jobs){
+        if(typeof collection.checkVisibility==="function" && !collection.checkVisibility({contentVisibilityAuto:true}))continue;
+        const width=collection.clientWidth;if(!width)continue;
         const main=collection.closest?.('.match-entry')?.querySelector('.match-main');
-        if(main){
-          const rowWidth=main.clientWidth;
-          if(main._iconFitWidth!==rowWidth){main._iconFitWidth=rowWidth;main.removeAttribute('data-icon-overlap');}
-          const icons=main.querySelector('.match-loadout-mini'),kda=main.querySelector('.match-kda');
-          if(icons && kda){const a=icons.getBoundingClientRect(),b=kda.getBoundingClientRect();if(a.width && b.width && a.right>b.left+.5 && a.left<b.right-.5 && a.bottom>b.top+.5 && a.top<b.bottom-.5)main.setAttribute('data-icon-overlap','');}
-        }
-        if(collection._tagFitWidth===width)return;
-        const items=[...collection.querySelectorAll("[data-match-tag]")],more=collection.querySelector("[data-match-tags-more]");
-        if(!more)return;
+        const rowWidth=main?.clientWidth,items=collection._tagFitWidth===width?null:[...collection.querySelectorAll("[data-match-tag]")],more=items?collection.querySelector("[data-match-tags-more]"):null;
+        measured.push({collection,popup,width,main,rowWidth,items,more});
+      }
+      // Reset every changed row before any geometry read can force layout.
+      for(const job of measured){
+        const {collection,popup,width,main,rowWidth,items,more}=job;
+        if(main && main._iconFitWidth!==rowWidth){main._iconFitWidth=rowWidth;main.removeAttribute('data-icon-overlap');}
+        if(!items || !more)continue;
         collection._tagFitWidth=width;
         if(popup.anchor===more)popup.close();
         for(const item of items)item.hidden=false;more.hidden=true;
+      }
+      for(const job of measured){
+        const {main,items,more}=job;
+        const icons=main?.querySelector('.match-loadout-mini'),kda=main?.querySelector('.match-kda');
+        if(icons && kda){const a=icons.getBoundingClientRect(),b=kda.getBoundingClientRect();job.overlap=a.width && b.width && a.right>b.left+.5 && a.left<b.right-.5 && a.bottom>b.top+.5 && a.top<b.bottom-.5;}
+        if(items && more)job.widths=items.map(item=>item.getBoundingClientRect().width+4);
+      }
+      for(const {main,overlap,items,more,width,widths} of measured){
+        if(overlap && !main.hasAttribute?.('data-icon-overlap'))main.setAttribute('data-icon-overlap','');
+        if(!widths)continue;
         let used=0,hidden=0;
-        const widths=items.map(item=>item.getBoundingClientRect().width+4);
         for(let i=0;i<items.length;i++) {
           const reserve=i<items.length-1 ? 32 : 0;
           if(!items[i].hasAttribute("data-match-tag-pinned") && (hidden || used+widths[i]+reserve>width)){items[i].hidden=true;hidden++;}
@@ -4212,8 +4219,12 @@
         }
         more.hidden=!hidden;more.textContent=`+${hidden}`;
         more.setAttribute("aria-label",`查看其余 ${hidden} 个标签`);
-      };
-      fit();
+      }
+    };
+    for(const collection of container.querySelectorAll(".match-tags-collection")) {
+      if(onlyNew && collection._tagObserver)continue;
+      const popup=bindMatchTagsPopover(collection),fit=()=>batch([{collection,popup}]);
+      fits.push({collection,popup});
       if(typeof ResizeObserver!=="undefined" && !collection._tagObserver) {
         collection._tagObserver=new ResizeObserver(()=>{
           if(collection._tagFitFrame)return;
@@ -4226,6 +4237,7 @@
         }
       }
     }
+    batch(fits);
   }
 
   function matchTagsBackgroundAllowed(tab) {

@@ -161,6 +161,18 @@ function buildIndex({ files, read, guards = [], historicalFiles = [], readHistor
     }
   }
 
+  // The renderer entry discovers tests by directory, so their names need not
+  // occur in YAML. Include only the scopes that the workflow actually invokes.
+  for (const workflow of all.filter(file => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(file))) {
+    for (const match of text(workflow).matchAll(/\bnode\s+scripts\/test-renderers\.cjs\s+(all|desktop)(?=\s|$)/g)) {
+      for (const test of nodeTests) {
+        if (match[1] === "desktop" && !test.startsWith("desktop/")) continue;
+        if (!workflowRefs.has(test)) workflowRefs.set(test, new Set());
+        workflowRefs.get(test).add(posix.basename(workflow));
+      }
+    }
+  }
+
   return { all, fileSet, nodeTests, referencedBy, declared, goTests, goTestIdentifiers, goTestNames, scriptRefs, workflowRefs, guards, text };
 }
 
