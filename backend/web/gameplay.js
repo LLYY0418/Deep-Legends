@@ -540,6 +540,11 @@
     return status?.clientView?.state === "ready";
   }
 
+  function restoreCommittedClientStatus() {
+    const status = window.deepLegendsStatusSnapshot?.();
+    if (status) updateStatus(status);
+  }
+
   function updateStatus(status) {
     // Status continues to carry collection/settings data. Legacy connection
     // fields never enter the tab reducer; only the versioned view can do that.
@@ -4135,17 +4140,16 @@
       const popup=bindMatchTagsPopover(collection);
       const fit=()=>{
         if(typeof collection.checkVisibility==="function" && !collection.checkVisibility({contentVisibilityAuto:true}))return;
-        // Hidden or unchanged rows need no descendant scan or layout work.
-        const width=collection.clientWidth;if(!width || collection._tagFitWidth===width)return;
+        // Tag and icon grids can resize independently. Keep their caches separate.
+        const width=collection.clientWidth;if(!width)return;
         const main=collection.closest?.('.match-entry')?.querySelector('.match-main');
         if(main){
-          const rowWidth=main.parentElement.clientWidth;
-          if(main._iconFitWidth!==rowWidth){
-            main._iconFitWidth=rowWidth;main.removeAttribute('data-icon-overlap');
-            const icons=main.querySelector('.match-loadout-mini'),kda=main.querySelector('.match-kda');
-            if(icons && kda){const a=icons.getBoundingClientRect(),b=kda.getBoundingClientRect();if(a.width && b.width && a.right>b.left+.5 && a.left<b.right-.5 && a.bottom>b.top+.5 && a.top<b.bottom-.5)main.setAttribute('data-icon-overlap','');}
-          }
+          const rowWidth=main.clientWidth;
+          if(main._iconFitWidth!==rowWidth){main._iconFitWidth=rowWidth;main.removeAttribute('data-icon-overlap');}
+          const icons=main.querySelector('.match-loadout-mini'),kda=main.querySelector('.match-kda');
+          if(icons && kda){const a=icons.getBoundingClientRect(),b=kda.getBoundingClientRect();if(a.width && b.width && a.right>b.left+.5 && a.left<b.right-.5 && a.bottom>b.top+.5 && a.top<b.bottom-.5)main.setAttribute('data-icon-overlap','');}
         }
+        if(collection._tagFitWidth===width)return;
         const items=[...collection.querySelectorAll("[data-match-tag]")],more=collection.querySelector("[data-match-tags-more]");
         if(!more)return;
         collection._tagFitWidth=width;
@@ -4162,7 +4166,11 @@
         more.setAttribute("aria-label",`查看其余 ${hidden} 个标签`);
       };
       fit();
-      if(typeof ResizeObserver!=="undefined" && !collection._tagObserver) {collection._tagObserver=new ResizeObserver(fit);collection._tagObserver.observe(collection);}
+      if(typeof ResizeObserver!=="undefined" && !collection._tagObserver) {
+        collection._tagObserver=new ResizeObserver(fit);collection._tagObserver.observe(collection);
+        const main=collection.closest?.('.match-entry')?.querySelector('.match-main');
+        if(main)collection._tagObserver.observe(main);
+      }
     }
   }
 
@@ -9767,6 +9775,7 @@
   renderOverview("players");
   renderLive();
   renderCapabilitySettings();
+  restoreCommittedClientStatus();
   ensureAugments();
   requestAnimationFrame(() => {
     const defaultSection = ["overview", "champions", "live", "favorites", "suite"].includes(state.settings.defaultPage) ? state.settings.defaultPage : "overview";

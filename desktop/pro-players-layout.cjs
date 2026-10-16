@@ -14,7 +14,7 @@ const assert = require('node:assert/strict');
 const root=path.resolve(__dirname,'..'), web=path.join(root,'backend','web');
 const chrome=process.env.CHROME_BIN || (process.platform==='darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r73-layout-'));
-let proc,ws,server,captureFailure;
+let proc,ws,server,captureFailure,mutationEvidence;const mutationHistory=[];
 async function main(){
  const launched=await launchChrome({executable:chrome,args:['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${temp}`,'about:blank'],directory:process.env.R73_SCREENSHOT_DIR||path.join(os.tmpdir(),'pro-players-layout')});
  proc=launched.child;const url=launched.endpoint;
@@ -29,7 +29,8 @@ async function main(){
   const directory=process.env.R73_SCREENSHOT_DIR||path.join(os.tmpdir(),'pro-players-layout');
   fs.mkdirSync(directory,{recursive:true});
   let snapshot;try{snapshot=await evaluate(`(()=>{const bar=document.querySelector('.topbar'),search=document.querySelector('.player-search');return {innerWidth,sidebar:document.documentElement.dataset.sidebar,level:bar?.dataset.topbarCompact,settled:bar?.dataset.topbarSettled,loadedMs:performance.now(),font:getComputedStyle(document.body).fontFamily,userAgent:navigator.userAgent,dpr:devicePixelRatio,viewport:{width:visualViewport?.width,scale:visualViewport?.scale},mutation:{text:document.querySelector('#mutation')?.textContent,rules:[...(document.querySelector('#mutation')?.sheet?.cssRules||[])].map(r=>r.cssText)},search:{scrollWidth:search?.scrollWidth,clientWidth:search?.clientWidth},tables:[...document.querySelectorAll('.pro-table')].map(t=>({scrollWidth:t.scrollWidth,parentClientWidth:t.parentElement.clientWidth,offsetWidth:t.offsetWidth,rectWidth:t.getBoundingClientRect().width,minWidth:getComputedStyle(t).minWidth,width:getComputedStyle(t).width,zoom:getComputedStyle(t).zoom,display:getComputedStyle(t).display}))};})()`);}catch(diagnosticError){snapshot={diagnosticError:diagnosticError.message};}
-  fs.writeFileSync(path.join(directory,'failure.json'),JSON.stringify({file:'desktop/pro-players-layout.cjs',scenario:'pro-players-layout',error:error.stack||String(error),snapshot},null,2)+'\n');
+  try{await call('DOM.enable');await call('CSS.enable');const {root}=await call('DOM.getDocument'),{nodeId}=await call('DOM.querySelector',{nodeId:root.nodeId,selector:'.pro-table'});fs.writeFileSync(path.join(directory,'matched-styles.json'),JSON.stringify(await call('CSS.getMatchedStylesForNode',{nodeId}),null,2)+'\n');}catch(error){snapshot.matchedStylesError=error.message;}
+  fs.writeFileSync(path.join(directory,'failure.json'),JSON.stringify({file:'desktop/pro-players-layout.cjs',scenario:'pro-players-layout',error:error.stack||String(error),mutationEvidence,snapshot},null,2)+'\n');
   const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(directory,'failure.png'),Buffer.from(shot.data,'base64'));
  };
  const waitForDOM=async(label,expression)=>{
@@ -98,7 +99,10 @@ async function main(){
  assert.notEqual(themeColors.lp,themeColors.ladder,'LP and ladder need distinct theme colors');
  if(process.env.R73_SCREENSHOT_DIR){const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(process.env.R73_SCREENSHOT_DIR,'pro-players-light.png'),Buffer.from(shot.data,'base64'));}
  // The same geometry assertions must observe the specified broken CSS.
- const mutate=async text=>evaluate(`(()=>{let s=document.querySelector('#mutation');if(!s){s=document.createElement('style');s.id='mutation';document.head.append(s);}s.textContent=${JSON.stringify(text)};})()`);
+ const mutate=async text=>{
+  mutationEvidence=await evaluate(`new Promise(resolve=>{let s=document.querySelector('#mutation');if(!s){s=document.createElement('style');s.id='mutation';document.head.append(s);}s.textContent=${JSON.stringify(text)};const samples=[],sample=()=>{const tables=[...document.querySelectorAll('.pro-table')];samples.push({at:performance.now(),sheet:{disabled:s.sheet?.disabled,media:s.sheet?.media?.mediaText,connected:s.isConnected,rules:[...(s.sheet?.cssRules||[])].map(r=>r.cssText)},tables:tables.map(t=>({connected:t.isConnected,matches:t.matches('.pro-table'),inline:t.style.cssText,minWidth:getComputedStyle(t).minWidth,scrollWidth:t.scrollWidth,parentClientWidth:t.parentElement.clientWidth}))});if(samples.length===4)resolve(samples);else requestAnimationFrame(sample);};sample();})`);
+  mutationHistory.push({css:text,samples:mutationEvidence});const directory=process.env.R73_SCREENSHOT_DIR||path.join(os.tmpdir(),'pro-players-layout');fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(path.join(directory,'mutation-evidence.json'),JSON.stringify(mutationHistory,null,2)+'\n');
+ };
  await call('Emulation.setDeviceMetricsOverride',{width:820,height:1100,deviceScaleFactor:1,mobile:false});
  await waitViewport({evaluate,width:820});await settleTopbar({evaluate});
  await mutate('.pro-table { min-width:770px !important; }');

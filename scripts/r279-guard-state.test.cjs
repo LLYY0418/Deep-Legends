@@ -1,0 +1,37 @@
+"use strict";
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const {JSDOM}=require('../desktop/node_modules/jsdom');
+const {compile}=require('../backend/web/r188-harness.cjs');
+const current=fs.readFileSync(path.join(__dirname,'r272-browser-checks.cjs'),'utf8');
+function sampling(source){const end=source.indexOf("results.push({r272:'score-placement-native-narrow'");const start=source.lastIndexOf('  await evaluate(',source.indexOf('  const score=await evaluate(',0));const atomic=source.indexOf('  const score=await evaluate(');return source.slice(start>source.indexOf("for(const rank of")&&source.slice(start,atomic).includes("row.style.width='35px'")?start:atomic,end);}
+async function scenario(source,{breakFit=false}={}){
+ const dom=new JSDOM('<main></main>',{runScripts:'outside-only'}),w=dom.window,list=w.document.querySelector('main');
+ const markup='<article class="match-entry"><div class="match-tags-collection"><span data-match-tag data-match-tag-pinned>1st<i data-tooltip="本场评分排名：全场 16 人中的第 1"></i></span><span data-match-tag>五杀</span><button data-match-tags-more></button></div></article>';
+ const reset=()=>{list.innerHTML=markup;const row=list.querySelector('.match-tags-collection');Object.defineProperty(row,'clientWidth',{get:()=>row.style.width==='35px'?35:168});row.checkVisibility=()=>true;for(const n of row.querySelectorAll('[data-match-tag]'))n.getBoundingClientRect=()=>({width:40});};reset();
+ const fit=compile(fs.readFileSync(path.join(__dirname,'../backend/web/gameplay.js'),'utf8'),['fitMatchTags'],{bindMatchTagsPopover:()=>({anchor:null})}).fitMatchTags;
+ w.__r272List=list;w.__r266Game={fitMatchTags:breakFit?()=>{}:fit};
+ const evaluate=async expression=>{const value=w.eval(expression);reset();return value;};
+ try{await vm.runInNewContext('(async()=>{'+sampling(source)+'})()',{evaluate,rank:1,assert,JSON});}finally{w.close();}
+}
+test('R272 narrow mutation and score assertion sample the same node across async reconciliation',()=>scenario(current));
+test('mutation: old separate CDP writes and reads fail when reconciliation replaces the row',async()=>{
+ const setter="row.style.width='35px';row._tagFitWidth=undefined;__r266Game.fitMatchTags(__r272List);";
+ const previous=current.replace(setter,'').replace('  const score=await evaluate(', '  await evaluate("(()=>{const row=__r272List.querySelector(\'.match-tags-collection\');'+setter+'return true})()");\n  const score=await evaluate(');
+ await assert.rejects(scenario(previous),/narrow fixture must be 35 logical pixels/);
+});
+test('mutation: stable narrow fixture with broken product fitting still fails original visible-tag assertion',()=>assert.rejects(scenario(current,{breakFit:true}),/2 !== 1/));
+
+
+const r265=fs.readFileSync(path.join(__dirname,'r265-browser.cjs'),'utf8');
+const savedWait=JSON.parse(r265.match(/await p\.until\(("new Promise[^\n]+")\);/)[1]);
+const savedMaxAssertion=r265.match(/assert\.equal\(sizes\.max,"640px"\)/)[0];
+async function savedSample({wait=true,brokenCSS=false}={}){
+ let frames=0;const menu={className:'af-menu',isConnected:true,_afMenuState:{page:'conditions'}};
+ const context={document:{querySelector:()=>menu},Promise,JSON,requestAnimationFrame:fn=>{if(++frames===2){menu.className='af-menu is-saved';menu._afMenuState.page='saved';}queueMicrotask(fn);}};
+ if(wait)assert.equal(await vm.runInNewContext(savedWait,context),true);
+ const sizes={max:menu._afMenuState.page==='saved'&&!brokenCSS?'640px':'1634px'};
+ vm.runInNewContext(savedMaxAssertion,{assert,sizes});return frames;
+}
+test('saved page settles semantically before the original max-height assertion',async()=>assert((await savedSample())>=4));
+test('mutation: sampling before saved page settles fails the original max-height assertion',()=>assert.rejects(savedSample({wait:false}),/1634px/));
+test('mutation: wrong CSS after a settled saved page still fails the original max-height assertion',()=>assert.rejects(savedSample({brokenCSS:true}),/1634px/));

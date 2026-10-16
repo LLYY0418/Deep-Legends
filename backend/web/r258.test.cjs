@@ -228,3 +228,24 @@ test('R258 collapsed cards retain rune links without scanning absent detail cont
  const bound=scans;tab.externalRender=()=>{};
  f.bindMatchDetailControls(root,tab);assert.equal(runeBindings,4);assert.equal(scans,bound);
 });
+
+
+test('R279 late bootstrap uses the same self identity and single overview load as live delivery',()=>{
+ for(const order of ['app-first','gameplay-first']){
+  const h=harness();try{
+   const appState={},window=h.dom.window;
+   const f=compile(app,['readCommittedClientStatus','acceptClientView'],{state:appState,window,CustomEvent:window.CustomEvent,renderClientConnection(){},renderLaunchpad(){},clearDisconnectedClientState(){},retryCollectionAfterConnection(){},queueLiveUpdateSlices(){},reportClientView(){}});
+   window.deepLegendsStatusSnapshot=f.readCommittedClientStatus;
+   const replay=compile(gameplay,['restoreCommittedClientStatus'],{window,updateStatus:h.updateStatus}).restoreCommittedClientStatus;
+   const listen=()=>{window.addEventListener('deep-legends:client-view',e=>h.updateClientView(e.detail));window.addEventListener('deep-legends:status',e=>h.updateStatus(e.detail));replay();};
+   const view=clientView(identity,100);
+   const publish=()=>{appState.status={clientView:view};f.acceptClientView(view);};
+   if(order==='app-first'){publish();listen();}else{listen();publish();}
+   assert.match(h.nodes.playerTabs.textContent,/Fixture#CN/);assert.equal(h.loads.length,1);
+   replay();f.acceptClientView(view);assert.equal(h.loads.length,1,'replay must not load overview twice');
+   f.acceptClientView({...view,state:'exiting',generation:101});replay();
+   assert(!h.nodes.playerTabs.querySelector('[data-player-tab="current"]'));
+   f.acceptClientView(view);replay();assert.equal(h.state.status.clientView.generation,101);
+  }finally{h.close();}
+ }
+});

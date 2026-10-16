@@ -9,7 +9,7 @@ const pausedRequests=new PausedRequests();
 // are explicitly synthetic; this does not claim real Windows or LCU evidence.
 const {spawn,execFileSync}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=process.env.R265_BROWSER_OUT || path.join(os.tmpdir(),'r265-browser'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'r265-browser-'));
-const errors=[],violations=[],results=[],closed=new Set(),canceled=new Set();let backend,chrome,ws,captureFailure;
+const errors=[],violations=[],results=[],closed=new Set(),canceled=new Set();let backend,chrome,ws,captureFailure,filterEvidence;
 const fixture=`
  const r265LoadedStatistics=window.__r265LoadedStatistics;
  const r265Sample=(data,k)=>{
@@ -113,12 +113,14 @@ async function main(){
    for(const count of [0,1,12]){
     await p.evaluate(`localStorage.setItem('deep-legends-history-presets-v1',JSON.stringify(Array.from({length:${count}},(_,i)=>({name:'常用 '+(i+1),conditions:{result:{values:['win'],not:false}}}))))`);
     await p.click('[data-af-page="saved"]');
+    await p.until("new Promise(resolve=>{let last='',stable=0;const sample=()=>{const menu=document.querySelector('[data-af-menu]'),snapshot=menu && JSON.stringify({page:menu._afMenuState?.page,className:menu.className,connected:menu.isConnected});stable=snapshot===last?stable+1:1;last=snapshot;if(stable>=3)resolve(menu?._afMenuState?.page==='saved');else requestAnimationFrame(sample);};sample();})");
+    filterEvidence=await p.evaluate("(()=>{const menu=document.querySelector('[data-af-menu]');return {at:performance.now(),className:menu.className,page:menu._afMenuState?.page,connected:menu.isConnected,ownerConnected:menu._afOwner?.isConnected,inline:menu.style.cssText,computed:getComputedStyle(menu).maxHeight,styles:[...document.styleSheets].map(s=>({href:s.href?new URL(s.href).pathname:'inline',disabled:s.disabled,rules:[...s.cssRules].filter(r=>r.cssText.includes('af-menu')).map(r=>r.cssText)}))};})()");
     const sizes=await p.evaluate("(()=>{const menu=document.querySelector('[data-af-menu]'),list=menu.querySelector('.af-saved-list'),footer=menu.querySelector('.af-savebar'),m=menu.getBoundingClientRect(),f=footer.getBoundingClientRect(),controls=[...footer.querySelectorAll('input,button')].map(n=>n.getBoundingClientRect());return {height:m.height,top:m.top,max:getComputedStyle(menu).maxHeight,scroll:list.scrollHeight>list.clientHeight,footerVisible:f.top>=m.top && f.bottom<=m.bottom && controls.every(r=>r.top>=m.top && r.bottom<=m.bottom)}})()");
     const frames=await p.evaluate("new Promise(resolve=>{const rows=[];const frame=()=>{const n=document.querySelector('[data-af-menu]'),r=n.getBoundingClientRect();rows.push({top:r.top,height:r.height,visible:!n.hidden && getComputedStyle(n).visibility!=='hidden' && Number(getComputedStyle(n).opacity)>0});if(rows.length<3)requestAnimationFrame(frame);else resolve(rows)};requestAnimationFrame(frame)})");
     assert(frames.every(f=>f.top===sizes.top && f.height===sizes.height && f.visible),JSON.stringify(frames));
     assert.equal(sizes.top+sizes.height/2,conditions.top+conditions.height/2);assert.equal(sizes.max,"640px");assert(sizes.footerVisible);heights.push(sizes.height);
     if(count<12)assert(sizes.height<640 && !sizes.scroll,JSON.stringify(sizes));else assert(sizes.height===640 && sizes.scroll,JSON.stringify(sizes));
-    results.push({case:'saved',theme,count,...sizes});await p.shot(theme+'-filter-saved-'+count);
+    results.push({case:'saved',theme,count,...sizes,filterEvidence});await p.shot(theme+'-filter-saved-'+count);
    }
    assert(heights[0]<heights[1] && heights[1]<heights[2],JSON.stringify(heights));await p.close();
   }
@@ -177,4 +179,4 @@ async function main(){
  assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(violations.length,0,JSON.stringify(violations));
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({host:{platform:process.platform,node:process.version},csp,scope:'real Chromium; public production binary/CSP; synthetic API/image fixtures',results,errors,violations},null,2));console.log(JSON.stringify({cases:results.length,screenshots:fs.readdirSync(out).filter(f=>f.endsWith('.png')).length,errors:errors.length}));
 }
-main().catch(async e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,stack:e.stack,pendingFetch:pausedRequests.snapshot(),results,errors,violations},null,2));try{await captureFailure?.();}catch(screenshotError){console.error('failure screenshot unavailable: '+screenshotError.message);}console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[tmp]}));
+main().catch(async e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,stack:e.stack,pendingFetch:pausedRequests.snapshot(),filterEvidence:typeof filterEvidence==='undefined'?undefined:filterEvidence,results,errors,violations},null,2));try{await captureFailure?.();}catch(screenshotError){console.error('failure screenshot unavailable: '+screenshotError.message);}console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[tmp]}));
