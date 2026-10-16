@@ -17,6 +17,7 @@ on:
         type: string
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: ${{ github.event_name == 'push' && format('diagnostic-{0}', github.ref) || format('diagnostic-run-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'push' }}
@@ -74,10 +75,16 @@ jobs:
         if: failure()
         shell: bash
         run: node scripts/ci-failure-triage.cjs --job "windows-browser-${{ matrix.shard }}" --evidence "$RUNNER_TEMP/r279-quick" --out "$RUNNER_TEMP/r279-quick/${{ matrix.shard }}/triage.json" --annotate
+      - name: Stamp the actual guard execution identity
+        if: always()
+        shell: bash
+        env:
+          DIAGNOSTIC_SHA: ${{ needs.resolve.outputs.sha }}
+        run: node scripts/r279-diagnostic-artifacts.cjs stamp "$RUNNER_TEMP/r279-quick" "${{ matrix.shard }}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r279-quick-${{ matrix.shard }}
+          name: r279-quick-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/r279-quick/**
           if-no-files-found: error
   strict:
@@ -107,10 +114,16 @@ jobs:
         if: always()
         shell: bash
         run: rm -f "$RUNNER_TEMP/r279-quick/public.exe"
+      - name: Stamp the actual strict execution identity
+        if: always()
+        shell: bash
+        env:
+          DIAGNOSTIC_SHA: ${{ needs.resolve.outputs.sha }}
+        run: node scripts/r279-diagnostic-artifacts.cjs stamp "$RUNNER_TEMP/r279-quick" strict
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r279-quick-strict
+          name: r279-quick-strict-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/r279-quick/**
           if-no-files-found: error
   coverage:
@@ -124,9 +137,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Select immutable artifacts from each latest actual execution
+        id: artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIAGNOSTIC_SHA: ${{ needs.resolve.outputs.sha }}
+        run: node scripts/r279-diagnostic-artifacts.cjs select "$RUNNER_TEMP/r279-quick"
       - uses: actions/download-artifact@v4
         with:
-          pattern: r279-quick-*
+          artifact-ids: ${{ steps.artifacts.outputs.ids }}
           merge-multiple: true
           path: ${{ runner.temp }}/r279-quick
       - name: Require complete guard and strict evidence
@@ -135,6 +154,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r279-windows-browser-quick-summary
+          name: r279-windows-browser-quick-summary-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/r279-quick/quick-summary.json
           if-no-files-found: error
