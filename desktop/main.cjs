@@ -481,7 +481,7 @@ function acceptReadyPayload(payload) {
   reportStartupStage("backend_ready");
   setSplashStatus("正在加载界面");
   createMainWindow();
-  if (!licenseEnabled) void pushSystemProxy();
+  void pushSystemProxy();
 }
 
 function requireActiveDesktopLicense() {
@@ -539,27 +539,44 @@ function reportLicenseWindowState(value) {
 // 英雄数据的联网请求在拿到结果前按“系统/环境代理”规则直连。
 let lastSystemProxy;
 let proxyPushPending=false;
+async function readSystemProxyTargets(ready) {
+  return new Promise((resolve, reject) => {
+    const request = http.request(`${ready.baseUrl}/api/system-proxy`, {method:"GET",headers:{"X-Local-Token":ready.token},timeout:3000}, response => {
+      let body="";
+      response.setEncoding("utf8");
+      response.on("data", chunk => {body+=chunk;if(body.length>32768)request.destroy(new Error("proxy targets too large"));});
+      response.on("error", reject);
+      response.on("end", () => {try {const data=JSON.parse(body);if(response.statusCode!==200 || !data.targets || typeof data.targets!=="object")throw Error("proxy targets unavailable");resolve(data.targets);} catch(error){reject(error);}});
+    });
+    request.once("error",reject);request.once("timeout",()=>request.destroy(new Error("proxy targets timeout")));request.end();
+  });
+}
 async function pushSystemProxy() {
  if(proxyPushPending || !backendReady)return;proxyPushPending=true;
+ const ready=backendReady;
+ try {
   loadDeferredModules();
-  let proxy = "";
-  try {
-    proxy = await resolveSystemProxy(session.defaultSession, "https://lol-api-champion.op.gg/");
-  } catch (_) {}
-  if (!backendReady || proxy===lastSystemProxy) {proxyPushPending=false;return;}
-  const body = JSON.stringify({ proxy });
-  const request = http.request(`${backendReady.baseUrl}/api/system-proxy`, {
+  const targets = await readSystemProxyTargets(ready), routes={};
+  let previous={};try {previous=JSON.parse(lastSystemProxy || '{}').routes || {};}catch{}
+  const entries=await Promise.all(Object.entries(targets).sort(([a],[b])=>a.localeCompare(b)).map(async([host,target])=>[host,await resolveSystemProxy(session.defaultSession,target,2500,previous[host] || '')]));
+  for(const [host,proxy] of entries)routes[host]=proxy;
+  const proxy=routes['lol-api-champion.op.gg'] || '';
+  const signature=JSON.stringify({backend:ready.baseUrl,token:ready.token,routes});
+  if (backendReady!==ready || signature===lastSystemProxy) {proxyPushPending=false;return;}
+  const body = JSON.stringify({ proxy, routes });
+  const request = http.request(`${ready.baseUrl}/api/system-proxy`, {
     method: "POST",
     headers: {
-      "X-Local-Token": backendReady.token,
+      "X-Local-Token": ready.token,
       "Content-Type": "application/json",
       "Content-Length": Buffer.byteLength(body),
     },
     timeout: 3000,
-  }, (response) => {if(response.statusCode===200)lastSystemProxy=proxy;proxyPushPending=false;response.resume();});
+  }, (response) => {if(response.statusCode===200 && backendReady===ready)lastSystemProxy=signature;proxyPushPending=false;response.resume();});
   request.once("error", (error) => {proxyPushPending=false;appendDesktopLog(`系统代理下发失败：${error.message}`);});
   request.once("timeout", () => request.destroy());
   request.end(body);
+ } catch (_) {proxyPushPending=false;}
 }
 
 function isLoopback(hostname) {

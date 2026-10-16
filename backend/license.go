@@ -861,8 +861,11 @@ func (m *licenseManager) Run(ctx context.Context) {
 	}
 }
 
-func productionLicenseManager(observe func(map[string]any)) *licenseManager {
+func productionLicenseManager(observe func(map[string]any), clients ...*http.Client) *licenseManager {
 	client := &http.Client{Timeout: licenseTimeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	if len(clients) > 0 {
+		client = clients[0]
+	}
 	store, err := newLicenseFileStore()
 	if err != nil {
 		return &licenseManager{state: "DEVICE_ERROR", options: licenseOptions{Now: time.Now, Elapsed: time.Now}, changed: make(chan struct{}, 1), wake: make(chan struct{}, 1), cancel: func() {}}

@@ -1,4 +1,11 @@
 'use strict';const test=require('node:test'),assert=require('node:assert/strict'),{JSDOM}=require('../../desktop/node_modules/jsdom');
+test('R280 announcements recovery reloads through existing single-flight loader',async()=>{
+ const api=require('./announcements.js'),dom=new JSDOM('<button id="announcements-button"></button><dialog id="announcements-dialog"><button data-announcements-close></button><div data-announcements-content></div></dialog>',{url:'https://fixture.test'}),w=dom.window;let calls=0,release;
+ try{w.setInterval=()=>1;w.fetch=()=>{calls++;return new Promise(resolve=>{release=resolve})};const mounted=api.mount(w,{visible:false,phase:'None',announcements:[]});
+ for(let i=0;i<3;i++)w.dispatchEvent(new w.CustomEvent('deep-legends:riot-relay-recovered'));
+ assert.equal(calls,1);release({ok:true,json:async()=>({source:'remote',announcements:[]})});await new Promise(setImmediate);assert.equal(calls,1);mounted.dismiss();
+ }finally{w.close();}
+});
 test('R278 P12 notice read state distinguishes dismiss, read and revision per id',()=>{const api=require(process.env.R278_ANNOUNCEMENTS_MODULE || './announcements.js'),map=new Map(),storage={getItem:k=>map.get(k),setItem:(k,v)=>map.set(k,v)},state=api.createReadState(storage),a={id:'outage',revision:'1'},b={id:'other',revision:'1'};assert.equal(state.isRead(a),false);state.dismiss(a);assert.equal(state.isRead(a),false);state.read(a);assert(state.isRead(a));assert(!state.isRead(b));assert(!state.isRead({...a,revision:'2'}));assert(api.createReadState(storage).isRead(a));});
 test('R278 P12 Markdown never emits executable HTML, styles, remote images or unsafe links',()=>{const api=require(process.env.R278_ANNOUNCEMENTS_MODULE || './announcements.js'),html=api.markdown('## 公告\n<script>alert(1)</script>\n<img src=x onerror=alert(1)>\n[x](javascript:alert(1))\n[官网](https://www.leagueoflegends.com/)\n![骗](https://evil.example/x.png)');const dom=new JSDOM(html);try{assert.equal(dom.window.document.querySelectorAll('script,[onerror],[style],img').length,0);assert.equal(dom.window.document.querySelectorAll('a').length,1);assert.match(html,/公告/);}finally{dom.window.close()}});
 test('R278 P12 popup waits for visibility and game phase, queues, preserves dismissal/read across restarts',async()=>{

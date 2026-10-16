@@ -129,7 +129,7 @@ func (a *app) handlePrestigeImage(w http.ResponseWriter, r *http.Request) {
 		if data, ok := a.storage.loadPrestigeArtwork(metadata.InstanceID); ok {
 			return data, nil
 		}
-		data, err := fetchTencentArtwork(ctx, artworkURL)
+		data, err := fetchTencentArtwork(ctx, artworkURL, a.externalHTTPClient(prestigeHTTPClient))
 		if err != nil {
 			return nil, err
 		}
@@ -149,13 +149,17 @@ func (a *app) handlePrestigeImage(w http.ResponseWriter, r *http.Request) {
 	writeTencentArtwork(w, data)
 }
 
-func fetchTencentArtwork(ctx context.Context, artworkURL string) ([]byte, error) {
+func fetchTencentArtwork(ctx context.Context, artworkURL string, clients ...*http.Client) ([]byte, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, artworkURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	request.Header.Set("Accept", "image/avif,image/webp,image/jpeg,image/*;q=0.8")
-	response, err := prestigeHTTPClient.Do(request)
+	client := prestigeHTTPClient
+	if len(clients) > 0 {
+		client = clients[0]
+	}
+	response, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +205,7 @@ func (a *app) handleSkinArt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data, err := a.loadAsset(r.Context(), "skin-art:"+strconv.FormatInt(id, 10), prestigeArtworkMaxEntryBytes, 90*time.Second, func(ctx context.Context) ([]byte, error) {
-		return fetchTencentArtwork(ctx, artworkURL)
+		return fetchTencentArtwork(ctx, artworkURL, a.externalHTTPClient(prestigeHTTPClient))
 	})
 	if err != nil {
 		http.NotFound(w, r)

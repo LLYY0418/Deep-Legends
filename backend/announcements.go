@@ -42,6 +42,7 @@ type announcementCache struct {
 	source        string
 	at            time.Time
 	fetching      bool
+	fetchFailed   bool
 	images        map[string]announcementImage
 	loadingImages map[string]bool
 }
@@ -146,7 +147,7 @@ func (a *app) fetchAnnouncements() {
 		defer func() { c.mu.Lock(); c.fetching = false; c.mu.Unlock() }()
 		ctx, cancel := context.WithTimeout(a.licenseBusinessContext(), 4*time.Second)
 		defer cancel()
-		client := &http.Client{Timeout: 2 * time.Second}
+		client := a.externalHTTPClient(&http.Client{Timeout: 2 * time.Second})
 		for _, prefix := range updateMirrors {
 			req, _ := http.NewRequestWithContext(ctx, "GET", prefix+announcementBranchURL+"announcements.json", nil)
 			resp, err := client.Do(req)
@@ -166,6 +167,8 @@ func (a *app) fetchAnnouncements() {
 			c.mu.Lock()
 			c.notices = mergeAnnouncements(bundle, notices)
 			c.source = "remote"
+			c.fetchFailed = false
+			c.at = time.Now()
 			c.images = map[string]announcementImage{}
 			c.mu.Unlock()
 			if a.storage != nil {
@@ -174,6 +177,9 @@ func (a *app) fetchAnnouncements() {
 			a.broadcastEvent(`{"type":"announcements-changed"}`)
 			return
 		}
+		c.mu.Lock()
+		c.fetchFailed = true
+		c.mu.Unlock()
 		a.recordDiagnostic(map[string]any{"event": "announcement_state", "id": "fetch", "revision": "", "source": "bundled", "action": "fetch-failed"})
 	})
 }
@@ -220,7 +226,7 @@ func (a *app) handleAnnouncementImage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 		defer cancel()
-		client := &http.Client{Timeout: 2 * time.Second}
+		client := a.externalHTTPClient(&http.Client{Timeout: 2 * time.Second})
 		for _, prefix := range updateMirrors {
 			req, _ := http.NewRequestWithContext(ctx, "GET", prefix+announcementBranchURL+name, nil)
 			resp, err := client.Do(req)

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	netproxy "golang.org/x/net/proxy"
 )
 
 // Only the automatic system-proxy route may fall back. Target HTTP errors are
@@ -65,6 +67,9 @@ func proxyConnectFailed(err error, proxy *url.URL) bool {
 		if op.Op == "proxyconnect" {
 			return true
 		}
+		if (proxy.Scheme == "socks5" || proxy.Scheme == "socks5h") && op.Op == "socks connect" {
+			return true
+		}
 		if op.Op == "dial" && op.Addr != nil {
 			host, port, _ := net.SplitHostPort(op.Addr.String())
 			return port == proxy.Port() && (strings.EqualFold(host, proxy.Hostname()) || net.ParseIP(host) != nil)
@@ -96,6 +101,10 @@ type automaticNetworkTransport struct {
 	recover           func()
 	state             string
 	probes            map[string]string
+	resolveProxy      func() string
+	routeProvider     *championProvider
+	hostRoutes        map[string]hostNetworkRoute
+	targetHost        string
 }
 
 var networkProbeURLs = map[string]string{
@@ -116,8 +125,10 @@ func networkGroup(host string) string {
 		return "aramkit"
 	case strings.Contains(host, "communitydragon"):
 		return "community"
-	default:
+	case host == hexdataHost || host == hexdataAssetHost:
 		return "hexdata"
+	default:
+		return host
 	}
 }
 func (t *automaticNetworkTransport) emit(state string) {
@@ -140,6 +151,25 @@ func (t *automaticNetworkTransport) emit(state string) {
 	}
 }
 func (t *automaticNetworkTransport) active() string {
+	t.mu.Lock()
+	children := make([]*automaticNetworkTransport, 0, len(t.hostRoutes))
+	for _, route := range t.hostRoutes {
+		children = append(children, route.transport)
+	}
+	t.mu.Unlock()
+	active := ""
+	for _, child := range children {
+		state := child.active()
+		if state == "代理不可用，已直连" {
+			return state
+		}
+		if state == "直连更快，已直连" || state == "代理" && active == "" {
+			active = state
+		}
+	}
+	if active != "" {
+		return active
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.settings.Mode == "direct" || t.proxyURL == "" {
@@ -170,9 +200,21 @@ func (t *automaticNetworkTransport) refreshProxy(raw string) {
 	t.failed = false
 	t.choices = map[string]networkChoice{}
 	t.mu.Unlock()
+	if closer, ok := t.proxy.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
 	t.emit(map[bool]string{true: "direct", false: "ok"}[raw == ""])
 }
 func (t *automaticNetworkTransport) CloseIdleConnections() {
+	t.mu.Lock()
+	children := make([]*automaticNetworkTransport, 0, len(t.hostRoutes))
+	for _, route := range t.hostRoutes {
+		children = append(children, route.transport)
+	}
+	t.mu.Unlock()
+	for _, child := range children {
+		child.CloseIdleConnections()
+	}
 	for _, rt := range []http.RoundTripper{t.proxy, t.direct} {
 		if c, ok := rt.(interface{ CloseIdleConnections() }); ok {
 			c.CloseIdleConnections()
@@ -192,18 +234,65 @@ func (t *automaticNetworkTransport) markSuccess(generation uint64) {
 	}
 }
 func (t *automaticNetworkTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	return t.roundTripRoutes(r, t.proxy, t.direct)
+	route := t.forRequest(r)
+	return route.roundTripRoutes(r, route.proxy, route.direct)
 }
 
 type mappedNetworkTransport struct {
 	owner         *automaticNetworkTransport
 	proxy, direct http.RoundTripper
+	mapRoute      func(http.RoundTripper) http.RoundTripper
+	mu            sync.Mutex
+	routes        map[*automaticNetworkTransport][2]http.RoundTripper
 }
 
 func (t *mappedNetworkTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	return t.owner.roundTripRoutes(r, t.proxy, t.direct)
+	owner := t.owner.forRequest(r)
+	if t.mapRoute == nil {
+		return owner.roundTripRoutes(r, t.proxy, t.direct)
+	}
+	t.mu.Lock()
+	if t.routes == nil {
+		t.routes = map[*automaticNetworkTransport][2]http.RoundTripper{}
+	}
+	routes, ok := t.routes[owner]
+	if !ok {
+		for previous, pair := range t.routes {
+			if previous != owner && previous.targetHost == owner.targetHost {
+				for _, rt := range pair {
+					if c, ok := rt.(interface{ CloseIdleConnections() }); ok {
+						c.CloseIdleConnections()
+					}
+				}
+				delete(t.routes, previous)
+			}
+		}
+		if len(t.routes) >= 128 {
+			for _, pair := range t.routes {
+				for _, rt := range pair {
+					if c, ok := rt.(interface{ CloseIdleConnections() }); ok {
+						c.CloseIdleConnections()
+					}
+				}
+			}
+			t.routes = map[*automaticNetworkTransport][2]http.RoundTripper{}
+		}
+		routes = [2]http.RoundTripper{t.mapRoute(owner.proxy), t.mapRoute(owner.direct)}
+		t.routes[owner] = routes
+	}
+	t.mu.Unlock()
+	return owner.roundTripRoutes(r, routes[0], routes[1])
 }
 func (t *mappedNetworkTransport) CloseIdleConnections() {
+	t.mu.Lock()
+	for _, pair := range t.routes {
+		for _, rt := range pair {
+			if c, ok := rt.(interface{ CloseIdleConnections() }); ok {
+				c.CloseIdleConnections()
+			}
+		}
+	}
+	t.mu.Unlock()
 	for _, rt := range []http.RoundTripper{t.proxy, t.direct} {
 		if closer, ok := rt.(interface{ CloseIdleConnections() }); ok {
 			closer.CloseIdleConnections()
@@ -212,7 +301,7 @@ func (t *mappedNetworkTransport) CloseIdleConnections() {
 }
 func (t *automaticNetworkTransport) roundTripRoutes(r *http.Request, proxyRoute, directRoute http.RoundTripper) (*http.Response, error) {
 	if t.settings.Mode == "auto" {
-		t.refreshProxy(strings.TrimSpace(systemProxyAddress()))
+		t.refreshProxy(strings.TrimSpace(t.currentSystemProxy()))
 	}
 	trace, _ := r.Context().Value(networkTraceKey{}).(*networkTrace)
 	t.mu.Lock()
@@ -420,20 +509,37 @@ func (t *automaticNetworkTransport) probeGroup(group string) {
 func systemProxyAddress() string { return getenvSystemProxy() }
 
 func newAutomaticNetworkTransport(settings championNetworkSettings, p *championProvider) *automaticNetworkTransport {
+	t := newAutomaticNetworkTransportForProxy(settings, p, systemProxyAddress)
+	t.routeProvider = p
+	return t
+}
+
+func (t *automaticNetworkTransport) currentSystemProxy() string {
+	if t.resolveProxy != nil {
+		return t.resolveProxy()
+	}
+	return systemProxyAddress()
+}
+
+func newAutomaticNetworkTransportForProxy(settings championNetworkSettings, p *championProvider, resolve func() string) *automaticNetworkTransport {
 	raw := settings.URL
 	if settings.Mode == "auto" {
-		raw = systemProxyAddress()
+		raw = resolve()
 	}
 	direct := newChampionHTTPClient(nil).Transport
 	proxyTransport := newChampionHTTPClient(func(r *http.Request) (*url.URL, error) {
 		address := settings.URL
 		if settings.Mode == "auto" {
-			address = systemProxyAddress()
+			address = resolve()
 		}
 		if address == "" {
 			return nil, nil
 		}
-		return url.Parse(address)
+		proxy, err := url.Parse(address)
+		if err == nil && (proxy.Scheme == "socks5" || proxy.Scheme == "socks5h") {
+			return nil, nil // DialContext bounds the complete SOCKS handshake below.
+		}
+		return proxy, err
 	}).Transport.(*http.Transport)
 	proxyTransport.TLSHandshakeTimeout = 3 * time.Second
 	proxyTransport.ResponseHeaderTimeout = 8 * time.Second
@@ -446,11 +552,29 @@ func newAutomaticNetworkTransport(settings championNetworkSettings, p *championP
 	// Dial/TLS errors before CONNECT are attributable to the selected proxy.
 	dial := proxyTransport.DialContext
 	proxyTransport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		selected := settings.URL
+		if settings.Mode == "auto" {
+			selected = resolve()
+		}
+		u, _ := url.Parse(selected)
+		if u != nil && (u.Scheme == "socks5" || u.Scheme == "socks5h") {
+			proxyAddress := u.Host
+			if u.Port() == "" {
+				proxyAddress = net.JoinHostPort(u.Hostname(), "1080")
+			}
+			dialer, err := netproxy.SOCKS5("tcp", proxyAddress, nil, &net.Dialer{Timeout: 3 * time.Second, KeepAlive: 30 * time.Second})
+			if err != nil {
+				return nil, &net.OpError{Op: "proxyconnect", Net: network, Err: err}
+			}
+			connectContext, cancel := context.WithTimeout(ctx, 3*time.Second)
+			defer cancel()
+			return dialer.(netproxy.ContextDialer).DialContext(connectContext, network, address)
+		}
 		c, err := dial(ctx, network, address)
 		if err != nil {
 			raw := settings.URL
 			if settings.Mode == "auto" {
-				raw = systemProxyAddress()
+				raw = resolve()
 			}
 			u, _ := url.Parse(raw)
 			if u != nil && address == u.Host {
@@ -459,7 +583,7 @@ func newAutomaticNetworkTransport(settings championNetworkSettings, p *championP
 		}
 		return c, err
 	}
-	return &automaticNetworkTransport{settings: settings, proxyURL: raw, proxy: proxyTransport, direct: direct, now: time.Now, choices: map[string]networkChoice{}, probes: networkProbeURLs, record: func(e map[string]any) {
+	return &automaticNetworkTransport{settings: settings, proxyURL: raw, resolveProxy: resolve, proxy: proxyTransport, direct: direct, now: time.Now, choices: map[string]networkChoice{}, probes: networkProbeURLs, record: func(e map[string]any) {
 		if p.diag != nil {
 			p.diag(e)
 		}

@@ -250,6 +250,7 @@ type sgpSummonerCacheEntry struct {
 
 func newSGPProvider() *sgpProvider {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
 	transport.MaxIdleConns = 32
 	transport.MaxIdleConnsPerHost = 8
 	transport.IdleConnTimeout = 90 * time.Second

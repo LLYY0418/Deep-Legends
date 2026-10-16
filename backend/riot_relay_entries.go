@@ -361,7 +361,7 @@ func (m *riotRelayEntryManager) client(base *http.Client, e riotRelayEntry) *htt
 	}
 	copy := *base
 	if owner, ok := base.Transport.(*automaticNetworkTransport); ok {
-		copy.Transport = &mappedNetworkTransport{owner: owner, proxy: relayEntryTransport(owner.proxy, e), direct: relayEntryTransport(owner.direct, e)}
+		copy.Transport = &mappedNetworkTransport{owner: owner, mapRoute: func(rt http.RoundTripper) http.RoundTripper { return relayEntryTransport(rt, e) }}
 	} else {
 		copy.Transport = relayEntryTransport(base.Transport, e)
 	}

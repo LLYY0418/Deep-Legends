@@ -36,6 +36,7 @@
   doc.addEventListener('focusout',()=>w.queueMicrotask(pump));w.addEventListener('deep-legends:modal-idle',pump);
   w.addEventListener('deep-legends:gameflow',e=>{phase=e.detail?.phase || 'None';pump();});doc.addEventListener('visibilitychange',pump);w.addEventListener('deep-legends:announcements-changed',()=>void load());
   w.desktopWindow?.onVisible(()=>{visible=true;pump();});
+  w.addEventListener('deep-legends:riot-relay-recovered',()=>void load());
   async function load(){if(fetching || stopped)return;fetching=true;try{const data=await requestJSON('/api/announcements',{timeoutMs:4000});if(!Array.isArray(data?.announcements))return;notices=data.announcements.slice().sort((a,b)=>Date.parse(b.updatedAt)-Date.parse(a.updatedAt));source=data.source || 'bundled';pump();}catch{report(null,'fetch-failed');}finally{fetching=false;}}
   async function startup(){try{const data=await requestJSON('/api/gameplay/phase',{timeoutMs:2000});phase=data?.phase || 'None';}catch{phase='None';}await load();}
   const timer=w.setInterval(()=>void load(),3600000);w.addEventListener('beforeunload',()=>{stopped=true;w.clearInterval(timer);observer.disconnect();},{once:true});if(initial)pump();else void startup();

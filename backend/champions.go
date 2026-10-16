@@ -89,6 +89,7 @@ type championProvider struct {
 	client                *http.Client
 	network               championNetworkSettings
 	activeProxy           string
+	systemProxyRoutes     map[string]string // exact target hostname -> PAC-selected proxy (empty means DIRECT)
 	networkRecovered      func()
 	cache                 *championDataCache
 	diag                  func(event map[string]any)

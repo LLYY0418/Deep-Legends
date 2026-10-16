@@ -719,6 +719,7 @@ func main() {
 	mux.HandleFunc("POST /api/champions/network", a.authorized(a.handleChampionNetwork))
 	mux.HandleFunc("GET /api/social/friends", a.authorized(a.handleSocialFriends))
 	mux.HandleFunc("POST /api/system-proxy", a.authorized(a.handleSystemProxy))
+	mux.HandleFunc("GET /api/system-proxy", a.authorized(a.handleSystemProxyTargets))
 	mux.HandleFunc("GET /api/champion-asset", a.authorized(a.handleChampionAsset))
 	mux.HandleFunc("POST /api/identity/refresh", a.authorized(a.handleIdentityRefresh))
 	mux.HandleFunc("POST /api/refresh", a.authorized(a.handleRefresh))
@@ -748,6 +749,7 @@ func main() {
 	mux.HandleFunc("POST /api/quit", a.authorized(a.handleQuit))
 	a.registerUpdateRoutes(mux)
 	a.updates = newUpdateManager(version, a.storage, a.broadcastUpdateEvent)
+	a.updates.client = a.externalHTTPClient(a.updates.client)
 	a.updates.foregroundBusy = func() bool {
 		if a.riot == nil || a.riot.foreground == nil {
 			return false

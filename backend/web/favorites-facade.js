@@ -540,4 +540,5 @@
   else window.addEventListener('deep-legends:status',onStatus);
   window.deepLegendsSections?.register('favorites-facade',()=>{if(panelVisible())activate();});
   window.deepLegendsFavoritesFacade = Object.freeze({ activate, setView });
+  window.addEventListener("deep-legends:riot-relay-recovered",()=>{if(panelVisible() && state.connected && !state[state.view] && !state.flights[state.view])void load(state.view,true);});
 })();

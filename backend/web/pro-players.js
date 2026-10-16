@@ -189,6 +189,7 @@
     void syncVisibility();if(visible && !document.hidden)void load();
   }
   window.addEventListener("deep-legends:section", handleLazySection);
+  window.addEventListener("deep-legends:riot-relay-recovered",()=>{if(visible && !document.hidden && state.error && !state.loading)void load(true);});
   window.deepLegendsSections?.register("pro-players", handleLazySection);
   const dispose=()=>{disposed=true;clearTimeout(pollTimer);activeController?.abort();};
   window.addEventListener('beforeunload',dispose,{once:true});

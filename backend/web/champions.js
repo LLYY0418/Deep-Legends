@@ -3033,6 +3033,13 @@
   }
   window.addEventListener("deep-legends:section", handleLazySection);
   window.deepLegendsSections?.register("champions", handleLazySection);
+  window.addEventListener("deep-legends:riot-relay-recovered", () => {
+    if(state.section!=="champions" || document.hidden || state.loading)return;
+    if(state.selected && state.mode==="arena" && state.arenaDetailError && !state.arenaDetailLoading){state.arenaDetailLoading=true;loadArenaDetail(state.selected);}
+    else if(state.selected && state.mode==="aram-mayhem" && state.mayhemDetailError && !state.mayhemDetailLoading){state.mayhemDetailLoading=true;loadMayhemDetail(state.selected);}
+    else if(state.error){if(state.selected)void openDetail(state.selected);else void loadWorkspace(true);}
+    else if(state.mayhemAtlasError && !state.mayhemAtlasLoading)void loadMayhemAtlas(true);
+  });
 
   if (settingPosition) {
     settingPosition.value = state.position;

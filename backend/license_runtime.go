@@ -32,7 +32,7 @@ func licensePublicRoute(r *http.Request) bool {
 		return true
 	}
 	switch r.Method + " " + r.URL.Path {
-	case "GET /api/license/status", "POST /api/license/activate", "GET /api/privacy", "GET /api/diagnostics/log", "POST /api/diagnostics/client", "POST /api/diagnostics/startup", "POST /api/diagnostics/startup-stage", "POST /api/quit":
+	case "GET /api/license/status", "POST /api/license/activate", "GET /api/system-proxy", "POST /api/system-proxy", "GET /api/privacy", "GET /api/diagnostics/log", "POST /api/diagnostics/client", "POST /api/diagnostics/startup", "POST /api/diagnostics/startup-stage", "POST /api/quit":
 		return true
 	}
 	return licenseUpdateRoute(r)
@@ -255,7 +255,9 @@ func (a *app) licenseBusinessContext() context.Context {
 }
 
 func (a *app) startApplicationBusiness(ctx context.Context) {
-	a.license = productionLicenseManager(a.recordDiagnostic)
+	a.license = productionLicenseManager(a.recordDiagnostic, a.externalHTTPClient(&http.Client{Timeout: licenseTimeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}))
 	goSafe("license_manager", func() { a.license.Run(ctx) })
 	goSafe("license_business", func() { a.runLicensedBusiness(ctx) })
 }
+
+func additionalSystemProxyTargets() []string { return []string{licenseOrigin} }

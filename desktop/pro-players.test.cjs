@@ -132,6 +132,20 @@ test("职业页懒加载、所有分组/账号、缺失状态、筛选缓存与�
   assert.deepEqual(errors, []);
 });
 
+test("R280 network recovery retries visible failed pro page once despite fresh cached data", async (t) => {
+  let mode="ok",release;
+  const {w,d,requests,section}=boot(t,{response:async()=>{if(mode==="fail")throw Error("network failed");if(mode==="pending")return new Promise(resolve=>{release=resolve});return fixture();}});
+  Object.defineProperty(d,"hidden",{value:false,configurable:true});
+  section();await tick();assert.equal(requests.length,1);
+  mode="fail";d.getElementById("pro-players-refresh").click();await tick();assert.equal(requests.length,2);
+  Object.defineProperty(d,"hidden",{value:true,configurable:true});
+  w.dispatchEvent(new w.CustomEvent("deep-legends:riot-relay-recovered"));await tick();assert.equal(requests.length,2);
+  Object.defineProperty(d,"hidden",{value:false,configurable:true});mode="pending";
+  for(let i=0;i<3;i++)w.dispatchEvent(new w.CustomEvent("deep-legends:riot-relay-recovered"));
+  await tick();assert.equal(requests.length,3);release(fixture());await tick();
+  w.dispatchEvent(new w.CustomEvent("deep-legends:riot-relay-recovered"));await tick();assert.equal(requests.length,3,"successful content must remain cached");
+});
+
 test("加载互斥、失败保留旧表、恢复与来源不可用名单", async (t) => {
   let fail = false, release;
   const { d, requests, section } = boot(t, { response: () => fail ? Promise.reject(new Error("network")) : new Promise((resolve) => { release = resolve; }) });

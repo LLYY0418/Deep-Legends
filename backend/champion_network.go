@@ -113,25 +113,54 @@ func championProxyFor(settings championNetworkSettings) (func(*http.Request) (*u
 // championProxyFor 的 auto 模式每次请求都会重新读取该环境变量，因此晚到也能生效。
 func (a *app) handleSystemProxy(w http.ResponseWriter, r *http.Request) {
 	var request struct {
-		Proxy string `json:"proxy"`
+		Proxy  string            `json:"proxy"`
+		Routes map[string]string `json:"routes"`
 	}
-	if err := decodeJSONRequest(r, &request, 4<<10); err != nil {
+	if err := decodeJSONRequest(r, &request, 32<<10); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	proxy := strings.TrimSpace(request.Proxy)
-	if a.licenseSideEffect(r.Context()) != nil {
-		http.Error(w, "软件授权已失效", http.StatusForbidden)
-		return
+	if request.Routes != nil {
+		targets := systemProxyTargets()
+		if len(request.Routes) > len(targets) {
+			http.Error(w, "代理目标无效", 400)
+			return
+		}
+		for host, raw := range request.Routes {
+			if targets[host] == "" {
+				http.Error(w, "代理目标无效", 400)
+				return
+			}
+			if raw != "" {
+				if _, err := validateChampionNetworkSettings(championNetworkSettings{Mode: "manual", URL: raw}); err != nil {
+					http.Error(w, "代理地址无效", 400)
+					return
+				}
+			}
+		}
+	}
+	if proxy != "" {
+		if _, err := validateChampionNetworkSettings(championNetworkSettings{Mode: "manual", URL: proxy}); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+	}
+	if p := a.champions; p != nil {
+		p.clientMu.Lock()
+		p.systemProxyRoutes = request.Routes
+		client := p.client
+		p.clientMu.Unlock()
+		if client != nil {
+			if transport, ok := client.Transport.(*automaticNetworkTransport); ok {
+				transport.refreshHostRoutes(request.Routes)
+			}
+		}
 	}
 	if proxy == "" {
 		_ = os.Unsetenv("DEEP_LEGENDS_SYSTEM_PROXY")
 		a.refreshAutomaticNetworkProxy("")
 		respondJSON(w, map[string]any{"ok": true, "proxy": ""})
-		return
-	}
-	if _, err := validateChampionNetworkSettings(championNetworkSettings{Mode: "manual", URL: proxy}); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	_ = os.Setenv("DEEP_LEGENDS_SYSTEM_PROXY", proxy)
@@ -181,6 +210,24 @@ func (a *app) refreshAutomaticNetworkProxy(raw string) {
 	if client != nil {
 		if t, ok := client.Transport.(*automaticNetworkTransport); ok && t.settings.Mode == "auto" {
 			t.refreshProxy(raw)
+			p.clientMu.RLock()
+			hasRoutes := len(p.systemProxyRoutes) > 0
+			p.clientMu.RUnlock()
+			if hasRoutes {
+				for group, endpoint := range t.probes {
+					request, err := http.NewRequest(http.MethodHead, endpoint, nil)
+					if err != nil {
+						continue
+					}
+					p.clientMu.RLock()
+					_, known := p.systemProxyRoutes[request.URL.Hostname()]
+					p.clientMu.RUnlock()
+					if known {
+						t.forRequest(request).probeGroup(group)
+					}
+				}
+				return
+			}
 			for group := range networkProbeURLs {
 				t.probeGroup(group)
 			}
@@ -226,6 +273,17 @@ func (a *app) recoverExternalNetwork() {
 		}
 		c.mu.Unlock()
 	}
+	a.assetCacheMu.Lock()
+	a.assetFailureUntil = map[string]time.Time{}
+	a.assetHostTimeouts = map[string]int{}
+	a.assetHostBackoffUntil = map[string]time.Time{}
+	a.assetCacheMu.Unlock()
+	notices := a.announcementState()
+	notices.mu.Lock()
+	if notices.fetchFailed {
+		notices.at = time.Time{}
+	}
+	notices.mu.Unlock()
 	a.recordDiagnostic(map[string]any{"event": "network_proxy_recovered"})
 	a.broadcastEvent(`{"type":"riot-relay-recovered"}`)
 }

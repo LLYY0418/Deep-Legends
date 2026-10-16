@@ -20,6 +20,7 @@ type licenseManager struct{}
 var errLicenseLocked = errors.New("business context unavailable")
 
 func productionLicenseManager(func(map[string]any)) *licenseManager { return nil }
+func additionalSystemProxyTargets() []string                        { return nil }
 func (a *app) startApplicationBusiness(ctx context.Context) {
 	a.mu.Lock()
 	a.proRefreshContext = ctx
