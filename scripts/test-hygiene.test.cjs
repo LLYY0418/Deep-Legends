@@ -55,6 +55,7 @@ test("the baseline writer refuses to raise a count without an explicit, reviewed
 test("R281 mutations: silent timeout and initially true app readiness fail the ratchet",()=>{
  const silent="await new Promise(resolve=>{const t=setInterval(check,50);setTimeout(()=>{clearInterval(t);resolve();},5000);});";
  assert.equal(scanSource(silent)['silent-timeout'],1);
+ assert.equal(scanSource(silent.replace('const t=setInterval(check,50);',''))['silent-timeout'],1,'the worklist timeout branch is unsafe even when the polling timer is created outside the promise');
  assert.equal(scanSource(silent.replace('resolve();','reject(Error(\"not ready\"));'))['silent-timeout'],0);
  assert.equal(scanSource(silent.replace('()=>{clearInterval(t);resolve();}','()=>resolve()'))['silent-timeout'],1);
  assert.equal(scanSource(silent.replace('()=>{clearInterval(t);resolve();}','resolve'))['silent-timeout'],1);

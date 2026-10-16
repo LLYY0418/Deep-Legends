@@ -41,7 +41,7 @@ function scanSource(source) {
     const start=text.indexOf('(',promise.index),body=text.slice(start,callEnd(text,start)),resolve=promise[1];
     // A lone timer pause belongs to sleep. A readiness check plus a resolving
     // timeout is the silent escape that can turn failed readiness into success.
-    if(!/\bsetInterval\s*\(|\b(?:if|while)\s*\(/.test(body))continue;
+    if(!/\b(?:setInterval|clearInterval)\s*\(|\b(?:if|while)\s*\(/.test(body))continue;
     for(const timer of body.matchAll(/\bsetTimeout\s*\(/g)){
       const timerStart=body.indexOf('(',timer.index),callback=body.slice(timerStart+1,callEnd(body,timerStart)-1);
       const resolves=new RegExp('(?:^\\s*'+resolve+'\\s*,|\\b'+resolve+'\\s*\\(\\s*\\))').test(callback);
