@@ -38,6 +38,7 @@
     "scripts/r279-diagnostic-shards.test.cjs",
     "scripts/r279-ci-routing.test.cjs",
     "scripts/r279-quick-workflow.test.cjs",
-    "scripts/release-plan.test.cjs"
+    "scripts/release-plan.test.cjs",
+    "scripts/r279-diagnostic-artifacts.test.cjs"
   ]
 }
