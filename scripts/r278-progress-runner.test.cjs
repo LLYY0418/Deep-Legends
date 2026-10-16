@@ -34,3 +34,15 @@ test('R278 actual asynchronous child records stdout and final target-verified mu
   assert.equal(r.exit,0);assert(r.progress.stdoutBytes>0);assert.deepEqual(r.progress.mutants,[{id:'fixture',state:'killed'}]);
  }finally{fs.rmSync(directory,{recursive:true,force:true});}
 });
+
+test('nested mutant screenshots remain real progress beyond the former fixed window',async()=>{
+ const f=fixture();try{for(let i=0;i<9;i++){f.tick(8);fs.writeFileSync(path.join(f.directory,`frame-${i}.png`),String(i));f.watch();}f.child.emit('close',1,null);const r=await f.promise;assert.equal(r.exit,1);assert.equal(r.progress.elapsedMs,72);assert.equal(r.progress.lastProgress.kind,'result-files');assert.equal(f.stopped,false);}finally{f.cleanup();}
+});
+async function nestedProbe(exit){
+ const vm=require('node:vm'),source=fs.readFileSync(path.join(__dirname,'r277-frontend-browser-mutations.cjs'),'utf8'),a=source.indexOf('  const run=await runProgressChild('),b=source.indexOf('  const failure=',a);
+ assert(a>=0&&b>a,'each real mutant must use the shared progress child rather than a fixed spawn timeout');
+ let options;const writes=[];
+ await vm.runInNewContext('(async()=>{'+source.slice(a,b)+'})()',{__dirname,runProgressChild:async o=>{options=o;return {exit,progress:{label:'p8-binding'}};},process:{execPath:'node',env:{}},path,root:'/project',override:'/scratch/web',out:'/scratch/output',report:'/proof',id:'p8-binding',assert,fs:{writeFileSync:(...args)=>writes.push(args)}});
+ assert.equal(options.directory,'/scratch/output');assert.equal(options.idleMs,180000);assert.equal(options.totalMs,900000);assert.equal(options.label,'p8-binding');assert.equal(options.env.R277_MUTATION_PROBE,'1');assert.equal(options.env.R266_WEB_OVERRIDE,'/scratch/web');assert.equal(options.env.R266_BROWSER_OUT,'/scratch/output');assert(writes.some(([file])=>file.endsWith('p8-binding-progress.json')));
+}
+test('actual nested mutant runner keeps bounded progress and requires an assertion failure exit',async()=>{await nestedProbe(1);await assert.rejects(nestedProbe(0),/p8-binding must fail/);await assert.rejects(nestedProbe(null),/p8-binding must fail/);});
