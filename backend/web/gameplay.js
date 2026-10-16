@@ -4169,7 +4169,10 @@
       if(typeof ResizeObserver!=="undefined" && !collection._tagObserver) {
         collection._tagObserver=new ResizeObserver(fit);collection._tagObserver.observe(collection);
         const main=collection.closest?.('.match-entry')?.querySelector('.match-main');
-        if(main)collection._tagObserver.observe(main);
+        if(main){
+          collection._tagObserver.observe(main);
+          for(const target of main.querySelectorAll('.match-loadout-mini,.match-kda'))collection._tagObserver.observe(target);
+        }
       }
     }
   }
@@ -9775,8 +9778,8 @@
   renderOverview("players");
   renderLive();
   renderCapabilitySettings();
-  restoreCommittedClientStatus();
   ensureAugments();
+  restoreCommittedClientStatus();
   requestAnimationFrame(() => {
     const defaultSection = ["overview", "champions", "live", "favorites", "suite"].includes(state.settings.defaultPage) ? state.settings.defaultPage : "overview";
     if (defaultSection !== "overview") document.querySelector(`[data-section="${defaultSection}"]`)?.click();
