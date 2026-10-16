@@ -4171,7 +4171,7 @@
         const main=collection.closest?.('.match-entry')?.querySelector('.match-main');
         if(main){
           collection._tagObserver.observe(main);
-          for(const target of main.querySelectorAll('.match-loadout-mini,.match-kda'))collection._tagObserver.observe(target);
+          for(const target of main.querySelectorAll('.match-champion,.match-loadout-mini,.match-kda'))collection._tagObserver.observe(target);
         }
       }
     }
