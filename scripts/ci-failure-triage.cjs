@@ -17,7 +17,7 @@ const root = path.resolve(__dirname, "..");
 const CATEGORIES = [
   ["crash", /panic:|SIGSEGV|SIGKILL|SIGABRT|fatal error:|out of memory|Target closed|Session closed|browser (?:has )?disconnected|Chrome (?:exited|crashed)|ECONNRESET|socket hang up|unexpected exit/i],
   ["watchdog", /WAIT_HARD_LIMIT|hard limit|watchdog|File exceeded|exceeded .*budget|budget exceeded|suite exceeded/i],
-  ["wait-timeout", /WAIT_STALLED|no observable progress|timed? ?out|timeout|did not mount|did not finish|did not (?:start|load|reach|appear)|condition timeout|deadline exceeded/i],
+  ["wait-timeout", /WAIT_STALLED|no observable progress|timed? ?out|timeout|did not mount|did not finish|did not (?:start|load|reach|appear)|condition timeout|deadline exceeded|\bdownload stuck\b/i],
   ["assertion", /AssertionError|ERR_ASSERTION|\bassert(?:ion|s)?\b|\bexpected\b|\bactual\b|Expected values|not (?:deep)?equal/i],
 ];
 
@@ -68,7 +68,14 @@ function parseLog(text, evidence) {
       const located = /(?:\(|\s|')((?:[\w./\\:-]*?)(?:backend|desktop|scripts)[\w./\\-]*\.(?:cjs|js)):\d+/.exec(detail);
       rows.push({ kind: "node-test", name: m[1], file: relFile(located ? located[1] : ""), message: detail.slice(0, 600), evidence });
     } else if ((m = /^\s*--- FAIL: (\w+)/.exec(line))) {
-      rows.push({ kind: "go-test", name: m[1], file: "", message: lines.slice(i + 1, i + 6).join("\n").slice(0, 600), evidence });
+      // go test prints t.Fatal diagnostics before --- FAIL, not after it.
+      let start = i;
+      while (start > 0 && !/^\s*(?:=== RUN|--- (?:PASS|FAIL|SKIP):)/.test(lines[start - 1])) start--;
+      const before = lines.slice(start, i).filter((s) => /^\s+\S+_test\.go:\d+:/.test(s));
+      const detail = (before.length ? before : lines.slice(i + 1, i + 6)).join("\n").slice(0, 600);
+      const located = /(?:^|\s)([\w./\-]+_test\.go):(\d+):/.exec(detail);
+      const file = located ? (located[1].includes("/") ? relFile(located[1]) : "backend/" + located[1]) : "";
+      rows.push({ kind: "go-test", name: m[1], file, message: detail, evidence, ...(located ? { line: Number(located[2]) } : {}) });
     } else if ((m = /^not ok \d+ - (.+)$/.exec(line))) {
       const detail = lines.slice(i + 1, i + 14).join("\n");
       const located = /location: '([^']+?):\d+:\d+'/.exec(detail);

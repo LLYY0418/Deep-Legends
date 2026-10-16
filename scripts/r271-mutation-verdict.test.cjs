@@ -33,3 +33,14 @@ test('R271 summary selects the real PowerShell assertion rather than the throw s
  const detail=python(`print(json.dumps(d('unflushed-output',1,${JSON.stringify(log)},'r271/unflushed.log')))`);
  assert.equal(detail.message,'ASSERTION FAILED: redirected output must finish before success or failure is handled');
 });
+
+test('R271 ANSI-formatted real assertion text is normalized without accepting unrelated failures',()=>{
+ const cases=[];
+ for(const [color,reset]of [['\u001b[31;1m','\u001b[0m'],['\\u001b[31;1m','\\u001b[0m'],['\\x1B[31;1m','\\x1B[0m']]){
+  const log=tap(target,`${color}intended${reset}\n${color}    | ${color}contract${reset}`);
+  cases.push({log,want:true},{log:log+' ETIMEDOUT',want:false},{log:log.replace(target,'unrelated'),want:false});
+ }
+ const values=python(`cases=json.loads(${JSON.stringify(JSON.stringify(cases))}); print(json.dumps([v(1,c['log'],True,${JSON.stringify(target)},${JSON.stringify(signature)}) for c in cases]))`);assert.deepEqual(values,cases.map(c=>c.want));
+ const log='    \\u001b[31;1m     | \\u001b[31;1mASSERTION FAILED: redirected output must finish before success or\\u001b[0m\n    \\u001b[31;1m     | \\u001b[31;1mfailure is handled\\u001b[0m\n';
+ assert.equal(python(`print(json.dumps(d('unflushed-output',1,${JSON.stringify(log)},'r271/unflushed.log')))` ).message,'ASSERTION FAILED: redirected output must finish before success or failure is handled');
+});

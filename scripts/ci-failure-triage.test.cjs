@@ -211,3 +211,14 @@ test('R271 mutation wrapper preserves the original timeout location, stage and l
  assert(annotations(report).some(line=>line.includes('event-query-start')&&line.includes('backend/web/r271.test.cjs')));assert(report.failures.some(f=>f.name==='AssertionError: baseline'));
  const malformed=parseLog('R279_MUTATION_FAILURE {bad\nError: original failure','job.log');assert(malformed.some(f=>f.name==='Error: original failure'));
 });
+
+
+test("real Go failure keeps its preceding diagnostic instead of the following test", () => {
+  const rows = parseLog("=== RUN   TestR196SlowSourceSwitchResumesAndHashes\n    r196_test.go:252: download stuck\n--- FAIL: TestR196SlowSourceSwitchResumesAndHashes (6.96s)\n=== RUN   TestNext\n--- PASS: TestNext (0.51s)", "windows.log");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].file, "backend/r196_test.go");
+  assert.equal(rows[0].line, 252);
+  assert.equal(rows[0].message.trim(), "r196_test.go:252: download stuck");
+  assert.equal(classify(rows[0].message), "wait-timeout");
+  assert.doesNotMatch(rows[0].message, /TestNext/);
+});

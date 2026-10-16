@@ -3,7 +3,13 @@ import json,re
 
 INFRA = re.compile(r'ETIMEDOUT|ENOENT|ParserError|SyntaxError|Cannot find module|ReferenceError|TypeError|spawn error|WAIT_STALLED|WAIT_HARD_LIMIT')
 
+def display_text(log):
+    # Remove only terminal SGR formatting, including Node TAP's escaped form.
+    # Keep raw evidence unchanged and do not decode arbitrary path/Unicode escapes.
+    return re.sub(r'(?:\x1b|\\u001b|\\x1b)\[[0-9;]*m', '', log, flags=re.I)
+
 def verify(returncode, log, negative=False, target=None, assertion=None):
+    log = display_text(log)
     if not negative:
         return returncode == 0
     if returncode != 1 or INFRA.search(log) or not target or not assertion:
@@ -18,6 +24,7 @@ def verify(returncode, log, negative=False, target=None, assertion=None):
         for block in failures)
 
 def failure_detail(name, returncode, log, evidence, target=None, assertion=None):
+    log = display_text(log)
     locations = re.findall(r"location: ['\"]([^'\"]+\.(?:cjs|js)):(\d+):\d+", log)
     if not locations:
         locations = re.findall(r'([^\s()]*?/(?:backend|desktop|scripts)/[^\s():]+\.(?:cjs|js)):(\d+):\d+',log)
