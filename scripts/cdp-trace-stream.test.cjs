@@ -1,0 +1,12 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const {readTraceStream,READ_BYTES}=require('./lib/cdp-trace-stream.cjs');
+async function discardTarget(read){const calls=[];const data=await read(async(method)=>{calls.push(method);return {data:'unused',eof:true}},'stream',{keep:false});assert.deepEqual(calls,['IO.close'],'discarded trace must close without downloading unused bytes');assert.equal(data.length,0);}
+test('unused successful-click trace is closed without an IO.read',()=>discardTarget(readTraceStream));
+async function retainedTarget(read){const bytes=Buffer.from('前后trace'),parts=[bytes.subarray(0,2),bytes.subarray(2)],calls=[];const result=await read(async(method,p)=>{calls.push(method);if(method==='IO.close')return {};assert.equal(p.handle,'stream');assert.equal(p.size,READ_BYTES,'retained trace reads must remain bounded');const data=parts.shift();return {data:data.toString('base64'),base64Encoded:true,eof:!parts.length}},'stream',{keep:true});assert.deepEqual(result,bytes,'all retained trace bytes must survive chunk boundaries');assert.deepEqual(calls,['IO.read','IO.read','IO.close']);}
+test('required trace is bounded per response and preserves split UTF8 bytes',()=>retainedTarget(readTraceStream));
+test('read failure still closes the stream and preserves the original error over cleanup errors',async()=>{const original=Error('read failed'),calls=[];await assert.rejects(readTraceStream(async method=>{calls.push(method);throw method==='IO.read'?original:Error('close failed')},'stream',{keep:true}),e=>e===original);assert.deepEqual(calls,['IO.read','IO.close']);});
+test('close failure is not hidden when no read error occurred',async()=>{await assert.rejects(readTraceStream(async()=>{throw Error('close failed')},'stream',{keep:false}),/close failed/);});
+function mutant(from,to){const source=fs.readFileSync(path.join(__dirname,'lib/cdp-trace-stream.cjs'),'utf8');assert(source.includes(from));const module={exports:{}};vm.runInNewContext(source.replace(from,to),{Buffer,module});return module.exports.readTraceStream;}
+test('mutation: reading discarded traces must fail the no-download target',async()=>{await assert.rejects(discardTarget(mutant('if(keep)for','if(true)for')),/discarded trace must close/);});
+test('mutation: removing the response bound must fail the retained-stream target',async()=>{await assert.rejects(retainedTarget(mutant(',size:READ_BYTES','')),/retained trace reads must remain bounded/);});

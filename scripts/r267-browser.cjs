@@ -9,6 +9,7 @@ const {browserAPI}=require('./r276-browser-api-fixtures.cjs');
 const root=path.resolve(__dirname,'..'),out=process.env.R267_BROWSER_OUT||path.join(os.tmpdir(),'deep-legends-r267-browser');
 const closedSessions=new Set(), canceledRequests=new Set();let canceledInterceptions=0;
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'r267-browser-')),errors=[],violations=[],results=[];let backend,chrome,ws;
+const evaluationFailures=new WeakMap();
 const inject=`window.__r267Base=structuredClone(overview);const source=overview.matches;overview.matches=Array.from({length:1000},(_,i)=>{const m=structuredClone(source[i%source.length]);m.gameId=900000+i;const p=m.participants.find(p=>p.participantId===m.subjectParticipantId);if(p){p.championId=[103,238,157,875,145,92,64,81,254,555,25,69,28,111,61,268,518,245,113,53,27,17,516,3][i%24];p.championName=['阿狸','劫','亚索','瑟提','卡莎','锐雯','李青','伊泽瑞尔','蔚','派克','莫甘娜','卡西奥佩娅','伊芙琳','深海泰坦','发条魔灵','沙皇','妮蔻','艾克','瑟庄妮','布里茨','辛吉德','提莫','奥恩','加里奥'][i%24];}return m;});if(new URLSearchParams(location.search).has('matrix'))overview.matches=['solo','hextech-aram','arena'].map(mode=>{const m=structuredClone(source.find(row=>row.modeGroup===mode)),p=m.participants.find(p=>p.participantId===m.subjectParticipantId);Object.assign(p,{kills:99,deaths:99,assists:99,kda:2});return m;});overview.pagination={begIndex:0,count:1000,hasMore:false};`;
 const intercept=`
  // Synthetic spell metadata, as in the R264 fixture. No backend/CDN fetch.
@@ -49,7 +50,11 @@ async function start(){
  const browserVersion=await send('Browser.getVersion');
  for(const theme of ['dark','light']){
   const {targetId}=await send('Target.createTarget',{url:'about:blank'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true}),call=(m,p)=>send(m,p,sessionId);
-  const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+  const evaluate=async expression=>{
+    const started=Date.now(),callers=[...(new Error().stack || '').matchAll(/(?:scripts|desktop)[\\/][A-Za-z0-9_./\\-]+\.cjs:\d+:\d+/g)].map(m=>m[0]);
+    try{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;}
+    catch(error){if(!evaluationFailures.has(error))evaluationFailures.set(error,{callers,elapsedMs:Date.now()-started});throw error;}
+  };
   const until=async expression=>{if(await waitForPage(evaluate,expression,{idleMs:15000,hardMs:90000}))return;throw Error('timeout '+expression+' '+await evaluate("JSON.stringify({loading:document.querySelector('#overview-content')?._overviewViewTab?.loading,html:document.querySelector('#overview-content')?.textContent.slice(0,600)})"));};
   const click=selector=>evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
   const frames=()=>evaluate('new Promise(resolve=>{let remaining=4;const frame=()=>--remaining?requestAnimationFrame(frame):resolve();requestAnimationFrame(frame)})');
@@ -144,4 +149,4 @@ async function start(){
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({host:{platform:process.platform,arch:process.arch,node:process.version,browser:browserVersion},completedAt:new Date().toISOString(),scope:'Real Chromium, embedded public assets and CSP; controlled synthetic API fixtures; screenshot pixel measurements',csp,results,errors,violations,canceledInterceptions},null,2));
  console.log(JSON.stringify({cases:results.length,errors:errors.length,violations:violations.length}));
 }
-start().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[temp]}));
+start().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,evaluationFailure:evaluationFailures.get(e),results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[temp]}));

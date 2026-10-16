@@ -937,10 +937,7 @@
         }else{
           if(Object.hasOwn(entry.dataset,'virtualMatch') || tab.openMatches?.has(entry.dataset.matchId) || !(height>0))continue;
           entry.style.minHeight=`${height}px`;entry.dataset.virtualMatch='';
-          for(const tags of entry.querySelectorAll('.match-tags-collection')) {
-            tags._tagObserver?.disconnect();delete tags._tagObserver;
-            if(tags._tagFitFrame){cancelAnimationFrame(tags._tagFitFrame);tags._tagFitFrame=0;}
-          }
+          releaseMatchTagObservers(entry);
           entry.innerHTML='<div class="match-virtual-skeleton gameplay-skeleton" aria-label="正在显示对局"><span></span><span></span><span></span></div>';stats.collapsed++;
         }
       }
@@ -4186,6 +4183,13 @@
     return doc._matchTagsPopover;
   }
 
+  function releaseMatchTagObservers(root) {
+    for(const tags of root?.querySelectorAll('.match-tags-collection') || []) {
+      tags._tagObserver?.disconnect();delete tags._tagObserver;
+      if(tags._tagFitFrame){cancelAnimationFrame(tags._tagFitFrame);tags._tagFitFrame=0;}
+    }
+  }
+
   function fitMatchTags(container, onlyNew = false) {
     for(const collection of container.querySelectorAll(".match-tags-collection")) {
       if(onlyNew && collection._tagObserver)continue;
@@ -4223,7 +4227,7 @@
         more.setAttribute("aria-label",`查看其余 ${hidden} 个标签`);
       };
       fit();
-      if(typeof ResizeObserver!=="undefined" && !collection._tagObserver) {
+      if(collection.isConnected!==false && typeof ResizeObserver!=="undefined" && !collection._tagObserver) {
         collection._tagObserver=new ResizeObserver(()=>{
           if(collection._tagFitFrame)return;
           collection._tagFitFrame=requestAnimationFrame(()=>{collection._tagFitFrame=0;fit();});
@@ -5233,10 +5237,11 @@
   function stashMatchFilterDOM(tab, view) {
     const container=overviewContainer(tab),list=container?.querySelector(".match-list");
     if(!list)return;
+    releaseMatchTagObservers(list);
     const fragment=document.createDocumentFragment();
     const placeholder=list.cloneNode(false);list.replaceWith(placeholder);fragment.appendChild(list);
     Object.assign(view,{fragment,list,openMatches:new Set(tab.openMatches),matchDetailTabs:new Map(tab.matchDetailTabs),buildPlayers:new Map(tab.buildPlayers || [])});
-    while(tab.matchViews.size>4) {const oldest=tab.matchViews.keys().next().value;tab.matchViews.delete(oldest);}
+    while(tab.matchViews.size>4) {const oldest=tab.matchViews.keys().next().value;disposeMatchRowHeight(tab.matchViews.get(oldest)?.list);tab.matchViews.delete(oldest);}
   }
 
   function restoreMatchFilterDOM(tab, view) {
@@ -5450,6 +5455,7 @@
     const cache=tab.filteredNodeCache ||= new Map(),removed=new Set();
     for(const [id,entry] of entries) {
       if(!current.has(id) || !visibleIDs.has(id)) {
+        releaseMatchTagObservers(entry);
         removed.add(entry);entries.delete(id);
         if(advanced && current.has(id)){cache.delete(id);cache.set(id,{entry,match:previous.get(id)});if(cache.size>60)cache.delete(cache.keys().next().value);}
       }
@@ -5470,7 +5476,7 @@
       if(entry && !changed && (!wasOpen || tab.openMatches.has(id))){if(old?.revision===match.revision)revisionSkipped++;continue;}
       const template=document.createElement('template');template.innerHTML=renderMatch(match,playerRef,tab);
       const replacement=template.content.firstElementChild;bindOverviewContent(replacement,tab);applyRenderedMetricStyles(replacement);prepareImages(replacement);
-      if(entry?.parentNode===list)entry.replaceWith(replacement);entries.set(id,replacement);
+      if(entry?.parentNode===list){releaseMatchTagObservers(entry);entry.replaceWith(replacement);}entries.set(id,replacement);
     }
     let position=0;
     for(const match of visible){const entry=entries.get(String(match.gameId));entry.hidden=false;if(list.children[position]!==entry){const placeholder=list.children[position];if(placeholder?.classList.contains('match-pending'))placeholder.replaceWith(entry);else list.insertBefore(entry,placeholder || null);}position++;}
@@ -8947,8 +8953,9 @@
   }, true);
   function disposeMatchRowHeight(root) {
     if (!root) return;
+    releaseMatchTagObservers(root);
     const lists = root.matches?.(".match-list") ? [root] : root.querySelectorAll(".match-list");
-    for (const list of lists) {list._rowHeightObserver?.disconnect();delete list._rowHeightObserver;delete list._measuredSummary;}
+    for (const list of lists) {list._virtualObserver?.disconnect();delete list._virtualObserver;list._rowHeightObserver?.disconnect();delete list._rowHeightObserver;delete list._measuredSummary;}
   }
 
   function observeMatchRowHeight(container) {

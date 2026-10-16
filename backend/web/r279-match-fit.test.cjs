@@ -78,11 +78,59 @@ function virtualizationCleanupScenario(source) {
 }
 test('virtualization releases hidden-card tag observations even without a ResizeObserver delivery',()=>virtualizationCleanupScenario(source));
 test('mutation: retaining hidden-card observations must fail before virtualization replaces DOM',()=>{
- const cleanup=`          for(const tags of entry.querySelectorAll('.match-tags-collection')) {
-            tags._tagObserver?.disconnect();delete tags._tagObserver;
-            if(tags._tagFitFrame){cancelAnimationFrame(tags._tagFitFrame);tags._tagFitFrame=0;}
-          }
-`;
+ const cleanup='          releaseMatchTagObservers(entry);\n';
  const broken=source.replace(cleanup,'');assert.notEqual(broken,source);
  assert.throws(()=>virtualizationCleanupScenario(broken),/virtualization must release tag observations/);
 });
+
+function disposalFixture(source,mode) {
+ const {JSDOM}=require('../../desktop/node_modules/jsdom');
+ const dom=new JSDOM('<main><div class="match-filterbar"></div><div class="match-list"><article class="match-entry" data-match-id="1"><span class="match-tags-collection"></span></article><article class="match-entry" data-match-id="2"></article></div></main>');
+ const d=dom.window.document,root=d.querySelector('main'),list=root.querySelector('.match-list'),old=list.firstChild,kept=list.lastChild,tag=old.firstChild,canceled=[];
+ let released=false,changed=false;tag._tagObserver={disconnect(){released=true}};tag._tagFitFrame=19;
+ const rows=[{gameId:1,revision:'old'},{gameId:2,revision:'kept'}];list._matchData=new Map(rows.map(m=>[String(m.gameId),m]));
+ const tab={data:{matches:mode==='replace'?[{gameId:1,revision:'new'},rows[1]]:[rows[1]]},openMatches:new Set(),matchViews:new Map()};
+ const deps={document:d,window:dom.window,globalThis:{deepLegendsHistoryFilters:null},cancelAnimationFrame:id=>canceled.push(id),filteredMatches:rows=>rows,bindOverviewContent(){},applyRenderedMetricStyles(){},prepareImages(){},overviewContainer:()=>root,renderMatch:m=>`<article class="match-entry" data-match-id="${m.gameId}"></article>`};
+ let name='reconcileFilteredMatchList';
+ if(mode==='stash'){name='stashMatchFilterDOM';const native=list.replaceWith.bind(list);list.replaceWith=(...args)=>{assert(released,'cache stash must release tag observers before detaching its list');changed=true;native(...args)};}
+ else if(mode==='dispose')name='disposeMatchRowHeight';
+ else {const method=mode==='replace'?'replaceWith':'remove',native=old[method].bind(old);old[method]=(...args)=>{assert(released,'ordinary filtering must release tag observers before removing a card');changed=true;native(...args)};}
+ try {
+  const f=compile(source,[name],deps);
+  if(mode==='stash'){const view={};f.stashMatchFilterDOM(tab,view);assert.equal(view.list,list);assert.equal(view.list.firstChild,old,'cached card DOM identity must remain unchanged');}
+  else if(mode==='dispose')f.disposeMatchRowHeight(root);
+  else {f.reconcileFilteredMatchList(list,tab);assert.equal(list.lastChild,kept,'unaffected card must retain DOM identity');}
+  assert(released,'full view disposal must release tag observers even without delivery');assert.equal(tag._tagObserver,undefined);assert.equal(tag._tagFitFrame,0);assert.deepEqual(canceled,[19]);if(mode!=='dispose')assert(changed);
+ }finally{dom.window.close();}
+}
+for(const mode of ['remove','replace'])test('ordinary filtering releases observers before '+mode+' without notification',()=>disposalFixture(source,mode));
+test('cache stash releases observations while preserving the retained card nodes',()=>disposalFixture(source,'stash'));
+test('full view disposal releases tag observations without a ResizeObserver delivery',()=>disposalFixture(source,'dispose'));
+test('mutation: removing the filter disposal hook must fail before a card leaves the list',()=>{
+ const broken=source.replaceAll('releaseMatchTagObservers(entry);','');assert.notEqual(broken,source);assert.throws(()=>disposalFixture(broken,'remove'),/ordinary filtering must release/);
+});
+test('mutation: removing the stash disposal hook must fail before the list is detached',()=>{
+ const broken=source.replace('releaseMatchTagObservers(list);','');assert.notEqual(broken,source);assert.throws(()=>disposalFixture(broken,'stash'),/cache stash must release/);
+});
+test('mutation: removing full-view disposal must fail the observation release target',()=>{
+ const broken=source.replace('releaseMatchTagObservers(root);','');assert.notEqual(broken,source);assert.throws(()=>disposalFixture(broken,'dispose'),/full view disposal must release/);
+});
+function initiallyDetached(source){let created=0;const collection={isConnected:false,querySelectorAll:()=>[]};class ResizeObserver{constructor(){created++}observe(){}}const f=compile(source,['fitMatchTags'],{ResizeObserver,bindMatchTagsPopover:()=>({anchor:null})});f.fitMatchTags({querySelectorAll:()=>[collection]});assert.equal(created,0,'first fit on detached collections must not create a new observation');}
+test('first fit on detached collections does not allocate new observations',()=>initiallyDetached(source));
+test('mutation: observing a detached cached list must fail the allocation target',()=>{const broken=source.replace('collection.isConnected!==false && ','');assert.notEqual(broken,source);assert.throws(()=>initiallyDetached(broken),/first fit on detached collections/);});
+
+function virtualizerDisposal(source){
+ const {JSDOM}=require('../../desktop/node_modules/jsdom'),dom=new JSDOM('<div class="match-list"><article class="match-entry" data-match-id="1"><span class="match-tags-collection"></span></article></div>');
+ const list=dom.window.document.querySelector('.match-list'),entry=list.firstChild,observers=[],frames=new Map();let serial=0;entry.getBoundingClientRect=()=>({height:120});
+ class IntersectionObserver{constructor(callback,options){this.callback=callback;this.options=options;observers.push(this)}observe(){}disconnect(){this.disconnected=true}}
+ try{const f=compile(source,['boundMatchDOM','disposeMatchRowHeight'],{window:{IntersectionObserver},document:dom.window.document,requestAnimationFrame:fn=>{frames.set(++serial,fn);return serial},cancelAnimationFrame:id=>frames.delete(id),Date:{now:()=>0}});f.boundMatchDOM(list,{openMatches:new Set()});observers.find(o=>o.options.rootMargin==='3200px 0px').callback([{target:entry,isIntersecting:false}]);assert.equal(frames.size,1);f.disposeMatchRowHeight(list);assert(observers.every(o=>o.disconnected),'view disposal must disconnect both virtualizer observations');assert.equal(frames.size,0,'view disposal must cancel the pending virtualizer frame');assert.equal(list._virtualObserver,undefined);}finally{dom.window.close();}
+}
+test('view disposal cancels pending virtualization and disconnects both observers',()=>virtualizerDisposal(source));
+test('mutation: retaining the virtualizer must fail its disposal target',()=>{const broken=source.replace('list._virtualObserver?.disconnect();delete list._virtualObserver;','');assert.notEqual(broken,source);assert.throws(()=>virtualizerDisposal(broken),/view disposal must disconnect/);});
+function evictedFilterView(source){
+ const {JSDOM}=require('../../desktop/node_modules/jsdom'),dom=new JSDOM('<main><div class="match-list"></div></main>'),root=dom.window.document.querySelector('main'),evicted=dom.window.document.createElement('div');evicted.className='match-list';let disconnected=false;evicted._virtualObserver={disconnect(){disconnected=true}};
+ const tab={matchViews:new Map([['oldest',{list:evicted}],['b',{}],['c',{}],['d',{}],['current',{}]])};
+ try{const f=compile(source,['stashMatchFilterDOM'],{document:dom.window.document,overviewContainer:()=>root});f.stashMatchFilterDOM(tab,tab.matchViews.get('current'));assert.equal(tab.matchViews.size,4);assert(!tab.matchViews.has('oldest'));assert(disconnected,'evicted filter view must dispose its virtualizer');assert.equal(evicted._virtualObserver,undefined);}finally{dom.window.close();}
+}
+test('filter view LRU eviction disposes its layout observers',()=>evictedFilterView(source));
+test('mutation: deleting a retained view without disposal must fail the LRU target',()=>{const broken=source.replace('disposeMatchRowHeight(tab.matchViews.get(oldest)?.list);','');assert.notEqual(broken,source);assert.throws(()=>evictedFilterView(broken),/evicted filter view must dispose/);});
