@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "formal": {
+    "productRounds": 2,
+    "testInfrastructureRounds": 2,
+    "firstEvent": "push",
+    "subsequentEvent": "workflow_dispatch",
+    "measure_windows_renderers": true,
+    "sameSha": true,
+    "workflow": "ci.yml",
+    "retry": {
+      "maxRetriesPerJob": 1,
+      "requiresUnchangedTestAndFixtures": true,
+      "dispatchMayRerunWorkflow": true,
+      "stopOnRepeatedFailure": true,
+      "stopOnChangedTestOrFixtureFailure": true
+    }
+  },
+  "diagnostic": {
+    "branchPrefix": "codex/diagnostic-r279-",
+    "workflow": "probe-windows-browser.yml",
+    "releaseEvidence": false,
+    "sweepRequired": false
+  },
+  "local": {
+    "targetMs": 300000,
+    "maxAssociatedNodeCostShare": 0.6,
+    "maxUnprofiledGoCases": 25,
+    "unknownNodeFileMs": 5000,
+    "directChangedTestsRequired": true
+  },
+  "targets": {
+    "windowsFeedbackMs": 600000,
+    "fullRoundMs": 1200000,
+    "enforcement": "record-only; product budgets remain in renderer-budgets.cjs"
+  }
+}

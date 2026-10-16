@@ -3,7 +3,7 @@ name: quality-and-windows-release
 on:
   push:
     tags-ignore: ['v*']
-    branches: ['**']
+    branches: ['**', '!codex/diagnostic-r279-*']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -14,6 +14,12 @@ on:
 
 permissions:
   contents: read
+
+# R279: a newer push to a codex/probe-* branch cancels the run it supersedes. Every other ref (main, release
+# branches, pull requests, dispatches elsewhere) gets a group unique to the run, so nothing else is ever cancelled or queued.
+concurrency:
+  group: ${{ startsWith(github.ref, 'refs/heads/codex/probe-') && format('probe-{0}', github.ref) || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/heads/codex/probe-') }}
 
 jobs:
   quality:
@@ -212,6 +218,10 @@ jobs:
       - name: R277 frontend actual unit mutations
         if: ${{ !cancelled() }}
         run: node scripts/r277-ci-orchestrate.cjs frontend-mutants --out docs/history/reports/r277/ci-integration/linux/frontend
+      - name: R279 failure triage (facts only, never changes the result)
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-proof-linux --base release-base --evidence "docs/history/reports/r277/ci-integration/linux" --out "docs/history/reports/r277/ci-integration/linux/triage.json" --annotate
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -236,6 +246,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: R279 native upgrade stage collection and dependency proofs
+        shell: pwsh
+        run: ./scripts/r279-upgrade-stages.test.ps1
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24.13'
@@ -275,6 +288,10 @@ jobs:
         run: |
           python scripts/r277-installer-callbacks.py --native --out docs/history/reports/r277/ci-integration/native-windows/p11
           if ($LASTEXITCODE -ne 0) { throw 'P11 native callback race/GC regression or fatal mutation proof failed' }
+      - name: R279 failure triage (facts only, never changes the result)
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-native-windows --base release-base --evidence "docs/history/reports/r277/ci-integration/native-windows" --out "docs/history/reports/r277/ci-integration/native-windows/triage.json" --annotate
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -307,6 +324,7 @@ jobs:
         shell: bash
         run: node scripts/r277-ci-orchestrate.cjs build-browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
       - name: R277 strict real-browser geometry and 400-match matrix
+        id: r277_strict
         shell: bash
         run: node scripts/r277-ci-orchestrate.cjs browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
       - name: R277 actual deferred asset loading CSP cache and 503 recovery
@@ -317,8 +335,10 @@ jobs:
         if: ${{ !cancelled() }}
         shell: bash
         run: node scripts/r277-ci-cn-score.cjs browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/cn-score"
+      # R279: mutations only mean something when the base strict step passed; otherwise a base failure would be
+      # reported a second time as a "wrong failure" of every mutant. Skipped (not red) when the base step failed.
       - name: R277 actual browser mutations
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.r277_strict.outcome == 'success' }}
         shell: bash
         run: node scripts/r277-ci-orchestrate.cjs browser-mutants --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
       - name: R277 Windows same-400-match before-after long-task measurement
@@ -329,6 +349,10 @@ jobs:
         if: always()
         shell: bash
         run: node scripts/r277-ci-orchestrate.cjs cleanup-browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
+      - name: R279 failure triage (facts only, never changes the result)
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-browser-matrix-${{ matrix.os }} --base release-base --evidence "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/triage.json" --annotate
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -674,3 +698,42 @@ jobs:
           name: chromium-guards-linux
           path: evidence/**
           if-no-files-found: error
+
+  # R279: facts-only digest of the failed steps of the hash-pinned legacy jobs (their definitions stay untouched).
+  # Failed-step log excerpts become check-run annotations and an artifact; this job can never fail the run.
+  triage-legacy:
+    if: ${{ always() && !cancelled() && (needs.quality.result == 'failure' || needs.windows-build.result == 'failure' || needs.windows-tests.result == 'failure' || needs.windows-upgrade.result == 'failure' || needs.browser-main.result == 'failure' || needs.browser-r265.result == 'failure' || needs.mutations-1.result == 'failure' || needs.mutations-2.result == 'failure' || needs.mutations-3.result == 'failure') }}
+    needs: [quality, windows-build, windows-tests, windows-upgrade, browser-main, browser-r265, mutations-1, mutations-2, mutations-3]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: R279 failed-step digest (facts only, never changes the result)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          dir="$RUNNER_TEMP/triage"; mkdir -p "$dir"; : > "$dir/failed.log"
+          api="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs"
+          gh api "$api" --paginate --jq '.jobs[] | select(.conclusion=="failure") | .id' > "$dir/jobs.txt" 2> "$dir/gh-error.txt"
+          gh api "$api" --paginate --jq '.jobs[] | select(.conclusion=="failure") | .name as $j | .steps[] | select(.conclusion=="failure") | "\($j) / \(.name)"' 2>> "$dir/gh-error.txt" | head -20 | sed 's/^/::notice title=failed step::/'
+          for id in $(cat "$dir/jobs.txt"); do
+            curl -sSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/jobs/$id/logs" 2>> "$dir/gh-error.txt" | sed -E 's/^[^0-9]*[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z //' >> "$dir/failed.log"
+          done
+          node scripts/ci-failure-triage.cjs --job legacy --base release-base --log "$dir/failed.log" --out "$dir/triage-legacy.json" --annotate
+          echo "::notice title=digest input::failed jobs=$(wc -l < "$dir/jobs.txt") log bytes=$(wc -c < "$dir/failed.log") log lines=$(wc -l < "$dir/failed.log") first api error=$(head -c 160 "$dir/gh-error.txt" | tr '\n' ' ')"
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: triage-legacy
+          if-no-files-found: ignore
+          path: ${{ runner.temp }}/triage/**

@@ -249,7 +249,7 @@ func TestR196SlowSourceSwitchResumesAndHashes(t *testing.T) {
 	if err := u.Download(); err != nil {
 		t.Fatal(err)
 	}
-	waitUpdateDownload(t, u)
+	r196WaitDownloadProgress(t, u, &clock)
 	switches := events.named("update_download_source_switched")
 	if len(switches) != 1 || switches[0]["reason"] != "slow" || !head || offset <= 0 || u.Status().State != "ready" {
 		t.Fatalf("switches=%v head=%v offset=%d state=%s", switches, head, offset, u.Status().State)

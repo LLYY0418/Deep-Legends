@@ -22,11 +22,14 @@ test('R275 actual R265 held fulfill request keeps the original timeout and failu
  try{
   let calls=0,waits=0;
   const start=source.indexOf('const until=async expr=>'),end=source.indexOf('\n  const click=',start);
-  const until=vm.runInNewContext(source.slice(start,end)+'until',{pausedRequests:p.tracker,timeoutDiagnostic,JSON,Promise,Error,evaluate:async()=>++calls<=200?false:{ready:'complete'},setTimeout:(done,ms)=>{assert.equal(ms,50);waits++;p.advance(ms);done();}});
+  const until=vm.runInNewContext(source.slice(start,end)+'until',{pausedRequests:p.tracker,timeoutDiagnostic,JSON,Promise,Error,
+   // Model the original diagnostic consumer's virtual window; real watchdog
+   // progress/idle behaviour has a separate integrated regression test.
+   waitForPage:async(evaluate,expr,options)=>{assert.equal(options.idleMs,10000);assert.equal(options.hardMs,60000);for(let n=0;n<200;n++){if(await evaluate(expr))return true;waits++;p.advance(50);}return false;},evaluate:async()=>++calls<=200?false:{ready:'complete'},setTimeout:(done,ms)=>{assert.equal(ms,50);waits++;p.advance(ms);done();}});
   const error=await until('fixtureReady').then(()=>assert.fail('held request must time out'),error=>error);
   const catchStart=source.indexOf('main().catch(')+'main().catch('.length,catchEnd=source.indexOf(').finally(',catchStart);
-  const proc={exitCode:0},writeFailure=vm.runInNewContext('('+source.slice(catchStart,catchEnd)+')',{fs,path,out:directory,pausedRequests:p.tracker,results:[],errors:[],violations:[],JSON,console:{error(){}},process:proc});
-  writeFailure(error);const artifact=JSON.parse(fs.readFileSync(path.join(directory,'failure.json'),'utf8'));
+  const proc={exitCode:0},writeFailure=vm.runInNewContext('('+source.slice(catchStart,catchEnd)+')',{fs,path,out:directory,pausedRequests:p.tracker,results:[],errors:[],violations:[],JSON,console:{error(){}},captureFailure:undefined,process:proc});
+  await writeFailure(error);const artifact=JSON.parse(fs.readFileSync(path.join(directory,'failure.json'),'utf8'));
   assert.equal(proc.exitCode,1);assert.equal(waits,200);assert.equal(calls,201);assert.match(artifact.error,/timeout fixtureReady.*request-1/);
   assert.deepEqual(artifact.pendingFetch,[{id:'request-1',resourceType:'Image',path:'/api/champion-asset',session:'session-1',target:'target-1',release:'Fetch.fulfillRequest',dwellMs:10000}]);
   assert.doesNotMatch(JSON.stringify(artifact),/SECRET|PRIVATE|raw-request|raw-network|raw-session|raw-target|token=|key=|Cookie|Authorization/);

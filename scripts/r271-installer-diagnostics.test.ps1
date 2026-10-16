@@ -3,7 +3,28 @@ $ErrorActionPreference = 'Stop'
 $fixtureClock = [Diagnostics.Stopwatch]::StartNew()
 function Write-R271Stage([string]$Stage) { [Console]::Out.WriteLine(('R271_STAGE {0} {1}ms' -f $Stage, $fixtureClock.ElapsedMilliseconds)); [Console]::Out.Flush() }
 Write-R271Stage 'script-start'
-. $HelperSource
+[Console]::Out.WriteLine(('R271_ENGINE version={0} platform={1}' -f $PSVersionTable.PSVersion, $PSVersionTable.Platform))
+# Instrument only in-memory fixture copies; the installed helper and Run-Setup stay unchanged.
+function Add-R271FixtureTrace([string]$Text, [System.Collections.IDictionary]$Markers) {
+    foreach ($entry in $Markers.GetEnumerator()) {
+        if ($Text.Contains($entry.Key)) {
+            $Text = $Text.Replace($entry.Key, ("Write-R271Stage '" + $entry.Value + "-start'`n" + $entry.Key + "`nWrite-R271Stage '" + $entry.Value + "-done'"))
+        }
+    }
+    return $Text
+}
+$helperText = Get-Content -LiteralPath $HelperSource -Raw
+$helperText = Add-R271FixtureTrace $helperText ([ordered]@{
+    'Show-R271LogTail ''installer stderr'' ($Prefix + ''-stderr.log'')' = 'stderr-tail'
+    'Show-R271LogTail ''installer stdout'' ($Prefix + ''-stdout.log'')' = 'stdout-tail'
+    'if (Test-Path -LiteralPath $StartupLog) { Copy-Item -LiteralPath $StartupLog -Destination $startupCopy }' = 'startup-copy'
+    'Show-R271LogTail ''installer startup log'' $startupCopy' = 'startup-tail'
+    '$events = @(Get-WinEvent -FilterHashtable @{ LogName = ''Application''; StartTime = $now.AddMinutes(-5); Level = 2 } -ErrorAction Stop)' = 'event-query'
+    '$related = @(Select-R271ApplicationErrors -Events $events -ProcessID $Process.Id -File $File -StartedAt $StartedAt -Now $now)' = 'event-filter'
+    '$json = ConvertTo-R271SafeText ($record | ConvertTo-Json -Depth 10)' = 'diagnostic-json'
+    '$json | Set-Content -LiteralPath ($Prefix + ''-application-errors.json'') -Encoding utf8' = 'diagnostic-write'
+})
+. ([ScriptBlock]::Create($helperText))
 Write-R271Stage 'helper-loaded'
 function Assert-R271($Condition, [string]$Message) { if (!$Condition) { throw "ASSERTION FAILED: $Message" } }
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('r271-setup-test-' + [Guid]::NewGuid().ToString('N'))
@@ -30,6 +51,7 @@ function Get-WinEvent($FilterHashtable, $ErrorAction) {
     New-R271Event 1002 '321' $script:fixtureFile $now.AddMinutes(-6)
 }
 function Start-Process($FilePath, $ArgumentList, [switch]$PassThru, $RedirectStandardError, $RedirectStandardOutput) {
+    Write-R271Stage 'mock-process-start'
     $script:fixtureStarted = Get-Date
     Assert-R271 ($ArgumentList -eq "--update --dest `"$install`"") 'real update/destination arguments must be unchanged'
     Assert-R271 ($FilePath -eq $script:fixtureFile) 'actual installer file must be unchanged'
@@ -39,7 +61,8 @@ function Start-Process($FilePath, $ArgumentList, [switch]$PassThru, $RedirectSta
     [IO.File]::WriteAllText($RedirectStandardOutput, 'synthetic stdout preserved')
     [IO.File]::WriteAllText((Join-Path $env:TMP 'DeepLegendsSetup-startup.log'), '[pid=321] synthetic installer startup')
     $process = [PSCustomObject]@{ Id = 321; ExitCode = $script:fixtureExit }
-    $process | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value { param($Timeout); if ($null -eq $Timeout) { $script:flushCalls++; return }; return $true }
+    $process | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value { param($Timeout); if ($null -eq $Timeout) { $script:flushCalls++; Write-R271Stage 'mock-output-flushed'; return }; return $true }
+    Write-R271Stage 'mock-process-ready'
     return $process
 }
 try {
@@ -49,7 +72,13 @@ try {
     $source = Get-Content -LiteralPath $RunSource -Raw
     $match = [regex]::Match($source, '(?s)function Run-Setup\(.*?(?=\r?\nfunction Get-R265AppState)')
     Assert-R271 $match.Success 'actual Run-Setup function must be extracted'
-    . ([ScriptBlock]::Create($match.Value))
+    $tracedRun = Add-R271FixtureTrace $match.Value ([ordered]@{
+    '$process = Start-Process -FilePath $File -ArgumentList "--update --dest `"$install`"" -PassThru -RedirectStandardError ($prefix + ''-stderr.log'') -RedirectStandardOutput ($prefix + ''-stdout.log'')' = 'setup-launch'
+    '$process.WaitForExit() # Flush the redirected readers after the original bounded wait.' = 'setup-flush'
+    'Save-R271SetupFailure -File $File -Version $Version -Process $process -StartedAt $started -Prefix $prefix -StartupLog $startupLog' = 'failure-collector'
+})
+    . ([ScriptBlock]::Create($tracedRun))
+    foreach ($name in @('Start-Process','Get-WinEvent','Get-CimInstance')) { Assert-R271 ((Get-Command $name).CommandType -eq 'Function') ('fixture mock must own ' + $name) }
     Write-R271Stage 'fixture-ready'
     $hostLines = @(Save-R271RunnerHost $evidence)
     Write-R271Stage 'host-saved'
@@ -66,9 +95,12 @@ try {
     $script:fixtureVersion = '0.12.82'; $script:fixtureFile = Join-Path $fixture 'Setup-0.12.82.exe'
     $script:fixtureExit = 2
     Write-R271Stage 'nonzero-diagnostics-start'
+    Write-R271Stage 'output-list-create-start'
     $output = New-Object 'System.Collections.Generic.List[string]'
+    Write-R271Stage 'output-list-create-done'
     $failure = ''
     try { Run-Setup -File $script:fixtureFile -Version '0.12.82' | ForEach-Object { $output.Add([string]$_) } } catch { $failure = $_.Exception.Message }
+    Write-R271Stage 'nonzero-call-returned'
     Assert-R271 ($failure -eq 'Real installer failed: 2') 'original nonzero-exit failure must remain'
     $text = $output -join "`n"
     Assert-R271 ($text.Contains('fatal error: synthetic runtime crash') -and $text.Contains('synthetic stdout preserved') -and $text.Contains('synthetic installer startup')) 'all three diagnostic tails must precede throw'

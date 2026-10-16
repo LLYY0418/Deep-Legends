@@ -1,6 +1,7 @@
 // Real Chromium layout guard. No jsdom measurements or external npm dependency.
 // CHROME_BIN=/path/to/chrome node desktop/r117-browser.cjs
 'use strict';
+const {waitForPage}=require('../scripts/lib/wait-progress.cjs');
 const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
 const {spawn} = require('node:child_process');
@@ -46,7 +47,7 @@ async function main(){
  await call('Emulation.setDeviceMetricsOverride',{width:1500,height:1050,deviceScaleFactor:1,mobile:false});
  await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});
  await call('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/?demo'});
- const until=async expression=>{const started=Date.now();while(Date.now()-started<20000){if(await evaluate('Boolean('+expression+')'))return;await new Promise(r=>setTimeout(r,50));}throw Error('condition timeout: '+expression);};
+ const until=async expression=>{if(await waitForPage(evaluate,'Boolean('+expression+')',{idleMs:20000,hardMs:120000}))return;throw Error('condition timeout: '+expression);};
  await until('document.querySelector(".demo-flag")');
  await new Promise(r=>setTimeout(r,600));
 

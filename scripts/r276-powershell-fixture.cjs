@@ -7,7 +7,7 @@ function runFixture(engine,args,{cwd,execute=spawnSync}={}){
  const result=execute(engine,args,{cwd,encoding:'utf8',timeout:15000,env});
  if(result.error){
   const stages=(result.stdout||'').split(/\r?\n/).filter(line=>line.startsWith('R271_STAGE '));
-  assert.fail(`${result.error.code||'spawn error'}: ${result.error.message}\nPowerShell fixture stages:\n${stages.join('\n')||'[script did not report a stage]'}\nstdout:\n${result.stdout||''}\nstderr:\n${result.stderr||''}`);
+  assert.fail(`${result.error.code||'spawn error'}: ${result.error.message}\nPowerShell fixture status=${result.status??'null'} signal=${result.signal||'none'}\nPowerShell fixture stages:\n${stages.join('\n')||'[script did not report a stage]'}\nstdout:\n${result.stdout||''}\nstderr:\n${result.stderr||''}`);
  }
  return result;
 }

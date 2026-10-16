@@ -6,8 +6,8 @@ function condition(expression,event,ref,input){return vm.runInNewContext(express
 test('R276 complete CI excludes v tags while the unchanged release workflow keeps them',()=>{
  assert.match(ci,/push:\s+tags-ignore: \['v\*'\]/);
  const spec=require('../desktop/node_modules/js-yaml').load(ci).on.push;
- assert.deepEqual(spec.branches,['**'],'tags-ignore alone disables branch pushes');
- const branchRuns=(push,ref)=>ref.startsWith('refs/heads/') && (push.branches?.includes('**') || (!push.branches&&!push['branches-ignore']&&!push.tags&&!push['tags-ignore']));
+ assert.deepEqual(spec.branches,['**','!codex/diagnostic-r279-*'],'all existing branches remain full CI; only the newly authorized diagnostic namespace is excluded');
+ const {branchRuns}=require('./lib/ci-routing.cjs');
  for(const ref of ['refs/heads/codex/ci-hardening-r276','refs/heads/codex/release-0.12.84','refs/heads/feature/nested'])assert.equal(branchRuns(spec,ref),true);
  const missingBranches={...spec};delete missingBranches.branches;assert.equal(branchRuns(missingBranches,'refs/heads/codex/ci-hardening-r276'),false,'the original omission must suppress the trigger');
  const release=fs.readFileSync(path.join(root,'.github/workflows/release.yml'),'utf8');assert.match(release,/push:\s+tags:\s+- "v\*"/);

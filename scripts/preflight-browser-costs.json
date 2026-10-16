@@ -1,0 +1,22 @@
+{
+  "source": "c49315d2 Windows quick run 38871118069; observed conservative profile, not a timing budget",
+  "guards": {
+    "r100": 6421,
+    "r117": 4865,
+    "current-game-layout": 6912,
+    "overview-banner-layout": 3481,
+    "pro-players-layout": 4633,
+    "r258": 5565,
+    "r264": 93434,
+    "r266": 290431,
+    "r266-matrix": 36514,
+    "r267": 72627,
+    "r269-geometry": 32028,
+    "r269": 134580,
+    "r272": 23583,
+    "r278": 12755,
+    "r275-offline": 252835,
+    "r265": 254608,
+    "r277-strict": 151000
+  }
+}

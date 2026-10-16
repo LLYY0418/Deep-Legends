@@ -1,4 +1,5 @@
 'use strict';
+const {waitForPage}=require('./lib/wait-progress.cjs');
 const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 const {r265API}=require('./r276-browser-api-fixtures.cjs');
@@ -8,7 +9,7 @@ const pausedRequests=new PausedRequests();
 // are explicitly synthetic; this does not claim real Windows or LCU evidence.
 const {spawn,execFileSync}=require('node:child_process'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=process.env.R265_BROWSER_OUT || path.join(os.tmpdir(),'r265-browser'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'r265-browser-'));
-const errors=[],violations=[],results=[],closed=new Set(),canceled=new Set();let backend,chrome,ws;
+const errors=[],violations=[],results=[],closed=new Set(),canceled=new Set();let backend,chrome,ws,captureFailure,filterEvidence;
 const fixture=`
  const r265LoadedStatistics=window.__r265LoadedStatistics;
  const r265Sample=(data,k)=>{
@@ -82,9 +83,10 @@ async function main(){
   const {targetId}=await send('Target.createTarget',{url:'about:blank'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true}),call=(m,p)=>send(m,p,sessionId);
   pausedRequests.attach(sessionId,targetId);
   const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
-  const until=async expr=>{for(let i=0;i<200;i++){if(await evaluate(expr))return;await new Promise(r=>setTimeout(r,50));}throw timeoutDiagnostic('timeout '+expr+' '+JSON.stringify(await evaluate("({url:location.pathname,ready:document.readyState,hidden:document.hidden,section:document.querySelector('[data-section].is-active')?.dataset.section,body:document.body.textContent.slice(0,300),view:document.querySelector('#overview-content')?.textContent.slice(0,1200),demo:document.body.classList.contains('is-demo'),gameplay:!!window.deepLegendsGameplay,requests:window.__r265RecoveryRequests,styles:[...document.querySelectorAll('link[rel=stylesheet]')].map(n=>new URL(n.href).pathname)})")),pausedRequests);};
+  const until=async expr=>{if(await waitForPage(evaluate,expr,{idleMs:10000,hardMs:60000}))return;throw timeoutDiagnostic('timeout '+expr+' '+JSON.stringify(await evaluate("({userAgent:navigator.userAgent,scripts:[...document.scripts].map(n=>({path:n.src?new URL(n.src).pathname:'inline',async:n.async,defer:n.defer})),resources:performance.getEntriesByType('resource').filter(n=>/\\.(?:js|css)(?:[?]|$)/.test(n.name)).map(n=>({path:new URL(n.name).pathname,start:n.startTime,end:n.responseEnd})),runtime:!!window.deepLegendsRuntime,demoReady:typeof window.deepLegendsDemoReady,toast:typeof window.deepLegendsToast,launchHidden:document.querySelector('#client-launchpad')?.hidden,appInert:document.querySelector('#app-frame')?.inert,url:location.pathname,ready:document.readyState,hidden:document.hidden,section:document.querySelector('[data-section].is-active')?.dataset.section,body:document.body.textContent.slice(0,300),view:document.querySelector('#overview-content')?.textContent.slice(0,1200),demo:document.body.classList.contains('is-demo'),gameplay:!!window.deepLegendsGameplay,requests:window.__r265RecoveryRequests,styles:[...document.querySelectorAll('link[rel=stylesheet]')].map(n=>new URL(n.href).pathname)})")),pausedRequests);};
   const click=s=>evaluate(`document.querySelector(${JSON.stringify(s)}).click()`),frame=()=>evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
   const shot=async name=>{await frame();const v=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(v.data,'base64'));};
+  captureFailure=()=>shot('failure');
   await send('Target.activateTarget',{targetId});for(const m of ['Network.enable','Page.enable','Runtime.enable'])await call(m);await call('Runtime.addBinding',{name:'r265CSP'});
   await call('Page.addScriptToEvaluateOnNewDocument',{source:"localStorage.clear();window.EventSource=class{addEventListener(){}close(){}};document.addEventListener('securitypolicyviolation',e=>r265CSP(JSON.stringify({directive:e.effectiveDirective,blockedURI:e.blockedURI})));window.__r265LoadedStatistics="+JSON.stringify(loadedStats)});
   await call('Fetch.enable',{patterns:[{urlPattern:'*'}]});await call('Emulation.setDeviceMetricsOverride',{width,height:scenario?1100:1900,deviceScaleFactor:1,mobile:false});
@@ -111,12 +113,14 @@ async function main(){
    for(const count of [0,1,12]){
     await p.evaluate(`localStorage.setItem('deep-legends-history-presets-v1',JSON.stringify(Array.from({length:${count}},(_,i)=>({name:'常用 '+(i+1),conditions:{result:{values:['win'],not:false}}}))))`);
     await p.click('[data-af-page="saved"]');
+    await p.until("new Promise(resolve=>{let last='',stable=0;const sample=()=>{const menu=document.querySelector('[data-af-menu]'),snapshot=menu && JSON.stringify({page:menu._afMenuState?.page,className:menu.className,connected:menu.isConnected});stable=snapshot===last?stable+1:1;last=snapshot;if(stable>=3)resolve(menu?._afMenuState?.page==='saved');else requestAnimationFrame(sample);};sample();})");
+    filterEvidence=await p.evaluate("(()=>{const menu=document.querySelector('[data-af-menu]');return {at:performance.now(),className:menu.className,page:menu._afMenuState?.page,connected:menu.isConnected,ownerConnected:menu._afOwner?.isConnected,inline:menu.style.cssText,computed:getComputedStyle(menu).maxHeight,styles:[...document.styleSheets].map(s=>({href:s.href?new URL(s.href).pathname:'inline',disabled:s.disabled,rules:[...s.cssRules].filter(r=>r.cssText.includes('af-menu')).map(r=>r.cssText)}))};})()");
     const sizes=await p.evaluate("(()=>{const menu=document.querySelector('[data-af-menu]'),list=menu.querySelector('.af-saved-list'),footer=menu.querySelector('.af-savebar'),m=menu.getBoundingClientRect(),f=footer.getBoundingClientRect(),controls=[...footer.querySelectorAll('input,button')].map(n=>n.getBoundingClientRect());return {height:m.height,top:m.top,max:getComputedStyle(menu).maxHeight,scroll:list.scrollHeight>list.clientHeight,footerVisible:f.top>=m.top && f.bottom<=m.bottom && controls.every(r=>r.top>=m.top && r.bottom<=m.bottom)}})()");
     const frames=await p.evaluate("new Promise(resolve=>{const rows=[];const frame=()=>{const n=document.querySelector('[data-af-menu]'),r=n.getBoundingClientRect();rows.push({top:r.top,height:r.height,visible:!n.hidden && getComputedStyle(n).visibility!=='hidden' && Number(getComputedStyle(n).opacity)>0});if(rows.length<3)requestAnimationFrame(frame);else resolve(rows)};requestAnimationFrame(frame)})");
     assert(frames.every(f=>f.top===sizes.top && f.height===sizes.height && f.visible),JSON.stringify(frames));
     assert.equal(sizes.top+sizes.height/2,conditions.top+conditions.height/2);assert.equal(sizes.max,"640px");assert(sizes.footerVisible);heights.push(sizes.height);
     if(count<12)assert(sizes.height<640 && !sizes.scroll,JSON.stringify(sizes));else assert(sizes.height===640 && sizes.scroll,JSON.stringify(sizes));
-    results.push({case:'saved',theme,count,...sizes});await p.shot(theme+'-filter-saved-'+count);
+    results.push({case:'saved',theme,count,...sizes,filterEvidence});await p.shot(theme+'-filter-saved-'+count);
    }
    assert(heights[0]<heights[1] && heights[1]<heights[2],JSON.stringify(heights));await p.close();
   }
@@ -175,4 +179,4 @@ async function main(){
  assert.equal(errors.length,0,JSON.stringify(errors));assert.equal(violations.length,0,JSON.stringify(violations));
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({host:{platform:process.platform,node:process.version},csp,scope:'real Chromium; public production binary/CSP; synthetic API/image fixtures',results,errors,violations},null,2));console.log(JSON.stringify({cases:results.length,screenshots:fs.readdirSync(out).filter(f=>f.endsWith('.png')).length,errors:errors.length}));
 }
-main().catch(e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,pendingFetch:pausedRequests.snapshot(),results,errors,violations},null,2));console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[tmp]}));
+main().catch(async e=>{fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify({error:e.message,stack:e.stack,pendingFetch:pausedRequests.snapshot(),filterEvidence:typeof filterEvidence==='undefined'?undefined:filterEvidence,results,errors,violations},null,2));try{await captureFailure?.();}catch(screenshotError){console.error('failure screenshot unavailable: '+screenshotError.message);}console.error(e);process.exitCode=1;}).finally(()=>cleanupChromeTest({children:[chrome,backend],sockets:[ws],directories:[tmp]}));

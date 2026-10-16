@@ -6,7 +6,10 @@ test('R275 held Fetch request fails the original page wait and names only safe d
  let time=0;const tracker=new PausedRequests(()=>time);tracker.attach('raw-session','raw-target');tracker.enter(params(),'raw-session');
  const source=fs.readFileSync(path.join(__dirname,'../scripts/r265-browser.cjs'),'utf8'),start=source.indexOf('const until=async expr=>'),end=source.indexOf('\n  const click=',start);
  let evaluates=0,waits=0;
- const until=vm.runInNewContext(source.slice(start,end)+'until',{pausedRequests:tracker,timeoutDiagnostic,JSON,Promise,Error,evaluate:async()=>{evaluates++;return evaluates<=200?false:{ready:'complete'};},setTimeout:(done,ms)=>{assert.equal(ms,50);waits++;time+=ms;done();}});
+ const until=vm.runInNewContext(source.slice(start,end)+'until',{pausedRequests:tracker,timeoutDiagnostic,JSON,Promise,Error,
+  // This consumer fixture retains its original 200 virtual polls; the real shared
+  // watchdog is exercised separately in r279-harness-adapters.test.cjs.
+  waitForPage:async(evaluate,expr,options)=>{assert.equal(options.idleMs,10000);assert.equal(options.hardMs,60000);for(let n=0;n<200;n++){if(await evaluate(expr))return true;waits++;time+=50;}return false;},evaluate:async()=>{evaluates++;return evaluates<=200?false:{ready:'complete'};},setTimeout:(done,ms)=>{assert.equal(ms,50);waits++;time+=ms;done();}});
  await assert.rejects(until('fixtureReady'),error=>{assert.match(error.message,/timeout fixtureReady/);assert.match(error.message,/request-1/);assert.match(error.message,/demo-data.js/);assert.match(error.message,/"dwellMs":10000/);assert.match(error.message,/"release":"not-started"/);assert.match(error.message,/session-1/);assert.match(error.message,/target-1/);assert.doesNotMatch(error.message,/SECRET|PRIVATE|raw-request|raw-session|raw-target|token=|key=/);return true;});
  assert.equal(waits,200);assert.equal(evaluates,201);
 });

@@ -129,6 +129,12 @@
     settingsPage: "appearance",
   };
 
+  // Late-loaded consumers bootstrap from the committed state, without a new pull.
+  function readCommittedClientStatus() {
+    return state.status || state.clientView ? {...state.status, clientView:state.clientView} : null;
+  }
+  window.deepLegendsStatusSnapshot = readCommittedClientStatus;
+
   const el = Object.fromEntries([
     "connection", "connection-avatar", "refresh", "quit", "owned-count", "chroma-count", "pool-count", "remaining-count", "notice",
     "search", "rarity-button", "rarity-menu", "sort", "sort-button", "sort-label", "sort-menu", "sort-direction", "list-meta", "retry-list", "skin-grid", "skin-card-template",

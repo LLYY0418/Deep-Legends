@@ -1,0 +1,159 @@
+name: Windows browser quick probe
+# Diagnostic only: not release acceptance, no Go suite, mutation shards or upgrade chain.
+# Fixed partitions preserve the complete main + r265 guard set and the full strict matrix.
+on:
+  push:
+    branches: [codex/diagnostic-r279-*]
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Candidate branch or SHA to inspect
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: ${{ github.event_name == 'push' && format('diagnostic-{0}', github.ref) || format('diagnostic-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.revision.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - name: Resolve the requested ref once for every independent VM
+        id: revision
+        shell: bash
+        run: |
+          revision="$(git rev-parse HEAD)"
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$revision" >> "$GITHUB_OUTPUT"
+  browser:
+    needs: resolve
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [diagnostic-r266, diagnostic-offline, diagnostic-r265, diagnostic-main-a, diagnostic-main-b]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix desktop
+      - name: Real Chrome and native stage collection proof
+        shell: pwsh
+        run: |
+          $chrome = node -e "process.stdout.write(require('./scripts/r277-ci-orchestrate.cjs').chrome(process.env))"
+          "CHROME_BIN=$chrome" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if ('${{ matrix.shard }}' -eq 'diagnostic-r265') { ./scripts/r279-upgrade-stages.test.ps1; if ($LASTEXITCODE -ne 0) { throw 'native stage collection failed' } }
+      - name: Complete fixed guard partition with API census
+        shell: bash
+        run: node scripts/r276-browser-job.cjs "${{ matrix.shard }}" "$RUNNER_TEMP/r279-quick/${{ matrix.shard }}"
+      - name: Remove the owned regenerable fixture binary
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/r279-quick/${{ matrix.shard }}/r264-public.exe"
+      - name: Failure facts
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job "windows-browser-${{ matrix.shard }}" --evidence "$RUNNER_TEMP/r279-quick" --out "$RUNNER_TEMP/r279-quick/${{ matrix.shard }}/triage.json" --annotate
+      - name: Stamp the actual guard execution identity
+        if: always()
+        shell: bash
+        env:
+          DIAGNOSTIC_SHA: ${{ needs.resolve.outputs.sha }}
+        run: node scripts/r279-diagnostic-artifacts.cjs stamp "$RUNNER_TEMP/r279-quick" "${{ matrix.shard }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r279-quick-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/r279-quick/**
+          if-no-files-found: error
+  strict:
+    needs: resolve
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix desktop
+      - name: Build strict public fixture
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs build-browser --backend "$RUNNER_TEMP/r279-quick/public.exe" --out "$RUNNER_TEMP/r279-quick/strict"
+      - name: Full Windows strict matrix
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs browser --backend "$RUNNER_TEMP/r279-quick/public.exe" --out "$RUNNER_TEMP/r279-quick/strict"
+      - name: Clean owned executable
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/r279-quick/public.exe"
+      - name: Stamp the actual strict execution identity
+        if: always()
+        shell: bash
+        env:
+          DIAGNOSTIC_SHA: ${{ needs.resolve.outputs.sha }}
+        run: node scripts/r279-diagnostic-artifacts.cjs stamp "$RUNNER_TEMP/r279-quick" strict
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r279-quick-strict-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/r279-quick/**
+          if-no-files-found: error
+  coverage:
+    if: always()
+    needs: [resolve, browser, strict]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Select immutable artifacts from each latest actual execution
+        id: artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DIAGNOSTIC_SHA: ${{ needs.resolve.outputs.sha }}
+        run: node scripts/r279-diagnostic-artifacts.cjs select "$RUNNER_TEMP/r279-quick"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.artifacts.outputs.ids }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/r279-quick
+      - name: Require complete guard and strict evidence
+        if: always()
+        run: node scripts/r279-quick-summary.cjs "$RUNNER_TEMP/r279-quick"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r279-windows-browser-quick-summary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/r279-quick/quick-summary.json
+          if-no-files-found: error

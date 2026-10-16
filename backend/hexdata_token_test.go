@@ -199,8 +199,10 @@ func TestHexdataPageTokenNeverAppearsInDiagnosticsOrDisk(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected path %s", request.URL.Path)
 	}))
+	stateGate := r274Gate(t, provider.hexdata.stateDisk, "hexdata-state")
 	provider.diag = func(event map[string]any) { mu.Lock(); events = append(events, event); mu.Unlock() }
 	_, _ = provider.hexdata.load(r147HeroContext(), "hero-json", "887", "/api/hexdata/heroes/887", "application/json", false)
+	r274Wait(t, stateGate.entered, "privacy state writer not reached", provider.hexdata.stateDisk)
 	mu.Lock()
 	requestEvents := 0
 	for _, event := range events {
@@ -227,6 +229,15 @@ func TestHexdataPageTokenNeverAppearsInDiagnosticsOrDisk(t *testing.T) {
 		t.Fatal("hexdata_request diagnostics were not emitted")
 	}
 	mu.Unlock()
+	// The privacy inventory must observe completed durable writes, not transient
+	// atomic-write files. Release the controlled writer only as the drain sees it.
+	if err := r276HexdataRestartDrain(provider, r276ReleaseStateClock{r274RealClock{}, stateGate}); err != nil {
+		t.Fatal("privacy disk durability barrier", err)
+	}
+	state := r274QueueSnapshot([]*championDataCache{provider.cache, provider.hexdata.stateDisk})
+	if state.running != 0 || state.pending != 0 {
+		t.Fatal("privacy scan before pending writes settled")
+	}
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return err

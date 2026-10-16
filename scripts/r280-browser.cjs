@@ -2,8 +2,8 @@
 const {withBrowser}=require('./r280-browser-fixture.cjs');
 const assert=require('node:assert/strict');
 async function run(){await withBrowser(async({page,results,errors})=>{
- const p=await page('dark');await p.until("document.querySelector('.match-entry') && !__r278Game.activeTab().loading");
- for(const width of [1280,1583])for(const zoom of [1,1.4,2]){
+ const p=await page('dark');await p.evaluate("window.__r280LayoutErrors=[];window.addEventListener('error',e=>{if(/ResizeObserver loop/i.test(e.message))__r280LayoutErrors.push(e.message)})");await p.until("document.querySelector('.match-entry') && !__r278Game.activeTab().loading");
+ for(const width of [1280,1440,1583,1920])for(const zoom of [1,1.4,2]){
   await p.call('Emulation.setDeviceMetricsOverride',{width,height:951,deviceScaleFactor:1.75,mobile:false});
   await p.evaluate(`document.documentElement.style.setProperty('--ui-zoom','${zoom}');document.documentElement.dataset.uiScale='${zoom}';new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
   const geometry=await p.evaluate(`(()=>{const rect=n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right}},bar=document.querySelector('.topbar');return {bar:rect(bar),controls:[...bar.querySelectorAll('#player-search-region,.player-search-fields,#refresh,#friends-toggle,#announcements-button,#update-button')].filter(n=>n.getClientRects().length).map(n=>({id:n.id || n.className,...rect(n)})),icons:[...bar.querySelectorAll('.function-icon')].filter(n=>n.getClientRects().length).map(rect),subtitle:getComputedStyle(document.querySelector('.window-drag>span')).display,friendsLabel:getComputedStyle(document.querySelector('.friends-toggle-label')).display,count:document.querySelector('#friends-toggle').innerText,gap:innerWidth-138-Math.max(...[...bar.querySelectorAll('.topbar-actions>*')].filter(n=>n.getClientRects().length).map(n=>n.getBoundingClientRect().right))}})()`);
@@ -11,14 +11,16 @@ async function run(){await withBrowser(async({page,results,errors})=>{
   results.push({kind:'topbar',width,zoom,geometry});await p.shot(`topbar-${width}-${zoom}`);
  }
  // Forty real collapsed/expanded cards, with the true scrolling container.
- await p.call('Emulation.setDeviceMetricsOverride',{width:1583,height:951,deviceScaleFactor:1.75,mobile:false});
+ for(const width of [1280,1440,1583,1920]){
+ await p.call('Emulation.setDeviceMetricsOverride',{width,height:951,deviceScaleFactor:1.75,mobile:false});
  for(const zoom of process.env.R280_MUTANT==='zoom-height'?[2]:[1,1.4,2]){
   await p.evaluate(`(()=>{const t=__r278Game.activeTab(),sample=__r280Overview.matches.find(m=>m.queueId===420);t.data={...__r280Overview,matches:Array.from({length:40},(_,i)=>({...sample,gameId:99000+i})),pagination:{hasMore:false}};t.loading=false;t.initialPagePending=false;t.openMatches=new Set();document.documentElement.style.setProperty('--ui-zoom','${zoom}');document.documentElement.dataset.uiScale='${zoom}';delete document.getElementById('overview-content').dataset.matchTierScope;__r278Game.renderOverview('players');document.getElementById('app-scroll').scrollTop=0;return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>{window.__r280OriginalHeights=[...document.querySelectorAll('.match-entry')].map(n=>n.getBoundingClientRect().height);r()})));})()`);
   const action=async()=>{for(let i=1;i<=12;i++){await p.evaluate(`document.getElementById('app-scroll').scrollTop=document.getElementById('app-scroll').scrollHeight*${i}/12`);await new Promise(r=>setTimeout(r,70));}await new Promise(r=>setTimeout(r,350));};
-  if(zoom===2)await p.record('zoom-2-scroll',action);else await action();
-  const samples=await p.evaluate("new Promise(resolve=>{const samples=[],timer=setInterval(()=>{samples.push(document.getElementById('app-scroll').scrollTop);if(samples.length===60){clearInterval(timer);resolve(samples)}},50)})");assert.equal(new Set(samples).size,1,'scroll jitter zoom='+zoom);
+  if(zoom===2)await p.record('zoom-2-scroll-'+width,action);else await action();
+  const samples=await p.evaluate("new Promise(resolve=>{const samples=[],timer=setInterval(()=>{samples.push(document.getElementById('app-scroll').scrollTop);if(samples.length===60){clearInterval(timer);resolve(samples)}},50)})");assert.equal(new Set(samples).size,1,'scroll jitter width='+width+' zoom='+zoom);
   const heights=await p.evaluate("[...document.querySelectorAll('.match-entry')].slice(0,5).map((n,i)=>({before:__r280OriginalHeights[i],after:n.getBoundingClientRect().height,collapsed:n.hasAttribute('data-virtual-match')}))");for(const h of heights){assert(h.collapsed);assert(Math.abs(h.before-h.after)<=1,'placeholder height '+JSON.stringify(h));}
-  results.push({kind:'virtualization',zoom,samples,heights});
+  results.push({kind:'virtualization',width,zoom,samples,heights});
+ }
  }
  await require('./r280-progress-share-checks.cjs')(p,results);
  // Match the real wire contract: stable revisions, a pending page, then ten deltas.
@@ -40,6 +42,7 @@ async function run(){await withBrowser(async({page,results,errors})=>{
  for(const theme of ['dark','light'])for(const zoom of [1,2]){
   await p.evaluate(`document.documentElement.dataset.theme='${theme}';document.documentElement.style.setProperty('--ui-zoom','${zoom}');document.documentElement.dataset.uiScale='${zoom}';document.querySelector('[data-open-career-dialog]').click()`);await p.until("document.querySelector('#career-dialog').open");await p.shot('career-header-'+theme+'-'+zoom);await p.evaluate("document.getElementById('career-dialog-close').click();document.getElementById('announcements-button').click()");await p.until("document.querySelector('#announcements-dialog').open");await p.shot('announcement-'+theme+'-'+zoom);await p.evaluate("document.querySelector('[data-announcements-close]').click()");
  }
+ assert.deepEqual(await p.evaluate('__r280LayoutErrors'),[],'ResizeObserver must not loop during width/zoom scrolling');
  assert.equal(errors.length,0,JSON.stringify(errors));
 });}
 if(require.main===module)run().catch(e=>{console.error(e);process.exitCode=1});module.exports={run};
