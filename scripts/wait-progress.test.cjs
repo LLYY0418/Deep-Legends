@@ -87,3 +87,31 @@ test("waitForPage reports true/false instead of throwing and probes the page thr
   const frozen = async (expression) => (expression === PAGE_PROGRESS_EXPRESSION ? { e: 1 } : false);
   assert.equal(await waitForPage(frozen, "window.never", { now: c.now, sleep: c.sleep, idleMs: 200 }), false);
 });
+
+function playerReadiness(mode) {
+  const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+  const source=fs.readFileSync(path.join(__dirname,'../desktop/pro-players.test.cjs'),'utf8');
+  const start=source.indexOf('  const ready = async (name) => {'),end=source.indexOf('\n  open("First")',start);
+  assert(start>=0&&end>start,'actual player readiness fixture must be exercised');
+  const c=clock(),observers=[],targets=[];let loaded=false,frames=0;
+  const d={getElementById:id=>({id}),getElementsByTagName(){throw Error('readiness must not scan the whole DOM');},querySelector(selector){if(mode==='check-error')throw Error('original readiness check failed');return selector.includes('player-tabs')?{textContent:'First',dataset:{playerTab:'first-key'},querySelector:()=>loaded?null:{}}:loaded?{}:null;}};
+  const w={MutationObserver:class{constructor(callback){this.callback=callback;this.disconnected=false;observers.push(this);}observe(target,options){targets.push({target,options});}disconnect(){this.disconnected=true;}},requestAnimationFrame(callback){frames++;callback();}};
+  const instrumented=async(check,options)=>{
+    assert.equal(observers.length,1,'readiness progress must observe changes rather than rescan the whole DOM');
+    assert.equal(options.idleMs,20000);assert.equal(options.hardMs,120000);assert.equal(options.intervalMs,20);
+    assert.equal(options.progress(),0);
+    return waitOutcome(check,{...options,now:c.now,sleep:async ms=>{await c.sleep(mode==='success'?ms:20000);if(mode==='success'||mode==='hard-limit'){observers[0].callback([]);assert(options.progress()>0);}if(mode==='success')loaded=true;}});
+  };
+  const ready=vm.runInNewContext('(()=>{'+source.slice(start,end)+';return ready;})()',{w,d,waitOutcome:instrumented,assert});
+  return {ready,observers,targets,frames:()=>frames};
+}
+
+test('actual player readiness observes progress without repeated full-page scans and keeps both restoration frames',async()=>{
+  const f=playerReadiness('success');assert.equal(await f.ready('First'),'first-key');assert.equal(f.frames(),2);assert.deepEqual(f.targets.map(t=>t.target.id),['player-tabs','overview-content']);assert(f.targets.every(t=>t.options.childList&&t.options.subtree&&t.options.characterData));assert(f.observers[0].disconnected);
+});
+for(const reason of ['stalled','hard-limit'])test('actual player readiness retains '+reason+' failure and disconnects progress observation',async()=>{
+  const f=playerReadiness(reason);await assert.rejects(f.ready('First'),new RegExp('player First did not finish loading.*'+reason));assert(f.observers[0].disconnected);assert.equal(f.frames(),0);
+});
+test('actual player readiness preserves a thrown check and disconnects its observer',async()=>{
+  const f=playerReadiness('check-error');await assert.rejects(f.ready('First'),/original readiness check failed/);assert(f.observers[0].disconnected);
+});

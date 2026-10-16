@@ -352,13 +352,21 @@ test("玩家页签各自保留纵向位置，跨页面返回也不串位", async
   await tick(180);
   const open = (name) => w.dispatchEvent(new w.CustomEvent("deep-legends:open-player", {detail:{gameName:name,tagLine:"KR1",region:"kr",source:"search"}}));
   const ready = async (name) => {
-    // R279: wait while the page keeps changing; fail only after 20 s without any DOM progress (hard ceiling 120 s).
-    let key = "";
-    const outcome = await waitOutcome(() => {
-      const tab = d.querySelector('#player-tabs [aria-selected="true"]');
-      if (tab?.textContent.includes(name) && !tab.querySelector('.mini-loading') && d.querySelector('#overview-content .summoner-strip')) { key = tab.dataset.playerTab; return true; }
-      return false;
-    }, { idleMs: 20000, hardMs: 120000, intervalMs: 20, progress: () => `${d.getElementsByTagName("*").length}:${(d.body.textContent || "").length}` });
+    // Observe progress once instead of rescanning the entire DOM at every poll.
+    let key = "", revision = 0, outcome;
+    const observer = new w.MutationObserver(() => { revision++; });
+    for (const id of ["player-tabs", "overview-content"]) {
+      observer.observe(d.getElementById(id), { childList: true, subtree: true, characterData: true });
+    }
+    try {
+      outcome = await waitOutcome(() => {
+        const tab = d.querySelector('#player-tabs [aria-selected="true"]');
+        if (tab?.textContent.includes(name) && !tab.querySelector('.mini-loading') && d.querySelector('#overview-content .summoner-strip')) { key = tab.dataset.playerTab; return true; }
+        return false;
+      }, { idleMs: 20000, hardMs: 120000, intervalMs: 20, progress: () => revision });
+    } finally {
+      observer.disconnect();
+    }
     if (!outcome.ok) assert.fail(`player ${name} did not finish loading (${outcome.reason}; ${outcome.progress})`);
     // Scroll restoration runs in rAF after the loaded content is rendered.
     await new Promise(resolve => w.requestAnimationFrame(() => w.requestAnimationFrame(resolve)));
