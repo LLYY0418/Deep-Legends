@@ -71,6 +71,7 @@ func assertLPObservationPrivacy(t *testing.T, events []map[string]any, forbidden
 		"event": true, "reason": true, "stage": true, "has_baseline": true,
 		"capture_index": true, "attempt": true, "attempts": true, "capability_state": true, "games_gap": true,
 		"wins_delta": true, "losses_delta": true, "score_delta": true, "baseline_source": true, "baseline_age_s": true, "snapshot_source": true, "writer": true, "season_fallback": true,
+		"status": true, "record_count": true, "baseline_count": true, "game_start_count": true, "pruned_records": true,
 	}
 	for _, event := range events {
 		for key := range event {

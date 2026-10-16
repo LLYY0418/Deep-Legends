@@ -85,29 +85,66 @@ type lpTracker struct {
 	staleRejections     map[string]time.Time
 	invalidateRanks     func(string)
 	onRecorded          func(string)
+	lastHistorySave     lpHistorySaveDiagnostic
+	lastHistorySaveAt   time.Time
 }
 
 func newLPTracker(store *localStore) *lpTracker {
-	tracker := &lpTracker{store: store, pending: make(map[string]bool), now: time.Now, startSeen: make(map[string]bool), startFlights: make(map[string]chan struct{}), baselineDiagnostics: make(map[string]lpBaselineDiagnostic)}
+	return newLPTrackerWithDiagnostics(store, nil)
+}
+
+func newLPTrackerWithDiagnostics(store *localStore, observe func(map[string]any)) *lpTracker {
+	tracker := &lpTracker{store: store, observeEvent: observe, pending: make(map[string]bool), now: time.Now, startSeen: make(map[string]bool), startFlights: make(map[string]chan struct{}), baselineDiagnostics: make(map[string]lpBaselineDiagnostic)}
 	tracker.history = lpHistoryData{SchemaVersion: lpHistorySchemaVersion, Baselines: make(map[string]map[string]lpSnapshot), Games: make(map[string]lpGameRecord), BaselineInfo: make(map[string]map[string]lpBaselineInfo), GameStarts: make(map[string]map[string]lpGameStartBaseline)}
+	event := map[string]any{"event": "lp_history_load", "status": "store_unavailable"}
+	defer func() {
+		event["record_count"] = len(tracker.history.Games)
+		event["baseline_count"] = lpHistoryQueueCount(tracker.history.Baselines)
+		event["game_start_count"] = lpHistoryQueueCount(tracker.history.GameStarts)
+		tracker.recordObservation(event)
+	}()
 	if store == nil {
 		return tracker
+	}
+	event["data_dir_source"] = "default"
+	if strings.TrimSpace(os.Getenv("LOL_LOOT_DATA_DIR")) != "" {
+		event["data_dir_source"] = "environment"
 	}
 	store.mu.Lock()
 	historyPath := filepath.Join(store.root, lpHistoryFile)
 	data, err := os.ReadFile(historyPath)
 	store.mu.Unlock()
 	if err != nil {
+		event["status"] = "read_failed"
+		event["reason"] = lpHistoryIOReason(err)
 		return tracker
 	}
+	event["file_bytes"] = len(data)
 	var loaded lpHistoryData
-	if len(data) > 1<<20 || json.Unmarshal(data, &loaded) != nil || !validLPHistory(loaded) {
+	reason := ""
+	switch {
+	case len(data) > 1<<20:
+		reason = "file_too_large"
+	case json.Unmarshal(data, &loaded) != nil:
+		reason = "invalid_json"
+	case !validLPHistory(loaded):
+		reason = "invalid_history"
+	}
+	if reason != "" {
+		event["status"], event["reason"] = "reset", reason
 		// 旧格式直接以 PUUID 为键。为兑现“不落盘稳定账号标识”的承诺，
 		// 不迁移也不保留旧内容，而是立即覆盖为空的新格式。
-		if err := tracker.persistLocked(); err != nil {
+		save := tracker.persistHistoryDiagnosticLocked("load_reset")
+		tracker.recordObservation(save)
+		event["reset_result"] = save["status"]
+		if save["status"] == "write_failed" {
 			store.mu.Lock()
-			_ = os.Remove(historyPath)
+			err := os.Remove(historyPath)
 			store.mu.Unlock()
+			event["remove_result"] = "removed"
+			if err != nil {
+				event["remove_result"] = lpHistoryIOReason(err)
+			}
 		}
 		return tracker
 	}
@@ -123,7 +160,49 @@ func newLPTracker(store *localStore) *lpTracker {
 	if loaded.GameStarts != nil {
 		tracker.history.GameStarts = loaded.GameStarts
 	}
+	event["status"], event["schema_version"] = "loaded", loaded.SchemaVersion
 	return tracker
+}
+
+func lpHistoryIOReason(err error) string {
+	if os.IsNotExist(err) {
+		return "not_found"
+	}
+	if os.IsPermission(err) {
+		return "permission_denied"
+	}
+	return "io_error"
+}
+
+func lpHistoryQueueCount[V any](accounts map[string]map[string]V) int {
+	count := 0
+	for _, queues := range accounts {
+		count += len(queues)
+	}
+	return count
+}
+
+type lpHistorySaveDiagnostic struct {
+	Stage, Status, Reason                  string
+	Records, Baselines, GameStarts, Pruned int
+}
+
+// Build under t.mu; callers deliver the event only after releasing tracker/store locks.
+func (t *lpTracker) persistHistoryDiagnosticLocked(stage string) map[string]any {
+	before := len(t.history.Games)
+	err := t.persistLocked()
+	state := lpHistorySaveDiagnostic{Stage: stage, Status: "saved", Records: len(t.history.Games), Baselines: lpHistoryQueueCount(t.history.Baselines), GameStarts: lpHistoryQueueCount(t.history.GameStarts), Pruned: before - len(t.history.Games)}
+	if t.store == nil {
+		state.Status = "store_unavailable"
+	} else if err != nil {
+		state.Status, state.Reason = "write_failed", lpHistoryIOReason(err)
+	}
+	now := t.now()
+	if state == t.lastHistorySave && now.Sub(t.lastHistorySaveAt) < time.Minute {
+		return nil
+	}
+	t.lastHistorySave, t.lastHistorySaveAt = state, now
+	return map[string]any{"event": "lp_history_save", "stage": state.Stage, "status": state.Status, "reason": state.Reason, "record_count": state.Records, "baseline_count": state.Baselines, "game_start_count": state.GameStarts, "pruned_records": state.Pruned}
 }
 
 func (t *lpTracker) recordObservation(event map[string]any) {
@@ -263,7 +342,7 @@ func (t *lpTracker) observe(playerRef string, ranks []gameplayRank, capabilities
 		changed = true
 	}
 	if changed {
-		t.persistLocked()
+		events = append(events, t.persistHistoryDiagnosticLocked("observe"))
 	}
 }
 
@@ -467,9 +546,10 @@ func (t *lpTracker) takeGameStart(client *LCUClient, playerRef string, loadRanks
 			t.history.GameStarts[hash] = make(map[string]lpGameStartBaseline)
 		}
 		t.history.GameStarts[hash][queue] = lpGameStartBaseline{gameID, queue, snapshot, source, t.now().UnixMilli()}
-		t.persistLocked()
+		saveEvent := t.persistHistoryDiagnosticLocked("game_start")
 		t.mu.Unlock()
 		t.recordObservation(event)
+		t.recordObservation(saveEvent)
 		return
 	}
 	t.recordObservation(map[string]any{"event": "lp_baseline_written", "writer": "game_start", "season_fallback": false, "reason": "read_failed", "attempts": 3})
@@ -583,9 +663,10 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 			delete(t.history.GameStarts[hash], queue)
 		}
 		delete(t.pending, pendingKey)
-		t.persistLocked()
+		saveEvent := t.persistHistoryDiagnosticLocked("capture")
 		t.mu.Unlock()
 		t.recordObservation(event)
+		t.recordObservation(saveEvent)
 	}()
 	if !t.waitContext(ctx, lpCaptureFirstWait) {
 		return

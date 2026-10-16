@@ -570,8 +570,7 @@ func main() {
 	a.watch.observe = a.recordDiagnostic
 	a.watch.broadcastChampionNames = a.championNames
 	a.convenience = a.watch
-	a.lpTracker = newLPTracker(store)
-	a.lpTracker.observeEvent = a.recordDiagnostic
+	a.lpTracker = newLPTrackerWithDiagnostics(store, a.recordDiagnostic)
 	a.lpTracker.invalidateRanks = a.invalidateRankPlayer
 	a.lpTracker.onRecorded = a.onLPRecorded
 	a.rankScores = newRankScoreCache()
