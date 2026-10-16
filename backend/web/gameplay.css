@@ -2345,9 +2345,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .multikill-tag{display:inline-flex;width:auto!important;height:auto!important;align-items:center;gap:3px;padding:2px 5px;background:var(--surface-strong);color:var(--primary-strong);border:1px solid var(--line);border-radius:6px}
 .multikill-tag>b{position:static;display:block;font-size:10px}
 .match-pending [data-match-layout][data-icon-overlap]{grid-template-columns:124px minmax(0,96px) minmax(0,1fr)}
-/* Manual placeholders own row geometry; native intrinsic placeholders must not add a second estimate. */
-.match-list[data-match-virtualizer]>.match-entry{content-visibility:visible;contain-intrinsic-size:none}
-.match-list[data-match-virtualizer]>.match-entry[data-virtual-match]{content-visibility:hidden}
+/* Manual placeholders own row height; rich rows retain layout isolation without intrinsic estimates. */
+.match-list[data-match-virtualizer]>.match-entry{content-visibility:visible;contain-intrinsic-size:none;contain:layout style paint}
+.match-list[data-match-virtualizer]>.match-entry[data-virtual-match]{content-visibility:hidden;contain:strict}
 .career-column>[data-career-key="ranks"]{overflow:visible}
 
 .career-column>.rank-career-section{display:flex;flex-direction:column}
