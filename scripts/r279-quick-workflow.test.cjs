@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const source=fs.readFileSync(path.join(__dirname,'../.github/workflows/probe-windows-browser.yml'),'utf8');
 function verify(text){
  const wf=yaml.load(text),{diagnosticShards,verifyDiagnosticShards}=require('./r276-browser-catalog.cjs');verifyDiagnosticShards();
+ for(const name of ['resolve','browser','strict','coverage'])assert(wf.jobs[name],'required diagnostic job missing: '+name);
  assert.deepEqual(Object.keys(wf.on),['push','workflow_call','workflow_dispatch']);assert.deepEqual(wf.on.push.branches,['codex/diagnostic-r279-*']);assert.deepEqual(wf.permissions,{contents:'read'});
  assert.equal(wf.jobs.browser['runs-on'],'windows-latest');assert.equal(wf.jobs.strict['runs-on'],'windows-latest');assert.equal(wf.jobs.browser.strategy['fail-fast'],false);
  assert.deepEqual(wf.jobs.browser.strategy.matrix.shard,Object.keys(diagnosticShards));
@@ -23,10 +24,10 @@ test('real CI passes only supported options to the r277 orchestration adapter',(
 
 test('mutation: losing a partition or the evidence coverage job must fail',()=>{
  assert.throws(()=>verify(source.replace('diagnostic-r266, ','')),{name:'AssertionError'});
- const wf=yaml.load(source);delete wf.jobs.coverage;assert.throws(()=>verify(yaml.dump(wf)));
+ const wf=yaml.load(source);delete wf.jobs.coverage;assert.throws(()=>verify(yaml.dump(wf)),{name:'AssertionError'});
 });
 
 test('mutation: resolving a moving user branch independently in any VM must fail',()=>{
  assert.throws(()=>verify(source.replace('ref: ${{ needs.resolve.outputs.sha }}','ref: ${{ inputs.ref || github.sha }}')),{name:'AssertionError'});
- const wf=yaml.load(source);delete wf.jobs.resolve;assert.throws(()=>verify(yaml.dump(wf)));
+ const wf=yaml.load(source);delete wf.jobs.resolve;assert.throws(()=>verify(yaml.dump(wf)),{name:'AssertionError'});
 });
