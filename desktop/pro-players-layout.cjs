@@ -6,6 +6,7 @@ const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
 const {serveStaticAPI}=require('../scripts/r276-browser-api-fixtures.cjs');
 const {waitOutcome}=require('../scripts/lib/wait-progress.cjs');
+const {navigateAppSection}=require('../scripts/lib/app-ready.cjs');
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -55,9 +56,7 @@ async function main(){
  await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});
  await call('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/?demo'});
  // app.js publishes deepLegendsToast after registering its navigation listener.
- await waitForDOM('app-frame ready',`(()=>{const app=document.querySelector('#app-frame');const appReady=typeof window.deepLegendsToast==='function';return {ready:document.readyState==='complete'&&appReady&&!!app&&!app.hasAttribute('inert'),readyState:document.readyState,appReady,present:!!app,inert:app?app.hasAttribute('inert'):null};})()`);
- await evaluate(`window.dispatchEvent(new CustomEvent('deep-legends:navigate',{detail:{section:'pro-players'}}))`);
- await waitForDOM('pro-player active section ready',`(()=>{const activeSection=[...document.querySelectorAll("main > [role='tabpanel'], main > [data-standalone-page]")].filter(panel=>!panel.hidden).map(panel=>panel.id);return {ready:activeSection.length===1&&activeSection[0]==='pro-players-panel',activeSection,readyState:document.readyState};})()`);
+ await navigateAppSection({evaluate,section:'pro-players'});
  await waitForDOM('pro-player six tables ready',`(()=>{const tables=document.querySelectorAll('.pro-table').length;return {ready:tables===6,tables,pending:document.querySelectorAll('.pro-pending').length,players:document.querySelectorAll('.pro-player-meta').length};})()`);
  await evaluate(`new Promise(r=>setTimeout(r,400))`);
  // R79: only one overview action remains in production. Add a second real

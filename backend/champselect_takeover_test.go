@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -239,17 +240,12 @@ func TestTakeoverBenchOwnEchoBeforeLateAckAndAutomaticUpgrade(t *testing.T) {
 
 func waitTakeoverIdle(t *testing.T, f *executionFixture) {
 	t.Helper()
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
+	r281RequireProgress(t, "takeover request did not finish", func() (bool, int, string) {
 		f.r.mu.Lock()
-		idle := len(f.r.pending) == 0 && len(f.r.champSelect.inFlight) == 0
+		pending, inFlight := len(f.r.pending), len(f.r.champSelect.inFlight)
 		f.r.mu.Unlock()
-		if idle {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatal("request did not finish")
+		return pending+inFlight == 0, pending + inFlight, fmt.Sprintf("%d/%d", pending, inFlight)
+	})
 }
 
 func prepareTakeoverPick(t *testing.T, group string, queue int64, lockDelay *int) *executionFixture {

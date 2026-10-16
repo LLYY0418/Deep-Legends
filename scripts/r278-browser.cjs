@@ -1,4 +1,5 @@
 'use strict';
+const {serveStaticAPI}=require('./r276-browser-api-fixtures.cjs');
 const {cleanupChromeTest}=require('./chrome-test-cleanup.cjs');
 const {launchChrome}=require('./chrome-test-launcher.cjs');
 const { evidencePath, requireEvidence } = require('./local-evidence.cjs');
@@ -35,6 +36,7 @@ async function main(){
   if(name==='/api/gameplay/phase'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({phase:'None'}));return}
   if(name==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream'});res.write('event: heartbeat\ndata: {}\n\n');const timer=setInterval(()=>res.write('event: heartbeat\ndata: {}\n\n'),2000);req.on('close',()=>clearInterval(timer));return}
   if(name==='/api/license/status'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({state:'ACTIVE',generation:1,message:''}));return}
+  if(serveStaticAPI(req,res))return;
   if(name.startsWith('/api/')){const asset=name.includes('image')||name.includes('asset');res.writeHead(200,{'Content-Type':asset?'image/svg+xml':'application/json'});res.end(asset?'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#587c83"/><path d="M8 32 20 8 32 32Z" fill="#c8af67"/></svg>':'{}');return}
   const relative=name==='/'?'index.html':name.slice(1),file=path.join(web,['index.html','license-ui.js'].includes(relative)?'default/'+relative:relative);if(relative.includes('..')||!fs.existsSync(file)){res.writeHead(404);res.end();return}let data=baseline && ['gameplay.js','gameplay.css'].includes(relative) ? fs.readFileSync(path.join(out,'baseline/backend/web',relative)) : fs.readFileSync(file);
   if(relative==='demo-data.js')data=Buffer.from(data.toString().replace('  const fixtures = new Map([',inject+'\n  const fixtures = new Map([').replace('    const params = new URLSearchParams(url.split("?")[1] || "");','    const params = new URLSearchParams(url.split("?")[1] || "");'+intercept));

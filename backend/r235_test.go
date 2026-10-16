@@ -228,7 +228,6 @@ func TestR235CurrentHistorySnapshotImmediateAndSSE(t *testing.T) {
 	if time.Since(started) > 300*time.Millisecond || len(matches) != 1 || matches[0].GameID != 111 {
 		t.Fatal(matches, time.Since(started))
 	}
-	deadline := time.After(8 * time.Second)
 	flightKey := struct {
 		a      *app
 		client *LCUClient
@@ -239,19 +238,22 @@ func TestR235CurrentHistorySnapshotImmediateAndSSE(t *testing.T) {
 	if !ok {
 		t.Fatal("history did not start")
 	}
-	select {
-	case <-f.(*clientHistoryFlight).done:
+	r281WaitUntil(t, "history did not finish", func() bool {
 		select {
-		case event := <-events:
-			var payload map[string]any
-			if json.Unmarshal([]byte(event), &payload) != nil || payload["type"] != "overview-matches" || payload["historyGeneration"].(float64) <= 0 {
-				t.Fatal(event)
-			}
+		case <-f.(*clientHistoryFlight).done:
+			return true
 		default:
-			t.Fatalf("refresh completed without SSE; result=%#v diagnostics=%#v", f.(*clientHistoryFlight).result, r175Events(t, a, "panic_recovered"))
+			return false
 		}
-	case <-deadline:
-		t.Fatal("history did not finish")
+	})
+	select {
+	case event := <-events:
+		var payload map[string]any
+		if json.Unmarshal([]byte(event), &payload) != nil || payload["type"] != "overview-matches" || payload["historyGeneration"].(float64) <= 0 {
+			t.Fatal(event)
+		}
+	default:
+		t.Fatalf("refresh completed without SSE; result=%#v diagnostics=%#v", f.(*clientHistoryFlight).result, r175Events(t, a, "panic_recovered"))
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestR86DiagnosticBufferBudgetAndImmediateRead(t *testing.T) {
@@ -54,19 +53,12 @@ func TestR86DiagnosticTimerFlushAndAsyncFailureVisible(t *testing.T) {
 	if err := s.appendDiagnostic(map[string]any{"event": "timer-flushed"}); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(time.Second)
-	for {
+	r281WaitUntil(t, "diagnostic timer did not flush/release handle", func() bool {
 		s.diagnosticMu.Lock()
 		closed := s.diagnosticFile == nil
 		s.diagnosticMu.Unlock()
-		if closed {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("200ms timer did not flush/release handle")
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+		return closed
+	})
 	data, err := os.ReadFile(filepath.Join(s.root, "logs", "diagnostics.jsonl"))
 	if err != nil || !bytes.Contains(data, []byte("timer-flushed")) {
 		t.Fatalf("timer flush: %v", err)

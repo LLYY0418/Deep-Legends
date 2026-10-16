@@ -153,10 +153,7 @@ func TestAcceptFocusSamplerStopsOnCancellationAndSingleFlight(t *testing.T) {
 	startAcceptFocusTrace(ctx, client, 0, record)
 	startAcceptFocusTrace(ctx, client, 0, record)
 	cancel()
-	deadline := time.Now().Add(time.Second)
-	for client.acceptFocusSampling.Load() && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
+	r281WaitUntil(t, "accept focus sampler cancellation", func() bool { return !client.acceptFocusSampling.Load() })
 	if client.acceptFocusSampling.Load() {
 		t.Fatal("sampler did not stop")
 	}

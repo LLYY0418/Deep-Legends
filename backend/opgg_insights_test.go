@@ -137,17 +137,12 @@ func TestOPGGHistoricalRanksStartDoesNotBlockCaller(t *testing.T) {
 	}
 	close(release)
 	released = true
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
+	r281RequireProgress(t, "OPGG historical rank background request did not finish", func() (bool, int, string) {
 		a.opgg.mu.Lock()
 		running := len(a.opgg.historyStarts)
 		a.opgg.mu.Unlock()
-		if running == 0 {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatal("OPGG historical rank background request did not finish")
+		return running == 0, running, fmt.Sprint(running)
+	})
 }
 
 func TestGameplayMatchTiersKeepsCNContract(t *testing.T) {
@@ -713,27 +708,23 @@ func TestLoadRiotOverviewLoadsOPGGHistoryWithoutMatchTierRequests(t *testing.T) 
 	if len(overview.Matches) != 1 || overview.Matches[0].GameID != 301 {
 		t.Fatalf("matches = %#v", overview.Matches)
 	}
-	deadline := time.Now().Add(time.Second)
-	for len(a.cachedOPGGHistoricalRanks(puuid)) == 0 && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
+	r281RequireProgress(t, "OPGG historical rank cache", func() (bool, int, string) {
+		count := len(a.cachedOPGGHistoricalRanks(puuid))
+		return count > 0, 1, fmt.Sprint(count)
+	})
 	overview.HistoricalRanks = a.cachedOPGGHistoricalRanks(puuid)
 	// R127 P1-c.4：总览会并行预热 OP.GG 对局列表。预热是后台 goroutine，总览本身
 	// 不等它、返回值里也不带平均段位；先等它落定再数请求，否则会与历史段位
 	// goroutine 竞态而偶发失败。
-	prefetchDeadline := time.Now().Add(2 * time.Second)
-	for {
+	r281RequireProgress(t, "OPGG background tier prefetch", func() (bool, int, string) {
 		a.opgg.mu.Lock()
 		settled := false
 		for _, entry := range a.opgg.tiers {
 			settled = settled || !entry.attemptedAt.IsZero()
 		}
 		a.opgg.mu.Unlock()
-		if settled || time.Now().After(prefetchDeadline) {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return settled, 1, fmt.Sprintf("%t/%d/%d", settled, opggCalls.Load(), postCalls.Load())
+	})
 	if opggCalls.Load() != 3 {
 		t.Fatalf("overview requested OP.GG %d time(s), want history GET + prefetch identity GET + prefetch games POST", opggCalls.Load())
 	}

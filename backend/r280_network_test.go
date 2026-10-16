@@ -146,8 +146,7 @@ func TestR280ProbeFasterRouteAndExpiry(t *testing.T) {
 			rt.proxy = route(false)
 			check := func() {
 				rt.probeGroup("riot")
-				deadline := time.Now().Add(time.Second)
-				for time.Now().Before(deadline) {
+				r281WaitUntil(t, "probe hung", func() bool {
 					rt.mu.Lock()
 					c := rt.choices["riot"]
 					rt.mu.Unlock()
@@ -155,11 +154,10 @@ func TestR280ProbeFasterRouteAndExpiry(t *testing.T) {
 						if c.direct != fastDirect {
 							t.Error("wrong winner")
 						}
-						return
+						return true
 					}
-					time.Sleep(time.Millisecond)
-				}
-				t.Fatal("probe hung")
+					return false
+				})
 			}
 			check()
 			rt.probeGroup("riot")

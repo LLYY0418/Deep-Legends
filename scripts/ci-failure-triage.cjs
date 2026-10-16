@@ -15,6 +15,7 @@ const fs = require("node:fs"), path = require("node:path"), cp = require("node:c
 const root = path.resolve(__dirname, "..");
 
 const CATEGORIES = [
+  ["performance", /R281_PERFORMANCE_ASSERTION|(?:click|collection|five filter cycles) long tasks?/i],
   ["crash", /panic:|SIGSEGV|SIGKILL|SIGABRT|fatal error:|out of memory|Target closed|Session closed|browser (?:has )?disconnected|Chrome (?:exited|crashed)|ECONNRESET|socket hang up|unexpected exit/i],
   ["watchdog", /WAIT_HARD_LIMIT|hard limit|watchdog|File exceeded|exceeded .*budget|budget exceeded|suite exceeded/i],
   ["wait-timeout", /WAIT_STALLED|no observable progress|timed? ?out|timeout|did not mount|did not finish|did not (?:start|load|reach|appear)|condition timeout|deadline exceeded|\bdownload stuck\b/i],
@@ -60,7 +61,7 @@ function parseFailureJson(data, evidence) {
   const message = data.error || data.message || data.reason || "";
   if (!message && !data.scenario && !data.case) return [];
   const located=/(?:\(|\s)((?:[\w./\\:-]*?)(?:backend|desktop|scripts)[\w./\\-]*\.(?:cjs|js)):\d+/.exec(data.stack||message);
-  return [{ kind: "guard", name: data.scenario || data.case || data.name || path.basename(path.dirname(evidence)), file: relFile(data.file || data.script || located?.[1] || ""), message: String(data.stack || message).slice(0, 600), evidence }];
+  return [{ kind: "guard", name: data.scenario || data.case || data.name || path.basename(path.dirname(evidence)), file: relFile(data.file || data.script || located?.[1] || ""), message: [data.signature,data.stack || message].filter(Boolean).join("\n").slice(0, 600), evidence, ...(data.performanceFailures?.length?{performanceFailures:data.performanceFailures}:{}) }];
 }
 
 function parseLog(text, evidence) {
@@ -199,6 +200,7 @@ function triage(options, readers = {}) {
       kind: row.kind, name: row.name, file: row.file || null,
       inDiff: row.file && changed ? changed.has(row.file) : null,
       category: classify(row.message), message: String(row.message || "").slice(0, 400), evidence: row.evidence,
+      ...(row.performanceFailures?{performanceFailures:row.performanceFailures}:{}),
       ...(row.kind==='mutation'?{line:row.line,errorCode:row.errorCode,lastStage:row.lastStage,exitCode:row.exitCode}:{}),
     });
   }

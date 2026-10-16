@@ -226,19 +226,12 @@ func TestR115_BroadcastUncertainWriteIsNotRetried(t *testing.T) {
 		t.Fatal("no write")
 	}
 	// Wait until the action worker actually exits, not merely until it emitted.
-	deadline := time.Now().Add(4 * time.Second)
-	for {
+	r281WaitUntil(t, "position broadcast worker retried or hung", func() bool {
 		r.mu.Lock()
 		pending := r.pending["position-broadcast"] != nil
 		r.mu.Unlock()
-		if !pending {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("worker retried or hung")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return !pending
+	})
 	for range 100 {
 		r.handleChampSelect(client, Summoner{})
 	}

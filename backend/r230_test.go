@@ -95,18 +95,8 @@ func TestR230Schema12FalseCompleteTriggersBackfill(t *testing.T) {
 	if progress.Complete {
 		t.Fatal("old completeness was reused", progress)
 	}
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		a.seasonBackfillMu.Lock()
-		n := len(a.seasonBackfills)
-		a.seasonBackfillMu.Unlock()
-		if n == 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("backfill timeout")
-		}
-		time.Sleep(time.Millisecond)
+	if err := r281AwaitSeasonJobs(a, "schema upgrade backfill", 1); err != nil {
+		t.Fatal(err)
 	}
 	if len(r175Events(t, a, "season_backfill_round")) == 0 {
 		t.Fatal("schema upgrade failed to trigger backfill")

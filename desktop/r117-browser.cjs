@@ -2,6 +2,7 @@
 // CHROME_BIN=/path/to/chrome node desktop/r117-browser.cjs
 'use strict';
 const {waitForPage}=require('../scripts/lib/wait-progress.cjs');
+const {serveStaticAPI}=require('../scripts/r276-browser-api-fixtures.cjs');
 const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
 const {spawn} = require('node:child_process');
@@ -34,6 +35,7 @@ async function main(){
    if(pathname==='/api/license/status'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({state:'ACTIVE'}));return;}
    if(pathname==='/api/image'||pathname==='/api/champion-asset'){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#364558"/></svg>');return;}
    if(pathname==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache'});res.write(': fixture stream\n\n');return;}
+   if(serveStaticAPI(req,res))return;
    if(pathname.startsWith('/api/')){res.statusCode=204;res.end();return;}
    const file=path.resolve(web,pathname==='/'?'index.html':'.'+pathname);
    if(!file.startsWith(web+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.statusCode=404;res.end();return;}

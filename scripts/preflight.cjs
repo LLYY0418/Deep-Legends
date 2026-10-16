@@ -66,6 +66,17 @@ function loadIndex(base = "HEAD", cwd = root, changes = changedFiles(base, cwd))
   return buildIndex({ files, historicalFiles, readHistorical, read: file => fs.readFileSync(path.join(cwd, file), "utf8"), guards: guards.map(row => row[0]) });
 }
 
+function behaviorChecks(base,changes,cwd=root) {
+  const source=require('./lib/source-inventory.cjs').inventory(cwd);
+  const deltas=changes.map(row=>{
+    const diff=git(['diff','--no-ext-diff','--unified=0',base,'--',row.file],{cwd});
+    const delta=diff.split('\n').filter(line=>/^[+-]/.test(line)&&!/^---|^\+\+\+/.test(line)).join('\n');
+    const conservative=!delta&&source.files.includes(row.file);
+    return {...row,delta:conservative?source.read(row.file):delta,basis:conservative?'whole-file-conservative':'changed-lines'};
+  });
+  return require('./lib/behavior-checks.cjs').analyzeChanges(source,deltas);
+}
+
 function run(label, command, args, options = {}) {
   const started = Date.now();
   console.log(`\n▶ ${label}\n  $ ${[command, ...args].join(" ").slice(0, 300)}`);
@@ -177,15 +188,26 @@ async function main() {
   const total = { node: index.nodeTests.length, go: index.goTests.length };
   if (!changes.length) { console.log("没有改动，无需预检。"); return 0; }
   printSummary(base, selection, total);
+  const behavior=behaviorChecks(gateBase,changes);
+  if(behavior.conservativeFiles.length)console.log('契约分析为整文件保守回放（不是实际变更行）：'+behavior.conservativeFiles.join(', '));
+  if(behavior.contractImpact.identifiers.length){
+    console.log('\n可能需要同步的契约：'+behavior.contractImpact.identifiers.join(', '));
+    for(const row of behavior.contractImpact.files)console.log(`  ${row.file}: 引用行 ${row.references.map(r=>r.line).join(',')}；断言行 ${row.assertions.map(r=>r.line).join(',')}`);
+  }
+  if(behavior.fixtureAlignment){
+    console.log(`启动夹具对齐：${behavior.fixtureAlignment.startupEndpoints.length}个静态端点候选、${behavior.fixtureAlignment.automaticUI.length}处自动界面线索`);
+    for(const issue of behavior.fixtureAlignment.issues)console.log(`  ✘ ${issue.guard} ${issue.file}:${issue.line} ${issue.reason}`);
+  }
 
   const parallel = Math.max(1, Math.min(os.availableParallelism?.() ?? os.cpus().length, 6));
   const execution=planExecution(selection,{workers:parallel,goNamesByFile:index.goTestNames,full:Boolean(options.full),browsers:options.browsers});
   console.log(`成本估算：Node worker约${Math.round(execution.estimate.nodeWorkerMs/1000)}s，已测文件成本占比${Math.round(execution.estimate.nodeFileCostShare*100)}%；未知Node成本${execution.estimate.unknownNodeFiles.length}文件；Go ${execution.estimate.goCases}用例（无耗时档案）；浏览器串行约${execution.estimate.browserSerialMs===null?"未知":Math.round(execution.estimate.browserSerialMs/1000)+"s"}。估算不是预算或通过证据。`);
   if(execution.deferAssociated)console.log(`关联验证延后CI：${execution.reasons.join("; ")}；直接改动测试仍回归。`);
   if(execution.deferBrowser)console.log("浏览器工作量超出本地反馈目标，保留完整清单交Windows诊断/CI；显式 --full --browsers 可本地完整执行。");
-  const report = { base, gateBase, generatedAt: new Date().toISOString(), totals: total, selection, execution, results: [] };
+  const report = { base, gateBase, generatedAt: new Date().toISOString(), totals: total, selection, execution, behavior, results: [] };
   let exitCode = 0;
   if (!options.list) {
+    if(behavior.fixtureAlignment?.issues.length){exitCode=1;report.results.push({label:'启动夹具对齐',ok:false,issues:behavior.fixtureAlignment.issues});}
     for (const gate of staticGates(selection, gateBase)) {
       const result = run(gate.label, gate.command, gate.args);
       report.results.push(result);
@@ -230,4 +252,4 @@ if (require.main === module) {
   main().then((code) => { process.exitCode = code; }, (error) => { console.error(error.stack || error); process.exitCode = 2; });
 }
 
-module.exports = { parseArgs, resolveBase, changedFiles, loadIndex, staticGates, runScriptTests };
+module.exports = { parseArgs, resolveBase, changedFiles, loadIndex, staticGates, runScriptTests, behaviorChecks };

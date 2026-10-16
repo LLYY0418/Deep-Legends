@@ -135,10 +135,7 @@ func TestR55ReadyCheckSignalsTriggerOneAccept(t *testing.T) {
 			settings.Rules.AutoAccept.DelayMS = 0
 			runner.apply(settings)
 			test.trigger(runner, client)
-			deadline := time.Now().Add(time.Second)
-			for requests.Load() == 0 && time.Now().Before(deadline) {
-				time.Sleep(5 * time.Millisecond)
-			}
+			r281WaitUntil(t, "ready-check accept request", func() bool { return requests.Load() > 0 })
 			time.Sleep(40 * time.Millisecond)
 			if got := requests.Load(); got != 1 {
 				t.Fatalf("accept requests = %d, want 1", got)

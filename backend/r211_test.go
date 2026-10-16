@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -34,24 +34,25 @@ func TestR211SGPForceSummaryFreshAndAllExpectedReusesFirstPage(t *testing.T) {
 		return upstream.RoundTrip(r)
 	})
 	t.Cleanup(func() {
-		deadline := time.Now().Add(3 * time.Second)
-		for {
-			a.seasonBackfillMu.Lock()
-			running := len(a.seasonBackfills)
-			a.seasonBackfillMu.Unlock()
-			if running == 0 {
-				return
+		var contexts []context.Context
+		r281RequireProgress(t, "season scanner did not finish", func() (bool, int, string) {
+			for len(background) > 0 {
+				// r276-capture-safe: r281RequireProgress invokes this snapshot serially in the cleanup goroutine.
+				contexts = append(contexts, <-background)
 			}
-			if time.Now().After(deadline) {
-				t.Fatal("season scanner did not finish")
+			pending := contexts[:0]
+			for _, ctx := range contexts {
+				select {
+				case <-ctx.Done():
+				default:
+					pending = append(pending, ctx)
+				}
 			}
-			select {
-			case ctx := <-background:
-				<-ctx.Done()
-			default:
-				runtime.Gosched()
-			}
-		}
+			// r276-capture-safe: only this synchronous cleanup snapshot owns the contexts slice.
+			contexts = pending
+			running, state := r281SeasonSnapshot(a)
+			return running == 0 && len(contexts) == 0, running + len(contexts), fmt.Sprintf("%s/contexts=%d", state, len(contexts))
+		})
 	})
 	request := func(filter, expected string) gameplayOverview {
 		t.Helper()

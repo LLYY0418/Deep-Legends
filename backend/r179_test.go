@@ -91,7 +91,8 @@ func TestR179SpecialistPrefetchCoalescesVisibleRows(t *testing.T) {
 	}
 	got := make(chan []runeStarterRow, 1)
 	go func() { got <- p.specialistStarterRows(context.Background(), 64, "mid", wanted) }()
-	// Await actual joining of the existing flight rather than timing a request.
+	// Observe absence of duplicate requests while the original flights remain
+	// deliberately blocked; the real joined result is checked after unblock.
 	time.Sleep(20 * time.Millisecond)
 	if timelines.Load() != 2 {
 		t.Fatalf("preflight/visible duplicate calls=%d", timelines.Load())
@@ -105,10 +106,10 @@ func TestR179SpecialistPrefetchCoalescesVisibleRows(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("merged request blocked")
 	}
-	deadline := time.Now().Add(time.Second)
-	for timelines.Load() < 3 && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
+	r281RequireProgress(t, "specialist timeline completion", func() (bool, int, string) {
+		count := timelines.Load()
+		return count >= 3, int(3 - count), fmt.Sprint(count)
+	})
 	p.attachReadySpecialistStarters(rows)
 	for i, row := range rows {
 		if i < 3 && !reflect.DeepEqual(row.StarterItemIDs, []int64{1055}) {

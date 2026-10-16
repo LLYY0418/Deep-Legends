@@ -169,17 +169,11 @@ func TestR99SummonerEventStillUpdatesIdentity(t *testing.T) {
 		t.Fatal("identity rejected event")
 	}
 	defer a.clearFacadeEventThrottle()
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
+	r281WaitUntil(t, "identity never updated", func() bool {
 		a.mu.RLock()
-		id := a.summoner.ProfileIconID
-		a.mu.RUnlock()
-		if id == 71 {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatal("identity never updated")
+		defer a.mu.RUnlock()
+		return a.summoner.ProfileIconID == 71
+	})
 }
 func TestR149RankBannerActionIsRetiredWithoutLCUWrites(t *testing.T) {
 	calls := 0
@@ -441,15 +435,15 @@ func TestR99SeedPresentInEveryPipelinePublication(t *testing.T) {
 	// Release one source only, observing its partial publication before completion.
 	close(releases["TheShy"])
 	closedFirst = true
-	deadline := time.Now().Add(2 * time.Second)
 	seen := false
-	for time.Now().Before(deadline) {
+	r281WaitUntil(t, "partial fixture did not publish", func() bool {
 		a.proPlayers.mu.Lock()
 		snapshot := cloneProTeams(a.proPlayers.teams)
 		a.proPlayers.mu.Unlock()
 		for _, team := range snapshot {
 			for _, member := range team.Members {
 				if member.Nickname == "TheShy" && member.Supplement && !member.Incomplete {
+					// r276-capture-safe: r281WaitUntil calls the predicate serially before the following seen assertion.
 					seen = true
 				}
 			}
@@ -458,10 +452,9 @@ func TestR99SeedPresentInEveryPipelinePublication(t *testing.T) {
 			if len(r99Rookie(a.buildProPlayers(snapshot, proRoster)).Accounts) != 4 {
 				t.Fatal("partial publication lost seed")
 			}
-			break
 		}
-		time.Sleep(time.Millisecond)
-	}
+		return seen
+	})
 	if !seen {
 		t.Fatal("partial fixture did not publish")
 	}

@@ -135,18 +135,11 @@ func TestR238HeadRefreshReportsDecodeFailures(t *testing.T) {
 	})
 	waitGameplaySeasonJobsBeforeCleanup(t, a)
 	a.startSeasonStatsRefresh(client, gameplayReference{ServerID: "HN1"}, Summoner{PUUID: ref}, ref, nil, false)
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		events := r175Events(t, a, "season_stats_head_refresh")
-		if len(events) > 0 {
-			if len(events) != 1 || events[0]["decode_failed"] != float64(1) || events[0]["complete"] != false {
-				t.Fatal(events)
-			}
-			return
-		}
-		time.Sleep(time.Millisecond)
+	r281WaitUntil(t, "head refresh diagnostic not committed", func() bool { return len(r175Events(t, a, "season_stats_head_refresh")) > 0 })
+	events := r175Events(t, a, "season_stats_head_refresh")
+	if len(events) != 1 || events[0]["decode_failed"] != float64(1) || events[0]["complete"] != false {
+		t.Fatal(events)
 	}
-	t.Fatal("head refresh diagnostic not committed")
 }
 
 func TestR238ProIdentityTenPlayersTenOverviewOpensAreBounded(t *testing.T) {

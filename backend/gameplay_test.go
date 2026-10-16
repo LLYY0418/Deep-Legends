@@ -168,23 +168,9 @@ func newGameplayOverviewSGPFixture(t *testing.T, withMatch bool) (*app, string, 
 	}
 	publicRef := a.registerGameplayReferenceDetails(gameplayReference{PlayerRef: playerRef, ServerID: "HN1", GameName: "测试玩家"})
 	t.Cleanup(func() {
-		deadline := time.Now().Add(5 * time.Second)
-		quiet := 0
-		for time.Now().Before(deadline) {
-			a.seasonBackfillMu.Lock()
-			running := len(a.seasonBackfills)
-			a.seasonBackfillMu.Unlock()
-			if running == 0 {
-				quiet++
-				if quiet >= 3 {
-					return
-				}
-			} else {
-				quiet = 0
-			}
-			time.Sleep(10 * time.Millisecond)
+		if err := r281AwaitSeasonJobs(a, "season background jobs did not settle", 3); err != nil {
+			t.Error(err)
 		}
-		t.Error("season background jobs did not settle")
 	})
 	return a, publicRef, &summaryRequests
 }
@@ -192,23 +178,9 @@ func newGameplayOverviewSGPFixture(t *testing.T, withMatch bool) (*app, string, 
 func waitGameplaySeasonJobsBeforeCleanup(t *testing.T, a *app) {
 	t.Helper()
 	t.Cleanup(func() {
-		deadline := time.Now().Add(5 * time.Second)
-		quiet := 0
-		for time.Now().Before(deadline) {
-			a.seasonBackfillMu.Lock()
-			running := len(a.seasonBackfills)
-			a.seasonBackfillMu.Unlock()
-			if running == 0 {
-				quiet++
-				if quiet >= 3 {
-					return
-				}
-			} else {
-				quiet = 0
-			}
-			time.Sleep(10 * time.Millisecond)
+		if err := r281AwaitSeasonJobs(a, "season background jobs did not settle before cleanup", 3); err != nil {
+			t.Error(err)
 		}
-		t.Error("season background jobs did not settle before cleanup")
 	})
 }
 
@@ -217,18 +189,8 @@ func callGameplayOverviewForTest(t *testing.T, a *app, publicRef string) {
 	// Register after the caller's store/TempDir cleanups so background cache
 	// writes finish before the store closes and its directory is removed.
 	t.Cleanup(func() {
-		deadline := time.Now().Add(3 * time.Second)
-		for {
-			a.seasonBackfillMu.Lock()
-			running := len(a.seasonBackfills)
-			a.seasonBackfillMu.Unlock()
-			if running == 0 {
-				return
-			}
-			if time.Now().After(deadline) {
-				t.Fatalf("overview cleanup: %d season tasks did not finish", running)
-			}
-			time.Sleep(time.Millisecond)
+		if err := r281AwaitSeasonJobs(a, "overview cleanup", 1); err != nil {
+			t.Fatal(err)
 		}
 	})
 	body := strings.NewReader(`{"playerRef":"` + publicRef + `","count":20}`)
@@ -1580,28 +1542,19 @@ func TestLoadQueueLabelsCachesPerLCUClientInstance(t *testing.T) {
 	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
 	first := loadQueueLabels(client)
 	first[420] = "mutated"
-	deadline := time.Now().Add(time.Second)
-	for {
+	r281RequireProgress(t, "queue background did not complete", func() (bool, int, string) {
 		client.queueLabelsMu.Lock()
-		ready := client.queueLabelsLoaded
+		ready, loading := client.queueLabelsLoaded, client.queueLabelsLoading
 		client.queueLabelsMu.Unlock()
-		if ready {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("queue background did not complete")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return ready, 1, fmt.Sprintf("%t/%t/%d", ready, loading, calls.Load())
+	})
 	second := loadQueueLabels(client)
 	if calls.Load() != 1 || second[420] != "单双排" {
 		t.Fatalf("queue label session cache = calls:%d first:%#v second:%#v", calls.Load(), first, second)
 	}
 	other := &LCUClient{baseURL: server.URL, token: "test", http: server.Client()}
 	_ = loadQueueLabels(other)
-	for calls.Load() < 2 && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
+	r281RequireProgress(t, "new LCU client queue catalog", func() (bool, int, string) { return calls.Load() >= 2, 1, fmt.Sprint(calls.Load()) })
 	if calls.Load() != 2 {
 		t.Fatalf("a new LCU client did not get a fresh queue catalog: %d", calls.Load())
 	}
@@ -2074,23 +2027,20 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 		t.Fatal("season scan was not started incrementally")
 	}
 	releaseSeason()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		a.seasonBackfillMu.Lock()
-		running := len(a.seasonBackfills)
-		a.seasonBackfillMu.Unlock()
+	r281RequireProgress(t, "season background task did not finish after release", func() (bool, int, string) {
+		running, progress := r281SeasonSnapshot(a)
 		if running == 0 {
 			season, _ := currentRankedSeason(time.Now())
 			hash := a.storage.accountHash(a.summoner)
 			disk, err := a.storage.loadSeasonStats(seasonStatsSource, hash, season)
 			if err == nil && disk.Complete && seasonStatsCount(disk.Stats) >= sgpPageSize {
-				return
+				return true, running, progress
 			}
+			progress += fmt.Sprintf("/%t/%d", disk.Complete, seasonStatsCount(disk.Stats))
 			// The refresh releases its flight before starting continuation.
 		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatal("season background task did not finish after release")
+		return false, running, progress
+	})
 }
 
 func TestNormalizeGameplayMatchIncludesStatPerks(t *testing.T) {

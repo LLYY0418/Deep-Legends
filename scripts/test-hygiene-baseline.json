@@ -70,17 +70,44 @@
       "sleep": 1,
       "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
     },
+    "scripts/r258-browser.cjs": {
+      "early-ready": 1,
+      "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
+    },
     "scripts/r264-browser.cjs": {
       "wall": 1,
-      "reason": "存量：产品时序契约（自助标签关闭≤300ms、恢复≤1s）本身就是墙钟断言，属于性能契约而非等待，保留"
+      "early-ready": 5,
+      "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
     },
     "scripts/r265-browser.cjs": {
       "sleep": 8,
-      "reason": "存量：真浏览器守卫里的固定稳定间隔与轮询，登记后只减不增，后续按 wait-progress 迁移"
+      "early-ready": 1,
+      "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
+    },
+    "scripts/r266-browser.cjs": {
+      "early-ready": 11,
+      "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
+    },
+    "scripts/r267-browser.cjs": {
+      "early-ready": 3,
+      "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
     },
     "scripts/r269-browser-checks.cjs": {
       "sleep": 1,
-      "reason": "存量：固定等待/稳定间隔（>=200ms），登记后只减不增；改动该文件时顺手迁移到 scripts/lib/wait-progress.cjs"
+      "early-ready": 1,
+      "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
+    },
+    "scripts/r272-browser-checks.cjs": {
+      "early-ready": 1,
+      "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
+    },
+    "scripts/r272-browser-ui.cjs": {
+      "early-ready": 4,
+      "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
+    },
+    "scripts/r277-frontend-browser-checks.cjs": {
+      "early-ready": 12,
+      "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
     },
     "scripts/r82-startup-ab-report.cjs": {
       "sleep": 1,

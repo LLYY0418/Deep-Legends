@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -52,12 +53,11 @@ func TestR252ManualSeasonHeadBypassesRecentGateAndStillProbes(t *testing.T) {
 	id.Store(215)
 	a.startSeasonStatsRefresh(client, reference, player, ref, nil, true)
 	// These waits observe background completion, not a product latency budget.
-	const backgroundWait = 5 * time.Second
 	waitFresh := func(count int) map[string]any {
 		t.Helper()
 		started := time.Now()
-		deadline := started.Add(backgroundWait)
-		for {
+		var latest map[string]any
+		r281RequireProgress(t, "manual head refresh remained throttled", func() (bool, int, string) {
 			var fresh []map[string]any
 			for _, row := range r175Events(t, a, "season_stats_head_refresh") {
 				if row["fresh"] == true && row["skip_reason"] != "recent" {
@@ -65,40 +65,23 @@ func TestR252ManualSeasonHeadBypassesRecentGateAndStillProbes(t *testing.T) {
 				}
 			}
 			if len(fresh) == count {
-				t.Logf("manual head refresh %d observed after %s", count, time.Since(started))
-				return fresh[count-1]
+				// r276-capture-safe: r281RequireProgress invokes this snapshot serially before waitFresh returns latest.
+				latest = fresh[count-1]
 			}
-			if time.Now().After(deadline) {
-				t.Fatalf("manual head refresh remained throttled after %s (want %d events): %v", time.Since(started), count, r175Events(t, a, "season_stats_head_refresh"))
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
+			return len(fresh) == count, max(0, count-len(fresh)), fmt.Sprint(len(fresh))
+		})
+		t.Logf("manual head refresh %d observed after %s", count, time.Since(started))
+		return latest
 	}
 	row := waitFresh(1)
 	if row["new_games"] != float64(1) || row["sgp_history_cache_hits"] != float64(0) {
 		t.Fatal(row)
 	}
 	started := time.Now()
-	deadline := started.Add(backgroundWait)
-	quiet := 0
-	for {
-		a.seasonBackfillMu.Lock()
-		running := len(a.seasonBackfills)
-		a.seasonBackfillMu.Unlock()
-		if running == 0 {
-			quiet++
-			if quiet >= 3 {
-				t.Logf("manual head background jobs settled after %s", time.Since(started))
-				break
-			}
-		} else {
-			quiet = 0
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("manual refresh did not finish after %s (running=%d)", time.Since(started), running)
-		}
-		time.Sleep(10 * time.Millisecond)
+	if err := r281AwaitSeasonJobs(a, "manual refresh did not finish", 3); err != nil {
+		t.Fatal(err)
 	}
+	t.Logf("manual head background jobs settled after %s", time.Since(started))
 	before = calls.Load()
 	a.startSeasonStatsRefresh(client, reference, player, ref, nil, true)
 	row = waitFresh(2)

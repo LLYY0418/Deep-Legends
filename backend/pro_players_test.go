@@ -307,17 +307,12 @@ func TestProCacheSingleflightRefreshBackoffAndStale(t *testing.T) {
 
 func waitProEnrichment(t *testing.T, a *app) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
+	r281RequireProgress(t, "background directory enrichment did not finish", func() (bool, int, string) {
 		a.proPlayers.mu.Lock()
 		updating := a.proPlayers.updating
 		a.proPlayers.mu.Unlock()
-		if !updating {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatal("background directory enrichment did not finish")
+		return !updating, 1, fmt.Sprint(updating)
+	})
 }
 
 func TestProDirectoryPublishesBeforeSlowSupplements(t *testing.T) {

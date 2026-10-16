@@ -103,16 +103,12 @@ func TestR210ExpiryTimerClearsWithoutSnapshotReadsAndFencesOldGeneration(t *test
 	s.now = func() time.Time { clockMu.Lock(); defer clockMu.Unlock(); return now }
 	s.expiryTimer.Reset(time.Millisecond)
 	s.mu.Unlock()
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
+	r281WaitUntil(t, "post-game reveal expiry timer cleanup", func() bool {
 		s.mu.Lock()
 		cleared := s.client == nil
 		s.mu.Unlock()
-		if cleared {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return cleared
+	})
 	s.mu.Lock()
 	cleared := s.client == nil
 	s.mu.Unlock()

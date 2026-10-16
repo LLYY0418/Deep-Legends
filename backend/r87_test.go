@@ -120,19 +120,11 @@ func TestR87PhasePrewarmMakesFirstLiveResponseFast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	a.observeGameplayPhase(ctx, c, "InProgress")
-	deadline := time.Now().Add(2 * time.Second)
-	for {
+	r281WaitUntil(t, "phase did not prewarm", func() bool {
 		a.liveSnapshots.mu.Lock()
-		ready := !a.liveSnapshots.at.IsZero()
-		a.liveSnapshots.mu.Unlock()
-		if ready {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("phase did not prewarm")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		defer a.liveSnapshots.mu.Unlock()
+		return !a.liveSnapshots.at.IsZero()
+	})
 	before := sessions.Load()
 	warm := call()
 	if sessions.Load() != before+1 || warm >= cold/2 {

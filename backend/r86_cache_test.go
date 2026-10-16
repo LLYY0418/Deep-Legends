@@ -282,17 +282,17 @@ func TestR86RiotQueuedDetailsExitWhileActiveRequestsHoldSlots(t *testing.T) {
 	}
 	waitForWorkers := func(want int) {
 		t.Helper()
-		deadline := time.Now().Add(2 * time.Second)
-		for {
+		r281RequireProgress(t, fmt.Sprintf("detail workers must converge to %d; labeled parent included", want), func() (bool, int, string) {
 			got, labeled := workers()
-			if got == want && labeled == want+1 { // Include the waiting overview parent.
-				return
+			remaining := got - want
+			if remaining < 0 {
+				remaining = -remaining
 			}
-			if time.Now().After(deadline) {
-				t.Fatalf("detail workers=%d, want %d while all four active slots remain held; total labeled=%d, want %d", got, want, labeled, want+1)
+			if labeled != want+1 {
+				remaining++
 			}
-			time.Sleep(time.Millisecond)
-		}
+			return got == want && labeled == want+1, remaining, fmt.Sprintf("detail workers=%d labeled=%d", got, labeled)
+		})
 	}
 	waitForWorkers(12) // Four active HTTP requests + eight semaphore waiters.
 	cancel()

@@ -913,8 +913,7 @@ func TestSpecialistRunesConcurrentCallsShareOneFlight(t *testing.T) {
 		runes, _ := provider.specialistRunes(context.Background(), 64, "leesin", "李青", "mid")
 		results <- runes
 	}()
-	deadline := time.Now().Add(time.Second)
-	for {
+	r281RequireProgress(t, "second call did not join the specialist singleflight", func() (bool, int, string) {
 		provider.specialistMu.Lock()
 		flight := provider.specialistFlights[specialistRuneKey(64, "mid")]
 		waiters := 0
@@ -922,14 +921,8 @@ func TestSpecialistRunesConcurrentCallsShareOneFlight(t *testing.T) {
 			waiters = flight.waiters
 		}
 		provider.specialistMu.Unlock()
-		if waiters == 1 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("second call did not join the specialist singleflight")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return waiters == 1, 1, fmt.Sprint(waiters)
+	})
 	close(releaseAccount)
 	first, second := <-results, <-results
 	if len(first) != 1 || len(second) != 1 || requests.Load() != 4 {

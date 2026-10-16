@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 func Test2253SameServerAliasObjectResponse(t *testing.T) {
@@ -87,16 +87,12 @@ func Test2253PendingPickRechecksTurnBeforeWriting(t *testing.T) {
 		return transport.RoundTrip(req)
 	})
 	f.runner.evaluateChampSelect(f.client, f.runner.currentWatch().ChampSelect)
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
+	r281RequireProgress(t, "champselect pending request cancellation", func() (bool, int, string) {
 		f.runner.mu.Lock()
 		pending := len(f.runner.pending)
 		f.runner.mu.Unlock()
-		if pending == 0 {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return pending == 0, pending, fmt.Sprint(pending)
+	})
 	if reads.Load() < 2 || f.patches.Load() != 0 {
 		t.Fatalf("reads=%d writes=%d", reads.Load(), f.patches.Load())
 	}
@@ -179,18 +175,13 @@ func Test2253CustomLegacyBanAndPickUseSameVerifiedModule(t *testing.T) {
 
 func wait2253Submitted(t *testing.T, r *watchRunner, id int64, completed bool) {
 	t.Helper()
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
+	r281RequireProgress(t, "submission not recorded", func() (bool, int, string) {
 		r.mu.Lock()
 		record, exists := r.champSelect.submitted[id]
 		busy := r.champSelect.inFlight[id]
 		r.mu.Unlock()
-		if exists && record.Completed == completed && !busy {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatal("submission not recorded")
+		return exists && record.Completed == completed && !busy, 1, fmt.Sprintf("%t/%t/%t", exists, record.Completed, busy)
+	})
 }
 
 func Test2253LegacySessionRequiresExactGameAndPlayer(t *testing.T) {

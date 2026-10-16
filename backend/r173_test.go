@@ -148,19 +148,12 @@ func TestR173SpecialistListNeverWaitsForStarterTimeline(t *testing.T) {
 	}
 	// A joined cache flight can return before its prefetch owner writes disk.
 	// Worker completion confirms persistence before testing a fresh provider.
-	deadline := time.Now().Add(2 * time.Second)
-	for {
+	r281WaitUntil(t, "opening prefetch did not finish persisting cache", func() bool {
 		p.specialistMu.Lock()
 		prefetchDone := p.starterPrefetches["KR_1"].done
 		p.specialistMu.Unlock()
-		if prefetchDone {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("opening prefetch did not finish persisting cache")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return prefetchDone
+	})
 	r274Flush(t, p.starterCache)
 	reloaded := newRiotProvider(p.champions)
 	if items, err := reloaded.specialistMatchStarters(context.Background(), "KR_1", 1); err != nil || !reflect.DeepEqual(items, []int64{1055}) {

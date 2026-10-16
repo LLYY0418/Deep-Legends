@@ -268,19 +268,14 @@ func TestR231CurrentForeignHistoryDoesNotWaitForRiot(t *testing.T) {
 	a := &app{riot: newRiotProvider(champs), lcu: client, summoner: Summoner{PUUID: "r231-local-player", GameName: "Fixture", TagLine: "JP1"}}
 	defer func() {
 		close(block)
-		deadline := time.Now().Add(2 * time.Second)
-		for {
+		err := r281AwaitProgress("background fixture did not stop", func() (bool, int, string) {
 			a.mu.RLock()
 			pending := len(a.currentRiotDetailFlights)
 			a.mu.RUnlock()
-			if pending == 0 {
-				return
-			}
-			if time.Now().After(deadline) {
-				t.Error("background fixture did not stop")
-				return
-			}
-			time.Sleep(time.Millisecond)
+			return pending == 0, pending, fmt.Sprint(pending)
+		}, r281WaitOptions{})
+		if err != nil {
+			t.Error(err)
 		}
 	}()
 	began := time.Now()

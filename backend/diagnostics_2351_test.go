@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -129,17 +130,12 @@ func Test2351BanSentinelHoversOnceWithoutLocking(t *testing.T) {
 // 不同，所以单独写一份而不是改共享 helper 的签名。
 func wait2351RunnerIdle(t *testing.T, f *r78ChampSelectFixture) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	r281RequireProgress(t, "champselect request did not finish", func() (bool, int, string) {
 		f.runner.mu.Lock()
-		idle := len(f.runner.pending) == 0 && len(f.runner.champSelect.inFlight) == 0
+		pending, inFlight := len(f.runner.pending), len(f.runner.champSelect.inFlight)
 		f.runner.mu.Unlock()
-		if idle {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatal("champselect request did not finish within 5s")
+		return pending+inFlight == 0, pending + inFlight, fmt.Sprintf("%d/%d", pending, inFlight)
+	})
 }
 
 // Keep the real transport/session preflight in the test, with no live LCU writes.
@@ -204,19 +200,12 @@ func Test2351DelayedPickCancelsThenAdvancesOnFreshSession(t *testing.T) {
 		return transport.RoundTrip(req)
 	})
 	f.runner.evaluateChampSelect(f.client, f.runner.currentWatch().ChampSelect)
-	deadline := time.Now().Add(time.Second)
-	for {
+	r281RequireProgress(t, "pending request did not cancel", func() (bool, int, string) {
 		f.runner.mu.Lock()
 		pending := len(f.runner.pending)
 		f.runner.mu.Unlock()
-		if pending == 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("pending request did not cancel")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return pending == 0, pending, fmt.Sprint(pending)
+	})
 	if f.patches.Load() != 0 {
 		t.Fatal("stale candidate submitted")
 	}

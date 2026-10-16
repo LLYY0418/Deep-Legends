@@ -141,19 +141,12 @@ func TestR207HonorStopsWhenPhaseChangesDuringRead(t *testing.T) {
 	}
 	runner.handlePhase(client, "GameStart")
 	close(resume)
-	deadline := time.Now().Add(time.Second)
-	for {
+	r281WaitUntil(t, "honor did not stop", func() bool {
 		runner.mu.Lock()
 		busy := runner.honorInProgress
 		runner.mu.Unlock()
-		if !busy {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("honor did not stop")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return !busy
+	})
 	if writes.Load() != 0 {
 		t.Fatalf("late honor writes = %d", writes.Load())
 	}

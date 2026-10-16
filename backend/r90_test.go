@@ -395,7 +395,6 @@ func TestR90EndPhaseReadsSGPTruthOnce(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	a.observeGameplayPhase(ctx, a.lcu, "EndOfGame")
-	deadline := time.Now().Add(2 * time.Second)
 	hasTruth := func() bool {
 		for _, e := range r90Events(t, a, "arena_group_truth_check") {
 			if e["truth_source"] == "sgp" && e["conclusive"] == true {
@@ -404,9 +403,7 @@ func TestR90EndPhaseReadsSGPTruthOnce(t *testing.T) {
 		}
 		return false
 	}
-	for !hasTruth() && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
+	r281WaitUntil(t, "SGP arena truth check did not finish", hasTruth)
 	if len(r90Events(t, a, "arena_group_truth_check")) != 1 {
 		t.Fatal("end phase did not compare SGP truth")
 	}
@@ -487,7 +484,6 @@ func TestR90EndPhaseTransitionRestartsCanceledTruthRead(t *testing.T) {
 		t.Fatal("first truth read did not start")
 	}
 	a.observeGameplayPhase(ctx, a.lcu, "EndOfGame")
-	deadline := time.Now().Add(2 * time.Second)
 	hasTruth := func() bool {
 		for _, e := range r90Events(t, a, "arena_group_truth_check") {
 			if e["truth_source"] == "sgp" && e["conclusive"] == true {
@@ -496,9 +492,7 @@ func TestR90EndPhaseTransitionRestartsCanceledTruthRead(t *testing.T) {
 		}
 		return false
 	}
-	for !hasTruth() && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
+	r281WaitUntil(t, "SGP arena truth check did not finish", hasTruth)
 	if !hasTruth() || requests.Load() != 2 {
 		t.Fatal("end phase canceled truth without resuming", requests.Load())
 	}

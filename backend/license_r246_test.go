@@ -70,14 +70,7 @@ func TestR246ThirtyMinutesOfRenewTimeoutsRemainActive(t *testing.T) {
 
 func r246Wait(t *testing.T, predicate func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		if predicate() {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	t.Fatal("automatic renew did not reach expected state")
+	r281WaitUntil(t, "automatic renew did not reach expected state", predicate)
 }
 func r246Run(t *testing.T, m *licenseManager) {
 	t.Helper()

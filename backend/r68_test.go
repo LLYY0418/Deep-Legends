@@ -296,19 +296,12 @@ func TestR68AutoMatchmakingGivesUpAndRequiresExplicitRetry(t *testing.T) {
 	}
 	// The terminal diagnostic is emitted just before the worker clears its
 	// in-flight bit; wait for cleanup, then prove repeated lobby events stop.
-	deadline := time.Now().Add(time.Second)
-	for {
+	r281WaitUntil(t, "auto-matchmaking worker did not clear in-flight state", func() bool {
 		runner.mu.Lock()
 		inFlight := runner.autoMatchInFlight
 		runner.mu.Unlock()
-		if !inFlight {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("auto-matchmaking worker did not clear in-flight state")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return !inFlight
+	})
 	runner.handleLobby(client, Summoner{}, rules)
 	time.Sleep(30 * time.Millisecond)
 	if searches.Load() != 3 {

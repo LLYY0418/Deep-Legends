@@ -109,18 +109,8 @@ func TestR214FreshSeasonHeadBypassesRecentGate(t *testing.T) {
 		t.Fatal(rows, calls.Load())
 	}
 	// Wait for background cleanup before closing the store or inspecting state.
-	deadline := time.Now().Add(time.Second)
-	for {
-		a.seasonBackfillMu.Lock()
-		running := len(a.seasonBackfills)
-		a.seasonBackfillMu.Unlock()
-		if running == 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("refresh did not finish")
-		}
-		time.Sleep(time.Millisecond)
+	if err := r281AwaitSeasonJobs(a, "refresh did not finish", 1); err != nil {
+		t.Fatal(err)
 	}
 	cache, err := a.storage.loadSeasonStats(seasonStatsSource, a.storage.accountHash(player), season)
 	if err != nil || len(cache.GameIDs) != 2 || seasonStatsCount(cache.Stats) != 2 {

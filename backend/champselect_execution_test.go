@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -147,19 +148,12 @@ func (f *executionFixture) configure(ban, pick, avoid bool, strategy string) {
 func (f *executionFixture) tick(t *testing.T) {
 	t.Helper()
 	f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
-	deadline := time.Now().Add(time.Second)
-	for {
+	r281RequireProgress(t, "scheduler stuck", func() (bool, int, string) {
 		f.r.mu.Lock()
-		busy := len(f.r.pending) > 0 || len(f.r.champSelect.inFlight) > 0
+		pending, inFlight := len(f.r.pending), len(f.r.champSelect.inFlight)
 		f.r.mu.Unlock()
-		if !busy {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("scheduler stuck")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return pending+inFlight == 0, pending + inFlight, fmt.Sprintf("%d/%d", pending, inFlight)
+	})
 }
 func (f *executionFixture) age() {
 	f.r.mu.Lock()

@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 func TestR186InstallDetectionFiveReasons(t *testing.T) {
@@ -99,10 +98,7 @@ func TestR186PortableDownloadApplyAndFailures(t *testing.T) {
 	if err := u.ApplyAsync(func() { quit.Add(1) }); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(time.Second)
-	for u.Status().State != "failed" && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
+	r281WaitUntil(t, "portable update failure completion", func() bool { return u.Status().State == "failed" })
 	if u.Status().State != "failed" || quit.Load() != 0 {
 		t.Fatal(u.Status(), quit.Load())
 	}

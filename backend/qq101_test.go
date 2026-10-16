@@ -246,16 +246,14 @@ func TestQQ101ProbeCooldownIsScopedByPatch(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("first QQ101 probe did not complete")
 	}
-	deadline := time.Now().Add(time.Second)
-	for {
-		provider.qq101ProbeMu.Lock()
-		running := provider.qq101ProbeRunning["13|emerald_plus|MIDDLE"]
-		provider.qq101ProbeMu.Unlock()
-		if !running || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(time.Millisecond)
+	waitProbe := func() {
+		r281WaitUntil(t, "QQ101 cooldown probe did not finish", func() bool {
+			provider.qq101ProbeMu.Lock()
+			defer provider.qq101ProbeMu.Unlock()
+			return !provider.qq101ProbeRunning["13|emerald_plus|MIDDLE"]
+		})
 	}
+	waitProbe()
 	firstCalls := atomic.LoadInt32(&buildCalls)
 	provider.startQQ101Probe(t.Context(), "ryze", 13, "emerald_plus", "mid")
 	time.Sleep(50 * time.Millisecond)
@@ -267,16 +265,7 @@ func TestQQ101ProbeCooldownIsScopedByPatch(t *testing.T) {
 		t.Fatalf("probe cooldown emitted another event: %#v", event)
 	default:
 	}
-	deadline = time.Now().Add(time.Second)
-	for {
-		provider.qq101ProbeMu.Lock()
-		running := provider.qq101ProbeRunning["13|emerald_plus|MIDDLE"]
-		provider.qq101ProbeMu.Unlock()
-		if !running || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
+	waitProbe()
 	provider.qq101ProbeMu.Lock()
 	stillRunning := provider.qq101ProbeRunning["13|emerald_plus|MIDDLE"]
 	provider.qq101ProbeMu.Unlock()

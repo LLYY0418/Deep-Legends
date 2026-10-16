@@ -58,10 +58,7 @@ func TestR56ReadyCheckAcceptIsOncePerWindowAndResetsForNextRound(t *testing.T) {
 
 	runner.handlePhase(client, "ChampSelect")
 	runner.handleEvent(client, LCUEvent{URI: "/lol-matchmaking/v1/ready-check", Data: []byte(`{"state":"InProgress"}`)}, Summoner{})
-	deadline := time.Now().Add(time.Second)
-	for requests.Load() < 2 && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
-	}
+	r281WaitUntil(t, "next ready-check accept request", func() bool { return requests.Load() >= 2 })
 	if got := requests.Load(); got != 2 {
 		t.Fatalf("next ready-check accept requests = %d, want 2", got)
 	}

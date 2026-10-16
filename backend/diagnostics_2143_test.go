@@ -1,27 +1,22 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 func wait2143Evaluation(t *testing.T, runner *watchRunner) {
 	t.Helper()
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
+	r281RequireProgress(t, "evaluation did not finish", func() (bool, int, string) {
 		runner.mu.Lock()
 		busy := runner.champSelect.processing
 		runner.mu.Unlock()
-		if !busy {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatal("evaluation did not finish")
+		return !busy, 1, fmt.Sprint(busy)
+	})
 }
 
 func Test2143CustomBanAvailabilityUpdatesAndPickWithWatchOff(t *testing.T) {

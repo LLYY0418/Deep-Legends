@@ -93,18 +93,11 @@ func TestR136MayhemSamplerStopsWhenGameflowLeaves(t *testing.T) {
 		t.Fatal("sampler did not start")
 	}
 	a.stopMayhemSamplerForClient("gameflow-left", client)
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		summary := r90Events(t, a, "live_client_mayhem_sample_summary")
-		if len(summary) == 1 {
-			if summary[0]["end_reason"] != "gameflow-left" || summary[0]["allgamedata_attempts"] != float64(1) {
-				t.Fatalf("leave summary = %v", summary[0])
-			}
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
+	r281WaitUntil(t, "gameflow exit did not stop sampler", func() bool { return len(r90Events(t, a, "live_client_mayhem_sample_summary")) == 1 })
+	summary := r90Events(t, a, "live_client_mayhem_sample_summary")
+	if summary[0]["end_reason"] != "gameflow-left" || summary[0]["allgamedata_attempts"] != float64(1) {
+		t.Fatalf("leave summary = %v", summary[0])
 	}
-	t.Fatal("gameflow exit did not stop sampler")
 }
 
 func TestR136MayhemSamplerIsSingletonPerGame(t *testing.T) {
@@ -128,13 +121,7 @@ func TestR136MayhemSamplerIsSingletonPerGame(t *testing.T) {
 		t.Fatal("a second sampler started for the same game")
 	}
 	a.stopMayhemSamplerForClient("gameflow-left", client)
-	deadline := time.Now().Add(2 * time.Second)
-	for len(r90Events(t, a, "live_client_mayhem_sample_summary")) == 0 {
-		if time.Now().After(deadline) {
-			t.Fatal("singleton sampler did not stop")
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	r281WaitUntil(t, "singleton sampler did not stop", func() bool { return len(r90Events(t, a, "live_client_mayhem_sample_summary")) > 0 })
 }
 
 func TestR136MayhemSamplerErrorKinds(t *testing.T) {

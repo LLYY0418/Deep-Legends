@@ -58,19 +58,12 @@ func TestR280ReviewProxyRecoveryAfterSpeedProbe(t *testing.T) {
 	if got := request(); got != "direct" {
 		t.Fatal(got)
 	}
-	deadline := time.Now().Add(time.Second)
-	for {
+	r281WaitUntil(t, "speed probe did not finish", func() bool {
 		rt.mu.Lock()
+		defer rt.mu.Unlock()
 		choice := rt.choices["riot"]
-		rt.mu.Unlock()
-		if !choice.probing && !choice.at.IsZero() {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("speed probe did not finish")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		return !choice.probing && !choice.at.IsZero()
+	})
 	before := calls.Load()
 	if got := request(); got != "direct" || calls.Load() != before {
 		t.Fatal("cooldown retried the proxy")

@@ -2,7 +2,6 @@ package main
 
 import (
 	"testing"
-	"time"
 )
 
 func Test1110CustomDraftUsesPracticePoolAndBans(t *testing.T) {
@@ -22,7 +21,7 @@ func Test1110CustomDraftNeverBorrowsNormalPool(t *testing.T) {
 	fixture.session.QueueID = 3110
 	fixture.enable("normal", "ban", []int64{141})
 	fixture.runner.evaluateChampSelect(fixture.client, fixture.runner.currentWatch().ChampSelect)
-	time.Sleep(30 * time.Millisecond)
+	wait2143Evaluation(t, fixture.runner)
 	if fixture.runner.champSelectSnapshot().GroupID != "practice" || fixture.patches.Load() != 0 {
 		t.Fatal("custom draft was unsupported or borrowed normal pool")
 	}

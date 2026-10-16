@@ -171,10 +171,7 @@ func TestR269MayhemDiskTTLAndNoRecordCache(t *testing.T) {
 		}
 		now = now.Add(2 * time.Hour)
 		restarted.lookup(context.Background(), "Fixture", "CN")
-		deadline := time.Now().Add(time.Second)
-		for calls.Load() < 2 && time.Now().Before(deadline) {
-			time.Sleep(time.Millisecond)
-		}
+		r281WaitUntil(t, "expired mayhem cache background refresh", func() bool { return calls.Load() >= 2 })
 		if calls.Load() != 2 {
 			t.Fatal("expired cache reused")
 		}

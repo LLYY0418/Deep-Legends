@@ -183,10 +183,7 @@ func TestR185BackendRuntimeMetricsAndHTTP(t *testing.T) {
 		t.Fatal("HTTP counter leaked")
 	}
 	ticks <- time.Unix(120, 0)
-	deadline := time.Now().Add(time.Second)
-	for len(r175Events(t, a, "backend_runtime_metrics")) < 2 && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
+	r281WaitUntil(t, "runtime metrics events after ticks", func() bool { return len(r175Events(t, a, "backend_runtime_metrics")) >= 2 })
 	if len(r175Events(t, a, "backend_runtime_metrics")) != 2 {
 		t.Fatal("not one event per tick")
 	}

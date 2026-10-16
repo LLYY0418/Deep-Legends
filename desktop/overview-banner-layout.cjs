@@ -5,6 +5,7 @@ const {cleanupChromeTest}=require('../scripts/chrome-test-cleanup.cjs');
 const {launchChrome}=require('../scripts/chrome-test-launcher.cjs');
 const {serveStaticAPI}=require('../scripts/r276-browser-api-fixtures.cjs');
 const {waitOutcome}=require('../scripts/lib/wait-progress.cjs');
+const {waitAppReady}=require('../scripts/lib/app-ready.cjs');
 const {spawn} = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -41,7 +42,7 @@ async function main(){
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});
  await call('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/?demo'});
- await waitForDOM('app-frame ready',`(()=>{const app=document.querySelector('#app-frame');return {ready:!!app&&!app.hasAttribute('inert'),present:!!app,inert:app?app.hasAttribute('inert'):null};})()`);
+ await waitAppReady({evaluate});
 
  await waitForDOM('overview summoner strip ready',`(()=>{const overview=document.querySelector('#overview-content');const strips=document.querySelectorAll('#overview-content .summoner-strip').length;return {ready:strips>0,overview:!!overview,strips,busy:overview?.getAttribute('aria-busy')??null};})()`);
  // R79: the production artwork now wraps an img; retain the intrinsic-size guard.

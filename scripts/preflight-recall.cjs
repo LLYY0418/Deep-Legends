@@ -57,9 +57,15 @@ function verifyGit() {
 
 if (require.main === module) {
   const args = process.argv.slice(2);
-  if (args.includes("--verify-git")) process.exit(verifyGit() ? 1 : 0);
+  if (args.includes("--verify-git")) {
+    const errors=require('./lib/r281-recall.cjs').verifyGit(root);for(const error of errors)console.error(error);
+    process.exit(verifyGit()||errors.length?1:0);
+  }
   const result = evaluate();
-  for (const row of result.rows) console.log(`${row.ok ? "✔" : "✘"} ${row.id}  ← ${row.failure}${row.ok ? "" : `\n    漏选：${row.missing.join(", ")}`}`);
+  const extra=require('./lib/r281-recall.cjs').recall({go:true});
+  result.rows.push(...extra.rows);result.total=result.rows.length;result.recalled=result.rows.filter(row=>row.ok).length;result.canonicalMapping=extra.canonicalMapping;result.deviations=extra.deviations;
+  console.log('R281：已知案例自动召回；30条原始编号清单未提供，完整映射尚未完成。');
+  for (const row of result.rows) console.log(`${row.ok ? "✔" : "✘"} ${row.id}  ← ${row.failure}${row.ok ? "" : `\n    漏选：${(row.missing||[JSON.stringify(row.detail)]).join(", ")}`}`);
   console.log(`\n召回 ${result.recalled}/${result.total}；不可选择类 ${result.notSelectable.length} 项：${result.notSelectable.map((n) => n.id).join(", ")}`);
   console.log("\n各改动集的选择规模：");
   for (const s of result.sets) console.log(`  ${s.id}: 改动 ${s.changedFiles} 个文件 → Node ${s.nodeSelected}/${s.nodeTotal}（${Math.round(s.nodeRatio * 100)}%），Go 文件 ${s.goTestFiles}/${s.goTotal}，浏览器守卫 ${s.guards}，相关脚本 ${s.relatedScripts}，未覆盖 ${s.unmapped.length}，建议直接推 probe：${s.recommendProbe}`);

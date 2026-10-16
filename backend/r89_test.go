@@ -313,10 +313,7 @@ func TestR89IdentityRestartAndExpiry(t *testing.T) {
 		}
 		r274Flush(t, p.identityDisk)
 	}
-	deadline := time.Now().Add(time.Second)
-	for calls.Load() < 3 && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
+	r281WaitUntil(t, "background account refresh requests", func() bool { return calls.Load() >= 3 })
 	if calls.Load() != 3 {
 		t.Fatalf("restart lookup plus background account refresh requests=%d", calls.Load())
 	}

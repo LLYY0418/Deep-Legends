@@ -106,16 +106,7 @@ func TestR92ProLadderStartsBeforeSupplementsFinish(t *testing.T) {
 		}
 	}
 	release()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		a.proPlayers.mu.Lock()
-		done := !a.proPlayers.updating
-		a.proPlayers.mu.Unlock()
-		if done {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
+	waitProEnrichment(t, a)
 	a.proPlayers.mu.Lock()
 	completed := a.proPlayers.teams
 	updating := a.proPlayers.updating

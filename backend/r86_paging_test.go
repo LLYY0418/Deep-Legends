@@ -94,18 +94,8 @@ func TestR86TenPageSeasonBackfillDoesNotPopulateHistoryCache(t *testing.T) {
 	}
 	a.sgp.cacheHistoryPage("HN1", "subject", 0, 50, nil, sgpHistoryPage{bytes: 1})
 	a.startSeasonBackfill(a.lcu, gameplayReference{PlayerRef: "subject", ServerID: "HN1"}, Summoner{}, "subject", nil, "HN1", cache.AccountHash, season, start)
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		a.seasonBackfillMu.Lock()
-		running := len(a.seasonBackfills)
-		a.seasonBackfillMu.Unlock()
-		if running == 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("backfill never completed")
-		}
-		time.Sleep(time.Millisecond)
+	if err := r281AwaitSeasonJobs(a, "backfill never completed", 1); err != nil {
+		t.Fatal(err)
 	}
 	if calls.Load() != 11 {
 		t.Fatalf("backfill requests=%d want11 (one terminal-page prefetch)", calls.Load())

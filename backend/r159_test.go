@@ -86,16 +86,7 @@ func TestR159HexdataHeroIconsAndObservedCatalogPersist(t *testing.T) {
 	if fast[first.AugmentID].IconPath != fullIcon || fast[first.AugmentID].FallbackIconPath != "" {
 		t.Fatalf("cached enrichment lost icon or fallback: %#v", fast[first.AugmentID])
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		if _, err := os.Stat(provider.cache.pathFor(observedHexdataAugmentsKey)); err == nil {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("observed index was not persisted")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	r281WaitUntil(t, "observed index was not persisted", func() bool { _, err := os.Stat(provider.cache.pathFor(observedHexdataAugmentsKey)); return err == nil })
 	restarted := newChampionProvider()
 	restarted.cache = newChampionDataCache(&localStore{root: root})
 	stored := gameplayAugmentIndexAll(restarted.observedHexdataAugments())
