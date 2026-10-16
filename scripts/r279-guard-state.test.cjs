@@ -37,3 +37,15 @@ async function savedSample({wait=true,brokenCSS=false}={}){
 test('saved page settles semantically before the original max-height assertion',async()=>assert((await savedSample())>=4));
 test('mutation: sampling before saved page settles fails the original max-height assertion',()=>assert.rejects(savedSample({wait:false}),/1634px/));
 test('mutation: wrong CSS after a settled saved page still fails the original max-height assertion',()=>assert.rejects(savedSample({brokenCSS:true}),/1634px/));
+
+const r266=fs.readFileSync(path.join(__dirname,'r266-browser.cjs'),'utf8');
+const matrixReady=r266.match(/await until\("document\.querySelectorAll\('\.match-summary'\)\.length===3"\);await settleTopbar\(\{evaluate\}\);/)[0];
+const threeRows=r266.match(/assert\.equal\(rects\.length,3,'matrix requires all three modes'\);/)[0];
+async function matrixRows({source=matrixReady,stuck=false}={}){
+ let count=2,now=0;const {waitForPage}=require('./lib/wait-progress.cjs');
+ const until=async expression=>{const ok=await waitForPage(async e=>e===expression?count===3:{rows:count},expression,{idleMs:100,hardMs:200,now:()=>now,sleep:async ms=>{now+=ms;if(!stuck)count=3;}});if(!ok)throw Error('matrix three rows ready: stalled');};
+ await vm.runInNewContext('(async()=>{'+source+'const rects=Array.from({length:count()});'+threeRows+'})()',{until,settleTopbar:async()=>{},evaluate:()=>{},count:()=>count,assert,Array});
+}
+test('R266 geometry waits for the third actual card after virtual hydration',()=>matrixRows());
+test('mutation: removing actual-row readiness must fail the original three-mode assertion',()=>assert.rejects(matrixRows({source:''}),/matrix requires all three modes/));
+test('mutation: a permanently virtual third row must fail readiness explicitly',()=>assert.rejects(matrixRows({stuck:true}),/matrix three rows ready: stalled/));

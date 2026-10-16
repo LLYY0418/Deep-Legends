@@ -4167,7 +4167,10 @@
       };
       fit();
       if(typeof ResizeObserver!=="undefined" && !collection._tagObserver) {
-        collection._tagObserver=new ResizeObserver(fit);collection._tagObserver.observe(collection);
+        collection._tagObserver=new ResizeObserver(()=>{
+          if(collection._tagFitFrame)return;
+          collection._tagFitFrame=requestAnimationFrame(()=>{collection._tagFitFrame=0;fit();});
+        });collection._tagObserver.observe(collection);
         const main=collection.closest?.('.match-entry')?.querySelector('.match-main');
         if(main){
           collection._tagObserver.observe(main);
