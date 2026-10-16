@@ -4187,7 +4187,7 @@
     const batch=jobs=>{
       const measured=[];
       for(const {collection,popup} of jobs){
-        if(typeof collection.checkVisibility==="function" && !collection.checkVisibility({contentVisibilityAuto:true}))continue;
+        if(collection.isConnected===false || typeof collection.checkVisibility==="function" && !collection.checkVisibility({contentVisibilityAuto:true}))continue;
         const width=collection.clientWidth;if(!width)continue;
         const main=collection.closest?.('.match-entry')?.querySelector('.match-main');
         const rowWidth=main?.clientWidth,items=collection._tagFitWidth===width?null:[...collection.querySelectorAll("[data-match-tag]")],more=items?collection.querySelector("[data-match-tags-more]"):null;
@@ -4221,15 +4221,18 @@
         more.setAttribute("aria-label",`查看其余 ${hidden} 个标签`);
       }
     };
+    const scheduler=container.ownerDocument || container;
+    const queueFit=job=>{
+      const pending=scheduler._tagFitJobs ||= new Map();pending.set(job.collection,job);
+      if(scheduler._tagFitFrame)return;
+      scheduler._tagFitFrame=requestAnimationFrame(()=>{scheduler._tagFitFrame=0;const jobs=[...pending.values()];pending.clear();batch(jobs);});
+    };
     for(const collection of container.querySelectorAll(".match-tags-collection")) {
       if(onlyNew && collection._tagObserver)continue;
-      const popup=bindMatchTagsPopover(collection),fit=()=>batch([{collection,popup}]);
+      const popup=bindMatchTagsPopover(collection);
       fits.push({collection,popup});
       if(typeof ResizeObserver!=="undefined" && !collection._tagObserver) {
-        collection._tagObserver=new ResizeObserver(()=>{
-          if(collection._tagFitFrame)return;
-          collection._tagFitFrame=requestAnimationFrame(()=>{collection._tagFitFrame=0;fit();});
-        });collection._tagObserver.observe(collection);
+        collection._tagObserver=new ResizeObserver(()=>queueFit({collection,popup}));collection._tagObserver.observe(collection);
         const main=collection.closest?.('.match-entry')?.querySelector('.match-main');
         if(main){
           collection._tagObserver.observe(main);

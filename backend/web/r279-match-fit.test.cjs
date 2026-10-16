@@ -41,11 +41,8 @@ test('mutation: omitting champion track observation must fail position-only over
 });
 
 test('mutation: synchronous observer writes must fail the error-free correction target',()=>{
- const anchor=`new ResizeObserver(()=>{
-          if(collection._tagFitFrame)return;
-          collection._tagFitFrame=requestAnimationFrame(()=>{collection._tagFitFrame=0;fit();});
-        })`;
- const broken=source.replace(anchor,'new ResizeObserver(fit)');
+ const anchor='new ResizeObserver(()=>queueFit({collection,popup}))';
+ const broken=source.replace(anchor,'new ResizeObserver(()=>batch([{collection,popup}]))');
  assert.notEqual(broken,source);assert.throws(()=>run(broken,true,true),/icon correction must run outside ResizeObserver delivery/);
 });
 
@@ -69,3 +66,37 @@ test('fitting resized tag rows batches layout reads across the retained list',()
 test('mutation: fitting each row separately must fail the layout batching target',()=>{
  const broken=source.replace('batch(fits);','for(const job of fits)batch([job]);');assert.notEqual(broken,source);assert.throws(()=>tagBatchTarget(broken),/observed layout flushes/);
 });
+
+function observerBatchTarget(source,detach=false,separate=false){
+ let width=35,dirty=false,flushes=0;const frames=[],observers=[];
+ const read=()=>{if(dirty){flushes++;dirty=false;}};
+ const flag=initial=>{let value=initial;return {get hidden(){return value},set hidden(next){if(value!==next)dirty=true;value=next}};};
+ const collections=Array.from({length:20},()=>{
+  const items=Array.from({length:3},(_,i)=>Object.assign(flag(false),{getBoundingClientRect(){read();return {width:20}},hasAttribute:()=>i===0}));
+  const more=Object.assign(flag(true),{setAttribute(){}});
+  return {get clientWidth(){read();return width},checkVisibility:()=>true,closest:()=>null,querySelectorAll:()=>items,querySelector:()=>more,items,more};
+ });
+ class ResizeObserver{constructor(callback){this.callback=callback;observers.push(this)}observe(){}}
+ const f=compile(source,['fitMatchTags'],{ResizeObserver,requestAnimationFrame:callback=>{frames.push(callback);return frames.length},bindMatchTagsPopover:()=>({anchor:null})});
+ const doc={};
+ if(separate)for(const collection of collections)f.fitMatchTags({ownerDocument:doc,querySelectorAll:()=>[collection]});
+ else f.fitMatchTags({querySelectorAll:()=>collections});
+ width=100;dirty=false;flushes=0;
+ for(const observer of observers)observer.callback();
+ assert.equal(frames.length,1,'one list resize must schedule a single correction frame across all rows');
+ if(detach)for(const collection of collections)collection.isConnected=false;
+ while(frames.length)frames.shift()();
+ if(detach){assert(collections.every(c=>c.items.slice(1).every(n=>n.hidden)&&!c.more.hidden),'detached queued rows must retain their last fitted state');return;}
+ assert(collections.every(c=>c.items.every(n=>!n.hidden)&&c.more.hidden),'one shared correction must restore every fitting tag');
+ assert(flushes<=2,'observer corrections must batch row writes before measuring, observed layout flushes='+flushes);
+}
+test('one resize delivery batches all observed match rows in one frame',()=>observerBatchTarget(source));
+
+test('mutation: scheduling each observed row separately fails the shared-frame target',()=>{
+ const broken=source.replace('scheduler._tagFitFrame=requestAnimationFrame','job.collection._tagFitFrame=requestAnimationFrame');
+ assert.notEqual(broken,source);assert.throws(()=>observerBatchTarget(broken),/one list resize must schedule a single correction frame/);
+});
+
+test('queued rows detached before their correction frame are skipped',()=>observerBatchTarget(source,true));
+
+test('rows bound through separate containers share their document correction frame',()=>observerBatchTarget(source,false,true));
