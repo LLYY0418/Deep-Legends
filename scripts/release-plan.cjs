@@ -2,8 +2,11 @@
 // Versioned execution policy travels with the test infrastructure; local notes are not a runtime dependency.
 const cp=require('node:child_process');
 const policy=require('./release-validation-policy.json');
+// These scripts change the produced binary/package, unlike test-only orchestration.
+const releaseInputs=new Set(['go.mod','go.sum','scripts/build-stage.cjs','scripts/normalize-source-line-endings.cjs','scripts/build-license-staging.cjs','scripts/make-release.cjs']);
 function productFile(file){
- if(!/^(backend|desktop)\//.test(file))return false;
+ if(releaseInputs.has(file)||/^build[^/]*\.(?:sh|ps1|cjs)$/.test(file))return true;
+ if(!/^(backend|desktop|installer|relay\/riot-worker)\//.test(file))return false;
  if(/_test\.go$|\.test\.[cm]?js$|-harness\.cjs$|-layout\.cjs$|-browser\.cjs$/.test(file))return false;
  return !/\/(?:testdata|node_modules)\//.test(file);
 }

@@ -13,6 +13,7 @@ const path = require("node:path");
 const posix = path.posix;
 
 const NODE_TEST_RE = /^(?:backend\/web|desktop|scripts)\/[^/]+\.test\.cjs$|^relay\/riot-worker\/[^/]+\.test\.mjs$/;
+const SCRIPT_TEST_RE = /^scripts\/.+\.test\.(?:py|ps1)$/;
 const GO_SOURCE_RE = /^backend\/[^/]+\.go$/;
 const GO_TEST_RE = /^backend\/[^/]+_test\.go$/;
 const FILE_TOKEN_RE = /[A-Za-z0-9_.-]+\.(?:cjs|mjs|js|css|html|json|go|py|ps1|sh|yml|yaml|md|nsi|nsh|ico|woff2)\b/g;
@@ -179,15 +180,18 @@ function isDesktopProduct(file) {
 function select(index, rawChanges, options = {}) {
   const changes = rawChanges.map((c) => (typeof c === "string" ? { file: normalize(c), status: "M" } : { file: normalize(c.file), status: c.status || "M" }));
   const broadRatio = options.broadRatio ?? 0.6;
+  const deleted = new Set(changes.filter(c => c.status === "D").map(c => c.file));
+  const scriptTests = [];
   const nodeSelected = new Map();
   const addNode = (file, reason) => {
+    if (deleted.has(file)) return;
     if (!nodeSelected.has(file)) nodeSelected.set(file, []);
     if (!nodeSelected.get(file).includes(reason)) nodeSelected.get(file).push(reason);
   };
   const guards = new Map();
   const addGuard = (name, reason) => { if (!guards.has(name)) guards.set(name, reason); };
   const goFiles = new Map();
-  const addGoFile = (file, reason) => { if (!goFiles.has(file)) goFiles.set(file, reason); };
+  const addGoFile = (file, reason) => { if (deleted.has(file)) return; if (!goFiles.has(file)) goFiles.set(file, reason); };
   const related = new Map();
   const windowsOnly = new Set();
   const ciOnly = new Map();
@@ -195,6 +199,19 @@ function select(index, rawChanges, options = {}) {
   const staticGates = new Set(["verify-no-docs-tracked"]);
   let webLayerTouched = false;
   let docsOnly = true;
+  // Follow the actual callers too: e.g. CI -> Python mutation runner -> PS fixture.
+  function executionEntries(file) {
+    const seen = new Set(), workflows = new Set(), pending = [file];
+    while (pending.length) {
+      const current = pending.pop();
+      if (seen.has(current)) continue;
+      seen.add(current);
+      for (const workflow of index.workflowRefs?.get(current) || []) workflows.add(workflow);
+      for (const caller of index.scriptRefs.get(current) || []) pending.push(caller);
+      for (const [caller] of index.referencedBy.get(current) || []) pending.push(caller);
+    }
+    return [...workflows].sort();
+  }
 
   for (const { file, status } of changes) {
     const reasonsBefore = nodeSelected.size + goFiles.size + guards.size;
@@ -202,6 +219,10 @@ function select(index, rawChanges, options = {}) {
     const isDoc = /\.md$/.test(file);
     if (!isDoc) docsOnly = false;
 
+    if (SCRIPT_TEST_RE.test(file)) {
+      covered = true;
+      if (!deleted.has(file)) scriptTests.push({file, runner: file.endsWith(".py") ? "python" : "powershell", workflows: executionEntries(file)});
+    }
     if (NODE_TEST_RE.test(file)) { addNode(file, "测试文件本身被改动"); covered = true; }
     for (const [test, via] of index.referencedBy.get(file) || []) { addNode(test, `引用了 ${file}（${via}）`); covered = true; }
     for (const script of index.scriptRefs.get(file) || []) {
@@ -224,7 +245,7 @@ function select(index, rawChanges, options = {}) {
       }
     }
     if (file.startsWith("installer/")) { windowsOnly.add(WINDOWS_ONLY_NOTE); covered = true; }
-    if (index.workflowRefs && index.workflowRefs.has(file) && file.startsWith("scripts/") && !NODE_TEST_RE.test(file) && !index.referencedBy.has(file)) {
+    if (index.workflowRefs && index.workflowRefs.has(file) && file.startsWith("scripts/") && !NODE_TEST_RE.test(file) && !SCRIPT_TEST_RE.test(file) && !deleted.has(file) && !index.referencedBy.has(file)) {
       ciOnly.set(file, [...index.workflowRefs.get(file)]);
       covered = true;
     }
@@ -265,6 +286,8 @@ function select(index, rawChanges, options = {}) {
   return {
     scopeWarnings,
     changed: changes,
+    scriptTests: scriptTests.sort((a,b) => a.file.localeCompare(b.file)),
+    removedTests: changes.filter(c => c.status === "D" && (NODE_TEST_RE.test(c.file) || GO_TEST_RE.test(c.file) || SCRIPT_TEST_RE.test(c.file))).map(c => c.file),
     nodeTests: [...nodeSelected].map(([file, reasons]) => ({ file, reasons })).sort((a, b) => a.file.localeCompare(b.file)),
     goTestFiles: [...goFiles].map(([file, reason]) => ({ file, reason })).sort((a, b) => a.file.localeCompare(b.file)),
     goTestNames: [...new Set(goTestNames)].sort(),
@@ -277,7 +300,7 @@ function select(index, rawChanges, options = {}) {
     webLayerTouched,
     broad,
     ratio: Number(ratio.toFixed(3)),
-    recommendProbe: broad || reallyUnmapped.length > 0 || ciOnly.size > 0,
+    recommendProbe: broad || reallyUnmapped.length > 0 || ciOnly.size > 0 || scriptTests.some(t => t.runner === "powershell"),
   };
 }
 

@@ -46,21 +46,20 @@ function resolveBase(explicit) {
   return main ? tryGit(["merge-base", "HEAD", main]) : "HEAD";
 }
 
-function changedFiles(base) {
+function changedFiles(base, cwd = root) {
   const changes = new Map();
-  const status = git(["diff", "--name-status", "-M", base]).split("\n").filter(Boolean);
-  for (const line of status) {
-    const parts = line.split("\t");
-    const code = parts[0][0];
-    if (code === "R") { changes.set(parts[2], "R"); changes.set(parts[1], "D"); }
-    else changes.set(parts[1], code);
+  const tokens = git(["diff", "--name-status", "-M", "-z", base, "--"], {cwd}).split("\0").filter(Boolean);
+  for (let i = 0; i < tokens.length;) {
+    const code = tokens[i++][0], file = tokens[i++];
+    if (code === "R") { changes.set(tokens[i++], "R"); changes.set(file, "D"); }
+    else changes.set(file, code);
   }
-  for (const file of git(["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean)) changes.set(file, "A");
+  for (const file of git(["ls-files", "--others", "--exclude-standard", "-z"], {cwd}).split("\0").filter(Boolean)) changes.set(file, "A");
   return [...changes].map(([file, statusCode]) => ({ file, status: statusCode }));
 }
 
 function loadIndex() {
-  const files = git(["ls-files", "-co", "--exclude-standard"]).split("\n").filter(Boolean);
+  const files = git(["ls-files", "-co", "--exclude-standard", "-z"]).split("\0").filter(Boolean);
   const { guards } = require("./r276-browser-catalog.cjs");
   return buildIndex({ files, read: (file) => fs.readFileSync(path.join(root, file), "utf8"), guards: guards.map((row) => row[0]) });
 }
@@ -73,6 +72,22 @@ function run(label, command, args, options = {}) {
   const ok = result.status === 0;
   console.log(`${ok ? "✔" : "✘"} ${label}（${(ms / 1000).toFixed(1)}s）`);
   return { label, ok, ms, status: result.status };
+}
+
+// Direct script tests never disappear into the associated-cost deferral.
+function runScriptTests(tests, {platform = process.platform, runCommand = run} = {}) {
+  return tests.map(test => {
+    const command = test.runner === "python" ? (platform === "win32" ? "python" : "python3") : "pwsh";
+    const args = test.runner === "python" ? [test.file] : ["-NoProfile", "-File", test.file];
+    if (test.runner === "powershell" && platform !== "win32") {
+      const mapped = test.workflows.length > 0;
+      return {label: "直接测试 " + test.file, file: test.file, command, args, workflows: test.workflows,
+        status: mapped ? "deferred-to-Windows-CI" : "blocked-unmapped-platform",
+        ok: mapped ? null : false,
+        note: mapped ? "本机不运行Windows夹具；等待列出的CI入口，不算通过" : "缺少Windows验证入口，必须补齐后才能声称直接测试覆盖"};
+    }
+    return {...runCommand("直接测试 " + test.file, command, args), file: test.file};
+  });
 }
 
 function staticGates(selection, base) {
@@ -110,8 +125,13 @@ function printSummary(base, selection, total) {
     console.log(`\n浏览器守卫：${selection.browserGuards.map((g) => g.name).join(", ")}`);
     console.log(`  原因：${selection.browserGuards[0].reason}`);
   }
+  if (selection.scriptTests?.length) {
+    console.log("\n直接改动的Python/PowerShell测试：");
+    for (const row of selection.scriptTests) console.log("  " + row.file + " ← " + row.runner + (row.workflows.length ? "；CI入口：" + row.workflows.join(", ") : "；无已知CI入口"));
+  }
+  if (selection.removedTests?.length) console.log("\n已删除测试不执行，关联验证仍保留：" + selection.removedTests.join(", "));
   if (selection.relatedScripts.length) {
-    console.log("\n相关脚本（在 CI 的 quality / proof 作业里运行，这里只提示，不自动执行）：");
+    console.log("\n相关脚本（引用关系提示，不代表已执行或已验证；本地不自动执行）：");
     for (const row of selection.relatedScripts.slice(0, 25)) console.log(`  ${row.file}  ← ${row.because.join(", ")}`);
     if (selection.relatedScripts.length > 25) console.log(`  …另有 ${selection.relatedScripts.length - 25} 个`);
   }
@@ -170,13 +190,20 @@ async function main() {
       if (!result.ok) exitCode = 1;
     }
     if(exitCode!==0){
-      for(const [label,selected] of [["Node回归",execution.nodeTests.map(row=>row.file)],["Go回归",execution.goTestNames],["浏览器",options.browsers&&!execution.deferBrowser?selection.browserGuards.map(row=>row.name):[]]])if(selected.length)report.results.push({label,status:"skipped-static-gate-failed",selected,note:"前置门禁失败，未执行且不算通过；修复前置后必须重新执行"});
+      for(const [label,selected] of [["脚本测试",execution.scriptTests.map(row=>row.file)],["Node回归",execution.nodeTests.map(row=>row.file)],["Go回归",execution.goTestNames],["浏览器",options.browsers&&!execution.deferBrowser?selection.browserGuards.map(row=>row.name):[]]])if(selected.length)report.results.push({label,status:"skipped-static-gate-failed",selected,note:"前置门禁失败，未执行且不算通过；修复前置后必须重新执行"});
     }
     if(execution.deferAssociated||execution.deferBrowser)report.results.push({label:"成本感知关联验证",status:"deferred-to-CI",note:"完整选择清单保留；直接修改测试回归，其余关联验证由CI执行，未执行不算通过",deferred:execution.deferred});
     if (exitCode===0 && execution.nodeTests.length) {
       const result = run(`Node 测试（${execution.nodeTests.length} 个文件，并发 ${parallel}）`, process.execPath, ["--test", `--test-concurrency=${parallel}`, ...execution.nodeTests.map((t) => t.file)]);
       report.results.push(result);
       if (!result.ok) exitCode = 1;
+    }
+    if (exitCode===0 && execution.scriptTests.length) {
+      for (const result of runScriptTests(execution.scriptTests)) {
+        report.results.push(result);
+        if (result.ok === false) exitCode = 1;
+        if (result.ok === null) console.log("待Windows CI验证：" + result.file + " → " + result.workflows.join(", ") + "（未通过）");
+      }
     }
     if (exitCode===0 && execution.goTestNames.length) {
       const pattern = `^(${execution.goTestNames.join("|")})$`;
@@ -187,7 +214,10 @@ async function main() {
     if (exitCode===0 && options.browsers && !execution.deferBrowser && selection.browserGuards.length) {
       for (const result of runBrowsers(selection)) { report.results.push(result); if (!result.ok) exitCode = 1; }
     }
-    console.log(`\n${exitCode === 0 ? (execution.deferAssociated||execution.deferBrowser?"本地已执行预检通过，其余关联验证明确延后CI":"快速预检通过") : "快速预检有失败"}。注意：这不是发版证据；完整验证以 probe / release 分支上的 CI 为准。`);
+    const platformPending=report.results.some(r=>r.status==="deferred-to-Windows-CI");
+    const summary=exitCode!==0 ? "快速预检有失败" : platformPending ? "本地已执行预检通过，直接改动Windows测试仍待CI" : execution.deferAssociated||execution.deferBrowser ? "本地已执行预检通过，其余关联验证明确延后CI" : "快速预检通过";
+    console.log("\n"+summary+"。注意：这不是发版证据；完整验证以 probe / release 分支上的 CI 为准。");
+    if (report.results.some(r=>r.status==="deferred-to-Windows-CI")) console.log("直接改动的Windows测试尚未通过；必须以列出的Windows CI实际结果补齐，不能把本地预检称为全部测试通过。");
     if (selection.browserGuards.length && (!options.browsers||execution.deferBrowser)) console.log("浏览器守卫未在本地运行（加 --browsers 查看成本决策，--full --browsers 显式完整运行）；它们在 CI 的 browser-main / browser-r265 / R277 matrix 里一定会跑。");
   }
   if (options.json) { fs.mkdirSync(path.dirname(path.resolve(options.json)), { recursive: true }); fs.writeFileSync(options.json, JSON.stringify(report, null, 2) + "\n");fs.writeFileSync(path.join(path.dirname(path.resolve(options.json)),"preflight-static-gates.json"),JSON.stringify({automaticStaging:false,gates:staticGates(selection,gateBase)},null,2)+"\n"); }
@@ -198,4 +228,4 @@ if (require.main === module) {
   main().then((code) => { process.exitCode = code; }, (error) => { console.error(error.stack || error); process.exitCode = 2; });
 }
 
-module.exports = { parseArgs, resolveBase, changedFiles, staticGates };
+module.exports = { parseArgs, resolveBase, changedFiles, staticGates, runScriptTests };

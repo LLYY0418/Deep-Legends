@@ -29,6 +29,7 @@ function planExecution(selection,{costs=defaultCosts,workers=6,limits=policy,goN
  const deferBrowser=browsers&&!full&&(deferAssociated||browserMs===null||browserMs>limits.targetMs);
  return {fullOverride:full,estimate:{nodeWorkerMs:nodeMs,nodeFileCostShare:share,unknownNodeFiles:nodeRows.filter(row=>!row.known).map(row=>row.file),goCases:selection.goTestNames.length,goDurationMs:null,browserSerialMs:browserMs,unknownBrowser,profile:browserCosts.source,warning:'prediction only; worker contention, cold builds and runner speed affect actual duration'},
   reasons,deferAssociated,deferBrowser,
+  scriptTests:selection.scriptTests||[],
   nodeTests:deferAssociated?directNode:selection.nodeTests,
   goTestNames:deferAssociated?requiredGoNames:selection.goTestNames,
   deferred:{nodeTests:deferAssociated?selection.nodeTests.filter(row=>!changed.has(row.file)):[],goTestNames:deferAssociated?selection.goTestNames.filter(name=>!requiredGoNames.includes(name)):[],browserGuards:deferBrowser?selection.browserGuards:[]},
