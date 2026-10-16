@@ -21,7 +21,23 @@ concurrency:
   group: ${{ github.event_name == 'push' && format('diagnostic-{0}', github.ref) || format('diagnostic-run-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'push' }}
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.revision.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - name: Resolve the requested ref once for every independent VM
+        id: revision
+        shell: bash
+        run: |
+          revision="$(git rev-parse HEAD)"
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$revision" >> "$GITHUB_OUTPUT"
   browser:
+    needs: resolve
     runs-on: windows-latest
     timeout-minutes: 20
     strategy:
@@ -31,7 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
@@ -65,12 +81,13 @@ jobs:
           path: ${{ runner.temp }}/r279-quick/**
           if-no-files-found: error
   strict:
+    needs: resolve
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
@@ -98,12 +115,12 @@ jobs:
           if-no-files-found: error
   coverage:
     if: always()
-    needs: [browser, strict]
+    needs: [resolve, browser, strict]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ needs.resolve.outputs.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

@@ -9,8 +9,10 @@ function verify(text){
  assert(!/secrets\.|gh release|git push|create-release|upload-release|release\.yml/.test(text));assert(!/browser-mutants|r206-real-upgrade|R276_BROWSER_ONLY/.test(text));
  assert(wf.jobs.browser.steps.some(s=>s.run?.includes('r276-browser-job.cjs "${{ matrix.shard }}"')));
  assert(wf.jobs.strict.steps.some(s=>s.run?.includes('r277-ci-orchestrate.cjs browser --backend')));
- assert.deepEqual(wf.jobs.coverage.needs,['browser','strict']);assert.equal(wf.jobs.coverage.if,'always()');assert(wf.jobs.coverage.steps.some(s=>s.run?.includes('r279-quick-summary.cjs')));
- for(const j of Object.values(wf.jobs)){assert(!j['continue-on-error']);assert(j.steps.some(s=>s.uses==='actions/upload-artifact@v4'&&s.if==='always()'));}
+ assert.deepEqual(wf.jobs.coverage.needs,['resolve','browser','strict']);assert.equal(wf.jobs.coverage.if,'always()');assert(wf.jobs.coverage.steps.some(s=>s.run?.includes('r279-quick-summary.cjs')));
+ for(const [name,j] of Object.entries(wf.jobs)){assert(!j['continue-on-error']);if(name!=='resolve')assert(j.steps.some(s=>s.uses==='actions/upload-artifact@v4'&&s.if==='always()'));}
+ assert.equal(wf.jobs.resolve.outputs.sha,'${{ steps.revision.outputs.sha }}');assert(wf.jobs.resolve.steps.find(s=>s.id==='revision').run.includes('git rev-parse HEAD'));
+ for(const name of ['browser','strict','coverage']){assert([].concat(wf.jobs[name].needs).includes('resolve'));const checkout=wf.jobs[name].steps.find(s=>s.uses==='actions/checkout@v4');assert.equal(checkout.with.ref,'${{ needs.resolve.outputs.sha }}','all VMs must use the one immutable resolved SHA');}
 }
 test('quick Windows workflow is manual, complete browser scope and has no publish capability',()=>verify(source));
 test('mutation: adding a publishing step must fail',()=>assert.throws(()=>verify(source+'\n# gh release create vTEST\n')));
@@ -22,4 +24,9 @@ test('real CI passes only supported options to the r277 orchestration adapter',(
 test('mutation: losing a partition or the evidence coverage job must fail',()=>{
  assert.throws(()=>verify(source.replace('diagnostic-r266, ','')),{name:'AssertionError'});
  const wf=yaml.load(source);delete wf.jobs.coverage;assert.throws(()=>verify(yaml.dump(wf)));
+});
+
+test('mutation: resolving a moving user branch independently in any VM must fail',()=>{
+ assert.throws(()=>verify(source.replace('ref: ${{ needs.resolve.outputs.sha }}','ref: ${{ inputs.ref || github.sha }}')),{name:'AssertionError'});
+ const wf=yaml.load(source);delete wf.jobs.resolve;assert.throws(()=>verify(yaml.dump(wf)));
 });
