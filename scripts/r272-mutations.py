@@ -27,8 +27,8 @@ with tempfile.TemporaryDirectory(prefix='r272-mutants-') as temp:
  overlay('lp-riot-self',[('backend/overview_lp.go','response.Player.IsCurrent = a.riotOverviewIsCurrent(response.Player)','response.Player.IsCurrent = false')])
  overlay('full-cumulative-stream',[('backend/overview_response_shape.go','partial.Matches = delta','_ = delta')])
  overlay('raw-riot-response',[('backend/gameplay.go','type gameplayMatch struct {','type gameplayMatch struct {\n RawResponse *riotMatch `json:"rawResponse,omitempty"`'),('backend/riot_api.go','return convertRiotMatchInfo(&match.Info, subjectPUUID, names, labels, region, "")','result := convertRiotMatchInfo(&match.Info, subjectPUUID, names, labels, region, "");result.RawResponse=match;return result')])
- source=(ROOT/'backend/web/gameplay.js').read_text();before=' || old.lpDelta!==match.lpDelta';assert before in source
- target=temp/'lp-frontend.js';target.write_text(source.replace(before,''));run('lp-frontend',js,{'R272_GAMEPLAY_SOURCE':str(target)},True)
+ source=(ROOT/'backend/web/gameplay.js').read_text();before='if(entry && !changed)patchLPChip(entry,match);';assert before in source
+ target=temp/'lp-frontend.js';target.write_text(source.replace(before,'// LP patch discarded'));run('lp-frontend',js,{'R272_GAMEPLAY_SOURCE':str(target)},True)
 
  overlay('credential-scoped-details',[('backend/riot_api.go','key := "riot-match-v4|" + matchID','key := "riot-match-v4|" + riotCredentialScope(ctx) + "|" + matchID')],'^TestR272DetailDiskCrossCredential$')
  overlay('lost-embedded-80-guard',[('backend/riot_routing.go','nearQuota := count*5 >= limit*4','nearQuota := count >= limit')],'^TestR272Embedded80GuardAndUserIsolation$')
