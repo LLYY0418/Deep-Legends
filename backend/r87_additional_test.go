@@ -68,6 +68,9 @@ func TestR87ReconnectPreflightRejectsLostEndEvent(t *testing.T) {
 		t.Run(phase, func(t *testing.T) {
 			var writes atomic.Int32
 			c := &LCUClient{baseURL: "https://127.0.0.1:2999", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+				if req.URL.Path == "/lol-gameflow/v1/session" {
+					return response2351(map[string]any{"gameData": map[string]any{"gameId": 284}}), nil
+				}
 				if req.Method == "POST" {
 					writes.Add(1)
 					return response2351(nil), nil
@@ -101,7 +104,7 @@ func TestR87ReconnectPreflightRejectsLostEndEvent(t *testing.T) {
 			r.handlePhase(c, "Reconnect")
 			select {
 			case d := <-waiting:
-				if d < 3*time.Second {
+				if d < 15*time.Second {
 					t.Fatal("no debounce")
 				}
 			case <-time.After(time.Second):

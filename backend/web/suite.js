@@ -295,7 +295,7 @@
 
   const watchDefinitions = [
     { key: "autoAccept", action: "accept", group: "排队与房间", title: "自动接受对局", phase: "确认对局 · ReadyCheck", phaseKey: "ReadyCheck", description: "匹配到对局时替你点“接受”。延时设为 0 会在毫秒内响应，建议留 1 - 2 秒更接近手动节奏。", control: "delay", min: 0, max: 10000, step: 100, countdownVerb: "接受" },
-    { key: "autoReconnect", action: "reconnect", group: "英雄选择与游戏中", title: "断线自动重连", phase: "掉线 · Reconnect", phaseKey: "Reconnect", description: "检测到掉线状态时自动重连正在进行的对局。只尝试一次，失败后交还给你手动处理。", control: "delay", min: 3000, max: 30000, step: 500, countdownVerb: "重连" },
+    { key: "autoReconnect", action: "reconnect", group: "英雄选择与游戏中", title: "断线自动重连", phase: "掉线 · Reconnect", phaseKey: "Reconnect", description: "检测到掉线状态时自动重连正在进行的对局。只尝试一次，失败后交还给你手动处理。", control: "reconnect-delay", countdownVerb: "重连" },
     { key: "autoPlayAgain", action: "play-again", group: "结算", title: "快速下一把", phase: "对局结束后", phaseKey: "EndOfGame", description: "结算后自动回到房间。若同时开启了自动点赞，会等点赞投票完成再返回。", control: "fixed-delay", displayDelayMs: 1575, countdownVerb: "返回" },
     { key: "autoHonor", action: "auto-honor", group: "结算", title: "结算自动点赞", phase: "结算 · 出现点赞票", phaseKey: "EndOfGame", description: "把点赞票投给同一房间的队友。找不到队友时按下方策略处理，任何情况下都不会投给敌方。", control: "honor", countdownVerb: "点赞" },
     { key: "skipCelebration", action: "skip-celebration", group: "结算", title: "跳过任务庆祝", phase: "结算前 · PreEndOfGame", phaseKey: "EndOfGame", description: "结算前的任务庆祝动画会拖慢回到房间的速度，开启后自动跳过这一段。", countdownVerb: "跳过" },
@@ -313,6 +313,9 @@
   ];
 
   function watchRuleControl(definition, rule) {
+    if (definition.control === "reconnect-delay") {
+      return `<div class="watch-delay-control"><span>延时</span><span class="select-wrap"><select class="suite-select watch-compact-select" data-watch-number="autoReconnect.delayMs" aria-label="${escapeHTML(definition.title)}延时">${[15000,20000,30000].map(value=>`<option value="${value}"${selected(Number(rule.delayMs),value)}>${formatDelay(value)}</option>`).join("")}</select></span></div>`;
+    }
     if (definition.control === "delay") {
       return `<div class="watch-delay-control"><span>延时</span><input class="suite-range" type="range" min="${definition.min}" max="${definition.max}" step="${definition.step}" value="${Number(rule.delayMs || 0)}" data-watch-delay="${definition.key}" aria-label="${escapeHTML(definition.title)}延时"><output class="suite-chip watch-delay-value" data-watch-output="${definition.key}">${formatDelay(rule.delayMs)}</output></div>`;
     }

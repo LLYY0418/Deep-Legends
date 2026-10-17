@@ -20,3 +20,5 @@ func nativeRiotClientProcessCommands() (processQueryResult, error) {
 func nativeLeagueProcessSnapshot() (processQueryResult, error) {
 	return processQueryResult{Method: "native"}, errors.New("native process discovery is only available on Windows")
 }
+
+func nativeLeagueCrashHandlerSeen() bool { return false }

@@ -2269,16 +2269,16 @@
   },
   {
     "file": "backend/r87_additional_test.go",
-    "line": 244,
+    "line": 247,
     "target": "events",
-    "source_sha256": "1164c3f3d7f3040d54aa2cbf765595de33a44900cff63082ae06d93d9329b4a5",
-    "comment": "r276-capture-safe: TestR87PositionBroadcastEveryFailureReason: waiting/release/done channels establish callback completion before events are checked"
+    "source_sha256": "513483d90427332d1229c9f053c49c04e0e454caf79b7e8b86d5c0b87a80c2a0",
+    "comment": "r276-capture-safe: TestR87PositionBroadcastEveryFailureReason: broadcastPositionContext invokes observe synchronously and returns before events are checked; no concurrent runner is started"
   },
   {
     "file": "backend/r87_test.go",
     "line": 235,
     "target": "event",
-    "source_sha256": "bb0b5c338024dc35be24d41af85937079941cc119fb4a85f9361b2099b4862f9",
+    "source_sha256": "4336cd624e2c33af1e2e4bcaf258633bb366c7a2cdf4c3a87345ba688356a1d0",
     "comment": "r276-capture-safe: TestR87PositionBroadcastFailureHasReason: the audited fixture operations in this test invoke this callback serially and return before event is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

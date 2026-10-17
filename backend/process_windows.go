@@ -44,6 +44,13 @@ func nativeRiotClientProcessCommands() (processQueryResult, error) {
 func nativeLeagueProcessSnapshot() (processQueryResult, error) {
 	return nativeProcessSnapshot(false, "LeagueClientUx.exe", "LeagueClient.exe")
 }
+
+// Toolhelp names only: never open handles or read command lines for the game
+// or its crash handler. A missing/unknown handler remains an unknown signal.
+func nativeLeagueCrashHandlerSeen() bool {
+	result, err := nativeProcessSnapshot(false, "LeagueCrashHandler64.exe", "LeagueCrashHandler.exe")
+	return err == nil && result.ProcessCount > 0
+}
 func nativeProcessCommands(processNames ...string) (processQueryResult, error) {
 	return nativeProcessSnapshot(true, processNames...)
 }

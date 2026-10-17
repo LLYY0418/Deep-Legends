@@ -103,6 +103,12 @@ type convenienceSettings struct {
 }
 
 type watchRunner struct {
+	reconnectAttempt *watchReconnectAttempt
+	reconnectMonitor *watchReconnectMonitor
+	reconnectFired   map[watchReconnectKey]bool
+	reconnectSettled map[watchReconnectKey]bool
+	reconnectOrder   []watchReconnectKey
+	reconnectSignals func(context.Context, *LCUClient) watchReconnectSignal
 	// Snapshot-only lookup. Never load a catalog to compose a chat message.
 	broadcastChampionNames  func() map[int64]string
 	now                     func() time.Time
@@ -143,7 +149,7 @@ func defaultWatchSettings() watchSettings {
 		MasterEnabled: true,
 		Rules: watchRuleSet{
 			AutoAccept:        watchTimedRule{DelayMS: 1500},
-			AutoReconnect:     watchTimedRule{DelayMS: 10000},
+			AutoReconnect:     watchTimedRule{DelayMS: reconnectSettlementDelayMS},
 			AutoHonor:         watchHonorRule{Strategy: "prefer-party"},
 			PositionBroadcast: watchBroadcastRule{Visibility: "self", AssignedPosition: true},
 			Invitations:       watchInvitationRule{Policies: map[string]string{}},
@@ -216,7 +222,12 @@ func saveWatchSettings(store *localStore, settings watchSettings) error {
 func normalizeWatchSettings(settings watchSettings) watchSettings {
 	settings.SchemaVersion = watchSettingsVersion
 	settings.Rules.AutoAccept.DelayMS = clampInt(settings.Rules.AutoAccept.DelayMS, 0, 10000, 1500)
-	settings.Rules.AutoReconnect.DelayMS = clampInt(settings.Rules.AutoReconnect.DelayMS, 3000, 30000, 10000)
+	settings.Rules.AutoReconnect.DelayMS = clampInt(settings.Rules.AutoReconnect.DelayMS, reconnectSettlementDelayMS, 30000, reconnectSettlementDelayMS)
+	if settings.Rules.AutoReconnect.DelayMS > 15000 && settings.Rules.AutoReconnect.DelayMS < 20000 {
+		settings.Rules.AutoReconnect.DelayMS = 20000
+	} else if settings.Rules.AutoReconnect.DelayMS > 20000 {
+		settings.Rules.AutoReconnect.DelayMS = 30000
+	}
 	settings.Rules.AutoMatchmaking.DelayMS = clampInt(settings.Rules.AutoMatchmaking.DelayMS, 0, 30000, 5000)
 	settings.Rules.AutoMatchmaking.MinPartySize = clampInt(settings.Rules.AutoMatchmaking.MinPartySize, 1, 5, 1)
 	switch settings.Rules.AutoHonor.Strategy {
@@ -341,6 +352,18 @@ func (r *watchRunner) apply(value any) {
 	for action := range r.champSelect.decision {
 		delete(r.champSelect.decision, action)
 	}
+	if !normalized.MasterEnabled || !normalized.Rules.AutoReconnect.Enabled {
+		if attempt := r.reconnectAttempt; attempt != nil {
+			if attempt.reason == "" {
+				attempt.reason = "canceled-phase-changed"
+			}
+			r.reconnectAttempt = nil
+		}
+		if r.reconnectMonitor != nil {
+			r.reconnectMonitor.cancel()
+			r.reconnectMonitor = nil
+		}
+	}
 	r.mu.Unlock()
 	for _, cancel := range cancels {
 		cancel()
@@ -377,6 +400,7 @@ func (r *watchRunner) handlePhase(client *LCUClient, phase string) {
 	r.mu.Unlock()
 	r.handleChampSelectPhase(phase)
 	settings := r.currentWatch()
+	r.observeReconnectPhase(client, phase, settings)
 	if phase == "None" {
 		r.setCustomSession(false)
 		r.cancelPending("auto-matchmaking")
@@ -445,7 +469,7 @@ func (r *watchRunner) handlePhase(client *LCUClient, phase string) {
 		}
 	case "Reconnect":
 		if settings.Rules.AutoReconnect.Enabled {
-			r.schedule(client, "reconnect", settings.Rules.AutoReconnect.DelayMS, http.MethodPost, "/lol-gameflow/v1/reconnect", nil)
+			r.scheduleReconnect(client, settings.Rules.AutoReconnect.DelayMS)
 		}
 	}
 }
@@ -1083,6 +1107,12 @@ func (r *watchRunner) cancelPending(action string) {
 	r.mu.Lock()
 	pending := r.pending[action]
 	delete(r.pending, action)
+	if action == "reconnect" && r.reconnectAttempt != nil && r.reconnectAttempt.pending == pending {
+		if r.reconnectAttempt.reason == "" {
+			r.reconnectAttempt.reason = "canceled-phase-changed"
+		}
+		r.reconnectAttempt = nil
+	}
 	if action == "auto-matchmaking" {
 		r.autoMatchInFlight = false
 	}
@@ -1666,6 +1696,14 @@ func (r *watchRunner) setCustomSession(custom bool) {
 	changed := r.customSession != custom
 	r.customSession = custom
 	if changed {
+		if r.reconnectAttempt != nil {
+			r.reconnectAttempt.reason = "canceled-phase-changed"
+			r.reconnectAttempt = nil
+		}
+		if r.reconnectMonitor != nil {
+			r.reconnectMonitor.cancel()
+			r.reconnectMonitor = nil
+		}
 		if r.writeCancel != nil {
 			r.writeCancel()
 			r.writeContext = nil

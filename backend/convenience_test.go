@@ -153,6 +153,10 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	done := make(chan string, 1)
 	events := make(chan string, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/lol-gameflow/v1/session" {
+			_, _ = w.Write([]byte(`{"gameData":{"gameId":284}}`))
+			return
+		}
 		if r.Method == http.MethodGet && r.URL.Path == "/lol-gameflow/v1/gameflow-phase" {
 			_, _ = w.Write([]byte(`"Reconnect"`))
 			return
@@ -181,13 +185,13 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	runner.handlePhase(client, "Reconnect")
 	select {
 	case event := <-events:
-		if event != "watch:armed:reconnect:3000" {
+		if event != "watch:armed:reconnect:15000" {
 			t.Fatalf("armed event = %q", event)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("reconnect was not armed")
 	}
-	if delay := <-waiting; delay != 3*time.Second {
+	if delay := <-waiting; delay != 15*time.Second {
 		t.Fatalf("delay=%v", delay)
 	}
 	select {

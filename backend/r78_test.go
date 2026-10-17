@@ -151,7 +151,7 @@ func TestR78V2WatchMigrationPreservesRulesAndAddsEmptyChampSelect(t *testing.T) 
 		t.Fatal(err)
 	}
 	settings := loadWatchSettings(trackTestStore(t, &localStore{root: root}))
-	if settings.SchemaVersion != 3 || !settings.Rules.AutoAccept.Enabled || settings.Rules.AutoAccept.DelayMS != 777 || settings.Rules.AutoReconnect.DelayMS != 9000 {
+	if settings.SchemaVersion != 3 || !settings.Rules.AutoAccept.Enabled || settings.Rules.AutoAccept.DelayMS != 777 || settings.Rules.AutoReconnect.DelayMS != 15000 {
 		t.Fatalf("migration changed existing rules: %#v", settings)
 	}
 	if !settings.ChampSelect.Enabled || len(settings.ChampSelect.Groups) != len(champSelectGroupDefinitions) {
