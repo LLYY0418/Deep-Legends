@@ -2759,7 +2759,8 @@
     void window.deepLegendsSections?.activate(name);
     if (name === "favorites") {
       const fresh = previousSection !== "favorites";
-      activateFavoritesPage(state.favoritesPage, fresh);
+      if (fresh) resetPoolControls();
+      activateFavoritesPage(fresh ? "collection" : state.favoritesPage, fresh);
     }
     if (name === "settings") {
       if (previousSection !== "settings") activateSettingsPage("appearance");
@@ -2870,7 +2871,7 @@
     if (state.section === "favorites") el.topbarSubtitle.textContent = subtitles[name] || "收藏工具";
     el.pageIntro.hidden = state.section !== "favorites";
     if (name === "collection" && (returning || previous !== "collection")) {
-      if (previous !== "collection") {
+      if (returning || previous !== "collection") {
         const ownedTab = el.viewTabs.find((item) => item.dataset.view === "owned");
         resetCollectionControls("owned");
         if (ownedTab) activateTab(ownedTab, el.viewTabs, () => {});

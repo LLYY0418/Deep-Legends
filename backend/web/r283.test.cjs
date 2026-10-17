@@ -60,17 +60,17 @@ test('R283 P13 career identity and explicit selection',()=>{
  assert.match(css,/\.facade-identity\s*\{[^}]*display:flex/);assert(css.includes('.facade-commit button {font-size:13px;}'));
  assert.match(css,/\.facade-film button\.is-selected\s*\{[^}]*border:2px/);assert(css.includes('.facade-film button.is-selected::after'));
 });
-test('R283 P14 collection return resets scroll without changing choices',()=>{
+test('R283 P14 collection scroll and overlay cleanup survives R284 default return',()=>{
  const app=fs.readFileSync(process.env.R283_APP_SOURCE||__dirname+'/app.js','utf8');
  const state={sectionScroll:{favorites:500},favoritesPage:'account',view:'chromas'},calls=[];
  compile(app,['restoreSectionScroll'],{state,el:{appScroll:{scrollTo:arg=>calls.push(arg)}}}).restoreSectionScroll('favorites');
  assert.equal(calls[0].top,0);assert.equal(state.favoritesPage,'account');assert.equal(state.view,'chromas');
  const body=extract(app,'resetCollectionReturn');assert(body.includes('stopHoverVideo()'));assert(body.includes('scrollLeft=0'));assert(body.includes('closeNativeSelectMenu'));
- assert(extract(app,'activateSection').includes('activateFavoritesPage(state.favoritesPage, fresh)'));
+ assert(extract(app,'activateSection').includes('activateFavoritesPage(fresh ? "collection" : state.favoritesPage, fresh)'));
  let loads=0,rescans=0,resets=0;
  const tab={dataset:{favoritesPage:'collection'},getAttribute:()=> 'collection'},panel={id:'collection'},returnState={favoritesPage:'collection',section:'favorites',view:'chromas',query:'安妮'};
- const f=compile(app,['activateFavoritesPage'],{state:returnState,el:{favoritesTabs:[tab],favoritesCollectionPanel:panel,favoritesAccountPanel:{},favoritesPoolsPanel:{},favoritesFacadePanel:{},topbarSubtitle:{},pageIntro:{}},activateTab:(tab,_tabs,callback)=>callback(tab),resetCollectionControls:()=>resets++,triggerCollectionRescanIfDirty:()=>rescans++,loadSkins:()=>loads++});
- f.activateFavoritesPage('collection',true);assert.equal(loads,1);assert.equal(rescans,1);assert.equal(resets,0);assert.equal(returnState.view,'chromas');assert.equal(returnState.query,'安妮');
+ const f=compile(app,['activateFavoritesPage'],{state:returnState,el:{favoritesTabs:[tab],viewTabs:[],favoritesCollectionPanel:panel,favoritesAccountPanel:{},favoritesPoolsPanel:{},favoritesFacadePanel:{},topbarSubtitle:{},pageIntro:{}},activateTab:(tab,_tabs,callback)=>callback(tab),resetCollectionControls:()=>{resets++;returnState.view='owned';returnState.query=''},triggerCollectionRescanIfDirty:()=>rescans++,loadSkins:()=>loads++});
+ f.activateFavoritesPage('collection',true);assert.equal(loads,1);assert.equal(rescans,1);assert.equal(resets,1);assert.equal(returnState.view,'owned');assert.equal(returnState.query,'');
 });
 test('R283 P17 one strict outage message, no row retry or duplicate stopped note',()=>{
  const state={beacon:{phase:'InProgress'},liveRetryAttempts:8},f=compile(game,['renderLiveRefreshStatus'],{state,liveGamePhase:()=>true,liveAutoRefreshStopped:()=> '数据尚未完整，已停止自动重试，可手动刷新',escapeHTML:String,serviceOutageIcon:()=>'<svg></svg>'});
