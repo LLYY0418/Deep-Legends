@@ -280,6 +280,8 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"build_spells_client":            {"render": true},
+	"augment_description_client":     {"ok": true, "retry": true, "unavailable": true},
 	"overview_art_client":            {"summary": true},
 	"client_view_client":             {"received": true, "applied": true, "rejected": true, "frame": true, "new-generation": true, "generation-rollback": true, "duplicate-generation": true, "invalid-frame": true},
 	"ui_zoom_state":                  {"applied": true},

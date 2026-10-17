@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -139,5 +141,29 @@ func TestR282StaleCatalogMissIsStillRetryable(t *testing.T) {
 	got := p.onlineAugmentDescription(context.Background(), 900)
 	if got.Status != "retry" || got.ErrorKind != "no_response" {
 		t.Fatalf("stale catalog cannot prove not_found: %#v", got)
+	}
+}
+
+func TestR282NewClientDiagnosticsPassCompleteHTTPHandler(t *testing.T) {
+	tests := []struct {
+		event, reason, fields string
+		status                int
+	}{
+		{"build_spells_client", "render", `{"mode":"arena","spell1Id_missing":1,"spell1Id_zero":2,"spell1Id_value":13,"spell2Id_missing":1,"spell2Id_zero":2,"spell2Id_value":13}`, 204},
+		{"augment_description_client", "ok", `{"augment_id":93,"retry_count":1,"source":"bundled","error_kind":"none","gave_up":false}`, 204},
+		{"augment_description_client", "retry", `{"augment_id":93,"retry_count":3,"source":"none","error_kind":"backoff_skipped","gave_up":true}`, 204},
+		{"augment_description_client", "unavailable", `{"augment_id":93,"retry_count":0,"source":"none","error_kind":"not_found","gave_up":false}`, 204},
+		{"build_spells_client", "render", `{"mode":"arena","playerRef":"private"}`, 400},
+		{"augment_description_client", "unknown", `{}`, 400},
+	}
+	for _, tc := range tests {
+		t.Run(tc.event+tc.reason+strconv.Itoa(tc.status), func(t *testing.T) {
+			w := httptest.NewRecorder()
+			body := `{"event":"` + tc.event + `","reason":"` + tc.reason + `","r278":` + tc.fields + `}`
+			(&app{}).handleClientDiagnostic(w, httptest.NewRequest("POST", "/api/diagnostics/client", strings.NewReader(body)))
+			if w.Code != tc.status {
+				t.Fatalf("%d %s", w.Code, w.Body.String())
+			}
+		})
 	}
 }
