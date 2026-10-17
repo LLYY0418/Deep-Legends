@@ -62,7 +62,7 @@ func (p *championProvider) cachedAugmentDescription(id int64) (gameplayAugmentDe
 	return item, true
 }
 func (p *championProvider) saveAugmentDescription(item gameplayAugmentDescription) {
-	if p.cache == nil || item.Status != "ok" {
+	if p.cache == nil || item.Status != "ok" || item.Source == "stale_cache" {
 		return
 	}
 	data, err := json.Marshal(item)
@@ -96,8 +96,13 @@ func (p *championProvider) onlineAugmentDescription(ctx context.Context, id int6
 		return augmentDescriptionFailure(id, err)
 	}
 	item := augmentDescriptionFromRows(id, rows, "cdragon")
-	if item.Status != "ok" && result.upstreamErr != nil {
-		return augmentDescriptionFailure(id, result.upstreamErr)
+	if result.upstreamErr != nil {
+		failure := augmentDescriptionFailure(id, result.upstreamErr)
+		if item.Status != "ok" {
+			return failure
+		}
+		item.Source = "stale_cache"
+		item.ErrorKind = failure.ErrorKind
 	}
 	return item
 }

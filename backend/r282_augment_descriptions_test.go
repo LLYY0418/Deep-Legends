@@ -167,3 +167,34 @@ func TestR282NewClientDiagnosticsPassCompleteHTTPHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestR282FailedRefreshCannotRenewOldDescription(t *testing.T) {
+	p := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) { return nil, errors.New("offline") }))
+	item := gameplayAugmentDescription{ID: 900, Status: "ok", Source: "cdragon", Description: "旧说明"}
+	p.saveAugmentDescription(item)
+	key := augmentDescriptionKey(900)
+	p.cache.mu.Lock()
+	old := p.cache.entries[key]
+	old.FetchedAt = time.Now().Add(-8 * 24 * time.Hour)
+	old.ExpiresAt = time.Now().Add(-24 * time.Hour)
+	p.cache.entries[key] = old
+	p.cache.mu.Unlock()
+	rawKey := championCacheKey(communityDragonHost, "/latest/cdragon/arena/zh_cn.json", "", "application/json")
+	_, err := p.cache.load(context.Background(), rawKey, -time.Hour, 24*time.Hour, false, func(context.Context) ([]byte, error) {
+		return []byte(`{"augments":[{"id":900,"name":"历史海克斯","desc":"旧说明"}]}`), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := p.onlineAugmentDescription(context.Background(), 900)
+	if got.Status != "ok" || got.Description != "旧说明" || got.Source != "stale_cache" || got.ErrorKind != "no_response" {
+		t.Fatalf("stale origin lost %#v", got)
+	}
+	p.saveAugmentDescription(got)
+	p.cache.mu.Lock()
+	after := p.cache.entries[key]
+	p.cache.mu.Unlock()
+	if !after.FetchedAt.Equal(old.FetchedAt) || !after.ExpiresAt.Equal(old.ExpiresAt) {
+		t.Fatal("failed refresh renewed stale data")
+	}
+}
