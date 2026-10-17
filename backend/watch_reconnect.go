@@ -27,9 +27,36 @@ type watchReconnectSignal struct {
 }
 
 type watchReconnectKey struct {
-	client *LCUClient
+	scope  string
 	gameID int64
 }
+
+func reconnectGameKey(client *LCUClient, id int64) watchReconnectKey {
+	// A new LCU connection must not grant another attempt in the same game.
+	// Read cached routing only: this helper is also called under runner.mu.
+	if client == nil {
+		return watchReconnectKey{gameID: id}
+	}
+	client.mu.RLock()
+	scope := strings.ToUpper(client.region) + "|" + strings.ToUpper(client.rsoPlatform)
+	client.mu.RUnlock()
+	return watchReconnectKey{scope: scope, gameID: id}
+}
+
+// Unknown routing while a client is rebinding cannot grant an extra attempt.
+// Known, different servers may legitimately reuse a numeric game ID.
+func reconnectGameRecorded(records map[watchReconnectKey]bool, key watchReconnectKey) bool {
+	if records[key] {
+		return true
+	}
+	for seen, recorded := range records {
+		if recorded && seen.gameID == key.gameID && (key.scope == "|" || seen.scope == "|") {
+			return true
+		}
+	}
+	return false
+}
+
 type watchReconnectAttempt struct {
 	client           *LCUClient
 	pending          *watchPendingAction
@@ -101,7 +128,7 @@ func (r *watchRunner) observeReconnectPhase(client *LCUClient, phase string, set
 	if attempt := r.reconnectAttempt; attempt != nil && (attempt.client != client || phase != "Reconnect") {
 		if reconnectSettlementPhase(phase) {
 			attempt.reason = "canceled-settle"
-			r.rememberReconnectGameLocked(watchReconnectKey{attempt.client, attempt.gameID}, true)
+			r.rememberReconnectGameLocked(reconnectGameKey(attempt.client, attempt.gameID), true)
 		} else if attempt.reason == "" {
 			attempt.reason = "canceled-phase-changed"
 		}
@@ -113,7 +140,7 @@ func (r *watchRunner) observeReconnectPhase(client *LCUClient, phase string, set
 		monitor.mu.Lock()
 		id := monitor.gameID
 		monitor.mu.Unlock()
-		r.rememberReconnectGameLocked(watchReconnectKey{client, id}, true)
+		r.rememberReconnectGameLocked(reconnectGameKey(client, id), true)
 	}
 	if monitor != nil && (!active || !live || monitor.client != client) {
 		monitor.cancel()
@@ -250,7 +277,7 @@ func (r *watchRunner) scheduleReconnect(client *LCUClient, delay int) {
 			}
 			attempt.finished = true
 			if outcome == "canceled-settle" {
-				r.rememberReconnectGameLocked(watchReconnectKey{client, attempt.gameID}, true)
+				r.rememberReconnectGameLocked(reconnectGameKey(client, attempt.gameID), true)
 			}
 			signal := attempt.signal
 			if decidedAt.IsZero() {
@@ -296,10 +323,10 @@ func (r *watchRunner) scheduleReconnect(client *LCUClient, delay int) {
 			}
 			attempt.signal = mergeReconnectSignal(attempt.signal, signal)
 			reason := reconnectSignalOutcome(attempt.signal)
-			if id > 0 && r.reconnectFired[watchReconnectKey{client, id}] {
+			if id > 0 && reconnectGameRecorded(r.reconnectFired, reconnectGameKey(client, id)) {
 				reason = "canceled-once-per-game"
 			}
-			if id > 0 && r.reconnectSettled[watchReconnectKey{client, id}] {
+			if id > 0 && reconnectGameRecorded(r.reconnectSettled, reconnectGameKey(client, id)) {
 				reason = "canceled-settle"
 			}
 			if attempt.reason == "" && reason != "" {
@@ -349,9 +376,9 @@ func (r *watchRunner) scheduleReconnect(client *LCUClient, delay int) {
 			return
 		}
 		r.mu.Lock()
-		key := watchReconnectKey{client, id}
+		key := reconnectGameKey(client, id)
 		allowed := ctx.Err() == nil && attempt.reason == "" && r.reconnectAttempt == attempt && !r.customSession && r.settings.MasterEnabled && r.settings.Rules.AutoReconnect.Enabled
-		once := r.reconnectFired[key]
+		once := reconnectGameRecorded(r.reconnectFired, key)
 		if allowed && !once {
 			r.rememberReconnectGameLocked(key, false)
 		}

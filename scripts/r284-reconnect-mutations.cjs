@@ -5,7 +5,7 @@ fs.mkdirSync(out,{recursive:true});
 try{
  for(const [name,transform,pattern] of [
   ['p1-three-second-window',s=>s.replace('reconnectSettlementDelayMS = 15000','reconnectSettlementDelayMS = 3000').replace('effective := max(delay, reconnectSettlementDelayMS)','effective := 3000'),'TestR284ReconnectCrashAtFifteenSeconds'],
-  ['p1-repeat-same-game',s=>s.replace('id > 0 && r.reconnectFired[watchReconnectKey{client, id}]','false').replace('once := r.reconnectFired[key]','once := false'),'TestR284ReconnectOncePerGameAndManualUnaffected'],
+  ['p1-repeat-same-game',s=>s.replace('id > 0 && reconnectGameRecorded(r.reconnectFired, reconnectGameKey(client, id))','false').replace('once := reconnectGameRecorded(r.reconnectFired, key)','once := false'),'TestR284ReconnectOncePerGameAndManualUnaffected'],
   ['p1-ignore-normal-exit',s=>s.replace('if s.ExitSignal == "normal" {','if false {'),'TestR284ReconnectNormalAndGameEnd'],
  ]){
   const source=fs.readFileSync(path.join(root,'backend/watch_reconnect.go'),'utf8'),mutant=transform(source);assert.notEqual(mutant,source);

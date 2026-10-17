@@ -866,7 +866,8 @@
     const sentinel = container?.querySelector("[data-match-sentinel]");
     const advanced=globalThis.deepLegendsHistoryFilters?.active(tab);
     const hasLoadedMore=advanced && filteredMatches(tab.data?.matches || [],tab).length>Number(tab.filteredVisibleCount || 20);
-	if (!sentinel || (!tab.data?.pagination?.hasMore && !hasLoadedMore) || tab.data?.pagination?.autoPaused && !tab.data.pagination.historyServiceDown || !("IntersectionObserver" in window)) return;
+    const serviceDown=tab.data?.pagination?.historyServiceDown || tab.historyFailureClass==='official' || tab.data?.capabilities?.some?.(c=>c.historyStatus==='official');
+	if (!sentinel || (!tab.data?.pagination?.hasMore && !hasLoadedMore) || tab.data?.pagination?.autoPaused && !serviceDown || !("IntersectionObserver" in window)) return;
     const scrollRoot = container.closest(".player-overlay-scroll") || document.getElementById("app-scroll");
     // A restored scroll position, detail collapse, or a short first page can
     // expose the sentinel without the user asking for another 20 API calls.
@@ -883,7 +884,7 @@
     const append = () => {
       if (!near || !requested || tab.appendFramePending || overviewContainer(tab) !== container) return;
       tab.matchAutoloadRequested=requested;
-      const blocked=tab.data?.pagination?.historyServiceDown && !tab.data.pagination.localHasMore?'service-down':tab.loading || tab.loadingMore?'loading':tab.quotaRetry?'quota':tab.data?.pagination?.autoPaused?'paused':!tab.data?'not-ready':!tab.data.pagination?.hasMore && !advanced?'no-more':'';
+      const blocked=serviceDown && !tab.data?.pagination?.localHasMore?'service-down':tab.loading || tab.loadingMore?'loading':tab.quotaRetry?'quota':tab.data?.pagination?.autoPaused?'paused':!tab.data?'not-ready':!tab.data.pagination?.hasMore && !advanced?'no-more':'';
       window.reportFlowDiagnostic?.('match_autoload_client',blocked?'blocked':'requested',{bound:true,near,requested,started:false,blocked_reason:blocked});
       if(blocked)return;
       tab.appendFramePending = true;
@@ -1036,7 +1037,7 @@
 
   async function loadOverview(tab, force = false, append = false, manual = false, quiet = false, scanCount = 0, retryDetails = false, background = false) {
     if (tab.closed || state.destroyed || tab.current && !connected()) return false;
-    if (append && tab.data?.pagination?.historyServiceDown && !tab.data.pagination.localHasMore) {
+    if (append && (tab.data?.pagination?.historyServiceDown || tab.historyFailureClass==='official' || tab.data?.capabilities?.some?.(c=>c.historyStatus==='official')) && !tab.data?.pagination?.localHasMore) {
       window.reportFlowDiagnostic?.('match_autoload_client','blocked',{bound:true,near:true,requested:true,started:false,blocked_reason:'service-down'});
       return false;
     }
@@ -1194,7 +1195,7 @@
       if (tab.overviewRequestToken !== requestToken) return false;
       tab.lastOverviewPageBytes=typeof TextEncoder==='function'?new TextEncoder().encode(JSON.stringify(payload)).length:encodeURIComponent(JSON.stringify(payload)).replace(/%[A-F0-9]{2}/g,'x').length;
       tab.lpRenderSource="complete";
-      if(!payload.pagination?.historyServiceDown && !(payload.capabilities || []).some(c=>c.historyStatus==='official') && tab.historyFailureClass==='official')tab.historyFailureClass='';
+      if(!payload.pagination?.historyServiceDown && !(Array.isArray(payload.capabilities)?payload.capabilities:[]).some(c=>c.historyStatus==='official') && tab.historyFailureClass==='official')tab.historyFailureClass='';
       tab.matchesReceived=true;tab.recentStatsReceived=true;tab.careerStatsSource="complete";
       if (payload.proMismatch) markProMismatch(tab);
       if (append) {

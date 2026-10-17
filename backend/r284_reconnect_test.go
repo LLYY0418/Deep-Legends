@@ -192,6 +192,26 @@ func TestR284ReconnectOncePerGameAndManualUnaffected(t *testing.T) {
 		t.Fatal("manual client reconnect was intercepted")
 	}
 }
+func TestR284ReconnectOnceSurvivesClientRebinding(t *testing.T) {
+	f := r284Reconnect(t, watchReconnectSignal{ExitSignal: "unknown"})
+	f.client.region, f.client.rsoPlatform = "TENCENT", "HN1"
+	f.start(t)
+	f.now.Store(15000)
+	f.release <- struct{}{}
+	f.decision(t, "fired")
+	f.runner.handlePhase(f.client, "InProgress")
+	f.client = &LCUClient{baseURL: f.client.baseURL, token: "new-session", http: f.client.http}
+	f.start(t)
+	f.now.Store(30000)
+	f.release <- struct{}{}
+	f.decision(t, "canceled-once-per-game")
+	if f.posts.Load() != 1 {
+		t.Fatal("client reconnection reset the same game's automatic attempt")
+	}
+	if reconnectGameRecorded(map[watchReconnectKey]bool{{scope: "TENCENT|HN1", gameID: 284}: true}, watchReconnectKey{scope: "TENCENT|HN2", gameID: 284}) {
+		t.Fatal("different known servers were conflated")
+	}
+}
 func TestR284ReconnectNormalAndGameEnd(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

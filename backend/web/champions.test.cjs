@@ -2270,7 +2270,7 @@ test("damage analysis sorts by a real metric and shows full colored values", () 
   assert.match(gameplayStyles, /\.match-stat-damage\s*>\s*b,\s*\.match-stat-taken > b\s*\{[^}]*display:\s*inline-flex/);
   assert.match(gameplayStyles, /\.match-stat\s*\{[^}]*minmax\(0,1fr\)/s);
   assert.match(gameplayStyles, /\.match-list\s*\{[^}]*overflow-anchor:\s*none/s);
-	assert.match(gameplayScript, /tab\.paginationStalls = upstreamAdditions > 0 \? 0/);
+	assert.match(gameplayScript, /tab\.paginationStalls = upstreamAdditions > 0 \|\| pagination\.historyServiceDown \? 0/);
   assert.match(gameplayScript, /function appendOverviewMatches\(tab, additions, reconciled = false\)/);
   assert.match(gameplayScript, /if \(append\) appendOverviewMatches\(tab, appendAdditions\);/);
 });

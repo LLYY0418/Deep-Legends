@@ -7,9 +7,9 @@ test('R284 P3 exhausted outage footer has the approved reason and no action',()=
  const p=f.normalizedPagination({matches:[],pagination:{begIndex:20,count:0,hasMore:false,historyServiceDown:true,localHasMore:false}},20);assert.equal(p.hasMore,true,'unknown upstream tail must remain resumable');assert.equal(p.nextBegIndex,20);
 });
 test('R284 P3 outage sentinel blocks with a diagnostic, retained and normal tails still load',()=>{
- for(const down of [true,false])for(const local of [true,false]){
+ for(const down of ['pagination','capability','failure',false])for(const local of [true,false]){
   const dom=new JSDOM('<div id="app-scroll"><main><div data-match-sentinel></div></main></div>');try{const w=dom.window,container=w.document.querySelector('main'),root=w.document.querySelector('#app-scroll'),calls=[],events=[],tasks=[];let observed;
-   const IO=class{constructor(cb){observed=cb}observe(){}disconnect(){}};const tab={data:{pagination:{hasMore:true,historyServiceDown:down,localHasMore:local}}};
+   const IO=class{constructor(cb){observed=cb}observe(){}disconnect(){}};const tab={historyFailureClass:down==='failure'?'official':'',data:{capabilities:down==='capability'?[{historyStatus:'official'}]:[],pagination:{hasMore:true,historyServiceDown:down==='pagination',localHasMore:local}}};
    const f=compile(source(),['bindMatchSentinel'],{state:{},document:w.document,window:{IntersectionObserver:IO,requestAnimationFrame:f=>f(),reportFlowDiagnostic:(e,r,v)=>events.push({e,r,...v})},IntersectionObserver:IO,matchObserverKey:()=> 'observer',overviewContainer:()=>container,loadOverview:()=>{calls.push(1);return Promise.resolve(true)},setTimeout:f=>{tasks.push(f);return 1},clearTimeout(){}});
    f.bindMatchSentinel(container,tab);observed([{isIntersecting:true}]);root.dispatchEvent(new w.WheelEvent('wheel',{deltaY:10}));for(const f of tasks)f();assert.equal(calls.length,down&&!local?0:1);if(down&&!local)assert(events.some(e=>e.blocked_reason==='service-down'));
   }finally{dom.window.close()}
