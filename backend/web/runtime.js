@@ -140,6 +140,11 @@
     try{await sendFlowDiagnostic(body,encoded,0);}finally{setTimeout(()=>{busy=false;void flushErrors();},2000)?.unref?.();}
   };
   const clampError = n=>Math.max(0,Math.min(1000000,Number(n)||0));
+  const browserBlockedOrigin = value => {
+    const raw=String(value || '').trim();
+    const scheme=raw.match(/^(data|blob|file)(?::|$)/i)?.[1];if(scheme)return scheme.toLowerCase()+':';
+    try{const url=new URL(raw);return ['https:','http:'].includes(url.protocol)?url.origin:'';}catch{return '';}
+  };
   window.reportBrowserErrorDiagnostic = (kind,fields={}) => {
     if(!Object.hasOwn(be,kind))return;
     be[kind]=Math.min(1000000,be[kind]+1);
@@ -150,12 +155,13 @@
     for(const n of (typeof document==='undefined'?[]:document.querySelectorAll?.('.summoner-strip h2,[data-copy-riot-id],[data-player-label]') || [])) {const value=n.dataset?.copyRiotId || n.dataset?.playerLabel || n.textContent?.trim();if(value && value.length>=2)message=message.split(value).join('[player]');}
     message=[...message].slice(0,160).join('');
     const stack=String(fields.stack || '').split('\n').map(row=>row.match(/([A-Za-z0-9_-]+\.(?:js|cjs))(?:\?[^)\s]*?)?:(\d+):(\d+)/)?.slice(1).join(':')).filter(Boolean).slice(0,3);
-    const signature=JSON.stringify([kind,errorType,scriptName,message,stack]),now=Date.now(),prior=errorSeen.get(signature);
+    const blockedOrigin=kind==='csp'?browserBlockedOrigin(fields.blockedURI):'',cspDirective=String(fields.directive || '').slice(0,40);
+    const signature=JSON.stringify([kind,errorType,scriptName,message,stack,cspDirective,blockedOrigin]),now=Date.now(),prior=errorSeen.get(signature);
     if(prior && now-prior.at<60000){prior.count++;deferred++;const queued=eq.get(signature);if(queued)queued.repeatCount=prior.count;return;}errorSeen.set(signature,{at:now,count:1});if(errorSeen.size>128)errorSeen.delete(errorSeen.keys().next().value);
-    eq.set(signature,{errorKind:kind,errorType,scriptName,message,stack,line:clampError(fields.line),column:clampError(fields.column),cspDirective:String(fields.directive || "").slice(0,40),repeatCount:prior?.count || 1});
+    eq.set(signature,{errorKind:kind,errorType,scriptName,message,stack,line:clampError(fields.line),column:clampError(fields.column),cspDirective,blockedOrigin,repeatCount:prior?.count || 1});
     void flushErrors();
   };
-  for(const [name,kind] of [["error","error"],["unhandledrejection","unhandledrejection"],["securitypolicyviolation","csp"]])window.addEventListener?.(name,e=>window.reportBrowserErrorDiagnostic(kind,{message:e.message || (e.error || e.reason)?.message,stack:(e.error || e.reason)?.stack,errorType:(e.error || e.reason)?.name,filename:e.filename || e.sourceFile,line:e.lineno || e.lineNumber,column:e.colno || e.columnNumber,directive:e.effectiveDirective}));
+  for(const [name,kind] of [["error","error"],["unhandledrejection","unhandledrejection"],["securitypolicyviolation","csp"]])window.addEventListener?.(name,e=>window.reportBrowserErrorDiagnostic(kind,{message:e.message || (e.error || e.reason)?.message,stack:(e.error || e.reason)?.stack,errorType:(e.error || e.reason)?.name,filename:e.filename || e.sourceFile,line:e.lineno || e.lineNumber,column:e.colno || e.columnNumber,directive:e.effectiveDirective,blockedURI:e.blockedURI}));
   // Keep individual phase observations (including identical polls), but send
   // bounded batches through one slot so telemetry cannot crowd out live reads.
   const gameflowQueue = [];

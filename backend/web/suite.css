@@ -612,6 +612,7 @@ button.suite-chip.is-gold { color: var(--primary-strong); border-color: var(--he
 .facade-film {padding:5px;}
 .facade-film button.is-selected img {opacity:1;}
 .facade-film button:not(.is-selected):hover img {opacity:.9;}
-.facade-film button.is-selected::after {content:"";position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--primary) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8 3 3 5-6' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E") center/16px no-repeat;}
+.facade-film button.is-selected::after {content:"";position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--primary);}
+.facade-film button.is-selected::before {content:"";position:absolute;z-index:1;right:8px;top:5px;width:5px;height:9px;border:solid white;border-width:0 2px 2px 0;transform:rotate(45deg);}
 .suite-segment button {font-size:13px;}
 .facade-commit button {font-size:13px;}

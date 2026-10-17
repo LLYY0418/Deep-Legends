@@ -283,6 +283,7 @@ type clientDiagnosticRequest struct {
 	ErrorLine               int                         `json:"line,omitempty"`
 	ErrorColumn             int                         `json:"column,omitempty"`
 	CSPDirective            string                      `json:"cspDirective,omitempty"`
+	BlockedOrigin           string                      `json:"blockedOrigin,omitempty"`
 	ErrorDeferred           int                         `json:"errorDeferred,omitempty"`
 }
 
@@ -559,6 +560,11 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		switch request.CSPDirective {
 		case "script-src-elem", "script-src-attr", "style-src-elem", "style-src-attr", "img-src", "connect-src", "default-src":
 			event["csp_directive"] = request.CSPDirective
+		}
+		if request.Reason == "csp" {
+			if origin := safeBrowserBlockedOrigin(request.BlockedOrigin); origin != "" {
+				event["blocked_origin"] = origin
+			}
 		}
 		counts := map[string]int{}
 		for _, kind := range []string{"error", "unhandledrejection", "csp"} {
