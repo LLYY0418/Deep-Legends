@@ -6,8 +6,9 @@
 }
 
 .suite-head {
+  position: sticky; top: 0; z-index: 14; background: var(--bg);
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 18px;
   align-items: flex-end;
   justify-content: space-between;
@@ -16,7 +17,9 @@
 
 .suite-tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex: 1;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   min-width: 0;
   gap: 6px;
 }
@@ -49,6 +52,7 @@
 
 .suite-metrics {
   display: flex;
+  flex-shrink: 0;
   gap: 22px;
   margin: 0;
 }
@@ -351,11 +355,11 @@ button.suite-tile { cursor: pointer; }
 
 @container suite-page (max-width: 720px) {
   .suite-panel { padding-top: 8px; }
-  .suite-head { align-items: stretch; }
-  .suite-tabs { width: 100%; flex-wrap: nowrap; overflow-x: auto; }
+  .suite-head { display: contents; position: static; }
+  .suite-tabs { position: sticky; top: 0; z-index: 14; background: var(--bg); width: 100%; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 12px; }
   .suite-tab { min-width: 112px; padding: 9px; }
   .suite-tab small { display: none; }
-  .suite-metrics { width: 100%; justify-content: flex-end; }
+  .suite-metrics { width: 100%; justify-content: flex-end; margin-bottom: 16px; }
   .suite-offline { grid-template-columns: 1fr; padding: 24px; text-align: center; }
   .suite-offline-mark { margin-inline: auto; }
   .watch-hero, .rig-lock, .facade-row, .facade-action, .sweep-sticky { grid-template-columns: 1fr; }
