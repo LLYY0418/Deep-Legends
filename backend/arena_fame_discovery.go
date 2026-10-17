@@ -25,9 +25,15 @@ type arenaFameDiscoveryState struct {
 	event          map[string]any
 	flushRequested bool
 	emitted        bool
+	lastPhase      string
+	postScheduled  bool
+	schedule       func(time.Duration, func()) func()
+	stops          []func()
+	operations     []lcuHelpOperation
+	baseline       map[string]map[string]float64
 }
 
-var arenaDiscoveryName = regexp.MustCompile(`(?i)cherry|arena|fame|gladiator|progression`)
+var arenaDiscoveryName = regexp.MustCompile(`(?i)cherry|arena|fame|gladiator|progression|eog|end-of-game|pre-end-of-game`)
 var arenaDiscoveryNumber = regexp.MustCompile(`(?i)fame|level|tier|points|rating|xp`)
 var arenaDiscoveryIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]{0,63}$`)
 var arenaDiscoverySegment = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
@@ -89,13 +95,13 @@ func arenaDiscoveryURI(uri string) string {
 	return strings.Join(parts, "/")
 }
 func (c *LCUClient) observeArenaDiscoveryEvent(event LCUEvent) {
-	if c == nil || !arenaDiscoveryName.MatchString(event.URI) {
+	if c == nil || !arenaDiscoveryObservedURI(event.URI) {
 		return
 	}
 	s := c.arenaDiscoveryState()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.started || len(s.uris) >= 32 {
+	if !s.started || s.emitted || len(s.uris) >= 64 {
 		return
 	}
 	uri := arenaDiscoveryURI(event.URI)
@@ -163,6 +169,13 @@ func arenaDiscoveryHelp(raw json.RawMessage) []lcuHelpOperation {
 	var walk func(any, string)
 	walk = func(v any, key string) {
 		switch node := v.(type) {
+		case string:
+			if arenaDiscoveryName.MatchString(key) && len(key) <= 120 && arenaDiscoveryEventLabel.MatchString(key) {
+				op := lcuHelpOperation{Name: key}
+				if !slices.Contains(ops, op) {
+					ops = append(ops, op)
+				}
+			}
 		case []any:
 			for _, child := range node {
 				walk(child, "")
@@ -218,6 +231,9 @@ func arenaDiscoveryHelp(raw json.RawMessage) []lcuHelpOperation {
 	}
 	walk(root, "")
 	slices.SortFunc(ops, func(a, b lcuHelpOperation) int { return strings.Compare(a.Path+a.Name, b.Path+b.Name) })
+	if len(ops) > 60 {
+		ops = ops[:60]
+	}
 	return ops
 }
 func arenaDiscoveryGETPath(template string, self Summoner) string {
@@ -276,10 +292,18 @@ func (a *app) discoverArenaFame(client *LCUClient) {
 		event := map[string]any{"event": "arena_fame_discovery"}
 		var help json.RawMessage
 		var helpStatus atomic.Int64
-		_ = client.RequestJSON(context.WithValue(ctx, lcuResponseStatusKey{}, &helpStatus), http.MethodGet, "/help", nil, &help)
+		err := client.RequestJSON(context.WithValue(ctx, lcuResponseStatusKey{}, &helpStatus), http.MethodGet, "/help?format=Full", nil, &help)
+		operations := arenaDiscoveryHelp(help)
+		if err != nil || len(operations) == 0 {
+			help = nil
+			helpStatus.Store(0)
+			_ = client.RequestJSON(context.WithValue(ctx, lcuResponseStatusKey{}, &helpStatus), http.MethodGet, "/help", nil, &help)
+			operations = arenaDiscoveryHelp(help)
+		}
 		event["help_status"] = int(helpStatus.Load())
+		baseline := map[string]map[string]float64{}
 		results := []map[string]any{}
-		for _, op := range arenaDiscoveryHelp(help) {
+		for _, op := range operations {
 			row := map[string]any{}
 			if op.Path != "" {
 				row["path"] = arenaDiscoveryHelpPath(op.Path)
@@ -297,6 +321,7 @@ func (a *app) discoverArenaFame(client *LCUClient) {
 					row["status"] = int(status.Load())
 					keys, numbers := arenaDiscoveryShape(raw)
 					row["keys"], row["numbers"] = keys, numbers
+					baseline[op.Path] = numbers
 				}
 			}
 			event["interfaces"] = append(results, row)
@@ -319,6 +344,8 @@ func (a *app) discoverArenaFame(client *LCUClient) {
 		}
 		s.mu.Lock()
 		s.event = event
+		s.operations = operations
+		s.baseline = baseline
 		flush := s.flushRequested
 		s.mu.Unlock()
 		if flush {
@@ -344,7 +371,15 @@ func (a *app) finishArenaFameDiscovery(s *arenaFameDiscoveryState) {
 		return
 	}
 	s.emitted = true
-	event := s.event
+	event := make(map[string]any, len(s.event))
+	for key, value := range s.event {
+		event[key] = value
+	}
+	for _, stop := range s.stops {
+		stop()
+	}
+	s.stops = nil
+	event["queue_types"] = map[string][]string{"lcu": s.queues[dataSourceLCU], "sgp": s.queues[dataSourceSGP]}
 	event["event_uris"] = append([]string(nil), s.uris...)
 	s.mu.Unlock()
 	for {
@@ -355,6 +390,8 @@ func (a *app) finishArenaFameDiscovery(s *arenaFameDiscoveryState) {
 		rows, _ := event["interfaces"].([]map[string]any)
 		if len(rows) > 0 {
 			event["interfaces"] = rows[:len(rows)-1]
+		} else if rows, _ := event["post_game"].([]map[string]any); len(rows) > 0 {
+			event["post_game"] = rows[:len(rows)-1]
 		} else {
 			event["queue_types"] = map[string][]string{}
 			event["event_uris"] = []string{}
@@ -373,4 +410,123 @@ func arenaDiscoveryHelpPath(path string) string {
 		}
 	}
 	return strings.Join(parts, "/")
+}
+
+func arenaDiscoveryObservedURI(uri string) bool {
+	if arenaDiscoveryName.MatchString(uri) {
+		return true
+	}
+	for _, prefix := range []string{"/lol-end-of-game/", "/lol-pre-end-of-game/", "/lol-ranked/", "/lol-progression/", "/lol-challenges/"} {
+		if strings.HasPrefix(uri, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// PreEndOfGame is part of the observation, not a flush boundary.
+func (a *app) observeArenaDiscoveryPhase(client *LCUClient, phase string) {
+	if client == nil {
+		return
+	}
+	s := client.arenaDiscoveryState()
+	s.mu.Lock()
+	previous := s.lastPhase
+	s.lastPhase = phase
+	next := phase == "ChampSelect" && s.started && previous != "" && previous != "ChampSelect"
+	reset := phase == "ChampSelect" && s.emitted
+	if next || reset {
+		s.mu.Unlock()
+		a.finishArenaFameDiscovery(s)
+		client.mu.Lock()
+		if client.arenaDiscovery == s {
+			client.arenaDiscovery = &arenaFameDiscoveryState{lastPhase: phase}
+		}
+		client.mu.Unlock()
+		return
+	}
+	if !s.started || s.emitted || s.postScheduled || (phase != "Lobby" && phase != "None") {
+		s.mu.Unlock()
+		return
+	}
+	s.postScheduled = true
+	schedule := s.schedule
+	if schedule == nil {
+		schedule = func(delay time.Duration, fn func()) func() {
+			timer := time.AfterFunc(delay, fn)
+			return func() { timer.Stop() }
+		}
+	}
+	s.stops = append(s.stops, schedule(20*time.Second, func() { a.probeArenaFamePostGame(client, s) }), schedule(120*time.Second, func() { a.finishArenaFameDiscovery(s) }))
+	s.mu.Unlock()
+}
+func (a *app) probeArenaFamePostGame(client *LCUClient, s *arenaFameDiscoveryState) {
+	s.mu.Lock()
+	if s.emitted {
+		s.mu.Unlock()
+		return
+	}
+	done := s.done
+	s.mu.Unlock()
+	client.mu.RLock()
+	session := client.sessionContext
+	client.mu.RUnlock()
+	if session == nil {
+		session = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(session, 30*time.Second)
+	defer cancel()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return
+	}
+	s.mu.Lock()
+	ops := append([]lcuHelpOperation(nil), s.operations...)
+	baseline := s.baseline
+	s.mu.Unlock()
+	a.mu.RLock()
+	self := a.summoner
+	a.mu.RUnlock()
+	for _, path := range []string{"/lol-end-of-game/v1/eog-stats-block", "/lol-pre-end-of-game/v1/currentSequenceEvent"} {
+		op := lcuHelpOperation{Method: http.MethodGet, Path: path}
+		if !slices.Contains(ops, op) {
+			ops = append(ops, op)
+		}
+	}
+	rows := []map[string]any{}
+	for _, op := range ops {
+		if op.Method != http.MethodGet {
+			continue
+		}
+		path := arenaDiscoveryGETPath(op.Path, self)
+		if path == "" {
+			continue
+		}
+		probe, stop := context.WithTimeout(ctx, 2*time.Second)
+		var raw json.RawMessage
+		var status atomic.Int64
+		_ = client.RequestJSON(context.WithValue(probe, lcuResponseStatusKey{}, &status), http.MethodGet, path, nil, &raw)
+		stop()
+		keys, numbers := arenaDiscoveryShape(raw)
+		difference := map[string]float64{}
+		for key, value := range numbers {
+			if before, ok := baseline[op.Path][key]; ok {
+				difference[key] = value - before
+			}
+		}
+		row := map[string]any{"path": arenaDiscoveryHelpPath(op.Path), "method": op.Method, "status": int(status.Load()), "keys": keys, "numbers": numbers, "difference": difference}
+		candidate := append(rows, row)
+		encoded, _ := json.Marshal(candidate)
+		if len(encoded) > 3500 {
+			break
+		}
+		rows = candidate
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.emitted || s.event == nil {
+		return
+	}
+	s.event["post_game"] = rows
 }

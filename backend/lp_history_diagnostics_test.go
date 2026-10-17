@@ -149,10 +149,10 @@ func TestLPHistorySaveCallbacksAndExport(t *testing.T) {
 	after.Wins++
 	after.LeaguePoints += 24
 	r182Capture(tracker, client, ref, queue, []lpSnapshot{after}, nil)
-	if len(saves) != 3 || saves[0]["stage"] != "observe" || saves[1]["stage"] != "game_start" || saves[2]["stage"] != "capture" || saves[2]["record_count"] != 1 {
+	if len(saves) != 4 || saves[0]["stage"] != "observe" || saves[1]["stage"] != "game_start" || saves[2]["stage"] != "capture" || saves[2]["record_count"] != 1 {
 		t.Fatal("save stages missing", saves)
 	}
-	if len(r175Events(t, a, "lp_history_save")) != 3 {
+	if len(r175Events(t, a, "lp_history_save")) != 4 {
 		t.Fatal("save events missing from diagnostic export")
 	}
 	newLPTrackerWithDiagnostics(tracker.store, a.recordDiagnostic)

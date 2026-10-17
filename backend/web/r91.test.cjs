@@ -173,7 +173,7 @@ test("R91 empty new-game snapshots stay explicit and bounded instead of showing 
     h.requests[0].resolve({ phase: "InProgress", available: false, players: [] }); await flush();
     assert.match(h.text(), /正在识别新对局/); assert.doesNotMatch(h.text(), /recommendation-empty|recommendation-90/);
     h.state.liveRetryAttempts = 8; h.scheduleLiveRefresh(); h.renderLive();
-    assert.equal(h.jobs.size, 0); assert.match(h.nodes.liveRefresh.closest(".live-toolbar").querySelector("[data-live-status]").textContent, /已停止自动重试/);
+    assert.equal(h.jobs.size, 0); assert.equal(h.nodes.liveRefresh.closest(".live-toolbar").querySelector("[data-live-status]").textContent, "");
     assert.ok(h.nodes.liveContent.querySelector("button"));
   } finally { h.close(); }
 });

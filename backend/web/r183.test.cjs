@@ -51,10 +51,11 @@ test('R183 ranked backend response renders an anonymous enemy in middle and stop
       assert.match(hidden.textContent, /中路/);
       assert.equal(hidden.querySelector('img').getAttribute('data-champion-id'), '1');
       assert.match(hidden.querySelector('img').getAttribute('src'), /id=1/);
-      assert.doesNotMatch(doc.querySelector('.live-refresh-status').textContent, /数据尚未完整/);
+      assert.doesNotMatch(doc.querySelector('.live-refresh-status')?.textContent || '', /数据尚未完整/);
     } finally { dom.window.close(); }
   }
   const incomplete = { ...response, players: response.players.filter((p) => !p.hidden) };
   assert.equal(functions.liveSnapshotComplete(incomplete), false);
-  assert.match(functions.renderLiveRefreshStatus(incomplete), /数据尚未完整/);
+  assert.equal(functions.renderLiveRefreshStatus(incomplete), '');
+  assert.match(extract('renderSessionSummary'), /liveAutoRefreshStopped\(data\)/);
 });

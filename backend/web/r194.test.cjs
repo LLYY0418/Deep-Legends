@@ -42,7 +42,7 @@ test('R194 actual backend quickplay response renders our anonymous TOP among fiv
     assert.doesNotMatch(top.textContent, /未定级|—/);
     assert.equal(top.textContent.split('客户端未公开该玩家').length - 1, 1);
     assert.equal(top.nextElementSibling.tagName, 'ARTICLE');
-    assert.doesNotMatch(doc.querySelector('.live-refresh-status').textContent, /数据尚未完整/);
+    assert.doesNotMatch(doc.querySelector('.live-refresh-status')?.textContent || '', /数据尚未完整/);
     assert.equal(h.liveSnapshotComplete(fixture), true);
   } finally { d.window.close(); }
 });
@@ -56,7 +56,8 @@ test('R194 quickplay nine-player snapshots keep five-second retries until recove
   h.timers[0].fn();
   assert.deepEqual(h.calls, [[false, 'interval']]);
   h.state.liveRetryAttempts = 8;
-  assert.match(h.renderLiveRefreshStatus(missing), /数据尚未完整/);
+  assert.equal(h.renderLiveRefreshStatus(missing), '');
+  assert.match(require('./r188-harness.cjs').extract(source,'renderSessionSummary'), /liveAutoRefreshStopped\(data\)/);
   h.state.live = fixture; h.state.liveRetryAttempts = 0;
   h.scheduleLiveRefresh();
   assert.equal(h.timers.length, 1, 'complete roster must not add another timer');

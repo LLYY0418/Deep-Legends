@@ -12,6 +12,7 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -73,7 +74,17 @@ type rendererPerfGroup struct {
 	MaxMS   float64 `json:"maxMs"`
 }
 type clientDiagnosticRequest struct {
-	R278 json.RawMessage `json:"r278,omitempty"`
+	R278              json.RawMessage `json:"r278,omitempty"`
+	Lost              int             `json:"lost,omitempty"`
+	LPImagesRecreated int             `json:"images_recreated,omitempty"`
+	OverviewRequests  int             `json:"overview_requests,omitempty"`
+	CanceledRequests  int             `json:"canceled_requests,omitempty"`
+	BusyMS            int             `json:"busy_ms,omitempty"`
+	LabelChanges      int             `json:"label_changes,omitempty"`
+	LatestGameID      int64           `json:"latest_game_id,omitempty"`
+	LatestEndedAt     int64           `json:"latest_ended_at,omitempty"`
+	AllListCount      int             `json:"all_list_count,omitempty"`
+	MissingCount      int             `json:"missing_count,omitempty"`
 
 	RankedMatches   int `json:"ranked_matches,omitempty"`
 	WithDelta       int `json:"with_delta,omitempty"`
@@ -286,6 +297,8 @@ var clientDiagnosticEvents = map[string]map[string]bool{
 	"client_view_client":             {"received": true, "applied": true, "rejected": true, "frame": true, "new-generation": true, "generation-rollback": true, "duplicate-generation": true, "invalid-frame": true},
 	"ui_zoom_state":                  {"applied": true},
 	"lp_chip_render":                 {"render": true},
+	"manual_refresh_client":          {"complete": true},
+	"match_filter_view":              {"render": true},
 	"overview_scroll_reset":          {"restored": true},
 	"overview_reference_expired":     {"retry": true},
 	"overview_rerender_client":       {"render": true, "filter_modal_error": true},
@@ -472,7 +485,35 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(204)
 		return
 	}
+	if request.Event == "manual_refresh_client" {
+		event["overview_requests"], event["canceled_requests"] = min(1000, max(0, request.OverviewRequests)), min(1000, max(0, request.CanceledRequests))
+		event["busy_ms"], event["label_changes"] = min(3600000, max(0, request.BusyMS)), min(1000, max(0, request.LabelChanges))
+		a.recordDiagnostic(event)
+		w.WriteHeader(204)
+		return
+	}
+	if request.Event == "match_filter_view" {
+		if !slices.Contains([]string{"server", "client-fallback", "lcu", "snapshot", "view-cache"}, request.Source) || normalizeGameplayMatchFilter(request.DirtyFilter) != request.DirtyFilter {
+			http.Error(w, "invalid filter view", 400)
+			return
+		}
+		event["filter"], event["source"], event["count"] = request.DirtyFilter, request.Source, min(1000, max(0, request.Count))
+		event["all_list_count"], event["missing_count"] = min(1000, max(0, request.AllListCount)), min(1000, max(0, request.MissingCount))
+		event["latest_game_id"], event["latest_ended_at"] = max(int64(0), request.LatestGameID), max(int64(0), request.LatestEndedAt)
+		a.recordDiagnostic(event)
+		w.WriteHeader(204)
+		return
+	}
 	if request.Event == "lp_chip_render" {
+		source := request.Source
+		if source == "" {
+			source = "complete"
+		}
+		if !slices.Contains([]string{"complete", "overview-matches", "patch", "lp-recorded"}, source) {
+			http.Error(w, "invalid LP source", 400)
+			return
+		}
+		event["source"], event["lost"], event["images_recreated"] = source, min(1000, max(0, request.Lost)), min(100000, max(0, request.LPImagesRecreated))
 		event["ranked_matches"], event["with_delta"], event["chips"], event["revision_skipped"] = min(1000, max(0, request.RankedMatches)), min(1000, max(0, request.WithDelta)), min(1000, max(0, request.Chips)), min(1000, max(0, request.RevisionSkipped))
 		a.recordDiagnostic(event)
 		w.WriteHeader(204)

@@ -16,6 +16,9 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			body := `{"event":"` + event + `","reason":"` + reason + `","key":"13:middle:CLASSIC:11:4-12","championId":13,"queueId":420,"position":"MID"}`
 
+			if event == "match_filter_view" {
+				body = `{"event":"match_filter_view","reason":"render","source":"view-cache","filter":"all"}`
+			}
 			if event == "client_view_client" {
 				body = `{"event":"client_view_client","action":"applied","reason":"` + reason + `","state":"ready","generation":2,"rejectionReason":"new-generation"}`
 			}

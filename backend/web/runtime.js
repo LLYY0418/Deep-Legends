@@ -258,7 +258,15 @@
       for(const key of ['multiplier','devicePixelRatio'])body[key]=Math.max(.1,Math.min(8,Number(fields[key]) || 1));
       for(const key of ['windowWidth','windowHeight','screenWidth','screenHeight'])body[key]=Math.max(0,Math.min(100000,Math.round(Number(fields[key]) || 0)));
     }
-    if(event==='lp_chip_render')for(const k of ['ranked_matches','with_delta','chips','revision_skipped'])body[k]=Math.max(0,Math.min(1000,Math.floor(Number(fields[k])||0)));
+    if(event==='lp_chip_render') {
+      for(const k of ['ranked_matches','with_delta','chips','revision_skipped','lost','images_recreated'])body[k]=Math.max(0,Math.min(100000,Math.floor(Number(fields[k])||0)));
+      body.source=['complete','overview-matches','patch','lp-recorded'].includes(fields.source)?fields.source:'complete';
+    }
+    if(event==='manual_refresh_client')for(const key of ['overview_requests','canceled_requests','busy_ms','label_changes'])body[key]=Math.max(0,Math.min(3600000,Math.floor(Number(fields[key])||0)));
+    if(event==='match_filter_view'){
+      body.filter=fields.filter;body.source=fields.source;
+      for(const key of ['count','latest_game_id','latest_ended_at','all_list_count','missing_count'])body[key]=Math.max(0,Math.min(Number.MAX_SAFE_INTEGER,Math.floor(Number(fields[key])||0)));
+    }
     if(event==='overview_rerender_client'){body.renderReason=String(fields.reason || reason).slice(0,80);body.tabType=['self','cn','riot','pro'].includes(fields.tabType)?fields.tabType:'cn';body.filterRetained=fields.filterRetained===true;body.modalOpen=fields.modalOpen===true;}
     if(event==='history_search_client'){for(const k of ['scanned','hits','pages','averagePageBytes'])body[k]=Math.max(0,Math.min(16*1024*1024,Number(fields[k])||0));body.stop_reason=reason;body.durationMs=Math.max(0,Math.min(3600000,Number(fields.durationMs)||0));for(const k of ['beg_index','new_unique'])body[k]=Math.max(0,Math.min(10000,Math.floor(Number(fields[k])||0)));body.exhausted=fields.exhausted===true;if(/^\d{4}-\d{2}-\d{2}$/.test(fields.time_range||''))body.time_range=fields.time_range;}
     if(event==='overview_scroll_reset' || event==='overview_reference_expired'){body.tabType=['self','cn','riot','pro'].includes(fields.tab_type)?fields.tab_type:'cn';if(event==='overview_scroll_reset'){body.renderReason=String(fields.render_reason||'').slice(0,80);for(const k of ['scroll_before','scroll_after'])body[k]=Math.max(0,Math.min(1000000,Math.floor(Number(fields[k])||0)));}else{body.append=fields.append===true;body.key_change_ms=Math.max(-1,Math.min(86400000,Math.floor(Number(fields.key_change_ms) || 0)));}}

@@ -27,5 +27,5 @@ test('R264 P6 ready avatar survives sparse cards and a late history error',async
 test('R264 early profile header does not turn unread summoner level into zero',()=>{
  const f=compile(source,['renderSelfIdentityHeader'],{state:{settings:{},tabs:[]},window:{},renderSummonerHighlights:()=>'',summonerRegionChip:()=>'',summonerProChip:()=>'',renderOverviewStreak:()=>'',iconFigure:()=>'',assetIcon:()=>'',assetPath:()=>'',number:String,escapeHTML,tabServerLabel:()=>''});
  for(const level of [undefined,0])assert.doesNotMatch(f.renderSelfIdentityHeader({current:true,identity:{summonerLevel:level},label:'Fixture'}),/召唤师等级 (?:0|undefined)/);
- assert.match(f.renderSelfIdentityHeader({current:true,identity:{summonerLevel:30},label:'Fixture'}),/召唤师等级 30/);
+ assert.match(f.renderSelfIdentityHeader({current:true,identity:{summonerLevel:30},label:'Fixture'}),/召唤师等级 <b class="summoner-level-value">30<\/b>/);
 });

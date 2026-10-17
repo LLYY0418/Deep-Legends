@@ -172,10 +172,6 @@
   }
 
   // R129 P1：后端 liveHistoryState 只产出 ok / empty / failed / unavailable
-  // （gameplay.go），arena_live_grouping.go 固定 unavailable，gameplay_refresh.go
-  // 读取 pending；全后端没有 "ready"。历史状态判断一律走这两个函数，词表写在
-  // 函数体内而不是模块级 const——本文件的函数会被测试用 compileFunctions 单独
-  // 编译，模块级 const 会变成自由变量抛 ReferenceError。
   function liveHistoryStateOf(player) {
     return String(player?.historyState || "empty").trim().toLowerCase();
   }
@@ -201,8 +197,13 @@
     const message = data?.phase && liveGamePhase(data.phase) && data.phase !== state.beacon.phase
       ? "对局阶段已变化，正在同步当前对局…"
       : state.liveLoadingVisible ? "正在刷新…"
-      : liveAutoRefreshStopped(data);
-    return message ? `<div class="live-refresh-status" role="status"><span>${escapeHTML(message)}</span></div>` : "";
+      : "";
+    if(message)return `<div class="live-refresh-status" role="status"><span>${escapeHTML(message)}</span></div>`;
+    if(data?.historyServiceDown===true) {
+      const reason='官方战绩服务暂时中断，部分玩家战绩无法读取，恢复后点「刷新对局」';
+      return `<div class="live-refresh-status is-service-outage" role="status">${serviceOutageIcon()}<span data-tooltip="${escapeHTML(reason)}" data-tooltip-overflow="self">${reason}</span></div>`;
+    }
+    return "";
   }
   function normalizeLiveOrder(value) { return ["team", "position", "kda", "win-rate"].includes(value) ? value : "team"; }
   function liveRecommendationTier() {
@@ -251,6 +252,8 @@
   const LIVE_CORE_OPTION_LIMIT = 5;
 
   async function api(path, options = {}, key = path, timeout = 30000) {
+    const overviewRequest=String(key).startsWith('overview:');
+    if(overviewRequest && typeof window!=="undefined")window.dispatchEvent(new CustomEvent('deep-legends:manual-refresh-metric',{detail:{overview_requests:1}}));
     state.controllers.get(key)?.abort();
     const controller = new AbortController();
     state.controllers.set(key, controller);
@@ -343,6 +346,7 @@
       throw error;
     } finally {
       clearTimeout(timer);
+      if(overviewRequest && typeof window!=="undefined" && (controller.signal.aborted || state.controllers.get(key)!==controller))window.dispatchEvent(new CustomEvent('deep-legends:manual-refresh-metric',{detail:{canceled_requests:1}}));
       if (state.controllers.get(key) === controller) state.controllers.delete(key);
     }
   }
@@ -513,7 +517,7 @@
       const group = overviewGroupForSection(name);
       const tab = activeTab(group);
       if (tab && previous !== name) tab.restoreScrollPending = true;
-      if (!tab && group === "pro") {
+      if (!tab) {
         renderOverview(group);
       } else if (tabReady(tab)) {
         if (shouldReloadOverview(tab) && tab.loadingMore) {
@@ -1137,7 +1141,10 @@
         if(partial.matches?.length)tab.matchesReceived=true;
         partial={...partial,matches:partial.matches || []};
         if (append || (tab.data && (tab.data.pagination?.filter || "all") !== (tab.matchFilter || "all"))) return;
+        tab.lpRenderSource="complete";
         const previous = tab.data;
+        const previousByID=new Map((previous?.matches || []).map(match=>[String(match.gameId),match]));
+        partial.matches=partial.matches.map(match=>mergeMatchLP(previousByID.get(String(match.gameId)),match));
         const incoming = new Set(partial.matches.map(match => String(match.gameId)));
         const updates = new Map(partial.matches.map(match => [String(match.gameId), match]));
         const matches = partial.matchesDelta ? [...(previous?.matches || []).filter(match=>!incoming.has(String(match.gameId))),...partial.matches].sort((a,b)=>Number(b.createdAt)-Number(a.createdAt)) : kind === "cards" && !partial.matches.length ? [...(previous?.matches || [])] : append
@@ -1180,6 +1187,7 @@
       }
       if (tab.overviewRequestToken !== requestToken) return false;
       tab.lastOverviewPageBytes=typeof TextEncoder==='function'?new TextEncoder().encode(JSON.stringify(payload)).length:encodeURIComponent(JSON.stringify(payload)).replace(/%[A-F0-9]{2}/g,'x').length;
+      tab.lpRenderSource="complete";
       tab.matchesReceived=true;tab.recentStatsReceived=true;tab.careerStatsSource="complete";
       if (payload.proMismatch) markProMismatch(tab);
       if (append) {
@@ -1207,7 +1215,8 @@
         const pagination = normalizedPagination(payload, 0);
         const previousData = tab.data;
         const previousMatches = previousData?.matches || [];
-        const freshMatches = payload.matches || [];
+        const oldByID=new Map(previousMatches.map(match=>[String(match.gameId),match]));
+        const freshMatches = (payload.matches || []).map(match=>mergeMatchLP(oldByID.get(String(match.gameId)),match));
         const sameFilter = (previousData?.pagination?.filter || "all") === (pagination.filter || "all");
         const historyUnavailable = Array.isArray(payload.capabilities) && payload.capabilities.some(item => item.name === "match-history" && item.state === "failed");
         const preserveLoadedPages = force && sameFilter && previousMatches.length > freshMatches.length;
@@ -1322,7 +1331,7 @@
         cancelOverviewProgress(tab);
         if (!append) {delete tab.overviewMatchSnapshot;clearTimeout(tab.historyWaitTimer);}
         tab.loading = false;
-      if(tab.lpRefreshPending){tab.lpRefreshPending=false;queueMicrotask(()=>{if(!tab.closed)void loadOverview(tab,true);});}
+
         tab.loadingMore = false;
         if (tab.pendingHistoricalRanks && !tab.closed && !state.destroyed) {
           const pending = tab.pendingHistoricalRanks; delete tab.pendingHistoricalRanks;
@@ -1434,9 +1443,44 @@
     }catch(error){if(error.name!=="RequestCancelled")tab.seasonRefreshPending=true;return false;}
   }
 
+  function mergeMatchLP(previous, next) {
+    if(previous?.lpDelta!=null && next.lpDelta==null)return {...next,lpDelta:previous.lpDelta,lpPending:false};
+    return next;
+  }
   function mergeCurrentHistoryHead(matches, head) {
+    const previous=new Map(matches.map(match=>[String(match.gameId),match]));
     const seen=new Set(head.map(match=>String(match.gameId)));
-    return [...head,...matches.slice(head.length).filter(match=>!seen.has(String(match.gameId)))];
+    return [...head.map(match=>mergeMatchLP(previous.get(String(match.gameId)),match)),...matches.filter(match=>!seen.has(String(match.gameId)))];
+  }
+  function matchContentVersion(match) {
+    const stable=value=>Array.isArray(value)?value.map(stable):value && typeof value==='object'?Object.fromEntries(Object.keys(value).sort().filter(key=>!['revision','lpDelta','lpPending'].includes(key)).map(key=>[key,stable(value[key])])):value;
+    return JSON.stringify(stable(match));
+  }
+  function renderLPChip(match) {
+    const ranked=[420,440].includes(Number(match.queueId)),resultKind=match.result,lpValue=Number(match.lpDelta);
+    const lpChip = ranked && resultKind !== "remake" && Number.isFinite(lpValue) && match.lpDelta != null
+      ? `<b class="lp-delta ${lpValue >= 0 ? "is-gain" : "is-drop"}" data-tooltip="这场排位的胜点变化\n由助手在对局结算时记录" data-tooltip-size="compact">${lpValue >= 0 ? "+" : "−"}${Math.abs(lpValue)} LP</b>`
+      : "";
+    return lpChip || (ranked && resultKind!=="remake" && match.lpPending?'<b class="lp-delta is-pending skeleton-block" aria-hidden="true"></b>':'');
+  }
+  function patchLPChip(entry, match) {
+    const previous=entry.querySelector('.lp-delta'),html=renderLPChip(match);
+    if(previous?.outerHTML===html)return;
+    if(!html){previous?.remove();return;}
+    if(previous)previous.outerHTML=html;else entry.querySelector('.result-word')?.insertAdjacentHTML('beforeend',html);
+  }
+  function handleLPRecorded(detail) {
+    if(!Array.isArray(detail?.matches))return;
+    const patches=new Map(detail.matches.map(match=>[String(match.gameId),match]));
+    for(const tab of [...(state.tabs || []),...(state.overlay || [])]) {
+      if(!tab.data || !(tab.current || tab.data.player?.isCurrent))continue;
+      const patch=matches=>matches.map(match=>patches.has(String(match.gameId))?mergeMatchLP(match,{...match,...patches.get(String(match.gameId))}):match);
+      tab.data.matches=patch(tab.data.matches || []);
+      for(const view of tab.matchViews?.values() || []) {view.matches=patch(view.matches || []);if(view.list)for(const entry of view.list.querySelectorAll('.match-entry')){const match=view.matches.find(m=>String(m.gameId)===entry.dataset.matchId);if(match)patchLPChip(entry,match);}}
+      tab.lpRenderSource='lp-recorded';
+      const container=overviewContainer(tab),root=container?._overviewSubpageStash || container,list=root?.querySelector('.match-list');
+      if(list)reconcileFilteredMatchList(list,tab);
+    }
   }
 
   function syncOverviewStreak(tab) {
@@ -1464,6 +1508,7 @@
       if(detail.replace) {
         if(generation && generation<Number(tab.data.historyGeneration || 0))continue;
         if((tab.matchFilter || "all")!=="all")continue;
+        tab.lpRenderSource="overview-matches";
         const previous=tab.data.matches || [],matches=mergeCurrentHistoryHead(previous,detail.matches);
         const hasTail=previous.length>detail.matches.length;
         tab.data={...tab.data,historyGeneration:generation,matches,pagination:{...(detail.pagination || tab.data.pagination),count:matches.length,hasMore:hasTail ? Boolean(tab.data.pagination?.hasMore) : Boolean(detail.pagination?.hasMore)}};
@@ -1471,13 +1516,15 @@
         syncOverviewStreak(tab);
         renderFilteredMatchView(tab);continue;
       }
+      tab.lpRenderSource="patch";
       const changed=new Map(detail.matches.map(match=>[String(match.gameId),match]));
-      tab.data.matches=tab.data.matches.map(match=>changed.get(String(match.gameId)) || match);
-      for(const id of changed.keys())rerenderMatch(tab,id);
+      tab.data.matches=tab.data.matches.map(match=>changed.has(String(match.gameId))?mergeMatchLP(match,changed.get(String(match.gameId))):match);
+      renderFilteredMatchView(tab);
       if((tab.matchFilter || "all")==="all") {tab.overviewStreak=computeOverviewStreak(tab.data.matches,tab.data.pagination?.hasMore,tab.data.player?.playerRef);syncOverviewStreak(tab);}
     }
   }
   function handleHistoryServiceRecovered(detail) {
+    if(state.section==="live" && state.live?.historyServiceDown)void loadLive(true,"outage-recovery");
     for(const tab of [...state.tabs,...state.overlay]){
       if(riotTab(tab) || !historyServiceState(tab) || detail?.serverId && tabServerID(tab)!==detail.serverId)continue;
       tab.historyRecoveryPending=true;
@@ -2457,7 +2504,7 @@
     const avatar=pending && !player.profileIconId?'<span class="game-icon is-summoner-avatar is-pending"></span>':masked?maskedProfileIcon('summoner-avatar'):iconFigure('profile',player.profileIconId,profileName,'summoner-avatar',false).replace(`alt="${escapeHTML(profileName)}"`,'alt=""');
     const art=window.deepLegendsOverviewArt?.render(player,tab.key,!pending && !tab.loading && !tab.initialPagePending) || (player.backgroundSource && player.backgroundPath?`<img class="summoner-strip-art" data-queued-src="/api/champion-asset?source=${encodeURIComponent(player.backgroundSource)}&path=${encodeURIComponent(player.backgroundPath)}" alt="" aria-hidden="true" decoding="async" data-game-image>`:'');
     const highlights=renderSummonerHighlights(data?.ranks || [],data?.masteries || [],{pending:pending || Boolean(tab.loading || tab.initialPagePending),capabilities:data?.capabilities || []});
-    return `<section class="summoner-strip${pending?' is-pending-strip':''}">${art}${avatar}<div class="summoner-strip-copy"><div><h2${copy?` class="summoner-copy-name" role="button" tabindex="0" data-copy-summoner="${escapeHTML(copy)}"`:''}>${profileName?escapeHTML(profileName):'<span class="skeleton-line"></span>'}</h2><div class="summoner-name-meta">${meta}</div></div><p class="summoner-level-row"><span>${Number(player.summonerLevel)>0?`召唤师等级 ${number(player.summonerLevel)}`:pending?'<span class="skeleton-line"></span>':''}${player.hidden?' · 身份已隐藏':''}</span>${player.privateHistory?'<span class="player-tab-hidden">隐藏战绩</span>':''}</p><p class="player-live-chip" data-friend-presence="${escapeHTML(tab.key)}" hidden></p></div>${highlights}</section>`;
+    return `<section class="summoner-strip${pending?' is-pending-strip':''}">${art}${avatar}<div class="summoner-strip-copy"><div><h2${copy?` class="summoner-copy-name" data-tooltip="${escapeHTML(profileName)}" data-tooltip-overflow="self" role="button" tabindex="0" data-copy-summoner="${escapeHTML(copy)}"`:''}>${profileName?escapeHTML(profileName):'<span class="skeleton-line"></span>'}</h2><div class="summoner-name-meta">${meta}</div></div><p class="summoner-level-row"><span>${Number(player.summonerLevel)>0?`召唤师等级 <b class="summoner-level-value">${number(player.summonerLevel)}</b>`:pending?'<span class="skeleton-line"></span>':''}${player.hidden?' · 身份已隐藏':''}</span>${player.privateHistory?'<span class="player-tab-hidden">隐藏战绩</span>':''}</p><p class="player-live-chip" data-friend-presence="${escapeHTML(tab.key)}" hidden></p></div>${highlights}</section>`;
   }
 
   function renderSelfIdentityHeader(tab) {return renderSummonerStrip(null,tab,true);}
@@ -2630,8 +2677,8 @@
     const renderedList = container.querySelector(".match-list");
     if (renderedList) {
       renderedList._matchData = new Map(rawMatches.map(match => [String(match.gameId), match]));
-      if(!preserveMatchList)boundMatchDOM(renderedList,tab);
-      if(!preserveMatchList)window.reportFlowDiagnostic?.('lp_chip_render','render',{ranked_matches:matches.filter(m=>[420,440].includes(Number(m.queueId))).length,with_delta:matches.filter(m=>m.lpDelta!=null).length,chips:renderedList.querySelectorAll('.lp-delta').length,revision_skipped:0});
+      if(!preserveMatchList){boundMatchDOM(renderedList,tab);reportMatchFilterView(tab,matches);}
+      if(!preserveMatchList)window.reportFlowDiagnostic?.('lp_chip_render','render',{ranked_matches:matches.filter(m=>[420,440].includes(Number(m.queueId))).length,with_delta:matches.filter(m=>m.lpDelta!=null).length,chips:renderedList.querySelectorAll('.lp-delta').length,revision_skipped:0,source:"complete",lost:0,images_recreated:renderedList.querySelectorAll("img").length});
     }
     container._matchListMatches = rawMatches;
     container._matchListFilter = tab.matchFilter;
@@ -3157,12 +3204,13 @@
       const lines=JSON.parse(button.dataset.seasonDataNote);
       panel.replaceChildren(...lines.map((line,index)=>{const node=doc.createElement(index===0 ? "strong" : "p");node.textContent=line;return node;}));
       panel.hidden=false;button.setAttribute("aria-expanded","true");button.setAttribute("aria-describedby",panel.id);
-      const rect=button.getBoundingClientRect(),width=panel.offsetWidth,height=panel.offsetHeight,padding=12,gap=8;
+      const scale=Number(win.getComputedStyle(panel).zoom)||1;
+      const rect=button.getBoundingClientRect(),width=panel.offsetWidth*scale,height=panel.offsetHeight*scale,padding=12,gap=8;
       const left=Math.max(padding,Math.min(rect.left,win.innerWidth-width-padding));
       const above=rect.bottom+gap+height>win.innerHeight-padding && rect.top>=height+gap+padding;
       panel.dataset.placement=above ? "top" : "bottom";
-      panel.style.left=`${left}px`;panel.style.top=`${Math.max(padding,above ? rect.top-height-gap : Math.min(rect.bottom+gap,win.innerHeight-height-padding))}px`;
-      panel.style.setProperty("--tag-arrow-left",`${Math.max(8,Math.min(width-8,rect.left+rect.width/2-left))}px`);
+      panel.style.left=`${left/scale}px`;panel.style.top=`${Math.max(padding,above ? rect.top-height-gap : Math.min(rect.bottom+gap,win.innerHeight-height-padding))/scale}px`;
+      panel.style.setProperty("--tag-arrow-left",`${Math.max(8,Math.min(width-8,rect.left+rect.width/2-left))/scale}px`);
       observer.observe(doc.body,{childList:true,subtree:true});
     };
     const buttonOf=node=>node?.closest?.("[data-season-data-note]");
@@ -3984,10 +4032,6 @@
   }
 
   // 补位标签：只认后端下发的布尔 true。R121 P1-1 起后端总开关默认关闭，正常
-  // 情况下这个字段根本不会出现、标签也不渲染；证据不足（海克斯大乱斗、LCU 战绩
-  // 回退路径）时同样缺失。提示文案只陈述数据事实——match-v5 的两个位置字段按
-  // Riot 官方定义都是服务器推算值，不记录大厅选位，所以这里不替客户端下任何
-  // 「这个位置是怎么分配出来的」结论（R121 P1-2）。
   function autofillChip(player) {
     if (player?.autofill !== true) return "";
     return `<b class="match-autofill-chip" data-tooltip="对局数据里没有这名玩家的个人位置（推算位置：${escapeHTML(positionLabel(player.position))}）" data-tooltip-size="compact">补位</b>`;
@@ -4191,12 +4235,13 @@
           for(const node of clone.querySelectorAll("[id]")) {const old=node.id,next=`${panel.id}-${old}`;node.id=next;for(const target of clone.querySelectorAll("*"))for(const attr of [...target.attributes])if(attr.value.includes(`url(#${old})`))target.setAttribute(attr.name,attr.value.replaceAll(`url(#${old})`,`url(#${next})`));}
           if(clone.matches("[data-tooltip]"))clone.tabIndex=0;clone.querySelectorAll("[data-tooltip]").forEach(tag=>tag.tabIndex=0);return clone;}));
         panel.hidden=false;button.setAttribute("aria-expanded","true");button.setAttribute("aria-describedby",panel.id);
-        const rect=button.getBoundingClientRect(),padding=12,gap=8,width=panel.offsetWidth,height=panel.offsetHeight;
+        const scale=Number(win.getComputedStyle(panel).zoom)||1;
+        const rect=button.getBoundingClientRect(),padding=12,gap=8,width=panel.offsetWidth*scale,height=panel.offsetHeight*scale;
         const above=rect.top>=height+gap+padding;
         const left=Math.max(padding,Math.min(win.innerWidth-width-padding,rect.left+rect.width/2-width/2));
         panel.dataset.placement=above ? "top" : "bottom";
-        panel.style.left=`${left}px`;panel.style.top=`${Math.max(padding,above ? rect.top-height-gap : Math.min(win.innerHeight-height-padding,rect.bottom+gap))}px`;
-        panel.style.setProperty("--tag-arrow-left",`${Math.max(8,Math.min(width-8,rect.left+rect.width/2-left))}px`);
+        panel.style.left=`${left/scale}px`;panel.style.top=`${Math.max(padding,above ? rect.top-height-gap : Math.min(win.innerHeight-height-padding,rect.bottom+gap))/scale}px`;
+        panel.style.setProperty("--tag-arrow-left",`${Math.max(8,Math.min(width-8,rect.left+rect.width/2-left))/scale}px`);
         observer.observe(doc.body,{childList:true,subtree:true});
       };
       const buttonOf=node=>node?.closest?.("[data-match-tags-more]");
@@ -4327,10 +4372,7 @@
     const queueID = Number(match.queueId);
     const modeKind = matchModeKind(match, subject);
     const ranked = queueID === 420 || queueID === 440;
-    const lpValue = Number(match.lpDelta);
-    const lpChip = ranked && resultKind !== "remake" && Number.isFinite(lpValue) && match.lpDelta != null
-      ? `<b class="lp-delta ${lpValue >= 0 ? "is-gain" : "is-drop"}" data-tooltip="这场排位的胜点变化\n由助手在对局结算时记录" data-tooltip-size="compact">${lpValue >= 0 ? "+" : "−"}${Math.abs(lpValue)} LP</b>`
-      : "";
+    const lpChip = renderLPChip(match);
     // 斗魂竞技场展示小队名次代替胜负字样。
     const arenaPlacement = modeKind === "arena" && Number(subject.placement) > 0 ? Number(subject.placement) : 0;
     const resultWord = matchResultWord(resultKind, arenaPlacement);
@@ -4470,11 +4512,6 @@
       let entries = [...pendingMatches.entries()];
       if (!entries.length) return;
       // R127 P1-c.4：同一屏的可见对局合并成一次请求。可见性观测器会分几次回调
-      // （实测 4 场、2 场、1 场），后两次只是在等第一次；所以先等一个很短的合并
-      // 窗口，再把这段时间内新可见、且没有在途请求的待查场次一起带上。收集与占位
-      // 是同步完成的，因此并发调用只会有一批真正发出去，其余收集到空集直接退出。
-      // 窗口为 0 时完全走旧路径（测试替身里的 window.setTimeout 可能被打桩成
-      // 永不触发，不能无条件等它）。
       if (MATCH_TIER_KR_COALESCE_MS > 0) {
         await new Promise((resolve) => window.setTimeout(resolve, MATCH_TIER_KR_COALESCE_MS));
         if (state.destroyed || !container.isConnected || container.dataset.matchTierScope !== scope) return;
@@ -5520,8 +5557,19 @@
     if (restoreScroll) restoreMatchScrollTop(tab);
   }
 
+  function reportMatchFilterView(tab,visible) {
+    const allRows=filteredMatches(tab.matchViews?.get('all')?.matches || [],tab),ids=new Set((tab.data?.matches || []).map(m=>String(m.gameId)));
+    window.reportFlowDiagnostic?.('match_filter_view','render',{filter:tab.matchFilter || 'all',source:tab.data.pagination?.serverFiltered?'server':tab.data.pagination?.filterFallback?'client-fallback':'view-cache',count:visible.length,latest_game_id:visible[0]?.gameId || 0,latest_ended_at:visible[0]?.endedAt || 0,all_list_count:allRows.length,missing_count:allRows.filter(m=>!ids.has(String(m.gameId))).length});
+  }
+  function retainFallbackFilterMatches(tab) {
+    if(!tab.data?.pagination?.filterFallback || (tab.matchFilter || 'all')==='all')return;
+    const all=tab.matchViews?.get('all')?.matches || [],known=filteredMatches(all,tab);
+    const merged=mergeCurrentHistoryHead(known,tab.data.matches || []);
+    tab.data.matches=merged.sort((a,b)=>Number(b.createdAt)-Number(a.createdAt) || Number(b.gameId)-Number(a.gameId));
+  }
   function reconcileFilteredMatchList(list, tab) {
     if(!list)return;
+    retainFallbackFilterMatches(tab);
     const raw=tab.data?.matches || [],advanced=globalThis.deepLegendsHistoryFilters?.active(tab);
     const previous=list._matchData || new Map(raw.map(match=>[String(match.gameId),match]));
     const current=new Map(raw.map(match=>[String(match.gameId),match]));
@@ -5541,16 +5589,18 @@
     } else for(const node of removed)node.remove();
     while(cache.size>60)cache.delete(cache.keys().next().value);
     const playerRef=tab.data?.player?.playerRef || tab.playerRef || '';
-    let revisionSkipped=0;
+    let revisionSkipped=0,imagesRecreated=0;
+    const beforeLP=new Set([...previous].filter(([,m])=>m.lpDelta!=null).map(([id])=>id));
     for(const match of visible) {
       const id=String(match.gameId),cached=cache.get(id);
       let entry=entries.get(id),old=previous.get(id);
       if(!entry && cached?.match===match){entry=cached.entry;old=cached.match;cache.delete(id);entries.set(id,entry);}
-      const changed=old!==match && (!old?.revision || old.revision!==match.revision || old.lpDelta!==match.lpDelta);
+      const changed=old!==match && (!old || matchContentVersion(old)!==matchContentVersion(match));
+      if(entry && !changed)patchLPChip(entry,match);
       const wasOpen=entry?.querySelector('[data-toggle-match][aria-expanded="true"]');
       if(entry && !changed && (!wasOpen || tab.openMatches.has(id))){if(old?.revision===match.revision)revisionSkipped++;continue;}
       const template=document.createElement('template');template.innerHTML=renderMatch(match,playerRef,tab);
-      const replacement=template.content.firstElementChild;bindOverviewContent(replacement,tab);applyRenderedMetricStyles(replacement);prepareImages(replacement);
+      const replacement=template.content.firstElementChild;imagesRecreated+=replacement.querySelectorAll("img").length;bindOverviewContent(replacement,tab);applyRenderedMetricStyles(replacement);prepareImages(replacement);
       if(entry?.parentNode===list)entry.replaceWith(replacement);entries.set(id,replacement);
     }
     let position=0;
@@ -5563,9 +5613,10 @@
       list._emptyHTML=html;
     }
     if(globalThis.deepLegendsHistoryFilters)globalThis.deepLegendsHistoryFilters.decorate(list,tab,advancedFilterContext(tab));
+    reportMatchFilterView(tab,visible);
     list._matchData=current;
     boundMatchDOM(list,tab);
-    window.reportFlowDiagnostic?.('lp_chip_render','render',{ranked_matches:visible.filter(m=>[420,440].includes(Number(m.queueId))).length,with_delta:visible.filter(m=>m.lpDelta!=null).length,chips:list.querySelectorAll('.lp-delta').length,revision_skipped:revisionSkipped});
+    window.reportFlowDiagnostic?.('lp_chip_render','render',{ranked_matches:visible.filter(m=>[420,440].includes(Number(m.queueId))).length,with_delta:visible.filter(m=>m.lpDelta!=null).length,chips:list.querySelectorAll('.lp-delta').length,revision_skipped:revisionSkipped,source:tab.lpRenderSource || "complete",lost:[...beforeLP].filter(id=>current.has(id) && current.get(id).lpDelta==null).length,images_recreated:imagesRecreated});
   }
 
   function rerenderMatch(tab, id) {
@@ -5998,8 +6049,6 @@
     if (!Array.isArray(next.players) || !next.players.length) return stale();
     const nextGameId = normalizeLiveGameId(next.gameId);
     // Initial-load snapshots may continue filling players within their request.
-    // A complete roster from another response waits for the final response;
-    // progress lacks ranks, privacy, premades and pro identities.
     const initialProgress = state.liveProgressSnapshot?.requestId === detail.requestId && state.liveProgressSnapshot?.live === state.live;
     if (!initialProgress && !state.liveAwaitingGame && state.live?.available && state.live.players?.length
         && nextGameId && normalizeLiveGameId(state.live.gameId) === nextGameId && state.live.queueId === next.queueId) {
@@ -6227,7 +6276,7 @@
     resetLiveGameScopedState(true, { reason: "hard_refresh", previous: state.live, next: state.live, source: "manual" });
   }
 
-  function handleHardRefresh() {
+  async function handleHardRefresh() {
     softResetGameplayState();
     const group = overviewGroupForSection();
     const tab = activeTab(group);
@@ -6237,7 +6286,9 @@
     if (connected()) tasks.push(loadLive(true));
     else renderLive("manual");
     scheduleBeaconPoll(0);
-    return Promise.allSettled(tasks);
+    await Promise.allSettled(tasks);
+    // A same-round replacement may own the controller after its predecessor ends.
+    while(!state.destroyed && [...state.controllers.keys()].some(key=>key==='live' || key.startsWith('overview:')))await new Promise(resolve=>setTimeout(resolve,20));
   }
 
   function setOverviewRefreshLoading(group, loading) {
@@ -6261,23 +6312,6 @@
   }
 
   // R116-D P1-2/P1-3/P1-5：把客户端已经给出的阵容英雄 ID 交给后端做交集。
-  //
-  // Anti-scope 第 1 条：这里**只传 ID**，绝不为这 10 个英雄各拉一次
-  // /api/hexdata/heroes/{id}。后端只读「本人英雄」那一次 hero-json 的缓存
-  // （评审 4.2/4.4：10 次请求 = 12 MB、最坏排队 11 秒 = ChampSelect 3 秒轮询
-  // 周期的 3.67 倍，而 recordLoadFailure 对取消直接 return，熔断计数永远是 0，
-  // 链路会每 80 秒稳定烧 12 MB 且永不报警）。
-  //
-  // Anti-scope 第 4 条：ChampSelect 阶段一律不下发敌方 ID。依据是
-  // 尚未用 Windows 真机的海斗对局证实 lcu_champ_select_session_shape
-  // .their_team_length，
-  // 探测未证实 theirTeam 非空 → 按未证实处理。后端 gameplayRosterMatchupPhases
-  // 有一道同样的阶段白名单，两处都要放开才算真的放开。
-  //
-  // 只在海斗（augmentSource === "hextech"）下计算：克制/协同来自 hexdata 的
-  // hero-json、队伍画像来自 hexdata 的 postmatch，别的模式后端根本没有这两份数据。
-  // 一侧超过 5 人（斗魂/极地等）时整侧留空——后端对超长的 ID 串一律丢弃，
-  // 前端提前不传，避免无意义的缓存签名抖动。
   const R116D_MATCHUP_PHASES = ["inprogress", "reconnect"];
   const R116D_ROSTER_SIDE_LIMIT = 5;
 
@@ -6452,11 +6486,6 @@
     if (!target) { recordLiveRecommendationSkip("no-target", null, data); return; }
     const targetKey = target.key;
     // R116-D：阵容（我方 5 人 + 视阶段而定的敌方 5 人）。拿不到阵容就不传 roster
-    // 参数，后端一个提示都不生成——降级方向由 liveRecommendationRoster 自己负责。
-    // R116-B 评审整改（D 账本 §11.7-2）去掉了原先的 typeof 护栏：那道护栏只是为了
-    // 让 champions.test.cjs 的 compileFunctions（注入列表固定、缺这个依赖）不抛
-    // ReferenceError，生产上从来不会走到「函数不存在」这一支；现在两个测试文件都
-    // 显式注入 liveRecommendationRoster，护栏留着只会掩盖真正的漏注入。
     const roster = liveRecommendationRoster(data);
     const rosterSignature = String(roster?.signature || "");
     if (data?.recommendations) { recordLiveRecommendationSkip("has-payload", target, data); return; }
@@ -6485,9 +6514,6 @@
     }
 	if (target.augmentSource === "hextech") query.set("source", "mayhem");
 	// R116-D P1-2/P1-3/P1-5：只把阵容的英雄 ID 交给后端做交集。
-	// Anti-scope 第 1 条——绝不为这 10 个英雄各拉一次 hero-json，后端只读本人
-	// 英雄那一次的缓存。Anti-scope 第 4 条——ChampSelect 阶段不下发敌方 ID
-	// （探测未证实 theirTeam 非空，后端还有一道同样的阶段白名单）。
 	if (roster?.phase) query.set("phase", roster.phase);
 	if (roster?.allyIds?.length) query.set("allyChampionIds", roster.allyIds.join(","));
 	if (roster?.enemyIds?.length) query.set("enemyChampionIds", roster.enemyIds.join(","));
@@ -6518,8 +6544,6 @@
       ensureItems();
       ensureSummonerSpells();
 	  // The first specialist check races this async recommendation request. Once
-	  // hasTopPlayers arrives, retry immediately instead of waiting for another
-	  // LCU live snapshot that may never change during champion select.
 	  ensureSpecialistRunes(state.live);
       if (liveRecommendationTarget(state.live)?.key === targetKey) {
         renderLive("recommendation");
@@ -6881,9 +6905,7 @@
   }
 
   // R129 P1：参与 markup 比较与增量替换的 HTML 只能由快照数据和用户选择决定，
-  // 不能包含 state.liveLoading、计时器、在途请求数这类瞬时状态；加载反馈只放在
-  // 工具栏的 data-live-status 状态条里。否则英雄选择阶段每 3 秒的自动刷新会各重绘两次
-  // 整块内容：海克斯图标退回名称首字占位、内容高度变化把滚动位置顶走。
+  // 不能包含 state.liveLoading；瞬时加载状态只更新工具栏的 data-live-status。
   function renderLive(source = "direct") {
     if (state.destroyed || (state.section && state.section !== "live")) return;
     state.liveRenderSource = state.liveRenderTrigger || liveRenderTriggerLabel(source);
@@ -7748,7 +7770,7 @@
 	if (!games.length) {
 	  const historyState = liveHistoryStateOf(player);
 	  if (historyState === "unavailable") return `<div class="insight-match-row"><small class="insight-none">${player.identityUnresolved === true ? "身份尚未公开" : "客户端未公开该玩家"}</small></div>`;
-	  if (historyState === "failed") return '<div class="insight-match-row"><small class="insight-none">读取失败</small><button class="text-button insight-retry" type="button" data-live-history-retry>重试</button></div>';
+	  if (historyState === "failed") return '<div class="insight-match-row"><small class="insight-none">读取失败</small></div>';
 	  return '<div class="insight-match-row"><small class="insight-none">该玩家当前模式暂无最近战绩</small></div>';
 	}
     const cells = globalThis.deepLegendsLiveArena?.chips(games, player) ??
@@ -7803,20 +7825,6 @@
   }
 
   // ---------------------------------------------------------------------
-  // R116-D P1-2/P1-3（克制与协同的行内小条）与 P1-5（队伍画像缺口标签）的渲染
-  // helper。
-  //
-  // 这七个函数原先定义在 renderLiveInsights 的函数体内。R116-B 评审整改把 D 账本
-  // §11.7-1 记的这笔技术债清掉了：当初定义在体内只是为了避开与 R116-F 并行修改
-  // champions.test.cjs 的冲突（compileFunctions 的注入列表是固定的，函数体里多一个
-  // 自由变量就会抛 ReferenceError），F 收尾后这个理由不再成立。提到模块作用域之后
-  // 每次渲染不再重新构造七个闭包，helper 也能被单独编译测试；三处 compileFunctions
-  // 的传递注入列表已同步补上这些名字（champions.test.cjs / gameplay.test.cjs /
-  // r116d.test.cjs），编译到的仍然是这里的真实实现，不是桩。
-  //
-  // 降级红线：没有命中就不渲染任何 DOM 节点（不显示「暂无数据」占位卡片），拿不到
-  // 英雄名的条目直接丢弃——渲染一个空名字或裸 ID 都是显示不存在的数据。
-  // ---------------------------------------------------------------------
   function liveRosterChampionName(players, championID) {
     const wanted = Number(championID) || 0;
     if (wanted <= 0) return "";
@@ -7849,9 +7857,6 @@
   }
 
   // modifier 传的是完整类名字面量（"is-weak" / "is-strong" / "is-synergy" /
-  // "is-unverified"），不是拼出来的 "is-" + tone：R117 的样式棘轮测试
-  // （r117-style.test.cjs）会统计「CSS 里定义但源码从未出现的类名」，
-  // 拼接写法会让这四个类名全部落进未引用预算里。
   function liveNoticeBar(modifier, text, tooltip) {
     return `<span class="roster-notice ${modifier}"${tooltip ? ` data-tooltip="${escapeHTML(tooltip)}" tabindex="0"` : ""}>${text}</span>`;
   }
@@ -7899,10 +7904,6 @@
     // R128 §2.3：队伍画像的口径说明不进 tooltip，只留可核对的入队人数。
     const tooltip = resolved > 0 ? `本队 ${resolved} 位英雄进入统计` : "";
     // 缺口类型放在 data-portrait-gap 属性上而不是 is-<key> 类名上：
-    // r117-style.test.cjs 会统计「CSS 里定义但源码从未出现的类名」，而
-    // frontline/crowdControl/sustainedDamage 这三个 key 来自后端，源码里
-    // 不会出现字面量，拼成类名就会白占未引用预算。三个标签视觉上同质
-    // （都是「缺什么」的告警），本来也不需要按 key 分色。
     return `<span class="team-portrait-tags"${tooltip ? ` data-tooltip="${escapeHTML(tooltip)}" tabindex="0"` : ""}>${labels.map((label) => `<b class="team-portrait-tag" data-portrait-gap="${escapeHTML(String(label.key || ""))}">${escapeHTML(String(label.label))}</b>`).join("")}</span>`;
   }
 
@@ -8348,11 +8349,7 @@
     const itemSet = buildItemSetPayload(build, self, data);
 	    const canApply = itemSet.blocks.length > 0 && data?.phase === "ChampSelect";
 	// R116-B P0-3-2：这个 `capabilities.hasAugments ? "" : <footer>` 是有意设计，
-	// 不是遗漏。海斗/斗魂的海克斯局不支持写入客户端装备方案——LCU 的装备写入
-	// 接口只认经典出装（item sets），把海克斯局的推荐塞进去要么被拒、要么写出一份
-	// 与当前模式不符的方案。git 历史从 ff3cf27c 到 7eb6393c 这个条件从未变动过。
-	// 本轮只补这条注释关闭方案里的遗留待确认项，条件本身一字未改（Anti-scope 第 3
-	// 条），并有回归测试钉住「海斗局 hasAugments=true 时按钮仍为空、经典局仍显示」。
+	// 海斗/斗魂的海克斯局不支持写入客户端装备方案。
 	    const action = capabilities.hasAugments ? "" : `<footer class="recommendation-action item-set-action"><div><strong>游戏装备方案</strong><span>${itemSet.blocks.length ? `${itemSet.blocks.length} 个推荐分组` : "当前没有可应用的装备推荐"}</span></div><button class="button button-primary apply-item-set" type="button" data-apply-item-set ${canApply ? "" : "disabled"}>${data?.phase === "ChampSelect" ? "应用装备方案" : "仅英雄选择阶段可应用"}</button></footer>`;
     const chainStatus = String(build.itemChainStatus || "");
     const hasChainStatus = chainStatus === "ready" || chainStatus === "unavailable";
@@ -8677,7 +8674,6 @@
   // 面板时只重绑这一个面板，不会给没被替换的节点重复挂监听。
   function bindLivePanelScope(scope) {
     if (!scope) return;
-    bindLiveNode(scope?.querySelector("[data-live-history-retry]"), "click", "data-live-history-retry", () => loadLive(true));
     // 对局页里点击玩家名称：在当前页面上以覆盖层打开该玩家的总览，
     // 不再跳转到总览页；对局数据来自本机客户端，使用当前客户端的实际平台。
     for (const button of scope.querySelectorAll("[data-player-ref]")) button.onclick = () => {
@@ -9405,7 +9401,7 @@
 	window.addEventListener("deep-legends:overview-player", (event) => applyOverviewPlayerIdentity(event.detail?.summoner || state.status?.summoner));
   window.addEventListener("deep-legends:section", (event) => activateSection(event.detail?.name || "overview"));
     window.addEventListener("deep-legends:history-service-recovered",event=>handleHistoryServiceRecovered(event.detail));
-	window.addEventListener("deep-legends:lp-recorded", () => {for(const tab of [...(state.tabs || []),...(state.overlay || [])])if(tab.current || tab.data?.player?.isCurrent){if(tab.loading)tab.lpRefreshPending=true;else void loadOverview(tab,true);}});
+  window.addEventListener("deep-legends:lp-recorded",event=>handleLPRecorded(event.detail));
  window.addEventListener("deep-legends:overview-matches", event => handleOverviewMatches(event.detail));
 	window.addEventListener("deep-legends:riot-relay-recovered", () => { void handleRelayRecovered(); });
 	window.addEventListener("deep-legends:season-progress", (event) => { void handleSeasonProgress(event.detail || {}); });

@@ -480,7 +480,8 @@ type gameplayMatch struct {
 	SubjectParticipantID int64  `json:"subjectParticipantId,omitempty"`
 	// LpDelta 是当前登录玩家这场排位的胜点变化（由本地 LP 追踪器在
 	// 对局结束时记录）；历史对局或未记录到的场次没有该字段。
-	LpDelta *int `json:"lpDelta,omitempty"`
+	LpDelta   *int `json:"lpDelta,omitempty"`
+	LpPending bool `json:"lpPending,omitempty"`
 	// AverageTier 供演示数据和向后兼容使用；生产数据由前端在首屏之后
 	// 调用 match-tiers 异步回填，避免慢速外部请求阻塞总览。
 	AverageTier    *matchTiersResponse   `json:"averageTier,omitempty"`
@@ -1651,7 +1652,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	capabilities = append(capabilities, historyCapabilities...)
 	a.recordMatchModeClassifications(matches)
 	// 标注本地追踪到的排位胜点变化（仅当前登录玩家的场次有记录）。
-	a.annotateLP(matches, playerRef, "sgp", isCurrent)
+
 	playerData := gameplayPlayer{
 		PlayerRef: playerRef, DisplayName: gameplayDisplayName(player), GameName: player.GameName,
 		TagLine: player.TagLine, ProfileIconID: player.ProfileIconID, SummonerLevel: player.SummonerLevel,
@@ -2638,7 +2639,30 @@ func (a *app) loadSGPMatchHistoryPage(ctx context.Context, client *LCUClient, se
 	return infos, consumed, more, resolution, err
 }
 
-func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, begIndex, count int, matchFilter string, names map[int64]string, queueLabels map[int64]string) ([]gameplayMatch, []EndpointCapability, gameplayPagination) {
+func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, begIndex, count int, matchFilter string, names map[int64]string, queueLabels map[int64]string) (result []gameplayMatch, caps []EndpointCapability, page gameplayPagination) {
+	defer func() {
+		filter := normalizeGameplayMatchFilter(matchFilter)
+		if filter == "all" || page.ServerFiltered {
+			return
+		}
+		if reference.ServerID == "" && a.sgp != nil {
+			reference.ServerID, _, _ = a.sgp.available(client)
+		}
+		known, localMore := a.retainedFilterHistory(client, reference, playerRef, filter, begIndex, count, names, queueLabels)
+		if localMore {
+			page.HasMore = true
+			page.Count = max(page.Count, count)
+		}
+		result = mergeFallbackHistory(filter, known, result)
+		page.Filter = filter
+		page.FilterFallback = true
+		latest, ended := int64(0), int64(0)
+		if len(result) > 0 {
+			latest, ended = result[0].GameID, result[0].EndedAt
+		}
+		a.recordDiagnostic(map[string]any{"event": "match_filter_view", "filter": filter, "source": "client-fallback", "count": len(result), "latest_game_id": latest, "latest_ended_at": ended, "all_list_count": len(mergeFallbackHistory(filter, known, nil)), "missing_count": missingHistoryMatches(filter, known, result)})
+	}()
+
 	ctx = context.WithValue(ctx, sgpDecodeCountContextKey{}, &overviewLoadCost{})
 	clientRegion, _ := clientRegionInfo(client)
 	if isRiotRegion(clientRegion) {
@@ -3289,6 +3313,7 @@ func (a *app) clearGameplayReferences() {
 }
 
 func (a *app) publicizeOverviewReferences(response *gameplayOverview) {
+	a.annotateOverviewLP(response, "public")
 	response.SeasonStart = seasonStartS26
 	playerReference := mergeGameplayReferences(response.Player.reference, gameplayReference{PlayerRef: response.Player.PlayerRef, DisplayName: response.Player.DisplayName, GameName: response.Player.GameName, TagLine: response.Player.TagLine, ProfileIconID: response.Player.ProfileIconID, SummonerLevel: response.Player.SummonerLevel, Region: response.Player.Region, ServerID: response.Player.ServerID})
 	index := a.proIdentitySnapshot()
@@ -4605,6 +4630,7 @@ func matchSubject(match gameplayMatch, playerRef string) (gameplayParticipant, b
 }
 
 type gameplayLiveResponse struct {
+	HistoryServiceDown       bool                      `json:"historyServiceDown"`
 	Phase                    string                    `json:"phase"`
 	Available                bool                      `json:"available"`
 	Unsupported              bool                      `json:"unsupported"`
@@ -8175,6 +8201,9 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 						early.ArenaRecord = liveArenaRecord(matches, playerRef, response.QueueID)
 					}
 					progress.Players[index] = early
+					if liveResultServiceDown(historyResult) {
+						progress.HistoryServiceDown = true
+					}
 					playersPublishedAt[index] = time.Now()
 					publishLiveProgress(ctx, progress)
 					progressMu.Unlock()
@@ -8422,6 +8451,9 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	var sgpMS, lcuMS, slowestPlayerMS, firstPlayerMS int64
 	lcuPlayers := 0
 	for i, result := range historyResults {
+		if liveResultServiceDown(result) {
+			response.HistoryServiceDown = true
+		}
 		if result.Evidence != nil {
 			sgpMS = max(sgpMS, result.Evidence.SGPMS)
 			lcuMS = max(lcuMS, result.Evidence.LCUMS)
@@ -8880,6 +8912,7 @@ func (a *app) loadLivePlayerMatchesForPrevious(ctx context.Context, client *LCUC
 	evidence := &liveHistoryEvidence{LCU: cloneGameplayMatches(lcu.Matches), SGP: cloneGameplayMatches(sgp.Matches), SGPRequested: sgp.State != "unavailable", SGPOK: sgpOK, SGPMS: sgpMS, LCUMS: lcuMS, LCURequested: lcuRequested}
 	if sgp.Evidence != nil {
 		evidence.QueueFiltered, evidence.PagesRead, evidence.StopReason = sgp.Evidence.QueueFiltered, sgp.Evidence.PagesRead, sgp.Evidence.StopReason
+		evidence.HistoryServiceDown = sgp.Evidence.HistoryServiceDown
 	}
 	if !sgpOK {
 		lcu.Evidence = evidence
@@ -11316,9 +11349,9 @@ func (a *app) enrichCurrentRiotMatches(client *LCUClient, ref gameplayReference,
 		if !same || len(enriched) == 0 {
 			return
 		}
-		for i := range enriched {
-			a.publicizeMatchReferences(&enriched[i])
-		}
+		out := gameplayOverview{Player: gameplayPlayer{IsCurrent: true}, Matches: enriched}
+		a.publicizeOverviewReferences(&out)
+		enriched = out.Matches
 		event, _ := json.Marshal(map[string]any{"type": "overview-matches", "account": public, "matches": enriched})
 		a.broadcastEvent(string(event))
 	})

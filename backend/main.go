@@ -573,6 +573,7 @@ func main() {
 	a.lpTracker = newLPTrackerWithDiagnostics(store, a.recordDiagnostic)
 	a.lpTracker.invalidateRanks = a.invalidateRankPlayer
 	a.lpTracker.onRecorded = a.onLPRecorded
+	a.lpTracker.onFinished = a.onLPFinished
 	a.rankScores = newRankScoreCache()
 	a.riot.opponentRankScore = func(ctx context.Context, puuid string) rankScoreEntry {
 		return a.playerRankScore(ctx, nil, puuid, false, "KR", "")
@@ -955,7 +956,7 @@ func (a *app) handleStatus(w http.ResponseWriter, _ *http.Request) {
 		SGPReady:           a.selfReadinessClient == client && a.selfReadinessAccount == identity.PUUID && a.selfSGPReady,
 		ClientDiscovery:    clientDiscovery,
 		ClientSessionEpoch: a.clientSessionEpoch, Version: version, BuildFingerprint: buildFingerprint, Connected: a.clientSessionConnectedLocked() && a.shutdownClient == nil, IdentityReady: identityReady, SnapshotReady: a.snapshotReady, ConnectionState: a.connectionState, EventStream: a.eventStream,
-		Syncing: a.syncing, LastSync: a.lastSync, LastAttempt: a.lastAttempt, LastDurationMS: a.lastDuration.Milliseconds(),
+		Syncing: a.syncing || a.collectionRefreshPending, LastSync: a.lastSync, LastAttempt: a.lastAttempt, LastDurationMS: a.lastDuration.Milliseconds(),
 		LastError: a.lastError, Summoner: summoner, OwnedCount: ownedCount, ChromaOwnedCount: ownedChromaCount(a.chromas), PoolTotal: a.poolTotal,
 		PoolMatched: a.poolMatched, Remaining: remainingCount, CalculationOK: a.calculationOKLocked(),
 		PoolIssues: issues, PoolSource: a.poolSource, PoolVersion: a.poolVersion, PoolID: a.poolID,

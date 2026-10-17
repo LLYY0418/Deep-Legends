@@ -81,12 +81,12 @@ test('R179 lane diagnostic direct sender preserves nonzero availability fields',
 });
 
 test('R179 repeated partial panel bindings dispatch each action exactly once',()=>{
- const dom=new JSDOM('<section><button data-rune-source="specialist"></button><button data-specialist-player="first"></button><button data-player-ref="p"></button><button data-live-position="mid"></button><button data-apply-runes></button><button data-apply-item-set></button><button data-live-history-retry></button><input data-apply-rune-spells type="checkbox"><div data-rune-choice="r"></div></section>'),root=dom.window.document.querySelector('section');
+ const dom=new JSDOM('<section><button data-rune-source="specialist"></button><button data-specialist-player="first"></button><button data-player-ref="p"></button><button data-live-position="mid"></button><button data-apply-runes></button><button data-apply-item-set></button><input data-apply-rune-spells type="checkbox"><div data-rune-choice="r"></div></section>'),root=dom.window.document.querySelector('section');
  const counts={};const count=k=>()=>counts[k]=(counts[k]||0)+1;const state={live:{},specialistPlayerTabs:new Map()};
  const f=compile(['bindLiveNode','bindRuneWorkspaceControls','bindLivePanelScope','bindRuneChoiceButtons'],{state,window:dom.window,CSS:{escape:String},clearRuneStarterRetries:()=>{},refreshLiveRuneWorkspace:count('workspace'),specialistRequestTarget:()=>({key:'61:mid'}),proRequestTarget:()=>null,ensureRuneStarterItems:()=>{},openPlayerOverlay:count('overlay'),playerButtonLabel:()=>'',proContextFromButton:()=>({}),selectLivePosition:count('position'),livePositionValue:String,applyRunes:count('runes'),applyItemSet:count('items'),loadLive:count('history'),renderLive:count('choice')});
  for(let i=0;i<30;i++) f.bindLivePanelScope(root);
  for(const button of root.querySelectorAll('button'))button.click();root.querySelector('[data-rune-choice]').click();
- assert.deepEqual(counts,{workspace:2,overlay:1,position:1,runes:1,items:1,history:1,choice:1});dom.window.close();
+ assert.deepEqual(counts,{workspace:2,overlay:1,position:1,runes:1,items:1,choice:1});dom.window.close();
 });
 
 test('R179 changing roster structure replaces rows and reports same-source recreated images honestly',()=>{

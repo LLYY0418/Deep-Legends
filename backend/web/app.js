@@ -738,6 +738,7 @@
 
   function setRefreshBusy(busy) {
     const label = busy ? "正在获取" : "重新读取";
+    if(state.manualRefreshMetrics && el.refresh.getAttribute("aria-label")!==label)state.manualRefreshMetrics.label_changes++;
     el.refresh.classList.toggle("is-loading", Boolean(busy));
     const text = el.refresh.querySelector('.refresh-icon + span');
     if (text) text.textContent = label;
@@ -1405,10 +1406,8 @@
       });
     }
     const tasks = [];
-    let prestigeTaskIndex = 0;
     for (let championIndex = 0; championIndex < championList.length; championIndex += 1) {
       const champion = championList[championIndex];
-      if (prestigeTaskIndex < prestigeTasks.length && championIndex % 2 === 0) tasks.push(prestigeTasks[prestigeTaskIndex++]);
       tasks.push(() => {
         const section = document.createElement("section");
         section.className = "chroma-section champion-group";
@@ -1425,8 +1424,20 @@
         for (const item of parent.items) tasks.push(() => {stack.querySelector('.chroma-stack-cards').append(makeChromaMiniCard(item,parent.items));return 1;});
       }
     }
-    while (prestigeTaskIndex < prestigeTasks.length) tasks.push(prestigeTasks[prestigeTaskIndex++]);
-    runRenderTasks(tasks, generation, "renderGeneration",40);
+    if(prestigeTasks.length)runPrestigeTasks(prestigeTasks,generation,()=>queueRenderFrame(()=>runRenderTasks(tasks,generation,"renderGeneration",24)));
+    else runRenderTasks(tasks,generation,"renderGeneration",40);
+  }
+
+  function runPrestigeTasks(tasks, generation, complete) {
+    let index=0;
+    const run=()=>{
+      if(generation!==state.renderGeneration)return;
+      const limit=index===0 && tasks.length<=48?48:24;
+      for(let count=0;index<tasks.length && count<limit;count++)tasks[index++]();
+      if(index<tasks.length){const frame=requestAnimationFrame(()=>{state.renderFrames.delete(frame);run();});state.renderFrames.add(frame);}
+      else complete();
+    };
+    run();
   }
 
   function cancelRenderFrames() {
@@ -2643,6 +2654,7 @@
   function restoreSectionScroll(name) {
     if (name === "overview") return; // player workspace owns its scroll
     const sectionScrollRestoreBudget = 2000;
+    if(name==="favorites"){el.appScroll.scrollTo({top:0,behavior:"instant"});return;}
     const target = Number(state.sectionScroll[name] || 0);
     el.appScroll.scrollTo({ top: target, behavior: "instant" });
     if (target <= 0) return;
@@ -2670,6 +2682,14 @@
     requestAnimationFrame(apply);
   }
 
+  function resetCollectionReturn() {
+    state.sectionScroll.favorites=0;
+    stopHoverVideo();closeRarityMenu();closeSortMenu();
+    for(const trigger of document.querySelectorAll('.native-select-menu [aria-expanded="true"]'))closeNativeSelectMenu(trigger.closest('.native-select-menu'));
+    for(const panel of document.querySelectorAll('.global-tooltip,.match-tags-popover'))panel.hidden=true;
+    for(const root of document.querySelectorAll('#favorites-panel .chroma-stack-cards,.chroma-stack-cards'))root.scrollLeft=0;
+  }
+
   function activateSection(name) {
     const tab = el.sectionTabs.find((item) => item.dataset.section === name);
     const standalonePanels = {
@@ -2679,6 +2699,7 @@
     if (!tab && !standalone) return;
     window.dispatchEvent(new CustomEvent("deep-legends:before-section"));
     const previousSection = state.section;
+    if(name==="favorites" && previousSection!==name)resetCollectionReturn();
     if (previousSection === "settings" && name !== "settings") resetDiagnosticsExport();
     if (previousSection !== name) state.sectionScroll[previousSection] = el.appScroll.scrollTop;
     if (name !== "favorites" && state.section === "favorites") {
@@ -2720,11 +2741,9 @@
     // itself. Switch panels synchronously; never photograph the outgoing page.
     applyPanels();
     void window.deepLegendsSections?.activate(name);
-    // 离开后重新进入的页面一律还原到默认页签与筛选项。
     if (name === "favorites") {
       const fresh = previousSection !== "favorites";
-      if (fresh) resetPoolControls();
-      activateFavoritesPage(fresh ? "collection" : state.favoritesPage, fresh);
+      activateFavoritesPage(state.favoritesPage, fresh);
     }
     if (name === "settings") {
       if (previousSection !== "settings") activateSettingsPage("appearance");
@@ -2826,9 +2845,11 @@
     if (state.section === "favorites") el.topbarSubtitle.textContent = subtitles[name] || "收藏工具";
     el.pageIntro.hidden = state.section !== "favorites";
     if (name === "collection" && (returning || previous !== "collection")) {
-      const ownedTab = el.viewTabs.find((item) => item.dataset.view === "owned");
-      resetCollectionControls("owned");
-      if (ownedTab) activateTab(ownedTab, el.viewTabs, () => {});
+      if (previous !== "collection") {
+        const ownedTab = el.viewTabs.find((item) => item.dataset.view === "owned");
+        resetCollectionControls("owned");
+        if (ownedTab) activateTab(ownedTab, el.viewTabs, () => {});
+      }
       triggerCollectionRescanIfDirty();
       loadSkins(false);
     }
@@ -3494,9 +3515,7 @@
     for (const controller of state.controllers.values()) controller.abort();
     state.controllers.clear();
     updateReadingOverlay();
-    clearTimeout(state.eventReconnectTimer);
-    state.eventReconnectDelay = 1000;
-    setupLiveUpdates();
+    // Manual reads preserve the live channel; genuine reconnects still resync.
     clearTimeout(state.statusTimer);
     clearTimeout(state.liveUpdateTimer);
     state.liveUpdateSlices.clear();
@@ -3505,8 +3524,9 @@
     void refreshStatus(false);
   }
 
-  el.refresh.addEventListener("click", async () => {
+  async function runManualRefresh() {
     if (state.manualRefreshing) return;
+    state.manualRefreshMetrics={started:Date.now(),overview_requests:0,canceled_requests:0,label_changes:0};
     state.manualRefreshing = true;
     el.refresh.disabled = true;
     setRefreshBusy(true);
@@ -3516,12 +3536,20 @@
 	  let refreshError = null;
 	  try {
 		await api("/api/refresh?source=user_refresh", { method: "POST" }, "refresh-background");
+        if(state.status)state.status.syncing=true;
 	  } catch (error) {
 		if (error.name !== "RequestCancelled") refreshError = error;
 	  }
       const waitFor = [];
       window.dispatchEvent(new CustomEvent("deep-legends:hard-refresh", { detail: { waitFor, reason: "manual" } }));
       await Promise.allSettled(waitFor);
+      if(!refreshError) {
+        await refreshStatus(false);
+        while(state.status?.connected && state.status.syncing && !state.destroyed && !state.backendExited) {
+          await new Promise(resolve=>setTimeout(resolve,200));
+          await refreshStatus(false);
+        }
+      }
 	  if (refreshError) showToast(`收藏后台补刷未启动：${refreshError.message}`);
 	  else showToast("对局与总览已重新读取");
     } finally {
@@ -3531,7 +3559,16 @@
         el.refresh.disabled = false;
         setRefreshBusy(false);
       }
+      const metrics=state.manualRefreshMetrics;
+      if(metrics)window.reportFlowDiagnostic?.('manual_refresh_client','complete',{overview_requests:metrics.overview_requests,canceled_requests:metrics.canceled_requests,busy_ms:Date.now()-metrics.started,label_changes:metrics.label_changes});
+      state.manualRefreshMetrics=null;
     }
+  }
+  el.refresh.addEventListener("click",runManualRefresh);
+  window.addEventListener('deep-legends:manual-refresh-metric',event=>{
+    const metric=state.manualRefreshMetrics;if(!metric)return;
+    metric.overview_requests+=Number(event.detail?.overview_requests || 0);
+    metric.canceled_requests+=Number(event.detail?.canceled_requests || 0);
   });
   el.startupLoadingRetry?.addEventListener("click", retrySummonerIdentity);
   el.quit.addEventListener("click", async () => { if (!confirm("退出 Deep Legends？")) return; state.destroyed = true; window.dispatchEvent(new CustomEvent("deep-legends:dispose")); clearTimeout(state.statusTimer); clearTimeout(state.liveUpdateTimer); clearTimeout(state.eventReconnectTimer); state.eventSource?.close(); for (const controller of state.controllers.values()) controller.abort(); state.controllers.clear(); try { await fetch("/api/quit", { method: "POST" }); } catch (_) {} document.body.innerHTML = '<main class="shell"><section class="empty-state"><strong>Deep Legends 已退出</strong><p>现在可以关闭这个页面。</p></section></main>'; });
@@ -4610,8 +4647,9 @@
       const rect = anchor.getBoundingClientRect();
       const viewportPadding = 12;
       const gap = 8;
-      const width = tooltip.offsetWidth;
-      const height = tooltip.offsetHeight;
+      const scale=Number(tooltip.ownerDocument.defaultView.getComputedStyle(tooltip).zoom) || 1;
+      const width = tooltip.offsetWidth*scale;
+      const height = tooltip.offsetHeight*scale;
       if (anchor.dataset.tooltipSide === "menu") {
         const boundary = anchor.closest(".region-menu")?.getBoundingClientRect() || rect;
         const fitsRight = window.innerWidth - boundary.right >= width + gap + viewportPadding;
@@ -4620,8 +4658,8 @@
           const left = fitsRight ? boundary.right + gap : boundary.left - width - gap;
           const top = Math.min(window.innerHeight - height - viewportPadding, Math.max(viewportPadding, rect.top + rect.height / 2 - height / 2));
           tooltip.dataset.placement = fitsRight ? "right" : "left";
-          tooltip.style.left = `${Math.round(left)}px`;
-          tooltip.style.top = `${Math.round(top)}px`;
+          tooltip.style.left = `${Math.round(left/scale)}px`;
+          tooltip.style.top = `${Math.round(top/scale)}px`;
           tooltip.dataset.shown = "true";
           return;
         }
@@ -4630,8 +4668,8 @@
       const fitsAbove = rect.top >= height + gap + viewportPadding;
       const top = fitsAbove ? rect.top - height - gap : Math.min(window.innerHeight - height - viewportPadding, rect.bottom + gap);
       tooltip.dataset.placement = fitsAbove ? "top" : "bottom";
-      tooltip.style.left = `${Math.round(left)}px`;
-      tooltip.style.top = `${Math.round(Math.max(viewportPadding, top))}px`;
+      tooltip.style.left = `${Math.round(left/scale)}px`;
+      tooltip.style.top = `${Math.round(Math.max(viewportPadding, top)/scale)}px`;
       tooltip.dataset.shown = "true";
     };
     const show = (next) => {

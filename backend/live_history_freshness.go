@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -44,14 +45,15 @@ func (a *app) observeLiveHistoryGame(client *LCUClient, phase string, gameID, qu
 // Read-only after a loader publishes its result. Kept with the 45-second cache
 // and flight so diagnostics compare the same windows used for the displayed row.
 type liveHistoryEvidence struct {
-	LCU, SGP      []gameplayMatch
-	SGPRequested  bool
-	SGPOK         bool
-	QueueFiltered bool
-	PagesRead     int
-	StopReason    string
-	SGPMS, LCUMS  int64
-	LCURequested  bool
+	HistoryServiceDown bool
+	LCU, SGP           []gameplayMatch
+	SGPRequested       bool
+	SGPOK              bool
+	QueueFiltered      bool
+	PagesRead          int
+	StopReason         string
+	SGPMS, LCUMS       int64
+	LCURequested       bool
 }
 
 func (a *app) clearLiveHistoryFreshness() {
@@ -241,6 +243,7 @@ func (a *app) loadLiveSGPMatches(ctx context.Context, client *LCUClient, referen
 			matches = append(matches, convertRiotMatchInfo(info, playerRef, names, nil, "", reference.ServerID))
 		}
 		if err != nil && len(matches) == 0 {
+			evidence.HistoryServiceDown = liveOfficialHistoryFailure(err)
 			return livePlayerMatchesResult{State: "failed", Evidence: evidence}, false
 		}
 		evidence.StopReason = liveHistoryPageStop(matches, playerRef, queueID, now, more, evidence.PagesRead)
@@ -409,4 +412,13 @@ func liveMissingNewerGames(lcu, sgp []gameplayMatch, queueID int64) any {
 		}
 	}
 	return len(newer)
+}
+
+// Only an official SGP 5xx or the history circuit can explain an outage.
+func liveOfficialHistoryFailure(err error) bool {
+	var upstream *sgpHTTPError
+	return errors.Is(err, errSGPHistoryCooling) || errors.As(err, &upstream) && upstream.StatusCode >= 500 && upstream.StatusCode < 600
+}
+func liveResultServiceDown(result livePlayerMatchesResult) bool {
+	return result.State == "failed" && result.Evidence != nil && result.Evidence.HistoryServiceDown
 }

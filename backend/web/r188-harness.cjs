@@ -24,7 +24,7 @@ function compile(source, names, dependencies = {}) {
   for (const name of ['scorePlacementChip','scoreRankChip','ordinalLabel','renderOverviewPendingPage','matchesPending','renderPendingMatches','reportDeferredMatchesCard','syncCollectionSession','requestOverviewWithReferenceRetry']) {
     if (!names.includes(name) && !dependencies[name] && source.includes(`function ${name}(`) && names.some(n => extract(source,n).includes(`${name}(`))) names.push(name);
   }
-  dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
+  dependencies = { state:{}, recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
   return Function(...Object.keys(dependencies), require('./r220-harness-support.cjs').prelude(source,{...dependencies,...Object.fromEntries(names.map(name=>[name,true]))}) + names.map(name => extract(source, name)).join('\n') + `\nreturn {${names.join(',')}};`)(...Object.values(dependencies));
 }
 const escapeHTML = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');

@@ -231,7 +231,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 [role="tabpanel"]:focus, [role="tabpanel"]:focus-visible { outline: 0; }
 [hidden] { display: none !important; }
 .game-icon.has-loaded-image > span, .champion-asset.has-loaded-image > span { display: none; }
-.global-tooltip { position: fixed; z-index: 55; width: max-content; max-width: min(calc(360px * var(--ui-zoom, 1)),calc(100vw - 24px)); padding: calc(7px * var(--ui-zoom, 1)) calc(11px * var(--ui-zoom, 1)) calc(8px * var(--ui-zoom, 1)); color: var(--tooltip-muted); background: var(--tooltip-surface); border: 1px solid var(--tooltip-line); border-radius: var(--radius-sm); box-shadow: 0 14px 34px var(--tooltip-shadow-cast),0 2px 8px var(--tooltip-shadow-contact); font-size: calc(11.5px * var(--ui-zoom, 1)); line-height: 1.5; overflow-wrap: anywhere; pointer-events: none; text-align: left; opacity: 0; transform: scale(.97) translateY(2px); transition: opacity 120ms ease-out,transform 120ms ease-out; }
+.global-tooltip { position: fixed; z-index: 55; zoom: var(--ui-zoom, 1); width: max-content; max-width: min(360px,calc((100vw - 24px) / var(--ui-zoom, 1))); padding: 7px 11px 8px; color: var(--tooltip-muted); background: var(--tooltip-surface); border: 1px solid var(--tooltip-line); border-radius: var(--radius-sm); box-shadow: 0 14px 34px var(--tooltip-shadow-cast),0 2px 8px var(--tooltip-shadow-contact); font-size: 11.5px; line-height: 1.5; overflow-wrap: anywhere; pointer-events: none; text-align: left; opacity: 0; transform: scale(.97) translateY(2px); transition: opacity 120ms ease-out,transform 120ms ease-out; }
 .global-tooltip[data-shown="true"] { opacity: 1; transform: none; }
 .global-tooltip[data-layout="titled"] { display: grid; gap: 3px; padding: 9px 12px 10px; }
 .global-tooltip[data-layout="roster"] { display: grid; min-width: 210px; gap: 6px; padding: 9px 10px 10px; }
@@ -249,11 +249,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .tooltip-roster-player { display: grid; grid-template-columns: 20px minmax(0,1fr); min-height: 22px; align-items: center; gap: 8px; font-size: 12px; }
 .tooltip-roster-name { min-width: 0; overflow: hidden; color: var(--tooltip-ink); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .tooltip-roster-icon { width: 20px; height: 20px; border-radius: 4px; background: var(--surface); object-fit: cover; }
-.global-tooltip[data-size="compact"] { max-width: min(280px,calc(100vw - 24px)); }
-.global-tooltip[data-size="ability"] { max-width: min(280px,calc(100vw - 24px)); }
+.global-tooltip[data-size="compact"] { max-width: min(280px,calc((100vw - 24px) / var(--ui-zoom, 1))); }
+.global-tooltip[data-size="ability"] { max-width: min(280px,calc((100vw - 24px) / var(--ui-zoom, 1))); }
 .global-tooltip[data-size="ability"][data-layout="titled"] { gap: 5px; }
 .global-tooltip[data-size="ability"] .tooltip-body { line-height: 1.75; }
-.global-tooltip[data-size="item"] { max-width: min(420px,calc(100vw - 24px)); }
+.global-tooltip[data-size="item"] { max-width: min(420px,calc((100vw - 24px) / var(--ui-zoom, 1))); }
 .global-tooltip[data-placement="top"] { transform-origin: bottom center; }
 .global-tooltip[data-placement="bottom"] { transform-origin: top center; }
 .global-tooltip[data-placement="left"] { transform-origin: right center; }
@@ -1150,7 +1150,7 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .facade-detail-dialog { width: fit-content; min-width: min(320px, calc((100dvw - 28px) / var(--ui-zoom, 1))); max-width: calc((100dvw - 28px) / var(--ui-zoom, 1)); max-height: calc((100dvh - 28px) / var(--ui-zoom, 1)); }
 
 .facade-detail-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
-.facade-detail-dialog .dialog-art { flex: 0 1 var(--facade-art-height, 128px); width: var(--facade-art-width, 128px); max-width: 100%; height: var(--facade-art-height, 128px); aspect-ratio: auto; margin: 12px auto 0; }
+.facade-detail-dialog .dialog-art { flex: 0 1 var(--facade-art-height, 128px); width: 100%; max-width: 100%; height: var(--facade-art-height, 128px); aspect-ratio: auto; margin: 0; }
 .facade-detail-dialog .dialog-copy { flex: 0 0 auto; }
 .facade-detail-dialog .dialog-art-primary { object-fit: contain; background: var(--surface-strong); }
 .facade-detail-dialog .dialog-copy > p { margin: 0; font-size: 12px; }
@@ -1307,3 +1307,5 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
  .topbar[data-topbar-compact="3"] .player-search-button {width:17px;height:17px;min-height:17px;}
  .topbar[data-topbar-compact="3"] .player-search {min-width:82px;}
 }
+
+.facade-detail-dialog .dialog-art-primary {width:var(--facade-art-width,128px);max-width:100%;margin-inline:auto;object-fit:contain;}

@@ -85,6 +85,8 @@ type lpTracker struct {
 	staleRejections     map[string]time.Time
 	invalidateRanks     func(string)
 	onRecorded          func(string)
+	onFinished          func(string, int64)
+	pendingGames        map[string]time.Time
 	lastHistorySave     lpHistorySaveDiagnostic
 	lastHistorySaveAt   time.Time
 }
@@ -94,7 +96,7 @@ func newLPTracker(store *localStore) *lpTracker {
 }
 
 func newLPTrackerWithDiagnostics(store *localStore, observe func(map[string]any)) *lpTracker {
-	tracker := &lpTracker{store: store, observeEvent: observe, pending: make(map[string]bool), now: time.Now, startSeen: make(map[string]bool), startFlights: make(map[string]chan struct{}), baselineDiagnostics: make(map[string]lpBaselineDiagnostic)}
+	tracker := &lpTracker{store: store, observeEvent: observe, pending: make(map[string]bool), pendingGames: make(map[string]time.Time), now: time.Now, startSeen: make(map[string]bool), startFlights: make(map[string]chan struct{}), baselineDiagnostics: make(map[string]lpBaselineDiagnostic)}
 	tracker.history = lpHistoryData{SchemaVersion: lpHistorySchemaVersion, Baselines: make(map[string]map[string]lpSnapshot), Games: make(map[string]lpGameRecord), BaselineInfo: make(map[string]map[string]lpBaselineInfo), GameStarts: make(map[string]map[string]lpGameStartBaseline)}
 	event := map[string]any{"event": "lp_history_load", "status": "store_unavailable"}
 	defer func() {
@@ -367,12 +369,16 @@ func (t *lpTracker) annotate(matches []gameplayMatch, playerRef string) {
 		if _, ranked := lpRankedQueues[matches[index].QueueID]; !ranked || matches[index].Result == "remake" {
 			continue
 		}
-		record, ok := t.history.Games[strconv.FormatInt(matches[index].GameID, 10)]
+		gameKey := strconv.FormatInt(matches[index].GameID, 10)
+		until := t.pendingGames[accountHash+"|"+gameKey]
+		matches[index].LpPending = !until.IsZero() && t.now().Before(until)
+		record, ok := t.history.Games[gameKey]
 		if !ok || record.AccountHash != accountHash {
 			continue
 		}
 		delta := record.Delta
 		matches[index].LpDelta = &delta
+		matches[index].LpPending = false
 		updateMatchRevision(&matches[index])
 	}
 }
@@ -556,7 +562,7 @@ func (t *lpTracker) takeGameStart(client *LCUClient, playerRef string, loadRanks
 }
 
 func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func() ([]gameplayRank, EndpointCapability)) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	if t != nil && t.invalidateRanks != nil {
 		defer t.invalidateRanks(playerRef)
@@ -610,6 +616,10 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 	t.captureIndex++
 	index := t.captureIndex
 	t.pending[pendingKey] = true
+	if t.pendingGames == nil {
+		t.pendingGames = make(map[string]time.Time)
+	}
+	t.pendingGames[hash+"|"+gameKey] = t.now().Add(90 * time.Second)
 	baseline, hasBaseline := t.history.Baselines[hash][queue]
 	info := t.history.BaselineInfo[hash][queue]
 	gameStart, hasStart := t.history.GameStarts[hash][queue]
@@ -663,13 +673,33 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 			delete(t.history.GameStarts[hash], queue)
 		}
 		delete(t.pending, pendingKey)
+		delete(t.pendingGames, hash+"|"+gameKey)
 		saveEvent := t.persistHistoryDiagnosticLocked("capture")
 		t.mu.Unlock()
 		t.recordObservation(event)
 		t.recordObservation(saveEvent)
+		if t.onFinished != nil {
+			t.onFinished(playerRef, gameID)
+		}
 	}()
 	if !t.waitContext(ctx, lpCaptureFirstWait) {
 		return
+	}
+	publish := func(snapshot lpSnapshot, source string, delta int) {
+		t.mu.Lock()
+		old, exists := t.history.Games[gameKey]
+		if exists && old.Delta == delta {
+			t.mu.Unlock()
+			return
+		}
+		t.history.Games[gameKey] = lpGameRecord{hash, queue, delta, t.now().UnixMilli()}
+		saved := t.persistHistoryDiagnosticLocked("capture")
+		t.mu.Unlock()
+		t.recordObservation(saved)
+		t.recordObservation(diagnostic("lp_capture_recorded", "", snapshot, source))
+		if t.onRecorded != nil {
+			t.onRecorded(playerRef)
+		}
 	}
 	firstChanged := false
 	settleSamples := 0
@@ -720,6 +750,15 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 		seenSameSource = true
 		after, afterOK := lpScore(snapshot)
 		before, beforeOK := lpScore(baseline)
+		// Publish a uniquely attributable result immediately; settlement continues below.
+		if hasBaseline && snapshot.games() == baseline.games()+1 && afterOK && beforeOK && after != before {
+			t.mu.Lock()
+			_, exists := t.history.Games[gameKey]
+			t.mu.Unlock()
+			if !exists {
+				publish(snapshot, source, after-before)
+			}
+		}
 
 		if !hasStart {
 			if hasBaseline && !debugStarted && (snapshot.Wins != baseline.Wins || snapshot.Losses != baseline.Losses || afterOK && beforeOK && after != before) {
@@ -740,6 +779,7 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 			case !afterOK || !beforeOK:
 				reason = "score_unresolved"
 			}
+			settled, settledSource, comparable := snapshot, source, false
 			for settle := 1; settle <= 2; settle++ {
 				if !t.waitContext(ctx, lpCaptureInterval) {
 					return
@@ -754,6 +794,8 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 					event["capability_state"] = nextCapability.State
 					if next.trustworthy() {
 						last, lastOK, lastSource = next, true, nextSource
+						comparable = nextSource == source && next.games() == baseline.games()+1 && next == settled
+						settled, settledSource = next, nextSource
 					}
 				}
 				t.recordObservation(event)
@@ -762,12 +804,11 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 				t.recordObservation(diagnostic("lp_capture_skipped", reason, snapshot, source))
 				return
 			}
-			t.mu.Lock()
-			t.history.Games[gameKey] = lpGameRecord{hash, queue, after - before, t.now().UnixMilli()}
-			t.mu.Unlock()
-			t.recordObservation(diagnostic("lp_capture_recorded", "", snapshot, source))
-			if t.onRecorded != nil {
-				t.onRecorded(playerRef)
+			publish(snapshot, source, after-before)
+			if comparable {
+				if score, ok := lpScore(settled); ok {
+					publish(settled, settledSource, score-before)
+				}
 			}
 			return
 		}
@@ -813,13 +854,7 @@ func (t *lpTracker) capture(client *LCUClient, playerRef string, loadRanks func(
 			t.recordObservation(diagnostic("lp_capture_skipped", reason, snapshot, source))
 			return
 		}
-		t.mu.Lock()
-		t.history.Games[gameKey] = lpGameRecord{hash, queue, delta, t.now().UnixMilli()}
-		t.mu.Unlock()
-		t.recordObservation(diagnostic("lp_capture_recorded", "", snapshot, source))
-		if t.onRecorded != nil {
-			t.onRecorded(playerRef)
-		}
+		publish(snapshot, source, delta)
 		return
 	}
 	if hasStart && seenMismatch && !seenSameSource {

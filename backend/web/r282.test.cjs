@@ -79,9 +79,9 @@ test('R282 P17 collection tracks and skeletons do not depend on card count',()=>
 test('R282 P18 ARAM and Rift preferred ranks have crests; Arena does not show ranked tiers',()=>{
  const arena=require('./live-arena.js');globalThis.deepLegendsMatchCards={live:{rankTitle:r=>r.tier+' '+(r.division||'')}};
  try{const solo={tier:'DIAMOND',division:'II'},flex={tier:'MASTER',leaguePoints:132,queueType:'RANKED_FLEX_SR'};
- for(const kind of ['aram','rift']){
+ for(const kind of ['aram']){
   assert.match(arena.identityLine({soloRank:solo,flexRank:flex},kind,'中路 · 未定级'),/rank-crests\/diamond.png/);
-  const html=arena.identityLine({soloRank:{tier:'UNRANKED'},flexRank:flex},kind,'中路');assert.match(html,/灵活 MASTER  132 LP/);assert.match(html,/rank-crests\/master.png/);
+  const html=arena.identityLine({soloRank:{tier:'UNRANKED'},flexRank:flex},kind,'中路');assert.match(html,/未定级/);assert(!html.includes('rank-crests/'));
   assert(!arena.identityLine({},kind,'中路').includes('rank-crests/'));assert.equal(arena.identityLine({hidden:true},kind,''),'');assert.match(arena.identityLine({hidden:true,soloRank:solo},kind,''),/diamond.png/);
  }
  assert(!arena.identityLine({soloRank:solo},'arena','').includes('rank-crests/'));

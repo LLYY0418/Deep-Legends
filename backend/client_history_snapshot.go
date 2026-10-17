@@ -173,7 +173,7 @@ func (a *app) loadCurrentHistoryFast(ctx context.Context, client *LCUClient, ref
 				latest = clientHistoryLatest[accountKey] == flight.generation
 				clientHistoryEpochMu.Unlock()
 				if same && latest {
-					public := gameplayOverview{Matches: cloneClientHistoryMatches(matches)}
+					public := gameplayOverview{Player: gameplayPlayer{IsCurrent: true}, Matches: cloneClientHistoryMatches(matches)}
 					a.publicizeOverviewReferences(&public)
 					event, _ := json.Marshal(map[string]any{"type": "overview-matches", "account": a.registerGameplayReferenceDetails(mergeGameplayReferences(ref, gameplayReference{PlayerRef: puuid, ClientIdentity: true})), "matches": public.Matches, "pagination": pagination, "replace": true, "historyGeneration": flight.generation})
 					a.broadcastEvent(string(event))

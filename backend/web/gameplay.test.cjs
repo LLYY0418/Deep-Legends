@@ -335,7 +335,7 @@ test("R69 history rows distinguish unavailable failed empty and pending states",
   assert.doesNotMatch(unavailable, /暂无最近战绩/);
   const failed = render(false, "failed");
   assert.match(failed, /读取失败/);
-  assert.match(failed, /data-live-history-retry/);
+  assert.doesNotMatch(failed, /data-live-history-retry/);
   assert.match(render(false, "empty"), /该玩家当前模式暂无最近战绩/);
   const pending = render(true, "pending");
   assert.match(pending, /live-history-skeleton/);

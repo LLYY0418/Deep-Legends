@@ -52,11 +52,11 @@ test('R263 P3 Summoner\'s Rift shows position plus preferred solo rank with a cr
   const f = playerRenderer();
   const base = { name: '甲', playerRef: 'p1', position: 'jungle', historyState: 'ok', recentGames: [], soloRank: solo, flexRank: flex };
   const soloQueue = identity(f.renderLivePlayer({ ...base, rank: solo }, 0, false, 0, [], '', false, false, 'InProgress', '', 'rift'));
-  assert.equal(soloQueue.line.textContent, '打野 · 翡翠 IV');
+  assert.equal(soloQueue.line.textContent, '打野 · 单双 翡翠 IV · 组排 铂金 I');
   const flexQueue = identity(f.renderLivePlayer({ ...base, rank: flex }, 0, false, 0, [], '', false, false, 'InProgress', '', 'rift'));
-  assert.equal(flexQueue.line.textContent, '打野 · 翡翠 IV');
+  assert.equal(flexQueue.line.textContent, '打野 · 单双 翡翠 IV · 组排 铂金 I');
   const unranked = identity(f.renderLivePlayer({ ...base, flexRank: null, rank: solo }, 0, false, 0, [], '', false, false, 'InProgress', '', 'rift'));
-  assert.equal(unranked.line.textContent, '打野 · 翡翠 IV');
+  assert.equal(unranked.line.textContent, '打野 · 单双 翡翠 IV · 组排 未定级');
   // Callers that do not pass a kind keep the previous single-rank line.
   const legacy = identity(f.renderLivePlayer({ ...base, rank: solo }, 0, false, 0, [], '', false, false, 'InProgress', ''));
   assert.equal(legacy.line.textContent, '打野 · 翡翠 IV');

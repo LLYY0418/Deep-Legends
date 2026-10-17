@@ -696,21 +696,21 @@
     "file": "backend/lp_history_diagnostics_test.go",
     "line": 44,
     "target": "events",
-    "source_sha256": "3282df525e3ad425fe16d479b80a37cefe2a6d39fb78eb5e45af1f34af957f77",
+    "source_sha256": "8fad3b3e2bd7aed7065289a9964d9c8cd10df6f9e5e9e1740602471229a2cde1",
     "comment": "r276-capture-safe: TestLPHistoryLoadDiagnostics: newLPTrackerWithDiagnostics invokes load/reset observers synchronously before returning; the subtest reads events only after construction returns and starts no concurrent tracker operations"
   },
   {
     "file": "backend/lp_history_diagnostics_test.go",
     "line": 114,
     "target": "load",
-    "source_sha256": "3282df525e3ad425fe16d479b80a37cefe2a6d39fb78eb5e45af1f34af957f77",
+    "source_sha256": "8fad3b3e2bd7aed7065289a9964d9c8cd10df6f9e5e9e1740602471229a2cde1",
     "comment": "r276-capture-safe: TestLPHistorySaveDiagnosticsAndRestart: the restarted tracker constructor invokes its load observer synchronously before returning; load is read only after that constructor returns"
   },
   {
     "file": "backend/lp_history_diagnostics_test.go",
     "line": 136,
     "target": "saves",
-    "source_sha256": "3282df525e3ad425fe16d479b80a37cefe2a6d39fb78eb5e45af1f34af957f77",
+    "source_sha256": "8fad3b3e2bd7aed7065289a9964d9c8cd10df6f9e5e9e1740602471229a2cde1",
     "comment": "r276-capture-safe: TestLPHistorySaveCallbacksAndExport: observe, takeGameStart and r182Capture are invoked sequentially and deliver their observers synchronously before returning; saves is inspected only after all three calls return"
   },
   {

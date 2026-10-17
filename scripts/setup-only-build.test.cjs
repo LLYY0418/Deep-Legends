@@ -92,6 +92,7 @@ function fixture(t) {
       fs.writeFileSync(artifact, "synthetic NSIS payload");
     })().catch(error => {console.error(error.message); process.exitCode = 1;});
   `);
+  writeScript("scripts/update-augment-descriptions.cjs", 'process.stdout.write("synthetic snapshot\\n");');
   writeScript("desktop/source-fingerprint.cjs", 'process.stdout.write("abcdef012345\\n");');
   writeScript("desktop/verify-packaged-runtime.cjs", `
     if (fs.readFileSync(process.argv[2], "utf8") !== "synthetic runtime") throw new Error("Missing runtime");

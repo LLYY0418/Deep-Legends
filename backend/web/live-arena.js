@@ -52,6 +52,17 @@
       return `<span class="arena-fame${tier}" data-tooltip="${h.escapeHTML(`斗魂等级 ${h.number(fame.level)} · 名望 ${h.number(fame.fame)}`)}" data-tooltip-size="compact"><svg class="arena-fame-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 13.5 4.6v6.8L8 14.5 2.5 11.4V4.6Z"/><path class="arena-fame-blades" d="m5.4 5.4 5.2 5.2M10.6 5.4 5.4 10.6"/></svg><b>${h.number(fame.level)}级</b><span class="arena-fame-divider" aria-hidden="true">·</span><span>${h.number(fame.fame)} 名望</span></span>`;
     }
     const valid=value=>value?.tier && /^(IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND|MASTER|GRANDMASTER|CHALLENGER)$/i.test(value.tier);
+    if(!player.hidden && ['rift','aram'].includes(kind)) {
+      const rankHTML=(rank,label)=>{
+        const tier=String(rank?.tier || '').toLowerCase(),known=valid(rank);
+        const title=(label?label+' ':'')+(known?h.rankTitle(rank):'未定级');
+        return {copy:title,html:(known?`<img class="live-rank-crest" src="/rank-crests/${tier}.png" alt="" decoding="async">`:'')+`<b class="live-rank-title">${h.escapeHTML(title)}</b>`};
+      };
+      const position=kind==='rift' && player.position?String(legacyCopy).split(' · ')[0]:'';
+      const ranks=kind==='rift'?[rankHTML(player.soloRank,'单双'),rankHTML(player.flexRank,'组排')]:[rankHTML(player.soloRank,'')];
+      const copy=[position,...ranks.map(r=>r.copy)].filter(Boolean).join(' · ');
+      return `<span class="live-player-rank" data-tooltip="${h.escapeHTML(copy)}" data-tooltip-overflow="self" data-tooltip-size="compact">${position?h.escapeHTML(position)+' · ':''}${ranks.map(r=>r.html).join(' · ')}</span>`;
+    }
     const rank=[player.soloRank,player.flexRank,player.rank].find(valid);
     if(player.hidden===true && !rank)return '';
     const tier=String(rank?.tier||'').toLowerCase();

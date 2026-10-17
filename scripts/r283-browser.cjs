@@ -1,0 +1,63 @@
+'use strict';
+process.env.R282_SCREEN_CATALOG='1';
+const assert=require('node:assert/strict'),{withBrowser}=require('./r280-browser-fixture.cjs');
+async function run(){await withBrowser(async({page,results,errors})=>{
+ for(const theme of ['dark','light']){
+  const p=await page(theme);await p.until("document.querySelector('.match-entry') && !__r278Game.activeTab().loading");
+  await p.evaluate("localStorage.setItem('lol-loot-ui-scale','1');document.documentElement.style.setProperty('--ui-zoom','1');document.documentElement.dataset.uiScale='1';window.__r283Reports=[];const r=window.reportFlowDiagnostic;window.reportFlowDiagnostic=(event,reason,fields)=>{__r283Reports.push({event,reason,...fields});r(event,reason,fields)}");
+  const lp=await p.evaluate(`(()=>{const g=__r278Game,t=g.activeTab(),m=t.data.matches.find(m=>[420,440].includes(m.queueId)),list=document.querySelector('.match-list');m.lpDelta=18;g.reconcileFilteredMatchList(list,t);window.__r283LP={id:m.gameId,row:list.querySelector('[data-match-id="'+m.gameId+'"]'),images:[...list.querySelectorAll('img')],account:t.data.player.playerRef};return {id:m.gameId,chips:list.querySelectorAll('.lp-delta').length}})()`);assert(lp.chips>0);
+  await p.record('r283-'+theme+'-lp-five-refreshes',async()=>{
+   for(let i=0;i<5;i++){
+    const r=await p.evaluate(`(()=>{const g=__r278Game,t=g.activeTab(),rows=t.data.matches.map(({lpDelta,...m})=>m);g.handleOverviewMatches({account:__r283LP.account,matches:rows,replace:true,pagination:t.data.pagination});return {same:__r283LP.images.every((img,i)=>img===document.querySelectorAll('.match-list img')[i]),chips:document.querySelectorAll('.match-list .lp-delta').length,last:__r283Reports.filter(r=>r.event==='lp_chip_render').at(-1)}})()`);
+    assert(r.same);assert.equal(r.chips,lp.chips);assert.equal(r.last.lost,0);assert.equal(r.last.images_recreated,0);results.push({kind:'P1-refresh',theme,...r});await p.evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+   }
+  });
+  const patched=await p.evaluate(`(()=>{const g=__r278Game,t=g.activeTab(),id=__r283LP.id,list=document.querySelector('.match-list');t.data.matches=t.data.matches.map(m=>m.gameId===id?{...m,lpDelta:null,lpPending:true}:m);g.reconcileFilteredMatchList(list,t);const row=list.querySelector('[data-match-id="'+id+'"]'),img=row.querySelector('img'),pending=!!row.querySelector('.lp-delta.is-pending'),started=performance.now();g.handleLPRecorded({matches:[{gameId:id,lpDelta:20,lpPending:false}]});return {pending,sameRow:row===list.querySelector('[data-match-id="'+id+'"]'),sameImage:img===row.querySelector('img'),text:row.querySelector('.lp-delta').textContent,latency:performance.now()-started}})()`);
+  assert(patched.pending&&patched.sameRow&&patched.sameImage);assert.equal(patched.text,'+20 LP');assert(patched.latency<300);results.push({kind:'P1-patch',theme,...patched});
+  // First-screen mounting is measured with the production catalog renderer.
+  await p.evaluate("__r278App.activateSection('favorites');__r278App.activateFavoritesPage('collection')");
+  const prestige=await p.evaluate(`(()=>{const a=__r278App;a.cancelRenderFrames();a.state.view='chromas';a.state.renderGeneration++;const grid=document.getElementById('skin-grid');grid.replaceChildren();const items=Array.from({length:461},(_,i)=>({id:90000+i,name:'臻彩 '+i,championId:1,championName:'安妮',parentSkinId:i+1,isPrestige:true,owned:true}));window.__r283PrestigeStart=performance.now();a.renderChromaCatalog(items,a.state.renderGeneration);return {first:document.querySelectorAll('.chroma-prestige-grid>.skin-card').length,immediateMS:performance.now()-__r283PrestigeStart}})()`);
+  assert(prestige.first>=24);await p.until("document.querySelectorAll('.chroma-prestige-grid>.skin-card').length===461");
+  prestige.longest=await p.evaluate("Math.max(0,...__r241LongTasks.filter(t=>t.start>=__r283PrestigeStart).map(t=>t.duration))");results.push({kind:'P5-first-frame',theme,...prestige});assert(prestige.immediateMS<50,JSON.stringify(prestige));await p.shot('r283-prestige-first-screen');
+  await p.evaluate("__r278App.cancelRenderFrames();__r278App.activateSection('overview')");
+  // A stage uses production renderers/CSS for repeatable geometry fixtures.
+  await p.evaluate("const stage=document.createElement('main');stage.id='r283-stage';stage.style.cssText='position:fixed;inset:72px 18px 18px 100px;z-index:999;overflow:auto;background:var(--bg);padding:12px';document.body.append(stage)");
+  for(const actor of ['self','foreign','long']){
+   const strip=await p.evaluate(`(()=>{const g=__r278Game,t=g.activeTab(),s=document.getElementById('r283-stage'),data={...__r280Overview,player:{...__r280Overview.player,gameName:${JSON.stringify(actor==='long'?'非常长的名字'.repeat(20):actor==='foreign'?'빈 스토리':'当前召唤师')},tagLine:'KR1',summonerLevel:353,isCurrent:${actor==='self'},region:${JSON.stringify(actor==='self'?'CN':'KR')}}};s.innerHTML=g.renderSummonerStrip(data,t,false);const n=s.querySelector('h2'),tag=s.querySelector('.summoner-tag'),value=s.querySelector('.summoner-level-value'),before=n.getBoundingClientRect();return {name:before.toJSON(),tag:tag.getBoundingClientRect().toJSON(),weight:getComputedStyle(value).fontWeight,color:getComputedStyle(value).color}})()`);
+   assert(Math.abs(strip.name.y-strip.tag.y)<12,JSON.stringify(strip));assert.equal(strip.weight,'700');results.push({kind:'P6-strip',theme,actor,...strip});await p.shot('r283-strip-'+actor);
+  }
+  for(const zoom of [1,1.25,1.5,2]){
+   await p.evaluate(`document.documentElement.style.setProperty('--ui-zoom','${zoom}');document.getElementById('r283-stage').innerHTML='<button id="r283-search" data-tooltip="搜索玩家" style="position:absolute;left:300px;top:160px">搜索</button><button id="r283-roster" data-tooltip="阵容" data-tooltip-roster="[]" style="position:absolute;left:500px;top:160px">阵容</button><button id="r283-score" data-tooltip="能力分\\n能力分的详细说明" data-tooltip-size="ability" style="position:absolute;left:700px;top:160px">能力分</button>';`);
+   for(const kind of ['search','roster','score']){
+    await p.evaluate(`document.getElementById('r283-${kind}').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}))`);await p.until("document.getElementById('global-tooltip').dataset.shown==='true'");
+    const tooltip=await p.evaluate(`(()=>{const a=document.getElementById('r283-${kind}').getBoundingClientRect(),t=document.getElementById('global-tooltip'),r=t.getBoundingClientRect();return {anchor:a.toJSON(),rect:r.toJSON(),scale:getComputedStyle(t).zoom,title:getComputedStyle(t.querySelector('.tooltip-title')).fontSize}})()`);
+    assert(Math.abs(Number(tooltip.scale)-zoom)<.01);assert(tooltip.rect.left>=0&&tooltip.rect.right<=1501,JSON.stringify(tooltip));assert(tooltip.rect.bottom<=tooltip.anchor.top+1 || tooltip.rect.top>=tooltip.anchor.bottom-1,JSON.stringify(tooltip));results.push({kind:'P7-tooltip',theme,zoom,type:kind,...tooltip});await p.shot('r283-tooltip-'+kind+'-'+zoom);
+    await p.evaluate(`document.getElementById('r283-${kind}').dispatchEvent(new PointerEvent('pointerout',{bubbles:true,relatedTarget:document.body}))`);
+   }
+  }
+  await p.evaluate("document.documentElement.style.setProperty('--ui-zoom','1');document.getElementById('r283-stage').innerHTML='<section class=build-detail>'+__r278Game.renderBuildAugments([89,93,391])+'</section><section id=r283-loadouts></section>'");
+  for(const count of [0,1,2,3,4]){
+   const positions=await p.evaluate(`(()=>{const g=__r278Game,t=g.activeTab(),m=structuredClone(t.data.matches[0]);m.queueId=2400;m.gameMode='KIWI';m.modeGroup='hextech-aram';m.participants[0].augmentIds=[89,93,347,359].slice(0,${count});m.subjectParticipantId=m.participants[0].participantId;document.getElementById('r283-loadouts').innerHTML=g.renderMatch(m,t.data.player.playerRef,t);return [...document.querySelectorAll('#r283-loadouts .match-loadout-mini .arena-augment-icon')].map(n=>n.getBoundingClientRect().toJSON())})()`);
+   if(positions.length>=2){assert.equal(positions[0].x,positions[1].x);assert(positions[1].y>positions[0].y)}if(positions.length>=3)assert(positions[2].x>positions[0].x);results.push({kind:'P10-columns',theme,count,positions});await p.shot('r283-mayhem-'+count);
+  }
+  // Light bases retain each icon's pre-existing shape and rarity border.
+  const augment=await p.evaluate("[...document.querySelectorAll('#r283-stage .arena-augment-icon')].map(n=>({background:getComputedStyle(n).backgroundColor,radius:getComputedStyle(n).borderRadius}))");if(theme==='light')for(const icon of augment)assert.equal(icon.background,'rgb(29, 37, 51)');results.push({kind:'P8-augment-bases',theme,augment});await p.shot('r283-augment-bases');
+  // Same toolbar measured with and without outage at 150%, using actual summary renderer.
+  for(const queueId of [420,1750]){
+   const outage=await p.evaluate(`(()=>{const g=__r278Game;document.getElementById('r283-stage').hidden=true;document.documentElement.style.setProperty('--ui-zoom','1.5');g.state.beacon.phase='InProgress';g.state.liveRetryAttempts=8;g.state.liveLoadingVisible=false;g.state.live={...g.state.live,phase:'InProgress',available:true,queueId:${queueId},historyServiceDown:true,players:Array.from({length:18},(_,i)=>({playerRef:'r283-'+i,teamId:i<9?100:200,historyState:'failed',championId:1,isAlly:i<9}))};__r278App.activateSection('live');g.renderLive('r283');const bar=document.querySelector('.live-toolbar'),before=bar.getBoundingClientRect().height,status=bar.querySelector('[data-live-status]'),text=status.textContent,dupes=bar.textContent.split('数据尚未完整，已停止自动重试，可手动刷新').length-1,retries=document.querySelectorAll('[data-live-history-retry],.insight-retry').length;g.state.live.historyServiceDown=false;g.renderLive('r283');const after=bar.getBoundingClientRect().height;g.state.live.historyServiceDown=true;g.renderLive('r283');return {before,after,text,dupes,retries,nowrap:getComputedStyle(status.querySelector('span')).whiteSpace}})()`);
+   assert.equal(outage.retries,0);assert.equal(outage.dupes,1);assert(outage.text.includes('官方战绩服务暂时中断'));assert(Math.abs(outage.before-outage.after)<=1,JSON.stringify(outage));assert.equal(outage.nowrap,'nowrap');results.push({kind:'P17-outage-toolbar',theme,queueId,...outage});await p.shot('r283-outage-'+queueId);
+  }
+  await p.evaluate("document.documentElement.style.setProperty('--ui-zoom','1');document.getElementById('r283-stage').remove();__r278App.activateSection('favorites');__r278App.activateFavoritesPage('collection')");
+  for(const kind of ['skin','chroma','prestige']){
+   await p.evaluate(`(()=>{const a=__r278App,item={id:1001,name:'验收原画',championId:1,championName:'安妮',owned:true,rarity:'Epic',isPrestige:${kind==='prestige'}};${kind==='skin'?'a.openSkinDetails(item,[item])':'a.openChromaDetails(item,[item])'};})()`);await p.until("document.getElementById('skin-dialog').open");
+   const art=await p.evaluate("(()=>{const d=document.getElementById('skin-dialog'),a=d.querySelector('.dialog-art'),x=d.getBoundingClientRect(),y=a.getBoundingClientRect();return {top:y.top-x.top,left:y.left-x.left,right:x.right-y.right}})()");assert(art.top<=1.1&&art.left<=1.1&&art.right<=1.1,JSON.stringify(art));results.push({kind:'P9-art-flush',theme,type:kind,...art});await p.shot('r283-dialog-'+kind);await p.evaluate("document.getElementById('skin-dialog').close()");
+  }
+  for(const sub of ['collection','account','pools','facade-collection']){
+   const scroll=await p.evaluate(`(()=>{const a=__r278App;a.activateFavoritesPage('${sub}');a.state.sectionScroll.favorites=500;document.querySelector('.app-scroll').scrollTop=500;const view=a.state.view;a.activateSection('overview');a.activateSection('favorites');return {top:document.querySelector('.app-scroll').scrollTop,sub:a.state.favoritesPage,view:a.state.view,oldView:view}})()`);assert.equal(scroll.top,0);assert.equal(scroll.sub,sub);assert.equal(scroll.view,scroll.oldView);results.push({kind:'P14-return',theme,...scroll});
+  }
+  await p.evaluate("__r278App.activateSection('suite');document.querySelector('[data-suite-tab=facade]').click()");await p.until("document.querySelector('.facade-identity')");await p.shot('r283-career');
+  const career=await p.evaluate("(()=>{const r=document.querySelector('.facade-identity'),n=r.querySelector('h2').getBoundingClientRect(),tag=r.querySelector('p').getBoundingClientRect();return {name:n.toJSON(),tag:tag.toJSON(),selected:document.querySelectorAll('.facade-film .is-selected').length}})()");assert(Math.abs(career.name.y-career.tag.y)<10);results.push({kind:'P13-career',theme,...career});
+ }
+ assert.deepEqual(errors,[]);
+ });}
+if(require.main===module)run().catch(e=>{console.error(e);process.exitCode=1});module.exports={run};

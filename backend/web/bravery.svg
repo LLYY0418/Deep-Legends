@@ -1,40 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="勇敢举动">
   <defs>
-    <radialGradient id="bv-bg" cx="50%" cy="45%" r="55%">
-      <stop offset="0" stop-color="#16325a"/>
-      <stop offset=".65" stop-color="#0b1a33"/>
-      <stop offset="1" stop-color="#060d1c"/>
+    <linearGradient id="bv2-ring" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#d8b46a"/>
+      <stop offset=".45" stop-color="#9a7638"/>
+      <stop offset=".75" stop-color="#6e5226"/>
+      <stop offset="1" stop-color="#b08d4c"/>
+    </linearGradient>
+    <radialGradient id="bv2-bg" cx="44%" cy="40%" r="62%">
+      <stop offset="0" stop-color="#155565"/>
+      <stop offset=".55" stop-color="#0b3340"/>
+      <stop offset="1" stop-color="#051a22"/>
     </radialGradient>
-    <linearGradient id="bv-ring" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2fd9ee"/>
-      <stop offset=".55" stop-color="#1c9fd0"/>
-      <stop offset="1" stop-color="#1667a6"/>
+    <radialGradient id="bv2-vignette" cx="50%" cy="50%" r="50%">
+      <stop offset=".72" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".45"/>
+    </radialGradient>
+    <linearGradient id="bv2-mark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ff6ff"/>
+      <stop offset=".55" stop-color="#2fd3ea"/>
+      <stop offset="1" stop-color="#16a9c6"/>
     </linearGradient>
-    <linearGradient id="bv-mark" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#e9fdff"/>
-      <stop offset="1" stop-color="#7fe3f5"/>
-    </linearGradient>
-    <filter id="bv-glow" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="1.6" result="b"/>
+    <filter id="bv2-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.8" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <circle class="bv-bg" cx="32" cy="32" r="31" fill="url(#bv-bg)"/>
-  <g class="bv-ring" fill="url(#bv-ring)">
-    <path d="M7.37 38.60 L6.55 36.44 L6.08 34.18 L5.86 31.86 L5.86 29.53 L6.08 27.20 L6.53 24.89 L7.19 22.63 L8.06 20.43 L9.14 18.32 L10.41 16.31 L11.86 14.43 L13.48 12.68 L15.25 11.10 L17.17 9.68 L19.21 8.45 L21.36 7.41 L23.59 6.57 L25.89 5.95 L28.23 5.54 L30.60 5.34 L32.98 5.37 L35.33 5.62 L37.65 6.09 L39.91 6.77 L42.09 7.65 L44.17 8.73 L46.12 10.00 L47.94 11.45 L49.59 13.07 L50.95 14.94 L50.95 14.94 L48.67 14.06 L46.70 13.05 L44.73 12.16 L42.76 11.42 L40.77 10.82 L38.78 10.37 L36.78 10.08 L34.79 9.94 L32.81 9.95 L30.85 10.11 L28.93 10.41 L27.04 10.86 L25.20 11.44 L23.42 12.16 L21.69 13.02 L20.04 14.00 L18.46 15.10 L16.97 16.33 L15.57 17.67 L14.26 19.11 L13.07 20.67 L11.98 22.32 L11.01 24.07 L10.17 25.91 L9.46 27.82 L8.88 29.81 L8.43 31.88 L8.10 34.01 L7.87 36.21 L7.37 38.60 Z"/>
-    <path d="M56.94 26.70 L57.65 28.88 L57.99 31.15 L58.10 33.46 L57.98 35.78 L57.65 38.08 L57.09 40.35 L56.33 42.56 L55.36 44.70 L54.19 46.74 L52.84 48.68 L51.32 50.48 L49.63 52.14 L47.79 53.63 L45.83 54.95 L43.75 56.09 L41.57 57.03 L39.32 57.76 L37.01 58.29 L34.67 58.60 L32.31 58.69 L29.96 58.57 L27.63 58.23 L25.34 57.67 L23.13 56.91 L21.00 55.95 L18.98 54.80 L17.08 53.47 L15.33 51.96 L13.75 50.29 L12.47 48.39 L12.47 48.39 L14.70 49.34 L16.63 50.41 L18.55 51.36 L20.48 52.17 L22.43 52.83 L24.40 53.35 L26.37 53.72 L28.34 53.93 L30.31 54.00 L32.26 53.92 L34.18 53.70 L36.07 53.33 L37.92 52.83 L39.72 52.19 L41.47 51.41 L43.15 50.51 L44.77 49.49 L46.30 48.34 L47.76 47.07 L49.12 45.70 L50.38 44.21 L51.54 42.62 L52.58 40.93 L53.51 39.15 L54.31 37.29 L54.99 35.34 L55.54 33.32 L55.97 31.22 L56.31 29.04 L56.94 26.70 Z"/>
-    <path d="M50.19 21.50 L50.42 21.68 L50.60 21.89 L50.77 22.10 L50.93 22.33 L51.09 22.55 L51.23 22.78 L51.37 23.02 L51.51 23.26 L51.64 23.50 L51.76 23.75 L51.88 24.00 L51.99 24.25 L52.09 24.50 L52.19 24.76 L52.28 25.02 L52.37 25.28 L52.45 25.54 L52.52 25.80 L52.59 26.07 L52.65 26.34 L52.71 26.61 L52.75 26.88 L52.80 27.15 L52.83 27.42 L52.86 27.69 L52.88 27.97 L52.89 28.24 L52.89 28.52 L52.87 28.79 L52.80 29.08 L52.80 29.08 L52.41 28.86 L52.20 28.63 L52.01 28.40 L51.85 28.17 L51.69 27.93 L51.55 27.70 L51.42 27.47 L51.29 27.24 L51.17 27.01 L51.06 26.77 L50.95 26.54 L50.85 26.31 L50.75 26.07 L50.66 25.84 L50.58 25.60 L50.50 25.36 L50.43 25.12 L50.36 24.88 L50.29 24.63 L50.24 24.38 L50.18 24.13 L50.13 23.88 L50.09 23.62 L50.05 23.35 L50.02 23.08 L50.00 22.80 L49.99 22.52 L49.99 22.22 L50.02 21.90 L50.19 21.50 Z"/>
-    <path d="M13.77 43.39 L13.60 43.32 L13.48 43.22 L13.36 43.11 L13.25 43.00 L13.15 42.88 L13.05 42.76 L12.96 42.64 L12.87 42.52 L12.78 42.39 L12.69 42.27 L12.61 42.14 L12.53 42.01 L12.46 41.87 L12.39 41.74 L12.32 41.60 L12.25 41.46 L12.19 41.32 L12.13 41.18 L12.08 41.04 L12.02 40.89 L11.98 40.75 L11.93 40.60 L11.89 40.45 L11.85 40.30 L11.82 40.15 L11.79 40.00 L11.77 39.85 L11.76 39.69 L11.75 39.53 L11.80 39.35 L11.80 39.35 L12.14 39.39 L12.34 39.47 L12.51 39.56 L12.66 39.66 L12.80 39.76 L12.93 39.86 L13.05 39.97 L13.16 40.07 L13.27 40.18 L13.36 40.30 L13.46 40.41 L13.54 40.53 L13.62 40.65 L13.69 40.77 L13.75 40.90 L13.81 41.03 L13.87 41.16 L13.91 41.30 L13.95 41.43 L13.99 41.58 L14.02 41.72 L14.04 41.87 L14.06 42.03 L14.06 42.19 L14.07 42.35 L14.06 42.53 L14.04 42.71 L14.01 42.90 L13.95 43.10 L13.77 43.39 Z"/>
-    <path d="M12.27 24.82 L17.17 24.11 L13.81 21.50 Z"/>
-    <path d="M23.43 12.28 L26.41 14.68 L25.89 11.39 Z"/>
-    <path d="M51.03 40.87 L46.09 41.15 L49.20 44.05 Z"/>
-    <path d="M37.02 52.91 L34.50 50.03 L34.43 53.36 Z"/>
-    <path class="bv-shard" d="M52.44 13.60 L56.66 14.74 L54.06 17.68 Z"/>
-    <path class="bv-shard" d="M10.93 49.68 L6.76 48.39 L9.46 45.55 Z"/>
-    <path class="bv-shard" d="M26.96 60.56 L22.76 62.22 L22.95 58.29 Z"/>
+  <circle cx="32" cy="32" r="30.5" fill="url(#bv2-bg)"/>
+  <g fill="none" stroke="#2c7584" stroke-linecap="round" opacity=".38">
+    <path d="M12 38c4-12 15-19 27-18" stroke-width="2.2"/>
+    <path d="M18 49c9 4 21 2 28-7" stroke-width="1.6"/>
+    <path d="M41 11c6 3 10 8 11 14" stroke-width="1.4"/>
   </g>
-  <g class="bv-mark" filter="url(#bv-glow)">
-    <path d="M24.2 24.2a8.2 8.2 0 1 1 12 7.2c-2.6 1.4-4 2.8-4 5.8" fill="none" stroke="url(#bv-mark)" stroke-width="5.8" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M32.2 42.6l3.8 3.8-3.8 3.8-3.8-3.8z" fill="#cdf7ff"/>
+  <circle cx="32" cy="32" r="30.5" fill="url(#bv2-vignette)"/>
+  <circle cx="32" cy="32" r="30.4" fill="none" stroke="url(#bv2-ring)" stroke-width="2.6"/>
+  <circle cx="32" cy="32" r="28.6" fill="none" stroke="#04131a" stroke-width=".8" opacity=".8"/>
+  <g filter="url(#bv2-glow)">
+    <path d="M24.2 25a7.9 7.9 0 1 1 11.6 7c-2.5 1.4-3.8 2.8-3.8 5.6v1" fill="none" stroke="url(#bv2-mark)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M32 44.6l3.6 3.6-3.6 3.6-3.6-3.6z" fill="#5fe6f7"/>
   </g>
 </svg>

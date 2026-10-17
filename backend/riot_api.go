@@ -1959,7 +1959,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		partial.Pagination.Partial = partial.HistoryLoaded < len(ids)
 		deriveRiotOverviewStats(&partial, puuid, names, provider.region())
 		a.completeOverviewBackground(&partial, puuid)
-		a.annotateOverviewLP(&partial, "riot", true)
+
 		a.publicizeOverviewReferences(&partial)
 		if len(cardOnly) > 0 && cardOnly[0] {
 			if cardProgress != nil {
@@ -2118,7 +2118,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		// 少于 ids），保证前端推进下一页偏移量时不会与本页重叠。
 		Pagination: riotOverviewPagination(begIndex, len(ids), count, matchFilter),
 	}
-	a.annotateOverviewLP(&response, "riot")
+
 	if begIndex > 0 {
 		a.publicizeOverviewReferences(&response)
 		if progress != nil {

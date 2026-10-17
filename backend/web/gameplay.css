@@ -1363,7 +1363,6 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .insight-match-row.is-history-pending { align-items: center; min-height: 38px; }
 .insight-match-row.is-history-pending .live-history-skeleton:nth-child(2) { width: 68px; }
 .insight-match-row.is-history-pending .live-history-skeleton:nth-child(3) { width: 54px; }
-.insight-retry { min-height: 24px; margin-left: 8px; padding: 1px 8px; font-size: 10px; }
 
 @supports not (grid-template-rows: subgrid) {
   .live-teams.is-insight:not(.is-arena) .live-player { min-height: 76px; }
@@ -2342,11 +2341,11 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 /* R282: the identity footprint is identical from placeholders through complete. */
 .summoner-strip { --strip-avatar-size:72px; --strip-name-height:32px; --strip-meta-height:24px; --strip-level-height:20px; grid-template-columns:var(--strip-avatar-size) minmax(0,1fr) 217px; }
 .summoner-strip .game-icon.is-summoner-avatar { width:var(--strip-avatar-size);height:var(--strip-avatar-size); }
-.summoner-strip-copy>div { display:grid; grid-template-rows:var(--strip-name-height) var(--strip-meta-height); gap:0; align-items:center; }
+.summoner-strip-copy>div { display:flex; flex-direction:row; flex-wrap:nowrap; height:var(--strip-name-height); gap:var(--identity-chip-gap); align-items:center; }
 .summoner-strip-copy h2 { height:var(--strip-name-height);line-height:var(--strip-name-height);margin:0; }
 .summoner-strip-copy h2>.skeleton-line { margin-top:10px; }
-.summoner-name-meta { height:var(--strip-meta-height);overflow:hidden; }
-.summoner-name-meta>.summoner-tag { flex:0 0 80px; width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.summoner-name-meta { display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:var(--identity-chip-gap);height:var(--strip-name-height);overflow:hidden; }
+.summoner-name-meta>.summoner-tag { flex:0 0 auto; width:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .is-identity-placeholder { visibility:hidden; }
 .summoner-level-row { height:var(--strip-level-height);line-height:var(--strip-level-height);margin-top:4px;overflow:hidden; }
 .summoner-strip-highlights { width:217px;grid-auto-columns:92px;grid-template-rows:77px 14px 12px;gap:4px 16px; }
@@ -2369,7 +2368,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .specialist-game-row:not(.is-selected):hover {background:color-mix(in srgb,var(--primary-soft) 18%,var(--surface));}
 
 [data-theme="light"] .summoner-strip-copy h2 {text-shadow:none;}
-[data-theme="light"] .arena-augment-icon {background:#202b3e;border-radius:50%;}
+[data-theme="light"] :is(.arena-augment-icon,.augment-icon) {background:#1d2533;}
 [data-theme="light"] .arena-augment-icon .game-icon {background:transparent;}
 
 :root:not([data-theme="light"]) .specialist-game-row .game-icon>span,:root:not([data-theme="light"]) .match-stat>em{color:#a5afc0}
@@ -2383,3 +2382,19 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-player-copy>.live-player-rank{display:flex;align-items:center;gap:4px;height:18px;line-height:18px}.live-rank-crest{width:16px;height:16px;object-fit:contain;flex:none}
 
 .build-skill-body{display:flex;align-items:flex-start;gap:12px}.build-skill-order{min-width:0;flex:1}.build-spells{display:flex;flex:none;gap:3px;align-items:center;height:40px}
+
+.lp-delta.is-pending {display:inline-block;width:46px;height:17px;vertical-align:middle;padding:1px 5px;}
+
+.summoner-strip-copy h2 {min-width:0;flex:0 1 auto;}
+.summoner-level-value {font-weight:700;color:var(--ink);}
+.match-loadout-mini.is-augments.is-mayhem {grid-template-rows:repeat(2,var(--match-loadout-size));grid-auto-flow:column;}
+.match-tags-popover {zoom:var(--ui-zoom,1);max-width:min(320px,calc((100vw - 24px) / var(--ui-zoom,1)));}
+
+[data-theme="light"] .match-loadout-mini .arena-augment-icon {border-radius:50%;}
+
+.live-toolbar {flex-wrap:nowrap;flex-direction:row;align-items:center;}
+.live-toolbar [data-live-status] {min-width:0;flex:1 1 0;}
+.live-toolbar .live-refresh-status {flex-wrap:nowrap;white-space:nowrap;min-width:0;line-height:20px;}
+.live-refresh-status.is-service-outage {justify-content:flex-end;color:var(--muted);}
+.live-refresh-status.is-service-outage>svg {flex:none;width:16px;height:16px;fill:currentColor;}
+.live-refresh-status.is-service-outage>span {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

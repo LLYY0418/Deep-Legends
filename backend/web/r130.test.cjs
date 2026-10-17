@@ -852,7 +852,7 @@ test('R130 P6 弹窗改紧凑布局、加载前 128×128 占位，皮肤/炫彩�
   assert.match(css, /\.facade-detail-dialog \{ width: fit-content;/, '弹窗宽度必须跟着内容收缩，不留大片空白');
   assert.match(css, /\.facade-detail-dialog \{[^}]*max-height: calc\(\(100dvh - 28px\) \/ var\(--ui-zoom, 1\)\)/, '旗帜图片在窗口够高时应能达到 640px，同时保留视口边距');
   assert.match(css, /\.facade-detail-dialog\[open\] \{ display: flex; flex-direction: column; overflow: hidden; \}/, '详情弹窗须让图片随可用高度收缩且不显示滚动条');
-  assert.match(css, /\.facade-detail-dialog \.dialog-art \{ flex: 0 1 var\(--facade-art-height, 128px\); width: var\(--facade-art-width, 128px\); max-width: 100%; height: var\(--facade-art-height, 128px\); aspect-ratio: auto;/, '图片区域尺寸由 JS 写进变量，空间不足时可缩小');
+  assert.match(css, /\.facade-detail-dialog \.dialog-art \{ flex: 0 1 var\(--facade-art-height, 128px\); width: 100%; max-width: 100%; height: var\(--facade-art-height, 128px\); aspect-ratio: auto;/, '图片区域尺寸由 JS 写进变量，空间不足时可缩小');
   assert.match(css, /\.facade-detail-dialog \.dialog-copy \{ flex: 0 0 auto; \}/, '详情文字不得为了隐藏滚动条而被压扁');
   assert.match(css, /\.facade-detail-dialog \.dialog-art-primary \{ object-fit: contain;/, '不得裁剪');
   assert.doesNotMatch(css, /\.facade-detail-dialog \{ width: min\(560px/, '560px 的固定宽度必须去掉');

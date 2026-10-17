@@ -147,6 +147,8 @@ try {
     $previousGoos = $env:GOOS
     $previousGoarch = $env:GOARCH
     $previousCgo = $env:CGO_ENABLED
+    & node (Join-Path $projectRoot "scripts/update-augment-descriptions.cjs")
+    if ($LASTEXITCODE -ne 0) { throw "Chinese augment snapshot generation failed" }
     $sourceFingerprint = (& node (Join-Path $desktopRoot "source-fingerprint.cjs")).Trim()
     if ($LASTEXITCODE -ne 0) { throw "Source fingerprint calculation failed" }
     if ($sourceFingerprint -notmatch '^[0-9a-f]{12}$') { throw "Invalid source fingerprint: $sourceFingerprint" }

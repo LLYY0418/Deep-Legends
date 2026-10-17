@@ -47,11 +47,11 @@ test('R235 retry transitions from error to loading to ready without throttling',
 
 test('R235 history head keeps pagination tail and rejects older generations',()=>{
  const f=compile(source,['mergeCurrentHistoryHead','handleOverviewMatches','syncOverviewStreak'],{state:{tabs:[],overlay:[]},renderFilteredMatchView:()=>{},computeOverviewStreak:()=>null,rerenderMatch:()=>{}});
- assert.deepEqual(f.mergeCurrentHistoryHead([{gameId:1},{gameId:2},{gameId:3}],[{gameId:4}]),[{gameId:4},{gameId:2},{gameId:3}]);
+ assert.deepEqual(f.mergeCurrentHistoryHead([{gameId:1},{gameId:2},{gameId:3}],[{gameId:4}]),[{gameId:4},{gameId:1},{gameId:2},{gameId:3}]);
  const state={tabs:[{playerRef:'self',data:{historyGeneration:2,matches:[{gameId:1},{gameId:2},{gameId:3}],pagination:{hasMore:true}}}],overlay:[]};
  const api=compile(source,['mergeCurrentHistoryHead','handleOverviewMatches','syncOverviewStreak'],{state,renderFilteredMatchView:()=>{},computeOverviewStreak:()=>null,rerenderMatch:()=>{}});
  api.handleOverviewMatches({account:'self',replace:true,historyGeneration:1,matches:[{gameId:9}]});assert.equal(state.tabs[0].data.matches[0].gameId,1);
- api.handleOverviewMatches({account:'self',replace:true,historyGeneration:3,matches:[{gameId:4}],pagination:{hasMore:false}});assert.equal(state.tabs[0].data.matches.length,3);assert.equal(state.tabs[0].data.pagination.hasMore,true);
+ api.handleOverviewMatches({account:'self',replace:true,historyGeneration:3,matches:[{gameId:4}],pagination:{hasMore:false}});assert.equal(state.tabs[0].data.matches.length,4);assert.equal(state.tabs[0].data.pagination.hasMore,true);
 });
 
 test('R235 restoring a 31-second filter schedules one head page and prepends only new cards',async()=>{

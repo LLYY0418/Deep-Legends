@@ -310,7 +310,7 @@ test("overview refresh button exposes a stable disabled loading state", () => {
 });
 
 test("manual reread awaits the backend identity refresh before hard-refresh dispatch", () => {
-  const start = appSource.indexOf('el.refresh.addEventListener("click"');
+  const start = appSource.indexOf('async function runManualRefresh(');
   const end = appSource.indexOf("el.startupLoadingRetry", start);
   assert.ok(start >= 0 && end > start, "manual refresh handler source not found");
   const handler = appSource.slice(start, end);

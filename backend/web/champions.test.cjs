@@ -3273,6 +3273,7 @@ test("round 9 tooltip pointer suppression survives the click focus event", () =>
       this.dataset = {};
       this.style = {};
       this.attributes = new Map();
+      this.ownerDocument={defaultView:{getComputedStyle:()=>({zoom:"1"})}};
       this.hidden = false;
       this.isConnected = true;
       this.offsetWidth = 120;
@@ -4502,7 +4503,7 @@ test("match loadout follows the OPGG mode matrix instead of trusting stray augme
   assert.equal((arena.loadout.match(/<augment>/g) || []).length, 4);
   assert.doesNotMatch(arena.loadout, /<spell>|<perk>|<style>/);
   // 模式只改变填充顺序，图标轨道尺寸继承普通战绩，避免 KDA / 统计列错位。
-  assert.doesNotMatch(gameplayStyles, /\.match-loadout-mini\.is-augments\.is-mayhem\s*\{/);
+  assert.match(gameplayStyles, /\.match-loadout-mini\.is-augments\.is-mayhem\s*\{[^}]*grid-auto-flow:column/);
   assert.doesNotMatch(cssBlockAfter(gameplayStyles, ".match-loadout-mini.is-augments {"), /grid-template-(?:columns|rows):/);
   for (const count of [0,1,3,4]) { const row=renderMatchLoadout({...subject,augmentIds:subject.augmentIds.slice(0,count)}, "mayhem"); assert.equal((row.loadout.match(/<augment>/g)||[]).length,count); assert.doesNotMatch(row.loadout,/is-empty|<spell>/); }
   assert.match(functionSource(gameplayScript, "renderBuild"), /matchAugmentIDs\(subject, 6\)/);
@@ -4572,7 +4573,7 @@ test("remade matches use a neutral result instead of win or loss", () => {
   assert.equal(matchResultWord("remake", 2), "第 2 名");
   const renderMatchSource = functionSource(gameplayScript, "renderMatch");
   assert.match(renderMatchSource, /class="match-entry is-\$\{resultKind\}"/);
-  assert.match(renderMatchSource, /ranked && resultKind !== "remake"/);
+  assert.match(functionSource(gameplayScript,"renderLPChip"), /ranked && resultKind !== "remake"/);
   assert.match(functionSource(gameplayScript, "renderRuneChoice"), /config\.result === "remake" \? "重开"/);
   assert.match(gameplayStyles, /\.match-entry\.is-remake\s*\{[^}]*background:\s*color-mix\(in oklab,var\(--muted\) 28%,var\(--surface-strong\)\)[^}]*border-color:\s*color-mix\(in oklab,var\(--muted\) 68%,var\(--line\)\)[^}]*box-shadow:\s*inset 4px 0 0 var\(--muted\)/s);
   assert.match(gameplayStyles, /\.is-remake \.match-result-meta strong, \.is-remake \.result-word\s*\{[^}]*color:\s*color-mix\(in oklab,var\(--muted\) 70%,var\(--ink\)\)/s);

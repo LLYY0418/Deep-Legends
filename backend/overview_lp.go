@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"strconv"
 	"strings"
 )
 
@@ -17,7 +19,7 @@ func (a *app) annotateOverviewLP(response *gameplayOverview, path string, quiet 
 	if response == nil {
 		return
 	}
-	if path == "riot" || path == "cache" && isRiotRegion(response.Player.Region) {
+	if isRiotRegion(response.Player.Region) {
 		response.Player.IsCurrent = a.riotOverviewIsCurrent(response.Player)
 	}
 	ref := ""
@@ -89,5 +91,34 @@ func (a *app) onLPRecorded(ref string) {
 	}
 	// Consumers fetch fresh annotation; client-history files remain valid because
 	// annotation is applied after every disk snapshot read as well.
-	a.broadcastEvent(`{"type":"lp-recorded"}`)
+	patches := []map[string]any{}
+	if a.lpTracker != nil {
+		hash := a.lpTracker.accountHash(ref)
+		a.lpTracker.mu.Lock()
+		for id, record := range a.lpTracker.history.Games {
+			if record.AccountHash == hash {
+				gameID, _ := strconv.ParseInt(id, 10, 64)
+				patches = append(patches, map[string]any{"gameId": gameID, "lpDelta": record.Delta, "lpPending": false})
+			}
+		}
+		a.lpTracker.mu.Unlock()
+	}
+	raw, _ := json.Marshal(map[string]any{"type": "lp-recorded", "matches": patches})
+	a.broadcastEvent(string(raw))
+}
+
+func (a *app) onLPFinished(ref string, gameID int64) {
+	if ref != a.currentPlayerRef() {
+		return
+	}
+	matches := []gameplayMatch{{GameID: gameID, QueueID: 420}}
+	if a.lpTracker != nil {
+		a.lpTracker.annotate(matches, ref)
+	}
+	patch := map[string]any{"gameId": gameID, "lpPending": false}
+	if matches[0].LpDelta != nil {
+		patch["lpDelta"] = *matches[0].LpDelta
+	}
+	raw, _ := json.Marshal(map[string]any{"type": "lp-recorded", "matches": []any{patch}})
+	a.broadcastEvent(string(raw))
 }
