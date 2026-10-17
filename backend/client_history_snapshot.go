@@ -59,6 +59,10 @@ func (a *app) clientHistorySnapshotKey(region, serverID, puuid string) string {
 }
 func (a *app) loadCurrentHistoryFast(ctx context.Context, client *LCUClient, ref gameplayReference, puuid string, count int, names, labels map[int64]string) ([]gameplayMatch, []EndpointCapability, gameplayPagination, uint64) {
 	count = min(20, clampMatchCount(count))
+	if a.sgp != nil && ref.ServerID != "" && a.sgp.historyCircuitCooling(ref.ServerID, "SUMMARY", false) {
+		matches, caps, pagination := a.loadDetailedMatches(ctx, client, ref, puuid, true, 0, count, "all", names, labels)
+		return matches, caps, pagination, 0
+	}
 	key := a.clientHistorySnapshotKey(clientRiotPlatform(client), ref.ServerID, puuid)
 	var snapshot clientHistorySnapshot
 	hasSnapshot := false

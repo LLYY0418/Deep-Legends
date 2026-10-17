@@ -102,6 +102,8 @@ type gameplayPagination struct {
 	ServerFiltered       bool   `json:"serverFiltered,omitempty"`
 	FilterFallback       bool   `json:"filterFallback,omitempty"`
 	FilterFallbackReason string `json:"filterFallbackReason,omitempty"`
+	HistoryServiceDown   bool   `json:"historyServiceDown,omitempty"`
+	LocalHasMore         bool   `json:"localHasMore,omitempty"`
 }
 
 var overviewSoftBudget = 18 * time.Second
@@ -2642,13 +2644,19 @@ func (a *app) loadSGPMatchHistoryPage(ctx context.Context, client *LCUClient, se
 func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, reference gameplayReference, playerRef string, isCurrent bool, begIndex, count int, matchFilter string, names map[int64]string, queueLabels map[int64]string) (result []gameplayMatch, caps []EndpointCapability, page gameplayPagination) {
 	defer func() {
 		filter := normalizeGameplayMatchFilter(matchFilter)
-		if filter == "all" || page.ServerFiltered {
+		for _, capability := range caps {
+			if capability.HistoryStatus == "official" {
+				page.HistoryServiceDown = true
+			}
+		}
+		if (filter == "all" || page.ServerFiltered) && !page.HistoryServiceDown {
 			return
 		}
 		if reference.ServerID == "" && a.sgp != nil {
 			reference.ServerID, _, _ = a.sgp.available(client)
 		}
 		known, localConsumed, localMore := a.retainedFilterHistory(client, reference, playerRef, filter, begIndex, count, names, queueLabels)
+		page.LocalHasMore = localMore
 		page.Count = max(page.Count, localConsumed)
 		if localMore {
 			page.HasMore = true
