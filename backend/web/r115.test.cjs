@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
-const read=name=>fs.readFileSync(name==='section-loader.js'&&process.env.R115_LOADER_SOURCE||path.join(__dirname,name),'utf8');
+const read=name=>fs.readFileSync(name==='index.html'&&process.env.R115_INDEX_SOURCE||name==='section-loader.js'&&process.env.R115_LOADER_SOURCE||path.join(__dirname,name),'utf8');
 function harness(){
  const dom=new JSDOM('<head></head><body><main id="champions-panel"></main><main id="pro-players-panel"></main><main id="suite-panel"></main><main id="settings-panel"></main></body>',{url:'http://fixture/',runScripts:'outside-only'});
  const w=dom.window;w.eval(read('section-loader.js'));const scripts=()=>[...w.document.querySelectorAll('script[data-section-module]')];const styles=()=>[...w.document.querySelectorAll('link[data-section-style]')];
@@ -9,11 +9,19 @@ function harness(){
  const fail=(name)=>styles().find(n=>n.dataset.sectionStyle===name)?.onerror();
  return {dom,w,scripts,styles,finish,fail,close:()=>dom.window.close()};
 }
-test('R115 initial resources retain friends and shared CSS, defer optional modules, and keep demo opt-in',()=>{
+test('R115 initial resources defer friends and optional modules, retain shared CSS, and keep demo opt-in',()=>{
  const html=read('index.html');for(const name of ['champions','pro-players','suite'])assert.doesNotMatch(html,new RegExp(`<script src="/${name}\\.js"`));
- assert.match(html,/<script src="\/friends.js"/);assert.equal((html.match(/<link rel="stylesheet"/g) || []).length,5);assert.doesNotMatch(html,/<link rel="stylesheet" href="\/(champions|pro-players|suite|shared-blocks)\.css"/);assert.match(read('app.css'),/\.mayhem-ranking-list/);assert.match(read('app.css'),/container-type:\s*inline-size/);
+ assert.doesNotMatch(html,/<script src="\/friends\.js"/);assert.equal((html.match(/<link rel="stylesheet"/g) || []).length,5);assert.doesNotMatch(html,/<link rel="stylesheet" href="\/(champions|pro-players|suite|shared-blocks)\.css"/);assert.match(read('app.css'),/\.mayhem-ranking-list/);assert.match(read('app.css'),/container-type:\s*inline-size/);
  assert.doesNotMatch(html,/<script src="\/demo-data.js"/);assert.match(read('runtime.js'),/if \(demo\)/);
  assert.equal(require('../../desktop/package.json').build.nsis.differentialPackage,false);
+});
+test('R115 friends load on demand and complete only after successful registration',async()=>{
+ const h=harness();try{
+  const task=h.w.deepLegendsSections.load('friends');await new Promise(setImmediate);
+  assert.equal(h.scripts().length,1);assert.equal(h.scripts()[0].getAttribute('src'),'/friends.js');
+  h.w.deepLegendsSections.register('friends',()=>{});h.scripts()[0].onload();await task;
+  await h.w.deepLegendsSections.load('friends');assert.equal(h.scripts().length,1);
+ }finally{h.close();}
 });
 test('R115 module requests are singleflight and repeat entry does not add script nodes',async()=>{
  const h=harness();try{const a=h.w.deepLegendsSections.activate('champions'),b=h.w.deepLegendsSections.activate('champions');assert.equal(h.styles().length,1);assert.equal(h.scripts().length,0);let activated=0;h.finish('champions',()=>activated++);await Promise.all([a,b]);assert.equal(activated,1);await h.w.deepLegendsSections.activate('overview');await h.w.deepLegendsSections.activate('champions');assert.equal(h.scripts().length,1);assert.equal(h.w.document.querySelector('[data-section-loading]'),null);}finally{h.close();}
