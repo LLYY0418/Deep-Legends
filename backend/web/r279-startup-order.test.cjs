@@ -5,7 +5,7 @@ const app=fs.readFileSync(path.join(__dirname,'app.js'),'utf8'),gameplay=fs.read
 function scenario(order,{dropReplay=false}={}) {
  const events=new EventTarget(),appState={},state={status:null},applied=[];let pulls=0,writes=0;
  const window={addEventListener:(...args)=>events.addEventListener(...args),dispatchEvent:event=>events.dispatchEvent(event)};
- const f=compile(app,['readCommittedClientStatus','acceptClientView'],{state:appState,window,CustomEvent,renderClientConnection(){},renderLaunchpad(){},clearDisconnectedClientState(){},retryCollectionAfterConnection(){},queueLiveUpdateSlices(){},reportClientView(){}});
+ const f=compile(app,['readCommittedClientStatus','acceptClientView'],{state:appState,window,CustomEvent,renderClientConnection(){},renderLaunchpad(){},clearDisconnectedClientState(){},updateWorkspaceAvailability(){},renderCollectionCounts(){},retryCollectionAfterConnection(){},queueLiveUpdateSlices(){},reportClientView(){}});
  window.deepLegendsStatusSnapshot=f.readCommittedClientStatus;
  const g=compile(gameplay,['updateStatus','updateClientView','restoreCommittedClientStatus'],{state,window,applyClientViewStatus:status=>{state.status=status;applied.push(status.clientView.generation);},fetch:()=>pulls++,localStorage:{setItem:()=>writes++}});
  const listen=()=>{window.addEventListener('deep-legends:client-view',e=>g.updateClientView(e.detail));window.addEventListener('deep-legends:status',e=>g.updateStatus(e.detail));if(!dropReplay)g.restoreCommittedClientStatus();};

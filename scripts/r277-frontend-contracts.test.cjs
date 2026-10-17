@@ -7,7 +7,7 @@ const {JSDOM}=require('../desktop/node_modules/jsdom');
 const game=read('gameplay.js'),app=read('app.js'),css=read('gameplay.css');
 test('P1 client view lifecycle diagnostics are deduplicated and reject backwards generations',()=>{
  const state={clientView:{generation:3,state:'ready'}},events=[];
- const api=compile(app,['acceptClientView','reportClientView'],{state,window:{reportFlowDiagnostic:(...e)=>events.push(e),dispatchEvent(){}},CustomEvent:class{},renderClientConnection(){},renderLaunchpad(){},retryCollectionAfterConnection(){},clearDisconnectedClientState(){},queueLiveUpdateSlices(){}});
+ const api=compile(app,['acceptClientView','reportClientView'],{state,window:{reportFlowDiagnostic:(...e)=>events.push(e),dispatchEvent(){}},CustomEvent:class{},renderClientConnection(){},renderLaunchpad(){},retryCollectionAfterConnection(){},clearDisconnectedClientState(){},updateWorkspaceAvailability(){},renderCollectionCounts(){},queueLiveUpdateSlices(){}});
  for(let i=0;i<20;i++)assert.equal(api.acceptClientView({type:'client-view',state:'ready',generation:2}),false);
  assert.equal(events.length,2);assert(events.some(e=>e[1]==='rejected' && e[2].reason==='generation-rollback'));
  for(const [generation,stateName] of [[4,'exiting'],[5,'no-client'],[6,'ready']])assert(api.acceptClientView({type:'client-view',state:stateName,generation}));

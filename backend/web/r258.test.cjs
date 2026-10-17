@@ -117,7 +117,7 @@ test('R258 client-view SSE alone builds and removes self without any status pull
  let source,pulls=0;const appState={},events=[];
  class EventSource {constructor(){source=this}addEventListener(){}close(){}}
  const window={EventSource,dispatchEvent:e=>{if(e.type==='deep-legends:client-view'){events.push(e.detail);h.updateClientView(e.detail);}}};
- const f=compile(app,['setupLiveUpdates','acceptClientView'],{state:appState,window,EventSource,CustomEvent:h.dom.window.CustomEvent,clearTimeout:()=>{},renderClientConnection:()=>{},renderLaunchpad:()=>{},clearDisconnectedClientState:()=>{},refreshStatus:()=>pulls++,LIVE_UPDATE_STATE_SLICES:{},updateUI:{},resyncLiveState:()=>{}});
+ const f=compile(app,['setupLiveUpdates','acceptClientView'],{state:appState,window,EventSource,CustomEvent:h.dom.window.CustomEvent,clearTimeout:()=>{},renderClientConnection:()=>{},renderLaunchpad:()=>{},clearDisconnectedClientState:()=>{},updateWorkspaceAvailability(){},renderCollectionCounts(){},refreshStatus:()=>pulls++,LIVE_UPDATE_STATE_SLICES:{},updateUI:{},resyncLiveState:()=>{}});
  f.setupLiveUpdates();h.state.status={connected:false};
  const view={type:'client-view',state:'ready',region:'TENCENT',serverId:'HN1',summoner:identity.summoner,sgpReady:true,generation:100};
  source.onmessage({data:JSON.stringify(view)});assert(h.nodes.playerTabs.querySelector('[data-player-tab="current"]'));assert.equal(h.loads.length,1);assert.equal(pulls,0);
@@ -234,7 +234,7 @@ test('R279 late bootstrap uses the same self identity and single overview load a
  for(const order of ['app-first','gameplay-first']){
   const h=harness();try{
    const appState={},window=h.dom.window;
-   const f=compile(app,['readCommittedClientStatus','acceptClientView'],{state:appState,window,CustomEvent:window.CustomEvent,renderClientConnection(){},renderLaunchpad(){},clearDisconnectedClientState(){},retryCollectionAfterConnection(){},queueLiveUpdateSlices(){},reportClientView(){}});
+   const f=compile(app,['readCommittedClientStatus','acceptClientView'],{state:appState,window,CustomEvent:window.CustomEvent,renderClientConnection(){},renderLaunchpad(){},clearDisconnectedClientState(){},updateWorkspaceAvailability(){},renderCollectionCounts(){},retryCollectionAfterConnection(){},queueLiveUpdateSlices(){},reportClientView(){}});
    window.deepLegendsStatusSnapshot=f.readCommittedClientStatus;
    const replay=compile(gameplay,['restoreCommittedClientStatus'],{window,updateStatus:h.updateStatus}).restoreCommittedClientStatus;
    const listen=()=>{window.addEventListener('deep-legends:client-view',e=>h.updateClientView(e.detail));window.addEventListener('deep-legends:status',e=>h.updateStatus(e.detail));replay();};

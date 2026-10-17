@@ -508,6 +508,7 @@
   }
 
 	function clearDisconnectedClientState() {
+      if (state.status) Object.assign(state.status, {snapshotReady:false, snapshotFallback:false, calculationOK:false, ownedCount:null, chromaOwnedCount:null, remainingCount:null, collectionDirty:false, syncing:false});
       state.accountRequestSeq = (state.accountRequestSeq || 0) + 1;
       state.poolsRequestSeq = (state.poolsRequestSeq || 0) + 1;
       state.poolCatalogRequestSeq = (state.poolCatalogRequestSeq || 0) + 1;
@@ -749,19 +750,20 @@
 
   function renderStatus() {
     if (state.backendExited) return;
+    acceptClientView(state.status.clientView);
     const data = state.status;
+    if (state.clientView && state.clientView.state !== "ready") {
+      data.connected = data.identityReady = data.sgpReady = false;
+      Object.assign(data, {snapshotReady:false, snapshotFallback:false, calculationOK:false, ownedCount:null, chromaOwnedCount:null, remainingCount:null, collectionDirty:false, syncing:false});
+    }
     document.body.classList.remove("is-fatal");
     if (!data.syncing || !data.connected) state.manualRefreshTimedOut = false;
     const refreshBusy = state.manualRefreshing || (data.syncing && !state.manualRefreshTimedOut);
     el.refresh.disabled = refreshBusy;
     setRefreshBusy(refreshBusy);
-    acceptClientView(data.clientView);
     data.clientView = state.clientView;
     renderClientConnection();
-    el.ownedCount.textContent = data.snapshotReady || data.snapshotFallback ? formatNumber(data.ownedCount) : "—";
-    el.chromaCount.textContent = data.snapshotReady ? formatNumber(data.chromaOwnedCount || 0) : "—";
-    el.poolCount.textContent = data.poolTotal ? formatNumber(data.poolTotal) : "—";
-    el.remainingCount.textContent = data.calculationOK || data.snapshotFallback ? formatNumber(data.remainingCount) : "—";
+    renderCollectionCounts(data);
     if (safeHTTPURL(data.poolSource)) el.poolSource.href = data.poolSource; else el.poolSource.removeAttribute("href");
     el.poolSource.textContent = `${data.poolVersion || "当前"} 奖池清单`;
     if (el.settingsBuildIdentity) {
@@ -773,6 +775,13 @@
     updateWorkspaceAvailability(data);
     renderUpdateStatus(data.update);
     window.dispatchEvent(new CustomEvent("deep-legends:status", { detail: data }));
+  }
+
+  function renderCollectionCounts(data) {
+    el.ownedCount.textContent = data.snapshotReady || data.snapshotFallback ? formatNumber(data.ownedCount) : "—";
+    el.chromaCount.textContent = data.snapshotReady ? formatNumber(data.chromaOwnedCount || 0) : "—";
+    el.poolCount.textContent = data.poolTotal ? formatNumber(data.poolTotal) : "—";
+    el.remainingCount.textContent = data.calculationOK || data.snapshotFallback ? formatNumber(data.remainingCount) : "—";
   }
 
   function reportClientView(view, action, reason) {
@@ -793,7 +802,11 @@
     // Legacy business consumers receive the same committed presentation state;
     // this notification never fetches status or decides tab visibility itself.
     if (state.status) state.status = {...state.status, clientView:view, connected:view.state === "ready", identityReady:view.state === "ready", sgpReady:view.sgpReady, clientRegion:view.region || "", serverId:view.serverId || "", summoner:view.summoner || {}};
-    if (previous?.state === "ready" && view.state !== "ready") clearDisconnectedClientState();
+    if (view.state !== "ready") clearDisconnectedClientState();
+    if (state.status) {
+      updateWorkspaceAvailability(state.status);
+      renderCollectionCounts(state.status);
+    }
     renderClientConnection();
     renderLaunchpad();
     window.dispatchEvent(new CustomEvent("deep-legends:client-view", {detail:view}));
@@ -2836,6 +2849,7 @@
   function activateFavoritesPage(name, returning = false) {
     const tab = el.favoritesTabs.find((item) => item.dataset.favoritesPage === name);
     if (!tab) return;
+    if (state.status) updateWorkspaceAvailability(state.status);
     const previous = state.favoritesPage;
     if (previous !== name) {
       cancelRenderFrames();
