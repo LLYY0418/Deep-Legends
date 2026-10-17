@@ -130,7 +130,7 @@
   function writePresets(storage,saved) {try{storage.setItem(key,JSON.stringify(saved.slice(0,12)));return true;}catch(_){return false;} }
   function blocked(tab,ctx) {
     if(tab.advancedSearch?.boundary?.reached && tab.advancedSearch.boundary.signature===JSON.stringify(conditions(tab)))return {reason:'time_boundary',copy:'已查完当前时间条件的对局'};
-    if(!tab.data?.pagination?.hasMore)return {reason:'no_more',copy:'已查完全部可查询的对局'};
+    if(!(ctx.hasMore?.() ?? tab.data?.pagination?.hasMore))return {reason:'no_more',copy:'已查完全部可查询的对局'};
     if(ctx.outage?.())return {reason:'outage',copy:'战绩服务暂时中断，恢复后可继续'};
     const seconds=Math.ceil(((ctx.quotaUntil?.() || tab.advancedSearch?.quotaUntil || 0)-Date.now())/1000);
     if(seconds>0)return {reason:'quota',copy:`查询额度恢复中，约 ${seconds} 秒后可继续`};
@@ -144,32 +144,32 @@
     try {
       while(!search.stopping && ctx.isActive() && !tab.closed && tab.advancedSearch===search) {
         const block=blocked(tab,ctx);if(block){search.stopReason=block.reason;break;}
-        if(filter(ctx.rows(),tab,ctx).length>=10 || search.scanned>=limit)break;
+        if(!ctx.hasMore && filter(ctx.rows(),tab,ctx).length>=10 || search.scanned>=limit)break;
         const before=new Set(ctx.rows().map(m=>String(m.gameId))),count=Math.min(20,limit-search.scanned);
-        const loaded=await ctx.load(count);search.pages++;search.bytes+=Number(ctx.pageBytes?.() || 0);
-        const consumed=new Set(ctx.rows().filter(m=>!before.has(String(m.gameId))).map(m=>String(m.gameId))).size;search.scanned+=consumed;
+        const loaded=await ctx.load(count,serverTimeRange(tab,ctx));search.pages++;search.bytes+=Number(ctx.pageBytes?.() || 0);
+        const consumed=ctx.pageScanned?.() ?? new Set(ctx.rows().filter(m=>!before.has(String(m.gameId))).map(m=>String(m.gameId))).size;search.scanned+=consumed;
         if(search.stopping){search.stopReason='user_stop';break;}
         const failure=blocked(tab,ctx);if(failure){search.stopReason=failure.reason;break;}
         search.progress();
         const range=serverTimeRange(tab,ctx);
-        if(range.startTime && loaded && ctx.rows().some(m=>timeValue(m.createdAt)<range.startTime*1000)){search.boundary={signature:JSON.stringify(conditions(tab)),reached:true};search.stopReason='time_boundary';break;}
+        if(!conditions(tab).time?.not && range.startTime && loaded && ctx.rows().some(m=>timeValue(m.createdAt)<range.startTime*1000)){search.boundary={signature:JSON.stringify(conditions(tab)),reached:true};search.stopReason='time_boundary';break;}
         if(!loaded || consumed<=0 || tab.data?.pagination?.moreError){search.stopReason='error';break;}
       }
     } catch(error) {search.stopReason=search.stopping?'user_stop':'error';}
     finally {
       if(search.cancelled)search.stopReason='user_stop';
       search.running=false;search.stopping=false;
-      ctx.diagnostic?.('history_search_client',{scanned:search.scanned,hits:filter(ctx.rows(),tab,ctx).length,pages:search.pages,stop_reason:search.stopReason,durationMs:Date.now()-started,averagePageBytes:search.pages?Math.round(search.bytes/search.pages):0,beg_index:ctx.cursor(),time_range:serverTimeRange(tab,ctx).startTime?new Date(serverTimeRange(tab,ctx).startTime*1000).toISOString().slice(0,10):'',new_unique:search.scanned,exhausted:!tab.data?.pagination?.hasMore});
+      ctx.diagnostic?.('history_search_client',{scanned:search.scanned,hits:filter(ctx.rows(),tab,ctx).length,pages:search.pages,stop_reason:search.stopReason,durationMs:Date.now()-started,averagePageBytes:search.pages?Math.round(search.bytes/search.pages):0,beg_index:ctx.cursor(),time_range:serverTimeRange(tab,ctx).startTime?new Date(serverTimeRange(tab,ctx).startTime*1000).toISOString().slice(0,10):'',new_unique:search.scanned,exhausted:!(ctx.hasMore?.() ?? tab.data?.pagination?.hasMore)});
       if(tab.advancedSearch===search)search.progress();
     }
     return true;
   }
   function serverTimeRange(tab,ctx) {
-    const c=conditions(tab).time;if(!c || c.not || !c.values.length)return {};
+    const c=conditions(tab).time;if(!c || !c.values.length)return {};
     const now=ctx.now?.() ?? Date.now(),today=new Date(now);today.setHours(0,0,0,0);
     const starts={today:today.getTime(),d3:now-3*86400000,d7:now-7*86400000,d30:now-30*86400000};
     const values=c.values.map(v=>starts[v]);if(values.some(v=>!Number.isFinite(v)))return {};
-    return {startTime:Math.floor(Math.min(...values)/1000),endTime:Math.floor(now/1000)};
+    return c.not ? {startTime:1,endTime:Math.floor(Math.min(...values)/1000)-1} : {startTime:Math.floor(Math.min(...values)/1000),endTime:Math.floor(now/1000)};
   }
   function ui(tab) {return tab.advancedMenu ||= {open:false,page:'conditions',category:'result',query:'',sort:'count',renaming:-1};}
   const optionCache = new WeakMap();
@@ -196,7 +196,7 @@
   }
   const button=(text,attribute,selected=false)=>`<button type="button" ${attribute}${selected?' class="is-active" aria-pressed="true"':' aria-pressed="false"'}>${text}</button>`;
   function capsules(cs,ctx,readonly=false) {
-    return Object.entries(cs).map(([category,c])=>`<span class="af-capsule${c.not?' is-not':''}">${readonly?`<span>${categories[category]} <i>|</i> ${c.not?'<em>不是</em> ':''}${escape(summary(category,c,ctx))}</span>`:button(`${categories[category]} <i>|</i> ${c.not?'<em>不是</em> ':''}${escape(summary(category,c,ctx))}`,`data-af-category="${category}"`)+`<button type="button" class="af-capsule-remove" data-af-remove="${category}" aria-label="删除${categories[category]}条件"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-close"/></svg></button>`}</span>`).join('');
+    return Object.entries(cs).map(([category,c])=>`<span class="af-capsule${c.not?' is-not':''}">${readonly?`<span>${categories[category]} <i>|</i> ${c.not?'<em>不是</em> ':''}${escape(summary(category,c,ctx))}</span>`:button(`${categories[category]} <i>|</i> ${c.not?'<em>不是</em> ':''}${escape(summary(category,c,ctx))}`,`data-af-category="${category}"`)+`<button type="button" data-af-remove="${category}" aria-label="删除${categories[category]}条件">×</button>`}</span>`).join('');
   }
   function optionCount(o,hero) {
     const winrate=Math.round(100*o.wins/o.count);
@@ -247,7 +247,7 @@
   }
   function menuBody(tab,ctx) {
     const m=ui(tab),saved=readPresets(ctx.storage),cs=normalizedEditing(tab);
-    if(m.page==='saved')return `<div class="af-saved"><div class="af-saved-heading">已保存 ${saved.length} / 12</div><div class="af-saved-list">${saved.map((p,i)=>`<div class="af-saved-row"><div class="af-saved-copy">${m.renaming===i?`<div class="af-rename"><input data-af-rename-input="${i}" value="${escape(p.name)}" maxlength="60" aria-label="新名称"><button type="button" data-af-rename-save="${i}" aria-label="保存名称"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-check"/></svg></button><button type="button" data-af-rename-cancel aria-label="取消重命名"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-close"/></svg></button></div>`:`<strong>${escape(p.name)}</strong>`}<div class="af-capsules">${capsules(p.conditions,ctx,true)}</div></div><div class="af-saved-actions"><button type="button" data-af-apply="${i}">套用</button><button type="button" data-af-rename="${i}">改名</button><button type="button" data-af-delete="${i}">删除</button></div></div>`).join('') || '<p class="af-empty">暂无常用筛选</p>'}</div><div class="af-current-conditions"><header><strong>当前条件</strong><small>（请先在底部输入框输入名称后保存）</small></header><div class="af-capsules">${Object.keys(cs).length?capsules(cs,ctx,true):'还没有选择条件'}</div></div><p data-af-save-error role="alert" hidden></p><footer class="af-savebar"><input data-af-name placeholder="输入名称后保存当前条件" aria-label="常用筛选名称" maxlength="60"><button type="button" data-af-save${!Object.keys(cs).length?' disabled':''}>保存当前条件</button>${saved.length>=12?'<span>最多保存 12 个</span>':''}</footer></div>`;
+    if(m.page==='saved')return `<div class="af-saved"><div class="af-saved-heading">已保存 ${saved.length} / 12</div><div class="af-saved-list">${saved.map((p,i)=>`<div class="af-saved-row"><div class="af-saved-copy">${m.renaming===i?`<div class="af-rename"><input data-af-rename-input="${i}" value="${escape(p.name)}" maxlength="60" aria-label="新名称"><button type="button" data-af-rename-save="${i}" aria-label="保存名称">✓</button><button type="button" data-af-rename-cancel aria-label="取消重命名">×</button></div>`:`<strong>${escape(p.name)}</strong>`}<div class="af-capsules">${capsules(p.conditions,ctx,true)}</div></div><div class="af-saved-actions"><button type="button" data-af-apply="${i}">套用</button><button type="button" data-af-rename="${i}">改名</button><button type="button" data-af-delete="${i}">删除</button></div></div>`).join('') || '<p class="af-empty">暂无常用筛选</p>'}</div><div class="af-current-conditions"><header><strong>当前条件</strong><small>（请先在底部输入框输入名称后保存）</small></header><div class="af-capsules">${Object.keys(cs).length?capsules(cs,ctx,true):'还没有选择条件'}</div></div><p data-af-save-error role="alert" hidden></p><footer class="af-savebar"><input data-af-name placeholder="输入名称后保存当前条件" aria-label="常用筛选名称" maxlength="60"><button type="button" data-af-save${!Object.keys(cs).length?' disabled':''}>保存当前条件</button>${saved.length>=12?'<span>最多保存 12 个</span>':''}</footer></div>`;
     const category=m.category || 'result',c=draft(tab,category),query=m.query.toLowerCase().trim();m.category=category;
     let opts=cachedOptions(tab,category,ctx,c).filter(o=>!query || searchOption(o,category,query,ctx));
     const compare=(a,b)=>category==='hero' && m.sort==='winrate' ? b.wins/b.count-a.wins/a.count : category==='hero' && m.sort==='recent' ? b.recent-a.recent : b.count-a.count;
@@ -259,19 +259,19 @@
     const sort=category==='hero' ? `<span class="af-sort-label">排序</span><div class="af-segment">${[['count','场次'],['winrate','胜率'],['recent','最近']].map(([value,label])=>button(label,`data-af-sort="${value}"`,m.sort===value)).join('')}</div>` : '';
     const cards=opts.map(o=>button(`${category==='hero'?ctx.icon?.(o.value,o.label) || '':category==='position'?ctx.positionIcon?.(o.value) || '':''}<strong>${escape(o.label)}</strong><small data-af-option-count>${optionCount(o,category==='hero')}</small>`,`data-af-option="${escape(o.value)}"`,c.values.includes(o.value)).replace('data-af-option=',`${o.count===0?'data-af-zero="true" ':''}data-af-option=`)).join('');
     const thresholds=category==='performance' ? `<div class="af-thresholds">${[['kda','KDA',0.5],['score','评分',0.5],['kp','参团率',5]].map(([name,label,step])=>`<label>${label} ≥<input type="number" min="0" ${name==='kp'?'max="100"':''} step="${step}" placeholder="—" value="${c.thresholds?.[name] ?? ''}" data-af-threshold="${name}" aria-label="${label}门槛"><span>${name==='kp'?'%':''}</span></label>`).join('')}</div>` : '';
-    return `<div class="af-columns"><div class="af-categories">${Object.entries(categories).map(([k,label])=>`<button type="button" data-af-category="${k}"${category===k?' class="is-active"':''}><span>${label}<i aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></i></span><small data-af-summary="${k}" title="${escape(cs[k] ? (cs[k].not?'不是 · ':'')+summary(k,cs[k],ctx) : '')}">${cs[k]?escape((cs[k].not?'不是 · ':'')+summary(k,cs[k],ctx)):''}</small></button>`).join('')}</div><div class="af-pane"><header><strong>${categories[category]}</strong><div class="af-segment">${button('是','data-af-not="false"',!c.not)}${button('不是','data-af-not="true"',c.not)}</div>${sort}</header><input class="af-search"${['hero','coplayer'].includes(category)?'':' hidden'} data-af-query placeholder="搜索${categories[category]}${category==='hero'?'（支持拼音、简称）':''}" aria-label="搜索${categories[category]}" value="${escape(m.query)}">${controls}${thresholds}<div class="af-options is-${category}">${cards || '<p class="af-empty">暂无可选项</p>'}${more?button('显示更多','data-af-more'):''}</div>${category==='multikill'?`<label class="af-atleast"><input type="checkbox" data-af-atleast${c.atLeast?' checked':''}>及以上</label>`:''}</div></div><footer class="af-modal-footer"><span data-af-preview></span><div class="af-capsule-slot"><div class="af-capsules${m.capsulesExpanded?' is-expanded':''}" data-af-draft-capsules>${capsules(cs,ctx)}</div></div><button type="button" data-af-clear>清除</button><button type="button" data-af-show-saved>保存为常用</button><button class="af-done" type="button" data-af-close>完成</button></footer>`;
+    return `<div class="af-columns"><div class="af-categories">${Object.entries(categories).map(([k,label])=>`<button type="button" data-af-category="${k}"${category===k?' class="is-active"':''}><span>${label}<i aria-hidden="true">›</i></span><small data-af-summary="${k}" title="${escape(cs[k] ? (cs[k].not?'不是 · ':'')+summary(k,cs[k],ctx) : '')}">${cs[k]?escape((cs[k].not?'不是 · ':'')+summary(k,cs[k],ctx)):''}</small></button>`).join('')}</div><div class="af-pane"><header><strong>${categories[category]}</strong><div class="af-segment">${button('是','data-af-not="false"',!c.not)}${button('不是','data-af-not="true"',c.not)}</div>${sort}</header><input class="af-search"${['hero','coplayer'].includes(category)?'':' hidden'} data-af-query placeholder="搜索${categories[category]}${category==='hero'?'（支持拼音、简称）':''}" aria-label="搜索${categories[category]}" value="${escape(m.query)}">${controls}${thresholds}<div class="af-options is-${category}">${cards || '<p class="af-empty">暂无可选项</p>'}${more?button('显示更多','data-af-more'):''}</div>${category==='multikill'?`<label class="af-atleast"><input type="checkbox" data-af-atleast${c.atLeast?' checked':''}>及以上</label>`:''}</div></div><footer class="af-modal-footer"><span data-af-preview></span><div class="af-capsule-slot"><div class="af-capsules${m.capsulesExpanded?' is-expanded':''}" data-af-draft-capsules>${capsules(cs,ctx)}</div></div><button type="button" data-af-clear>清除</button><button type="button" data-af-show-saved>保存为常用</button><button class="af-done" type="button" data-af-close>完成</button></footer>`;
   }
   function searchOption(o,category,query,ctx) {return o.label.toLowerCase().includes(query) || category==='hero' && ctx.heroSearch?.(query,o.value,o.label)>0;}
   function render(tab,context) {
     const ctx=context(),m=ui(tab),n=Object.keys(conditions(tab)).length;
-    return `<div class="af-select app-select${n?' is-active':''}" data-af-root><button class="app-select-trigger" type="button" data-af-open aria-haspopup="dialog" aria-expanded="${m.open}"><svg class="function-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-7a448332b5"/></svg><span>筛选</span>${n?`<b>${n}</b>`:''}<svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></button></div>`;
+    return `<div class="af-select app-select${n?' is-active':''}" data-af-root><button class="app-select-trigger" type="button" data-af-open aria-haspopup="dialog" aria-expanded="${m.open}"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14l-5.5 6v5l-3 1v-6z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>筛选</span>${n?`<b>${n}</b>`:''}</button></div>`;
   }
   function menuFor(container) {return container?._afDialog || null;}
   function ensureMenu(container,tab,ctx) {
     const doc=container.ownerDocument,slot=container.closest('.player-overlay-scroll')?'overlay':'main';
     doc._afDialogs ||= {};
     let menu=doc._afDialogs[slot];
-    if(!menu){const template=doc.createElement('template'),m=ui(tab);template.innerHTML=`<dialog class="af-menu${m.page==='saved'?' is-saved':''}" data-af-menu aria-label="战绩筛选" aria-modal="true" hidden><nav><strong>筛选战绩</strong><div role="tablist">${button('条件',`data-af-page="conditions" role="tab" aria-selected="${m.page==='conditions'}"`,m.page==='conditions')}${button('常用',`data-af-page="saved" role="tab" aria-selected="${m.page==='saved'}"`,m.page==='saved')}</div><button type="button" data-af-close aria-label="关闭筛选"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-close"/></svg></button></nav><div class="af-menu-body">${m.open?menuBody(tab,ctx):''}</div></dialog>`;menu=template.content.firstElementChild;doc.body.append(menu);doc._afDialogs[slot]=menu;
+    if(!menu){const template=doc.createElement('template'),m=ui(tab);template.innerHTML=`<dialog class="af-menu${m.page==='saved'?' is-saved':''}" data-af-menu aria-label="战绩筛选" aria-modal="true" hidden><nav><strong>筛选战绩</strong><div role="tablist">${button('条件',`data-af-page="conditions" role="tab" aria-selected="${m.page==='conditions'}"`,m.page==='conditions')}${button('常用',`data-af-page="saved" role="tab" aria-selected="${m.page==='saved'}"`,m.page==='saved')}</div><button type="button" data-af-close aria-label="关闭筛选">×</button></nav><div class="af-menu-body">${m.open?menuBody(tab,ctx):''}</div></dialog>`;menu=template.content.firstElementChild;doc.body.append(menu);doc._afDialogs[slot]=menu;
       for(const type of ['click','change','input','cancel','keydown'])menu.addEventListener(type,event=>menu._afOwner?._afHandlers?.[type]?.(event),type==='cancel');
     }
     container._afDialog=menu;return menu;
@@ -284,7 +284,7 @@
     if(!active(tab))return '';const ctx=context();
     return `<div class="af-conditionbar" data-af-conditions><div class="af-capsules">${capsules(conditions(tab),ctx)}${button('+ 条件','data-af-add class="af-add"')}</div><div class="af-counts" data-af-counts>${counts(tab,ctx)}</div></div>`;
   }
-  function scannedCount(tab,ctx) {return new Set(ctx.rows().map(m=>String(m.gameId))).size;}
+  function scannedCount(tab,ctx) {return ctx.scannedCount?.() ?? new Set(ctx.rows().map(m=>String(m.gameId))).size;}
   function timeLabel(tab) {
     const values=conditions(tab).time?.values || [];
     return ['d30','d7','d3','today'].find(v=>values.includes(v));

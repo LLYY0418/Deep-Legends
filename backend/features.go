@@ -280,6 +280,7 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"overview_art_client":            {"summary": true},
 	"client_view_client":             {"received": true, "applied": true, "rejected": true, "frame": true, "new-generation": true, "generation-rollback": true, "duplicate-generation": true, "invalid-frame": true},
 	"ui_zoom_state":                  {"applied": true},
 	"lp_chip_render":                 {"render": true},
@@ -287,6 +288,7 @@ var clientDiagnosticEvents = map[string]map[string]bool{
 	"overview_reference_expired":     {"retry": true},
 	"overview_rerender_client":       {"render": true, "filter_modal_error": true},
 	"client_follow_client":           {"login": true, "platform-change": true, "identity-change": true},
+	"career_cards_render":            {"render": true},
 	"match_virtual_client":           {"summary": true},
 	"pool_render_client":             {"render": true},
 	"history_outage_retry":           {"recovered": true, "still_down": true},

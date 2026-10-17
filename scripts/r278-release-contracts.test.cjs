@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
 test('R278 P15 version and Chinese changelog match the release worklist',()=>{
- const pkg=require(process.env.R278_PACKAGE_FILE || '../desktop/package.json'),lock=require('../desktop/package-lock.json');for(const v of [pkg.version,lock.version,lock.packages[''].version])assert.equal(v,'0.12.86');
+ const pkg=require(process.env.R278_PACKAGE_FILE || '../desktop/package.json'),lock=require('../desktop/package-lock.json');for(const v of [pkg.version,lock.version,lock.packages[''].version])assert.equal(v,'0.12.87');
  const entry=fs.readFileSync(path.join(root,'CHANGELOG.md'),'utf8').split('## 0.12.85')[1]?.split('\n## ')[0];assert(entry);for(const topic of ['登录','战绩','额度','筛选','收藏','公告','更新','日志'])assert(entry.includes(topic));assert.doesNotMatch(entry,/goroutine|LCU|SGP|HTTP|SHA|P1–P14/);
 });
 

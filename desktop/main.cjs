@@ -20,7 +20,11 @@ function installDesktopCrashDiagnostics() {
     appendDesktopLog("进程异常 " + JSON.stringify(desktopCrashEvent(kind, details)));
   };
   app.on("render-process-gone", (_event, _contents, details) => record("render-process-gone", details));
-  app.on("child-process-gone", (_event, details) => record("child-process-gone", details));
+  app.on("child-process-gone", (_event, details) => {
+    record("child-process-gone", details);
+    const { isNetworkService, recoverNetworkService } = require("./desktop-log.cjs");
+    if (isNetworkService?.(details)) void recoverNetworkService(mainWindow, event => appendDesktopLog("网络服务 " + JSON.stringify(event)));
+  });
   // Monitoring writes synchronously without swallowing the uncaught exception
   // or replacing Node/Electron's fatal-exception behavior.
   process.on("uncaughtExceptionMonitor", error => record("uncaughtException", { name: error?.name }));

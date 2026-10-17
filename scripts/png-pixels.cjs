@@ -19,7 +19,7 @@ function decodePNG(buffer){
    const predictor=[0,a,b,Math.floor((a+b)/2),paeth(a,b,c)][filter];pixels[i]=(packed[y*(stride+1)+1+x]+predictor)&255;
   }
  }
- return {width,height,brightness(x,y){assert(x>=0 && y>=0 && x<width && y<height);const i=(Math.floor(y)*width+Math.floor(x))*channels;return .2126*pixels[i]+.7152*pixels[i+1]+.0722*pixels[i+2];}};
+ return {width,height,pixel(x,y){assert(x>=0 && y>=0 && x<width && y<height);const i=(Math.floor(y)*width+Math.floor(x))*channels;return [pixels[i],pixels[i+1],pixels[i+2]];},brightness(x,y){assert(x>=0 && y>=0 && x<width && y<height);const i=(Math.floor(y)*width+Math.floor(x))*channels;return .2126*pixels[i]+.7152*pixels[i+1]+.0722*pixels[i+2];}};
 }
 function regionBrightness(png,rect){
  const values=[];

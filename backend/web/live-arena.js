@@ -43,20 +43,22 @@
   function identityLine(player, kind, legacyCopy) {
     const h = helpers();
     const span = (copy, tooltip) => copy ? `<span${tooltip ? ` data-tooltip="${h.escapeHTML(copy)}" data-tooltip-overflow="self" data-tooltip-size="compact"` : ''}>${h.escapeHTML(copy)}</span>` : '';
-    if (player.hidden === true || !['rift', 'arena', 'none'].includes(kind)) return span(legacyCopy, false);
+    if (!['rift', 'aram', 'arena', 'none'].includes(kind) || player.hidden === true && !['rift','aram'].includes(kind)) return span(legacyCopy, false);
     if (kind === 'none') return '';
     if (kind === 'arena') {
       const fame = Number(player.arenaFame?.level) > 0 ? player.arenaFame : null;
       if (!fame) return '';
       const tier = tiers[String(fame.tier || '').toUpperCase()] || '';
-      return `<span class="arena-fame${tier}" data-tooltip="${h.escapeHTML(`斗魂等级 ${h.number(fame.level)} · 名望 ${h.number(fame.fame)}`)}" data-tooltip-size="compact"><svg class="function-icon arena-fame-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-91b16449a6"/></svg><b>${h.number(fame.level)}级</b><span class="arena-fame-divider" aria-hidden="true">·</span><span>${h.number(fame.fame)} 名望</span></span>`;
+      return `<span class="arena-fame${tier}" data-tooltip="${h.escapeHTML(`斗魂等级 ${h.number(fame.level)} · 名望 ${h.number(fame.fame)}`)}" data-tooltip-size="compact"><svg class="arena-fame-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 13.5 4.6v6.8L8 14.5 2.5 11.4V4.6Z"/><path class="arena-fame-blades" d="m5.4 5.4 5.2 5.2M10.6 5.4 5.4 10.6"/></svg><b>${h.number(fame.level)}级</b><span class="arena-fame-divider" aria-hidden="true">·</span><span>${h.number(fame.fame)} 名望</span></span>`;
     }
-    if (!player.soloRank && !player.flexRank) return span(legacyCopy, true);
-    const queue = (label, value) => `${h.escapeHTML(label)} ${value?.tier ? `<b class="live-rank-title">${h.escapeHTML(h.rankTitle(value))}</b> ${h.escapeHTML(h.number(value.leaguePoints))} LP` : '未定级'}`;
-    const ranks = [queue('单双', player.soloRank), queue('灵活', player.flexRank)];
-    if (player.rank?.queueType === 'RANKED_FLEX_SR') ranks.reverse();
-    const copy=[String(legacyCopy).split(' · ')[0],...ranks.map(value=>value.replace(/<[^>]*>/g,''))].join(' · ');
-    return `<span data-tooltip="${h.escapeHTML(copy)}" data-tooltip-overflow="self" data-tooltip-size="compact">${h.escapeHTML(String(legacyCopy).split(' · ')[0])} · ${ranks.join(' · ')}</span>`;
+    const valid=value=>value?.tier && /^(IRON|BRONZE|SILVER|GOLD|PLATINUM|EMERALD|DIAMOND|MASTER|GRANDMASTER|CHALLENGER)$/i.test(value.tier);
+    const rank=[player.soloRank,player.flexRank,player.rank].find(valid);
+    if(player.hidden===true && !rank)return '';
+    const tier=String(rank?.tier||'').toLowerCase();
+    const flex=rank && (rank===player.flexRank || rank.queueType==='RANKED_FLEX_SR');
+    const label=rank?`${flex?'灵活 ':''}${h.rankTitle(rank)}${['master','grandmaster','challenger'].includes(tier)?' '+h.number(rank.leaguePoints)+' LP':''}`:'未定级';
+    const position=kind==='rift' && !player.hidden?String(legacyCopy).split(' · ')[0]:'';
+    return `<span class="live-player-rank">${position?h.escapeHTML(position)+' · ':''}${rank?`<img class="live-rank-crest" src="/rank-crests/${tier}.png" alt="" decoding="async">`:''}<b class="live-rank-title">${h.escapeHTML(label)}</b></span>`;
   }
 
   // 斗魂右侧三格：近 N 局「X胜 Y负」（胜 = 名次在前一半，对齐 Akari isCherryPlacementWin）、
@@ -145,7 +147,7 @@
     dialog.className = 'career-dialog live-match-dialog';
     dialog.setAttribute('aria-labelledby', 'live-match-dialog-title');
     dialog.setAttribute('aria-describedby', 'live-match-dialog-context');
-    dialog.innerHTML = '<section class="career-dialog-sheet"><header class="career-dialog-head"><div><h2 id="live-match-dialog-title">对局详情</h2><p id="live-match-dialog-context"></p></div><button class="dialog-close-button control-icon-button" type="button" aria-label="关闭对局详情" data-tooltip="关闭" data-close-live-match><svg class="control-icon function-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-a6e644b804"/></svg></button></header><div class="live-match-dialog-content"></div></section>';
+    dialog.innerHTML = '<section class="career-dialog-sheet"><header class="career-dialog-head"><div><h2 id="live-match-dialog-title">对局详情</h2><p id="live-match-dialog-context"></p></div><button class="dialog-close-button control-icon-button" type="button" aria-label="关闭对局详情" data-tooltip="关闭" data-close-live-match><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div class="live-match-dialog-content"></div></section>';
     document.body.append(dialog);
     const entry = { dialog, title: dialog.querySelector('#live-match-dialog-title'), context: dialog.querySelector('#live-match-dialog-context'), content: dialog.querySelector('.live-match-dialog-content'), opener: null, view: null, token: 0 };
     dialog.querySelector('[data-close-live-match]').addEventListener('click', () => dialog.close());

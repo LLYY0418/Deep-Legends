@@ -810,6 +810,8 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 		if raw := r.URL.Query().Get("begIndex"); raw != "" {
 			request.BegIndex, _ = strconv.Atoi(raw)
 		}
+		request.StartTime, _ = strconv.ParseInt(r.URL.Query().Get("startTime"), 10, 64)
+		request.EndTime, _ = strconv.ParseInt(r.URL.Query().Get("endTime"), 10, 64)
 		request.MatchFilter = r.URL.Query().Get("matchFilter")
 		request.ExpectGameID = r.URL.Query().Get("expectGameId")
 		request.Force = r.URL.Query().Get("force") == "1" || strings.EqualFold(r.URL.Query().Get("force"), "true")
@@ -826,6 +828,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	if request.RetryDetails {
 		r = r.WithContext(context.WithValue(r.Context(), overviewRetryDetailsKey{}, true))
+		r = r.WithContext(context.WithValue(r.Context(), riotRequestSourceKey{}, "supplement"))
 	}
 	if !request.RetryDetails && (request.Force || r.URL.Query().Get("force") == "1") && a.champions != nil {
 		if _, source := riotUserKeys.effective(); source == "relay" && (isRiotRegion(request.Region) && (request.PlayerRef != "" || request.GameName != "")) {
@@ -7479,6 +7482,7 @@ type gameplayLivePlayer struct {
 	ChampionID          int64  `json:"championId,omitempty"`
 	ChampionPickIntent  int64  `json:"championPickIntent,omitempty"`
 	ChampionPickPending bool   `json:"championPickPending,omitempty"`
+	Bravery             bool   `json:"bravery,omitempty"`
 	ChampionLocked      bool   `json:"championLocked"`
 	ChampionName        string `json:"championName,omitempty"`
 	Position            string `json:"position,omitempty"`
@@ -7646,6 +7650,7 @@ type lcuLivePlayer struct {
 	ChampionID           int64  `json:"championId"`
 	ChampionPickIntent   int64  `json:"championPickIntent"`
 	ChampionPickPending  bool   `json:"-"`
+	Bravery              bool   `json:"-"`
 	ChampionLocked       bool   `json:"-"`
 	ProfileIconID        int64  `json:"profileIconId"`
 	PUUID                string `json:"puuid"`
@@ -8091,7 +8096,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		summoner := summonerFromGameplayReference(ref)
 		hidden, unresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
 		self := gameplayLivePlayerIsCurrent(ref, current.PUUID, raw.player.CellID, localPlayerCellID)
-		progress.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: a.registerGameplayReferenceDetails(ref), DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, Hidden: hidden, IsCurrent: self, Region: ref.Region}, TeamID: raw.team, IsAlly: self || arenaMode && phase == "ChampSelect", IdentityUnresolved: unresolved, ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionLocked: raw.player.ChampionLocked, ChampionName: championName(names, raw.player.ChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), HistoryState: "pending"}
+		progress.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: a.registerGameplayReferenceDetails(ref), DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, Hidden: hidden, IsCurrent: self, Region: ref.Region}, TeamID: raw.team, IsAlly: self || arenaMode && phase == "ChampSelect", IdentityUnresolved: unresolved, ChampionID: raw.player.ChampionID, Bravery: arenaMode && phase == "ChampSelect" && (self || raw.team == 100) && (raw.player.ChampionID == -3 || raw.player.ChampionPickIntent == -3 || raw.player.Bravery), ChampionPickPending: raw.player.ChampionPickPending, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionLocked: raw.player.ChampionLocked, ChampionName: championName(names, raw.player.ChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), HistoryState: "pending"}
 	}
 	var progressMu sync.Mutex
 	publishLiveProgress(ctx, progress)
@@ -8141,16 +8146,13 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 					defer a.recoverPanic("gameplay.loadGameplayLive.2")
 
 					defer enrichment.Done()
-					if aramMode {
-						return // ARAM details do not display ranked tiers.
-					}
 					if arenaMode {
 						// R263 P2.1：斗魂不展示召唤师峡谷段位，改读斗魂等级与名望。
 						arenaFame = a.loadLiveArenaFame(ctx, client, reference, playerRef, isCurrent, summoner.Privacy)
 						ranksFinishedAt[index] = time.Now()
 						return
 					}
-					ranks = append([]gameplayRank(nil), a.playerRankScore(ctx, client, playerRef, isCurrent, reference.ServerID, summoner.Privacy).ranks...)
+					ranks = append([]gameplayRank(nil), a.livePlayerRankScore(ctx, client, response.GameID, playerRef, isCurrent, reference.ServerID, summoner.Privacy).ranks...)
 					ranksFinishedAt[index] = time.Now()
 				}()
 				go func() {
@@ -8196,17 +8198,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 					}
 				}
 			}
-			var rank *gameplayRank
-			for rankIndex := range ranks {
-				if response.QueueID == 440 && ranks[rankIndex].QueueType == "RANKED_FLEX_SR" {
-					rank = &ranks[rankIndex]
-					break
-				}
-				if response.QueueID != 440 && ranks[rankIndex].QueueType == "RANKED_SOLO_5x5" {
-					rank = &ranks[rankIndex]
-					break
-				}
-			}
+			rank := livePreferredRank(soloRank, flexRank)
 			modeStats, recentGames := liveRecentPlayerStats(matches, playerRef, response.QueueID)
 			displayChampionID := raw.player.ChampionID
 			if displayChampionID <= 0 {
@@ -8221,7 +8213,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 				rankedRecord = recentRankedRecord(recentGames)
 			}
 			hidden, identityUnresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
-			response.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(summoner.Privacy), "PRIVATE"), Autofill: raw.player.IsAutofilled, IsCurrent: isCurrent, reference: reference}, IdentityUnresolved: identityUnresolved, TeamID: raw.team, IsAlly: isAlly, ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
+			response.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(summoner.Privacy), "PRIVATE"), Autofill: raw.player.IsAutofilled, IsCurrent: isCurrent, reference: reference}, IdentityUnresolved: identityUnresolved, TeamID: raw.team, IsAlly: isAlly, Bravery: arenaMode && phase == "ChampSelect" && (isCurrent || isAlly) && (raw.player.ChampionID == -3 || raw.player.ChampionPickIntent == -3 || raw.player.Bravery), ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
 			response.Players[index].SoloRank, response.Players[index].FlexRank = soloRank, flexRank
 			if arenaMode {
 				response.Players[index].ArenaFame = arenaFame
@@ -9020,6 +9012,18 @@ func mergeChampSelectPlayers(existing []struct {
 	}
 	merge := func(source []lcuChampSelectPlayer, team int64, ownTeam bool) {
 		for _, selected := range source {
+			// Keep the action marker separate from champion IDs: non-Arena
+			// modes retain their existing payload and portrait behavior.
+			braveryAction := false
+			if ownTeam && selected.CellID != nil {
+				for _, group := range session.Actions {
+					for _, action := range group {
+						if action.ActorCellID == *selected.CellID && strings.EqualFold(action.Type, "pick") && action.ChampionID != 0 {
+							braveryAction = action.ChampionID == -3
+						}
+					}
+				}
+			}
 			visiblePlayerRef := visibleChampSelectPlayerReference(selected)
 			selectedReference := normalizeGameplayReference(gameplayReference{PlayerRef: visiblePlayerRef, AlternatePlayerRef: selected.ObfuscatedPUUID, SummonerID: selected.SummonerID, AlternateSummonerID: selected.ObfuscatedSummonerID, GameName: selected.GameName, DisplayName: selected.GameName, TagLine: selected.TagLine})
 			index := -1
@@ -9048,12 +9052,13 @@ func mergeChampSelectPlayers(existing []struct {
 				result = append(result, struct {
 					player lcuLivePlayer
 					team   int64
-				}{player: lcuLivePlayer{CellID: selected.CellID, PUUID: visiblePlayerRef, ObfuscatedPUUID: selected.ObfuscatedPUUID, SummonerID: selected.SummonerID, ObfuscatedSummonerID: selected.ObfuscatedSummonerID, ChampionID: selected.ChampionID, ChampionPickIntent: pickIntent, ChampionPickPending: selected.ChampionPickIntent < 0, ChampionLocked: selected.ChampionID > 0, SummonerName: selected.GameName, GameName: selected.GameName, TagLine: selected.TagLine, NameVisibilityType: selected.NameVisibilityType, SelectedPosition: selected.AssignedPosition, Spell1ID: selected.Spell1ID, Spell2ID: selected.Spell2ID, IsAutofilled: ownTeam && selected.IsAutofilled}, team: team})
+				}{player: lcuLivePlayer{CellID: selected.CellID, PUUID: visiblePlayerRef, ObfuscatedPUUID: selected.ObfuscatedPUUID, SummonerID: selected.SummonerID, ObfuscatedSummonerID: selected.ObfuscatedSummonerID, ChampionID: selected.ChampionID, ChampionPickIntent: pickIntent, ChampionPickPending: selected.ChampionPickIntent < 0, Bravery: ownTeam && (braveryAction || selected.ChampionID == -3 || selected.ChampionPickIntent == -3), ChampionLocked: selected.ChampionID > 0, SummonerName: selected.GameName, GameName: selected.GameName, TagLine: selected.TagLine, NameVisibilityType: selected.NameVisibilityType, SelectedPosition: selected.AssignedPosition, Spell1ID: selected.Spell1ID, Spell2ID: selected.Spell2ID, IsAutofilled: ownTeam && selected.IsAutofilled}, team: team})
 				continue
 			}
 			result[index].player.IsAutofilled = ownTeam && selected.IsAutofilled
 			result[index].player.ChampionPickIntent = positiveChampionPickIntent(selected.ChampionPickIntent)
 			result[index].player.ChampionPickPending = selected.ChampionPickIntent < 0
+			result[index].player.Bravery = ownTeam && (braveryAction || selected.ChampionID == -3 || selected.ChampionPickIntent == -3)
 			if selected.ChampionID > 0 {
 				result[index].player.ChampionID = selected.ChampionID
 				result[index].player.ChampionLocked = true
@@ -11284,7 +11289,11 @@ func (a *app) enrichCurrentRiotMatches(client *LCUClient, ref gameplayReference,
 		}
 		public := a.registerGameplayReferenceDetails(mergeGameplayReferences(ref, gameplayReference{PlayerRef: playerRef}))
 		enriched := []gameplayMatch{}
+		ctx = context.WithValue(ctx, riotRequestSourceKey{}, "lcu-self-history")
 		for _, match := range matches {
+			if !riotPublicMatchEligible(match) {
+				continue
+			}
 			raw, err := a.riot.forPlatform(region).matchByID(ctx, strings.ToUpper(region)+"_"+strconv.FormatInt(match.GameID, 10))
 			if err != nil {
 				continue
@@ -11313,4 +11322,15 @@ func (a *app) enrichCurrentRiotMatches(client *LCUClient, ref gameplayReference,
 		event, _ := json.Marshal(map[string]any{"type": "overview-matches", "account": public, "matches": enriched})
 		a.broadcastEvent(string(event))
 	})
+}
+
+func livePreferredRank(solo, flex *gameplayRank) *gameplayRank {
+	for _, rank := range []*gameplayRank{solo, flex} {
+		if rank != nil {
+			if _, ok := rankAbsoluteScore(rank.Tier, rank.Division, rank.LeaguePoints); ok {
+				return rank
+			}
+		}
+	}
+	return nil
 }

@@ -1,0 +1,52 @@
+{
+  "Camille": {
+    "id": "Camille",
+    "key": "164",
+    "name": "青钢影"
+  },
+  "Ezreal": {
+    "id": "Ezreal",
+    "key": "81",
+    "name": "探险家"
+  },
+  "Jinx": {
+    "id": "Jinx",
+    "key": "222",
+    "name": "暴走萝莉"
+  },
+  "KSante": {
+    "id": "KSante",
+    "key": "897",
+    "name": "纳祖芒荣耀"
+  },
+  "LeeSin": {
+    "id": "LeeSin",
+    "key": "64",
+    "name": "盲僧"
+  },
+  "Nautilus": {
+    "id": "Nautilus",
+    "key": "111",
+    "name": "深海泰坦"
+  },
+  "Nidalee": {
+    "id": "Nidalee",
+    "key": "76",
+    "name": "狂野女猎手"
+  },
+  "Orianna": {
+    "id": "Orianna",
+    "key": "61",
+    "name": "发条魔灵"
+  },
+  "Poppy": {
+    "id": "Poppy",
+    "key": "78",
+    "name": "圣锤之毅"
+  },
+  "Syndra": {
+    "id": "Syndra",
+    "key": "134",
+    "name": "暗黑元首"
+  }
+}

@@ -67,6 +67,7 @@ type LCUDiscoveryStatus struct {
 }
 
 type LCUClient struct {
+	arenaDiscovery        *arenaFameDiscoveryState
 	historyGames          *historyGameCache
 	discoverySummoner     *Summoner
 	license               *licenseManager

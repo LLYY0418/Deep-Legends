@@ -1,0 +1,48 @@
+{
+  "startTime": "2024-09-25T12:00:00Z",
+  "state": "completed",
+  "type": "match",
+  "blockName": "Play-Ins",
+  "league": {
+    "name": "Worlds",
+    "slug": "worlds"
+  },
+  "match": {
+    "id": "112966697102367347",
+    "flags": [
+      "hasVod"
+    ],
+    "teams": [
+      {
+        "name": "MVK Esports",
+        "code": "MVK",
+        "image": "http://static.lolesports.com/teams/1767089709161_White_Logo.png",
+        "result": {
+          "outcome": "loss",
+          "gameWins": 0
+        },
+        "record": {
+          "wins": 0,
+          "losses": 2
+        }
+      },
+      {
+        "name": "Movistar KOI",
+        "code": "MKOI",
+        "image": "http://static.lolesports.com/teams/1734012609283_MKOI_FullColor_Blue.png",
+        "result": {
+          "outcome": "win",
+          "gameWins": 2
+        },
+        "record": {
+          "wins": 2,
+          "losses": 0
+        }
+      }
+    ],
+    "strategy": {
+      "type": "bestOf",
+      "count": 3
+    }
+  }
+}

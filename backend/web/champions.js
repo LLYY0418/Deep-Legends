@@ -819,7 +819,7 @@
       }
     }
     if (!rows.length) return "";
-    return `<section class="recommendation-section mayhem-item-ranking" data-mayhem-personal-builds><header><h3><span class="arena-section-icon" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-diamond"/></svg></span>我的海斗出装</h3><span class="section-count">本人 ${compactNumber(payload.sampleGames)} 场</span></header><div class="mayhem-ranking-list">${rows.join("")}</div></section>`;
+    return `<section class="recommendation-section mayhem-item-ranking" data-mayhem-personal-builds><header><h3><span class="arena-section-icon" aria-hidden="true">◈</span>我的海斗出装</h3><span class="section-count">本人 ${compactNumber(payload.sampleGames)} 场</span></header><div class="mayhem-ranking-list">${rows.join("")}</div></section>`;
   }
 
   function resetArenaControls() {
@@ -1078,7 +1078,7 @@
     const rows = filteredChampionRows();
     return `<section class="champion-list-card">
       <div class="champion-filter-bar">
-        <label class="champion-search"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-search"/></svg></span><span class="sr-only">搜索英雄</span><input type="search" value="${escapeHTML(state.query)}" placeholder="搜索中文、拼音、英文、缩写或外号" autocomplete="off" data-champion-search></label>
+        <label class="champion-search"><span aria-hidden="true">⌕</span><span class="sr-only">搜索英雄</span><input type="search" value="${escapeHTML(state.query)}" placeholder="搜索中文、拼音、英文、缩写或外号" autocomplete="off" data-champion-search></label>
         <div class="champion-position-tabs" role="tablist" aria-label="英雄位置">${positionOptions.map((item) => `<button type="button" role="tab" aria-label="${item.label}" aria-selected="${item.value === state.position}" class="${item.value === state.position ? "is-active" : ""}" data-champion-position="${item.value}">${positionIcon(item.value)}<span>${item.label}</span></button>`).join("")}</div>
         <span class="champion-result-count" role="status">${rows.length} 位英雄</span>
       </div>
@@ -1125,7 +1125,7 @@
     const selected = selectedRow ? mayhemSelectedRow({ ...(state.selected || {}), ...selectedRow }) : null;
     const list = `<section class="champion-list-card mayhem-champions">
       <div class="aram-champion-head"><div><h3>英雄梯度</h3><p>胜率与海克斯 · ${escapeHTML(currentModePatch())}</p></div><span class="champion-result-count">${rows.length} 位</span></div>
-      <label class="champion-search compact"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-search"/></svg></span><span class="sr-only">搜索英雄</span><input type="search" value="${escapeHTML(state.query)}" placeholder="搜索英雄" autocomplete="off" data-champion-search></label>
+      <label class="champion-search compact"><span aria-hidden="true">⌕</span><span class="sr-only">搜索英雄</span><input type="search" value="${escapeHTML(state.query)}" placeholder="搜索英雄" autocomplete="off" data-champion-search></label>
       <div data-champion-results>${renderChampionResults(rows)}</div>
     </section>`;
     return `<div class="mayhem-workspace">
@@ -1134,7 +1134,7 @@
         <div class="mayhem-tier-entry"><button class="button button-primary tier-trigger" type="button" aria-haspopup="dialog" aria-controls="mayhem-tier-dialog" data-open-mayhem-tiers>英雄梯度</button></div>
         ${selected ? renderMayhemDetailPane(selected) : '<div class="arena-pane-empty"><strong>选择一位英雄</strong><span>查看推荐海克斯、装备排行与完整构筑</span></div>'}
       </div>
-      <dialog class="mayhem-tier-dialog" id="mayhem-tier-dialog" aria-labelledby="mayhem-tier-dialog-title"><div class="mayhem-tier-dialog-sheet"><header><div><h2 id="mayhem-tier-dialog-title">英雄梯度</h2><p>胜率与海克斯 · ${escapeHTML(currentModePatch())}</p></div><button class="icon-button control-icon-button tier-dialog-close" type="button" aria-label="关闭英雄梯度" data-close-mayhem-tiers><svg class="control-icon function-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-77f15c2bbb"/></svg></button></header><div class="mayhem-tier-dialog-content"></div></div></dialog>
+      <dialog class="mayhem-tier-dialog" id="mayhem-tier-dialog" aria-labelledby="mayhem-tier-dialog-title"><div class="mayhem-tier-dialog-sheet"><header><div><h2 id="mayhem-tier-dialog-title">英雄梯度</h2><p>胜率与海克斯 · ${escapeHTML(currentModePatch())}</p></div><button class="icon-button control-icon-button tier-dialog-close" type="button" aria-label="关闭英雄梯度" data-close-mayhem-tiers><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></header><div class="mayhem-tier-dialog-content"></div></div></dialog>
     </div>`;
   }
 
@@ -1203,7 +1203,7 @@
     const specs = mayhemDetailTabSpecs(detail);
     const tabs = specs.map(([key, label]) => `<button type="button" role="tab" id="mayhem-detail-tab-${key}" aria-controls="mayhem-detail-panel-${key}" aria-selected="${active === key}" tabindex="${active === key ? "0" : "-1"}" class="${active === key ? "is-active" : ""}" data-mayhem-detail-tab="${key}">${label}</button>`).join("");
     // 海克斯图鉴与稀有度分布是跨英雄的全局维度，保留独立入口并复用既有视图状态机。
-    return `<div class="mayhem-detail-toolbar"><div class="mayhem-detail-tabs" role="tablist" aria-label="英雄详情分区" data-mayhem-detail-tabs data-tab-count="${specs.length}">${tabs}</div><button type="button" class="mayhem-atlas-entry" data-mayhem-view="atlas" aria-label="离开当前英雄，查看全局海克斯图鉴与稀有度分布"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-diamond"/></svg></span>海克斯图鉴</button></div>`;
+    return `<div class="mayhem-detail-toolbar"><div class="mayhem-detail-tabs" role="tablist" aria-label="英雄详情分区" data-mayhem-detail-tabs data-tab-count="${specs.length}">${tabs}</div><button type="button" class="mayhem-atlas-entry" data-mayhem-view="atlas" aria-label="离开当前英雄，查看全局海克斯图鉴与稀有度分布"><span aria-hidden="true">◈</span>海克斯图鉴</button></div>`;
   }
 
   // 只渲染当前 tab 的内容：隐藏 tab 一个节点都不进 DOM，因此不可能占布局高度
@@ -1270,7 +1270,7 @@
       const icon = asset.source && asset.path ? assetImage(asset, "recommend-icon", true) : '<span class="mayhem-item-name-only" aria-hidden="true"></span>';
       return `<article${mayhemSampleTierLabel(row) ? ' class="is-low-confidence"' : ""}><b>${index + 1}</b>${icon}<strong>${escapeHTML(asset.name || "未知装备")}</strong><dl><div><dt>胜率</dt><dd class="metric-win"${mayhemWilsonTooltip(row)}>${percent(row.winRate)}</dd></div><div><dt>场次</dt><dd>${compactNumber(row.games)}</dd></div>${mayhemDeltaCell(row.deltaWinRate)}${mayhemWithoutItemCell(row)}${mayhemSampleCell(row)}</dl></article>`;
     }).join("");
-    return `<section class="recommendation-section mayhem-item-ranking"><header><h3><span class="arena-section-icon" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-diamond"/></svg></span>装备排行</h3><span class="section-count">${objectRows(rows).length} 件</span></header><div class="mayhem-ranking-list">${content || '<p class="mayhem-inline-empty">暂无装备排行样本。</p>'}</div></section>`;
+    return `<section class="recommendation-section mayhem-item-ranking"><header><h3><span class="arena-section-icon" aria-hidden="true">◈</span>装备排行</h3><span class="section-count">${objectRows(rows).length} 件</span></header><div class="mayhem-ranking-list">${content || '<p class="mayhem-inline-empty">暂无装备排行样本。</p>'}</div></section>`;
   }
 
   // ---- R116-B P0-1 / P0-2 的行内标签（海克斯卡与装备排行共用）----
@@ -1368,7 +1368,7 @@
       return `<dl class="option-stats">${hasPick ? `<div class="is-pick"><dt>选用率</dt><dd>${percent(row.pickRate)}</dd></div>` : ""}${hasWin ? `<div class="is-win"><dt>胜率</dt><dd>${percent(row.winRate)}</dd></div>` : ""}</dl>`;
     };
     const spellGroup = (title, rows) => `<section><h4>${title}</h4><div class="config-option-list">${rows.map((row) => renderConfigOption(row, "spell", null, spellStats)).join("") || '<p class="muted">暂无样本</p>'}</div></section>`;
-    return `<section class="recommendation-section champion-build-board mayhem-opening-config"><header><div><h3><span class="arena-section-icon" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-star"/></svg></span>开局配置</h3><p>当前版本推荐出门装、鞋子与召唤师技能</p></div></header><div class="mayhem-opening-grid">${group("出门装", starters, "item")}${group("鞋子", boots, "item")}${spellGroup("召唤师技能", spells)}</div></section>`;
+    return `<section class="recommendation-section champion-build-board mayhem-opening-config"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>开局配置</h3><p>当前版本推荐出门装、鞋子与召唤师技能</p></div></header><div class="mayhem-opening-grid">${group("出门装", starters, "item")}${group("鞋子", boots, "item")}${spellGroup("召唤师技能", spells)}</div></section>`;
   }
 
   // 技能加点从「开局配置」搬到「构筑」tab（工单三-tab 表格：构筑 = 装备排行 +
@@ -1376,12 +1376,12 @@
   function renderMayhemSkillPlan(build) {
     const skills = objectRows(build?.skills)[0];
     if (!skills) return "";
-    return `<section class="recommendation-section champion-build-board mayhem-skill-plan"><header><div><h3><span class="arena-section-icon" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-star"/></svg></span>技能加点</h3><p>升级优先级与加点顺序</p></div></header><div class="mayhem-build-grid"><section class="skill-plan">${renderChampionSkillPlan(skills, false)}</section></div></section>`;
+    return `<section class="recommendation-section champion-build-board mayhem-skill-plan"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✧</span>技能加点</h3><p>升级优先级与加点顺序</p></div></header><div class="mayhem-build-grid"><section class="skill-plan">${renderChampionSkillPlan(skills, false)}</section></div></section>`;
   }
 
   function renderMayhemItemRoutes(build, citation) {
     const routes = mayhemRouteRows(objectRows(build.coreItems).filter((row) => objectRows(row.assets).length && objectRows(row.assets).every((asset) => asset.kind === "item"))).slice(0, CORE_RECOMMENDATION_LIMIT);
-    return `<section class="recommendation-section champion-build-board mayhem-item-routes"><header><div><h3><span class="arena-section-icon" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-placeholder"/></svg></span>装备路线</h3><p>核心装备路线与后续成装顺序</p></div></header><div class="mayhem-build-grid"><section><div class="config-option-list">${routes.map((row) => renderConfigOption(row, "route", false)).join("") || '<p class="muted">暂无样本</p>'}</div></section></div></section>`;
+    return `<section class="recommendation-section champion-build-board mayhem-item-routes"><header><div><h3><span class="arena-section-icon" aria-hidden="true">◇</span>装备路线</h3><p>核心装备路线与后续成装顺序</p></div></header><div class="mayhem-build-grid"><section><div class="config-option-list">${routes.map((row) => renderConfigOption(row, "route", false)).join("") || '<p class="muted">暂无样本</p>'}</div></section></div></section>`;
   }
 
   // R116-B P0-2 排序护栏：这里以前调 sortedGradeRows（按 grade → score → games
@@ -1405,7 +1405,7 @@
       <section class="augment-directory mayhem-atlas-browser">
         <div class="mayhem-panel-head">
           <div><h3>海克斯图鉴</h3><p>${objectRows(state.augments?.rows).length} 个海克斯，按梯度与品质排列</p></div>
-          <label class="champion-search compact"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-search"/></svg></span><span class="sr-only">搜索海克斯</span><input type="search" value="${escapeHTML(state.augmentQuery)}" placeholder="搜索名称或效果" autocomplete="off" data-augment-search></label>
+          <label class="champion-search compact"><span aria-hidden="true">⌕</span><span class="sr-only">搜索海克斯</span><input type="search" value="${escapeHTML(state.augmentQuery)}" placeholder="搜索名称或效果" autocomplete="off" data-augment-search></label>
         </div>
         <div class="augment-rarity-tabs mayhem-rarity-tabs" role="tablist" aria-label="海克斯品质">${filters}</div>
         <div class="mayhem-atlas-list" role="listbox" aria-label="海克斯列表">${items.length ? items.map((item) => renderMayhemAtlasRow(item, selected)).join("") : renderEmpty("没有匹配的海克斯", "更换品质或清除搜索词后重试。")}</div>
@@ -1494,7 +1494,7 @@
   function renderMayhemHeroRarityPanel(rows) {
     const stages = objectRows(rows).filter((row) => Number(row?.stage) > 0 && mayhemHeroRarityTotal(row) > 0);
     if (!stages.length) return "";
-    return `<section class="recommendation-section mayhem-hero-rarity"><header><div><h3><span class="arena-section-icon" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-diamond"/></svg></span>该英雄专属品质概率</h3><p>各阶段白银 / 黄金 / 棱彩选取概率</p></div><span class="section-count">${stages.length} 个阶段</span></header><div class="mayhem-rarity-stages">${stages.map(mayhemHeroRarityStage).join("")}</div></section>`;
+    return `<section class="recommendation-section mayhem-hero-rarity"><header><div><h3><span class="arena-section-icon" aria-hidden="true">◈</span>该英雄专属品质概率</h3><p>各阶段白银 / 黄金 / 棱彩选取概率</p></div><span class="section-count">${stages.length} 个阶段</span></header><div class="mayhem-rarity-stages">${stages.map(mayhemHeroRarityStage).join("")}</div></section>`;
   }
 
   // 三组之和。后端已经保证只有 Total > 0 的阶段才下发，这里再算一次是给前端一道
@@ -1523,7 +1523,7 @@
     const selected = selectedRow && state.selected ? arenaSelectedRow({ ...state.selected, ...selectedRow }) : null;
     const list = `<section class="champion-list-card aram-champions arena-champions">
       <div class="aram-champion-head"><div><h3>英雄梯度</h3><p>胜率与海克斯 · ${escapeHTML(currentModePatch())}</p></div><span class="champion-result-count">${rows.length} 位</span></div>
-      <label class="champion-search compact"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-search"/></svg></span><span class="sr-only">搜索英雄</span><input type="search" value="${escapeHTML(state.query)}" placeholder="搜索英雄" autocomplete="off" data-champion-search></label>
+      <label class="champion-search compact"><span aria-hidden="true">⌕</span><span class="sr-only">搜索英雄</span><input type="search" value="${escapeHTML(state.query)}" placeholder="搜索英雄" autocomplete="off" data-champion-search></label>
       <div data-champion-results>${renderChampionResults(rows)}</div>
     </section>`;
     return `<div class="arena-redesign-workspace">
@@ -1532,7 +1532,7 @@
         <div class="arena-tier-entry"><button class="button button-primary tier-trigger" type="button" aria-haspopup="dialog" aria-controls="arena-tier-dialog" data-open-arena-tiers>英雄梯度</button></div>
         ${selected ? renderArenaDetailPane(selected) : '<div class="arena-pane-empty"><strong>选择一位英雄</strong><span>查看海克斯、装备与吃鸡战绩</span></div>'}
       </div>
-      <dialog class="mayhem-tier-dialog arena-tier-dialog" id="arena-tier-dialog" aria-labelledby="arena-tier-dialog-title"><div class="mayhem-tier-dialog-sheet"><header><div><h2 id="arena-tier-dialog-title">英雄梯度</h2><p>胜率与海克斯 · ${escapeHTML(currentModePatch())}</p></div><button class="icon-button control-icon-button tier-dialog-close" type="button" aria-label="关闭英雄梯度" data-close-arena-tiers><svg class="control-icon function-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-77f15c2bbb"/></svg></button></header><div class="arena-tier-dialog-content"></div></div></dialog>
+      <dialog class="mayhem-tier-dialog arena-tier-dialog" id="arena-tier-dialog" aria-labelledby="arena-tier-dialog-title"><div class="mayhem-tier-dialog-sheet"><header><div><h2 id="arena-tier-dialog-title">英雄梯度</h2><p>胜率与海克斯 · ${escapeHTML(currentModePatch())}</p></div><button class="icon-button control-icon-button tier-dialog-close" type="button" aria-label="关闭英雄梯度" data-close-arena-tiers><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></header><div class="arena-tier-dialog-content"></div></div></dialog>
     </div>`;
   }
 
@@ -1660,7 +1660,7 @@
     const visible = state.arenaExpanded.augments ? sorted : sorted.slice(0, 9);
     const scores = sorted.map((row) => row.score);
     const filters = [["all", "全部"], ["silver", "银色"], ["gold", "黄金"], ["prismatic", "棱彩"]];
-    return `<section class="arena-data-section arena-augment-section"><header><div><span class="arena-section-icon" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-star"/></svg></span><span><h3>海克斯推荐</h3><small>按档位与样本展示前九项 · ${allRows.length} 条</small></span></div><div class="arena-chips arena-rarity-chips" role="tablist" aria-label="海克斯品质">${filters.map(([value, label]) => `<button type="button" role="tab" aria-selected="${state.arenaRarity === value}" class="${state.arenaRarity === value ? "is-active" : ""}" data-arena-rarity="${value}"><i class="is-${value}" aria-hidden="true"></i>${label}</button>`).join("")}</div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "augment", index, scores)).join("")}</div>${renderArenaExpand("augments", sorted.length, 9)}` : '<div class="arena-section-empty">该品质暂无海克斯样本</div>'}</section>`;
+    return `<section class="arena-data-section arena-augment-section"><header><div><span class="arena-section-icon" aria-hidden="true">✦</span><span><h3>海克斯推荐</h3><small>按档位与样本展示前九项 · ${allRows.length} 条</small></span></div><div class="arena-chips arena-rarity-chips" role="tablist" aria-label="海克斯品质">${filters.map(([value, label]) => `<button type="button" role="tab" aria-selected="${state.arenaRarity === value}" class="${state.arenaRarity === value ? "is-active" : ""}" data-arena-rarity="${value}"><i class="is-${value}" aria-hidden="true"></i>${label}</button>`).join("")}</div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "augment", index, scores)).join("")}</div>${renderArenaExpand("augments", sorted.length, 9)}` : '<div class="arena-section-empty">该品质暂无海克斯样本</div>'}</section>`;
   }
 
   // Preserve every upstream item. Grade, official score, then sample count
@@ -1677,7 +1677,7 @@
 		const visible = state.arenaExpanded[kind] ? sorted : sorted.slice(0, 6);
 		const scores = sorted.map((row) => row.score);
 		if (!sorted.length) return "";
-		return `<section class="arena-data-section arena-${kind}-section"><header><div><span class="arena-section-icon" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-diamond"/></svg></span><span><h3>${title}</h3><small>${copy} · ${sorted.length} 条</small></span></div></header><div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, kind, index, scores)).join("")}</div>${renderArenaExpand(kind, sorted.length)}</section>`;
+		return `<section class="arena-data-section arena-${kind}-section"><header><div><span class="arena-section-icon" aria-hidden="true">◈</span><span><h3>${title}</h3><small>${copy} · ${sorted.length} 条</small></span></div></header><div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, kind, index, scores)).join("")}</div>${renderArenaExpand(kind, sorted.length)}</section>`;
   }
 
   function renderArenaCoreSection(build) {
@@ -1685,7 +1685,7 @@
     const visible = state.arenaExpanded.core ? sorted : sorted.slice(0, 6);
     const scores = sorted.map((row) => row.score);
     if (!sorted.length && !(build.boots || []).length) return "";
-    return `<section class="arena-data-section arena-core-section"><header><div><span class="arena-section-icon" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-placeholder"/></svg></span><span><h3>核心物品</h3><small>核心装备统计 · ${sorted.length} 条</small></span></div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "core", index, scores)).join("")}</div>${renderArenaExpand("core", sorted.length)}` : ""}<div class="arena-slim-rows">${renderArenaSlimRow(sortedArenaRows(build.boots || []).slice(0, 3))}</div></section>`;
+    return `<section class="arena-data-section arena-core-section"><header><div><span class="arena-section-icon" aria-hidden="true">◇</span><span><h3>核心物品</h3><small>核心装备统计 · ${sorted.length} 条</small></span></div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "core", index, scores)).join("")}</div>${renderArenaExpand("core", sorted.length)}` : ""}<div class="arena-slim-rows">${renderArenaSlimRow(sortedArenaRows(build.boots || []).slice(0, 3))}</div></section>`;
   }
 
   // 斗魂与海斗共用同一张海克斯卡片：DOM 与类名一致，样式就不会再走偏。
@@ -1693,7 +1693,7 @@
   // 由调用方给定，其余（图标尺寸、徽章、名称字号、品质芯片）全部共享。
   function renderArenaOptionCard(row, kind, index, scores = [], options) {
     const assets = row.assets || [];
-    const route = assets.map((asset, assetIndex) => `${assetIndex ? '<span class="route-arrow" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></span>' : ""}${renderAssetButton(asset)}`).join("");
+    const route = assets.map((asset, assetIndex) => `${assetIndex ? '<span class="route-arrow" aria-hidden="true">›</span>' : ""}${renderAssetButton(asset)}`).join("");
     const name = assets.length === 1 ? assets[0]?.name || "未知选项" : "";
     const rarityKey = kind === "augment" ? arenaRarityKey(row.rarity) : "";
     const rarity = rarityKey ? ` is-${rarityKey}` : "";
@@ -1959,7 +1959,7 @@
     const detailBody = state.loading ? `<div class="champion-detail-content">${renderDetailSkeleton()}</div>` : state.error ? renderError(state.error, true) : detail ? renderDetailContent(detail) : renderError("详情暂时不可用", true);
     const modeLabel = state.mode === "ranked" ? "梯度榜" : state.mode === "arena" ? "斗魂竞技场" : "海克斯大乱斗";
 	const detailTierSelect = state.mode === "ranked" ? `<label class="champion-tier-select select-wrap champion-detail-tier-select"><span>段位</span><select data-champion-tier aria-label="切换英雄详情段位">${renderTierOptions()}</select></label>` : "";
-    root.innerHTML = `<div class="champion-detail-toolbar"><button class="champion-back" type="button" data-champion-back><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-arrow-left"/></svg></span> 返回${modeLabel}</button>${detailTierSelect}</div>
+    root.innerHTML = `<div class="champion-detail-toolbar"><button class="champion-back" type="button" data-champion-back><span aria-hidden="true">←</span> 返回${modeLabel}</button>${detailTierSelect}</div>
       <header class="champion-detail-hero${hasPositions ? " has-positions" : ""}">
         <img class="champion-detail-art" data-queued-src="${heroArtworkURL(meta, source, path)}" alt="" aria-hidden="true" decoding="async" data-champion-image>
         <div class="champion-detail-art-shade" aria-hidden="true"></div>
@@ -2026,7 +2026,7 @@
     const body = entries.length
       ? `<div class="arena-option-grid mayhem-recommend-grid">${entries.map(renderMayhemRecommendedAugment).join("")}</div>`
       : `<p class="mayhem-inline-empty">${stage ? "这个阶段没有可展示的海克斯样本。" : "暂无可展示的海克斯推荐样本。"}</p>`;
-    return `<section class="recommendation-section mayhem-augment-ranking"><header><div><h3><span class="arena-section-icon" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-star"/></svg></span>海克斯推荐</h3><p>按综合评分、胜率与样本展示各品质前三项</p></div>${chips}</header>${body}</section>`;
+    return `<section class="recommendation-section mayhem-augment-ranking"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>海克斯推荐</h3><p>按综合评分、胜率与样本展示各品质前三项</p></div>${chips}</header>${body}</section>`;
   }
 
   // 当前生效的阶段号。斗魂/单双排路径恒为 0（英雄级汇总），它们的行里没有
@@ -2503,7 +2503,7 @@
   function renderConfigOption(row, kind, showWinRate = null, statsRenderer = null) {
     const icons = (row.assets || []).map((asset, index) => {
       const normalized = kind === "spell" ? summonerSpellAsset(asset) : asset;
-      return kind === "route" ? `<span class="route-step">${index ? '<span class="route-arrow" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></span>' : ""}${renderAssetButton(normalized)}</span>` : renderAssetButton(normalized);
+      return kind === "route" ? `<span class="route-step">${index ? '<span class="route-arrow" aria-hidden="true">›</span>' : ""}${renderAssetButton(normalized)}</span>` : renderAssetButton(normalized);
     }).join("");
     const stats = statsRenderer ? statsRenderer(row) : showWinRate === true
       ? `<span class="${kind === "route" ? "route-win-rate" : "option-win-rate"}"><small>胜率</small><b>${percent(row.winRate)}</b></span>`
@@ -2584,7 +2584,7 @@
     }
     return `<section class="recommendation-section counter-group is-${kind}"><header><div><h4>${title}</h4><p>${copy}</p></div><span class="section-count">${escapeHTML(sampleNote)}</span></header><div>${rows.slice(0, 5).map((row) => {
       const width = Math.min(100, Math.max(4, Number(row.winRate) || 0));
-      return `<button type="button" class="counter-champion" data-counter-champion="${escapeHTML(row.key)}"><span class="champion-portrait"><img data-queued-src="${imageURL(row.imageSource, row.imagePath)}" alt="" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML((row.name || "?").slice(0, 1))}</span></span><span><strong>${escapeHTML(row.name || row.key)}</strong><small>${compactNumber(row.games)} 场</small></span><span class="counter-meter" aria-hidden="true"><i data-bar-width="${width}"></i></span><b>${percent(row.winRate)}</b><i aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></i></button>`;
+      return `<button type="button" class="counter-champion" data-counter-champion="${escapeHTML(row.key)}"><span class="champion-portrait"><img data-queued-src="${imageURL(row.imageSource, row.imagePath)}" alt="" loading="lazy" decoding="async" data-champion-image><span>${escapeHTML((row.name || "?").slice(0, 1))}</span></span><span><strong>${escapeHTML(row.name || row.key)}</strong><small>${compactNumber(row.games)} 场</small></span><span class="counter-meter" aria-hidden="true"><i data-bar-width="${width}"></i></span><b>${percent(row.winRate)}</b><i aria-hidden="true">›</i></button>`;
     }).join("")}</div></section>`;
   }
 
@@ -2673,7 +2673,7 @@
   function renderSkeleton() { return `<div class="champions-skeleton" aria-label="正在联网读取英雄数据"><span></span><span></span><span></span><span></span><span></span><span></span></div>`; }
   function renderDetailSkeleton() { return `<div class="champion-detail-skeleton" aria-label="正在读取英雄详情"><span></span><span></span><span></span></div>`; }
   function renderError(message, detail = false) { return `<div class="champion-state is-error"><span aria-hidden="true">!</span><strong>${detail ? "详情读取失败" : "数据读取失败"}</strong><p>${escapeHTML(message)}</p><button class="text-button" type="button" data-champion-retry>${detail ? "重新读取详情" : "重试"}</button></div>`; }
-  function renderEmpty(title, copy) { return `<div class="champion-state"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-placeholder"/></svg></span><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-champion-clear>清除筛选</button></div>`; }
+  function renderEmpty(title, copy) { return `<div class="champion-state"><span aria-hidden="true">◇</span><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-champion-clear>清除筛选</button></div>`; }
   function prepareImages(container = root) {
     for (const image of container.querySelectorAll("[data-champion-image]")) {
       const loaded = () => { image.hidden = false; image.parentElement?.classList.add("has-loaded-image"); window.deepLegendsAugmentArtwork?.prepare(image); };

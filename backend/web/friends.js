@@ -224,12 +224,12 @@
 
   function renderEmpty(icon, text, retry) {
     const icons = {
-      disconnected: "<use href=\"/icons.svg#dl-icon-key-47488b09cd\"/>",
-      search: "<use href=\"/icons.svg#dl-icon-key-ebcfe82f6c\"/>",
-      empty: "<use href=\"/icons.svg#dl-icon-key-24db67bd4a\"/>",
+      disconnected: '<path d="M8.5 9.5a3.2 3.2 0 1 1 3.2 3.2M2.8 20.4c.7-3.1 3.1-4.9 6-4.9 1.2 0 2.3.3 3.2.9"/><path d="m15.5 15.5 5 5m0-5-5 5"/>',
+      search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
+      empty: '<circle cx="9" cy="8" r="3.4"/><path d="M2.8 20c.7-3.2 3.2-5 6.2-5s5.5 1.8 6.2 5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.4 15.2c2.5.2 4.3 1.8 4.8 4.3"/>',
     };
     el.list.setAttribute("aria-busy", "false");
-    el.list.innerHTML = `<div class="friends-empty"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true">${icons[icon] || icons.empty}</svg><span>${text}</span>${retry ? '<button id="friends-retry" class="text-button" type="button">重试</button>' : ""}</div>`;
+    el.list.innerHTML = `<div class="friends-empty"><svg viewBox="0 0 24 24" aria-hidden="true">${icons[icon] || icons.empty}</svg><span>${text}</span>${retry ? '<button id="friends-retry" class="text-button" type="button">重试</button>' : ""}</div>`;
   }
 
   function renderFriendRow(friend, offlineSection) {
@@ -246,7 +246,7 @@
         <span class="friend-name"><span class="friend-player-name"><span class="friend-game-name">${escapeHTML(friend.gameName)}</span>${tag}</span>${note}</span>
         <span class="friend-status ${kind}">${statusHTML(friend, kind)}</span>
       </span>
-      ${champion}<span class="friend-open-hint" aria-hidden="true">战绩 <svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></span>
+      ${champion}<span class="friend-open-hint" aria-hidden="true">战绩 ›</span>
     </button>`;
   }
 
@@ -267,7 +267,7 @@
         ? `${section.total}`
         : `<b>${section.online}</b> / ${section.total}`;
       parts.push(`<button class="friends-group-head${section.offline ? " is-offline-group" : ""}" type="button" data-group-key="${section.key}" aria-expanded="${String(!collapsed)}">
-        <span class="friends-group-arrow" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24"><use href="/icons.svg#dl-icon-chevron-right"/></svg></span>
+        <span class="friends-group-arrow" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>
         <span>${escapeHTML(section.name)}</span>
         <span class="friends-group-count">${count}</span>
       </button>`);

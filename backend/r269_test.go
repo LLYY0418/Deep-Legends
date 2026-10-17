@@ -445,7 +445,7 @@ func TestR269AccountFallbackResolvesInRelayScope(t *testing.T) {
 		return r206RelayResponse(401, []byte(`{"status":{"message":"expired"}}`)), nil
 	})}
 	account, err := p.accountByRiotID(context.Background(), "Fixture", "KR1")
-	if err != nil || account.scope != "relay" || account.PUUID != "relay-key-subject" || direct.Load() != 1 || relay.Load() != 1 {
+	if err != nil || account.scope != "relay" || account.PUUID != "relay-key-subject" || direct.Load() != 2 || relay.Load() != 1 {
 		t.Fatal(account, err, direct.Load(), relay.Load())
 	}
 	if _, exists := p.accountCache["fixture\x1fkr1|credential:embedded"]; exists {

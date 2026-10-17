@@ -147,7 +147,7 @@ func TestR113PrewarmDeduplicatesAndDoesNotWaitForRoster(t *testing.T) {
 	}
 }
 
-func TestR113ARAMSkipsRankRequestsAndStartsRecommendationsBeforeHistory(t *testing.T) {
+func TestR113ARAMLoadsRanksAndStartsRecommendationsBeforeHistory(t *testing.T) {
 	var rankReads atomic.Int32
 	warmed := make(chan struct{})
 	finished := make(chan struct{})
@@ -159,7 +159,7 @@ func TestR113ARAMSkipsRankRequestsAndStartsRecommendationsBeforeHistory(t *testi
 			json.NewEncoder(w).Encode(Summoner{PUUID: "r113-player-reference", GameName: "Fixture", TagLine: "CN1"})
 		case strings.HasPrefix(req.URL.Path, "/lol-ranked/"):
 			rankReads.Add(1)
-			io.WriteString(w, `{"queues":[]}`)
+			io.WriteString(w, `{"queues":[{"queueType":"RANKED_SOLO_5x5","tier":"GOLD","division":"I"}]}`)
 		case strings.HasPrefix(req.URL.Path, "/lol-match-history/"):
 			select {
 			case <-warmed:
@@ -185,8 +185,8 @@ func TestR113ARAMSkipsRankRequestsAndStartsRecommendationsBeforeHistory(t *testi
 	if !got.Available || len(got.Players) != 1 || !got.Players[0].IsCurrent {
 		t.Fatalf("unexpected roster: %#v", got.Players)
 	}
-	if rankReads.Load() != 0 || got.Players[0].Rank != nil {
-		t.Fatal("ARAM still requested unused ranked data")
+	if rankReads.Load() != 1 || got.Players[0].Rank == nil || got.Players[0].Rank.Tier != "GOLD" {
+		t.Fatalf("ARAM ranked data missing or repeated: reads=%d rank=%+v", rankReads.Load(), got.Players[0].Rank)
 	}
 }
 

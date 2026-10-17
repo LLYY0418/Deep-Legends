@@ -13,6 +13,7 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 function facade(sourceText = source) {
   const dom = new JSDOM(html, { url: "http://fixture/", runScripts: "outside-only", pretendToBeVisual: true });
   const w = dom.window;
+  w.document.getElementById("favorites-panel").hidden = false;
   w.document.getElementById("favorites-facade-panel").hidden = false;
   w.requestAnimationFrame = (callback) => callback();
   const pending = new Map();

@@ -1,0 +1,223 @@
+{
+  "esportsGameId": "112966697102367348",
+  "esportsMatchId": "112966697102367347",
+  "gameMetadata": {
+    "patchVersion": "14.18.617.4123",
+    "blueTeamMetadata": {
+      "esportsTeamId": "103461966965149786",
+      "participantMetadata": [
+        {
+          "participantId": 1,
+          "esportsPlayerId": "110350224593953686",
+          "summonerName": "MDK Myrwn",
+          "championId": "KSante",
+          "role": "top"
+        },
+        {
+          "participantId": 2,
+          "esportsPlayerId": "103877629120745120",
+          "summonerName": "MDK Elyoya",
+          "championId": "Nidalee",
+          "role": "jungle"
+        },
+        {
+          "participantId": 3,
+          "esportsPlayerId": "104711049101664016",
+          "summonerName": "MDK Fresskowy",
+          "championId": "Syndra",
+          "role": "mid"
+        },
+        {
+          "participantId": 4,
+          "esportsPlayerId": "103536968833612789",
+          "summonerName": "MDK Supa",
+          "championId": "Jinx",
+          "role": "bottom"
+        },
+        {
+          "participantId": 5,
+          "esportsPlayerId": "107564404490889053",
+          "summonerName": "MDK Alvaro",
+          "championId": "Nautilus",
+          "role": "support"
+        }
+      ]
+    },
+    "redTeamMetadata": {
+      "esportsTeamId": "107251245690956393",
+      "participantMetadata": [
+        {
+          "participantId": 6,
+          "esportsPlayerId": "112603524650868411",
+          "summonerName": "VKE Nanaue",
+          "championId": "Camille",
+          "role": "top"
+        },
+        {
+          "participantId": 7,
+          "esportsPlayerId": "109828289393968653",
+          "summonerName": "VKE Gury",
+          "championId": "LeeSin",
+          "role": "jungle"
+        },
+        {
+          "participantId": 8,
+          "esportsPlayerId": "107251572267658009",
+          "summonerName": "VKE Kati",
+          "championId": "Orianna",
+          "role": "mid"
+        },
+        {
+          "participantId": 9,
+          "esportsPlayerId": "107251561724960718",
+          "summonerName": "VKE Shogun",
+          "championId": "Ezreal",
+          "role": "bottom"
+        },
+        {
+          "participantId": 10,
+          "esportsPlayerId": "107251574398720447",
+          "summonerName": "VKE Bie",
+          "championId": "Poppy",
+          "role": "support"
+        }
+      ]
+    }
+  },
+  "frames": [
+    {
+      "rfc460Timestamp": "2024-09-25T12:12:37.279Z",
+      "gameState": "in_game",
+      "blueTeam": {
+        "totalGold": 0,
+        "inhibitors": 0,
+        "towers": 0,
+        "barons": 0,
+        "totalKills": 0,
+        "dragons": [],
+        "participants": [
+          {
+            "participantId": 1,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 2,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 3,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 4,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 5,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          }
+        ]
+      },
+      "redTeam": {
+        "totalGold": 0,
+        "inhibitors": 0,
+        "towers": 0,
+        "barons": 0,
+        "totalKills": 0,
+        "dragons": [],
+        "participants": [
+          {
+            "participantId": 6,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 7,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 8,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 9,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 10,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          }
+        ]
+      }
+    }
+  ]
+}

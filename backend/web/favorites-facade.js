@@ -161,7 +161,7 @@
 
   // ---------- 渲染 ----------
   function panelVisible() {
-    return Boolean(el.panel) && !el.panel.hidden;
+    return Boolean(el.panel) && !el.panel.hidden && !el.panel.parentElement?.closest("[hidden]");
   }
 
   function renderDisconnected() {
@@ -174,7 +174,7 @@
     // 否则会留着上一份目录摘要。
     el.meta.removeAttribute("aria-label");
     el.grid.setAttribute("aria-busy", "false");
-    el.grid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-collection"/></svg></span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会自动展示头像与旗帜目录。</p></div>';
+    el.grid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true">❖</span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会自动展示头像与旗帜目录。</p></div>';
   }
 
   function renderError(message) {
@@ -381,7 +381,7 @@
       if (!child.matches(".skin-card[data-facade-key]")) child.remove();
     }
     if (!rows.length) {
-      el.grid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-search"/></svg></span><strong>没有符合条件的条目</strong><p>调整搜索、系列或快捷分类后再试。</p></div>';
+      el.grid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true">⌕</span><strong>没有符合条件的条目</strong><p>调整搜索、系列或快捷分类后再试。</p></div>';
       return;
     }
     let index = 0;

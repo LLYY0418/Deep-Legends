@@ -94,7 +94,7 @@ test('R280 review: changed career share uses the complete overview and binds onc
   dom.window.close();
 });
 
-test('R280 review: every loot category and friend empty state resolves the shared sprite', () => {
+test('R280 review: loot categories and friend empty states retain v0.12.85 inline paths', () => {
   const app = fs.readFileSync(__dirname+'/app.js','utf8');
   const friends = fs.readFileSync(__dirname+'/friends.js','utf8');
   const dom = new JSDOM('<main></main>'),list = dom.window.document.querySelector('main');
@@ -104,10 +104,8 @@ test('R280 review: every loot category and friend empty state resolves the share
   const renderEmpty = Function('el',extract(friends,'renderEmpty')+';return renderEmpty')({list});
   const check = () => {
     for (const svg of list.querySelectorAll('svg')) {
-      assert(svg.classList.contains('function-icon'));
-      const href = svg.querySelector('use').getAttribute('href');
-      assert.match(href,/^\/icons\.svg#/);
-      assert(sprite.window.document.getElementById(href.split('#')[1]),href+' must resolve');
+      assert(svg.querySelector('path,circle'));
+      assert.equal(svg.querySelector('use'),null);
     }
   };
   list.innerHTML = categories.map(categoryIcon).join('');assert.equal(list.querySelectorAll('svg').length,9);check();

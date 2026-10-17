@@ -25,6 +25,7 @@ type relayAttemptResult struct {
 }
 
 func (p *riotProvider) candidateAttempt(ctx context.Context, m *riotRelayEntryManager, e riotRelayEntry, host, path string, query url.Values, responseMax int64, headers *atomic.Bool, ticket *relayHedgeTicket, admitted chan<- struct{}, release func()) relayAttemptResult {
+	ctx = context.WithValue(ctx, riotRequestPathKey{}, riotPathShape(path))
 	defer release()
 	if ticket != nil && admitted == nil {
 		defer m.releaseHedgeReservation(ticket)

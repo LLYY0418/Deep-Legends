@@ -15,7 +15,7 @@ test('R278 820px folds the sidebar while preserving expanded preference; 821 thr
  const x=fixture();try{
   for(const width of [820,819,450]){x.setWidth(width);x.f.applySidebar();assert.equal(x.d.documentElement.dataset.sidebar,'collapsed',`${width}px must collapse`);assert.equal(x.getSaved(),'expanded');}
   for(const width of [821,850,900])for(const level of [0,1,3]){x.setWidth(width);x.d.querySelector('header').dataset.topbarCompact=String(level);x.f.applySidebar();assert.equal(x.d.documentElement.dataset.sidebar,'expanded',`${width}px level${level}`);}
-  x.d.querySelector('header').dataset.topbarCompact='4';x.f.applySidebar();assert.equal(x.d.documentElement.dataset.sidebar,'collapsed');
+  x.d.querySelector('header').dataset.topbarCompact='4';x.f.applySidebar();assert.equal(x.d.documentElement.dataset.sidebar,'expanded');
   x.setSaved('collapsed');for(const width of [450,820,821,900,1920]){x.setWidth(width);x.d.querySelector('header').dataset.topbarCompact='0';x.f.applySidebar();assert.equal(x.d.documentElement.dataset.sidebar,'collapsed');}
  }finally{x.dom.window.close()}
 });

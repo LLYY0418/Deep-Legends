@@ -1,0 +1,63 @@
+{
+  "pros": [
+    {
+      "key": "pro-112966697102367348-1",
+      "title": "MKOI MDK Myrwn",
+      "championId": 897,
+      "championName": "纳祖芒荣耀",
+      "primaryStyleId": 8400,
+      "subStyleId": 8300,
+      "selectedPerkIds": [
+        8437,
+        8446,
+        8444,
+        8451,
+        8345,
+        8347,
+        5005,
+        5001,
+        5011
+      ],
+      "statModIds": [
+        5005,
+        5001,
+        5011
+      ],
+      "shardResolution": "explicit-unique",
+      "itemIds": [
+        3047,
+        3364,
+        6662,
+        2504,
+        6665,
+        1029
+      ],
+      "stats": {
+        "pickRate": null,
+        "winRate": null,
+        "games": null
+      },
+      "playerName": "MDK Myrwn",
+      "playedAt": 1727266357279,
+      "result": "win",
+      "opponentChampionId": 164,
+      "opponentChampionName": "青钢影",
+      "opponentPlayerName": "MVK VKE Nanaue",
+      "position": "上路",
+      "sourceKey": "pro",
+      "eventLabel": "Worlds · 2024-09-25 · MVK vs MKOI 第 1 局",
+      "winKnown": true,
+      "win": true,
+      "selectedComplete": true,
+      "recordGames": 1,
+      "recordWins": 1,
+      "cacheReadAt": "2024-09-25T13:12:37Z"
+    }
+  ],
+  "preparing": false,
+  "outcomesLoading": false,
+  "stale": false,
+  "readAt": "2024-09-25T13:12:37.279Z",
+  "failedGames": 0,
+  "totalGames": 1
+}

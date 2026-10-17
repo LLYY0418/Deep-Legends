@@ -18,10 +18,8 @@ import (
 // https://wiki.leagueoflegends.com/en-us/Arena
 // 1–2 木、3–5 青铜、6–8 白银、9–11 黄金、12 角斗士。
 //
-// 客户端排位接口仍保留 CHERRY 队列条目，带 ratedTier / ratedRating
-// （LolRankedRankedQueueStats，2026-09 LCU swagger）。仓库里没有真实样本，
-// 所以只在 ratedTier 与按名望换算出的档位一致时才展示；不一致或缺字段时
-// 不显示，并记 arena_fame_source_shape 诊断供发版后真机取证。
+// 当前客户端未返回 CHERRY。保留已有显示校验，但不猜测新来源；
+// arena_fame_discovery 用真机只读诊断确认真实接口后再接入。
 var arenaFameLevelThresholds = []int{100, 1600, 3600, 6100, 9100, 12600, 16600, 21600, 26600, 31600, 37600, 47600}
 
 type gameplayArenaFame struct {
@@ -116,6 +114,10 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 	var raw json.RawMessage
 	source := ""
 	found := false
+	queueTypes := []string{}
+	if isCurrent {
+		defer a.discoverArenaFame(client)
+	}
 	if client != nil && !isRemoteTencentServer(client, serverID) {
 		path := "/lol-ranked/v1/ranked-stats/" + url.PathEscape(playerRef)
 		if isCurrent {
@@ -124,6 +126,10 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 		var payload json.RawMessage
 		if err := client.RequestJSON(ctx, http.MethodGet, path, nil, &payload); err == nil {
 			source = dataSourceLCU
+			queueTypes = arenaDiscoveryQueueTypes(payload)
+			if isCurrent {
+				client.rememberArenaQueueTypes(source, queueTypes)
+			}
 			for _, entry := range rankedQueueEntries(payload) {
 				var queue struct {
 					QueueType   string  `json:"queueType"`
@@ -140,6 +146,16 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 	if !found && a.sgp != nil && clientRiotPlatform(client) == "" && serverID != "" && !isRemoteTencentServer(client, serverID) {
 		if stats, err := a.sgp.rankedStatsOn(ctx, client, serverID, playerRef, isCurrent, privacy); err == nil {
 			source = dataSourceSGP
+			queueTypes = []string{}
+			for _, q := range stats.Queues {
+				if arenaDiscoveryIdentifier.MatchString(q.QueueType) {
+					queueTypes = append(queueTypes, q.QueueType)
+				}
+			}
+			sort.Strings(queueTypes)
+			if isCurrent {
+				client.rememberArenaQueueTypes(source, queueTypes)
+			}
 			for _, queue := range stats.Queues {
 				if queue.QueueType == "CHERRY" {
 					tier, rating, found = queue.RatedTier, queue.RatedRating, true
@@ -156,7 +172,11 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 	if !found {
 		reason = "no_cherry_entry"
 	}
-	a.recordArenaFameShape(source, isCurrent, found, raw, reason)
+	if found && value != nil {
+		reason = "source_unverified"
+	}
+	a.recordArenaFameShape(source, isCurrent, found, raw, reason, queueTypes)
+	value = nil // R282: no verified Fame endpoint has been captured from a real client.
 	state.mu.Lock()
 	if state.fame.entries == nil {
 		state.fame.entries = map[string]arenaFameCacheEntry{}
@@ -174,7 +194,7 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 
 // recordArenaFameShape records, once per source and self/other, the CHERRY
 // entry key names plus a fixed set of scalar values. No identity is recorded.
-func (a *app) recordArenaFameShape(source string, isSelf, found bool, raw json.RawMessage, reason string) {
+func (a *app) recordArenaFameShape(source string, isSelf, found bool, raw json.RawMessage, reason string, queueTypes ...[]string) {
 	logKey := source + "|" + map[bool]string{true: "self", false: "other"}[isSelf]
 	state := a.r263()
 	state.mu.Lock()
@@ -188,6 +208,9 @@ func (a *app) recordArenaFameShape(source string, isSelf, found bool, raw json.R
 	state.fame.logged[logKey] = true
 	state.mu.Unlock()
 	event := map[string]any{"event": "arena_fame_source_shape", "source": source, "is_self": isSelf, "found": found, "reason": reason}
+	if len(queueTypes) > 0 {
+		event["queue_types"] = queueTypes[0]
+	}
 	var object map[string]json.RawMessage
 	if len(raw) > 0 && json.Unmarshal(raw, &object) == nil {
 		keys := make([]string, 0, len(object))

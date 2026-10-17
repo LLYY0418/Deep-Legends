@@ -48,15 +48,15 @@ function identity(html) {
   return { copy, line: [...copy.children].find((node) => node !== copy.querySelector('.live-player-identity')) };
 }
 
-test('R263 P3 Summoner\'s Rift shows position plus solo and flex ranks, current queue first', () => {
+test('R263 P3 Summoner\'s Rift shows position plus preferred solo rank with a crest', () => {
   const f = playerRenderer();
   const base = { name: '甲', playerRef: 'p1', position: 'jungle', historyState: 'ok', recentGames: [], soloRank: solo, flexRank: flex };
   const soloQueue = identity(f.renderLivePlayer({ ...base, rank: solo }, 0, false, 0, [], '', false, false, 'InProgress', '', 'rift'));
-  assert.equal(soloQueue.line.textContent, '打野 · 单双 翡翠 IV 48 LP · 灵活 铂金 I 59 LP');
+  assert.equal(soloQueue.line.textContent, '打野 · 翡翠 IV');
   const flexQueue = identity(f.renderLivePlayer({ ...base, rank: flex }, 0, false, 0, [], '', false, false, 'InProgress', '', 'rift'));
-  assert.equal(flexQueue.line.textContent, '打野 · 灵活 铂金 I 59 LP · 单双 翡翠 IV 48 LP');
+  assert.equal(flexQueue.line.textContent, '打野 · 翡翠 IV');
   const unranked = identity(f.renderLivePlayer({ ...base, flexRank: null, rank: solo }, 0, false, 0, [], '', false, false, 'InProgress', '', 'rift'));
-  assert.equal(unranked.line.textContent, '打野 · 单双 翡翠 IV 48 LP · 灵活 未定级');
+  assert.equal(unranked.line.textContent, '打野 · 翡翠 IV');
   // Callers that do not pass a kind keep the previous single-rank line.
   const legacy = identity(f.renderLivePlayer({ ...base, rank: solo }, 0, false, 0, [], '', false, false, 'InProgress', ''));
   assert.equal(legacy.line.textContent, '打野 · 翡翠 IV');
@@ -161,7 +161,7 @@ function insightsRenderer() {
     isSummonersRiftMatch: (data) => Number(data.mapId) === 11,
     renderLiveRosterNoticeBars: () => '', renderLiveTeamPortraitTags: () => '', renderLiveRecentPositions: () => '',
     renderLivePlayer: (player, _index, _arena, _champion, _all, _positions, _aram, _hextech, _phase, _display, kind) => `<article class="live-player" data-kind="${kind}">${player.playerRef}</article>`,
-    renderInsightMatches: () => '<div class="insight-match-row"></div>', isARAMRelatedMatch: () => false, champSelectEnemyPlaceholder: () => false, arenaTeamMeta: () => null,
+    renderInsightMatches: () => '<div class="insight-match-row"></div>', isARAMRelatedMatch: data => Number(data.mapId)===12 && [450,2400].includes(Number(data.queueId)), champSelectEnemyPlaceholder: () => false, arenaTeamMeta: () => null,
   };
   installModule();
   return compile(js, ['orderLivePlayers', 'clusterPremadePlayers', 'livePremadeRoster', 'arenaLivePlayerGroups', 'insightTeamLayout', 'renderLiveInsights'], deps);
@@ -204,8 +204,8 @@ test('R263 P3 identity kind follows the mode: Rift CLASSIC, URF and ARAM', () =>
   const kind = (data) => new JSDOM(f.renderLiveInsights({ phase: 'InProgress', players, ...data })).window.document.querySelector('article').dataset.kind;
   assert.equal(kind({ gameMode: 'CLASSIC', mapId: 11, queueId: 420 }), 'rift');
   assert.equal(kind({ gameMode: 'URF', mapId: 11, queueId: 900 }), 'none', 'URF is on the Rift map but is an entertainment mode');
-  assert.equal(kind({ gameMode: 'ARAM', mapId: 12, queueId: 450 }), 'none');
-  assert.equal(kind({ gameMode: 'KIWI', mapId: 12, queueId: 2400 }), 'none');
+  assert.equal(kind({ gameMode: 'ARAM', mapId: 12, queueId: 450 }), 'aram');
+  assert.equal(kind({ gameMode: 'KIWI', mapId: 12, queueId: 2400 }), 'aram');
 });
 
 test('R263 P1 CSS: two squads per row with subgrid alignment, single column only when narrow', () => {

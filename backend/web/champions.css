@@ -951,3 +951,16 @@
   .mayhem-detail-tabs button { min-height: 44px; }
   .mayhem-atlas-entry { min-height: 40px; }
 }
+
+[data-theme="light"] .mayhem-detail-tabs button.is-active{color:var(--primary-strong)}
+[data-theme="light"] .topcard-stats{color:var(--on-art-ink)}
+
+[data-theme="light"] .topcard-stats{--metric-win-color:var(--on-art-win)}
+[data-theme="light"] :is(.mayhem-overview-identity,.arena-overview-identity) :is(h2,small){color:var(--on-art-heading)}
+[data-theme="light"] :is(.mayhem-overview-metrics,.arena-overview-metrics,.champion-detail-metrics)>div{background:var(--surface)}
+[data-theme="light"] .champion-detail-metrics span{color:var(--muted)}
+[data-theme="light"] .champion-detail-metrics strong{color:var(--ink)}
+[data-theme="light"] .champion-detail-metrics .metric-win strong{color:var(--success)}
+[data-theme="light"] .champion-detail-metrics .metric-pick strong{color:var(--accent)}
+[data-theme="light"] .champion-detail-metrics .metric-ban strong{color:var(--danger)}
+[data-theme="light"] .arena-overview-secondary{background:var(--surface)}

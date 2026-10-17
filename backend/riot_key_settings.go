@@ -33,6 +33,9 @@ type riotKeyStore struct {
 	invalidKey       string
 	rejected         bool
 	exists           bool
+	authUntil        time.Time
+	authProbeDone    chan struct{}
+	now              func() time.Time
 	embeddedRejected bool
 	networkFailures  int
 	routeUntil       time.Time
@@ -89,6 +92,13 @@ func loadRiotKeyStore(store *localStore) *riotKeyStore {
 	return s
 }
 
+func (s *riotKeyStore) authNowLocked() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
+}
+
 func (s *riotKeyStore) effective() (string, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -102,7 +112,7 @@ func (s *riotKeyStore) effectiveLocked() (string, string) {
 	if s.key != "" {
 		return s.key, "user"
 	}
-	if value := riotEmbeddedKey(); value != "" && !s.embeddedRejected {
+	if value := riotEmbeddedKey(); value != "" && (!s.embeddedRejected || !s.authNowLocked().Before(s.authUntil)) {
 		return value, "embedded"
 	}
 	if len(configuredRiotRelays()) > 0 {
@@ -145,6 +155,9 @@ func riotKeyState() string {
 	key, source := riotUserKeys.effective()
 	riotUserKeys.mu.Lock()
 	defer riotUserKeys.mu.Unlock()
+	if riotUserKeys.embeddedRejected && riotUserKeys.authNowLocked().Before(riotUserKeys.authUntil) && (source == "embedded" || source == "relay" || source == "none") {
+		return "cooldown"
+	}
 	if riotUserKeys.rejected || key != "" && key == riotUserKeys.invalidKey {
 		return "invalid"
 	}

@@ -10,7 +10,7 @@ import (
 
 func isR278Diagnostic(event string) bool {
 	switch event {
-	case "match_virtual_client", "pool_render_client", "history_outage_retry", "client_follow_client", "history_outage_ui", "overview_reference_fallback", "match_autoload_client", "collection_new_marker", "overview_reload_reason", "announcement_state":
+	case "overview_art_client", "career_cards_render", "match_virtual_client", "pool_render_client", "history_outage_retry", "client_follow_client", "history_outage_ui", "overview_reference_fallback", "match_autoload_client", "collection_new_marker", "overview_reload_reason", "announcement_state":
 		return true
 	}
 	return false
@@ -27,6 +27,13 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 	event := map[string]any{"event": r.Event, "reason": r.Reason}
 	for key, value := range fields {
 		switch key {
+		case "card":
+			s, ok := value.(string)
+			if !ok || (s != "recent-ranked" && s != "ability" && s != "champions") {
+				http.Error(w, "invalid card", 400)
+				return
+			}
+			event[key] = s
 		case "view", "result":
 			v, ok := value.(string)
 			if !ok || !(v == "owned" || v == "remaining" || v == "unowned" || v == "recovered" || v == "still_down") {
@@ -59,7 +66,7 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 			}
 		case "source":
 			s, ok := value.(string)
-			if ok && (s == "event" || s == "status" || s == "circuit" || s == "fresh-503" || s == "bundled" || s == "remote" || s == "cache") {
+			if ok && (s == "complete" || s == "cards" || s == "progress" || s == "retained" || s == "event" || s == "status" || s == "circuit" || s == "fresh-503" || s == "bundled" || s == "remote" || s == "cache") {
 				event[key] = s
 			}
 		case "id", "notice_revision":
@@ -77,14 +84,22 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 			if ok && (s == "" || s == "loading" || s == "quota" || s == "paused" || s == "not-ready" || s == "no-more") {
 				event[key] = s
 			}
-		case "applied", "bound", "near", "requested", "started":
+		case "video_path_present", "reduced_motion", "video_rendered", "src_set", "playing", "applied", "bound", "near", "requested", "started":
 			v, ok := value.(bool)
 			if !ok {
 				http.Error(w, "invalid flag", 400)
 				return
 			}
 			event[key] = v
-		case "collapsed", "hydrated", "item_count", "rendered_cards", "duration_ms", "count", "latency_ms", "matches_before", "matches_after", "durationMs":
+		case "error_code", "media_http_status", "rerender_count":
+			v, ok := value.(float64)
+			maximum := map[string]float64{"error_code": 4, "media_http_status": 599, "rerender_count": 100000}[key]
+			if !ok || v < 0 || v > maximum || v != float64(int(v)) {
+				http.Error(w, "invalid media metric", 400)
+				return
+			}
+			event[key] = int(v)
+		case "games", "generation", "collapsed", "hydrated", "item_count", "rendered_cards", "duration_ms", "count", "latency_ms", "matches_before", "matches_after", "durationMs":
 			v, ok := value.(float64)
 			if !ok || v < 0 || v > 3600000 {
 				http.Error(w, "invalid metric", 400)

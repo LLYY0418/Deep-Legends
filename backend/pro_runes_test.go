@@ -593,7 +593,7 @@ func TestProRuneFailureCountsAcrossIndexTerminalAndDetail(t *testing.T) {
 	}
 }
 
-func TestProRunePerPlayerLimitAndStrictPosition(t *testing.T) {
+func TestProRunePerPlayerLimitAndAnyPosition(t *testing.T) {
 	rows := []proRuneRow{}
 	now := time.Now()
 	for player := 0; player < 7; player++ {
@@ -620,7 +620,7 @@ func TestProRunePerPlayerLimitAndStrictPosition(t *testing.T) {
 	counts := map[string]int{}
 	for i, r := range selected {
 		counts[r.Player]++
-		if r.Participant.Role != "mid" || r.Participant.ChampionID != "Cassiopeia" {
+		if r.Participant.ChampionID != "Cassiopeia" {
 			t.Fatal("wrong champion/lane", r)
 		}
 		if i > 0 && r.Game.Start.After(selected[i-1].Game.Start) {
@@ -636,8 +636,8 @@ func TestProRunePerPlayerLimitAndStrictPosition(t *testing.T) {
 		}
 	}
 	for _, lane := range []string{"support", "", "other"} {
-		if len(proNewestRows(rows, "Cassiopeia", lane)) != 0 {
-			t.Fatal("must not fall back to another lane", lane)
+		if len(proNewestRows(rows, "Cassiopeia", lane)) != 35 {
+			t.Fatal("all lanes must remain eligible", lane)
 		}
 	}
 	for _, pair := range [][2]string{{"bottom", "adc"}, {"utility", "support"}, {"middle", "mid"}} {
@@ -693,8 +693,8 @@ func TestProRuneMultiPlayerRecommendationKeepsFullRecord(t *testing.T) {
 		t.Fatal(counts)
 	}
 	empty := p.recommend(context.Background(), 69, "top")
-	if len(empty.Pros) != 0 || empty.Reason != "no-sample" {
-		t.Fatal("wrong-lane fallback", empty)
+	if len(empty.Pros) != 10 {
+		t.Fatal("cross-lane samples missing", empty)
 	}
 }
 

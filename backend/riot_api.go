@@ -450,10 +450,19 @@ func (p *riotProvider) get(ctx context.Context, host, requestPath string, query 
 // getLimited 与 get 相同，但允许调用方指定响应大小上限；对局时间线
 // （timeline）包含逐帧事件，体积可达数 MB，需要比常规接口更大的额度。
 func (p *riotProvider) getLimitedRoute(ctx context.Context, host, requestPath string, query url.Values, out any, responseMax int64) error {
-	if !riotKeyConfigured() {
+	ctx = context.WithValue(ctx, riotRequestPathKey{}, riotPathShape(requestPath))
+	key, source := riotRequestCredential(ctx)
+	if key == "" && source != "relay" {
 		return errRiotKeyMissing
 	}
-	key, source := riotRequestCredential(ctx)
+	if source == "embedded" && ctx.Value(riotAuthProbeKey{}) == nil {
+		riotUserKeys.mu.Lock()
+		reprobe := riotUserKeys.embeddedRejected
+		riotUserKeys.mu.Unlock()
+		if reprobe && !p.confirmRiotCredential(ctx, key, source) {
+			return &riotStatusError{message: "Riot 服务冷却中", status: 403}
+		}
+	}
 	if event := riotSameCredentialDiagnostic(key, riotEmbeddedKey(), source); event != nil {
 		p.routeRecord(event)
 	}
@@ -688,8 +697,10 @@ func (p *riotProvider) getLimitedRoute(ctx context.Context, host, requestPath st
 			if source == "relay" {
 				return errRiotRelayUnavailable
 			}
-			riotUserKeys.observe(request.Header.Get("X-Riot-Token"), response.StatusCode)
-			return &riotStatusError{message: "Riot Key 无效", status: response.StatusCode}
+			if ctx.Value(riotAuthProbeKey{}) == nil {
+				p.confirmRiotCredential(ctx, key, source)
+			}
+			return &riotStatusError{message: "Riot 请求被拒绝", status: response.StatusCode}
 		case http.StatusTooManyRequests:
 			retryAfter := time.Duration(riotRetryAfter(response.Header.Get("Retry-After"), time.Now(), 3)) * time.Second
 			cooldown := ""
@@ -946,11 +957,12 @@ func (p *riotProvider) accountByRiotID(ctx context.Context, gameName, tagLine st
 		var status *riotStatusError
 		fallback := !errors.As(err, &status)
 		if status != nil {
-			fallback = status.status == 401 || status.status == 403 || status.status == 429
 			riotUserKeys.mu.Lock()
-			if status.status == 401 || status.status == 403 {
-				riotUserKeys.embeddedRejected = true
-			}
+			rejected := riotUserKeys.embeddedRejected
+			riotUserKeys.mu.Unlock()
+			fallback = (status.status == 401 || status.status == 403) && rejected || status.status == 429
+			riotUserKeys.mu.Lock()
+
 			if status.status == 429 {
 				riotUserKeys.routeUntil = time.Now().Add(time.Duration(status.retryAfter) * time.Second)
 			}
@@ -1283,6 +1295,7 @@ func (p *riotProvider) loadRiotMatchFlight(ctx context.Context, matchID string, 
 // matchTimeline 读取单场对局的时间线（装备路线与技能加点用）。
 // 韩服对局的 matchID 由 "KR_" + gameId 构成。
 func (p *riotProvider) matchTimeline(ctx context.Context, matchID string) ([]timelineFrame, error) {
+	ctx = context.WithValue(ctx, riotRequestSourceKey{}, "timeline")
 	var timeline lcuGameTimeline
 	if err := p.getLimited(ctx, p.clusterHost(), "/lol/match/v5/matches/"+url.PathEscape(matchID)+"/timeline", nil, &timeline, riotTimelineResponseMax); err != nil {
 		return nil, err

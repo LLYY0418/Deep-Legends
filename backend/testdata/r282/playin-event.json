@@ -1,0 +1,365 @@
+{
+  "data": {
+    "event": {
+      "id": "112966697102367347",
+      "type": "match",
+      "tournament": {
+        "id": "112966669920590211"
+      },
+      "league": {
+        "id": "98767975604431411",
+        "slug": "worlds",
+        "image": "http://static.lolesports.com/leagues/1592594612171_WorldsDarkBG.png",
+        "name": "Worlds"
+      },
+      "match": {
+        "strategy": {
+          "count": 3
+        },
+        "teams": [
+          {
+            "id": "107251245690956393",
+            "name": "MVK Esports",
+            "code": "MVK",
+            "image": "http://static.lolesports.com/teams/1767089709161_White_Logo.png",
+            "result": {
+              "gameWins": 0
+            }
+          },
+          {
+            "id": "103461966965149786",
+            "name": "Movistar KOI",
+            "code": "MKOI",
+            "image": "http://static.lolesports.com/teams/1734012609283_MKOI_FullColor_Blue.png",
+            "result": {
+              "gameWins": 2
+            }
+          }
+        ],
+        "games": [
+          {
+            "number": 1,
+            "id": "112966697102367348",
+            "state": "completed",
+            "teams": [
+              {
+                "id": "107251245690956393",
+                "side": "blue"
+              },
+              {
+                "id": "103461966965149786",
+                "side": "red"
+              }
+            ],
+            "vods": [
+              {
+                "id": "113226305135824998",
+                "parameter": "K4-JK3T16As",
+                "locale": "de-DE",
+                "mediaLocale": {
+                  "locale": "de-DE",
+                  "englishName": "German (Germany)",
+                  "translatedName": "Deutsch"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:53:05.735Z",
+                "startMillis": 889000,
+                "endMillis": 3390000
+              },
+              {
+                "id": "113198759365456106",
+                "parameter": "3LrfSX93S6c",
+                "locale": "en-US",
+                "mediaLocale": {
+                  "locale": "en-US",
+                  "englishName": "English (North America)",
+                  "translatedName": "English (North America)"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:44:57.676Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "113198524834724160",
+                "parameter": "7LtAxldo-8E",
+                "locale": "es-MX",
+                "mediaLocale": {
+                  "locale": "es-MX",
+                  "englishName": "Spanish (Mexico)",
+                  "translatedName": "Español (Latinoamérica)"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T12:07:52.669Z",
+                "startMillis": 330000,
+                "endMillis": 2503000
+              },
+              {
+                "id": "113212479608409390",
+                "parameter": "wy3AOZjVLLI",
+                "locale": "fr-FR",
+                "mediaLocale": {
+                  "locale": "fr-FR",
+                  "englishName": "French (France)",
+                  "translatedName": "Français"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:36:34.314Z",
+                "startMillis": 1826000,
+                "endMillis": 5115000
+              },
+              {
+                "id": "113214808427828403",
+                "parameter": "2259988909",
+                "locale": "it-IT",
+                "mediaLocale": {
+                  "locale": "it-IT",
+                  "englishName": "Italian (Italy)",
+                  "translatedName": "Italiano"
+                },
+                "provider": "twitch",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:31:28.704Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "113203324915252851",
+                "parameter": "tJacsoC4BaM",
+                "locale": "ja-JP",
+                "mediaLocale": {
+                  "locale": "ja-JP",
+                  "englishName": "Japanese (Japan)",
+                  "translatedName": "日本語"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:29:36.167Z",
+                "startMillis": 2296000,
+                "endMillis": 5082000
+              },
+              {
+                "id": "113212789182337799",
+                "parameter": "137335701",
+                "locale": "ko-KR",
+                "mediaLocale": {
+                  "locale": "ko-KR",
+                  "englishName": "Korean (Korea)",
+                  "translatedName": "한국어"
+                },
+                "provider": "afreecatv",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:24:48.755Z",
+                "startMillis": 2584000,
+                "endMillis": 5090000
+              },
+              {
+                "id": "113210983381392830",
+                "parameter": "Gqo_rwyr5Zw",
+                "locale": "pt-BR",
+                "mediaLocale": {
+                  "locale": "pt-BR",
+                  "englishName": "Portuguese (Brazil)",
+                  "translatedName": "Português (Brasil)"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:11:43.112Z",
+                "startMillis": 3371000,
+                "endMillis": 6451000
+              },
+              {
+                "id": "113212726246196359",
+                "parameter": "WTBMhllso1c",
+                "locale": "zh-TW",
+                "mediaLocale": {
+                  "locale": "zh-TW",
+                  "englishName": "Chinese (Republic of China)",
+                  "translatedName": "繁體中文"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:30:05.339Z",
+                "startMillis": 2137000,
+                "endMillis": 4774000
+              }
+            ]
+          },
+          {
+            "number": 2,
+            "id": "112966697102367349",
+            "state": "completed",
+            "teams": [
+              {
+                "id": "107251245690956393",
+                "side": "blue"
+              },
+              {
+                "id": "103461966965149786",
+                "side": "red"
+              }
+            ],
+            "vods": [
+              {
+                "id": "113226305135562853",
+                "parameter": "K4-JK3T16As",
+                "locale": "de-DE",
+                "mediaLocale": {
+                  "locale": "de-DE",
+                  "englishName": "German (Germany)",
+                  "translatedName": "Deutsch"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:53:05.735Z",
+                "startMillis": 4111000,
+                "endMillis": 6347000
+              },
+              {
+                "id": "113198759365652715",
+                "parameter": "3Y2mRgLFZbo",
+                "locale": "en-US",
+                "mediaLocale": {
+                  "locale": "en-US",
+                  "englishName": "English (North America)",
+                  "translatedName": "English (North America)"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T12:55:13.851Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "113198572658357358",
+                "parameter": "mCba_vx2AJU",
+                "locale": "es-MX",
+                "mediaLocale": {
+                  "locale": "es-MX",
+                  "englishName": "Spanish (Mexico)",
+                  "translatedName": "Español (Latinoamérica)"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T13:01:24.531Z",
+                "startMillis": 424000,
+                "endMillis": 2246000
+              },
+              {
+                "id": "113212479590031416",
+                "parameter": "wy3AOZjVLLI",
+                "locale": "fr-FR",
+                "mediaLocale": {
+                  "locale": "fr-FR",
+                  "englishName": "French (France)",
+                  "translatedName": "Français"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:36:34.314Z",
+                "startMillis": 5152000,
+                "endMillis": 7836000
+              },
+              {
+                "id": "113214808420337133",
+                "parameter": "2260046249",
+                "locale": "it-IT",
+                "mediaLocale": {
+                  "locale": "it-IT",
+                  "englishName": "Italian (Italy)",
+                  "translatedName": "Italiano"
+                },
+                "provider": "twitch",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T13:00:29.302Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "113203324934308419",
+                "parameter": "tJacsoC4BaM",
+                "locale": "ja-JP",
+                "mediaLocale": {
+                  "locale": "ja-JP",
+                  "englishName": "Japanese (Japan)",
+                  "translatedName": "日本語"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:29:36.167Z",
+                "startMillis": 5549000,
+                "endMillis": 8085000
+              },
+              {
+                "id": "113212789136641446",
+                "parameter": "137335701",
+                "locale": "ko-KR",
+                "mediaLocale": {
+                  "locale": "ko-KR",
+                  "englishName": "Korean (Korea)",
+                  "translatedName": "한국어"
+                },
+                "provider": "afreecatv",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:24:48.755Z",
+                "startMillis": 5798000,
+                "endMillis": 8044000
+              },
+              {
+                "id": "113210983404769275",
+                "parameter": "Gqo_rwyr5Zw",
+                "locale": "pt-BR",
+                "mediaLocale": {
+                  "locale": "pt-BR",
+                  "englishName": "Portuguese (Brazil)",
+                  "translatedName": "Português (Brasil)"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:11:43.112Z",
+                "startMillis": 6452000,
+                "endMillis": 9645000
+              },
+              {
+                "id": "113212726234074522",
+                "parameter": "WTBMhllso1c",
+                "locale": "zh-TW",
+                "mediaLocale": {
+                  "locale": "zh-TW",
+                  "englishName": "Chinese (Republic of China)",
+                  "translatedName": "繁體中文"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2024-09-25T11:30:05.339Z",
+                "startMillis": 5483000,
+                "endMillis": 7728000
+              }
+            ]
+          },
+          {
+            "number": 3,
+            "id": "112966697102367350",
+            "state": "unneeded",
+            "teams": [
+              {
+                "id": "103461966965149786",
+                "side": "blue"
+              },
+              {
+                "id": "107251245690956393",
+                "side": "red"
+              }
+            ],
+            "vods": []
+          }
+        ]
+      },
+      "streams": []
+    }
+  }
+}

@@ -232,7 +232,7 @@ func (p *proRuneProvider) rows(snapshot proRuneSnapshot, now time.Time) []proRun
 		}
 		for _, pair := range [][2]proTeamMetadata{{g.Metadata.Blue, g.Metadata.Red}, {g.Metadata.Red, g.Metadata.Blue}} {
 			for _, part := range pair[0].Participants {
-				name := p.player(pair[0].TeamID, part)
+				name := p.eventPlayer(snapshot.Events[g.MatchID], pair[0].TeamID, part)
 				if name == "" {
 					continue
 				}
@@ -254,22 +254,23 @@ func (p *proRuneProvider) rows(snapshot proRuneSnapshot, now time.Time) []proRun
 	return result
 }
 
-// Match the requested lane strictly; never borrow another lane's rune page.
+// All lanes are eligible; the requested lane breaks ties at the same timestamp.
 // The cap is per roster identity, not per champion or number of player tabs.
 func proNewestRows(rows []proRuneRow, champion, position string) []proRuneRow {
 	result := []proRuneRow{}
 	lane := canonicalSpecialistPosition(position)
-	if lane == "" || lane == "other" {
-		return result
-	}
 	for _, r := range rows {
-		if strings.EqualFold(r.Participant.ChampionID, champion) && canonicalSpecialistPosition(r.Participant.Role) == lane {
+		if strings.EqualFold(r.Participant.ChampionID, champion) {
 			result = append(result, r)
 		}
 	}
 	sort.SliceStable(result, func(i, j int) bool {
 		if !result[i].Game.Start.Equal(result[j].Game.Start) {
 			return result[i].Game.Start.After(result[j].Game.Start)
+		}
+		iLane, jLane := canonicalSpecialistPosition(result[i].Participant.Role) == lane, canonicalSpecialistPosition(result[j].Participant.Role) == lane
+		if iLane != jLane {
+			return iLane
 		}
 		return result[i].Game.ID+result[i].Participant.PlayerID < result[j].Game.ID+result[j].Participant.PlayerID
 	})
@@ -368,6 +369,9 @@ func (p *proRuneProvider) recommend(ctx context.Context, championID int, positio
 	}
 	p.mu.Unlock()
 	now := time.Now()
+	if p.now != nil {
+		now = p.now()
+	}
 	response.Stale = sourceIncomplete || (response.Reason != "" && response.Failed == 0) || snapshot.ReadAt.IsZero() || now.Sub(snapshot.ReadAt) > proRuneTTL
 	if len(snapshot.Games) == 0 {
 		if response.Preparing {
@@ -487,13 +491,10 @@ func (p *proRuneProvider) recommend(ctx context.Context, championID int, positio
 		e := snapshot.Events[r.Game.MatchID]
 		teams := []string{}
 		for _, t := range e.Match.Teams {
-			code := proRuneTeams[t.ID]
-			if code == "" {
-				code = t.Code
-			}
+			code := proEventTeamCode(e, t.ID)
 			teams = append(teams, code)
 		}
-		config := gameplayRecommendationRune{Key: fmt.Sprintf("pro-%s-%d", r.Game.ID, r.Participant.ParticipantID), SourceKey: "pro", Title: proRuneTeams[r.TeamID] + " " + r.Player,
+		config := gameplayRecommendationRune{Key: fmt.Sprintf("pro-%s-%d", r.Game.ID, r.Participant.ParticipantID), SourceKey: "pro", Title: proEventTeamCode(e, r.TeamID) + " " + r.Player,
 			ChampionID: int64(championID), ChampionName: meta.NameZH, PlayerName: r.Player, Position: map[string]string{"top": "上路", "jungle": "打野", "mid": "中路", "bottom": "下路", "support": "辅助"}[r.Participant.Role],
 			PrimaryStyleID: participant.Perks.StyleID, SubStyleID: participant.Perks.SubStyleID, SelectedPerkIDs: perkIDs, StatModIDs: shards, ShardResolution: shardResolution, SelectedComplete: &complete, ItemIDs: participant.Items,
 			PlayedAt: r.Game.Start.UnixMilli(), WinKnown: &known, RecordGames: rec.games, RecordWins: rec.wins, RecordPartial: rec.partial || response.Stale,
@@ -608,8 +609,8 @@ func proOpponentDisplayName(row proRuneRow, event proRuneEvent) string {
 			continue
 		}
 		code := strings.TrimSpace(team.Code)
-		if known := proRuneTeams[team.ID]; known != "" {
-			code = known
+		if code == "" {
+			code = proRuneTeams[team.ID]
 		}
 		if code == "" {
 			return name

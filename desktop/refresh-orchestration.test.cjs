@@ -373,7 +373,7 @@ test("R70 cached collection reentry avoids a request and never uses outgoing DOM
     w.fetch = (input, init) => { if (requestURL(input).startsWith("/api/skins")) skinRequests++; return original(input, init); };
     w.document.startViewTransition = () => { transitions++; throw new Error("snapshot must not block navigation"); };
     w.document.querySelector('[data-section="favorites"]').click();
-    await waitFor(() => skinRequests > 0 && w.document.querySelector("#skin-grid .skin-card"), "collection not rendered");
+    await waitFor(() => skinRequests > 0 && w.document.querySelector("#skin-grid .skin-card[data-collection-id]"), "collection not rendered");
     const first = skinRequests;
     w.document.querySelector('[data-section="overview"]').click();
     w.document.querySelector('[data-section="favorites"]').click();

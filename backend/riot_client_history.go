@@ -14,6 +14,7 @@ import (
 // retains its LCU profile and season snapshot while public statistics share
 // the same identity resolver.
 func (a *app) loadClientRiotHistory(ctx context.Context, region, puuid string, begIndex, count int, filter string, names, labels map[int64]string, references ...gameplayReference) ([]gameplayMatch, gameplayPagination, error) {
+	ctx = context.WithValue(ctx, riotRequestSourceKey{}, "lcu-self-history")
 	if a.riot == nil {
 		return nil, gameplayPagination{}, errRiotKeyMissing
 	}

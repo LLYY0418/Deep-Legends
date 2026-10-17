@@ -113,6 +113,7 @@ type proRuneSnapshot struct {
 	ReadAt time.Time
 }
 type proRuneProvider struct {
+	now              func() time.Time
 	provider         *championProvider
 	root             string
 	notify           func()
@@ -263,12 +264,7 @@ func proEventAllowed(e proRuneEvent) bool {
 	if proRuneLeagues[e.League.ID] == "" || len(e.Match.Teams) != 2 || e.Match.Teams[0].ID == e.Match.Teams[1].ID {
 		return false
 	}
-	for _, t := range e.Match.Teams {
-		if proRuneTeams[t.ID] != "" {
-			return true
-		}
-	}
-	return false
+	return proNumericID(e.Match.Teams[0].ID) && proNumericID(e.Match.Teams[1].ID)
 }
 func (p *proRuneProvider) event(ctx context.Context, id string) (proRuneEvent, error) {
 	var e proRuneEvent
@@ -466,6 +462,11 @@ func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
 	sourceIncomplete := false
 	reason := ""
 	matches := map[string]bool{}
+	matchLeagues := map[string]string{}
+	indexStats := map[string]*proIndexDiagnostic{}
+	for id := range proRuneLeagues {
+		indexStats[id] = &proIndexDiagnostic{Dropped: map[string]int{"team": 0, "time": 0, "missing-data": 0}}
+	}
 	ids := make([]string, 0, 5)
 	for id := range proRuneLeagues {
 		ids = append(ids, id)
@@ -511,6 +512,7 @@ func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
 				}
 				if e.State == "completed" && !e.Start.After(now) && e.Start.After(cutoff.Add(-24*time.Hour)) && proNumericID(e.Match.ID) {
 					matches[e.Match.ID] = true
+					matchLeagues[e.Match.ID] = leagueID
 				}
 			}
 			mu.Unlock()
@@ -544,6 +546,7 @@ func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
 		e, err := p.event(ctx, id)
 		if err != nil {
 			mu.Lock()
+			indexStats[matchLeagues[id]].Dropped["missing-data"]++
 			failed++
 			sourceIncomplete = true
 			reason = proRuneErrorReason(err)
@@ -551,6 +554,15 @@ func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
 			return
 		}
 		if !proEventAllowed(e) {
+			mu.Lock()
+			stats := indexStats[matchLeagues[id]]
+			for _, g := range e.Match.Games {
+				if g.State == "completed" {
+					stats.Completed++
+					stats.Dropped["team"]++
+				}
+			}
+			mu.Unlock()
 			return
 		}
 		mu.Lock()
@@ -562,12 +574,21 @@ func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
 			}
 			row, err := p.indexGame(ctx, e, g)
 			mu.Lock()
+			stats := indexStats[matchLeagues[id]]
+			stats.Completed++
 			if err != nil {
+				stats.Dropped["missing-data"]++
 				failed++
 				failedGames[g.ID] = true
 				reason = proRuneErrorReason(err)
 			} else if row.Start.After(cutoff) && !row.Start.After(now) {
 				next.Games[row.ID] = row
+				stats.Included++
+				if row.Start.After(stats.Latest) {
+					stats.Latest = row.Start
+				}
+			} else {
+				stats.Dropped["time"]++
 			}
 			mu.Unlock()
 		}
@@ -576,6 +597,15 @@ func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
 		failed++
 		sourceIncomplete = true
 		reason = "upstream-timeout"
+	}
+	if p.provider != nil && p.provider.diag != nil {
+		for league, stats := range indexStats {
+			date := ""
+			if !stats.Latest.IsZero() {
+				date = stats.Latest.UTC().Format("2006-01-02")
+			}
+			p.provider.diag(map[string]any{"event": "pro_rune_index", "league": proRuneLeagues[league], "completed": stats.Completed, "included": stats.Included, "dropped": stats.Dropped, "latest_date": date})
+		}
 	}
 	// A failed game does not make the successfully refreshed index an old cache.
 	if !sourceIncomplete {
@@ -679,4 +709,38 @@ func (a *app) handleGameplayProRunes(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
 	respondJSON(w, p.recommend(ctx, id, position))
+}
+
+// Tournament metadata is authoritative for participants in the allowed major leagues.
+// The reviewed account roster remains separate from this public event index.
+type proIndexDiagnostic struct {
+	Completed, Included int
+	Dropped             map[string]int
+	Latest              time.Time
+}
+
+func proEventTeamCode(event proRuneEvent, teamID string) string {
+	for _, team := range event.Match.Teams {
+		if team.ID == teamID {
+			if code := strings.TrimSpace(team.Code); code != "" {
+				return code
+			}
+			return proRuneTeams[teamID]
+		}
+	}
+	return ""
+}
+func (p *proRuneProvider) eventPlayer(event proRuneEvent, teamID string, part proParticipant) string {
+	if name := p.player(teamID, part); name != "" {
+		return name
+	}
+	code := proEventTeamCode(event, teamID)
+	name := strings.TrimSpace(part.SummonerName)
+	if code == "" || name == "" || !proNumericID(part.PlayerID) {
+		return ""
+	}
+	if len(name) > len(code) && strings.EqualFold(name[:len(code)], code) && name[len(code)] == ' ' {
+		name = strings.TrimSpace(name[len(code):])
+	}
+	return name
 }

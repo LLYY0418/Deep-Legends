@@ -110,9 +110,9 @@ test("卡片等待图片时显示加载中，失败后才显示暂无预览", ()
 test("详情与炫彩导航共用全局图标尺寸令牌", () => {
   const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
   const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
-  assert.match(css, /--control-icon-size:var\(--icon-md\)/);
-  assert.match(css, /\.function-icon[^}]*width:var\(--icon-md\)/);
-  assert.match(html, /id="skin-dialog-fullscreen"[^>]*>[\s\S]*?<svg class="control-icon function-icon"/);
+  assert.match(css, /--control-icon-size:\s*24px/);
+  assert.match(css, /\.control-icon[^}]*width:\s*var\(--control-icon-size\)/);
+  assert.match(html, /id="skin-dialog-fullscreen"[^>]*>[\s\S]*?<svg class="control-icon"/);
   assert.match(source, /navigationIcon\("previous"\)/);
 });
 

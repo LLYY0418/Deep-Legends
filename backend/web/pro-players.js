@@ -48,7 +48,7 @@
   function render() {
     content.setAttribute("aria-busy", String(state.loading));
     refresh.disabled = state.loading;
-    refresh.innerHTML = state.loading ? "正在读取…" : '<svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-refresh"/></svg>刷新账号';
+    refresh.textContent = state.loading ? "正在读取…" : "↻ 刷新账号";
     for (const button of filters.querySelectorAll("[data-pro-team]")) button.setAttribute("aria-pressed", String(button.dataset.proTeam === state.team));
     const data = state.data;
     if (!data) {

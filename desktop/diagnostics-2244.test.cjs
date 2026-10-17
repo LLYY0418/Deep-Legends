@@ -16,14 +16,14 @@ test('2244 skill summary uses real main/sub priorities after R, without repeated
   assert.equal(w.renderSkillPlan({skillPriority:[]},[]).includes('主Q'),false);
  }finally{w.close();}
 });
-test('2244 banner exact animation, no video for unknown skin or reduced motion',()=>{
+test('2244 banner exact content animation under both motion preferences, no video for unknown skin',()=>{
  for(const reduced of [false,true]){
   const dom=new JSDOM('',{runScripts:'outside-only'}),w=dom.window;
   try{
    w.matchMedia=()=>({matches:reduced,addEventListener(){}});w.eval(read('overview-art.js'));
    const player={backgroundSkinId:103086,backgroundPosterPath:'/lol-game-data/assets/ahri_centered_86.jpg',backgroundSource:'gtimg',backgroundPath:'/fallback.jpg',backgroundVideoPath:'/lol-game-data/assets/centered.webm'};
    w.document.body.innerHTML=w.deepLegendsOverviewArt.render(player);
-   assert.equal(w.document.querySelectorAll('video').length,reduced?0:1);
+   assert.equal(w.document.querySelectorAll('video').length,1);
    assert.equal(w.document.querySelector('.overview-art').dataset.focusSkin,'103086');
    assert.equal(w.document.querySelector('[data-overview-poster]').getAttribute('data-queued-src'),'/api/image?path=%2Flol-game-data%2Fassets%2Fahri_centered_86.jpg');
    assert.equal(w.deepLegendsOverviewArt.render({backgroundSkinId:123456}), '');

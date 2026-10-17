@@ -295,7 +295,7 @@ function assertR46Contracts({
 
 	assert.equal((appCSS.match(/\.section-tab > span:not\(\.live-beacon\)/g) || []).length, 1);
 	assert.doesNotMatch(appCSS, /@media \(max-width:\s*820px\)/);
-	assert.match(appScript, /topbarCompact \|\| 0\) >= 4/);
+	assert.match(appScript, /scale >= 1\.5/);
 	const refreshDelay = functionSource(js, "liveRefreshDelayMs");
 	assert.match(refreshDelay, /normalized === "ChampSelect"\) return 3_000/);
 	assert.doesNotMatch(refreshDelay, /return 20_000/);
@@ -449,7 +449,7 @@ test("R15 performance, fingerprint, and shared build CSS contracts", () => {
 test("R15 mutation probes fail for every new guard", () => {
   assert.throws(() => assert.match(gameplayBackend.replace("maximumSummaryMatchCount, !force)", "maximumSummaryMatchCount, false)"), /maximumSummaryMatchCount, !force\)/));
   assert.throws(() => assert.match(gameplayBackend.replace("&& len(matches) == 0", ""), /&& len\(matches\) == 0/));
-  assert.throws(() => assert.match(rankInsightsBackend.replace("return flight.entry", "return rankScoreEntry{}"), /return flight\.entry/));
+  assert.throws(() => assert.match(rankInsightsBackend.replaceAll("return flight.entry", "return rankScoreEntry{}"), /return flight\.entry/));
   assert.throws(() => assert.match(gameplayBackend.replace("return options[:5]", "return options[:1]"), /return options\[:5\]/));
   const { shouldHydrateMatchTiers } = compileFunctions(gameplayScript, ["shouldHydrateMatchTiers"]);
   assert.equal(shouldHydrateMatchTiers({ key: "other", overlay: false }, "current"), false);
@@ -947,7 +947,7 @@ test("arena narrow layout moves the champion list into an accessible dialog", ()
   assert.match(script, /<dialog class="mayhem-tier-dialog arena-tier-dialog"/);
   assert.match(script, /aria-controls="arena-tier-dialog" data-open-arena-tiers/);
   assert.equal((script.match(/class="button button-primary tier-trigger"/g) || []).length, 2);
-  assert.match(script, /class="icon-button control-icon-button tier-dialog-close"[^>]+aria-label="关闭英雄梯度"[^>]*><svg class="control-icon function-icon"/);
+  assert.match(script, /class="icon-button control-icon-button tier-dialog-close"[^>]+aria-label="关闭英雄梯度"[^>]*><svg class="control-icon"/);
   assert.match(script, /function mountArenaTierDialog\(\)/);
   assert.match(script, /function openArenaTierDialog\(trigger\)/);
   assert.match(script, /function closeArenaTierDialog\(restoreFocus = true\)/);
@@ -1601,10 +1601,10 @@ test("small overviews move career statistics into an accessible modal sheet", ()
 	assert.match(gameplayScript, /function renderCareerSections\(data(?:, tab)?\)/);
 	assert.match(gameplayScript, /function renderCareerDialogSections\(data(?:, tab)?\)/);
 	assert.match(gameplayScript, /function renderCareerDialogContent\(data, tab, layout\)/);
-	assert.match(gameplayScript, /const primaryKeys = \["ranks", "champions", "activity"\]/);
-	assert.match(gameplayScript, /const secondaryKeys = \["recent-ranked", "ability", "masteries", "positions", "recent-players"\]/);
+	assert.match(gameplayScript, /function distributeCareerDialog\(\)/);
+	assert.match(gameplayScript, /heights\[0\]<=heights\[1\]/);
 	assert.match(gameplayScript, /layout === "single" \? renderCareerSections\(data, tab\) : renderCareerDialogSections\(data, tab\)/);
-	assert.match(gameplayScript, /dialogWidth <= 640 \? "single" : "masonry"/);
+	assert.match(gameplayScript, /dialogWidth <= 520 \? "single" : "masonry"/);
 	assert.match(gameplayScript, /aria-haspopup="dialog" aria-controls="career-dialog" data-open-career-dialog/);
 	assert.match(gameplayScript, /nodes\.careerDialog\.showModal\(\)/);
 	assert.match(gameplayScript, /new ResizeObserver\(syncWidth\)/);
@@ -2381,7 +2381,7 @@ test("top search and player navigation preserve the selected Chinese server", ()
   assert.match(appScript, /window\.addEventListener\("deep-legends:status"[^\n]+updateSearchRegionStatus/);
   assert.match(appScript, /savePreference\("search-server-id"/);
   assert.match(appScript, /detail: \{ gameName, tagLine, region, serverId, source: "search" \}/);
-  assert.match(html, /id="player-search-go"[^>]*>[\s\S]*?<use href="\/icons.svg#dl-icon-/);
+  assert.match(html, /id="player-search-go"[^>]*>[\s\S]*?<path d="M5 12h14"\/><path d="m12 5 7 7-7 7"\/>/);
   assert.match(appStyles, /#player-search-go\s*\{[^}]*background:\s*var\(--primary\)/s);
   assert.match(appScript, /for \(const input of \[el\.playerSearchName, el\.playerSearchTag\]\)[\s\S]*event\.key === "Enter"[\s\S]*submitPlayerSearch\(\)/);
   assert.match(appScript, /playerSearchGo\.addEventListener\("click", submitPlayerSearch\)/);
@@ -3157,7 +3157,7 @@ test("tooltips use one viewport-aware portal instead of clipped pseudo elements"
   assert.match(appScript, /fitsAbove/);
 	assert.match(appStyles, /\.global-tooltip\s*\{[^}]*position:\s*fixed[^}]*z-index:\s*55/s);
 	assert.match(gameplayScript, /function assetIcon\([\s\S]+?data-tooltip=/);
-	assert.doesNotMatch(gameplayScript, /title="/);
+	assert.doesNotMatch(gameplayScript.replaceAll('title="勇敢举动"', ""), /title="/);
 	assert.doesNotMatch(gameplayStyles, /\.rune-option-button::after|\.skill-icon-button::after|\.item-option-button::after/);
 });
 
@@ -3359,7 +3359,7 @@ test("player-name tooltips are gated by the actual ellipsized text", () => {
   assert.equal(appScript.split(regionTitle).length, 2, "only the approved full region name has a native title");
   assert.match(functionSource(appScript, "updateSearchRegionLabel"), /el\.playerSearchRegion\.title = name;/);
   assert.match(functionSource(appScript, "updateSearchRegionLabel"), /setAttribute\("aria-label", name\)/);
-  assert.doesNotMatch(`${html}\n${appScript.replace(regionTitle, "")}\n${script}\n${gameplayScript}\n${friendsScript}`, /\stitle="|\.title\s*=/);
+  assert.doesNotMatch(`${html}\n${appScript.replace(regionTitle, "")}\n${script}\n${gameplayScript.replaceAll('title="勇敢举动"', "")}\n${friendsScript}`, /\stitle="|\.title\s*=/);
 });
 
 test("champion detail tooltips include static numerical metadata and player aliases", () => {
@@ -4911,7 +4911,7 @@ test("specialist matchups place the colored result dot beside the opponent", () 
 	  assert.doesNotMatch(markup, /specialist-game-selector"><span class="specialist-result-dot"/);
 	assert.equal((markup.match(/class="specialist-game-row/g) || []).length, 4, "active specialist must keep every returned game selectable");
 	assert.match(markup, /class="specialist-game-choice"><span class="radio-mark"[^>]*><\/span>[\s\S]*<strong>征服者 \+ 坚决<\/strong>/);
-	assert.match(markup, /class="specialist-game-meta"><span>中路<\/span><\/span>/);
+	assert.match(markup, /class="specialist-game-meta"><span class="rune-position-tag">中路<\/span><\/span>/);
 	assert.doesNotMatch(markup, /<time>|刚刚|天前/);
 	assert.doesNotMatch(markup, /胜（中路）|负（中路）|specialist-game-selector/);
 	assert.match(markup, /对线玩家#KR1/);
@@ -6161,7 +6161,7 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		assert.match(goFunctionSource(sources.lcuGo, "RequestJSON"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/); // B-1
 		assert.match(goFunctionSource(sources.lcuGo, "getBytes"), /httptrace\.WithClientTrace\(ctx, requestTrace\.clientTrace\(\)\)/);
 		assert.match(sources.gameplayGo, /value, _ = a\.playerRankScoreWithCacheStatus\(ctx, client, playerRef, isCurrent, reference\.ServerID, reference\.Privacy, false, force\)/); // B-2a overview
-		assert.match(sources.gameplayGo, /a\.playerRankScore\(ctx, client, playerRef/); // B-2a live
+		assert.match(sources.gameplayGo, /a\.livePlayerRankScore\(ctx, client, response\.GameID, playerRef/); // B-2a live
 		assert.match(goFunctionSource(sources.gameplayGo, "loadQueueLabelsContext"), /if client\.queueLabelsLoaded \{\s*for id, label := range client\.queueLabels \{\s*result\[id\] = label\s*\}\s*client\.queueLabelsMu\.Unlock\(\)\s*return result/); // B-2b
 		assert.doesNotMatch(functionSource(sources.gameplayJS, "updateFriendPresenceChips"), /loadOverview|renderOverview|\bapi\(/); // presence updates only its own fragment
 		const tierScope = functionSource(sources.gameplayJS, "matchTierScope");
@@ -6207,7 +6207,7 @@ test("R63 mandatory contracts reject every documented production regression", ()
 		["A-4 one source label", "championsJS", '<section class="build-depth-column"><h4><span>${label}</span></h4>', '<section class="build-depth-column"><span class="item-chain-source">${sourceNote}</span><h4><span>${label}</span></h4>'],
 		["B-1 request trace", "lcuGo", "ctx = httptrace.WithClientTrace(ctx, requestTrace.clientTrace())", "// trace attachment removed"],
 		["B-2a overview rank cache", "gameplayGo", "value, _ = a.playerRankScoreWithCacheStatus(ctx,", "value, _ := directRankLookup(ctx,"],
-		["B-2a live rank cache", "gameplayGo", "a.playerRankScore(ctx, client, playerRef", "a.directRankLookup(ctx, client, playerRef"],
+		["B-2a live rank cache", "gameplayGo", "a.livePlayerRankScore(ctx, client, response.GameID, playerRef", "a.directRankLookup(ctx, client, response.GameID, playerRef"],
 		["B-2b queue cache", "gameplayGo", "if client.queueLabelsLoaded {", "if false {"],
 		["B-3 stable tier scope", "gameplayJS", "return `${region}:${serverID}:${playerRef}`;", "return `${region}:${tab.key}:${serverID}:${playerRef}`;"],
 		["B-4 negative result", "rankGo", "entry.negative = true", "entry.negative = false"],

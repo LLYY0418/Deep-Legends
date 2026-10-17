@@ -209,6 +209,7 @@
   window.addEventListener?.('pagehide',flushLocalDiagnostics);
   let exportSequence = 0;
   window.flushFlowDiagnostics = async () => {
+    window.deepLegendsOverviewArt?.flush();
     // Export must not race a just-clicked filter's telemetry. Wait briefly,
     // then record remaining pending work rather than claiming a complete drain.
     void flushGameflowDiagnostics();
@@ -219,10 +220,10 @@
     await sendFlowDiagnostic(body, JSON.stringify(body), 1, 1500);
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
-    if(['match_virtual_client','pool_render_client','history_outage_retry','client_follow_client','history_outage_ui','overview_reference_fallback','match_autoload_client','collection_new_marker','overview_reload_reason','announcement_state'].includes(event)){
-      const allowed=['view','item_count','rendered_cards','result','duration_ms','collapsed','hydrated','height_mismatch_max_px','zoom','from_group','to_group','search_from','search_to','applied','source','count','bound','near','requested','started','blocked_reason','latency_ms','matches_before','matches_after','id','notice_revision','durationMs'];
+    if(['overview_art_client','career_cards_render','match_virtual_client','pool_render_client','history_outage_retry','client_follow_client','history_outage_ui','overview_reference_fallback','match_autoload_client','collection_new_marker','overview_reload_reason','announcement_state'].includes(event)){
+      const allowed=['video_path_present','reduced_motion','video_rendered','src_set','playing','error_code','media_http_status','rerender_count','card','games','generation','view','item_count','rendered_cards','result','duration_ms','collapsed','hydrated','height_mismatch_max_px','zoom','from_group','to_group','search_from','search_to','applied','source','count','bound','near','requested','started','blocked_reason','latency_ms','matches_before','matches_after','id','notice_revision','durationMs'];
       const r278={};for(const key of allowed)if(Object.hasOwn(fields,key))r278[key]=fields[key];
-      const body={event,reason,r278},encoded=JSON.stringify(body);if(flowPending.has(encoded) || flowSamples.has(encoded))return;
+      const body={event,reason,r278},encoded=JSON.stringify(body);if(event!=="overview_art_client" && (flowPending.has(encoded) || flowSamples.has(encoded)))return;
       if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
     }
     if(event==='local_request_client' && reason==='complete' && fields.httpStatus>=200 && fields.httpStatus<300 && (!fields.errorKind || fields.errorKind==='none')){

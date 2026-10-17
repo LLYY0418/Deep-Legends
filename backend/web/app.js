@@ -5,16 +5,8 @@
 
   const STATUS_INTERVAL = 60 * 60 * 1000;
   const CLIENT_INSTALLATION_TTL = 30_000;
-  // R130 P1-A 兜底：卡片任务拿到名额后超过这个时长仍没有任何 load/error，就按失败
-  // 处理——释放名额、试下一个候选地址、全部试完显示「暂无预览」。
-  // R130 工单原本给的阈值比这个短，实测口径下必须放大：第二层 image-queue.js 从
-  // 放行到彻底放弃的最坏路径是 10s 超时 + 10s 重试冷却 + 再 10s 超时 = 30s，而且
-  // 这 30s 是从「第二层放行」起算，看门狗是从「第一层发名额」起算，中间还要排第二
-  // 层自己的 5 个名额。阈值取在 30s 之前会让看门狗抢在第二层前面推进，既有概率跳过
-  // 本来能显示的候选地址，也会在每张慢图上误报一条 card_image_stalled，把「名额
-  // 是否泄漏」这个判据搞脏。45s 留出排队余量，让看门狗在第二层重试结束后兜底。
+  // Image watchdog releases tasks that never produce load/error within the configured budget.
   const CARD_IMAGE_STALL_MS = 45_000;
-  // R130 P1-6：card_image_stalled 每 10 秒最多上报一条。
   const CARD_IMAGE_STALL_REPORT_INTERVAL_MS = 10_000;
 	const LIVE_UPDATE_STATE_SLICES = Object.freeze({
 	  "refresh-started": ["status"],
@@ -212,7 +204,7 @@
 		const label = document.createElement("label");
 		label.className = "app-select-search";
 		label.dataset.appSelectSearch = "";
-		label.innerHTML = '<svg class="function-icon app-select-search-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-shape-5681797753"/></svg><span class="sr-only">搜索选项</span><input type="search" placeholder="搜索中文、拼音、英文、缩写或外号" autocomplete="off" data-app-select-search-input>';
+		label.innerHTML = '<svg class="app-select-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg><span class="sr-only">搜索选项</span><input type="search" placeholder="搜索中文、拼音、英文、缩写或外号" autocomplete="off" data-app-select-search-input>';
 		menu.insertBefore(label, optionsRoot);
 	  }
 	  root.classList.add("has-search");
@@ -264,7 +256,7 @@
 	  const signature = nativeSelectOptionsSignature(options);
 	  const buttons = [...optionsRoot.querySelectorAll('[role="menuitemradio"]')];
 	  if (root._nativeSelectOptionsSignature !== signature || buttons.length !== options.length) {
-		optionsRoot.innerHTML = options.map((option) => `<button type="button" role="menuitemradio" aria-checked="${option === selected}" data-native-select-value="${escapeHTML(option.value)}" ${option.disabled ? "disabled" : ""}><span>${escapeHTML(option.textContent.trim())}</span><span class="app-select-check" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-check"/></svg></span></button>`).join("");
+		optionsRoot.innerHTML = options.map((option) => `<button type="button" role="menuitemradio" aria-checked="${option === selected}" data-native-select-value="${escapeHTML(option.value)}" ${option.disabled ? "disabled" : ""}><span>${escapeHTML(option.textContent.trim())}</span><span class="app-select-check" aria-hidden="true">✓</span></button>`).join("");
 		root._nativeSelectOptionsSignature = signature;
 		filterNativeSelectMenu(root, root.querySelector("[data-app-select-search-input]")?.value || "");
 		return;
@@ -288,7 +280,7 @@
 	  if (!label) return;
 	  const root = document.createElement("div");
 	  root.className = "app-select native-select-menu";
-	  root.innerHTML = `<button class="app-select-trigger" type="button" aria-haspopup="menu" aria-expanded="false" data-app-select-trigger><span></span><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></button><div class="app-select-menu" role="menu" data-app-select-menu hidden><div class="app-select-options" data-app-select-options></div><div class="app-select-empty" data-app-select-empty hidden>没有匹配项</div></div>`;
+	  root.innerHTML = `<button class="app-select-trigger" type="button" aria-haspopup="menu" aria-expanded="false" data-app-select-trigger><span></span></button><div class="app-select-menu" role="menu" data-app-select-menu hidden><div class="app-select-options" data-app-select-options></div><div class="app-select-empty" data-app-select-empty hidden>没有匹配项</div></div>`;
 	  select.classList.add("sr-only");
 	  select.tabIndex = -1;
 	  select.setAttribute("aria-hidden", "true");
@@ -744,12 +736,21 @@
     }
   }
 
+  function setRefreshBusy(busy) {
+    const label = busy ? "正在获取" : "重新读取";
+    el.refresh.classList.toggle("is-loading", Boolean(busy));
+    const text = el.refresh.querySelector('.refresh-icon + span');
+    if (text) text.textContent = label;
+    el.refresh.setAttribute('aria-label', label);
+    el.refresh.dataset.tooltip = label;
+  }
+
   function renderStatus() {
     if (state.backendExited) return;
     const data = state.status;
     document.body.classList.remove("is-fatal");
     el.refresh.disabled = data.syncing || state.manualRefreshing;
-    el.refresh.classList.toggle("is-loading", data.syncing || state.manualRefreshing);
+    setRefreshBusy(data.syncing || state.manualRefreshing);
     acceptClientView(data.clientView);
     data.clientView = state.clientView;
     renderClientConnection();
@@ -973,7 +974,7 @@
       const starting = Boolean(state.clientLaunchPending?.[item.id] || state.clientLaunchWaiting?.[item.id] || state.clientLaunchInFlight === item.id || launchedID === item.id);
       const label = starting ? "正在启动…" : isTCLS ? "国服纯净入口" : item.name;
       const description = item.id==="riot" && !item.available ? "本机未安装 Riot 客户端" : isTCLS ? "跳过 WeGame，直连国服客户端" : item.location || item.description || "";
-      return `<button${isTCLS ? ' id="official-login"' : ""} class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"${starting || !item.available ? " disabled" : ""}><span class="launcher-kind">${escapeHTML(isTCLS ? "L" : item.id === "wegame" ? "W" : "R")}</span><span class="launcher-card-copy"><strong>${escapeHTML(label)}</strong><small data-tooltip="${escapeHTML(description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(description)}</small></span><span class="launcher-arrow" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-chevron-right"/></svg></span></button>`;
+      return `<button${isTCLS ? ' id="official-login"' : ""} class="launcher-card" type="button" data-client-id="${escapeHTML(item.id)}"${starting || !item.available ? " disabled" : ""}><span class="launcher-kind">${escapeHTML(isTCLS ? "L" : item.id === "wegame" ? "W" : "R")}</span><span class="launcher-card-copy"><strong>${escapeHTML(label)}</strong><small data-tooltip="${escapeHTML(description)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(description)}</small></span><span class="launcher-arrow" aria-hidden="true">›</span></button>`;
     }).join("") : "";
     if (!foreign && !installations.some(item => item.available)) {
       el.launcherList.innerHTML += '<button class="text-button scan-launchers" type="button">重新检查安装位置</button>';
@@ -1151,9 +1152,7 @@
     return chronological || localeCompare(left.name, right.name) || Number(left.id) - Number(right.id);
   }
 
-  // R130 P5：摘要行里的数字统一用主题色。一律用 DOM 拼接，绝不把未转义文本塞进
-  // innerHTML——摘要里既有款数、英雄数，也有快照时间这类来自外部的字符串。
-  // 数字直接传 number，由 formatNumber 统一格式化；数组按顺序展开；空值跳过。
+  // Build summary text and themed numbers with DOM nodes.
   function renderListMeta(...segments) {
     const nodes = [];
     const push = (segment) => {
@@ -1190,17 +1189,17 @@
     el.grid.classList.toggle("hide-unowned", state.view === "chromas" && !state.showUnownedChromas);
     el.grid.classList.toggle("hide-prestige", state.view === "chromas" && !state.showPrestigeChromas);
     const qualityGrouping = state.qualitySelections.size > 0 || state.sort === "rarity";
-    el.grid.classList.toggle("is-grouped", (state.view === "all" || state.view === "chromas" || qualityGrouping) && !state.loading && !state.listError);
+    el.grid.classList.toggle("is-grouped", (state.view === "all" || state.view === "chromas" || qualityGrouping) && !state.listError);
     if (state.loading && !(state.status?.connected && !state.status?.snapshotReady && collectionReadFailed(state.status))) {
       cancelDeferredImages(el.grid);stopHoverVideo();
-      el.grid.innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton"></div>').join("");
+      el.grid.innerHTML = renderCollectionSkeleton();
       el.listMeta.textContent = state.status?.connected && !state.status?.snapshotReady ? "正在读取收藏" : "正在整理皮肤…";
       return;
     }
 	if (state.status?.connected && !state.status?.snapshotReady && !state.staleSnapshot) {
 	  el.listMeta.textContent = "正在读取收藏";
 	  if (!collectionReadFailed(state.status)) {
-	    el.grid.innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton"></div>').join("");
+	    el.grid.innerHTML = renderCollectionSkeleton();
 	  } else {
 	    el.grid.innerHTML = `<div class="empty-state"><strong>收藏信息读取失败</strong>${state.status.lastError ? `<p>${escapeHTML(state.status.lastError)}</p>` : ""}<div class="empty-actions"><button class="text-button refresh-inline" type="button">立即重新读取</button></div></div>`;
 	    el.grid.querySelector(".refresh-inline")?.addEventListener("click", retryCollection);
@@ -1233,7 +1232,7 @@
     if (!visible.length) {
       if (!state.status?.connected) {
         el.listMeta.textContent = "";
-        el.grid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-diamond"/></svg></span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会自动展示皮肤与炫彩收藏。</p></div>';
+        el.grid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true">◆</span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会自动展示皮肤与炫彩收藏。</p></div>';
         return;
       }
       const message = state.view === "chromas" && !state.showUnownedChromas ? "当前没有已拥有的炫彩；可打开“显示未获取”查看完整目录。" : state.view === "chromas" && !state.showPrestigeChromas ? "当前没有符合条件的普通炫彩；可打开“显示臻彩”查看臻彩目录。" : "没有符合当前筛选条件的皮肤。";
@@ -1552,7 +1551,7 @@
     button.type = "button";
     window.deepLegendsCollectionNewItems?.decorate(button,'chromas',chroma.id);
     button.setAttribute("aria-label", `${chroma.owned ? "已拥有" : "未获取"}，查看 ${chroma.name}`);
-    button.innerHTML = `<span class="chroma-mini-art"><img alt="" loading="lazy" decoding="async">${chroma.isPrestige ? '<span class="chroma-prestige-badge">臻彩</span>' : ""}${chroma.owned ? "" : '<span class="chroma-mini-lock" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-shape-239c83edeb"/></svg></span>'}</span><span class="chroma-mini-name">${escapeHTML(chromaDisplayName(chroma))}</span>`;
+    button.innerHTML = `<span class="chroma-mini-art"><img alt="" loading="lazy" decoding="async">${chroma.isPrestige ? '<span class="chroma-prestige-badge">臻彩</span>' : ""}${chroma.owned ? "" : '<span class="chroma-mini-lock" aria-hidden="true">🔒</span>'}</span><span class="chroma-mini-name">${escapeHTML(chromaDisplayName(chroma))}</span>`;
     const image = button.querySelector("img");
     const fallback = document.createElement("span");
     fallback.className = "image-fallback";
@@ -1616,8 +1615,8 @@
 
   function localImageSources(paths) { return paths.map((path) => `/api/image?path=${encodeURIComponent(path)}`); }
   function navigationIcon(direction) {
-    const icon = direction === "previous" ? "previous" : "next";
-    return `<svg class="control-icon function-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision"><use href="/icons.svg#dl-icon-${icon}"/></svg>`;
+    const path = direction === "previous" ? "m15 5-7 7 7 7" : "m9 5 7 7-7 7";
+    return `<svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
   }
   function ordinaryChromaImageSources(chroma) {
     return [...new Set(localImageSources([chroma.tilePath, chroma.chromaPath, chroma.splashPath].filter(Boolean)))];
@@ -1656,8 +1655,7 @@
   function openChromaDetails(chroma, candidates = null, options = {}) {
     const generation = ++state.detailGeneration;
     clearTimeout(state.detailMediaTimer);
-    // R130 P1-C：弹窗进入顶层之后卡片就收不到可靠的 pointerleave 了，悬停视频会一直
-    // 挂着 /api/media 的连接，和弹窗自己的原画、背景、悬停视频抢浏览器那 6 条连接。
+    // Opening the dialog must release all card hover-video connections.
     stopHoverVideo();
     state.selectedSkin = chroma;
     state.detailKind = "chroma";
@@ -1726,10 +1724,16 @@
   }
 
   function configureSparseGrid(grid, count) {
-    if (count < 1 || count > 3) return;
-    grid.classList.add("is-sparse");
-    grid.style.setProperty("--sparse-columns", String(count));
-    grid.style.setProperty("--sparse-max-width", `${count * 640}px`);
+    grid.classList.remove("is-sparse");
+    grid.style.removeProperty("--sparse-columns");
+    grid.style.removeProperty("--sparse-max-width");
+  }
+
+  function renderCollectionSkeleton(view = state.view) {
+    const cards='<div class="skin-card" aria-hidden="true"><div class="skin-art skeleton"></div></div>'.repeat(8);
+    const heading='<header class="champion-heading" aria-hidden="true"><div><h2><span class="skeleton-line"></span></h2><span>&nbsp;</span></div></header>';
+    if(view==='chromas')return `<section class="chroma-section prestige-section has-owned collection-skeleton">${heading}<div class="chroma-prestige-grid">${cards}</div></section><section class="chroma-section champion-group has-owned has-ordinary has-owned-ordinary collection-skeleton">${heading}<div class="chroma-stack-grid"><div class="chroma-stack"><header><strong class="skeleton-line">&nbsp;</strong></header><div class="chroma-stack-cards">${'<div class="chroma-mini-card skeleton" aria-hidden="true"></div>'.repeat(4)}</div></div></div></section>`;
+    return view==='all'||state.qualitySelections.size||state.sort==='rarity'?`<section class="champion-group collection-skeleton">${heading}<div class="champion-skins">${cards}</div></section>`:cards;
   }
 
   function makeSkinCard(skin, options = {}) {
@@ -1765,22 +1769,14 @@
     return sources;
   }
   function skinVideoPath(skin) { return skin.collectionVideoPath || skin.splashVideoPath || skin.cardHoverVideoPath; }
-  // R130 P1-C：悬停视频走 /api/media，不经过图片队列，而以前全文件没有
-  // pointerleave——鼠标移开后循环视频继续占着连接，要等列表重建才停。Chromium
-  // 每个主机最多 6 条连接，炫彩原画、终极皮肤这类动态原画体积大，在列表上随便
-  // 划过几张卡就能把连接占满，图片因此超时，再叠加 P1-A 的名额泄漏就是整屏
-  // 「加载中」。这里限制全局同时只播放 1 个悬停视频，开始下一个前先停掉上一个。
+  // Hover video is independent from the image queue and must stop on navigation or hidden state.
   function stopHoverVideo() {
     const current = state.hoverVideo;
     if (!current) return;
     state.hoverVideo = null;
-    // resetVideo 会移除 src 并调用 load()，这才会真正中断传输、释放连接；
-    // 单纯 pause() 在 Chromium 里仍然保持连接。
+    // Remove src and load to release the connection; pause alone retains it.
     resetVideo(current.video);
-    // 展示状态按当前真实情况恢复，不能用播放前的快照：视频播放期间图片可能已经
-    // 加载完成，快照会把「加载中」的占位重新盖到已经出图的卡片上。出过图就只显示
-    // 图；没出过图（还在加载、或候选全部失败）才让占位继续显示——图片本身没有
-    // is-loaded 时 CSS 就是 opacity: 0，露出来也看不见，不会变成一块空白。
+    // Restore the current image state, never the snapshot from before video playback.
     const loaded = current.image.classList.contains("is-loaded");
     current.image.hidden = false;
     current.fallback.hidden = loaded;
@@ -1827,10 +1823,7 @@
     clearTimeout(timer);
     state.cardImageWatchdogs.delete(image);
   }
-  // R130 P1-6：看门狗判定卡片图卡死时上报，每 10 秒最多一条。只带队列计数、候选
-  // 序号与来源类别，不带任何资源路径，与 image-queue.js 的失败上报同一隐私口径。
-  // 限速在这里做而不是复用 runtime.js 的 sampled 通道：那条通道的 in-flight 集合
-  // 是所有 sampled 事件共用的，local_request_client 在途时会把 stall 一起压掉。
+  // Bound watchdog diagnostics to one sample per ten seconds; never include item identity.
   function reportCardImageStall(sourceIndex, url) {
     const now = Date.now();
     if (now - state.lastCardImageStallReportAt < CARD_IMAGE_STALL_REPORT_INTERVAL_MS) return;
@@ -1865,10 +1858,7 @@
       const sourceIndex = index;
       const source = sources[index++];
       image.setAttribute("data-queued-src", source);
-      // R130 P1-A 兜底看门狗：第二层彻底放弃时靠 removeAttribute("src") 收尾，
-      // 而移除 src 不触发任何 load/error，onerror 上的候选回退与名额释放就永远
-      // 不会执行。这里保证 CARD_IMAGE_STALL_MS（见文件顶部那条常量的注释）内必定
-      // 推进一次；写死具体秒数会和常量脱节，R133 P1 就是在收拾这个。
+      // Once every queue candidate is exhausted, remove src and release its observer slot.
       if (typeof setTimeout !== "function") return;
       const timer = setTimeout(() => {
         state.cardImageWatchdogs.delete(image);
@@ -1885,8 +1875,7 @@
       clearCardImageWatchdog(image);
       image.classList.add("is-loaded"); fallback.hidden = true; complete();
     };
-    // 看门狗已经推进到下一个候选之后，第二层迟到的 error 不能再推进一次，否则会
-    // 跳过本来能显示的那个地址。
+    // Late errors cannot advance a source already advanced by the watchdog.
     image.onerror = () => {
       if (completed) return;
       if (index > 0 && sources[index - 1] !== image.getAttribute("data-queued-src")) return;
@@ -2139,8 +2128,7 @@
 
   function resetDialogImage(message) {
     loadDialogBackdrop("");
-    // R130 P1-A：弹窗图同样走 loadImageSources，重建前必须清掉上一张的看门狗，
-    // 否则它会在 CARD_IMAGE_STALL_MS 之后醒来，给一张已经关掉的弹窗重新写 data-queued-src。
+    // Cancel the previous artwork watchdog before rebuilding its image.
     clearCardImageWatchdog(el.skinDialogImage);
     el.skinDialogImage.onload = null;
     el.skinDialogImage.onerror = null;
@@ -2155,7 +2143,7 @@
   async function openSkinDetails(skin, candidates = null) {
     const generation = ++state.detailGeneration;
     clearTimeout(state.detailMediaTimer);
-    // R130 P1-C：同 openChromaDetails——弹窗一开，卡片的 pointerleave 就不可靠了。
+    // Dialogs interrupt hover ownership.
     stopHoverVideo();
     state.selectedSkin = skin;
     state.detailKind = "skin";
@@ -2290,7 +2278,7 @@
         el.accountLiveState.textContent = "等待客户端";
         el.accountLiveState.className = "state-chip";
       }
-      el.accountContent.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-user"/></svg></span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会按类别展示战利品、皮肤物品和待领取奖励。</p></div>';
+      el.accountContent.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true">◉</span><strong>等待英雄联盟客户端</strong><p>登录国服客户端并进入大厅后，这里会按类别展示战利品、皮肤物品和待领取奖励。</p></div>';
       return;
     }
     if (!el.accountContent._accountMarkup) el.accountContent.innerHTML = '<div class="account-loading"><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line"></div></div>';
@@ -2521,12 +2509,13 @@
     el.poolSkinGrid.classList.remove("is-grouped");
     if (state.poolLoading) {
       el.poolListMeta.textContent = "正在整理奖池皮肤…";
-      el.poolSkinGrid.innerHTML = Array.from({ length: 6 }, () => '<div class="skeleton"></div>').join("");
+      el.poolSkinGrid.classList.add('is-grouped');
+      el.poolSkinGrid.innerHTML = renderCollectionSkeleton('all');
       return;
     }
     if (!state.status?.connected) {
       el.poolListMeta.textContent = "";
-      el.poolSkinGrid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-hexagon"/></svg></span><strong>等待英雄联盟客户端</strong><p>登录并进入大厅后，三合一奖池目录、清单上传与本地历史会自动开放。</p></div>';
+      el.poolSkinGrid.innerHTML = '<div class="gameplay-empty"><span aria-hidden="true">⬡</span><strong>等待英雄联盟客户端</strong><p>登录并进入大厅后，三合一奖池目录、清单上传与本地历史会自动开放。</p></div>';
       return;
     }
     if (!state.status?.calculationOK) {
@@ -2565,7 +2554,7 @@
       el.poolSkinGrid.append(section);
       for (const skin of skins) tasks.push(() => grid.append(makeSkinCard(skin, { locked: !skin.owned, poolState: !skin.owned, detailItems: displayOrder })));
     }
-    state.poolRenderPending=false;
+    state.poolRenderPending=false;state.poolRenderInterrupted=false;
     runRenderTasks(tasks, generation, "poolRenderGeneration");
     window.reportFlowDiagnostic?.("pool_render_client","render",{view:state.poolView,item_count:visible.length,rendered_cards:visible.length,reason:"catalog-or-invalidated"});
   }
@@ -2581,7 +2570,7 @@
   }
 
   function renderRiotKeySettings(data) {
-    if (el.settingRiotKeyState) el.settingRiotKeyState.textContent = ["embedded", "relay"].includes(data.source) && data.status !== "invalid" ? "使用内置服务" : { configured: "已配置", unverified:"已保存，暂未验证", unconfigured: "未配置", invalid: "无效" }[data.status] || "未配置";
+    if (el.settingRiotKeyState) el.settingRiotKeyState.textContent = ["embedded", "relay"].includes(data.source) && !["invalid","cooldown"].includes(data.status) ? "使用内置服务" : { cooldown:"内置服务冷却中", configured: "已配置", unverified:"已保存，暂未验证", unconfigured: "未配置", invalid: "无效" }[data.status] || "未配置";
     state.riotHasUserKey=data.hasUserKey ?? ["user","personal"].includes(data.source);
     if(el.settingRiotKeyInput)el.settingRiotKeyInput.placeholder=state.riotHasUserKey?"已保存，粘贴新的 Key 可替换":"粘贴 Riot API Key";
     if(el.settingRiotKeyClear)el.settingRiotKeyClear.disabled=!state.riotHasUserKey;
@@ -2651,11 +2640,7 @@
     });
   }
 
-  // 回到某个页面时把滚动位置还原回去。一次性 scrollTo 是不够的：英雄页
-  // 重新进入时会先渲染一版加载态（内容比原来矮得多），浏览器会把 scrollTop
-  // 夹回 0；等数据到位、页面重新变高时已经没人再去设置它了。所以这里持续
-  // 重试到真正滚到目标位置为止，并给一个时间上限，同时一旦用户自己动了滚轮／
-  // 触摸／键盘就立刻放弃，绝不和用户抢滚动条。
+  // Restore scroll repeatedly while async content grows, within the bounded restore budget.
   function restoreSectionScroll(name) {
     if (name === "overview") return; // player workspace owns its scroll
     const sectionScrollRestoreBudget = 2000;
@@ -2700,7 +2685,7 @@
     if (name !== "favorites" && state.section === "favorites") {
       cancelRenderFrames();
       cancelPoolRenderFrames();
-      el.grid.replaceChildren();el.poolSkinGrid?.replaceChildren();state.poolCatalogSignature="";state.poolRenderPending=true;state.renderedSignature="";delete el.grid._collectionRenderKey;state.collectionRenderPending=true;
+      el.grid.replaceChildren();el.poolSkinGrid?.replaceChildren();state.poolCatalogSignature="";state.poolRenderPending=true;state.poolRenderInterrupted=true;state.renderedSignature="";delete el.grid._collectionRenderKey;state.collectionRenderPending=true;
       state.renderGeneration += 1;
       state.poolRenderGeneration += 1;
       cancelDeferredImages(el.grid);
@@ -2826,7 +2811,7 @@
     if (previous !== name) {
       cancelRenderFrames();
       cancelPoolRenderFrames();
-      el.grid.replaceChildren();el.poolSkinGrid?.replaceChildren();state.poolCatalogSignature="";state.poolRenderPending=true;state.renderedSignature="";delete el.grid._collectionRenderKey;state.collectionRenderPending=true;
+      el.grid.replaceChildren();el.poolSkinGrid?.replaceChildren();state.poolCatalogSignature="";state.poolRenderPending=true;state.poolRenderInterrupted=true;state.renderedSignature="";delete el.grid._collectionRenderKey;state.collectionRenderPending=true;
       state.renderGeneration += 1;
       state.poolRenderGeneration += 1;
       cancelDeferredImages(el.grid);
@@ -2849,7 +2834,10 @@
       loadSkins(false);
     }
     if (name === "account" && !state.accountLoaded) loadAccount();
-    if (name === "pools" && !state.poolsLoaded) loadPools();
+    if (name === "pools") {
+      if (!state.poolsLoaded) loadPools();
+      else if (state.poolRenderInterrupted || state.poolRenderPending) renderPoolCatalog();
+    }
     if (name === "facade-collection") window.deepLegendsFavoritesFacade?.activate?.();
     if (state.status) renderNotice(state.status);
   }
@@ -2944,22 +2932,7 @@
   const THEME_OPTIONS = ["auto", "light", "dark", "azure", "emerald", "violet", "crimson", "aurora", "oled"];
   const THEME_BACKGROUNDS = { light: "#ffffff", dark: "#0B0E14", azure: "#0A0F16", emerald: "#0B0E12", violet: "#0C0D14", crimson: "#0E0C0D", aurora: "#0A0F12", oled: "#000000" };
 
-  // ---------- 界面缩放 ----------
-  // 缩放做在前端（:root 上的 --ui-zoom + .app-frame 的 CSS zoom），而不是桌面外壳的
-  // webContents.setZoomFactor：后者只在 Electron 里生效，用浏览器直连后端预览时
-  // 一点效果都没有。前端方案两个环境都生效，桌面外壳只负责把 Windows 标题栏覆盖层
-  // 的高度和窗口最小尺寸跟着档位走。
-  //
-  // 自动缩放是**连续**的：倍率 = 窗口逻辑尺寸 ÷ 设计基准，不取档位。
-  // 1920×1080 恰好是基准，倍率 1.00，像素级等于设计稿；窗口再宽/再高就整体等比放大。
-  // ★下限是 1.00：只放大不自动缩小。窗口小于基准时不去压字号（1080p 上窗口占屏 92%，
-  // 真按比例算会缩到 0.92 倍、字号 10.5→9.66，比不做适配还糟），交给原有响应式断点。
-  // 想用更小的界面换更多内容，设置页里有手动 90% 档。
-  // CSS zoom 缩放的是整棵渲染树，字体、图标、间距、圆角、1px 描边全部同比例，
-  // 所以不需要把全站 px 改写成 rem——rem 反而漏掉硬编码 px 和 SVG 尺寸。
-  //
-  // ★UI_SCALE_STEPS 只是设置页里手动锁档的可选值；自动模式不受它约束。
-  // 档位表与基准必须与 desktop/ui-scale.cjs 一致，desktop/ui-scale.test.cjs 有断言。
+  // Auto zoom uses 1920×900, quantized to 1% within 1–2.
   const UI_SCALE_STEPS = [0.9, 1, 1.1, 1.25, 1.4, 1.5, 1.75, 2];
   const UI_SCALE_BASE_WIDTH = 1920;
   const UI_SCALE_BASE_HEIGHT = 900;
@@ -2968,12 +2941,12 @@
   let uiScaleReady = false;
   let uiScaleRevision = 0;
   let appliedUiScale = 0;
+  let sidebarOverride = null;
   let uiScaleFrame = 0;
 
   function autoUiScale(width = window.innerWidth, height = window.innerHeight) {
     const raw = Math.min(Number(width) / UI_SCALE_BASE_WIDTH, Number(height) / UI_SCALE_BASE_HEIGHT);
     if (!Number.isFinite(raw)) return 1;
-    // 量化到 1%：拖窗口时避免每一个像素都触发一次整页重排。
     return Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, Math.round(raw * 100) / 100));
   }
 
@@ -2984,7 +2957,6 @@
     return stored !== "auto" && UI_SCALE_STEPS.includes(fixed) ? fixed : 0;
   }
 
-  // 缩放会触发整页重排，所以只在真正跨档时写 --ui-zoom。
   function applyUiScale() {
     const fixed = preferredUiScale();
     const scale = fixed || autoUiScale();
@@ -2995,6 +2967,8 @@
     appliedUiScale = scale;
     document.documentElement.style.setProperty("--ui-zoom", String(scale));
     document.documentElement.dataset.uiScale = String(scale);
+    sidebarOverride = null;
+    applySidebar();
     // 桌面外壳据此把标题栏覆盖层高度改成 round(56 * scale)，否则系统三大按钮会和顶栏错位。
     window.desktopScale?.applied?.(scale);
     renderUiScaleAutoLabel();
@@ -3093,9 +3067,15 @@
     return hour >= 6 && hour < 18 ? "light" : "dark";
   }
 
-  function applySidebar() {
+  function sidebarConstraint() {
     const width = document.querySelector(".app-frame")?.clientWidth || window.innerWidth;
-    const collapsed = preference("sidebar", "expanded") === "collapsed" || width <= 820 || Number(document.querySelector(".topbar")?.dataset.topbarCompact || 0) >= 4;
+    const scale = Number(document.documentElement.dataset.uiScale) || 1;
+    return { forced: scale >= 1.5 || width <= 820, key: String(scale) + ':' + (width <= 820) };
+  }
+  function applySidebar() {
+    const constraint = sidebarConstraint();
+    if (sidebarOverride && sidebarOverride.key !== constraint.key) sidebarOverride = null;
+    const collapsed = sidebarOverride ? sidebarOverride.collapsed : constraint.forced || preference("sidebar", "expanded") === "collapsed";
     document.documentElement.dataset.sidebar = collapsed ? "collapsed" : "expanded";
     el.sidebarToggle.setAttribute("aria-expanded", String(!collapsed));
     el.sidebarToggle.setAttribute("aria-label", collapsed ? "展开侧边栏" : "收起侧边栏");
@@ -3103,9 +3083,11 @@
     el.settingsSidebarToggle.textContent = collapsed ? "展开侧边栏" : "收起侧边栏";
     document.querySelector(".topbar")?.dispatchEvent(new window.Event("topbar-layout"));
   }
-
   function toggleSidebar() {
-    savePreference("sidebar", preference("sidebar", "expanded") === "collapsed" ? "expanded" : "collapsed");
+    const constraint = sidebarConstraint();
+    const collapsed = document.documentElement.dataset.sidebar !== "collapsed";
+    if (constraint.forced) sidebarOverride = { key: constraint.key, collapsed };
+    else savePreference("sidebar", collapsed ? "collapsed" : "expanded");
     applySidebar();
   }
 
@@ -3350,11 +3332,7 @@
     };
     return [...new Set([fixed[token], item.tilePath, item.asset, item.splashPath].filter(Boolean))];
   }
-  // R146：所有战利品图标按「可见像素外框的几何平均边长」归一到同一视觉大小，
-  // 基准是蓝色精粹（256 图内可见 107×169，在 70px 图框里放大 1.65 倍后约 48×76，
-  // 几何平均约 60px）。只按最大边归一会让实心方块（挑战券、宝箱）比瘦长的水晶
-  // 显得大很多，几何平均把宽高一起算进去。同时最大边不超过 LOOT_ICON_MAX_SIDE。
-  // 规则只看图，不看物品类型，所以以后新增的物品自动适用。
+  // Normalize loot artwork by visible-pixel bounds, using blue essence as the reference.
   const LOOT_ICON_BOX = 70;
   const LOOT_ICON_TARGET = 60;
   const LOOT_ICON_MAX_SIDE = 78;
@@ -3456,7 +3434,7 @@
         applyChromaGroupClasses(stack,parent.items);updateChromaSummary(stack.querySelector('.chroma-stack-summary'),parent.items);stack.querySelector('header strong').textContent=parent.name;
         const cards=stack.querySelector('.chroma-stack-cards'),mounted=new Map([...cards.children].map(card=>[card.dataset.collectionId,card])),ids=new Set(parent.items.map(item=>String(item.id)));
         for(const [cardID,card] of mounted)if(!ids.has(cardID)){cancelDeferredImages(card);card.remove();}
-        parent.items.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.id));if(!card){card=makeChromaMiniCard(item,parent.items);mounted.set(String(item.id),card);}card._collectionSkin=item;card._collectionCandidates=parent.items;card.classList.toggle('is-owned',Boolean(item.owned));card.classList.toggle('is-locked',!item.owned);card.setAttribute('aria-label',`${item.owned?'已拥有':'未获取'}，查看 ${item.name}`);card.querySelector('.chroma-mini-lock')?.remove();if(!item.owned)card.querySelector('.chroma-mini-art').insertAdjacentHTML('beforeend','<span class="chroma-mini-lock" aria-hidden="true"><svg class="function-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg#dl-icon-shape-239c83edeb"/></svg></span>');window.deepLegendsCollectionNewItems?.decorate(card,'chromas',item.id);if(cards.children[index]!==card)cards.insertBefore(card,cards.children[index] || null);cards.dispatchEvent(new Event('scroll'));return 1;}));
+        parent.items.forEach((item,index)=>tasks.push(()=>{let card=mounted.get(String(item.id));if(!card){card=makeChromaMiniCard(item,parent.items);mounted.set(String(item.id),card);}card._collectionSkin=item;card._collectionCandidates=parent.items;card.classList.toggle('is-owned',Boolean(item.owned));card.classList.toggle('is-locked',!item.owned);card.setAttribute('aria-label',`${item.owned?'已拥有':'未获取'}，查看 ${item.name}`);card.querySelector('.chroma-mini-lock')?.remove();if(!item.owned)card.querySelector('.chroma-mini-art').insertAdjacentHTML('beforeend','<span class="chroma-mini-lock" aria-hidden="true">🔒</span>');window.deepLegendsCollectionNewItems?.decorate(card,'chromas',item.id);if(cards.children[index]!==card)cards.insertBefore(card,cards.children[index] || null);cards.dispatchEvent(new Event('scroll'));return 1;}));
       }
     }
     runRenderTasks(tasks,generation,'renderGeneration',40);
@@ -3484,17 +3462,17 @@
   function lootCategorySlug(category) { return ({ "材料": "material", "宝箱": "chest", "英雄": "champion", "皮肤": "skin", "小小英雄": "companion", "永恒星碑": "eternal", "表情": "emote", "守卫": "ward", "图标": "icon" })[category] || "material"; }
   function lootCategoryIcon(category) {
     const paths = {
-      "宝箱": "<use href=\"/icons.svg#dl-icon-key-0af0a5992b\"/>",
-      "材料": "<use href=\"/icons.svg#dl-icon-key-f58efcfbd7\"/>",
-      "英雄": "<use href=\"/icons.svg#dl-icon-key-428fb77e75\"/>",
-      "皮肤": "<use href=\"/icons.svg#dl-icon-key-92b65543ef\"/>",
-      "小小英雄": "<use href=\"/icons.svg#dl-icon-key-f3326853f7\"/>",
-      "永恒星碑": "<use href=\"/icons.svg#dl-icon-key-3a1a25b9f4\"/>",
-      "表情": "<use href=\"/icons.svg#dl-icon-key-9881ea50fc\"/>",
-      "守卫": "<use href=\"/icons.svg#dl-icon-key-b20a737253\"/>",
-      "图标": "<use href=\"/icons.svg#dl-icon-key-a149777c59\"/>",
+      "宝箱": '<path d="M4 4h16l2 6v10H2V10l2-6Zm2 2-1 4h14l-1-4H6Zm-2 6v6h16v-6h-6v3h-4v-3H4Z"/>',
+      "材料": '<path d="M6 3h12l3 5-3 13H6L3 8l3-5Zm2 3L6 9l2 9h8l2-9-2-3H8Zm1 4h6v2H9v-2Z"/>',
+      "英雄": '<path d="m12 2 7 4v6c0 4.7-3 8-7 10-4-2-7-5.3-7-10V6l7-4Zm0 3L8 7.3v4.5c0 3 1.6 5.3 4 6.9 2.4-1.6 4-3.9 4-6.9V7.3L12 5Zm-3 4h6l-1 6h-4L9 9Z"/>',
+      "皮肤": '<path d="M4 5.5 8.5 3 12 5l3.5-2L20 5.5V13c0 4.4-3.7 7.3-8 9-4.3-1.7-8-4.6-8-9V5.5Zm3 2V13c0 2.6 2 4.5 5 5.9 3-1.4 5-3.3 5-5.9V7.5l-1.5-.8L12 9 8.5 6.7 7 7.5Zm1.5 3.5 2 1 1.5-1.5 1.5 1.5 2-1v3.5l-3.5 2-3.5-2V11Z"/>',
+      "小小英雄": '<path d="M12 2c4.4 0 8 3.1 8 7 0 2.3-1.2 4.2-3.1 5.5L18 20l-4-2-2 4-2-4-4 2 1.1-5.5A6.7 6.7 0 0 1 4 9c0-3.9 3.6-7 8-7Zm-3 6a1.4 1.4 0 1 0 0 2.8A1.4 1.4 0 0 0 9 8Zm6 0a1.4 1.4 0 1 0 0 2.8A1.4 1.4 0 0 0 15 8Zm-6 5c.8 1.2 1.8 1.8 3 1.8s2.2-.6 3-1.8H9Z"/>',
+      "永恒星碑": '<path d="M13 2c.3 3-1.4 4.6-2.9 6.1C8.5 9.7 7 11.2 7 14a5 5 0 0 0 10 0c0-2.1-.9-4.2-2.7-6.4.2 2.6-.6 4.1-2.3 5.4.4-3.6-1.2-6.1 1-11Zm-1 18a3 3 0 0 1-3-3c0-1.3.7-2.4 1.7-3.5.2 1.7.8 2.8 1.8 3.5.6-1 .9-2 .7-3.4 1.1 1.2 1.8 2.3 1.8 3.4a3 3 0 0 1-3 3Z"/>',
+      "表情": '<path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20ZM8.5 8A1.5 1.5 0 1 0 8.5 11a1.5 1.5 0 0 0 0-3Zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm-8 6c.9 2 2.4 3 4.5 3s3.6-1 4.5-3h-9Z"/>',
+      "守卫": '<path d="M12 2 7 7v5l-3 4 5 1 3 5 3-5 5-1-3-4V7l-5-5Zm0 4 2 2v5l1 1.5-2 .5-1 2-1-2-2-.5 1-1.5V8l2-2Z"/>',
+      "图标": '<path d="M12 2a7 7 0 0 1 4.7 12.2A9.5 9.5 0 0 1 21 22H3a9.5 9.5 0 0 1 4.3-7.8A7 7 0 0 1 12 2Zm0 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 11c-2.4 0-4.5 1.1-5.8 3h11.6A7 7 0 0 0 12 16Z"/>',
     };
-    return `<svg class="function-icon" viewBox="0 0 24 24" focusable="false">${paths[category] || paths["材料"]}</svg>`;
+    return `<svg viewBox="0 0 24 24" focusable="false">${paths[category] || paths["材料"]}</svg>`;
   }
   function playerName(summoner) { const name = summoner.gameName || summoner.displayName || "当前召唤师"; return `${name}${summoner.tagLine ? `#${summoner.tagLine}` : ""}`; }
   function rewardStatusLabel(value) { return ({ PENDING_SELECTION: "待选择", PENDING: "待领取", CREATED: "待处理" })[String(value || "").toUpperCase()] || value || "待处理"; }
@@ -3533,7 +3511,7 @@
     if (state.manualRefreshing) return;
     state.manualRefreshing = true;
     el.refresh.disabled = true;
-    el.refresh.classList.add("is-loading");
+    setRefreshBusy(true);
     showToast("正在重新读取对局与总览");
     softResetShellState();
     try {
@@ -3553,7 +3531,7 @@
       if (state.status) renderStatus();
       else {
         el.refresh.disabled = false;
-        el.refresh.classList.remove("is-loading");
+        setRefreshBusy(false);
       }
     }
   });
@@ -3839,14 +3817,12 @@
       let next = level;
       const bounds = bar.getBoundingClientRect(), scale = bounds.width / bar.offsetWidth || 1;
       const logicalWidth = bounds.width / scale;
-      const minimumLevel = logicalWidth <= 600 ? 3 : 0;
-      if (topbarOverflows(bar) || level < minimumLevel) next = Math.min(5, level + 1);
-      else if (level && (level > 3 || logicalWidth > 616)) {
+      if (topbarOverflows(bar)) next = Math.min(3, level + 1);
+      else if (level) {
         // Probe only the next wider state off-screen, reserving 16 logical px.
         // The live bar changes at most one level per frame; failed probes never flash.
         const probe = bar.cloneNode(true);
-        let width = bar.offsetWidth - 16;
-        if (level === 4 && preference('sidebar','expanded') !== 'collapsed') width -= parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-expanded-width')) - document.querySelector('.sidebar').clientWidth;
+        let width = bar.offsetWidth - 24 / scale;
         probe.dataset.topbarCompact = String(level - 1);
         probe.inert = true; probe.setAttribute('aria-hidden','true');
         probe.style.cssText = `position:fixed;left:-10000px;top:0;visibility:hidden;width:${Math.max(0,width)}px;zoom:1;`;
@@ -3855,7 +3831,6 @@
       }
       if (next !== level) {
         bar.dataset.topbarCompact = String(next);
-        applySidebar();
         schedule();
       } else bar.dataset.topbarSettled = 'true';
     };
@@ -4100,11 +4075,7 @@
     clearTimeout(state.detailMediaTimer);
     // R130 P1-A：关闭弹窗后不会再有新的 loadImageSources 来顶掉看门狗，必须显式清理。
     clearCardImageWatchdog(el.skinDialogImage);
-    // R130 P1-A：弹窗节点一直留在文档里（isConnected 恒为 true），第二层彻底放弃时
-    // 照样会补发合成 error。不把 onload/onerror 与 data-queued-src 一起摘掉，一个
-    // 已经关闭的弹窗会继续试剩下的候选地址、白占连接，还会把「暂无预览」写进下一次
-    // 打开要用的占位里。摘掉 data-queued-src 之后第二层会走「URL 变了就重新入队」
-    // 那条路，enqueue 读不到 url 直接返回，不会再发请求。
+    // Hidden dialogs remain connected; release exhausted image tasks explicitly.
     el.skinDialogImage.onload = null;
     el.skinDialogImage.onerror = null;
     el.skinDialogImage.removeAttribute("data-queued-src");
@@ -4392,7 +4363,7 @@
       updateUI.announced = current.latest;
     }
     el.updateButton.querySelector(".dot").hidden = !(current.state === "ready" || current.state === "available" && updateUI.seen !== current.latest);
-    el.updateButton.style.setProperty("--update-progress-offset", String(59 * (1 - percent / 100)));
+    el.updateButton.querySelector(".hex-progress").setAttribute("stroke-dashoffset", String(59 * (1 - percent / 100)));
     const tooltip = manual ? `有新版本 ${current.latest}` : busy ? `正在下载新版本 ${percent}%` : ready ? "新版本已下载，点击升级" : `有新版本 ${current.latest}`;
     el.updateButton.dataset.tooltip = tooltip;
     el.updateButton.setAttribute("aria-label", tooltip);
@@ -4817,7 +4788,7 @@
       }
       const rect = overlay.getTitlebarAreaRect();
       const inset = Math.max(0, Math.round(window.innerWidth - rect.x - rect.width));
-      if (inset > 0) document.documentElement.style.setProperty("--titlebar-inset", `${inset + 8}px`);
+      if (inset > 0) document.documentElement.style.setProperty("--titlebar-inset", `calc(${inset + 8}px / var(--ui-zoom,1))`);
       else document.documentElement.style.removeProperty("--titlebar-inset");
     };
     overlay.addEventListener("geometrychange", update);

@@ -130,7 +130,7 @@ func TestR266EmbeddedRejectedAndQuota(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if status == 200 && (direct != 2 || relay != 0) || status != 200 && (direct != 1 || relay < 1) {
+			if status == 200 && (direct != 2 || relay != 0) || status != 200 && (direct != map[bool]int{true: 2, false: 1}[status == 401 || status == 403] || relay < 1) {
 				t.Fatalf("guard failed direct=%d relay=%d", direct, relay)
 			}
 			if (status == 401 || status == 403) && !s.embeddedRejected {

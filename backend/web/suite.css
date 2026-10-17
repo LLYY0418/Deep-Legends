@@ -593,3 +593,14 @@ button.suite-chip.is-gold { color: var(--primary-strong); border-color: var(--he
 
 .rig-camera-mode { grid-template-columns: minmax(0, 1fr) 120px; font-size: 12.5px; font-weight: 600; }
 .rig-camera-mode .select-wrap { width: 120px; max-width: 100%; }
+
+.facade-preview-body {z-index:2;}
+.facade-identity {position:relative;z-index:2;padding-top:36px;color:var(--ink);}
+[data-theme="light"] .suite-tab.is-active :is(strong,.suite-tab-icon) {color:var(--primary-strong);}
+[data-theme="light"] .cs-mode-item small i {opacity:1;}
+[data-theme="light"] .cs-master-off :is(.cs-mode-list,.cs-capabilities) {opacity:1;}
+[data-theme="light"] .cs-rail-slot.st-gone {opacity:1;}
+[data-theme="light"] .cs-rail-arrow {color:var(--muted);}
+[data-theme="light"] .cs-rail-arrow.is-hot {color:var(--primary-strong);}
+[data-theme="light"] .suite-note.is-warning {color:#76451b;}
+[data-theme="light"] .cs-mode-item.is-active>span:first-child {color:var(--primary-strong);}

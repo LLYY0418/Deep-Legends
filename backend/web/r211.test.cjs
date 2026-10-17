@@ -64,7 +64,7 @@ test('R211 streak skips remakes/custom, stops unknown and uses arena placement',
  const all=f.computeOverviewStreak(Array.from({length:20},(_,i)=>match('win',i)),true,'');assert.match(f.renderOverviewStreak(all),/20\+连胜/);
  assert.equal(f.computeOverviewStreak([match('win',0),match('unknown',1),match('win',2)],false,''),null);
  const arena=Array.from({length:3},(_,i)=>({...match('win',i),queueId:1700,modeGroup:'arena',subject:{placement:4}}));assert.equal(f.computeOverviewStreak(arena,false,'').result,'win');
- assert.match(f.renderOverviewStreak({result:'loss',count:3}),/icons\.svg#dl-icon-/);assert.match(f.renderOverviewStreak({result:'win',count:3}),/icons\.svg#dl-icon-/);
+ assert.match(f.renderOverviewStreak({result:'loss',count:3}),/streak-rain/);assert.match(f.renderOverviewStreak({result:'win',count:3}),/streak-outer-flame/);
 });
 test('R230 name copy shows feedback; hidden name cannot bind',async()=>{
  const dom=new JSDOM('<h2 data-copy-summoner="名称#tag" data-tooltip="名称">名称</h2><h2>隐藏玩家</h2>'),writes=[];

@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+type riotRequestPathKey struct{}
+type riotRequestSourceKey struct{}
+type riotAuthProbeKey struct{}
 type riotRouteKey struct{}
 type riotPinnedCredentialKey struct{}
 type riotPinnedCredential struct{ key, source string }
@@ -205,7 +208,12 @@ func riotRequestEvent(record func(map[string]any), ctx context.Context, route, c
 	if trace, ok := ctx.Value(networkTraceKey{}).(*networkTrace); ok {
 		proxy, stage = trace.proxy, trace.stage
 	}
-	record(map[string]any{"proxy": proxy, "error_stage": stage, "event": "riot_request", "route": route, "category": category, "entry": entry, "status": status, "ttfb_ms": ttfb.Milliseconds(), "total_ms": total.Milliseconds(), "bytes": bytes, "queued_ms": queued.Milliseconds(), "attempt": attempt, "cancelled": ctx.Err() != nil, "cancel_reason": riotCancelReason(ctx), "foreground": !isRiotBackground(ctx)})
+	shape, _ := ctx.Value(riotRequestPathKey{}).(string)
+	source, _ := ctx.Value(riotRequestSourceKey{}).(string)
+	if source == "" {
+		source = "overview"
+	}
+	record(map[string]any{"path_shape": shape, "source": source, "proxy": proxy, "error_stage": stage, "event": "riot_request", "route": route, "category": category, "entry": entry, "status": status, "ttfb_ms": ttfb.Milliseconds(), "total_ms": total.Milliseconds(), "bytes": bytes, "queued_ms": queued.Milliseconds(), "attempt": attempt, "cancelled": ctx.Err() != nil, "cancel_reason": riotCancelReason(ctx), "foreground": !isRiotBackground(ctx)})
 }
 func (p *riotProvider) routeRecord(event map[string]any) {
 	if p.champions != nil && p.champions.diag != nil {
@@ -296,9 +304,11 @@ func (p *riotProvider) getLimited(ctx context.Context, host, path string, query 
 		}
 		if status.status == 401 || status.status == 403 {
 			s.mu.Lock()
-			s.embeddedRejected = true
+			rejected := s.embeddedRejected
 			s.mu.Unlock()
-			p.routeRecord(map[string]any{"event": "riot_key_rejected", "source": "embedded", "status": status.status})
+			if !rejected {
+				return err
+			}
 			return p.relayFallback(ctx, host, path, query, out, max)
 		}
 		if status.status == 429 {

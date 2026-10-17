@@ -1,0 +1,231 @@
+{
+  "esportsGameId": "112966697102367348",
+  "esportsMatchId": "112966697102367347",
+  "gameMetadata": {
+    "patchVersion": "14.18.617.4123",
+    "blueTeamMetadata": {
+      "esportsTeamId": "103461966965149786",
+      "participantMetadata": [
+        {
+          "participantId": 1,
+          "esportsPlayerId": "110350224593953686",
+          "summonerName": "MDK Myrwn",
+          "championId": "KSante",
+          "role": "top"
+        },
+        {
+          "participantId": 2,
+          "esportsPlayerId": "103877629120745120",
+          "summonerName": "MDK Elyoya",
+          "championId": "Nidalee",
+          "role": "jungle"
+        },
+        {
+          "participantId": 3,
+          "esportsPlayerId": "104711049101664016",
+          "summonerName": "MDK Fresskowy",
+          "championId": "Syndra",
+          "role": "mid"
+        },
+        {
+          "participantId": 4,
+          "esportsPlayerId": "103536968833612789",
+          "summonerName": "MDK Supa",
+          "championId": "Jinx",
+          "role": "bottom"
+        },
+        {
+          "participantId": 5,
+          "esportsPlayerId": "107564404490889053",
+          "summonerName": "MDK Alvaro",
+          "championId": "Nautilus",
+          "role": "support"
+        }
+      ]
+    },
+    "redTeamMetadata": {
+      "esportsTeamId": "107251245690956393",
+      "participantMetadata": [
+        {
+          "participantId": 6,
+          "esportsPlayerId": "112603524650868411",
+          "summonerName": "VKE Nanaue",
+          "championId": "Camille",
+          "role": "top"
+        },
+        {
+          "participantId": 7,
+          "esportsPlayerId": "109828289393968653",
+          "summonerName": "VKE Gury",
+          "championId": "LeeSin",
+          "role": "jungle"
+        },
+        {
+          "participantId": 8,
+          "esportsPlayerId": "107251572267658009",
+          "summonerName": "VKE Kati",
+          "championId": "Orianna",
+          "role": "mid"
+        },
+        {
+          "participantId": 9,
+          "esportsPlayerId": "107251561724960718",
+          "summonerName": "VKE Shogun",
+          "championId": "Ezreal",
+          "role": "bottom"
+        },
+        {
+          "participantId": 10,
+          "esportsPlayerId": "107251574398720447",
+          "summonerName": "VKE Bie",
+          "championId": "Poppy",
+          "role": "support"
+        }
+      ]
+    }
+  },
+  "frames": [
+    {
+      "rfc460Timestamp": "2024-09-25T12:49:40.456Z",
+      "gameState": "finished",
+      "blueTeam": {
+        "totalGold": 69896,
+        "inhibitors": 2,
+        "towers": 10,
+        "barons": 0,
+        "totalKills": 17,
+        "dragons": [
+          "infernal",
+          "infernal",
+          "infernal"
+        ],
+        "participants": [
+          {
+            "participantId": 1,
+            "totalGold": 11446,
+            "level": 16,
+            "kills": 2,
+            "deaths": 3,
+            "assists": 7,
+            "creepScore": 217,
+            "currentHealth": 1092,
+            "maxHealth": 4142
+          },
+          {
+            "participantId": 2,
+            "totalGold": 14630,
+            "level": 16,
+            "kills": 7,
+            "deaths": 2,
+            "assists": 9,
+            "creepScore": 238,
+            "currentHealth": 0,
+            "maxHealth": 2647
+          },
+          {
+            "participantId": 3,
+            "totalGold": 14985,
+            "level": 18,
+            "kills": 1,
+            "deaths": 2,
+            "assists": 10,
+            "creepScore": 330,
+            "currentHealth": 2104,
+            "maxHealth": 2396
+          },
+          {
+            "participantId": 4,
+            "totalGold": 19621,
+            "level": 18,
+            "kills": 7,
+            "deaths": 0,
+            "assists": 9,
+            "creepScore": 406,
+            "currentHealth": 2219,
+            "maxHealth": 2565
+          },
+          {
+            "participantId": 5,
+            "totalGold": 9214,
+            "level": 14,
+            "kills": 0,
+            "deaths": 2,
+            "assists": 14,
+            "creepScore": 32,
+            "currentHealth": 739,
+            "maxHealth": 2846
+          }
+        ]
+      },
+      "redTeam": {
+        "totalGold": 65608,
+        "inhibitors": 0,
+        "towers": 6,
+        "barons": 1,
+        "totalKills": 9,
+        "dragons": [
+          "chemtech",
+          "mountain",
+          "infernal"
+        ],
+        "participants": [
+          {
+            "participantId": 6,
+            "totalGold": 15719,
+            "level": 18,
+            "kills": 5,
+            "deaths": 4,
+            "assists": 1,
+            "creepScore": 311,
+            "currentHealth": 1982,
+            "maxHealth": 3552
+          },
+          {
+            "participantId": 7,
+            "totalGold": 11963,
+            "level": 16,
+            "kills": 1,
+            "deaths": 2,
+            "assists": 4,
+            "creepScore": 234,
+            "currentHealth": 1352,
+            "maxHealth": 3218
+          },
+          {
+            "participantId": 8,
+            "totalGold": 14380,
+            "level": 18,
+            "kills": 1,
+            "deaths": 3,
+            "assists": 3,
+            "creepScore": 323,
+            "currentHealth": 2754,
+            "maxHealth": 2820
+          },
+          {
+            "participantId": 9,
+            "totalGold": 15873,
+            "level": 17,
+            "kills": 2,
+            "deaths": 4,
+            "assists": 1,
+            "creepScore": 366,
+            "currentHealth": 0,
+            "maxHealth": 2868
+          },
+          {
+            "participantId": 10,
+            "totalGold": 7673,
+            "level": 12,
+            "kills": 0,
+            "deaths": 4,
+            "assists": 4,
+            "creepScore": 28,
+            "currentHealth": 0,
+            "maxHealth": 2472
+          }
+        ]
+      }
+    }
+  ]
+}

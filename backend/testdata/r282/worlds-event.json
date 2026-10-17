@@ -1,0 +1,317 @@
+{
+  "data": {
+    "event": {
+      "id": "113475798006664574",
+      "type": "match",
+      "tournament": {
+        "id": "113475452383887518"
+      },
+      "league": {
+        "id": "98767975604431411",
+        "slug": "worlds",
+        "image": "http://static.lolesports.com/leagues/1592594612171_WorldsDarkBG.png",
+        "name": "Worlds"
+      },
+      "match": {
+        "strategy": {
+          "count": 1
+        },
+        "teams": [
+          {
+            "id": "103461966965149786",
+            "name": "Movistar KOI",
+            "code": "MKOI",
+            "image": "http://static.lolesports.com/teams/1734012609283_MKOI_FullColor_Blue.png",
+            "result": {
+              "gameWins": 0
+            }
+          },
+          {
+            "id": "99566404579461230",
+            "name": "kt Rolster",
+            "code": "KT",
+            "image": "http://static.lolesports.com/teams/kt_darkbackground.png",
+            "result": {
+              "gameWins": 1
+            }
+          }
+        ],
+        "games": [
+          {
+            "number": 1,
+            "id": "113475798006664575",
+            "state": "completed",
+            "teams": [
+              {
+                "id": "103461966965149786",
+                "side": "blue"
+              },
+              {
+                "id": "99566404579461230",
+                "side": "red"
+              }
+            ],
+            "vods": [
+              {
+                "id": "115382482021851591",
+                "parameter": "2592249086",
+                "locale": "cs-CZ",
+                "mediaLocale": {
+                  "locale": "cs-CZ",
+                  "englishName": "Czech (Czechia)",
+                  "translatedName": "Čeština"
+                },
+                "provider": "twitch",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T04:33:07.268Z",
+                "startMillis": 9404000,
+                "endMillis": 12900000
+              },
+              {
+                "id": "115378589638722111",
+                "parameter": "2592250623",
+                "locale": "de-DE",
+                "mediaLocale": {
+                  "locale": "de-DE",
+                  "englishName": "German (Germany)",
+                  "translatedName": "Deutsch"
+                },
+                "provider": "twitch",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T04:36:16.144Z",
+                "startMillis": 9224000,
+                "endMillis": 12720000
+              },
+              {
+                "id": "115377128486638956",
+                "parameter": "j4BsUdHj2BU",
+                "locale": "en-US",
+                "mediaLocale": {
+                  "locale": "en-US",
+                  "englishName": "English (North America)",
+                  "translatedName": "English (North America)"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T07:11:29.421Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "115377820531622108",
+                "parameter": "12hWKJ_jIuA",
+                "locale": "es-ES",
+                "mediaLocale": {
+                  "locale": "es-ES",
+                  "englishName": "Spanish (Spain)",
+                  "translatedName": "Español (España)"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T07:04:53.270Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "115377401279152066",
+                "parameter": "mKhe1eojKds",
+                "locale": "es-MX",
+                "mediaLocale": {
+                  "locale": "es-MX",
+                  "englishName": "Spanish (Mexico)",
+                  "translatedName": "Español (Latinoamérica)"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T07:11:39.187Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "115377833657769962",
+                "parameter": "EBSVB0Om0Rs",
+                "locale": "fr-FR",
+                "mediaLocale": {
+                  "locale": "fr-FR",
+                  "englishName": "French (France)",
+                  "translatedName": "Français"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T07:06:51.592Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "115377876548853723",
+                "parameter": "HRTvmZU9Dyc",
+                "locale": "it-IT",
+                "mediaLocale": {
+                  "locale": "it-IT",
+                  "englishName": "Italian (Italy)",
+                  "translatedName": "Italiano"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T07:03:59.705Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "115378526923325985",
+                "parameter": "2592248853",
+                "locale": "ja-JP",
+                "mediaLocale": {
+                  "locale": "ja-JP",
+                  "englishName": "Japanese (Japan)",
+                  "translatedName": "日本語"
+                },
+                "provider": "twitch",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T04:31:24.130Z",
+                "startMillis": 9515000,
+                "endMillis": 13011000
+              },
+              {
+                "id": "115378578432628985",
+                "parameter": "174942159",
+                "locale": "ko-KR",
+                "mediaLocale": {
+                  "locale": "ko-KR",
+                  "englishName": "Korean (Korea)",
+                  "translatedName": "한국어"
+                },
+                "provider": "afreecatv",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T06:55:30.874Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "115378508016976411",
+                "parameter": "h2QGCJOKFKE",
+                "locale": "pl-PL",
+                "mediaLocale": {
+                  "locale": "pl-PL",
+                  "englishName": "Polish (Poland)",
+                  "translatedName": "Polski"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T04:19:39.082Z",
+                "startMillis": 10291000,
+                "endMillis": 13787000
+              },
+              {
+                "id": "115378566275211552",
+                "parameter": "nqjKGXYNJZ4",
+                "locale": "pt-BR",
+                "mediaLocale": {
+                  "locale": "pt-BR",
+                  "englishName": "Portuguese (Brazil)",
+                  "translatedName": "Português (Brasil)"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T04:23:38.886Z",
+                "startMillis": 10004000,
+                "endMillis": 13500000
+              },
+              {
+                "id": "115378493894500598",
+                "parameter": "2592235041",
+                "locale": "pt-PT",
+                "mediaLocale": {
+                  "locale": "pt-PT",
+                  "englishName": "Portuguese (European)",
+                  "translatedName": "Português Europeu"
+                },
+                "provider": "twitch",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T04:05:00.144Z",
+                "startMillis": 11163000,
+                "endMillis": 14659000
+              },
+              {
+                "id": "115378554516275754",
+                "parameter": "ugRtApIIDII",
+                "locale": "sr-SR",
+                "mediaLocale": {
+                  "locale": "sr-SR",
+                  "englishName": "Serbian",
+                  "translatedName": "Srpski"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T04:58:46.489Z",
+                "startMillis": 7921000,
+                "endMillis": 11417000
+              },
+              {
+                "id": "115378482385854703",
+                "parameter": "2592252190",
+                "locale": "th-TH",
+                "mediaLocale": {
+                  "locale": "th-TH",
+                  "englishName": "Thai (Thailand)",
+                  "translatedName": "ภาษาไทย"
+                },
+                "provider": "twitch",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T04:40:48.122Z",
+                "startMillis": 9035000,
+                "endMillis": 12531000
+              },
+              {
+                "id": "115378413359341752",
+                "parameter": "2592247556",
+                "locale": "tr-TR",
+                "mediaLocale": {
+                  "locale": "tr-TR",
+                  "englishName": "Turkish (Turkey)",
+                  "translatedName": "Türkçe"
+                },
+                "provider": "twitch",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T04:29:37.144Z",
+                "startMillis": 9675000,
+                "endMillis": 13171000
+              },
+              {
+                "id": "115377476415463186",
+                "parameter": "rwf-hR0TNgk",
+                "locale": "vi-VN",
+                "mediaLocale": {
+                  "locale": "vi-VN",
+                  "englishName": "Vietnamese (Vietnam)",
+                  "translatedName": "Tiếng Việt"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T07:11:25.202Z",
+                "startMillis": null,
+                "endMillis": null
+              },
+              {
+                "id": "115378541666115860",
+                "parameter": "IOfexZkJ8Fk",
+                "locale": "zh-TW",
+                "mediaLocale": {
+                  "locale": "zh-TW",
+                  "englishName": "Chinese (Republic of China)",
+                  "translatedName": "繁體中文"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": "2025-10-15T04:34:22.616Z",
+                "startMillis": 9404000,
+                "endMillis": 12900000
+              }
+            ]
+          }
+        ]
+      },
+      "streams": []
+    }
+  }
+}

@@ -82,7 +82,7 @@ test('P9 distant 400-match rows bound rich DOM after a frame and remain recovera
 });
 test('P10 actual zoom multiplier and dimensions are diagnostic dedup key',()=>{
  const vm=require('node:vm'),{extract}=require('../backend/web/r188-harness.cjs'),events=[],style={setProperty(){}},state={},window={innerWidth:900,innerHeight:700,screen:{width:1920,height:1080},devicePixelRatio:1.5,reportFlowDiagnostic:(...e)=>events.push(e)};
- const ctx={state,window,document:{documentElement:{style,dataset:{}}},preferredUiScale:()=>1.25,autoUiScale:()=>1,renderUiScaleAutoLabel(){},appliedUiScale:0};vm.runInNewContext(extract(app,'applyUiScale'),ctx);
+ const ctx={state,window,document:{documentElement:{style,dataset:{}}},preferredUiScale:()=>1.25,autoUiScale:()=>1,renderUiScaleAutoLabel(){},applySidebar(){},appliedUiScale:0};vm.runInNewContext(extract(app,'applyUiScale'),ctx);
  ctx.applyUiScale();for(let i=0;i<3600;i++)ctx.applyUiScale();assert.equal(events.length,1);assert.equal(events[0][2].multiplier,1.25);assert.equal(events[0][2].screenWidth,1920);assert.equal(events[0][2].devicePixelRatio,1.5);
  window.innerWidth=1280;ctx.applyUiScale();assert.equal(events.length,2);assert.equal(events[1][2].windowWidth,1280);assert(Buffer.byteLength(JSON.stringify(events))<50000);
 });

@@ -69,7 +69,7 @@ func TestR272ArenaKnownTrioSurvivesMissingMember(t *testing.T) {
 		})
 	}
 }
-func TestR272ArenaFameLCUPriorityForSelfAndOther(t *testing.T) {
+func TestR272ArenaFameRankedSourceRemainsUnverifiedForSelfAndOther(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"queues":[{"queueType":"CHERRY","ratedTier":"SILVER","ratedRating":12600.4}]}`)
 	}))
@@ -78,8 +78,8 @@ func TestR272ArenaFameLCUPriorityForSelfAndOther(t *testing.T) {
 	for _, self := range []bool{true, false} {
 		a := &app{sgp: newSGPProvider()}
 		value := a.loadLiveArenaFame(context.Background(), client, gameplayReference{ServerID: "HN1"}, strings.Repeat("a", 48), self, "")
-		if value == nil || value.Fame != 12600 {
-			t.Fatal("LCU CHERRY fame not used", self, value)
+		if value != nil {
+			t.Fatal("unverified ranked Fame must remain hidden", self, value)
 		}
 	}
 }

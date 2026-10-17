@@ -129,6 +129,9 @@ func (c *rankScoreCache) get(playerRef string) (rankScoreEntry, bool) {
 	if item.entry.negative {
 		ttl = rankScoreNegativeCacheTTL
 	}
+	if strings.HasPrefix(playerRef, "live-game:") {
+		ttl = 24 * time.Hour
+	}
 	if time.Since(item.entry.at) > ttl {
 		c.removeElement(element)
 		return rankScoreEntry{}, false
@@ -700,4 +703,43 @@ func (a *app) handleRiotMatchTiers(w http.ResponseWriter, r *http.Request, reque
 	}
 	a.recordDiagnostic(event)
 	respondJSON(w, response)
+}
+
+// Keep one ranked lookup per player/game while reusing the common source cache
+// and quota path. The existing bounded LRU also bounds historical game entries.
+func (a *app) livePlayerRankScore(ctx context.Context, client *LCUClient, gameID int64, playerRef string, isCurrent bool, serverID, privacy string) rankScoreEntry {
+	if gameID <= 0 {
+		return a.playerRankScore(ctx, client, playerRef, isCurrent, serverID, privacy)
+	}
+	cache := a.ensureRankScores()
+	key := "live-game:" + strconv.FormatInt(gameID, 10) + ":" + strings.ToUpper(serverID) + "|" + playerRef
+	for ctx.Err() == nil {
+		if entry, ok := cache.get(key); ok {
+			return entry
+		}
+		flight, leader := cache.beginFlight(key, ctx)
+		if !leader {
+			select {
+			case <-ctx.Done():
+				return rankScoreEntry{}
+			case <-flight.done:
+				if flight.invalidated {
+					continue
+				}
+				return flight.entry
+			}
+		}
+		entry, accepted := func() (rankScoreEntry, bool) {
+			defer cache.finishFlight(key, flight, rankScoreEntry{})
+			result := a.playerRankScore(flight.ctx, client, playerRef, isCurrent, serverID, privacy)
+			if flight.ctx.Err() == nil {
+				return result, cache.finishFlight(key, flight, result, key)
+			}
+			return result, false
+		}()
+		if accepted {
+			return entry
+		}
+	}
+	return rankScoreEntry{}
 }

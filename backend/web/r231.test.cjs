@@ -21,8 +21,8 @@ test('R231 table single expansion and sorting preserve every main row/avatar; mo
 });
 test('R231 arrows/count, unique multikill gradients and masked build avatar tooltip',()=>{
  const state={settings:{maskNames:true}},f=functions(['renderMasteries','renderChampionStats','renderMultiKillTag','renderBuildPlayers','matchPlayerGroups'],{state,escapeHTML,iconFigure,number:String,compactNumber:String,kda:String,percent:String});
- const mastery=f.renderMasteries([],true,37),champions=f.renderChampionStats([],{games:20},{tableSupported:true});assert.match(mastery,/37 个英雄/);assert.doesNotMatch(mastery,/最高分|›/);assert.match(champions,/viewBox="0 0 24 24"/);
- const dom=new JSDOM(f.renderMultiKillTag(5,9)+f.renderMultiKillTag(5,9));const uses=[...dom.window.document.querySelectorAll('use')];assert.equal(uses.length,2);assert(uses.every(n=>n.getAttribute('href')==='/icons.svg#dl-icon-multikill-5'));
+ const mastery=f.renderMasteries([],true,37),champions=f.renderChampionStats([],{games:20},{tableSupported:true});assert.match(mastery,/37 个英雄/);assert.doesNotMatch(mastery,/最高分|›/);assert.match(champions,/viewBox="0 0 16 16"/);
+ const dom=new JSDOM(f.renderMultiKillTag(5,9)+f.renderMultiKillTag(5,9));const gradients=[...dom.window.document.querySelectorAll('linearGradient')];assert.equal(gradients.length,4);assert.equal(new Set(gradients.map(n=>n.id)).size,4);
  const match={gameId:9,participants:[{participantId:1,teamId:100,gameName:'SecretSelf',tagLine:'S',championId:1},{participantId:2,teamId:200,gameName:'SecretOther',tagLine:'O',championId:2}]};dom.window.document.body.innerHTML=f.renderBuildPlayers(match,match.participants[0],match.participants[1]);
  assert.equal(dom.window.document.querySelectorAll('.build-player [data-tooltip]').length,0);assert(!dom.window.document.body.innerHTML.includes('Secret'));dom.window.close();
 });

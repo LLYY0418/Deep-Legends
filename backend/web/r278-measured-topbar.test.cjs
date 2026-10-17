@@ -11,7 +11,7 @@ test('R278 measured topbar detects child bounds, internal search overflow and pa
  search.scrollWidth=100;buttons=[box(10,32),box(41,32)];assert.equal(f.topbarOverflows(bar),true);
  buttons=[box(10,32),box(50,32)];children=[{getBoundingClientRect:()=>box(150,42)}];assert.equal(f.topbarOverflows(bar),true);
 });
-test('R278 measured compact controller changes at most one level per frame and reserves sixteen pixels before restoring',async()=>{
+test('R278 measured compact controller changes at most one level per frame and reserves twenty-four physical pixels before restoring',async()=>{
  const dom=new JSDOM('<main><header class="topbar"></header><aside class="sidebar"></aside></main>'),d=dom.window.document,bar=d.querySelector('header'),frames=[],observers=[];
  let width=700,required=3,minRestoredWidth=700;
  Object.defineProperty(bar,'offsetWidth',{get:()=>width});
@@ -24,9 +24,9 @@ test('R278 measured compact controller changes at most one level per frame and r
  try{
   f.setupTopbarCompact();await Promise.resolve();
   const tick=()=>{const before=Number(bar.dataset.topbarCompact),fn=frames.shift();assert(fn);fn();assert(Math.abs(Number(bar.dataset.topbarCompact)-before)<=1);};
-  for(let i=0;i<4;i++)tick();assert.equal(bar.dataset.topbarCompact,'3');assert.equal(bar.dataset.topbarSettled,'true');assert.deepEqual(levels,[1,2,3]);
-  required=0;width=715;observers[0].callback();observers[0].callback();assert.equal(frames.length,1,'observer callbacks must coalesce');tick();assert.equal(bar.dataset.topbarCompact,'3','fifteen pixels are insufficient');
-  width=716;observers[0].callback();for(let i=0;i<4;i++)tick();assert.equal(bar.dataset.topbarCompact,'0');assert.equal(bar.dataset.topbarSettled,'true');assert.equal(d.querySelectorAll('header').length,1,'measurement copies must be removed');
+  for(let i=0;i<4;i++)tick();assert.equal(bar.dataset.topbarCompact,'3');assert.equal(bar.dataset.topbarSettled,'true');assert.deepEqual(levels,[],"compaction must not override the sidebar preference");
+  required=0;width=711;observers[0].callback();observers[0].callback();assert.equal(frames.length,1,'observer callbacks must coalesce');tick();assert.equal(bar.dataset.topbarCompact,'3','fifteen pixels are insufficient');
+  width=712;observers[0].callback();for(let i=0;i<4;i++)tick();assert.equal(bar.dataset.topbarCompact,'0');assert.equal(bar.dataset.topbarSettled,'true');assert.equal(d.querySelectorAll('header').length,1,'measurement copies must be removed');
  }finally{dom.window.close()}
 });
 test('R278 compact region uses exactly two Unicode characters and retains complete accessible identity',()=>{
@@ -62,22 +62,9 @@ test('R278 approved official-auto contract rejects restored seconds in actual pr
  }finally{dom.window.close()}
 });
 
-test('R278 logical width floor keeps compact level three through sixteen pixels of hysteresis',async()=>{
- const dom=new JSDOM('<main><header class="topbar"></header></main>'),d=dom.window.document,bar=d.querySelector('header'),frames=[],observers=[];
- let width=601;
- Object.defineProperty(bar,'offsetWidth',{get:()=>width});
- bar.getBoundingClientRect=()=>({width:width*2});
- class Observer {constructor(callback){this.callback=callback;observers.push(this)}observe(){}}
- const f=compile(app,['setupTopbarCompact'],{document:d,window:dom.window,requestAnimationFrame:fn=>{frames.push(fn);return frames.length},ResizeObserver:Observer,MutationObserver:Observer,preference:()=> 'expanded',applySidebar(){},topbarOverflows:()=>false});
- const drain=()=>{let count=0;while(frames.length){assert(count++<10,'controller must settle');const before=Number(bar.dataset.topbarCompact);frames.shift()();assert(Math.abs(Number(bar.dataset.topbarCompact)-before)<=1);}assert.equal(bar.dataset.topbarSettled,'true');};
- const resize=value=>{width=value;observers[0].callback();drain();};
- try{
-  f.setupTopbarCompact();drain();assert.equal(bar.dataset.topbarCompact,'0','width above 600 without overflow must not force compaction');
-  for(const value of [600,599,450]){resize(value);assert(Number(bar.dataset.topbarCompact)>=3,'logical width <=600 must enforce compact level three');}
-  for(const value of [601,615,600,616,601,600]){resize(value);assert.equal(bar.dataset.topbarCompact,'3','boundary changes must not oscillate or bypass sixteen logical pixels');}
-  resize(617);assert.equal(bar.dataset.topbarCompact,'0','wide space restores one level per frame');
-  assert.equal(d.querySelectorAll('header').length,1,'measurement copies must be removed');
- }finally{dom.window.close()}
+test('R282 compact levels depend on overflow rather than a fixed logical-width floor',()=>{
+ assert(!app.includes('const minimumLevel ='));
+ assert(app.includes('24 / scale'));
 });
 
 test('R278 approved restart contract follows startup login despite saved manual preference',()=>{

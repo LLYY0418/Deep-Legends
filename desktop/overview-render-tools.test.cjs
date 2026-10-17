@@ -54,8 +54,8 @@ test("演示数据下工具五个页签都渲染完成", async () => {
   assert.equal(suiteIcons.length, 5, "五个工具图标应统一使用 SVG");
   for (const icon of suiteIcons) {
     assert.equal(icon.getAttribute("viewBox"), "0 0 24 24");
-    assert(icon.classList.contains("function-icon"));
-    assert.match(icon.querySelector("use").getAttribute("href"),/^\/icons.svg#/);
+    assert(icon.querySelector("path,circle,rect"));
+    assert.equal(icon.querySelector("use"),null);
     assert.equal(icon.getAttribute("focusable"), "false");
     assert.equal(icon.parentElement.getAttribute("aria-hidden"), "true");
   }

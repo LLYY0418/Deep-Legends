@@ -30,7 +30,7 @@ function functionSource(script, name) {
   assert.fail(`unbalanced ${name}`);
 }
 
-function compile(names,deps={}) {if (!names.includes("liveClientPositionsPending") && names.some(n=>functionSource(source,n).includes("liveClientPositionsPending("))) names=[...names,"liveClientPositionsPending"];deps={updateLiveLoadingVisibility(){},...deps};return Function(...Object.keys(deps),names.map(n=>functionSource(source,n)).join("\n")+`\nreturn {${names.join(",")}}`)(...Object.values(deps))}
+function compile(names,deps={}) {if(names.includes("loadLive")&&!names.includes("retainArenaBravery")) names=[...names,"retainArenaBravery"];if (!names.includes("liveClientPositionsPending") && names.some(n=>functionSource(source,n).includes("liveClientPositionsPending("))) names=[...names,"liveClientPositionsPending"];deps={updateLiveLoadingVisibility(){},...deps};return Function(...Object.keys(deps),names.map(n=>functionSource(source,n)).join("\n")+`\nreturn {${names.join(",")}}`)(...Object.values(deps))}
 function harness(data,section="live") {
  let serial=0;const timers=new Map();const calls=[];
  const state={section,beacon:{phase:data.phase},live:data,settings:{liveRefresh:true,liveInterval:60}};
