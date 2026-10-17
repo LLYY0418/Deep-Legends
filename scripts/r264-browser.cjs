@@ -125,8 +125,8 @@ async function start(){
    results.push({theme,storage,case:'P1',visibleCount:0,launchpadVisible:true,overlay:false,reconnectedSearch:true,closeMs});
   }
   if(!process.env.R264_CASE || process.env.R264_CASE==='P2'){
-  await click('#section-favorites');
   await evaluate("window.__r264Conflict=true;window.__r264SetStatus({snapshotReady:false,syncing:false,lastError:''});for(const stream of window.__r264Streams)stream.onmessage?.({data:'refresh-started'})");
+  await click('#section-favorites');
   await until("window.__r264EnsureCalls===1 && document.querySelector('#skin-grid')?.textContent.includes('客户端连接中')");
   const recoveryStarted=Date.now();await evaluate("window.__r264Conflict=false;window.__r264SetStatus({})");
   await until("window.__r264EnsureCalls===2 && !document.querySelector('#skin-grid')?.textContent.includes('客户端连接中') && document.querySelector('#skin-grid .skin-card')");

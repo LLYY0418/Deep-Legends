@@ -158,6 +158,9 @@ module.exports=async({evaluate,until,click,call,shot,ready,results})=>{
  await evaluate("window.__r277Ready=structuredClone(__r266App.state.clientView);window.__r277Generation=__r277Ready.generation+100;__r266App.acceptClientView({...__r277Ready,state:'exiting',generation:__r277Generation});true");
  await until("!document.querySelector('[data-player-tab=\"current\"]')");
  await evaluate("__r266App.acceptClientView({...__r277Ready,state:'no-client',generation:__r277Generation+1});__r266App.acceptClientView({...__r277Ready,state:'ready',generation:__r277Generation+2});true");
+ // A ready connection starts a new collection read; its cleared snapshot must
+ // be restored by a real status response, as in the production scan flow.
+ await evaluate("__r266App.refreshStatus().then(()=>{if(!__r266App.state.status.snapshotReady)throw Error('reconnected collection snapshot missing');return true})");
  await until("__r266Game.state.tabs.some(t=>t.current && t.data?.matches?.length>0 && !t.loading)");
  const rejection=await evaluate("(()=>{const before=__r277FlowEvents.length;for(let i=0;i<20;i++)__r266App.acceptClientView({...__r277Ready,generation:__r277Generation});return __r277FlowEvents.slice(before).filter(e=>e[0]==='client_view_client')})()");assert.equal(rejection.length,2);assert(rejection.some(e=>e[1]==='rejected'&&e[2].reason==='generation-rollback'));results.push({P:1,selfReappeared:true,staleFrameDiagnostics:rejection});
  // P10 real settings handler, not a CSS-only test write.
