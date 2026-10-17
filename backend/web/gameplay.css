@@ -2326,7 +2326,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .summoner-highlight.is-pending-highlight figcaption .skeleton-line{width:80px}
 .career-pending.gameplay-skeleton { display:contents; }
 .is-career-pending > header > :not(h3) { visibility:hidden; }
-.career-pending.gameplay-skeleton > * { color:transparent; pointer-events:none; background:linear-gradient(100deg,var(--skeleton-base) 20%,var(--skeleton-glint) 42%,var(--skeleton-base) 64%);background-size:220% 100%;animation:skeleton 1.3s linear infinite; }
+.career-pending.gameplay-skeleton > * { color:transparent; pointer-events:none; background-color:var(--skeleton-base);background-image:linear-gradient(100deg,var(--skeleton-base) 20%,var(--skeleton-glint) 42%,var(--skeleton-base) 64%);background-size:220% 100%;animation:skeleton 1.3s linear infinite; }
 .career-pending.gameplay-skeleton > * > * { visibility:hidden; }
 @media (prefers-reduced-motion:reduce) { .career-pending.gameplay-skeleton > * {animation:none;background-image:none;} }
 @container matches-column (max-width:720px){.match-pending .match-players{display:none}}

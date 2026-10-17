@@ -11,7 +11,7 @@ const mutations=[
  ['p3-stopped','history-recovery.js',"if(tab.advancedSearch?.stopReason==='user_stop')return;","if(false)return;",'P3 quota automatically'],
  ['p4-height','gameplay.css','.is-pending-strip .game-icon.is-summoner-avatar{border-radius:50%}','.summoner-strip.is-pending-strip{height:116px!important;min-height:116px!important}.is-pending-strip .game-icon.is-summoner-avatar{border-radius:50%}','P4 skeleton'],
  ['p4-retained-filter','gameplay.js',"filterbar.classList.toggle('gameplay-skeleton',pending);","filterbar.classList.toggle('gameplay-skeleton',true);",'P4 retained filter'],
- ['p4-zero','gameplay.js','if(pending)return `<section class="career-section champion-performance">','if(false)return `<section class="career-section champion-performance">','P4 pending champion'],
+ ['p4-zero','gameplay.js','if(pending)return renderCareerPendingMarkup(renderChampionStats(items,overall,progress));','if(false)return renderCareerPendingMarkup(renderChampionStats(items,overall,progress));','P4 pending champion'],
  ['p5-reuse','history-filters.js','const icon=icons.get(button.dataset.afOption);','const icon=null;','P5 decoded'],
  ['p6-unread','collection-new-items.js','return record?.navUnread===true;','return false;','P6 collection'],
  ['p7-nowrap','app.css','.topbar button { white-space: nowrap; flex-shrink: 0; }','.topbar button { flex-shrink: 0; }','P7 top'],
