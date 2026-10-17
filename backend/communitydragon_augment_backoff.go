@@ -100,7 +100,13 @@ func (p *championProvider) augmentCatalogBackoffObserve(parentCtx context.Contex
 }
 
 func (p *championProvider) fetchCommunityDragonAugmentPart(ctx, parentCtx context.Context, stage, requestPath string) ([]byte, error) {
-	data, _, err := p.fetchWithMetadataCacheKeyLoader(ctx, communityDragonHost, requestPath, nil, 1<<20, "application/json", "", func(loadCtx context.Context) ([]byte, error) {
+	result, err := p.fetchCommunityDragonAugmentPartResult(ctx, parentCtx, stage, requestPath)
+	return result.data, err
+}
+
+func (p *championProvider) fetchCommunityDragonAugmentPartResult(ctx, parentCtx context.Context, stage, requestPath string) (championCacheLoadResult, error) {
+	started := time.Now()
+	loader := func(loadCtx context.Context) ([]byte, error) {
 		if err := loadCtx.Err(); err != nil {
 			return nil, err
 		}
@@ -110,6 +116,28 @@ func (p *championProvider) fetchCommunityDragonAugmentPart(ctx, parentCtx contex
 		data, err := p.fetchDirect(loadCtx, communityDragonHost, requestPath, nil, 1<<20, "application/json")
 		p.augmentCatalogBackoffObserve(parentCtx, stage, err)
 		return data, err
-	})
-	return data, err
+	}
+	var result championCacheLoadResult
+	var err error
+	if p.cache == nil {
+		result.data, err = loader(ctx)
+		result.state = championCacheStateMiss
+		if err == nil {
+			result.fetchedAt = started
+		} else {
+			result.state = championCacheStateError
+		}
+	} else {
+		ttl, stale, persist := championCachePolicy(communityDragonHost, requestPath, "application/json")
+		result, err = p.cache.loadWithStatus(ctx, championCacheKey(communityDragonHost, requestPath, "", "application/json"), ttl, stale, persist, loader)
+	}
+	observedErr := err
+	if observedErr == nil {
+		observedErr = result.upstreamErr
+	}
+	recordAssetCacheState(ctx, result.state)
+	if ctx.Value(arenaRetryContextKey{}) == nil {
+		p.reportChampionUpstream(communityDragonHost, "application/json", result.data, observedErr, result.state, started)
+	}
+	return result, err
 }

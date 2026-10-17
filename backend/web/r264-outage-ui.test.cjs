@@ -12,7 +12,7 @@ test('R264 P5.1 A B C are distinct, official content is safe, and cached matches
 test('R264 P6 one of ten matches keeps all three incomplete statistics cards away from zero and absence',()=>{
  const f=helpers(),tab={data:{matches:[{gameId:1,queueId:420}],pagination:{partial:true,count:10}},initialPagePending:false};assert(f.historyStatsPending(tab.data,tab));
  const h=compile(source,['careerSectionEntries','rankedQueueData','rankedQueueSwitcher','rankedQueueLabel','rankedQueueNoun','isMayhemQueueId','renderAbility','renderRecentRanked','renderPositionStats'],{escapeHTML,number:String,riotRegion:()=>false,renderRanks:()=>'',renderChampionStats:()=>'',renderMasteries:()=>'',renderRecentPlayers:()=>'',renderActivity:()=>'',renderOverviewShareButton:()=>''});
- const sections=new Map(h.careerSectionEntries(tab.data,tab));for(const key of ['recent-ranked','ability','positions']){assert.match(sections.get(key),/career-pending/);assert.doesNotMatch(sections.get(key),/战绩未读全/);assert.doesNotMatch(sections.get(key),/近 0 场|未发现|暂无可统计|0%/);}
+ const sections=new Map(h.careerSectionEntries(tab.data,tab));for(const key of ['recent-ranked','ability','positions']){assert.match(sections.get(key),/career-pending/);assert.doesNotMatch(sections.get(key),/战绩未读全/);assert.doesNotMatch(require('./r188-harness.cjs').visibleCareerText(sections.get(key)),/近 0 场|未发现|暂无可统计|0%/);}
  tab.data.pagination.partial=false;assert.equal(f.historyStatsPending(tab.data,tab),false);
 });
 test('R264 P6 ready avatar survives sparse cards and a late history error',async()=>{

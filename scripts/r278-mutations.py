@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='r278-mutants-') as d:
  mutate('P13-auto-predownload-disabled','backend/update.go','predownload := u.autoPredownload && resultState == "available" && !u.status.ManualOnly','predownload := false',test='TestR278P13AutomaticPredownloadAndForegroundTakeover')
  mutate('P14-success-poll-not-aggregated','backend/request_diagnostic_summary.go','local := event["event"] == "local_request_client"','local := false',test='TestR278P14LocalSuccessWindow')
  mutate('P14-snapshot-dedup-lost','backend/diagnostic_snapshots.go','if !snapshotDiagnosticEvent(name) {','if name == "overview_art_source" || !snapshotDiagnosticEvent(name) {',test='TestR278P14SnapshotRetainsChanges')
- mutate('P15-release-version-stale','desktop/package.json','"version": "0.12.86"','"version": "0.12.84"','R278_PACKAGE_FILE')
+ mutate('P15-release-version-stale','desktop/package.json','"version": "0.12.87"','"version": "0.12.84"','R278_PACKAGE_FILE')
 proof['unchanged'](ROOT,snapshot)
 run('restored-node',node);run('restored-go',['go','test','./backend','-run','^TestR278','-count=1','-v','-timeout=90s'])
 proof['unchanged'](ROOT,snapshot)

@@ -9,7 +9,7 @@ function views(both=false){
  const document=d.window.document,externalMatchViews=new Map(),nodes={playerOverlayContent:document.createElement('main')};
  const state=f.state;state.tabs=[];state.overlay=[];
  const workspaces=new Map();
- const renderMatch=(match,_ref,tab)=>`<article class="match-entry" data-match-id="${match.gameId}"><div class="match-summary"><button data-toggle-match="${match.gameId}"></button><img src="icon.svg"></div><div class="match-detail">${tab.openMatches.has(String(match.gameId))&&tab.matchDetailTabs.get(String(match.gameId))==='build'?f.renderBuildAugments(match.participants[0].augmentIds):'概览'}</div></article>`;
+ const renderMatch=(match,_ref,tab)=>`<article class="match-entry" data-match-id="${match.gameId}"><div class="match-summary"><button data-toggle-match="${match.gameId}"></button><img src="icon.svg"></div><div class="match-detail">${tab.openMatches.has(String(match.gameId))&&tab.matchDetailTabs.get(String(match.gameId))==='build'?'<div class="build-detail">'+f.renderBuildAugments(match.participants[0].augmentIds)+'</div>':'概览'}</div></article>`;
  for(let i=0;i<2;i++){
   const tab={key:`tab${i}`,data:{player:{playerRef:'self'},matches:Array.from({length:10},(_,j)=>({gameId:i*10+j+1,subjectParticipantId:4,participants:[{participantId:4,augmentIds:[j===1?1225:120]}]}))},openMatches:new Set(i===0||both?[String(i*10+2)]:[]),matchDetailTabs:new Map([[String(i*10+2),'build']]),matchViewRevision:7};
   state.tabs.push(tab);const content=document.querySelector(i?'#two':'#one');content.innerHTML=tab.data.matches.map(m=>renderMatch(m,'',tab)).join('');workspaces.set(tab,{content});
@@ -17,7 +17,7 @@ function views(both=false){
  // Second tab's existing DOM is parked in the real retained-view fragment form.
  const cached=document.createDocumentFragment();while(document.querySelector('#two').firstChild)cached.appendChild(document.querySelector('#two').firstChild);
  workspaces.get(state.tabs[1]).content._overviewViews=new Map([[state.tabs[1],{content:cached}]]);
- const deps={...f.deps,state,externalMatchViews,nodes,document,renderMatch,
+ const deps={...f.deps,renderBuildAugments:f.renderBuildAugments,state,externalMatchViews,nodes,document,renderMatch,
   api:async()=>({items:[{id:1225,status:'ok',description:'真实正文'}]}),
   tabGroup:t=>t,overviewWorkspace:t=>workspaces.get(t),overviewContainer:t=>t.overlay?nodes.playerOverlayContent:t===state.tabs[0]?workspaces.get(t).content:null,
   rerenderTab:()=>assert.fail('whole tab redraw'),bindMatchDetailControls:()=>{},bindPlayerLinks:()=>{},applyRenderedMetricStyles:()=>{},prepareImages:()=>{},
@@ -32,7 +32,7 @@ test('R191 09 only intersecting open build detail changes among twenty retained 
  await f.ensureAugmentDescriptions([1225]);
  assert.equal(f.state.tabs[0].matchViewRevision,7);assert.equal(f.state.tabs[1].matchViewRevision,7);
  const current=[...f.document.querySelectorAll(".match-entry"),...f.cached.querySelectorAll(".match-entry")];
- for(let i=0;i<20;i++) {assert.equal(cards[i],current[i]);assert.equal(cards[i].querySelector('.match-summary'),summaries[i]);if(i===1){assert.notEqual(cards[i].querySelector('.match-detail'),details[i]);assert.match(cards[i].textContent,/真实正文/);}else assert.equal(cards[i].querySelector('.match-detail'),details[i]);}
+ for(let i=0;i<20;i++) {assert.equal(cards[i],current[i]);assert.equal(cards[i].querySelector('.match-summary'),summaries[i]);if(i===1){assert.equal(cards[i].querySelector('.match-detail'),details[i]);assert.match(cards[i].textContent,/真实正文/);}else assert.equal(cards[i].querySelector('.match-detail'),details[i]);}
  assert.equal(f.document.querySelectorAll('.match-entry').length,10);
 });
 test('R191 10 shared IDs update active and cached tabs plus overlay and external views',async()=>{
@@ -42,10 +42,10 @@ test('R191 10 shared IDs update active and cached tabs plus overlay and external
  const overlay={overlay:true,data:{matches:[{gameId:21,subjectParticipantId:4,participants:[{participantId:4,augmentIds:[1225]}]}]},openMatches:new Set(['21']),matchDetailTabs:new Map([['21','build']]),matchViewRevision:3};
  f.state.overlay.push(overlay);f.document.body.append(f.nodes.playerOverlayContent);f.nodes.playerOverlayContent.innerHTML=f.renderMatch(overlay.data.matches[0],'',overlay);const overlayCard=f.nodes.playerOverlayContent.firstElementChild,overlayDetail=overlayCard.querySelector('.match-detail');
  const external=f.document.createElement('section');f.document.body.append(external);const calls=[];
- f.externalMatchViews.set(external,{tab:{data:{matches:[{gameId:22,subjectParticipantId:4,participants:[{participantId:4,augmentIds:[1225]}]}]},openMatches:new Set(['22']),matchDetailTabs:new Map([['22','build']]),externalRender:id=>calls.push(id)}});
+ external.innerHTML='<div class="build-detail">'+fixture(source).renderBuildAugments([1225])+'</div>';f.externalMatchViews.set(external,{tab:{data:{matches:[{gameId:22,subjectParticipantId:4,participants:[{participantId:4,augmentIds:[1225]}]}]},openMatches:new Set(['22']),matchDetailTabs:new Map([['22','build']]),externalRender:id=>calls.push(id)}});
  await f.ensureAugmentDescriptions([1225]);
- for(const i of [1,11]){assert.notEqual(f.entries[i].querySelector('.match-detail'),before[i]);assert.match(f.entries[i].textContent,/真实正文/)}
- assert.equal(f.entries[2].querySelector('.match-detail'),before[2]);assert.equal(overlayCard,f.nodes.playerOverlayContent.firstElementChild);assert.notEqual(overlayDetail,overlayCard.querySelector('.match-detail'));assert.deepEqual(calls,['22']);assert.deepEqual([...f.state.tabs.map(t=>t.matchViewRevision),overlay.matchViewRevision],[7,7,3]);
+ for(const i of [1,11]){assert.equal(f.entries[i].querySelector('.match-detail'),before[i]);assert.match(f.entries[i].textContent,/真实正文/)}
+ assert.equal(f.entries[2].querySelector('.match-detail'),before[2]);assert.equal(overlayCard,f.nodes.playerOverlayContent.firstElementChild);assert.equal(overlayDetail,overlayCard.querySelector('.match-detail'));assert.deepEqual(calls,[]);assert.match(external.textContent,/真实正文/);assert.deepEqual([...f.state.tabs.map(t=>t.matchViewRevision),overlay.matchViewRevision],[7,7,3]);
 });
 const css=read('gameplay.css');
 test('R191 14 effect icons and value gaps use corrected dimensions, wide tree is centered',()=>{

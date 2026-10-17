@@ -62,6 +62,14 @@ async function cleanupChromeTest({children = [], sockets = [], servers = [], dir
  try {
   for (const socket of sockets) {try {await socket?.close();} catch (error) {warn(error.message);}}
   const stopped = await Promise.all(children.map(child => stopChild(child, options)));
+  // Crashpad/updater descendants can inherit Chrome's pipes after Chrome exits.
+  // The guard has already recorded its result; release only these owned readers.
+  children.forEach((child,index)=>{
+   if (!child || !stopped[index]) return;
+   for (const stream of [child.stdin,child.stdout,child.stderr]) {
+    try {stream?.destroy?.();} catch (error) {warn(error.message);}
+   }
+  });
   await Promise.all(servers.map(server => closeServer(server, options)));
   if (stopped.every(Boolean)) await removeDirectories(directories, options);
  } catch (error) {warn(error.message);}

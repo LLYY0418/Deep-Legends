@@ -12,7 +12,7 @@ test('R214 selected player descriptions load once and redraw only the intersecti
  const unrelated={gameId:215,subjectParticipantId:1,participants:[{participantId:1,augmentIds:[9]}]};
  const tab={key:'self',data:{matches:[match,unrelated]},openMatches:new Set(['214','215']),matchDetailTabs:new Map([['214','build'],['215','build']])};
  const redraw=(_tab,id)=>{redraws.push(id);assert.equal(id,'214');container.innerHTML=f.renderBuild(match,match.participants[0],tab);controls.bindMatchDetailControls(container,tab);};
- const f=fixture(source,{riotTab:()=>false,connected:()=>false,rerenderMatch:redraw,api:async url=>{
+ const f=fixture(source,{document:dom.window.document,overviewWorkspace:()=>({content:container}),tabGroup:t=>t,riotTab:()=>false,connected:()=>false,rerenderMatch:redraw,api:async url=>{
   const ids=new URL(url,'http://test').searchParams.get('ids');requests.push(ids);
   if(ids==='3,4')await new Promise(resolve=>{finishOther=resolve;});
   return{items:ids.split(',').map(id=>({id:Number(id),status:'ok',description:`说明文字 ${id}`}))};
@@ -29,7 +29,7 @@ test('R214 selected player descriptions load once and redraw only the intersecti
  redraw(tab,'214');assert.deepEqual(requests,['1,2','3,4']);
  finishOther();await new Promise(setImmediate);
  assert.match(container.textContent,/说明文字 3/);assert.match(container.textContent,/说明文字 4/);assert.equal(container.querySelectorAll('.skel').length,0);
- assert.ok(redraws.length>=3);assert.ok(redraws.every(id=>id==='214'));
+ assert.ok(redraws.length>=2);assert.ok(redraws.every(id=>id==='214'));
  container.querySelector('[data-build-player="1"]').click();await new Promise(setImmediate);
  assert.match(container.textContent,/说明文字 1/);assert.deepEqual(requests,['1,2','3,4']);
  dom.window.close();

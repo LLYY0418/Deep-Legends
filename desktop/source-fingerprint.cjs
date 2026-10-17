@@ -39,7 +39,7 @@ function sourceFingerprint(projectRoot = root) {
     "desktop/verify-license-release.cjs", "desktop/verify-license-staging-pack.cjs", "scripts/build-license-staging.cjs",
     "desktop/assets/hexcore-icon.ico", "installer/ui/app.ico", "backend/data/reroll_pool_14_5.txt", "backend/data/reroll_pool_14_5.json",
     "backend/data/skin_release_dates.json", "backend/data/skin_release_overrides.json",
-    "backend/data/augment_catalog_20260924.json", "backend/data/augment_icons_20260924.bin",
+    "backend/data/augment_descriptions_20261017.json", "backend/data/augment_catalog_20260924.json", "backend/data/augment_icons_20260924.bin",
     "backend/data/arena_items_20260924.json", "backend/data/champion_names_16.19.1_zh_cn.json",
     "backend/data/champion_icons_16.19.1.bin",
   ].map((name) => path.join(projectRoot, name));

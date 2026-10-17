@@ -98,7 +98,7 @@ test('R282 P19 confirmed zero ranked only, real casual samples and shared mode s
  for(const changed of [{matches:[...data.matches,match(21,440)]},{ranks:[{queueType:'RANKED_FLEX_SR',wins:0,losses:1,winRate:0}]},{capabilities:[{name:'ranked-stats',state:'failed'}]},{rankedQueues:{420:{seasonGames:1}}},{ranks:[{queueType:'RANKED_SOLO_5x5',wins:0,losses:0,winRate:-1}]}])assert.equal(select({...data,...changed},{}),null);
  assert.equal(select(data,{initialPageError:'failed'}),null);assert.equal(select({...data,ranks:undefined},{}),null);assert.equal(select(data,{loading:true}),null);assert.equal(select(data,{initialPagePending:true}),null);
  const multi={...data,matches:[...data.matches,match(30,450)]};assert.equal(select(multi,{}).selected.key,'2300');assert.equal(select(multi,{casualMode:'450'}).overall.games,1);
- assert(extract(game,'careerSectionEntries').includes("!['ranks','ability'].includes(key)"));assert(extract(game,'careerSectionEntries').includes("replaceAll('近期海斗','近期对局')"));assert(extract(game,'updateCareerCards').includes('child.remove()'));
+ assert(extract(game,'careerSectionEntries').includes("!['ranks','ability','positions'].includes(key)"));assert(extract(game,'careerSectionEntries').includes("replaceAll('近期海斗','近期对局')"));assert(extract(game,'updateCareerCards').includes('child.remove()'));
  dom.window.close();
 });
 

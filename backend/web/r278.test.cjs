@@ -20,7 +20,7 @@ test('R278 P3 empty revision round trips and malformed reference carries silent 
  assert.throws(()=>f.resolveOverviewFrame(stream,{matches:[{gameId:2,revision:'x'}]}),e=>e.referenceFallback==='missing');assert.doesNotMatch(source,/已保留前 \$\{number\(rawMatches.length\)\} 场/);
 });
 test('R278 P5 pending ranks never invent unranked and CN uses milestones',()=>{
- const f=compile(source,['renderRanks'],{renderRankMMRPopover:()=>'',riotTab:()=>false,escapeHTML,renderRankHistory:()=>'<div class="rank-history">foreign</div>',renderRankMilestones:()=>'<div>历史最高</div>',renderCareerPendingRows:()=>'<span></span>'});
+ const f=compile(source,['renderRanks'],{renderRankMMRPopover:()=>'',riotTab:()=>false,escapeHTML,renderRankHistory:()=>'<div class="rank-history">foreign</div>',renderRankMilestones:()=>'<div>历史最高</div>',renderCareerPendingMarkup:markup=>markup});
  const pending=f.renderRanks([],[],[],null,null,{loading:true});assert.doesNotMatch(pending,/未定级|Unranked/);
  const html=f.renderRanks([],[{name:'ranked-stats',state:'available'}],[],{},null,{loading:false});assert.match(html,/未定级/);assert.doesNotMatch(html,/rank-history|尚未定级/);
  const css=fs.readFileSync(process.env.R278_CSS_SOURCE || __dirname+'/gameplay.css','utf8');assert.doesNotMatch(css,/\[data-career-key="ranks"\]\s*\{\s*min-height:\s*450px/);

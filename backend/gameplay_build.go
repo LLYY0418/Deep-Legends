@@ -342,9 +342,13 @@ func (a *app) handleCNScoreParts(w http.ResponseWriter, r *http.Request, gameID,
 }
 
 type gameplayAugmentDescription struct {
-	ID          int64  `json:"id"`
-	Description string `json:"description"`
-	Status      string `json:"status"`
+	ID           int64  `json:"id"`
+	Description  string `json:"description"`
+	Status       string `json:"status"`
+	Source       string `json:"source,omitempty"`
+	ErrorKind    string `json:"error_kind,omitempty"`
+	RetryCount   int    `json:"retry_count"`
+	LCUErrorKind string `json:"lcu_error_kind,omitempty"`
 }
 
 func parseAugmentDescriptionIDs(value string) ([]int64, error) {
@@ -434,14 +438,90 @@ func (a *app) handleGameplayAugmentDescriptions(w http.ResponseWriter, r *http.R
 		return
 	}
 	started := time.Now()
-	items := loadGameplayAugmentDescriptions(r.Context(), ids, a.championDataProvider().gameplayAugmentDescription)
-	ok := 0
+	retry, _ := strconv.Atoi(r.URL.Query().Get("retry"))
+	if retry < 0 || retry > 100 {
+		retry = 0
+	}
+	a.mu.RLock()
+	client := a.lcu
+	connected := a.clientSessionConnectedLocked()
+	a.mu.RUnlock()
+	var once sync.Once
+	var local []gameplayAugment
+	localFailure := "disconnected"
+	loadLocal := func(ctx context.Context) []gameplayAugment {
+		once.Do(func() {
+			if client != nil && connected {
+				localCtx, cancel := context.WithTimeout(ctx, time.Second)
+				defer cancel()
+				data, err := client.GetBytesContext(localCtx, "/lol-game-data/assets/v1/cherry-augments.json")
+				if err != nil {
+					localFailure = augmentDescriptionFailure(0, err).ErrorKind
+					return
+				}
+				var raw []gameplayAugmentRaw
+				if json.Unmarshal(data, &raw) != nil || len(raw) == 0 {
+					localFailure = "invalid_shape"
+					return
+				}
+				local = normalizeGameplayAugments(raw)
+				if len(local) == 0 {
+					localFailure = "invalid_shape"
+					return
+				}
+				localFailure = "not_found"
+				for _, row := range local {
+					if augmentEffectDescription(row.Description) != "" {
+						localFailure = ""
+						break
+					}
+				}
+			}
+		})
+		return local
+	}
+	p := a.championDataProvider()
+	items := make([]gameplayAugmentDescription, len(ids))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 2)
+	for i, id := range ids {
+		wg.Add(1)
+		go func(i int, id int64) {
+			defer recoverPanic("augment-description")
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-r.Context().Done():
+				items[i] = augmentDescriptionFailure(id, r.Context().Err())
+				return
+			}
+			defer func() { <-sem }()
+			ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+			defer cancel()
+			items[i] = p.resolveAugmentDescription(ctx, id, loadLocal)
+			items[i].RetryCount = retry
+		}(i, id)
+	}
+	wg.Wait()
+	for i := range items {
+		if items[i].Source != "cache" && items[i].Source != "stale_cache" {
+			items[i].LCUErrorKind = localFailure
+			if items[i].Source != "lcu" && localFailure == "" {
+				items[i].LCUErrorKind = "not_found"
+			}
+		}
+	}
+	ok, unavailable, retryCount := 0, 0, 0
 	for _, item := range items {
 		if item.Status == "ok" {
 			ok++
+		} else if item.Status == "retry" {
+			retryCount++
+		} else {
+			unavailable++
 		}
 	}
-	a.recordDiagnostic(map[string]any{"event": "augment_descriptions_loaded", "requested": len(ids), "ok": ok, "unavailable": len(ids) - ok, "duration_ms": time.Since(started).Milliseconds()})
+	a.recordDiagnostic(map[string]any{"event": "augment_descriptions_loaded", "requested": len(ids), "ok": ok, "unavailable": unavailable, "retry": retryCount, "duration_ms": time.Since(started).Milliseconds(), "items": items})
 	respondJSON(w, struct {
 		Items []gameplayAugmentDescription `json:"items"`
 	}{items})

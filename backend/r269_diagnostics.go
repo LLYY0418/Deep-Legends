@@ -19,7 +19,7 @@ type compactDiagnosticWindow struct {
 func (a *app) compactDiagnostic(event map[string]any, now time.Time) (map[string]any, bool) {
 	name, _ := event["event"].(string)
 	switch name {
-	case "client_follow_client", "history_outage_ui", "overview_reference_fallback", "match_autoload_client", "collection_new_marker", "overview_reload_reason", "announcement_state", "overview_art_client", "overview_art_source", "sgp_history_circuit", "gameflow_phase_client", "browser_error_client":
+	case "build_spells_client", "augment_description_client", "client_follow_client", "history_outage_ui", "overview_reference_fallback", "match_autoload_client", "collection_new_marker", "overview_reload_reason", "announcement_state", "overview_art_client", "overview_art_source", "sgp_history_circuit", "gameflow_phase_client", "browser_error_client":
 	default:
 		return event, true
 	}

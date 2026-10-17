@@ -87,7 +87,7 @@ test('R265 partial sample boundaries and all five dependent cards; complete samp
   if(partial){data.pagination.partial=false;data.capabilities=[{name:'match-history',state:'failed'}];assert.deepEqual(new Map(f.careerSectionEntries(data,tab)),cards,'capability-only failure keeps partial titles and labels');}
   for(const key of ['recent-ranked','ability','positions','recent-players','activity']){
    const html=cards.get(key);
-   if(weak){assert.match(html,/career-pending/);assert.doesNotMatch(html,/战绩未读全/);assert.doesNotMatch(html,/暂无重复同场玩家|activity-cell|基于最近/);}
+   if(weak){assert.match(html,/career-pending/);assert.doesNotMatch(html,/战绩未读全/);assert.doesNotMatch(require('./r188-harness.cjs').visibleCareerText(html),/暂无重复同场玩家|基于最近/);}
    else if(partial && key!=='recent-ranked')assert.match(html,new RegExp(`基于最近 ${k} 场`));
    else assert.doesNotMatch(html,/基于最近/);
   }

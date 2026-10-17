@@ -1451,7 +1451,7 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.ok(arenaOverviewSource.indexOf("renderMatchScoreCell(record)") < arenaOverviewSource.indexOf('class="arena-detail-kda"'));
 	assert.match(arenaOverviewSource, /class="arena-detail-damage"[^>]+aria-label=[^>]+><b class="match-damage-value">\$\{plainInteger\(item\.damage\)\}<\/b><i aria-hidden="true">\/<\/i><b class="match-taken-value">\$\{plainInteger\(item\.damageTaken\)\}<\/b>/);
 	assert.doesNotMatch(arenaOverviewSource, /<small>伤害<\/small>|<small>承伤<\/small>/);
-	assert.match(functionSource(gameplayScript, "renderMatchLoadout"), /matchAugmentIDs\(subject, modeKind === "mayhem" \? 2 : 4\)[\s\S]{0,180}Array\.from\(\{ length: modeKind === "mayhem" \? 2 : 4 \}/);
+	assert.match(functionSource(gameplayScript, "renderMatchLoadout"), /matchAugmentIDs\(subject, 4\)[\s\S]{0,180}Array\.from\(\{ length: 4 \}/);
 	assert.match(gameplayScript, /function matchModeKind\(match, subject\)/);
 	assert.match(gameplayScript, /const spells = \[[\s\S]{0,260}spellIconFigure\(subject\.spell2Id, "small"\)/);
   assert.match(gameplayScript, /const statRows = modeKind === "arena" \? `\$\{damageRow\}\$\{takenRow\}` : `\$\{participationRow\}\$\{csRow\}\$\{tierRow\}`/);
@@ -1627,7 +1627,7 @@ test("small overviews move career statistics into an accessible modal sheet", ()
 test("rank history and ability comparison stay inside the shared career surface", () => {
 	assert.match(gameplayScript, /renderRanks\(data\.ranks \|\| \[\], data\.capabilities \|\| \[\], data\.historicalRanks \|\| \[\], data\.rankMilestones, data\.seasonStatsProgress, tab\)/);
 	assert.match(gameplayScript, /function renderHistoricalRanks\(items\)/);
-	assert.match(gameplayScript, /function renderRankMilestones\(milestones\)/);
+	assert.match(gameplayScript, /function renderRankMilestones\(milestones, allowFlex=false\)/);
 	assert.match(gameplayScript, /return renderHistoricalRanks\(historicalRanks\) \|\| renderRankMilestones\(rankMilestones\)/);
 	assert.match(gameplayScript, /index >= 5 \? " data-rank-history-extra hidden"/);
 	assert.match(gameplayScript, /data-rank-history-toggle/);
@@ -1771,7 +1771,8 @@ test("career ranked queue switches use one recent sample and ignore season scan 
 	assert.doesNotMatch(gameplayScript, /function renderSeasonProgressBadge/);
 	const entries = functionSource(gameplayScript, "careerSectionEntries");
 	assert.doesNotMatch(entries, /render(?:RecentRanked|Ability|PositionStats)\([^\n]*seasonStatsProgress/);
-	assert.match(entries, /renderChampionStats\(championRows, championOverall, championProgress,[^\n]*championStatsPending\(championRows,championOverall,championProgress,tab\)\)/);
+	assert.match(entries, /renderChampionStats\(championRows, championOverall, championProgress\)/);
+	assert.match(entries, /championStatsPending\(championRows,championOverall,championProgress,tab\)/);
 	assert.match(entries, /const championProgress = opggSeason[\s\S]*: data\.seasonStatsProgress/);
 });
 
@@ -4490,10 +4491,10 @@ test("match loadout follows the OPGG mode matrix instead of trusting stray augme
   const mayhem = renderMatchLoadout(subject, "mayhem");
   assert.equal(mayhem.usesAugments, true);
   assert.equal(mayhem.layout, "mayhem");
-  assert.equal((mayhem.loadout.match(/<augment>/g) || []).length, 2);
-  assert.equal((mayhem.loadout.match(/<spell>/g) || []).length, 2);
+  assert.equal((mayhem.loadout.match(/<augment>/g) || []).length, 4);
+  assert.equal((mayhem.loadout.match(/<spell>/g) || []).length, 0);
   assert.match(mayhem.loadout, /<augment>901<\/augment>.*<augment>902<\/augment>/);
-  assert.doesNotMatch(mayhem.loadout, /<augment>90[34]<\/augment>/);
+  assert.match(mayhem.loadout, /<augment>903<\/augment>.*<augment>904<\/augment>/);
   assert.doesNotMatch(mayhem.loadout, /<perk>|<style>/);
 
   const arena = renderMatchLoadout(subject, "arena");
@@ -4501,9 +4502,9 @@ test("match loadout follows the OPGG mode matrix instead of trusting stray augme
   assert.equal((arena.loadout.match(/<augment>/g) || []).length, 4);
   assert.doesNotMatch(arena.loadout, /<spell>|<perk>|<style>/);
   // 模式只改变填充顺序，图标轨道尺寸继承普通战绩，避免 KDA / 统计列错位。
-  assert.match(cssBlockAfter(gameplayStyles, ".match-loadout-mini.is-augments.is-mayhem {"), /grid-auto-flow:\s*column/);
+  assert.doesNotMatch(gameplayStyles, /\.match-loadout-mini\.is-augments\.is-mayhem\s*\{/);
   assert.doesNotMatch(cssBlockAfter(gameplayStyles, ".match-loadout-mini.is-augments {"), /grid-template-(?:columns|rows):/);
-  assert.doesNotMatch(cssBlockAfter(gameplayStyles, ".match-loadout-mini.is-augments.is-mayhem {"), /grid-template-(?:columns|rows):/);
+  for (const count of [0,1,3,4]) { const row=renderMatchLoadout({...subject,augmentIds:subject.augmentIds.slice(0,count)}, "mayhem"); assert.equal((row.loadout.match(/<augment>/g)||[]).length,count); assert.doesNotMatch(row.loadout,/is-empty|<spell>/); }
   assert.match(functionSource(gameplayScript, "renderBuild"), /matchAugmentIDs\(subject, 6\)/);
 
   const classic = renderMatchLoadout(subject, "mayhem-classic");
@@ -6591,7 +6592,7 @@ test("the duplicated 30-day ranked card is gone from every layer", () => {
 // 与右边高亮的页签重复。页签本身已经把当前队列表达清楚了。
 test("ranked queue switchers drop the redundant text label", () => {
 	const toolbars = gameplayScript.match(/<div class="career-section-tools">[\s\S]*?<\/div>/g) || [];
-	assert.equal(toolbars.length, 7, "包含同结构骨架头部的队列切换器");
+	assert.equal(toolbars.length, 6, "骨架复用已有卡片头部，不重复声明队列切换器");
 	for (const toolbar of toolbars) {
 		assert.match(toolbar,/rankedQueueSwitcher|\$\{tools\}/);
 	}

@@ -3,7 +3,7 @@ const {withBrowser}=require('./r280-browser-fixture.cjs');
 const assert=require('node:assert/strict');
 async function run(){await withBrowser(async({page,results,errors})=>{
  const p=await page('dark');await p.until("document.querySelector('.match-entry') && !__r278Game.activeTab().loading");
- for(const width of [2189,1100,960,870])for(const zoom of [0.9,1,1.14,1.5,1.75,2]){
+ for(const width of [2189,1100,960,870,700])for(const zoom of [0.9,1,1.14,1.5,1.75,2]){
   await p.call('Emulation.setDeviceMetricsOverride',{width,height:1100,deviceScaleFactor:1,mobile:false});
   await p.evaluate(`localStorage.setItem('lol-loot-ui-scale','${zoom}');document.documentElement.style.setProperty('--ui-zoom','${zoom}');document.documentElement.dataset.uiScale='${zoom}';__r278App.applySidebar();document.querySelector('.topbar').dispatchEvent(new Event('topbar-layout'));`);
   await p.until("document.querySelector('.topbar').dataset.topbarSettled==='true'");

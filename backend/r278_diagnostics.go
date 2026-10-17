@@ -10,7 +10,7 @@ import (
 
 func isR278Diagnostic(event string) bool {
 	switch event {
-	case "overview_art_client", "career_cards_render", "match_virtual_client", "pool_render_client", "history_outage_retry", "client_follow_client", "history_outage_ui", "overview_reference_fallback", "match_autoload_client", "collection_new_marker", "overview_reload_reason", "announcement_state":
+	case "build_spells_client", "augment_description_client", "overview_art_client", "career_cards_render", "match_virtual_client", "pool_render_client", "history_outage_retry", "client_follow_client", "history_outage_ui", "overview_reference_fallback", "match_autoload_client", "collection_new_marker", "overview_reload_reason", "announcement_state":
 		return true
 	}
 	return false
@@ -27,6 +27,20 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 	event := map[string]any{"event": r.Event, "reason": r.Reason}
 	for key, value := range fields {
 		switch key {
+		case "mode":
+			s, ok := value.(string)
+			if !ok || (s != "arena" && s != "mayhem" && s != "rift" && s != "aram") {
+				http.Error(w, "invalid mode", 400)
+				return
+			}
+			event[key] = s
+		case "error_kind":
+			s, ok := value.(string)
+			if !ok || (s != "none" && s != "timeout" && s != "backoff_skipped" && s != "no_response" && s != "not_found") {
+				http.Error(w, "invalid error kind", 400)
+				return
+			}
+			event[key] = s
 		case "card":
 			s, ok := value.(string)
 			if !ok || (s != "recent-ranked" && s != "ability" && s != "champions") {
@@ -66,7 +80,7 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 			}
 		case "source":
 			s, ok := value.(string)
-			if ok && (s == "complete" || s == "cards" || s == "progress" || s == "retained" || s == "event" || s == "status" || s == "circuit" || s == "fresh-503" || s == "bundled" || s == "remote" || s == "cache") {
+			if ok && (s == "complete" || s == "cards" || s == "progress" || s == "retained" || s == "event" || s == "status" || s == "circuit" || s == "fresh-503" || s == "bundled" || s == "remote" || s == "cache" || s == "stale_cache" || s == "lcu" || s == "cdragon" || s == "hexdata" || s == "none") {
 				event[key] = s
 			}
 		case "id", "notice_revision":
@@ -84,7 +98,7 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 			if ok && (s == "" || s == "loading" || s == "quota" || s == "paused" || s == "not-ready" || s == "no-more") {
 				event[key] = s
 			}
-		case "video_path_present", "reduced_motion", "video_rendered", "src_set", "playing", "applied", "bound", "near", "requested", "started":
+		case "gave_up", "video_path_present", "reduced_motion", "video_rendered", "src_set", "playing", "applied", "bound", "near", "requested", "started":
 			v, ok := value.(bool)
 			if !ok {
 				http.Error(w, "invalid flag", 400)
@@ -99,7 +113,7 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 				return
 			}
 			event[key] = int(v)
-		case "games", "generation", "collapsed", "hydrated", "item_count", "rendered_cards", "duration_ms", "count", "latency_ms", "matches_before", "matches_after", "durationMs":
+		case "spell1Id_missing", "spell1Id_zero", "spell1Id_value", "spell2Id_missing", "spell2Id_zero", "spell2Id_value", "augment_id", "retry_count", "games", "generation", "collapsed", "hydrated", "item_count", "rendered_cards", "duration_ms", "count", "latency_ms", "matches_before", "matches_after", "durationMs":
 			v, ok := value.(float64)
 			if !ok || v < 0 || v > 3600000 {
 				http.Error(w, "invalid metric", 400)

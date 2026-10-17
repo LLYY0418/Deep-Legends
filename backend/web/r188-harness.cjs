@@ -60,4 +60,9 @@ function fixture({directory = web, gameplaySource, active = 'runes', locked = fa
   state.laneMatchupCandidates.set(functions.laneMatchupCandidateKey(context), pending ? {rows: []} : candidates);
   return {source, data, state, pair, candidates, events, ...functions};
 }
-module.exports = {read, extract, compile, escapeHTML, fixture};
+function visibleCareerText(html) {
+  const {JSDOM}=require('../../desktop/node_modules/jsdom'),dom=new JSDOM(html);
+  dom.window.document.querySelectorAll('.career-pending[aria-hidden="true"],.is-career-pending>header>:not(h3)').forEach(n=>n.remove());
+  const text=dom.window.document.body.textContent;dom.window.close();return text;
+}
+module.exports = {read, extract, compile, escapeHTML, fixture, visibleCareerText};

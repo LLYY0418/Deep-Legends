@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {compile}=require('./r188-harness.cjs');
-const source=fs.readFileSync(process.env.R211_GAMEPLAY_SOURCE || path.join(__dirname,'gameplay.js'),'utf8');
+const source=require('./r277-deferred-fixture.cjs').join(fs.readFileSync(process.env.R211_GAMEPLAY_SOURCE || path.join(__dirname,'gameplay.js'),'utf8'));
 function dirtyHarness({hidden=false,present=false,gameId='9014822625'}={}) {
  let now=100000,serial=0;const jobs=new Map(),events=[],requests=[];
  const tab={current:true,key:'self',matchFilter:'flex',latestAllGameId:'100',data:{matches:[{gameId:100}],pagination:{filter:'flex'}},matchViews:new Map([['all',{}]])};
@@ -37,7 +37,7 @@ const {escapeHTML}=require('./r188-harness.cjs');
 test('R211 build selection switches equipment skills rune effects and augments, defaults to self',()=>{
  const state={settings:{maskNames:false},matchTimelines:new Map()},tab={key:'one'},match={gameId:9,participants:[{participantId:1,teamId:100,championId:1,championName:'一',championLevel:18,gameName:'Self',perkIds:[11]},{participantId:2,teamId:200,championId:2,championName:'二',championLevel:17,hidden:true,perkIds:[22]}]};
  state.matchTimelines.set('9',{available:true,participants:match.participants.map(p=>({participantId:p.participantId,itemGroups:[{minute:1,events:[{itemId:100+p.participantId}]}],skillOrder:[{slot:p.participantId,level:1}]}))});
- const f=compile(source,['buildSubject','renderBuildPlayers','matchPlayerGroups','renderBuild'],{state,escapeHTML,number:String,ensureAugmentDescriptions:()=>{},matchTimelineKey:()=> '9',riotTab:()=>false,connected:()=>true,matchAugmentIDs:p=>p.augmentIds||[],iconFigure:(_kind,id)=>`<img src="/${id}">`,renderBuildAugments:ids=>`hex:${ids.join(',')}`,renderUnifiedRuneBoard:p=>`runes:${p.perkIds}`,renderRuneEffects:p=>`effects:${p.perkIds}`,renderRuneYield:p=>`yield:${p.perkIds}`,renderItemRoute:t=>`item:${t.itemGroups[0].events[0].itemId}`,renderSkillOrder:t=>`skill:${t.skillOrder[0].slot}`,skillPrioritySummary:()=>''});
+ const f=compile(source,['buildSubject','renderBuildPlayers','matchPlayerGroups','renderBuild','recordBuildSpellShape'],{window:{},matchModeKind:()=>"standard",spellIconFigure:()=>"",state,escapeHTML,number:String,ensureAugmentDescriptions:()=>{},matchTimelineKey:()=> '9',riotTab:()=>false,connected:()=>true,matchAugmentIDs:p=>p.augmentIds||[],iconFigure:(_kind,id)=>`<img src="/${id}">`,renderBuildAugments:ids=>`hex:${ids.join(',')}`,renderUnifiedRuneBoard:p=>`runes:${p.perkIds}`,renderRuneEffects:p=>`effects:${p.perkIds}`,renderRuneYield:p=>`yield:${p.perkIds}`,renderItemRoute:t=>`item:${t.itemGroups[0].events[0].itemId}`,renderSkillOrder:t=>`skill:${t.skillOrder[0].slot}`,skillPrioritySummary:()=>''});
  let html=f.renderBuild(match,match.participants[0],tab);assert.match(html,/item:101/);assert.match(html,/skill:1/);assert.match(html,/runes:11/);assert.match(html,/effects:11/);assert.match(html,/yield:11/);
  tab.buildPlayers=new Map([['9',2]]);html=f.renderBuild(match,match.participants[0],tab);assert.match(html,/item:102/);assert.match(html,/skill:2/);assert.match(html,/runes:22/);assert.match(html,/effects:22/);assert.match(html,/yield:22/);assert.match(html,/隐藏玩家/);
  match.participants[1].augmentIds=[33];assert.match(f.renderBuild(match,match.participants[0],tab),/hex:33/);

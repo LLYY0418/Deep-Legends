@@ -1949,43 +1949,9 @@ func (p *championProvider) loadCommunityDragonAugments(ctx context.Context) ([]g
 		p.rememberCommunityDragonAugments(base)
 		return base, nil
 	}
-	var arenaPayload struct {
-		Augments []struct {
-			ID           int64                      `json:"id"`
-			Name         string                     `json:"name"`
-			Desc         string                     `json:"desc"`
-			Tooltip      string                     `json:"tooltip"`
-			IconLarge    string                     `json:"iconLarge"`
-			Rarity       int                        `json:"rarity"`
-			DataValues   map[string]json.RawMessage `json:"dataValues"`
-			Calculations map[string]json.RawMessage `json:"calculations"`
-		} `json:"augments"`
-	}
-	if json.Unmarshal(arenaData, &arenaPayload) != nil {
-		p.reportMayhemAugmentCatalogShape(base)
-		p.rememberCommunityDragonAugments(base)
+	supplement, arenaErr := normalizeArenaAugmentDescriptions(arenaData)
+	if arenaErr != nil {
 		return base, nil
-	}
-	supplement := make([]gameplayAugment, 0, len(arenaPayload.Augments))
-	for _, item := range arenaPayload.Augments {
-		if item.ID <= 0 {
-			continue
-		}
-		iconPath := strings.TrimSpace(strings.ReplaceAll(item.IconLarge, "\\", "/"))
-		if !strings.HasPrefix(strings.ToLower(iconPath), "assets/") || strings.Contains(iconPath, "..") {
-			iconPath = ""
-		} else {
-			iconPath = "/lol-game-data/assets/" + iconPath
-		}
-		iconPath, fallbackIconPath := normalizeAugmentIconPaths(iconPath)
-		description := renderArenaAugmentDescription(item.Desc, item.DataValues, item.Calculations)
-		if description == "" {
-			description = renderArenaAugmentDescription(item.Tooltip, item.DataValues, item.Calculations)
-		}
-		supplement = append(supplement, gameplayAugment{
-			ID: item.ID, Name: strings.TrimSpace(item.Name), Description: description,
-			Rarity: arenaCDragonRarity(item.Rarity), IconPath: iconPath, FallbackIconPath: fallbackIconPath,
-		})
 	}
 	catalog := mergeGameplayAugmentMetadata(base, supplement)
 	p.reportMayhemAugmentCatalogShape(catalog)
@@ -2660,4 +2626,44 @@ func (p *championProvider) structuredSynergies(subjectID int, values []opggSyner
 
 func arenaTeamChampionFromMeta(meta championMetadata) arenaTeamChampion {
 	return arenaTeamChampion{ID: meta.ID, Key: meta.Key, Name: meta.NameZH, ImageSource: meta.ImageSource, ImagePath: meta.ImagePath}
+}
+
+func normalizeArenaAugmentDescriptions(arenaData []byte) ([]gameplayAugment, error) {
+	var arenaPayload struct {
+		Augments []struct {
+			ID           int64                      `json:"id"`
+			Name         string                     `json:"name"`
+			Desc         string                     `json:"desc"`
+			Tooltip      string                     `json:"tooltip"`
+			IconLarge    string                     `json:"iconLarge"`
+			Rarity       int                        `json:"rarity"`
+			DataValues   map[string]json.RawMessage `json:"dataValues"`
+			Calculations map[string]json.RawMessage `json:"calculations"`
+		} `json:"augments"`
+	}
+	if err := json.Unmarshal(arenaData, &arenaPayload); err != nil {
+		return nil, err
+	}
+	supplement := make([]gameplayAugment, 0, len(arenaPayload.Augments))
+	for _, item := range arenaPayload.Augments {
+		if item.ID <= 0 {
+			continue
+		}
+		iconPath := strings.TrimSpace(strings.ReplaceAll(item.IconLarge, "\\", "/"))
+		if !strings.HasPrefix(strings.ToLower(iconPath), "assets/") || strings.Contains(iconPath, "..") {
+			iconPath = ""
+		} else {
+			iconPath = "/lol-game-data/assets/" + iconPath
+		}
+		iconPath, fallbackIconPath := normalizeAugmentIconPaths(iconPath)
+		description := renderArenaAugmentDescription(item.Desc, item.DataValues, item.Calculations)
+		if description == "" {
+			description = renderArenaAugmentDescription(item.Tooltip, item.DataValues, item.Calculations)
+		}
+		supplement = append(supplement, gameplayAugment{
+			ID: item.ID, Name: strings.TrimSpace(item.Name), Description: description,
+			Rarity: arenaCDragonRarity(item.Rarity), IconPath: iconPath, FallbackIconPath: fallbackIconPath,
+		})
+	}
+	return supplement, nil
 }

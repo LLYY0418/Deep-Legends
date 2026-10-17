@@ -1255,7 +1255,7 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 [data-theme="light"] :is(.summoner-strip-copy,.summoner-name-meta,.summoner-tag) {text-shadow:none;filter:none;}
 [data-theme="light"] .game-icon.is-summoner-avatar {box-shadow:0 2px 6px rgb(0 0 0 / .15);}
 .topbar[data-topbar-compact="3"] #player-search-region-label {display:none;}
-.topbar[data-topbar-compact="3"] #player-search-region-short {display:inline;}
+.topbar[data-topbar-compact="3"] #player-search-region-short {display:inline;text-overflow:clip;}
 @container topbar (max-width:380px) {
  .topbar[data-topbar-compact="3"] .window-drag {margin-right:6px;}
  .topbar[data-topbar-compact="3"] :is(.button,.icon-button,.friends-toggle,.player-search-region>button,.player-search-fields) {height:32px;min-height:32px;max-height:32px;}
@@ -1284,3 +1284,26 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 [data-theme="light"]{--on-art-ink:#e3e8f0;--on-art-win:#95f3ba;--on-art-heading:#f4f6fa}
 
 .collection-skeleton .champion-heading .skeleton-line{width:100px;height:20px;margin:0}.collection-skeleton .skin-art.skeleton{border-radius:0}
+
+@container topbar (max-width:300px) {
+ .topbar[data-topbar-compact="3"] .window-drag {margin-right:0;}
+ .topbar[data-topbar-compact="3"] .window-drag strong {font-size:11px;}
+ .topbar[data-topbar-compact="3"] :is(.button,.icon-button,.friends-toggle,.player-search-region>button,.player-search-fields) {height:28px;min-height:28px;max-height:28px;}
+ .topbar[data-topbar-compact="3"] :is(#refresh,#announcements-button,#update-button) {width:28px;flex-basis:28px;}
+ .topbar[data-topbar-compact="3"] :is(.control-icon,.friends-toggle>svg,.player-search-region>button>svg,.player-search-button svg) {width:14px;height:14px;}
+ .topbar[data-topbar-compact="3"] .player-search-button {width:22px;height:22px;min-height:22px;}
+ .topbar[data-topbar-compact="3"] .player-search {min-width:96px;gap:2px;margin-right:2px;}
+ .topbar[data-topbar-compact="3"] .player-search-query {min-width:2px;}
+ .topbar[data-topbar-compact="3"] .player-search-fields {padding-inline:1px;}
+ .topbar[data-topbar-compact="3"] .player-search-region>button {font-size:10px;padding-inline:2px;gap:2px;}
+ .topbar[data-topbar-compact="3"] .friends-toggle {gap:2px;padding-inline:2px;}
+ .topbar[data-topbar-compact="3"] .friends-count {min-width:12px;padding-block:0;padding-inline:1px;font-size:9px;}
+}
+@container topbar (max-width:250px) {
+ .topbar[data-topbar-compact="3"] .window-drag strong {font-size:10px;}
+ .topbar[data-topbar-compact="3"] :is(.button,.icon-button,.friends-toggle,.player-search-region>button,.player-search-fields) {height:22px;min-height:22px;max-height:22px;}
+ .topbar[data-topbar-compact="3"] :is(#refresh,#announcements-button,#update-button) {width:22px;flex-basis:22px;}
+ .topbar[data-topbar-compact="3"] :is(.control-icon,.friends-toggle>svg,.player-search-region>button>svg,.player-search-button svg) {width:12px;height:12px;}
+ .topbar[data-topbar-compact="3"] .player-search-button {width:17px;height:17px;min-height:17px;}
+ .topbar[data-topbar-compact="3"] .player-search {min-width:82px;}
+}

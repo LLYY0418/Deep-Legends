@@ -1,5 +1,5 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{EventEmitter}=require('node:events'),{spawnSync}=require('node:child_process');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{EventEmitter}=require('node:events'),{spawn,spawnSync}=require('node:child_process');
 const helper=path.resolve(process.env.R276_CLEANUP_HELPER||path.join(__dirname,'chrome-test-cleanup.cjs'));
 const {cleanupChromeTest,stopChild,removeDirectories,removeDirectoriesSync}=require(helper);
 class ProfileWriter extends EventEmitter {
@@ -70,4 +70,17 @@ test('cleanup preserves failed main exit status and never turns passing main red
   const script=`const {cleanupChromeTest}=require(${JSON.stringify(helper)});Promise.resolve().then(()=>{if(${failed})throw Error('main guard failure');}).catch(()=>{process.exitCode=7;}).finally(()=>cleanupChromeTest());`;
   const result=spawnSync(process.execPath,['-e',script],{encoding:'utf8'});assert.equal(result.status,want,'cleanup masked main guard failure');
  }
+});
+test('exited browser descendants cannot retain the guard through inherited stderr',async t=>{
+ const source="const {spawn}=require('node:child_process');const p=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{detached:true,stdio:['ignore',process.stdout,process.stderr]});console.log(p.pid);p.unref();";
+ const child=spawn(process.execPath,['-e',source],{stdio:['ignore','pipe','pipe']});
+ let descendant,timer;
+ t.after(()=>{clearTimeout(timer);if(descendant)try{process.kill(descendant,'SIGTERM');}catch{}child.stdout.destroy();child.stderr.destroy();});
+ const exited=new Promise(resolve=>child.once('exit',resolve)),closed=new Promise(resolve=>child.once('close',resolve));
+ descendant=await new Promise(resolve=>child.stdout.once('data',data=>resolve(Number(data.toString().trim()))));
+ assert(descendant>0);await exited;
+ assert.equal(child.stderr.destroyed,false,'fixture retains the descendant pipe after exit');
+ await cleanupChromeTest({children:[child]});
+ await Promise.race([closed,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new assert.AssertionError({message:'inherited pipe kept the guard alive',actual:'open',expected:'closed'})),4000);})]);
+ assert.equal(child.stderr.destroyed,true);
 });

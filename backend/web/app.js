@@ -826,7 +826,7 @@
     el.connection.dataset.tooltipSize = "compact";
   }
 
-  // 未连接客户端时，收藏页与奖池页隐藏全部筛选控件，只保留居中的提示卡。
+  // Disconnected collections and pools show their connection card.
   const workspaceControls = {
     collectionToolbar: document.querySelector(".collection-toolbar"),
     listRow: document.querySelector(".list-row"),
@@ -924,8 +924,7 @@
   }
 
   function renderLaunchpad(view = state.clientView) {
-    // 启动入口卡只在总览页“当前召唤师”页签展示；搜索出的玩家页签（无论
-    // 是否查到结果）都不展示，避免干扰查看他人战绩。
+    // Only the current-summoner tab shows the launchpad.
     const selfReady = view?.state === "ready";
     if (selfReady) {
       state.clientLaunchInFlight = "";
@@ -2969,7 +2968,6 @@
     document.documentElement.dataset.uiScale = String(scale);
     sidebarOverride = null;
     applySidebar();
-    // 桌面外壳据此把标题栏覆盖层高度改成 round(56 * scale)，否则系统三大按钮会和顶栏错位。
     window.desktopScale?.applied?.(scale);
     renderUiScaleAutoLabel();
     return scale;
@@ -3816,11 +3814,8 @@
       const level = Number(bar.dataset.topbarCompact);
       let next = level;
       const bounds = bar.getBoundingClientRect(), scale = bounds.width / bar.offsetWidth || 1;
-      const logicalWidth = bounds.width / scale;
       if (topbarOverflows(bar)) next = Math.min(3, level + 1);
       else if (level) {
-        // Probe only the next wider state off-screen, reserving 16 logical px.
-        // The live bar changes at most one level per frame; failed probes never flash.
         const probe = bar.cloneNode(true);
         let width = bar.offsetWidth - 24 / scale;
         probe.dataset.topbarCompact = String(level - 1);

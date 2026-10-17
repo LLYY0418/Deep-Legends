@@ -750,7 +750,6 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .arena-team-roster[data-team-size="2"] { display: flex; justify-content: space-between; gap: 8px; }
 .arena-team-roster[data-team-size="2"] button { flex: 0 1 auto; max-width: calc(50% - 4px); }
 .match-loadout-mini.is-augments { grid-auto-flow: row; grid-auto-columns: auto; }
-.match-loadout-mini.is-augments.is-mayhem { grid-auto-flow: column; }
 .arena-augment-icon { --augment-accent: var(--rarity-iron); display: inline-flex; flex: 0 0 auto; overflow: hidden; background: #090B0F; border: 1px solid var(--augment-accent); border-radius: 7px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .035); }
 .arena-augment-icon.is-bronze { --augment-accent: var(--rarity-bronze); }
 .arena-augment-icon.is-silver { --augment-accent: var(--rarity-silver); }
@@ -1000,8 +999,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .gameplay-empty strong { color: var(--ink); font-size: 16px; }
 .gameplay-empty p { max-width: 54ch; margin: 0; }
 .gameplay-skeleton { display: grid; gap: 10px; }
-.gameplay-skeleton span { min-height: 126px; background-color: var(--skeleton-base); background-image: linear-gradient(100deg,var(--skeleton-base) 20%,var(--skeleton-glint) 42%,var(--skeleton-base) 64%); background-size: 220% 100%; border-radius: var(--radius-md); animation: skeleton 1.3s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .gameplay-skeleton span { animation: none; background-image: none; } }
+.gameplay-skeleton:not(.career-pending) span { min-height: 126px; background-color: var(--skeleton-base); background-image: linear-gradient(100deg,var(--skeleton-base) 20%,var(--skeleton-glint) 42%,var(--skeleton-base) 64%); background-size: 220% 100%; border-radius: var(--radius-md); animation: skeleton 1.3s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .gameplay-skeleton:not(.career-pending) span { animation: none; background-image: none; } }
 
 
 .live-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; margin-bottom: 10px; padding: 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
@@ -2282,27 +2281,15 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .af-select > .app-select-trigger svg { width: 17px; height: 17px; }
 .af-select.is-active > .app-select-trigger { background: var(--primary-soft); color: var(--primary-strong); border-color: var(--primary-strong); }
 .af-select > .app-select-trigger b { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 6px; color: var(--surface); background: var(--primary-strong); font-size: 11px; }
-.career-pending.gameplay-skeleton { padding: 16px; min-height: 100px; }
-.career-pending.gameplay-skeleton span { height: 18px; min-height: 18px; max-width: 80%; }
-.career-pending.gameplay-skeleton span:nth-child(2) { max-width: 60%; }
 [data-match-layout][data-icon-overlap] { grid-template-columns: 124px minmax(0,96px) minmax(0,1fr); }
 
 
   .match-filterbar.gameplay-skeleton { display: flex; min-height: 46px; }
 .match-filterbar.gameplay-skeleton button { color: transparent; pointer-events: none; background-image: linear-gradient(100deg,var(--skeleton-base) 20%,var(--skeleton-glint) 42%,var(--skeleton-base) 64%); background-size: 220% 100%; animation: skeleton 1.3s linear infinite; }
 
-.rank-row.gameplay-skeleton span { height: 18px; min-height: 18px; }
+.rank-row.gameplay-skeleton:not(.career-pending) span { height: 18px; min-height: 18px; }
 .rank-row.gameplay-skeleton .rank-crest { height: 44px; min-height: 44px; }
 .rank-row.gameplay-skeleton > div { display: grid; gap: 8px; }
-.career-column > [data-career-key="recent-ranked"]:has(.career-pending) { min-height: 100px; }
-.career-column > [data-career-key="ability"]:has(.career-pending) { min-height: 100px; }
-.career-column > [data-career-key="champions"]:has(.career-pending) { min-height: 100px; }
-.career-column > [data-career-key="masteries"]:has(.career-pending) { min-height: 100px; }
-.career-column > [data-career-key="positions"]:has(.career-pending) { min-height: 100px; }
-.career-column > [data-career-key="recent-players"]:has(.career-pending) { min-height: 100px; }
-.career-column > [data-career-key="activity"]:has(.career-pending) { min-height: 100px; }
-.career-column > .career-section:has(.career-pending) { display: flex; flex-direction: column; }
-.career-column .career-pending { flex: 1; align-content: space-evenly; }
 .match-filterbar.gameplay-skeleton > span { min-height: 0; height: 30px; width: 45%; }
 .rank-history-row[hidden] { display: none; }
 .rank-history.no-winrate .rank-history-row, .rank-history.no-winrate .rank-history-head { grid-template-columns: 64px minmax(0,1fr); }
@@ -2312,7 +2299,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 [data-champselect-insight] .live-rank-title { color: var(--primary-strong); font-weight: 700; }
 
 .match-filterbar.gameplay-skeleton { gap: 8px; }
-.match-filterbar.gameplay-skeleton span { min-height: 0; background: none; animation: none; }
+.match-filterbar.gameplay-skeleton:not(.career-pending) span { min-height: 0; background: none; animation: none; }
 
 /* R280: pointer bridge and stable virtual placeholders. */
 .rank-mmr-popover::before{position:absolute;inset:-8px 0 auto;height:8px;content:""}
@@ -2337,23 +2324,11 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .is-pending-strip .summoner-strip-highlights .summoner-highlight{min-width:92px}
 .summoner-highlight.is-pending-highlight .skeleton-square{width:64px;height:64px}
 .summoner-highlight.is-pending-highlight figcaption .skeleton-line{width:80px}
-.career-pending .recent-ranked-content{width:100%;display:flex}
-.career-pending .recent-ranked-ring{border-radius:50%}
-.career-pending .recent-ranked-ring::before{display:none}
-.career-pending .ability-radar-wrap{width:100%;aspect-ratio:320/275}
-.career-pending:has(.recent-ranked-content),.career-pending:has(.ability-radar-wrap){display:block;padding:0}
-.career-section.recent-ranked-section{min-height:230px}
-.career-section.ability-section{min-height:360px}
-
-/* The shell footprint is shared by its pending and populated content. */
-.career-column>[data-career-key]{overflow:auto}
-.career-column>[data-career-key="recent-ranked"]{height:230px;min-height:230px}
-.career-column>[data-career-key="ability"]{height:360px;min-height:360px}
-.career-column>[data-career-key="champions"]{height:318px}
-.career-column>[data-career-key="masteries"]{height:261px}
-.career-column>[data-career-key="positions"]{height:254px}
-.career-column>[data-career-key="recent-players"]{height:207px}
-.career-column>[data-career-key="activity"]{height:174px}
+.career-pending.gameplay-skeleton { display:contents; }
+.is-career-pending > header > :not(h3) { visibility:hidden; }
+.career-pending.gameplay-skeleton > * { color:transparent; pointer-events:none; background:linear-gradient(100deg,var(--skeleton-base) 20%,var(--skeleton-glint) 42%,var(--skeleton-base) 64%);background-size:220% 100%;animation:skeleton 1.3s linear infinite; }
+.career-pending.gameplay-skeleton > * > * { visibility:hidden; }
+@media (prefers-reduced-motion:reduce) { .career-pending.gameplay-skeleton > * {animation:none;background-image:none;} }
 @container matches-column (max-width:720px){.match-pending .match-players{display:none}}
 .match-kda{justify-self:stretch}
 .match-pending [data-match-layout][data-icon-overlap]{grid-template-columns:124px minmax(0,96px) minmax(0,1fr)}
@@ -2374,14 +2349,15 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .summoner-name-meta>.summoner-tag { flex:0 0 80px; width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .is-identity-placeholder { visibility:hidden; }
 .summoner-level-row { height:var(--strip-level-height);line-height:var(--strip-level-height);margin-top:4px;overflow:hidden; }
-.summoner-strip-highlights { width:217px;grid-auto-columns:92px;gap:4px 16px; }
+.summoner-strip-highlights { width:217px;grid-auto-columns:92px;grid-template-rows:77px 14px 12px;gap:4px 16px; }
+.summoner-highlight>figcaption {grid-row:2 / span 2;}
 .summoner-highlight { min-height:104px; }
-@container gameplay-page (max-width:700px) {
+@container gameplay-page (max-width:520px) {
  .summoner-strip {grid-template-columns:var(--strip-avatar-size) minmax(0,1fr);}
  .summoner-strip-highlights {grid-column:1/-1;}
 }
 .career-column { align-content:start;align-items:start; }
-.career-column>[data-career-key="ranks"] { height:auto;min-height:0;align-self:start;overflow:visible; }
+.career-column>[data-career-key="ranks"] { align-self:start;overflow:visible; }
 .career-dialog-grid[data-career-layout="single"] {grid-template-columns:minmax(0,1fr);}
 .career-dialog-grid[data-career-layout="masonry"] {grid-template-columns:repeat(2,minmax(0,1fr));}
 .career-dialog-stack {display:flex;flex-direction:column;gap:10px;}
@@ -2405,3 +2381,5 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 [data-theme="light"] :is(.live-arena-build-section,.late-option-band).is-prismatic>h3{color:#683280}
 
 .live-player-copy>.live-player-rank{display:flex;align-items:center;gap:4px;height:18px;line-height:18px}.live-rank-crest{width:16px;height:16px;object-fit:contain;flex:none}
+
+.build-skill-body{display:flex;align-items:flex-start;gap:12px}.build-skill-order{min-width:0;flex:1}.build-spells{display:flex;flex:none;gap:3px;align-items:center;height:40px}

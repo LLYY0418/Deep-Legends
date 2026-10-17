@@ -2343,7 +2343,6 @@
     const recentQueue = rankedQueueData(data, tab, "recent");
     const abilityQueue = rankedQueueData(data, tab, "ability");
     const positionQueue = rankedQueueData(data, tab, "position");
-    if(pendingStats){recentQueue.recentRanked={historyPending:true};abilityQueue.ability={historyPending:true};positionQueue.positions=[];positionQueue.queueGames=-1;}
     const hasSeason = data.seasonStatsProgress && !data.seasonStatsProgress.unavailable;
     const opggSeason = riotRegion(data.player?.region) && !data.player?.privateHistory && tab?.opggSeason?.playerRef === data.player?.playerRef ? tab.opggSeason.data : null;
     const missingKRSeason = riotRegion(data.player?.region) && !opggSeason;
@@ -2356,12 +2355,12 @@
 	  ["ranks", renderRanks(data.ranks || [], data.capabilities || [], data.historicalRanks || [], data.rankMilestones, data.seasonStatsProgress, tab)],
 	  ["recent-ranked", renderRecentRanked(recentQueue.recentRanked, recentQueue.queueId, rankedQueueSwitcher(tab, recentQueue.queueId, "recent", data),partialHistory)],
 	  ["ability", renderAbility(abilityQueue.ability, abilityQueue.queueLabel, rankedQueueSwitcher(tab, abilityQueue.queueId, "ability"), abilityQueue.abilitySampleGames, abilityQueue.queueGames)],
-      ["champions", renderChampionStats(championRows, championOverall, championProgress,missingKRSeason && !tab?.opggSeasonAttemptRef || tab?.opggSeasonPending || championStatsPending(championRows,championOverall,championProgress,tab))],
+      ["champions", renderChampionStats(championRows, championOverall, championProgress)],
       ["masteries", renderMasteries(data.masteries || [], (data.capabilities || []).some(item => item.name === "champion-mastery" && item.state === "available"), data.masteryChampionCount)],
 	  ["positions", renderPositionStats(positionQueue.positions, positionQueue.positionQueueId || positionQueue.queueId, rankedQueueSwitcher(tab, positionQueue.queueId, "position"), positionQueue.positionQueueLabel, positionQueue.queueGames,partialHistory)],
-      ["recent-players", renderRecentPlayers(data.recentPlayers || [], recentHistoryCapability,pendingStats,partialHistory)],
-      ["activity", renderActivity(data.activityHours || [],pendingStats).replace("</section>", `${renderOverviewShareButton()}</section>`)],
-    ].filter(([key])=>!casual || !['ranks','ability'].includes(key) || key==='ranks' && (data.rankMilestones?.peakTier || data.rankMilestones?.previousSeason?.some(r=>r.tier) || data.historicalRanks?.some(r=>r.tier))).map(([key,markup])=> {
+      ["recent-players", renderRecentPlayers(data.recentPlayers || [], recentHistoryCapability,false,partialHistory)],
+      ["activity", renderActivity(data.activityHours || []).replace("</section>", `${renderOverviewShareButton()}</section>`)],
+    ].filter(([key])=>!casual || !['ranks','ability','positions'].includes(key) || key==='ranks' && (data.rankMilestones?.peakTier || data.rankMilestones?.previousSeason?.some(r=>r.tier) || data.historicalRanks?.some(r=>r.tier))).map(([key,markup])=> {
       if(casual){
         const label=casual.selected?.label || '';
         if(key==='ranks'){
@@ -2376,10 +2375,10 @@
       }
 
       const capability={ranks:'ranked-stats',masteries:'champion-mastery'}[key];
-      if(tab.loading && key!=='ranks' && capability && !data.masteries?.length && !data.capabilities?.some(c=>c.name===capability))return [key,`<section data-career-key="${key}" class="career-section ${key}-section${key==='champions'?' champion-performance':''}"><header><h3>英雄熟练度</h3></header><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`];
+      if(tab.loading && key!=='ranks' && capability && !data.masteries?.length && !data.capabilities?.some(c=>c.name===capability))return [key,renderCareerPendingMarkup(markup.replace('<section',`<section data-career-key="${key}"`))];
       const titles={'recent-ranked':'近期排位',ability:'能力表现',positions:'位置偏好','recent-players':'最近一起玩',activity:'游戏时间分布',champions:'英雄胜率'};
       if((historyServiceState(tab)?.kind==="official" || !(data.matches?.length) && (tab.initialPageError || tab.error) && !tab.loading) && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section${key==='champions'?' champion-performance':''}"><header><h3>${titles[key]}</h3></header><div class="ability-unavailable"><strong>暂不可用</strong></div></section>`];
-      if((pendingMatches || pendingAggregates || pendingStats) && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section${key==='champions'?' champion-performance':''}"><header><h3>${titles[key]}</h3><div class="career-section-tools">${['recent-ranked','ability','positions'].includes(key)?rankedQueueSwitcher(tab,420,key==='recent-ranked'?'recent':key==='positions'?'position':key):''}</div></header><div class="career-pending gameplay-skeleton">${renderCareerPendingRows(key)}</div></section>`];
+      if((pendingMatches || pendingAggregates || pendingStats || key==='champions' && championStatsPending(championRows,championOverall,championProgress,tab)) && titles[key])return [key,renderCareerPendingMarkup(markup.replace('<section',`<section data-career-key="${key}"`))];
       markup=markup.replace('<section',`<section data-career-key="${key}"`);
       return [key,!pendingStats && partialHistory && ['ability','positions','recent-players','activity'].includes(key)?markup.replace('</h3>',`</h3><small class="history-sample-label">基于最近 ${Number(data.historyLoaded ?? data.matches?.length ?? 0)} 场</small>`):markup];
     });
@@ -2429,12 +2428,8 @@
     }
   }
 
-  function renderCareerPendingRows(key) {
-    if(key==='ranks')return '<div class="rank-row gameplay-skeleton"><span class="rank-crest"></span><div><span></span><span></span></div><div class="rank-record"><span></span><span></span></div></div>'.repeat(2);
-    if(key==='recent-ranked')return '<div class="recent-ranked-content"><div class="recent-ranked-record"><div class="recent-ranked-ring skeleton-square"></div><small class="skeleton-line"></small></div><dl class="recent-ranked-metrics">'+('<div class="recent-ranked-metric"><span class="skeleton-line"></span></div>'.repeat(3))+'</dl></div><div class="recent-ranked-positions"><span>位置胜率</span><span class="skeleton-line"></span></div>';
-    if(key==='ability')return '<div class="ability-meta"><span class="skeleton-line"></span></div><div class="ability-radar-wrap skeleton-square"></div>';
-    const rows={champions:9,masteries:5,positions:5,'recent-players':4,'recent-ranked':3,ability:3,activity:3};
-    return Array.from({length:rows[key] || 3},()=>'<span></span>').join('');
+  function renderCareerPendingMarkup(markup) {
+    return markup.replace('class="career-section','class="is-career-pending career-section').replace(/(<section[^>]*>(?:\s*<header>[\s\S]*?<\/header>)?)([\s\S]*)(<\/section>)$/, '$1<div class="career-pending gameplay-skeleton" aria-hidden="true">$2</div>$3');
   }
 
   function syncMatchFilterPending(filterbar, tab) {
@@ -3184,7 +3179,7 @@
 
   function renderChampionStats(items, overall, progress, pending=false) {
     if (progress?.seasonOnly && progress.unavailable) return `<section class="career-section champion-performance"><header><h3>英雄胜率</h3><span>本赛季${progress.tableSupported ? overviewDetailArrow("champion-table", "查看英雄数据表") : ""}</span></header>${progress.message && progress.message !== "当前数据源不提供赛季统计" ? `<p class="section-empty">${escapeHTML(progress.message)}</p>` : ""}</section>`;
-    if(pending)return `<section class="career-section champion-performance"><header><h3>英雄胜率</h3></header><div class="career-pending gameplay-skeleton">${renderCareerPendingRows('champions')}</div></section>`;
+    if(pending)return renderCareerPendingMarkup(renderChampionStats(items,overall,progress));
     const rankedGames = (items || []).reduce((total, item) => total + Number(item.games || 0), 0);
     const tableGames = Number(overall?.games) || rankedGames;
     const overallRow = `<div class="champion-stat-row is-overall"><span class="overall-champion-mark" aria-hidden="true">全</span><div><strong>全部英雄</strong><small>CS ${number(overall.cs)} (${number(overall.csPerMinute)})</small></div><div><b>${kda(overall.kda)}:1 KDA</b><small>${number(overall.kills)} / ${number(overall.deaths)} / ${number(overall.assists)}</small></div><div><b class="win-rate-value">${percent(overall.winRate)}</b><small>${number(overall.games)} 场</small></div></div>`;
@@ -4012,15 +4007,15 @@
       subject.perkIds?.[0] ? perkIconFigure(subject.perkIds[0], "small") : "",
       subject.subStyleId ? perkStyleIconFigure(subject.subStyleId, "small") : "",
     ].map((content) => content || emptyLoadoutSlot);
-    const augmentIDs = matchAugmentIDs(subject, modeKind === "mayhem" ? 2 : 4);
-    const augmentSlots = Array.from({ length: modeKind === "mayhem" ? 2 : 4 }, (_, index) => augmentIDs[index]
+    const augmentIDs = matchAugmentIDs(subject, 4);
+    const augmentSlots = Array.from({ length: 4 }, (_, index) => augmentIDs[index]
       ? augmentIconFigure(augmentIDs[index], "small")
       : '<span class="arena-augment-slot is-empty" aria-hidden="true"></span>');
     const usesAugments = modeKind === "arena" || modeKind === "mayhem";
     const loadout = modeKind === "arena"
       ? augmentSlots.join("")
       : modeKind === "mayhem"
-        ? [...spells, ...augmentSlots].join("")
+        ? augmentIDs.map(id => augmentIconFigure(id, "small")).join("")
         : [...spells, ...runes].join("");
     return { augmentIDs, usesAugments, layout: modeKind === "mayhem" ? "mayhem" : usesAugments ? "augments" : "standard", loadout };
   }
@@ -4897,42 +4892,40 @@
     }).join("")}</div>`;
   }
 
-  async function ensureAugmentDescriptions(ids) {
-    const missing = [...new Set(ids.map(Number))].filter(id => id > 0 && !state.augmentDescriptions.has(id)).slice(0, 6);
-    if (!missing.length) return;
-    for (const id of missing) state.augmentDescriptions.set(id, { status: "loading" });
-    try {
-      const result = await api(`/api/gameplay/augment-descriptions?ids=${missing.join(",")}`, {}, `augment-descriptions:${missing.join(",")}`, 30000);
-      for (const id of missing) {
-        const item = result?.items?.find(item => Number(item.id) === id);
-        state.augmentDescriptions.set(id, item?.status === "ok" && item.description ? item : { status: "unavailable" });
-      }
-    } catch {
-      for (const id of missing) state.augmentDescriptions.set(id, { status: "unavailable" });
+  async function ensureAugmentDescriptions(ids, retry = false) {
+    const eligible = [...new Set(ids.map(Number))].filter(id => {const e=state.augmentDescriptions.get(id);return id>0 && (!e || retry && e.status==="retry" && !e.timer && !e.inFlight);});
+    if(!eligible.length || state.destroyed)return;
+    const next=id=>Number(state.augmentDescriptions.get(id)?.retryCount ?? -1)+1,attempt=next(eligible[0]),missing=eligible.filter(id=>next(id)===attempt).slice(0,6);
+    for(const id of missing){const old=state.augmentDescriptions.get(id);state.augmentDescriptions.set(id,{status:old?"retry":"loading",inFlight:true,retryCount:attempt});}
+    let result;
+    try {result=await api(`/api/gameplay/augment-descriptions?ids=${missing.join(",")}&retry=${attempt}`,{},`augment-descriptions:${missing.join(",")}:${attempt}`,30000);}catch{}
+    if(state.destroyed)return;
+    for(const id of missing){
+      const item=result?.items?.find(item=>Number(item.id)===id);
+      const entry=item?.status==="ok" && item.description ? {...item,status:"ok"} : item?.status==="unavailable" ? {status:"unavailable",source:"none",error_kind:"not_found"} : {status:"retry",source:"none",error_kind:item?.error_kind || "no_response"};
+      entry.retryCount=attempt;state.augmentDescriptions.set(id,entry);
+      window.reportFlowDiagnostic?.("augment_description_client",entry.status,{augment_id:id,retry_count:attempt,source:entry.source || "none",error_kind:entry.error_kind || "none",gave_up:entry.status==="retry" && attempt>=3});
+      if(entry.status==="retry" && attempt<3){entry.timer=setTimeout(()=>{entry.timer=null;if(!state.destroyed)void ensureAugmentDescriptions([id],true);},[3000,10000,30000][attempt]);entry.timer?.unref?.();}
     }
     rerenderAugmentDescriptionViews(missing);
+    const rest=eligible.filter(id=>!missing.includes(id));if(rest.length)await ensureAugmentDescriptions(rest,retry);
   }
 
   function rerenderAugmentDescriptionViews(ids) {
-    const changed = new Set(ids.map(Number));
-    const tabs = new Set([...(state.tabs || []), ...(state.overlay || [])]);
-    for (const [container, view] of externalMatchViews) {
-      if (container.isConnected) tabs.add(view.tab);
-    }
-    for (const tab of tabs) {
-      for (const match of tab.data?.matches || []) {
-        const id = String(match.gameId);
-        if (!tab.openMatches?.has(id) || tab.matchDetailTabs?.get(id) !== "build") continue;
-        const subject = buildSubject(match, matchSubject(match, tab.data?.player?.playerRef), tab);
-        if (matchAugmentIDs(subject, 6).some(id => changed.has(Number(id)))) rerenderMatch(tab, id);
-      }
+    const roots=new Set([document,...externalMatchViews.keys()]);
+    for(const tab of [...(state.tabs || []),...(state.overlay || [])]){const workspace=tab.overlay?nodes.playerOverlayContent:overviewWorkspace(tabGroup(tab)).content;const cached=workspace?._overviewViews?.get(tab)?.content;if(cached)roots.add(cached);for(const view of tab.matchViews?.values() || [])if(view.list)roots.add(view.list);}
+    for(const root of roots)for(const node of root.querySelectorAll(".build-detail .aug[data-augment-id]")){
+      const id=Number(node.dataset.augmentId);if(!ids.includes(id))continue;
+      const scroll=[];for(let p=node.parentElement;p;p=p.parentElement)if(p.scrollTop)scroll.push([p,p.scrollTop]);
+      const template=document.createElement("template");template.innerHTML=renderBuildAugments([id]);const card=template.content.querySelector(".aug");
+      card.querySelector(".aug-order").textContent=node.querySelector(".aug-order").textContent;node.replaceWith(card);for(const [p,top] of scroll)p.scrollTop=top;
     }
   }
 
-  async function ensureBuildData(match, tab) {
+  async function ensureBuildData(match, tab, retry = false) {
     const subject = matchSubject(match, tab.data?.player?.playerRef);
-    const ids = matchAugmentIDs(subject, 6);
-    if (ids.length) void ensureAugmentDescriptions(ids);
+    const ids = matchAugmentIDs(buildSubject(match, subject, tab), 6);
+    if (ids.length) void ensureAugmentDescriptions(ids, retry);
     if (!match.perkStatsStale || !riotTab(tab)) return;
     const key = `${tab.region}:${match.gameId}`;
     if (!state.perkStatsRefreshes.has(key)) {
@@ -4982,6 +4975,11 @@
     return `<div class="build-player-selector${layout.arena ? " is-arena" : ""}" role="tablist" aria-label="构建玩家">${groups.join(layout.arena ? "" : '<span class="build-player-vs">VS</span>')}</div>`;
   }
 
+  function recordBuildSpellShape(match, subject) {
+    // R277 deferred detail renderer: recordBuildSpellShape
+    return matchDetailRenderer?.recordBuildSpellShape(match, subject);
+  }
+
   function renderBuild(match, subject, tab) {
     const self = subject;
     subject = buildSubject(match, subject, tab);
@@ -5010,10 +5008,13 @@
       : timeline?.available && timeline.skillOrder?.length
         ? renderSkillOrder(timeline)
         : unavailableCopy("这场对局暂时读取不到技能加点记录，不会用英雄默认顺序代替。");
+    recordBuildSpellShape(match, subject);
+    const spellIcons = [subject.spell1Id,subject.spell2Id].filter(id=>Number(id)>0).map(id=>spellIconFigure(id,"small")).join("");
+    const buildSpells = spellIcons ? `<div class="build-spells">${spellIcons}</div>` : "";
     const skillSummary = timeline?.available && timeline.skillOrder?.length ? skillPrioritySummary(timeline.skillOrder) : "";
     return `<div class="build-detail">${selector}${timelineOfficial?`<div class="service-outage-inline" role="status">${serviceOutageIcon()}<span>官方战绩服务暂时中断，恢复后可重新加载</span><button type="button" class="text-button" data-timeline-retry="${escapeHTML(String(match.gameId))}">重新加载</button></div>`:""}
       <section><header><h4>装备路线</h4>${timeline && !timeline.available && !timelineOfficial ? `<button type="button" class="text-button" data-timeline-retry="${escapeHTML(String(match.gameId))}">重试加载</button>` : ""}</header>${routeContent}</section>
-      <section><header><h4>技能加点</h4>${skillSummary || "<span>按对局中的真实加点顺序</span>"}</header>${skillContent}</section>
+      <section><header><h4>技能加点</h4>${skillSummary || ""}</header><div class="build-skill-body"><div class="build-skill-order">${skillContent}</div>${buildSpells}</div></section>
       <section class="rune-detail"><header><h4>${hasAugments ? "海克斯" : "符文"}</h4>${hasAugments ? "" : renderRuneYield(subject)}</header>${runeContent}</section>
     </div>`;
   }
@@ -5670,7 +5671,7 @@
       if (button.dataset.matchDetail === "build") {
         ensurePerks(); ensureItems();
         const match = (tab.data?.matches || []).find((item) => String(item.gameId) === String(button.dataset.gameId));
-        if (match) { ensureMatchTimeline(match, matchSubject(match, tab.data?.player?.playerRef), tab); ensureBuildData(match, tab); }
+        if (match) { ensureMatchTimeline(match, matchSubject(match, tab.data?.player?.playerRef), tab); ensureBuildData(match, tab, true); }
       }
       rerenderMatch(tab, String(button.dataset.gameId));
     });

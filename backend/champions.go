@@ -76,6 +76,7 @@ var (
 )
 
 type championProvider struct {
+	augmentDescriptions augmentDescriptionFlights
 	// Set before use; zero keeps the production translation budget.
 	lootTranslationTimeout time.Duration
 

@@ -13,6 +13,7 @@ import (
 // together. It is only metadata: win rates and grades still come from their
 // live statistical sources. Unknown IDs remain unknown instead of being guessed.
 //
+//go:embed data/augment_descriptions_20261017.json
 //go:embed data/augment_catalog_20260924.json data/augment_icons_20260924.bin data/arena_items_20260924.json
 var bundledArenaData embed.FS
 
@@ -136,3 +137,12 @@ var readBundledArenaItems = sync.OnceValue(func() []gameplayItem {
 func bundledArenaItems() []gameplayItem {
 	return append([]gameplayItem(nil), readBundledArenaItems()...)
 }
+
+var bundledAugmentDescriptions = sync.OnceValue(func() []gameplayAugment {
+	data, err := bundledArenaData.ReadFile("data/augment_descriptions_20261017.json")
+	if err != nil {
+		return nil
+	}
+	rows, _ := normalizeArenaAugmentDescriptions(data)
+	return rows
+})

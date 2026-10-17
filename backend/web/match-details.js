@@ -4,6 +4,13 @@
   'use strict';
   function create(dependencies) {
     const {state,readMatchScores,escapeHTML,number,kda,plainInteger,compactNumber,plainText,iconFigure,playerParticipantName,proBadgeAttributes,autofillChip,renderMatchScoreCell,renderItemIcons,matchPlayerGroups,isCurrentMatchParticipant,arenaTeamMeta,arenaPlacementResult,augmentIconFigure,arenaGroupLabel,matchModeKind,positionLabel,itemIconFigure,renderRuneStyleIcon,perkIconFigure,isSummonersRiftMatch,TEAM_ANALYSIS_METRICS,TEAM_ANALYSIS_POSITIONS,SKILL_SLOT_LETTERS,PERK_EFFECT_OVERRIDES} = dependencies;
+  function recordBuildSpellShape(match, subject) {
+    const kind=matchModeKind(match,subject),mode=kind==="arena"?"arena":kind==="mayhem"?"mayhem":kind==="standard" || kind==="mayhem-classic"?"rift":"aram";
+    state.buildSpellModes ||= new Set();if(state.buildSpellModes.has(mode))return;state.buildSpellModes.add(mode);
+    const fields={mode};for(const key of ["spell1Id","spell2Id"])for(const status of ["missing","zero","value"])fields[key+"_"+status]=(match.participants || []).filter(p=>status==="missing"?p[key]==null:status==="zero"?p[key]!=null && Number(p[key])===0:Number(p[key])>0).length;
+    window.reportFlowDiagnostic?.("build_spells_client","render",fields);
+  }
+
 function matchTableRows(players, scores, match) {
     return players.map((item, index) => {
       const record = scores.get(Number(item.participantId));
@@ -256,7 +263,7 @@ function renderRuneEffects(subject) {
     }).join("");
     return `<div class="rune-effects" aria-label="符文效果">${content}</div>`;
   }
-    return Object.freeze({renderMatchOverview,renderArenaMatchOverview,renderTeamAnalysis,renderItemRoute,skillPrioritySummary,renderSkillOrder,renderRuneYield,renderRuneEffects});
+    return Object.freeze({recordBuildSpellShape,renderMatchOverview,renderArenaMatchOverview,renderTeamAnalysis,renderItemRoute,skillPrioritySummary,renderSkillOrder,renderRuneYield,renderRuneEffects});
   }
   window.deepLegendsMatchDetails=Object.freeze({create});
   window.deepLegendsSections.register('match-details',()=>{});
