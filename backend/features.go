@@ -74,6 +74,8 @@ type rendererPerfGroup struct {
 	MaxMS   float64 `json:"maxMs"`
 }
 type clientDiagnosticRequest struct {
+	OverviewPage      string          `json:"page,omitempty"`
+	OverviewFrom      string          `json:"from,omitempty"`
 	R278              json.RawMessage `json:"r278,omitempty"`
 	Lost              int             `json:"lost,omitempty"`
 	LPImagesRecreated int             `json:"images_recreated,omitempty"`
@@ -299,6 +301,7 @@ var clientDiagnosticEvents = map[string]map[string]bool{
 	"lp_chip_render":                 {"render": true},
 	"manual_refresh_client":          {"complete": true},
 	"match_filter_view":              {"render": true},
+	"overview_subpage_open":          {"open": true},
 	"overview_scroll_reset":          {"restored": true},
 	"overview_reference_expired":     {"retry": true},
 	"overview_rerender_client":       {"render": true, "filter_modal_error": true},
@@ -448,6 +451,16 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	event := map[string]any{"event": request.Event, "reason": request.Reason}
+	if request.Event == "overview_subpage_open" {
+		if !slices.Contains([]string{"champion-table", "masteries"}, request.OverviewPage) || !slices.Contains([]string{"dialog", "page"}, request.OverviewFrom) {
+			http.Error(w, "invalid subpage diagnostic", 400)
+			return
+		}
+		event["page"], event["from"], event["ok"] = request.OverviewPage, request.OverviewFrom, request.CopyOK
+		a.recordDiagnostic(event)
+		w.WriteHeader(204)
+		return
+	}
 	if request.Event == "collection_failure_state_shown" {
 		event["session_epoch"] = request.SessionEpoch
 		event["value"] = min(int64(3600000), max(int64(0), request.FailureValue))

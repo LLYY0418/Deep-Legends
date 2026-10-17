@@ -19,6 +19,9 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 			if event == "match_filter_view" {
 				body = `{"event":"match_filter_view","reason":"render","source":"view-cache","filter":"all"}`
 			}
+			if event == "overview_subpage_open" {
+				body = `{"event":"overview_subpage_open","reason":"open","page":"masteries","from":"dialog","ok":true}`
+			}
 			if event == "client_view_client" {
 				body = `{"event":"client_view_client","action":"applied","reason":"` + reason + `","state":"ready","generation":2,"rejectionReason":"new-generation"}`
 			}

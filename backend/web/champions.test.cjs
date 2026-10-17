@@ -1600,7 +1600,7 @@ test("small overviews move career statistics into an accessible modal sheet", ()
 	assert.match(html, /id="career-dialog-close"[^>]+aria-label="关闭生涯统计"/);
 	assert.match(gameplayScript, /function renderCareerSections\(data(?:, tab)?\)/);
 	assert.match(gameplayScript, /function renderCareerDialogSections\(data(?:, tab)?\)/);
-	assert.match(gameplayScript, /function renderCareerDialogContent\(data, tab, layout\)/);
+	assert.match(gameplayScript, /function renderCareerDialogContent\(data, tab, layout, force = false\)/);
 	assert.match(gameplayScript, /function distributeCareerDialog\(\)/);
 	assert.match(gameplayScript, /heights\[0\]<=heights\[1\]/);
 	assert.match(gameplayScript, /layout === "single" \? renderCareerSections\(data, tab\) : renderCareerDialogSections\(data, tab\)/);

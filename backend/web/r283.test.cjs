@@ -73,11 +73,12 @@ test('R283 P14 collection return resets scroll without changing choices',()=>{
  f.activateFavoritesPage('collection',true);assert.equal(loads,1);assert.equal(rescans,1);assert.equal(resets,0);assert.equal(returnState.view,'chromas');assert.equal(returnState.query,'安妮');
 });
 test('R283 P17 one strict outage message, no row retry or duplicate stopped note',()=>{
- const state={beacon:{phase:'InProgress'},liveRetryAttempts:8},f=compile(game,['renderLiveRefreshStatus'],{state,liveGamePhase:()=>true,escapeHTML:String,serviceOutageIcon:()=>'<svg></svg>'});
+ const state={beacon:{phase:'InProgress'},liveRetryAttempts:8},f=compile(game,['renderLiveRefreshStatus'],{state,liveGamePhase:()=>true,liveAutoRefreshStopped:()=> '数据尚未完整，已停止自动重试，可手动刷新',escapeHTML:String,serviceOutageIcon:()=>'<svg></svg>'});
  for(const queueId of [420,1750])for(const down of [true,false]) {
   const data={phase:'InProgress',queueId,historyServiceDown:down,players:Array.from({length:18},()=>({historyState:'failed'}))};
   const html=f.renderLiveRefreshStatus(data);assert.equal((new JSDOM(html).window.document.body.textContent.match(/官方战绩服务暂时中断/g)||[]).length,down?1:0);assert(!html.includes('数据尚未完整'));if(down)assert(html.includes('data-tooltip-overflow="self"'));
  }
+ const failed=compile(game,['renderInsightMatches'],{state:{},escapeHTML:String,number:String,liveHistorySettled:()=>true,liveHistoryStateOf:p=>p.historyState}).renderInsightMatches({historyState:'failed',recentGames:[]});assert.equal(failed,'<div class="insight-match-row"></div>','keep alignment without duplicating the current-mode summary');
  assert(!extract(game,'renderInsightMatches').includes('data-live-history-retry'));assert(!game.includes('bindLiveNode(scope?.querySelector("[data-live-history-retry]"'));
  const css=fs.readFileSync(process.env.R283_GAMEPLAY_CSS_SOURCE||__dirname+'/gameplay.css','utf8');assert(!css.includes('.insight-retry'));
 });

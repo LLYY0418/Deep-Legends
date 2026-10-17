@@ -134,6 +134,8 @@ function bootDemoApp(options = {}) {
     // deferred tests opt into the actual cold-loading state machine instead.
     if (file === "match-details.js" && options.deferredMatchDetails) continue;
     let source = fs.readFileSync(path.join(WEB, file), "utf8");
+    if (file === "runtime.js" && options.runtimeSourceTransform) source = options.runtimeSourceTransform(source);
+    if (file === "app.js" && options.appSourceTransform) source = options.appSourceTransform(source);
     if (file === "suite.js" && process.env.R137_SUITE_SOURCE) source = fs.readFileSync(process.env.R137_SUITE_SOURCE, "utf8");
     if (file === "suite.js" && options.suiteSourceTransform) source = options.suiteSourceTransform(source);
     if (file === "champions.js" && options.championsSourceTransform) source = options.championsSourceTransform(source);

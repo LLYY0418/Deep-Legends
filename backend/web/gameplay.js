@@ -3424,6 +3424,17 @@
     for(const button of container.querySelectorAll("[data-table-queue]"))button.addEventListener("click",()=>{tab.championTableQueue=button.dataset.tableQueue;tab.championTableExpandedId=null;tab.championTableOpponentLimits=new Map();void openOverviewSubpage(tab,"champion-table");});
   }
 
+  function bindOverviewSubpageLinks(root, tab, beforeOpen) {
+    for(const button of root.querySelectorAll('[data-overview-subpage]')) {
+      if(button._overviewSubpageBound)continue;button._overviewSubpageBound=true;
+      button.addEventListener('click',async()=>{
+        const page=button.dataset.overviewSubpage;let ok=false;
+        try{beforeOpen?.();await openOverviewSubpage(tab,page);ok=tab.overviewSubpage===page && tab.overviewSubpageState?.status==='ready';}
+        finally{window.reportFlowDiagnostic?.('overview_subpage_open','open',{page,from:beforeOpen?'dialog':'page',ok});}
+      });
+    }
+  }
+
   async function openOverviewSubpage(tab, page) {
     const container=overviewContainer(tab),scroll=container?.closest(".player-overlay-scroll") || document.getElementById("app-scroll");
     if (!tab.overviewSubpage) tab.overviewReturnScroll=Number(scroll?.scrollTop||0);
@@ -3623,13 +3634,14 @@
     if (nodes.careerDialog?.open) nodes.careerDialog.close();
   }
 
-  function renderCareerDialogContent(data, tab, layout) {
-    if (!nodes.careerDialogContent || nodes.careerDialogContent.dataset.careerLayout === layout && nodes.careerDialogContent._careerData === data) return;
+  function renderCareerDialogContent(data, tab, layout, force = false) {
+    if (!nodes.careerDialogContent || !force && nodes.careerDialogContent.dataset.careerLayout === layout && nodes.careerDialogContent._careerData === data) return;
     nodes.careerDialogContent._careerData = data;
     const scrollTop = nodes.careerDialogContent.scrollTop;
     nodes.careerDialogContent.innerHTML = layout === "single" ? renderCareerSections(data, tab) : renderCareerDialogSections(data, tab);
     nodes.careerDialogContent.dataset.careerLayout = layout;
     bindPlayerLinks(nodes.careerDialogContent, tab, closeCareerDialog);
+    bindOverviewSubpageLinks(nodes.careerDialogContent,tab,closeCareerDialog);
     bindOverviewShareControls(nodes.careerDialogContent, overviewContainer(tab), tab);
     bindRankHistoryControls(nodes.careerDialogContent);
     bindRankedQueueControls(nodes.careerDialogContent, tab);
@@ -5853,7 +5865,7 @@
     const scroll=matchTierScrollRoot(container);
     if(scroll && scroll._matchTagTab!==tab) {if(scroll._matchTagHandler)scroll.removeEventListener("scroll",scroll._matchTagHandler);scroll._matchTagTab=tab;scroll._matchTagHandler=()=>hydrateVisibleMatchTags(overviewContainer(tab)||container,tab);scroll.addEventListener("scroll",scroll._matchTagHandler,{passive:true});}
     bindSummonerCopy(container);
-    for (const button of container.querySelectorAll("[data-overview-subpage]")) button.addEventListener("click",()=>openOverviewSubpage(tab,button.dataset.overviewSubpage));
+    bindOverviewSubpageLinks(container,tab);
     container.querySelector("[data-complete-overview]")?.addEventListener("click", () => loadOverview(tab, true, false, true, true));
     const rerender = () => rerenderTab(tab,"bindOverviewContent");
     bindPlayerLinks(container, tab);
@@ -5877,7 +5889,7 @@
   }
 
   function bindRankedQueueControls(container, tab) {
-    for(const button of container.querySelectorAll('[data-casual-mode]'))button.addEventListener('click',()=>{tab.casualMode=button.dataset.casualMode;updateCareerCards(tab,'casual_mode');if(nodes.careerDialog?.open)renderCareerDialogContent(tab.data,tab,nodes.careerDialogContent.clientWidth<=640?'single':'masonry');});
+    for(const button of container.querySelectorAll('[data-casual-mode]'))button.addEventListener('click',()=>{tab.casualMode=button.dataset.casualMode;updateCareerCards(tab,'casual_mode');if(nodes.careerDialog?.open)renderCareerDialogContent(tab.data,tab,nodes.careerDialogContent.clientWidth<=520?'single':'masonry',true);});
     for (const button of container.querySelectorAll("[data-ranked-queue]")) button.addEventListener("click", () => {
       const queue = button.dataset.rankedQueue;
       const scope = button.closest("[data-ranked-queue-scope]")?.dataset.rankedQueueScope || "recent";
@@ -5892,7 +5904,7 @@
         nodes.careerDialogContent.dataset.careerLayout = "";
     nodes.careerDialogContent.scrollTop = 0;
         const width = nodes.careerDialogContent.clientWidth || nodes.careerDialog.clientWidth || window.innerWidth;
-        renderCareerDialogContent(tab.data, tab, width <= 640 ? "single" : "masonry");
+        renderCareerDialogContent(tab.data, tab, width <= 520 ? "single" : "masonry");
       }
     });
   }
@@ -7770,7 +7782,7 @@
 	if (!games.length) {
 	  const historyState = liveHistoryStateOf(player);
 	  if (historyState === "unavailable") return `<div class="insight-match-row"><small class="insight-none">${player.identityUnresolved === true ? "身份尚未公开" : "客户端未公开该玩家"}</small></div>`;
-	  if (historyState === "failed") return '<div class="insight-match-row"><small class="insight-none">读取失败</small></div>';
+	  if (historyState === "failed") return '<div class="insight-match-row"></div>';
 	  return '<div class="insight-match-row"><small class="insight-none">该玩家当前模式暂无最近战绩</small></div>';
 	}
     const cells = globalThis.deepLegendsLiveArena?.chips(games, player) ??

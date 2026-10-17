@@ -81,7 +81,7 @@ test('R280 review: changed career share uses the complete overview and binds onc
     generateOverviewShare:container => captures.push(container),
     requestAnimationFrame:noop,setTimeout:noop,matchTierScrollRoot:() => null,
   };
-  for (const name of ['bindScoreDetails','fitMatchTags','hydrateVisibleMatchTags','bindSummonerCopy','bindPlayerLinks','bindMatchFilterControls','bindRankHistoryControls','bindRankedQueueControls','bindMayhemRatingControls','bindMatchSentinel','bindMatchDetailControls','applyRenderedMetricStyles','prepareImages']) deps[name] = noop;
+  for (const name of ['bindScoreDetails','fitMatchTags','hydrateVisibleMatchTags','bindSummonerCopy','bindPlayerLinks','bindOverviewSubpageLinks','bindMatchFilterControls','bindRankHistoryControls','bindRankedQueueControls','bindMayhemRatingControls','bindMatchSentinel','bindMatchDetailControls','applyRenderedMetricStyles','prepareImages']) deps[name] = noop;
   const f = functions(['updateCareerCards','bindOverviewContent','bindOverviewShareControls'],deps);
   f.updateCareerCards(tab,'stream');
   const card = root.querySelector('[data-career-key="activity"]');

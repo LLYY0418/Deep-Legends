@@ -4603,6 +4603,7 @@
     tooltip.className = "global-tooltip";
     tooltip.setAttribute("role", "tooltip");
     tooltip.hidden = true;
+    if(typeof tooltip.showPopover==='function')tooltip.setAttribute('popover','manual');
     document.body.append(tooltip);
     let anchor = null;
     let frame = 0;
@@ -4640,6 +4641,9 @@
       anchor = null;
       delete tooltip.dataset.shown;
       tooltip.hidden = true;
+      if(typeof tooltip.hidePopover==='function' && tooltip.matches(':popover-open'))tooltip.hidePopover();
+      if(tooltip.parentElement!==document.body)document.body.append(tooltip);
+      tooltip.style.zoom='';
     };
     const position = () => {
       frame = 0;
@@ -4647,7 +4651,8 @@
       const rect = anchor.getBoundingClientRect();
       const viewportPadding = 12;
       const gap = 8;
-      const scale=Number(tooltip.ownerDocument.defaultView.getComputedStyle(tooltip).zoom) || 1;
+      let scale=1;
+      for(let node=tooltip;node;node=node.parentElement)scale*=Number(tooltip.ownerDocument.defaultView.getComputedStyle(node).zoom) || 1;
       const width = tooltip.offsetWidth*scale;
       const height = tooltip.offsetHeight*scale;
       if (anchor.dataset.tooltipSide === "menu") {
@@ -4675,6 +4680,12 @@
     const show = (next) => {
       const content = String(next?.dataset.tooltip || "").trim();
       if (!content || !targetOf(next)) { hide(); return; }
+      const host=next.closest('dialog[open]') || document.body;
+      if(tooltip.parentElement!==host){
+        if(typeof tooltip.hidePopover==='function' && tooltip.matches(':popover-open'))tooltip.hidePopover();
+        host.append(tooltip);
+      }
+      tooltip.style.zoom=host===document.body?'':'1';
       if (anchor && anchor !== next && anchor.getAttribute("aria-describedby") === tooltip.id) anchor.removeAttribute("aria-describedby");
       anchor = next;
       anchor.setAttribute("aria-describedby", tooltip.id);
@@ -4757,6 +4768,7 @@
       tooltip.dataset.size = next.dataset.tooltipSize || "";
       delete tooltip.dataset.shown;
       tooltip.hidden = false;
+      if(typeof tooltip.showPopover==='function'){if(tooltip.matches(':popover-open'))tooltip.hidePopover();tooltip.showPopover();}
       tooltip.style.left = "0px";
       tooltip.style.top = "0px";
       if (frame) cancelAnimationFrame(frame);
@@ -4800,6 +4812,7 @@
     document.addEventListener("deep-legends:tooltip-hide", (event) => {
       if (!event.detail?.anchor || event.detail.anchor === anchor) hide();
     });
+    document.addEventListener("close",event=>{if(event.target===tooltip.parentElement)hide();},true);
     document.addEventListener("keydown", (event) => {
       clearPointerSuppression();
       if (event.key === "Escape") hide();

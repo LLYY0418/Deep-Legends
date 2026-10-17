@@ -58,7 +58,7 @@ test('R257 updated scope leaves overview without a note and keeps the table arro
  }
  root.innerHTML=f.renderChampionStats([],{games:208},progress);
  const arrow=root.querySelector('[data-overview-subpage]');assert.match(arrow.previousSibling.textContent,/已统计 208 场/);
- let navigations=0;const deps={document:dom.window.document,state:{},requestAnimationFrame:noop,setTimeout:noop,matchTierScrollRoot:()=>null,bindSummonerCopy:noop,bindPlayerLinks:noop,bindOverviewShareControls:noop,bindMatchFilterControls:noop,bindRankHistoryControls:noop,bindRankedQueueControls:noop,bindMayhemRatingControls:noop,bindMatchEntryControls:noop,bindMatchDetailControls:noop,bindMatchSentinel:noop,openOverviewSubpage:()=>navigations++,rerenderTab:noop};
+ let navigations=0;const deps={window:dom.window,document:dom.window.document,state:{},requestAnimationFrame:noop,setTimeout:noop,matchTierScrollRoot:()=>null,bindSummonerCopy:noop,bindPlayerLinks:noop,bindOverviewShareControls:noop,bindMatchFilterControls:noop,bindRankHistoryControls:noop,bindRankedQueueControls:noop,bindMayhemRatingControls:noop,bindMatchEntryControls:noop,bindMatchDetailControls:noop,bindMatchSentinel:noop,openOverviewSubpage:()=>navigations++,rerenderTab:noop};
  compile(source,expand(source,['bindOverviewContent'],deps),deps).bindOverviewContent(root,{});
  arrow.click();assert.equal(navigations,1);assert.equal(dom.window.document.querySelector('.season-data-note-popover'),null);
  dom.window.close();
