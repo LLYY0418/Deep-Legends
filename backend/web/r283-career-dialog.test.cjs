@@ -6,6 +6,7 @@ async function fixture(){
  const w=f.window,g=w.__r283Career;await waitForRender(w,()=>g?.activeTab()?.data&&!g.activeTab().loading&&w.document.querySelector('.career-column'),'career fixture ready',10000);
  const tab=g.activeTab();tab.data={...tab.data,capabilities:[...tab.data.capabilities.filter(c=>c.name!=='champion-mastery'),{name:'champion-mastery',state:'available'}],seasonStatsProgress:{complete:true,tableSupported:true},seasonChampionStats:tab.data.championStats||[],seasonOverall:{...tab.data.overall,games:30}};const dialog=g.nodes.careerDialog,root=g.nodes.careerDialogContent,requests=[],diagnostics=[],listeners=new WeakMap();
  dialog.close=function(){this.removeAttribute('open');this.dispatchEvent(new w.Event('close'))};
+ dialog.showModal=function(){this.setAttribute('open','')};
  const fetch=w.fetch;w.fetch=(url,options)=>{if(String(url).startsWith('/api/gameplay/champion-table')||String(url).startsWith('/api/gameplay/masteries')){requests.push({url:String(url),open:dialog.open});return Promise.resolve(new w.Response(JSON.stringify({available:true,rows:[],items:[],overall:{},queue:'420'})))}if(String(url).startsWith('/api/diagnostics/client'))diagnostics.push(JSON.parse(options.body));return fetch(url,options)};
  const add=w.EventTarget.prototype.addEventListener;w.EventTarget.prototype.addEventListener=function(type,...args){if(!listeners.has(this))listeners.set(this,new Set());listeners.get(this).add(type);return add.call(this,type,...args)};
  function render(layout='masonry'){root.dataset.careerLayout='';dialog.setAttribute('open','');g.renderCareerDialogContent(tab.data,tab,layout);return root}
@@ -31,6 +32,23 @@ test('R283 P18 telemetry sends subpage actions and existing R283 metrics through
   f.w.reportFlowDiagnostic('match_filter_view','render',{filter:'solo',source:'view-cache',count:3,all_list_count:3,missing_count:0});
   for(const event of ['overview_subpage_open','manual_refresh_client','match_filter_view'])assert(f.diagnostics.some(d=>d.event===event),'runtime dropped '+event);
   const sub=f.diagnostics.find(d=>d.event==='overview_subpage_open');assert.equal(sub.from,'page');assert.equal(sub.ok,false);assert(!('privateName' in sub));
+ }finally{f.w.close()}
+});
+test('R284 P6 dialog return restores both scroll positions only while its opener is visible',async()=>{
+ const f=await fixture();try{
+  let visible=true;Object.defineProperty(f.w.HTMLElement.prototype,'offsetParent',{configurable:true,get(){return this.matches('[data-open-career-dialog]')&&visible?f.w.document.body:null}});
+  for(const region of ['cn','kr'])for(const layout of ['single','masonry'])for(const from of ['dialog','page','widened','leave']){
+   f.tab.region=region;f.tab.current=region==='cn';f.g.state.activeGroup=region==='kr'?'kr':'players';f.g.state.activeTabs[f.g.state.activeGroup]=f.tab.key;f.tab.data.player={...f.tab.data.player,region,playerRef:'p6-'+region};f.tab.overviewSubpage='';f.g.renderOverview(f.g.state.activeGroup);
+   const container=f.g.overviewContainer(f.tab);Object.defineProperty(container,'clientWidth',{configurable:true,value:layout==='single'?500:900});visible=true;f.w.document.getElementById('app-scroll').scrollTop=315;
+   if(from!=='page')f.render(layout);const root=from==='page'?container:f.root;root.scrollTop=187;root.querySelector('[data-overview-subpage="masteries"]').click();
+   await waitForRender(f.w,()=>f.tab.overviewSubpageState?.status==='ready','subpage ready',2000);
+   if(from==='widened')visible=false;if(from==='leave')f.w.dispatchEvent(new f.w.CustomEvent('deep-legends:before-section'));
+   container.querySelector('[data-overview-return]').click();await new Promise(r=>f.w.requestAnimationFrame(()=>f.w.requestAnimationFrame(r)));
+   assert.equal(f.dialog.open,from==='dialog',region+'/'+layout+'/'+from);assert.equal(f.w.document.getElementById('app-scroll').scrollTop,315);
+   if(from==='dialog'){assert.equal(f.root.scrollTop,187);assert.equal(f.root.dataset.careerLayout,layout);f.g.closeCareerDialog();}
+   assert.equal(f.tab.overviewDialogReturn,undefined);
+  }
+  assert.deepEqual(f.errors,[]);
  }finally{f.w.close()}
 });
 test('R283 P18 same-data casual mode click repaints the open dialog',async()=>{

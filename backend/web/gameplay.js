@@ -395,6 +395,7 @@
   function selectPlayerGroup(group) {
     state.lastManualTabAt = Date.now();
     if (!visiblePlayerGroups().includes(group)) return;
+    if(state.activeGroup!==group)delete activeTab()?.overviewDialogReturn;
     const tab = activeTab(group);
     if (tab) selectPlayerTab(tab.key);
     else { if(globalThis.deepLegendsHistoryFilters)cancelAdvancedMatchSearch(activeTab()); state.activeGroup = group; if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("deep-legends:overview-group",{detail:{group}}));renderPlayerTabs(); renderOverview(group); }
@@ -2045,14 +2046,14 @@
       tab.restoreScrollPending = Boolean(tab.loading && !tab.data);
     });
   }
-  window.addEventListener("deep-legends:before-section", () => {savePlayerScroll();for(const tab of [...state.tabs,...state.overlay])cancelHistoryRecovery(tab);if(globalThis.deepLegendsHistoryFilters)for(const tab of [...state.tabs,...state.overlay])cancelAdvancedMatchSearch(tab);});
+  window.addEventListener("deep-legends:before-section", () => {savePlayerScroll();for(const tab of [...state.tabs,...state.overlay]){delete tab.overviewDialogReturn;cancelHistoryRecovery(tab);}if(globalThis.deepLegendsHistoryFilters)for(const tab of [...state.tabs,...state.overlay])cancelAdvancedMatchSearch(tab);});
   document.addEventListener('visibilitychange',()=>{for(const tab of [...state.tabs,...state.overlay]){if(document.hidden)cancelHistoryRecovery(tab);else if(historyRecoveryActive(tab))scheduleHistoryServerRetry(tab);}});
 
   function selectPlayerTab(key) {
     state.lastManualTabAt = Date.now();
     const tab = state.tabs.find((item) => item.key === key);
     if (!tab) return;
-    if(activeTab()!==tab)cancelHistoryRecovery(activeTab());
+    if(activeTab()!==tab){delete activeTab()?.overviewDialogReturn;cancelHistoryRecovery(activeTab());}
     const group = tabGroup(tab);
     if(globalThis.deepLegendsHistoryFilters && activeTab() !== tab) cancelAdvancedMatchSearch(activeTab());
     savePlayerScroll();
@@ -2077,6 +2078,7 @@
   // 两个服务器的玩家互不相通：新页签/覆盖层继承来源页面的服务器标签，
   // 韩服总览里点到的玩家一定按韩服查询，国服页面同理。
   function rememberActiveTab(group) {
+    delete activeTab()?.overviewDialogReturn;
     cancelHistoryRecovery(activeTab());
     if(globalThis.deepLegendsHistoryFilters) cancelAdvancedMatchSearch(activeTab());
     savePlayerScroll();
@@ -2138,6 +2140,7 @@
     if (top && init.playerRef && top.playerRef === init.playerRef && (top.serverId || "") === (init.serverId || "")) return;
     if (top && init.riotId && top.riotId && top.riotId.gameName === init.riotId.gameName && top.riotId.tagLine === init.riotId.tagLine && (top.region || "") === (init.region || "") && (top.serverId || "") === (init.serverId || "")) return;
     cancelHistoryRecovery(top || activeTab());
+    delete (top || activeTab())?.overviewDialogReturn;
     const entry = {
       key: `overlay-${Date.now()}-${state.overlay.length}`, overlay: true, current: false,
       playerRef: "", region: "", serverId: "", label: "隐藏玩家", loading: false, data: null, error: "",
@@ -2152,6 +2155,7 @@
   function overlayBack() {
     const closed = state.overlay.pop();
     if (closed) {
+      delete closed.overviewDialogReturn;
       cancelHistoryRecovery(closed);
       if(globalThis.deepLegendsHistoryFilters)cancelAdvancedMatchSearch(closed);
       closed.closed = true;
@@ -2164,6 +2168,7 @@
   function closeOverlay() {
     while (state.overlay.length) {
       const closed = state.overlay.pop();
+      delete closed.overviewDialogReturn;
       cancelHistoryRecovery(closed);
       if(globalThis.deepLegendsHistoryFilters)cancelAdvancedMatchSearch(closed);
       closed.closed = true;
@@ -2247,6 +2252,7 @@
     savePlayerScroll();
     const index = state.tabs.findIndex((tab) => tab.key === key && !tab.current);
     if (index < 0) return;
+    delete state.tabs[index].overviewDialogReturn;
     cancelHistoryRecovery(state.tabs[index]);
     if(globalThis.deepLegendsHistoryFilters)cancelAdvancedMatchSearch(state.tabs[index]);
     state.tabs[index].closed = true;
@@ -3460,6 +3466,8 @@
       if(button._overviewSubpageBound)continue;button._overviewSubpageBound=true;
       button.addEventListener('click',async()=>{
         const page=button.dataset.overviewSubpage;let ok=false;
+        if(beforeOpen)tab.overviewDialogReturn={from:'dialog',scrollTop:Number(root.scrollTop || 0),layout:root.dataset.careerLayout};
+        else if(!tab.overviewSubpage)delete tab.overviewDialogReturn;
         try{beforeOpen?.();await openOverviewSubpage(tab,page);ok=tab.overviewSubpage===page && tab.overviewSubpageState?.status==='ready';}
         finally{window.reportFlowDiagnostic?.('overview_subpage_open','open',{page,from:beforeOpen?'dialog':'page',ok});}
       });
@@ -3506,9 +3514,12 @@
     container.innerHTML=`<section class="overview-detail-page"><header><button type="button" class="text-button" data-overview-return><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 3-5 5 5 5"/></svg><span>返回总览</span></button>${heading}</header>${tab.overviewSubpage==="champion-table" && !(current.status==="ready" && current.data?.available) ? championTableQueueTabs(tab.championTableQueue || "420") : ""}${current.status==="ready" && current.data?.available ? (tab.overviewSubpage==="masteries" ? renderMasteryDetails(current.data) : renderChampionTable(current.data,tab)) : current.status==="loading" ? '<p class="muted">正在读取…</p>' : `<p class="section-empty">${escapeHTML(current.error || current.data?.detail || "详情读取失败")} <button type="button" class="text-button" data-subpage-retry>重试</button></p>`}</section>`;
     if(note)bindSeasonDataNotes(container);
     container.querySelector("[data-overview-return]")?.addEventListener("click",()=>{
+      const dialogReturn=tab.overviewDialogReturn;delete tab.overviewDialogReturn;
       tab.overviewSubpage="";rerenderTab(tab,"renderOverviewSubpage");
       const scroll=container.closest(".player-overlay-scroll")||document.getElementById("app-scroll");if(scroll)scroll.scrollTop=Number(tab.overviewReturnScroll||0);
       document.querySelectorAll(".mastery-details-popover").forEach(node=>node.remove());
+      const opener=container.querySelector('[data-open-career-dialog]');
+      if(dialogReturn?.from==='dialog' && opener?.offsetParent && !tab.closed)openCareerDialog(container,tab,opener,dialogReturn);
     });
     container.querySelector("[data-subpage-retry]")?.addEventListener("click",()=>openOverviewSubpage(tab,tab.overviewSubpage));
     if(tab.overviewSubpage==="champion-table")bindChampionTable(container,tab);else if(current.status==="ready")bindMasteryDetails(container,current.data);
@@ -3690,9 +3701,10 @@
     schedule();
   }
 
-  function openCareerDialog(container, tab, opener) {
+  function openCareerDialog(container, tab, opener, returning = null) {
     if (!nodes.careerDialog || !nodes.careerDialogContent || !tab.data || nodes.careerDialog.open) return;
     const data = tab.data;
+    const returnScroll=Math.max(0,Number(returning?.scrollTop || 0));
     const player = data.player || {};
     const playerIndex = Math.max(1, state.tabs.findIndex((item) => item.key === tab.key));
     const maskProfile = state.settings.maskNames && !player.isCurrent;
@@ -3721,8 +3733,8 @@
     state.careerDialogObserver?.observe(container);
     syncWidth();
     nodes.careerDialog.showModal();
-    nodes.careerDialogContent.scrollTop = 0;
-    requestAnimationFrame(()=>{distributeCareerDialog();nodes.careerDialogContent.scrollTop=0;});
+    nodes.careerDialogContent.scrollTop = returnScroll;
+    requestAnimationFrame(()=>{if(nodes.careerDialog.open){distributeCareerDialog();nodes.careerDialogContent.scrollTop=returnScroll;}});
     window.desktopTheme?.setModalOpen?.(true);
     requestAnimationFrame(() => nodes.careerDialogClose?.focus({ preventScroll: true }));
   }

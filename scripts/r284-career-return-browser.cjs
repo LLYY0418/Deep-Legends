@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict'),{withBrowser}=require('./r280-browser-fixture.cjs');
+withBrowser(async({page,results})=>{for(const theme of ['dark','light']){
+ const p=await page(theme);await p.until('__r278Game.activeTab()?.data&&!__r278Game.activeTab().loading');
+ await p.evaluate(`(()=>{const t=__r278Game.activeTab();t.data={...t.data,capabilities:[...t.data.capabilities.filter(c=>c.name!=='champion-mastery'),{name:'champion-mastery',state:'available'}],seasonStatsProgress:{complete:true,tableSupported:true},seasonOverall:{...t.data.overall,games:30}};const fetch=window.fetch;window.fetch=(url,options)=>['/api/gameplay/champion-table?','/api/gameplay/masteries?'].some(s=>String(url).startsWith(s))?Promise.resolve(new Response(JSON.stringify({available:true,rows:[],items:[],overall:{},queue:'420'}))):fetch(url,options);})()`);
+ for(const region of ['cn','kr'])for(const layout of ['single','masonry']){
+  await p.call('Emulation.setDeviceMetricsOverride',{width:layout==='single'?560:1200,height:900,deviceScaleFactor:1,mobile:false});
+  await p.evaluate(`(()=>{document.documentElement.style.setProperty('--ui-zoom','1');const g=__r278Game,t=g.activeTab();t.region='${region}';t.current=${region==='cn'};t.data.player={...t.data.player,region:'${region}',playerRef:'r284-${region}'};g.state.activeGroup='${region==='cn'?'players':'kr'}';g.state.activeTabs[g.state.activeGroup]=t.key;g.renderOverview(g.state.activeGroup);document.querySelector('[data-open-career-dialog]').click()})()`);
+  await p.until('document.getElementById("career-dialog").open');
+  const before=await p.evaluate(`(()=>{const d=document.getElementById('career-dialog-content'),root=document.getElementById('app-scroll');d.scrollTop=187;root.scrollTop=315;return {inner:d.scrollTop,outer:root.scrollTop,layout:d.dataset.careerLayout}})()`);assert.equal(before.layout,layout);
+  await p.evaluate(`document.querySelector('#career-dialog [data-overview-subpage="${layout==='single'?'masteries':'champion-table'}"]').click()`);await p.until('__r278Game.activeTab().overviewSubpageState?.status==="ready"');
+  await p.evaluate("document.querySelector('[data-overview-return]').click()");await p.evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+  const after=await p.evaluate("({open:document.getElementById('career-dialog').open,inner:document.getElementById('career-dialog-content').scrollTop,outer:document.getElementById('app-scroll').scrollTop,layout:document.getElementById('career-dialog-content').dataset.careerLayout})");assert(after.open);assert.equal(after.inner,before.inner);assert.equal(after.outer,before.outer);assert.equal(after.layout,before.layout);results.push({theme,region,layout,before,after});if(region==='cn')await p.shot('p6-return-'+layout);await p.evaluate('__r278Game.closeCareerDialog()');
+ }
+}}).catch(e=>{console.error(e);process.exitCode=1});
