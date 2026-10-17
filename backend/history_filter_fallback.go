@@ -45,7 +45,7 @@ func mergeFallbackHistory(filter string, known, incoming []gameplayMatch) []game
 
 // Read only retained data, scoped to the same client platform/server/account.
 // Season scans use the same retained SGP page store, including older pages.
-func (a *app) retainedFilterHistory(client *LCUClient, reference gameplayReference, ref, filter string, begIndex, count int, names, labels map[int64]string) ([]gameplayMatch, bool) {
+func (a *app) retainedFilterHistory(client *LCUClient, reference gameplayReference, ref, filter string, begIndex, count int, names, labels map[int64]string) ([]gameplayMatch, int, bool) {
 	rows := []gameplayMatch{}
 	cachedRows := []gameplayMatch{}
 	key := a.clientHistorySnapshotKey(clientRiotPlatform(client), reference.ServerID, ref)
@@ -77,11 +77,12 @@ func (a *app) retainedFilterHistory(client *LCUClient, reference gameplayReferen
 			cachedRows = append(cachedRows, convertRiotMatchInfo(info, ref, names, labels, "", reference.ServerID))
 		}
 	}
-	cachedRows = mergeFallbackHistory(filter, cachedRows, nil)
-	start := min(max(0, begIndex), len(cachedRows))
-	end := min(start+max(1, count), len(cachedRows))
-	rows = append(rows, cachedRows[start:end]...)
-	return rows, end < len(cachedRows)
+	// Fallback cursors count unfiltered source rows. Page the combined retained
+	// history once, then apply the mode filter; never prepend the snapshot head.
+	rows = mergeFallbackHistory("all", rows, cachedRows)
+	start := min(max(0, begIndex), len(rows))
+	end := min(start+max(1, count), len(rows))
+	return mergeFallbackHistory(filter, rows[start:end], nil), end - start, end < len(rows)
 }
 
 func missingHistoryMatches(filter string, known, shown []gameplayMatch) int {

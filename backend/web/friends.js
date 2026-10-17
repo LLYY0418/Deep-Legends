@@ -376,7 +376,9 @@
     setOpen(false);
   }, true);
 
-  window.addEventListener("deep-legends:status", (event) => {
+  el.toggle.disabled = true;
+  updateBadge();
+  const onStatus = (event) => {
     const connected = Boolean(event.detail?.connected);
     if (connected === state.connected) return;
     state.connected = connected;
@@ -398,7 +400,9 @@
       updateBadge();
       if (state.open) render();
     }
-  });
+  };
+  if (window.deepLegendsSections) window.deepLegendsSections.listen("deep-legends:status", onStatus);
+  else window.addEventListener("deep-legends:status", onStatus);
 
   window.addEventListener("deep-legends:friends-updated", () => {
     if (!state.connected) return;
@@ -417,6 +421,6 @@
   window.addEventListener("deep-legends:dispose", disposeFriends, { once: true });
   window.addEventListener("beforeunload", disposeFriends, { once: true });
 
-  el.toggle.disabled = true;
-  updateBadge();
+  window.deepLegendsFriendsReady = true;
+  window.deepLegendsSections?.register("friends", () => {});
 })();

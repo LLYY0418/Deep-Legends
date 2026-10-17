@@ -1084,6 +1084,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 .recommendation-area { --rune-icon-size: 32px; --rune-style-icon-width: 32px; --rune-style-icon-height: 40px; --rune-header-height: 52px; --rune-row-height: 52px; container: recommendation-area / inline-size; margin-top: 14px; }
 .recommendation-tab-row { display: flex; flex-wrap: wrap; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 0 10px; }
+#live-content .recommendation-tab-row { position: sticky; top: 0; z-index: 14; background: var(--bg); }
 .live-content > .recommendation-area:first-child, .recommendation-area:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
 #live-content [data-live-body] > .arena-my-squad-notice + .recommendation-area { margin-top: 0; }
 .recommendation-champion-summary { display: grid; grid-template-columns: minmax(360px,.82fr) minmax(0,1.18fr); grid-template-areas: "summary matchups" "positions matchups"; align-items: center; gap: 7px 16px; margin-bottom: 10px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
@@ -2395,6 +2396,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-toolbar {flex-wrap:nowrap;flex-direction:row;align-items:center;}
 .live-toolbar [data-live-status] {min-width:0;flex:1 1 0;}
 .live-toolbar .live-refresh-status {flex-wrap:nowrap;white-space:nowrap;min-width:0;line-height:20px;}
-.live-refresh-status.is-service-outage {justify-content:flex-end;color:var(--muted);}
-.live-refresh-status.is-service-outage>svg {flex:none;width:16px;height:16px;fill:currentColor;}
-.live-refresh-status.is-service-outage>span {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.live-refresh-status.is-service-outage {color:var(--muted);}
+.live-refresh-status.is-service-outage>svg {flex:none;width:16px;height:16px;fill:currentColor;margin-top:2px;}
+.live-refresh-status.is-service-outage>span {flex:1;min-width:0;overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere;}
+.live-toolbar:has(.is-service-outage) {flex-wrap:wrap;row-gap:8px;}
+.live-toolbar [data-live-status]:has(.is-service-outage) {order:1;flex:1 0 100%;}
+.live-toolbar .live-refresh-status.is-service-outage {align-items:flex-start;justify-content:flex-start;white-space:normal;}

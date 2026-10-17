@@ -48,6 +48,7 @@
     listError: "",
     controllers: new Map(),
     manualRefreshing: false,
+    manualRefreshTimedOut: false,
     collectionRescanInFlight: false,
     collectionEnsureInFlight: false,
     collectionRequestAt: 0,
@@ -750,8 +751,10 @@
     if (state.backendExited) return;
     const data = state.status;
     document.body.classList.remove("is-fatal");
-    el.refresh.disabled = data.syncing || state.manualRefreshing;
-    setRefreshBusy(data.syncing || state.manualRefreshing);
+    if (!data.syncing || !data.connected) state.manualRefreshTimedOut = false;
+    const refreshBusy = state.manualRefreshing || (data.syncing && !state.manualRefreshTimedOut);
+    el.refresh.disabled = refreshBusy;
+    setRefreshBusy(refreshBusy);
     acceptClientView(data.clientView);
     data.clientView = state.clientView;
     renderClientConnection();
@@ -2772,10 +2775,18 @@
   });
   document.getElementById("pro-players-return")?.addEventListener("click", () => activateSection("pro-players"));
   let openFriendsFromLink = false;
-  window.addEventListener("deep-legends:status", (event) => {
-    if (openFriendsFromLink && event.detail?.connected) {
+  function openPendingFriendsLink() {
+    if (openFriendsFromLink && state.status?.connected) {
       openFriendsFromLink = false;
       queueMicrotask(() => document.getElementById("friends-toggle")?.click());
+    }
+  }
+  window.addEventListener("deep-legends:status", (event) => {
+    if (!event.detail?.connected) return;
+    if (window.deepLegendsFriendsReady) openPendingFriendsLink();
+    else {
+      const task = window.deepLegendsSections?.load("friends");
+      if (task) void task.then(openPendingFriendsLink).catch(() => {});
     }
   });
   function activateSectionLink() {
@@ -3526,6 +3537,7 @@
 
   async function runManualRefresh() {
     if (state.manualRefreshing) return;
+    state.manualRefreshTimedOut = false;
     state.manualRefreshMetrics={started:Date.now(),overview_requests:0,canceled_requests:0,label_changes:0};
     state.manualRefreshing = true;
     el.refresh.disabled = true;
@@ -3544,14 +3556,16 @@
       window.dispatchEvent(new CustomEvent("deep-legends:hard-refresh", { detail: { waitFor, reason: "manual" } }));
       await Promise.allSettled(waitFor);
       if(!refreshError) {
+        const syncDeadline=performance.now()+60000;
         await refreshStatus(false);
-        while(state.status?.connected && state.status.syncing && !state.destroyed && !state.backendExited) {
+        while(state.status?.connected && state.status.syncing && !state.destroyed && !state.backendExited && performance.now()<syncDeadline) {
           await new Promise(resolve=>setTimeout(resolve,200));
           await refreshStatus(false);
         }
+        state.manualRefreshTimedOut=Boolean(state.status?.connected && state.status.syncing && performance.now()>=syncDeadline);
       }
 	  if (refreshError) showToast(`收藏后台补刷未启动：${refreshError.message}`);
-	  else showToast("对局与总览已重新读取");
+	  else if(!state.manualRefreshTimedOut) showToast("对局与总览已重新读取");
     } finally {
       state.manualRefreshing = false;
       if (state.status) renderStatus();

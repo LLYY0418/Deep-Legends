@@ -2648,10 +2648,10 @@ func (a *app) loadDetailedMatches(ctx context.Context, client *LCUClient, refere
 		if reference.ServerID == "" && a.sgp != nil {
 			reference.ServerID, _, _ = a.sgp.available(client)
 		}
-		known, localMore := a.retainedFilterHistory(client, reference, playerRef, filter, begIndex, count, names, queueLabels)
+		known, localConsumed, localMore := a.retainedFilterHistory(client, reference, playerRef, filter, begIndex, count, names, queueLabels)
+		page.Count = max(page.Count, localConsumed)
 		if localMore {
 			page.HasMore = true
-			page.Count = max(page.Count, count)
 		}
 		result = mergeFallbackHistory(filter, known, result)
 		page.Filter = filter
