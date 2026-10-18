@@ -3971,7 +3971,7 @@
     const safe = value => String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
     const labels = { kda: "KDA", kp: "参团", damage: "伤害", gold: "经济", cs: "分均补刀", vision: "视野" };
     const parts = (record.parts || []).filter(part => Number.isFinite(part.value) && Number.isFinite(part.norm)).map(part => ({ label: labels[part.key] || part.key, value: part.key === "kp" ? `${(part.value * 100).toFixed(1)}%` : part.value.toFixed(2), norm: Math.max(0,Math.min(1,part.norm)) }));
-    const tooltip = `本局评分 · 全场第 ${record.rank || "—"}`;
+    const tooltip = `评分：全场第${record.rank || "—"}名`;
     return `<i class="match-score${tone}" data-tooltip="${safe(tooltip)}" data-score-participant="${Number(record.participantId) || 0}" data-tooltip-score="${safe(JSON.stringify({ value: record.score.toFixed(1), parts }))}" data-tooltip-size="compact" tabindex="0">${record.score.toFixed(1)}</i>`;
   }
 
@@ -5887,7 +5887,7 @@
       if(candidate.matches('[data-match-tag-pinned]')){
         const entry=node.closest('.match-entry'),match=tab.data?.matches?.find(m=>String(m.gameId)===entry?.dataset.matchId),subject=match && matchSubject(match,tab.data?.player?.playerRef);
         const record=match && readMatchScores(match).get(Number(subject?.participantId));
-        if(record){const template=document.createElement('template');template.innerHTML=scoreChip(record);node.dataset.scoreParticipant=String(subject.participantId);node.dataset.tooltipScore=template.content.firstElementChild.dataset.tooltipScore;node.dataset.tooltip ||= `本局评分 · 全场第 ${record.rank || '—'}`;node.tabIndex=0;}
+        if(record){const template=document.createElement('template');template.innerHTML=scoreChip(record);node.dataset.scoreParticipant=String(subject.participantId);node.dataset.tooltipScore=template.content.firstElementChild.dataset.tooltipScore;node.dataset.tooltip=template.content.firstElementChild.dataset.tooltip;node.tabIndex=0;}
       }
       const load=()=>{const entry=node.closest('.match-entry'),match=tab.data?.matches?.find(m=>String(m.gameId)===entry?.dataset.matchId);void ensureScoreDetails(match,tab);};
       node.addEventListener('pointerenter',load);node.addEventListener('focus',load);
