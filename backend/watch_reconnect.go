@@ -12,10 +12,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
-const reconnectSettlementDelayMS = 15000
+const reconnectSettlementDelayMS = 5000
 const reconnectEventDataURL = "https://127.0.0.1:2999/liveclientdata/eventdata"
 
 type watchReconnectSignal struct {
@@ -270,9 +271,11 @@ func (r *watchRunner) scheduleReconnect(client *LCUClient, delay int) {
 		defer cancel()
 		outcome := "canceled-phase-changed"
 		var decidedAt time.Time
+		posted := false
+		httpStatus, confirmedBy := 0, "none"
 		defer func() {
 			r.mu.Lock()
-			if attempt.reason != "" && outcome != "fired" {
+			if attempt.reason != "" && !posted {
 				outcome = attempt.reason
 			}
 			attempt.finished = true
@@ -288,7 +291,7 @@ func (r *watchRunner) scheduleReconnect(client *LCUClient, delay int) {
 				delete(r.pending, "reconnect")
 			}
 			r.mu.Unlock()
-			diagnostic := map[string]any{"event": "watch_reconnect_decision", "reconnect_ms": elapsed, "outcome": outcome, "exit_signal": signal.ExitSignal, "game_end_seen": signal.GameEndSeen, "crash_handler_seen": signal.CrashHandlerSeen, "client_log_parsed": signal.ClientLogParsed, "delay_ms_setting": attempt.delay, "effective_delay_ms": attempt.effective}
+			diagnostic := map[string]any{"event": "watch_reconnect_decision", "reconnect_ms": elapsed, "outcome": outcome, "exit_signal": signal.ExitSignal, "game_end_seen": signal.GameEndSeen, "crash_handler_seen": signal.CrashHandlerSeen, "client_log_parsed": signal.ClientLogParsed, "delay_ms_setting": attempt.delay, "effective_delay_ms": attempt.effective, "http_status": httpStatus, "confirmed_by": confirmedBy}
 			if signal.ExitSignal == "" {
 				diagnostic["exit_signal"] = "unknown"
 			}
@@ -296,7 +299,7 @@ func (r *watchRunner) scheduleReconnect(client *LCUClient, delay int) {
 				diagnostic["exit_code"] = *signal.ExitCode
 			}
 			r.record(diagnostic)
-			if outcome != "fired" {
+			if !posted {
 				r.record(map[string]any{"event": "watch_action", "action": "reconnect", "result": "canceled", "reason": "reconnect-no-longer-active"})
 				r.emit("watch:canceled:reconnect")
 			}
@@ -392,16 +395,43 @@ func (r *watchRunner) scheduleReconnect(client *LCUClient, delay int) {
 		}
 		// One automatic attempt, including an uncertain HTTP result. Manual client
 		// reconnect is independent and is never intercepted by this runner.
-		outcome = "fired"
+		posted = true
 		decidedAt = r.clockNow()
-		err := r.requestWatchJSON(requestCtx, client, http.MethodPost, "/lol-gameflow/v1/reconnect", nil)
-		result := "fired"
-		if err != nil {
-			result = "failed"
+		// The timer's cancellation ends admission, not an already sent POST.
+		// Retain the LCU session lifetime and the existing write gate.
+		postCtx, postCancel := context.WithTimeout(parent, 8*time.Second)
+		var status atomic.Int64
+		err := r.requestWatchJSON(context.WithValue(postCtx, lcuResponseStatusKey{}, &status), client, http.MethodPost, "/lol-gameflow/v1/reconnect", nil)
+		postCancel()
+		httpStatus = int(status.Load())
+		result := "failed"
+		if err == nil && httpStatus >= 200 && httpStatus < 300 {
+			result, confirmedBy = "fired", "http"
+		} else if confirmReconnectPhase(parent, client, id) {
+			result, confirmedBy = "fired", "phase"
 		}
+		outcome = result
 		r.record(map[string]any{"event": "watch_action", "action": "reconnect", "result": result})
 		r.emit("watch:" + result + ":reconnect")
 	}()
+}
+
+// A response can be lost after LCU has accepted the reconnect. Re-read both
+// phase and identity within a separate, session-bound confirmation window.
+func confirmReconnectPhase(parent context.Context, client *LCUClient, id int64) bool {
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+	defer cancel()
+	for ctx.Err() == nil {
+		var phase string
+		if client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase) == nil &&
+			(phase == "GameStart" || phase == "InProgress") && reconnectSessionID(ctx, client) == id {
+			return true
+		}
+		if waitContext(ctx, 100*time.Millisecond) != nil {
+			break
+		}
+	}
+	return false
 }
 
 func (m *watchReconnectMonitor) run(ctx context.Context) {

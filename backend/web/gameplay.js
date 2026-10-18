@@ -860,6 +860,9 @@
   }
 
   function bindMatchSentinel(container, tab) {
+    // Header/card binders also call this with a partial subtree. They do not
+    // own the full list observer and must leave its scroll listeners alive.
+    if (!container?.querySelector("[data-match-sentinel]") && overviewContainer(tab) !== container) return;
     const observerKey = matchObserverKey(tab);
     state[observerKey]?.disconnect();
     state[observerKey] = null;
@@ -872,6 +875,8 @@
     // A restored scroll position, detail collapse, or a short first page can
     // expose the sentinel without the user asking for another 20 API calls.
     let near = false, requested = Boolean(tab.matchAutoloadRequested), pointerScrolling = false;
+    let downward = false, guardReported = false;
+    const generation = tab.matchSentinelGeneration = Number(tab.matchSentinelGeneration || 0) + 1;
     let lastTop = Number(scrollRoot?.scrollTop || 0);
     const cleanup = () => {
       observer.disconnect();
@@ -882,7 +887,17 @@
       scrollRoot?.removeEventListener("scroll", onScroll);
     };
     const append = () => {
-      if (!near || !requested || tab.appendFramePending || overviewContainer(tab) !== container) return;
+      const guard = !near ? "near" : !requested ? "requested" : tab.appendFramePending ? "frame-pending" : overviewContainer(tab) !== container ? "container" : "";
+      if (guard) {
+        if (downward && !guardReported) {
+          const rect = sentinel.getBoundingClientRect(), rootRect = scrollRoot?.getBoundingClientRect();
+          if (!sentinel.hidden && (near || rootRect && rect.top <= rootRect.bottom + 48 && rect.bottom >= rootRect.top)) {
+            guardReported = true;
+            window.reportFlowDiagnostic?.('match_autoload_client','guard',{bound:true,near,requested,started:false,blocked_reason:guard,generation});
+          }
+        }
+        return;
+      }
       tab.matchAutoloadRequested=requested;
       const blocked=serviceDown && !tab.data?.pagination?.localHasMore?'service-down':tab.loading || tab.loadingMore?'loading':tab.quotaRetry?'quota':tab.data?.pagination?.autoPaused?'paused':!tab.data?'not-ready':!tab.data.pagination?.hasMore && !advanced?'no-more':'';
       window.reportFlowDiagnostic?.('match_autoload_client',blocked?'blocked':'requested',{bound:true,near,requested,started:false,blocked_reason:blocked});
@@ -906,16 +921,16 @@
         }, delay);
       });
     };
-    const onWheel = event => { if (event.deltaY > 0) { requested = true; append(); } };
+    const onWheel = event => { if (event.deltaY > 0) { downward = requested = true; append(); } };
     const onTouch = () => { pointerScrolling = true; };
     const onPointer = event => { pointerScrolling = event.target === scrollRoot; };
     const onKey = event => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target?.tagName)) return;
-      if (["ArrowDown", "PageDown", "End", " "].includes(event.key)) { requested = true; append(); }
+      if (["ArrowDown", "PageDown", "End", " "].includes(event.key)) { downward = requested = true; append(); }
     };
     const onScroll = () => {
       const top = Number(scrollRoot.scrollTop || 0);
-      if (top > lastTop) { requested = true; append(); }
+      if (top > lastTop) { downward = requested = true; append(); }
       lastTop = top;
     };
     const observer = new IntersectionObserver(entries => {
@@ -7819,7 +7834,7 @@
   }
 
   function renderInsightMatches(player) {
-	if (player.hidden === true) return "";
+	if (player.hidden === true) return '<div class="insight-match-row is-hidden-player" aria-hidden="true"></div>';
 	// R129 P1：与 renderLivePlayer 共用同一个判据，两处词表不会再各写一份。
 	if (!liveHistorySettled(player)) return '<div class="insight-match-row is-history-pending" aria-label="战绩读取中"><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span></div>';
     const games = (player.recentGames || []).slice(0, 10);
@@ -9026,7 +9041,11 @@
     if (!Number(id)) return "";
     if (!state.summonerSpells) return pendingCatalogIcon(`召唤师技能 ${id}`, size);
     const spell = (state.summonerSpells.spells || []).find((candidate) => Number(candidate.id) === Number(id));
-    return spell?.iconPath ? assetIcon(spell.iconPath, spell.name || `召唤师技能 ${id}`, size) : iconFigure("spell", id, `召唤师技能 ${id}`, size);
+    const name = spell?.name || `召唤师技能 ${id}`;
+    const description = plainText(spell?.description || "");
+    const tooltip = description && description !== name ? `${name}\n${description}` : name;
+    const icon = spell?.iconPath ? assetIcon(spell.iconPath, name, size, false) : iconFigure("spell", id, name, size, false);
+    return `<span class="item-tooltip" tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}">${icon}</span>`;
   }
   function perkIconFigure(id, size = "", withTooltip = true) {
     if (!state.perks) return pendingCatalogIcon(`符文 ${id}`, size, withTooltip);

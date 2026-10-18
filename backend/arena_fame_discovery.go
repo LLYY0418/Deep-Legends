@@ -324,12 +324,7 @@ func (a *app) discoverArenaFame(client *LCUClient) {
 					baseline[op.Path] = numbers
 				}
 			}
-			event["interfaces"] = append(results, row)
-			encoded, _ := json.Marshal(event)
-			if len(encoded) > 6500 {
-				event["truncated"] = true
-				break
-			}
+
 			results = append(results, row)
 		}
 		event["interfaces"] = results
@@ -337,11 +332,7 @@ func (a *app) discoverArenaFame(client *LCUClient) {
 		event["queue_types"] = map[string][]string{"lcu": s.queues[dataSourceLCU], "sgp": s.queues[dataSourceSGP]}
 		event["event_uris"] = append([]string(nil), s.uris...)
 		s.mu.Unlock()
-		// Leave headroom for recordDiagnostic's common envelope.
-		if encoded, _ := json.Marshal(event); len(encoded) > 7800 {
-			event["event_uris"] = []string{}
-			event["truncated"] = true
-		}
+
 		s.mu.Lock()
 		s.event = event
 		s.operations = operations
@@ -354,8 +345,8 @@ func (a *app) discoverArenaFame(client *LCUClient) {
 	})
 }
 
-// Emit one aggregate when Arena ends (or the connection closes), so WebSocket
-// names observed after the help probes are included in the same bounded event.
+// Emit the complete observation when Arena ends (or the connection closes),
+// including WebSocket names seen after the help probes, in bounded records.
 func (a *app) finishArenaFameDiscovery(s *arenaFameDiscoveryState) {
 	if s == nil {
 		return
@@ -382,23 +373,55 @@ func (a *app) finishArenaFameDiscovery(s *arenaFameDiscoveryState) {
 	event["queue_types"] = map[string][]string{"lcu": s.queues[dataSourceLCU], "sgp": s.queues[dataSourceSGP]}
 	event["event_uris"] = append([]string(nil), s.uris...)
 	s.mu.Unlock()
-	for {
-		raw, _ := json.Marshal(event)
-		if len(raw) <= 7200 {
-			break
-		}
-		rows, _ := event["interfaces"].([]map[string]any)
-		if len(rows) > 0 {
-			event["interfaces"] = rows[:len(rows)-1]
-		} else if rows, _ := event["post_game"].([]map[string]any); len(rows) > 0 {
-			event["post_game"] = rows[:len(rows)-1]
-		} else {
-			event["queue_types"] = map[string][]string{}
-			event["event_uris"] = []string{}
-		}
-		event["truncated"] = true
+	for _, part := range arenaFameDiscoveryParts(event) {
+		a.recordDiagnostic(part)
 	}
-	a.recordDiagnostic(event)
+}
+
+// Keep the compact form for small observations. Larger observations are split
+// by top-level field; concatenating data in part_index order yields that field's
+// exact JSON. Split on runes so even oversized individual shapes remain intact.
+func arenaFameDiscoveryParts(event map[string]any) []map[string]any {
+	if raw, err := json.Marshal(event); err == nil && len(raw) <= 3000 {
+		return []map[string]any{event}
+	}
+	keys := make([]string, 0, len(event))
+	for key := range event {
+		if key != "event" {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	parts := []map[string]any{}
+	id := strconv.FormatInt(time.Now().UnixNano(), 36)
+	for _, key := range keys {
+		raw, err := json.Marshal(event[key])
+		if err != nil {
+			continue
+		} // Observations contain only JSON values.
+		chunk := ""
+		emit := func() {
+			parts = append(parts, map[string]any{"event": "arena_fame_discovery", "discovery_id": id, "part": key, "encoding": "json-fragments", "data": chunk})
+			chunk = ""
+		}
+		for _, r := range string(raw) {
+			next := chunk + string(r)
+			encoded, _ := json.Marshal(next)
+			// 2 KiB of encoded data leaves room for the standard log envelope,
+			// the part labels and indices, safely below the 4095-byte limit.
+			if len(encoded) > 2000 && chunk != "" {
+				emit()
+			}
+			chunk += string(r)
+		}
+		if chunk != "" {
+			emit()
+		}
+	}
+	for i, part := range parts {
+		part["part_index"], part["part_count"] = i+1, len(parts)
+	}
+	return parts
 }
 
 func arenaDiscoveryHelpPath(path string) string {
@@ -516,12 +539,7 @@ func (a *app) probeArenaFamePostGame(client *LCUClient, s *arenaFameDiscoverySta
 			}
 		}
 		row := map[string]any{"path": arenaDiscoveryHelpPath(op.Path), "method": op.Method, "status": int(status.Load()), "keys": keys, "numbers": numbers, "difference": difference}
-		candidate := append(rows, row)
-		encoded, _ := json.Marshal(candidate)
-		if len(encoded) > 3500 {
-			break
-		}
-		rows = candidate
+		rows = append(rows, row)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -149,7 +149,7 @@ func defaultWatchSettings() watchSettings {
 		MasterEnabled: true,
 		Rules: watchRuleSet{
 			AutoAccept:        watchTimedRule{DelayMS: 1500},
-			AutoReconnect:     watchTimedRule{DelayMS: reconnectSettlementDelayMS},
+			AutoReconnect:     watchTimedRule{DelayMS: 15000},
 			AutoHonor:         watchHonorRule{Strategy: "prefer-party"},
 			PositionBroadcast: watchBroadcastRule{Visibility: "self", AssignedPosition: true},
 			Invitations:       watchInvitationRule{Policies: map[string]string{}},
@@ -222,12 +222,14 @@ func saveWatchSettings(store *localStore, settings watchSettings) error {
 func normalizeWatchSettings(settings watchSettings) watchSettings {
 	settings.SchemaVersion = watchSettingsVersion
 	settings.Rules.AutoAccept.DelayMS = clampInt(settings.Rules.AutoAccept.DelayMS, 0, 10000, 1500)
-	settings.Rules.AutoReconnect.DelayMS = clampInt(settings.Rules.AutoReconnect.DelayMS, reconnectSettlementDelayMS, 30000, reconnectSettlementDelayMS)
-	if settings.Rules.AutoReconnect.DelayMS > 15000 && settings.Rules.AutoReconnect.DelayMS < 20000 {
-		settings.Rules.AutoReconnect.DelayMS = 20000
-	} else if settings.Rules.AutoReconnect.DelayMS > 20000 {
-		settings.Rules.AutoReconnect.DelayMS = 30000
+	saved := clampInt(settings.Rules.AutoReconnect.DelayMS, 5000, 30000, 5000)
+	nearest := 5000
+	for _, option := range []int{10000, 15000, 20000, 30000} {
+		if max(saved, option)-min(saved, option) < max(saved, nearest)-min(saved, nearest) {
+			nearest = option
+		}
 	}
+	settings.Rules.AutoReconnect.DelayMS = nearest
 	settings.Rules.AutoMatchmaking.DelayMS = clampInt(settings.Rules.AutoMatchmaking.DelayMS, 0, 30000, 5000)
 	settings.Rules.AutoMatchmaking.MinPartySize = clampInt(settings.Rules.AutoMatchmaking.MinPartySize, 1, 5, 1)
 	switch settings.Rules.AutoHonor.Strategy {

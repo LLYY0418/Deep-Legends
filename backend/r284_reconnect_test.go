@@ -17,15 +17,15 @@ func TestR284ReconnectDelayMigration(t *testing.T) {
 	if got := defaultWatchSettings().Rules.AutoReconnect.DelayMS; got != 15000 {
 		t.Fatalf("reconnect default=%d, want 15000ms settlement window", got)
 	}
-	for _, delay := range []int{3000, 9000, 10000, 15000} {
+	for _, delay := range []int{15000, 20000, 30000} {
 		settings := defaultWatchSettings()
 		settings.Rules.AutoReconnect.DelayMS = delay
-		if got := normalizeWatchSettings(settings).Rules.AutoReconnect.DelayMS; got != 15000 {
-			t.Fatalf("saved delay %d migrated to %d, want 15000", delay, got)
+		if got := normalizeWatchSettings(settings).Rules.AutoReconnect.DelayMS; got != delay {
+			t.Fatalf("saved delay %d changed to %d", delay, got)
 		}
 	}
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, convenienceSettingsFile), []byte(`{"rules":{"autoReconnect":{"enabled":true,"delayMs":3000}}}`), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, convenienceSettingsFile), []byte(`{"rules":{"autoReconnect":{"enabled":true,"delayMs":15000}}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	settings := loadWatchSettings(trackTestStore(t, &localStore{root: root}))
@@ -94,7 +94,7 @@ func r284Reconnect(t *testing.T, signal watchReconnectSignal) *r284ReconnectFixt
 	}
 	settings := r.currentWatch()
 	settings.Rules.AutoReconnect.Enabled = true
-	settings.Rules.AutoReconnect.DelayMS = 3000
+	settings.Rules.AutoReconnect.DelayMS = 15000
 	r.apply(settings)
 	t.Cleanup(func() { r.handlePhase(f.client, "Lobby") })
 	return f

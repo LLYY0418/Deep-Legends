@@ -1,0 +1,55 @@
+[
+  {
+    "id": 4,
+    "name": "闪现",
+    "description": "使你朝着你的指针位置瞬间传送一小段距离。",
+    "summonerLevel": 7,
+    "cooldown": 300,
+    "gameModes": [
+      "ARAM",
+      "TUTORIAL",
+      "KIWI",
+      "ULTBOOK",
+      "FIRSTBLOOD",
+      "SWIFTPLAY",
+      "CLASSIC",
+      "PRACTICETOOL",
+      "RUBY",
+      "RUBY_TRIAL_1",
+      "BRAWL",
+      "WIPMODEWIP4",
+      "URF",
+      "SNOWURF",
+      "KIWI_JADE",
+      "RUBY_TRIAL_3",
+      "ONEFORALL",
+      "ARSR",
+      "NEXUSBLITZ",
+      "DOOMBOTSTEEMO",
+      "RUBY_TRIAL_2"
+    ],
+    "iconPath": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_flash.png"
+  },
+  {
+    "id": 2201,
+    "name": "闪人",
+    "description": "获得短暂的爆发性移动速度，这个移速会在逃离敌方英雄时提升。",
+    "summonerLevel": 1,
+    "cooldown": 45,
+    "gameModes": [
+      "CHERRY"
+    ],
+    "iconPath": "/lol-game-data/assets/DATA/Spells/Icons2D/Icon_SummonerSpell_Flee.2v2_Mode_Fighters.png"
+  },
+  {
+    "id": 2202,
+    "name": "闪现",
+    "description": "使英雄朝着你的指针悬停的位置瞬间传送一小段距离。",
+    "summonerLevel": 1,
+    "cooldown": 0,
+    "gameModes": [
+      "CHERRY"
+    ],
+    "iconPath": "/lol-game-data/assets/DATA/Spells/Icons2D/Summoner_flash.png"
+  }
+]

@@ -95,7 +95,7 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 			event[key] = s
 		case "blocked_reason":
 			s, ok := value.(string)
-			if ok && (s == "" || s == "loading" || s == "quota" || s == "paused" || s == "not-ready" || s == "no-more") {
+			if ok && (s == "" || s == "loading" || s == "quota" || s == "paused" || s == "not-ready" || s == "no-more" || s == "service-down" || s == "near" || s == "requested" || s == "frame-pending" || s == "container") {
 				event[key] = s
 			}
 		case "gave_up", "video_path_present", "reduced_motion", "video_rendered", "src_set", "playing", "applied", "bound", "near", "requested", "started":

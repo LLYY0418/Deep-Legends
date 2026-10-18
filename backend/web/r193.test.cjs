@@ -32,11 +32,11 @@ test('R193 1 hidden identity subtitle contains only position and disappears with
     assert.doesNotMatch(current.renderLivePlayer({...hidden, rank: {tier: 'gold'}}, 0), /黄金/);
   } finally { d.window.close(); }
 });
-test('R193 2 hidden combined card contains one client-unavailable message and no history row', () => {
+test('R193 2 hidden combined card contains one client-unavailable message and an empty history slot', () => {
   const html = combined(current, hidden);
   assert.equal(html.split('客户端未公开该玩家').length - 1, 1);
-  assert.doesNotMatch(html, /insight-match-row/);
-  assert.equal(current.renderInsightMatches({...hidden, historyState: 'pending'}), '');
+  assert.match(html, /insight-match-row is-hidden-player/);
+  assert.equal(current.renderInsightMatches({...hidden, historyState: 'pending'}), '<div class="insight-match-row is-hidden-player" aria-hidden="true"></div>');
 });
 test('R193 3 hidden card omits empty win-rate and KDA columns without em dashes', () => {
   const html = combined(current, hidden), d = dom(html);

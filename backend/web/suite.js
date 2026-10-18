@@ -314,7 +314,7 @@
 
   function watchRuleControl(definition, rule) {
     if (definition.control === "reconnect-delay") {
-      return `<div class="watch-delay-control"><span>延时</span><span class="select-wrap"><select class="suite-select watch-compact-select" data-watch-number="autoReconnect.delayMs" aria-label="${escapeHTML(definition.title)}延时">${[15000,20000,30000].map(value=>`<option value="${value}"${selected(Number(rule.delayMs),value)}>${formatDelay(value)}</option>`).join("")}</select></span></div>`;
+      return `<div class="watch-delay-control"><span>延时</span><span class="select-wrap"><select class="suite-select watch-compact-select" data-watch-number="autoReconnect.delayMs" aria-label="${escapeHTML(definition.title)}延时">${[5000,10000,15000,20000,30000].map(value=>`<option value="${value}"${selected(Number(rule.delayMs),value)}>${formatDelay(value)}</option>`).join("")}</select></span></div>`;
     }
     if (definition.control === "delay") {
       return `<div class="watch-delay-control"><span>延时</span><input class="suite-range" type="range" min="${definition.min}" max="${definition.max}" step="${definition.step}" value="${Number(rule.delayMs || 0)}" data-watch-delay="${definition.key}" aria-label="${escapeHTML(definition.title)}延时"><output class="suite-chip watch-delay-value" data-watch-output="${definition.key}">${formatDelay(rule.delayMs)}</output></div>`;
@@ -451,7 +451,7 @@
       : event?.kind === "failed" ? '<span class="suite-chip is-danger">上次触发失败</span>'
       : event?.kind === "skipped" ? `<span>${escapeHTML(event.message)}</span>`
       : event?.kind === "fired" ? '<span>上次触发 · 刚刚</span>'
-      : event?.kind === "canceled" ? '<span>已被更高优先级动作取消 · 准备下次触发</span>'
+      : event?.kind === "canceled" ? (definition.action === "reconnect" ? "" : '<span>已被更高优先级动作取消 · 准备下次触发</span>')
       : current ? `<span>${rule.enabled ? '正在评估当前阶段' : '已到触发阶段 · 规则尚未开启'}</span>` : '<span>尚未到触发阶段</span>';
     const status = masterEnabled ? eventStatus : '<span class="suite-chip is-warning">总开关已关闭 · 已暂停</span>';
     const control = watchRuleControl(definition, rule);

@@ -1342,9 +1342,6 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-teams.is-insight:not(.is-arena) > .live-team > header { grid-row: 1; }
 .live-teams.is-insight:not(.is-arena) .live-player-list.is-insight { display: contents; }
 
-.live-teams.is-insight:not(.is-arena):has(.live-player.is-hidden) { grid-template-rows: none; }
-.live-teams.is-insight:not(.is-arena):has(.live-player.is-hidden) > .live-team { display: block; grid-row: auto; }
-.live-teams.is-insight:not(.is-arena):has(.live-player.is-hidden) .live-player-list.is-insight { display: grid; }
 .live-player-list.is-insight .insight-match-row { display: flex; flex-wrap: wrap; align-content: flex-end; align-items: flex-end; gap: 5px; padding: 0 11px 11px 68px; }
 .live-player-list.is-insight .live-player { border-top: 1px solid var(--line); }
 .live-player-list.is-insight .live-player:first-child { border-top: 0; }
