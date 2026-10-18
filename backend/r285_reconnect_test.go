@@ -11,7 +11,7 @@ import (
 func TestR285ReconnectHTTPAndPhaseConfirmation(t *testing.T) {
 	for _, kind := range []string{"sse-before-http", "transport-phase", "http500", "different-game"} {
 		t.Run(kind, func(t *testing.T) {
-			f := r284Reconnect(t, watchReconnectSignal{ExitSignal: "crash"})
+			f := r284Reconnect(t, r285CrashSignal())
 			original := f.client.http.Transport
 			f.client.http.Transport = gameplayRoundTripFunc(func(req *http.Request) (*http.Response, error) {
 				if req.URL.Path != "/lol-gameflow/v1/reconnect" {
@@ -79,7 +79,7 @@ func TestR285ReconnectDelayChoicesAndSettlement(t *testing.T) {
 	if reconnectSettlementDelayMS != 5000 {
 		t.Fatalf("minimum=%d", reconnectSettlementDelayMS)
 	}
-	f := r284Reconnect(t, watchReconnectSignal{ExitSignal: "unknown"})
+	f := r284Reconnect(t, watchReconnectSignal{})
 	s := f.runner.currentWatch()
 	s.Rules.AutoReconnect.DelayMS = 5000
 	f.runner.apply(s)
@@ -98,7 +98,7 @@ func TestR285ReconnectDelayChoicesAndSettlement(t *testing.T) {
 }
 
 func TestR285ReconnectSessionCancellationStillStopsPOST(t *testing.T) {
-	f := r284Reconnect(t, watchReconnectSignal{ExitSignal: "crash"})
+	f := r284Reconnect(t, r285CrashSignal())
 	session, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f.client.sessionContext = session
@@ -118,4 +118,8 @@ func TestR285ReconnectSessionCancellationStillStopsPOST(t *testing.T) {
 	if d["confirmed_by"] != "none" || d["http_status"] != 0 {
 		t.Fatal(d)
 	}
+}
+
+func r285CrashSignal() watchReconnectSignal {
+	return watchReconnectSignal{MatchedMarker: "crash-handler", CrashHandlerSeen: true, ProcessKnown: true, ProcessGone: true}
 }

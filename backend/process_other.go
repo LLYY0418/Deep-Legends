@@ -22,3 +22,7 @@ func nativeLeagueProcessSnapshot() (processQueryResult, error) {
 }
 
 func nativeLeagueCrashHandlerSeen() bool { return false }
+
+func nativeLeagueGameProcessRunning() (bool, error) {
+	return false, errors.New("game process snapshot is only available on Windows")
+}

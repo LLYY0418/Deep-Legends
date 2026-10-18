@@ -6,8 +6,6 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -20,11 +18,12 @@ const reconnectSettlementDelayMS = 5000
 const reconnectEventDataURL = "https://127.0.0.1:2999/liveclientdata/eventdata"
 
 type watchReconnectSignal struct {
-	ExitSignal                                     string
-	ExitCode                                       *int64
-	GameEndSeen, CrashHandlerSeen, ClientLogParsed bool
-	LastEventName                                  string
-	LastEventTime                                  float64
+	MatchedMarker                           string
+	GameLogFound, ProcessKnown, ProcessGone bool
+	GameLogBytes                            int
+	GameEndSeen, CrashHandlerSeen           bool
+	LastEventName                           string
+	LastEventTime                           float64
 }
 
 type watchReconnectKey struct {
@@ -77,8 +76,10 @@ type watchReconnectMonitor struct {
 	phase             string
 	gameID            int64
 	signal            watchReconnectSignal
-	tail              reconnectLogTail
+	logRoots          []string
+	inProgressAt      time.Time
 	nextEvent         int64
+	nextEventSample   time.Time
 	handlerSampled    bool
 	handlerPresent    bool
 	handlerAppearedAt time.Time
@@ -88,36 +89,24 @@ func reconnectSettlementPhase(phase string) bool {
 	return isEndOfGamePhase(phase) || phase == "None" || phase == "Lobby"
 }
 func reconnectSignalOutcome(s watchReconnectSignal) string {
-	if s.GameEndSeen {
-		return "canceled-game-end"
-	}
-	if s.ExitSignal == "normal" {
+	switch s.MatchedMarker {
+	case "game-exit-early":
 		return "canceled-voluntary"
-	}
-	return ""
-}
-func mergeReconnectSignal(old, next watchReconnectSignal) watchReconnectSignal {
-	old.GameEndSeen = old.GameEndSeen || next.GameEndSeen
-	old.CrashHandlerSeen = old.CrashHandlerSeen || next.CrashHandlerSeen
-	old.ClientLogParsed = old.ClientLogParsed || next.ClientLogParsed
-	if next.LastEventName != "" {
-		old.LastEventName, old.LastEventTime = next.LastEventName, next.LastEventTime
-	}
-	if next.ExitSignal == "normal" || old.ExitSignal != "normal" && next.ExitSignal == "crash" {
-		old.ExitSignal = next.ExitSignal
-		old.ExitCode = nil
-		if next.ExitCode != nil {
-			code := *next.ExitCode
-			old.ExitCode = &code
+	case "game-completed", "game-clean-shutdown":
+		return "canceled-clean-exit"
+	case "game-truncated", "crash-handler":
+		if s.ProcessKnown && s.ProcessGone {
+			return ""
 		}
 	}
-	if old.ExitSignal != "normal" && old.CrashHandlerSeen {
-		old.ExitSignal = "crash"
+	return "canceled-unknown"
+}
+func mergeReconnectSignal(old, next watchReconnectSignal) watchReconnectSignal {
+	next.GameEndSeen = old.GameEndSeen || next.GameEndSeen
+	if next.LastEventName == "" {
+		next.LastEventName, next.LastEventTime = old.LastEventName, old.LastEventTime
 	}
-	if old.ExitSignal == "" {
-		old.ExitSignal = "unknown"
-	}
-	return old
+	return next
 }
 
 // Runs before the legacy phase scheduler. Cancelling a timer is also a durable
@@ -152,12 +141,18 @@ func (r *watchRunner) observeReconnectPhase(client *LCUClient, phase string, set
 	if active && live && monitor == nil && r.reconnectSignals == nil && !r.customSession {
 		parent, stop := client.sessionRequestContext(context.Background())
 		ctx, cancel := context.WithCancel(parent)
-		monitor = &watchReconnectMonitor{client: client, cancel: cancel, phase: phase, nextEvent: 0}
+		monitor = &watchReconnectMonitor{client: client, cancel: cancel, nextEvent: 0}
 		r.reconnectMonitor = monitor
 		go func() { defer recoverPanic("watch.reconnect.monitor"); defer stop(); monitor.run(ctx) }()
 	}
 	if monitor != nil {
 		monitor.mu.Lock()
+		if phase == "InProgress" && monitor.phase != "InProgress" {
+			monitor.inProgressAt = r.clockNow()
+		}
+		if phase == "GameStart" && monitor.phase != "GameStart" {
+			monitor.inProgressAt = time.Time{}
+		}
 		monitor.phase = phase
 		monitor.mu.Unlock()
 	}
@@ -202,7 +197,7 @@ func reconnectSessionID(ctx context.Context, client *LCUClient) int64 {
 }
 func (r *watchRunner) readReconnectSignal(ctx context.Context, client *LCUClient) watchReconnectSignal {
 	if ctx.Err() != nil {
-		return watchReconnectSignal{ExitSignal: "unknown"}
+		return watchReconnectSignal{}
 	}
 	if r.reconnectSignals != nil {
 		return r.reconnectSignals(ctx, client)
@@ -215,9 +210,11 @@ func (r *watchRunner) readReconnectSignal(ctx context.Context, client *LCUClient
 	}
 	r.mu.Unlock()
 	if monitor == nil || monitor.client != client {
-		return watchReconnectSignal{ExitSignal: "unknown"}
+		return watchReconnectSignal{}
 	}
-	monitor.sample(ctx)
+	if !monitor.sample(ctx) {
+		return watchReconnectSignal{}
+	}
 	return monitor.snapshotForGame(gameID, time.Now())
 }
 
@@ -225,10 +222,15 @@ func (m *watchReconnectMonitor) snapshotForGame(id int64, now time.Time) watchRe
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if id <= 0 || m.gameID != id {
-		return watchReconnectSignal{ExitSignal: "unknown"}
+		return watchReconnectSignal{}
 	}
 	recentHandler := !m.handlerAppearedAt.IsZero() && now.Sub(m.handlerAppearedAt) >= 0 && now.Sub(m.handlerAppearedAt) <= 30*time.Second
-	return mergeReconnectSignal(m.signal, watchReconnectSignal{CrashHandlerSeen: recentHandler})
+	signal := m.signal
+	signal.CrashHandlerSeen = recentHandler
+	if recentHandler && signal.ProcessKnown && signal.ProcessGone && reconnectSignalOutcome(signal) != "canceled-voluntary" && reconnectSignalOutcome(signal) != "canceled-clean-exit" {
+		signal.MatchedMarker = "crash-handler"
+	}
+	return signal
 }
 
 func (m *watchReconnectMonitor) observeCrashHandler(present bool, now time.Time) {
@@ -291,13 +293,11 @@ func (r *watchRunner) scheduleReconnect(client *LCUClient, delay int) {
 				delete(r.pending, "reconnect")
 			}
 			r.mu.Unlock()
-			diagnostic := map[string]any{"event": "watch_reconnect_decision", "reconnect_ms": elapsed, "outcome": outcome, "exit_signal": signal.ExitSignal, "game_end_seen": signal.GameEndSeen, "crash_handler_seen": signal.CrashHandlerSeen, "client_log_parsed": signal.ClientLogParsed, "delay_ms_setting": attempt.delay, "effective_delay_ms": attempt.effective, "http_status": httpStatus, "confirmed_by": confirmedBy}
-			if signal.ExitSignal == "" {
-				diagnostic["exit_signal"] = "unknown"
+			marker := signal.MatchedMarker
+			if marker == "" {
+				marker = "none"
 			}
-			if signal.ExitCode != nil {
-				diagnostic["exit_code"] = *signal.ExitCode
-			}
+			diagnostic := map[string]any{"event": "watch_reconnect_decision", "reconnect_ms": elapsed, "outcome": outcome, "crash_handler_seen": signal.CrashHandlerSeen, "delay_ms_setting": attempt.delay, "effective_delay_ms": attempt.effective, "game_log_found": signal.GameLogFound, "game_log_bytes": signal.GameLogBytes, "process_gone": signal.ProcessGone, "matched_marker": marker, "http_status": httpStatus, "confirmed_by": confirmedBy}
 			r.record(diagnostic)
 			if !posted {
 				r.record(map[string]any{"event": "watch_action", "action": "reconnect", "result": "canceled", "reason": "reconnect-no-longer-active"})
@@ -332,7 +332,7 @@ func (r *watchRunner) scheduleReconnect(client *LCUClient, delay int) {
 			if id > 0 && reconnectGameRecorded(r.reconnectSettled, reconnectGameKey(client, id)) {
 				reason = "canceled-settle"
 			}
-			if attempt.reason == "" && reason != "" {
+			if attempt.reason == "" && reason != "" && reason != "canceled-unknown" {
 				attempt.reason = reason
 				cancel()
 			}
@@ -354,6 +354,14 @@ func (r *watchRunner) scheduleReconnect(client *LCUClient, delay int) {
 			return
 		}
 		signal := r.readReconnectSignal(ctx, client)
+		// Never classify a live process as truncated. Continue waiting without
+		// resetting the original delay or granting another automatic attempt.
+		for signal.ProcessKnown && !signal.ProcessGone {
+			if wait(ctx, time.Second) != nil {
+				return
+			}
+			signal = r.readReconnectSignal(ctx, client)
+		}
 		r.mu.Lock()
 		attempt.signal = mergeReconnectSignal(attempt.signal, signal)
 		reason := reconnectSignalOutcome(attempt.signal)
@@ -447,30 +455,48 @@ func (m *watchReconnectMonitor) run(ctx context.Context) {
 		}
 	}
 }
-func (m *watchReconnectMonitor) sample(ctx context.Context) {
+func (m *watchReconnectMonitor) sample(ctx context.Context) bool {
 	m.sampleMu.Lock()
 	defer m.sampleMu.Unlock()
 	if ctx.Err() != nil {
-		return
+		return false
 	}
 	id := reconnectSessionID(ctx, m.client)
 	if id <= 0 {
-		return
+		return false
 	}
 	m.mu.Lock()
 	if id > 0 && id != m.gameID {
 		m.gameID = id
 		m.signal = watchReconnectSignal{}
-		m.tail = reconnectLogTail{}
 		m.nextEvent = 0
+		m.nextEventSample = time.Time{}
 		m.handlerSampled, m.handlerPresent, m.handlerAppearedAt = false, false, time.Time{}
 	}
 	phase := m.phase
+	anchor := m.inProgressAt
+	roots := append([]string(nil), m.logRoots...)
 	nextEvent := m.nextEvent
+	sampleEvents := !time.Now().Before(m.nextEventSample)
+	if sampleEvents {
+		m.nextEventSample = time.Now().Add(10 * time.Second)
+	}
 	m.mu.Unlock()
-	signal := m.tail.read()
+	running, processErr := nativeLeagueGameProcessRunning()
+	signal := watchReconnectSignal{ProcessKnown: processErr == nil, ProcessGone: processErr == nil && !running}
+	if signal.ProcessGone {
+		if len(roots) == 0 {
+			query, _ := nativeLeagueProcessCommands()
+			roots = reconnectGameLogRoots(query)
+			m.mu.Lock()
+			m.logRoots = roots
+			m.mu.Unlock()
+		}
+		signal = readReconnectGameLogs(roots, anchor, time.Now())
+		signal.ProcessKnown, signal.ProcessGone = true, true
+	}
 	m.observeCrashHandler(nativeLeagueCrashHandlerSeen(), time.Now())
-	if phase == "InProgress" || phase == "Reconnect" {
+	if (phase == "InProgress" || phase == "Reconnect") && !signal.ProcessGone && sampleEvents {
 		name, eventTime, next, ended := readReconnectEvents(ctx, nextEvent, liveClientDataHTTPClient)
 		signal.LastEventName, signal.LastEventTime, signal.GameEndSeen = name, eventTime, ended
 		m.mu.Lock()
@@ -480,6 +506,7 @@ func (m *watchReconnectMonitor) sample(ctx context.Context) {
 	m.mu.Lock()
 	m.signal = mergeReconnectSignal(m.signal, signal)
 	m.mu.Unlock()
+	return true
 }
 
 func readReconnectEvents(ctx context.Context, next int64, client *http.Client) (string, float64, int64, bool) {
@@ -527,109 +554,3 @@ func readReconnectEvents(ctx context.Context, next int64, client *http.Client) (
 }
 
 var reconnectEventNamePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,47}$`)
-var reconnectExitCodePattern = regexp.MustCompile(`(?i)(?:exit(?:ed)?(?:\s+with)?[ _-]*code|exitcode)\s*[:=]?\s*(-?(?:0x[0-9a-f]+|[0-9]+))(?:\s|[,;.)]|$)`)
-
-func parseReconnectExitSignal(text string) watchReconnectSignal {
-	signal := watchReconnectSignal{ExitSignal: "unknown"}
-	for _, line := range strings.Split(text, "\n") {
-		lower := strings.ToLower(line)
-		if !strings.Contains(lower, "gameflow") && !strings.Contains(lower, "game process") && !strings.Contains(lower, "league of legends") {
-			continue
-		}
-		if match := reconnectExitCodePattern.FindStringSubmatch(line); len(match) == 2 {
-			code, err := strconv.ParseInt(match[1], 0, 64)
-			if err != nil {
-				continue
-			}
-			signal.ExitCode = &code
-			signal.ClientLogParsed = true
-			signal.ExitSignal = "crash"
-			if code == 0 {
-				signal.ExitSignal = "normal"
-			}
-		} else if strings.Contains(lower, "user closed") || strings.Contains(lower, "user quit") || strings.Contains(lower, "normal exit") || strings.Contains(lower, "exited normally") {
-			signal.ExitSignal = "normal"
-			signal.ClientLogParsed = true
-			signal.ExitCode = nil
-		}
-	}
-	return signal
-}
-
-type reconnectLogTail struct {
-	initialized bool
-	roots       []string
-	file        string
-	offset      int64
-}
-
-func (tail *reconnectLogTail) read() watchReconnectSignal {
-	if len(tail.roots) == 0 {
-		query, _ := nativeLeagueProcessCommands()
-		for _, lock := range targetedLockfileCandidates(query) {
-			tail.roots = append(tail.roots, filepath.Join(filepath.Dir(lock), "Logs"))
-		}
-	}
-	newest := ""
-	var newestAt time.Time
-	for _, root := range tail.roots {
-		for _, dir := range []string{root, filepath.Join(root, "LeagueClient Logs")} {
-			handle, err := os.Open(dir)
-			if err != nil {
-				continue
-			}
-			entries, _ := handle.ReadDir(512)
-			handle.Close()
-			for _, entry := range entries {
-				name := strings.ToLower(entry.Name())
-				if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || !strings.Contains(name, "leagueclient") || strings.Contains(name, "ux") || !strings.HasSuffix(name, ".log") {
-					continue
-				}
-				info, err := entry.Info()
-				if err == nil && info.ModTime().After(newestAt) {
-					newestAt = info.ModTime()
-					newest = filepath.Join(dir, entry.Name())
-				}
-			}
-		}
-	}
-	if newest == "" {
-		return watchReconnectSignal{ExitSignal: "unknown"}
-	}
-	file, err := os.Open(newest)
-	if err != nil {
-		return watchReconnectSignal{ExitSignal: "unknown"}
-	}
-	defer file.Close()
-	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() {
-		return watchReconnectSignal{ExitSignal: "unknown"}
-	}
-	if !tail.initialized {
-		tail.initialized = true
-		tail.file = newest
-		tail.offset = info.Size()
-		return watchReconnectSignal{ExitSignal: "unknown"}
-	}
-	if tail.file != newest || tail.offset > info.Size() {
-		tail.file = newest
-		tail.offset = info.Size()
-		return watchReconnectSignal{ExitSignal: "unknown"}
-	}
-	start := max(tail.offset, info.Size()-(64<<10))
-	raw := make([]byte, info.Size()-start)
-	n, _ := file.ReadAt(raw, start)
-	raw = raw[:n]
-	complete := strings.LastIndexByte(string(raw), '\n')
-	if complete < 0 {
-		return watchReconnectSignal{ExitSignal: "unknown"}
-	}
-	text := string(raw[:complete+1])
-	if start > tail.offset {
-		if first := strings.IndexByte(text, '\n'); first >= 0 {
-			text = text[first+1:]
-		}
-	}
-	tail.offset = start + int64(complete+1)
-	return parseReconnectExitSignal(text)
-}

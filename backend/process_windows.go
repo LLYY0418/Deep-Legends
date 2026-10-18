@@ -51,6 +51,12 @@ func nativeLeagueCrashHandlerSeen() bool {
 	result, err := nativeProcessSnapshot(false, "LeagueCrashHandler64.exe", "LeagueCrashHandler.exe")
 	return err == nil && result.ProcessCount > 0
 }
+
+// Read the Toolhelp name snapshot only; the game is never opened.
+func nativeLeagueGameProcessRunning() (bool, error) {
+	result, err := nativeProcessSnapshot(false, "League of Legends.exe")
+	return result.ProcessCount > 0, err
+}
 func nativeProcessCommands(processNames ...string) (processQueryResult, error) {
 	return nativeProcessSnapshot(true, processNames...)
 }

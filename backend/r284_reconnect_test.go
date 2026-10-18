@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -137,7 +136,7 @@ func (f *r284ReconnectFixture) decision(t *testing.T, want string) map[string]an
 	return nil
 }
 func TestR284ReconnectSettleAndRepeatedNotifications(t *testing.T) {
-	f := r284Reconnect(t, watchReconnectSignal{ExitSignal: "unknown"})
+	f := r284Reconnect(t, watchReconnectSignal{})
 	f.start(t)
 	f.now.Store(3000)
 	f.runner.handlePhase(f.client, "Reconnect")
@@ -154,8 +153,7 @@ func TestR284ReconnectSettleAndRepeatedNotifications(t *testing.T) {
 	}
 }
 func TestR284ReconnectCrashAtFifteenSeconds(t *testing.T) {
-	code := int64(1)
-	f := r284Reconnect(t, watchReconnectSignal{ExitSignal: "crash", ExitCode: &code, ClientLogParsed: true, CrashHandlerSeen: true})
+	f := r284Reconnect(t, r285CrashSignal())
 	f.start(t)
 	f.now.Store(3000)
 	if f.posts.Load() != 0 {
@@ -164,7 +162,7 @@ func TestR284ReconnectCrashAtFifteenSeconds(t *testing.T) {
 	f.now.Store(15000)
 	f.release <- struct{}{}
 	d := f.decision(t, "fired")
-	if f.posts.Load() != 1 || d["reconnect_ms"] != int64(15000) || d["exit_signal"] != "crash" || d["effective_delay_ms"] != 15000 {
+	if f.posts.Load() != 1 || d["reconnect_ms"] != int64(15000) || d["matched_marker"] != "crash-handler" || d["effective_delay_ms"] != 15000 {
 		t.Fatalf("crash decision=%v posts=%d", d, f.posts.Load())
 	}
 	f.now.Store(20000)
@@ -173,7 +171,7 @@ func TestR284ReconnectCrashAtFifteenSeconds(t *testing.T) {
 	}
 }
 func TestR284ReconnectOncePerGameAndManualUnaffected(t *testing.T) {
-	f := r284Reconnect(t, watchReconnectSignal{ExitSignal: "unknown"})
+	f := r284Reconnect(t, r285CrashSignal())
 	f.start(t)
 	f.now.Store(15000)
 	f.release <- struct{}{}
@@ -193,7 +191,7 @@ func TestR284ReconnectOncePerGameAndManualUnaffected(t *testing.T) {
 	}
 }
 func TestR284ReconnectOnceSurvivesClientRebinding(t *testing.T) {
-	f := r284Reconnect(t, watchReconnectSignal{ExitSignal: "unknown"})
+	f := r284Reconnect(t, r285CrashSignal())
 	f.client.region, f.client.rsoPlatform = "TENCENT", "HN1"
 	f.start(t)
 	f.now.Store(15000)
@@ -212,29 +210,10 @@ func TestR284ReconnectOnceSurvivesClientRebinding(t *testing.T) {
 		t.Fatal("different known servers were conflated")
 	}
 }
-func TestR284ReconnectNormalAndGameEnd(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		signal  watchReconnectSignal
-		outcome string
-	}{
-		{"normal", watchReconnectSignal{ExitSignal: "normal", ClientLogParsed: true}, "canceled-voluntary"},
-		{"game-end", watchReconnectSignal{ExitSignal: "crash", GameEndSeen: true}, "canceled-game-end"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			f := r284Reconnect(t, tc.signal)
-			f.start(t)
-			f.decision(t, tc.outcome)
-			if f.posts.Load() != 0 {
-				t.Fatal("voluntary/end reconnect")
-			}
-		})
-	}
-}
 func TestR284ReconnectPreflightKeepsGameAndPhase(t *testing.T) {
 	for _, kind := range []string{"game-changed", "settled-without-event", "late-normal"} {
 		t.Run(kind, func(t *testing.T) {
-			f := r284Reconnect(t, watchReconnectSignal{ExitSignal: "unknown"})
+			f := r284Reconnect(t, r285CrashSignal())
 			f.start(t)
 			want := "canceled-phase-changed"
 			switch kind {
@@ -244,7 +223,7 @@ func TestR284ReconnectPreflightKeepsGameAndPhase(t *testing.T) {
 				f.phase.Store("EndOfGame")
 				want = "canceled-settle"
 			case "late-normal":
-				f.signal.Store(watchReconnectSignal{ExitSignal: "normal", ClientLogParsed: true})
+				f.signal.Store(watchReconnectSignal{MatchedMarker: "game-exit-early", ProcessKnown: true, ProcessGone: true})
 				want = "canceled-voluntary"
 			}
 			f.now.Store(15000)
@@ -256,54 +235,8 @@ func TestR284ReconnectPreflightKeepsGameAndPhase(t *testing.T) {
 		})
 	}
 }
-func TestR284ReconnectExitLogParser(t *testing.T) {
-	for _, tc := range []struct {
-		text, signal string
-		code         *int64
-	}{
-		{"gameflow: Game exited with code: 0\n", "normal", r284ExitCode(0)},
-		{"gameflow: Game process exitCode = -1\n", "crash", r284ExitCode(-1)},
-		{"gameflow: League of Legends exited with code 0xC0000005\n", "crash", r284ExitCode(3221225477)},
-		{"gameflow: game user closed\n", "normal", nil},
-		{"unrelated client exit code: 0\n", "unknown", nil},
-		{"gameflow: unexpected format\n", "unknown", nil},
-	} {
-		signal := parseReconnectExitSignal(tc.text)
-		if signal.ExitSignal != tc.signal || !reflect.DeepEqual(signal.ExitCode, tc.code) || signal.ClientLogParsed != (tc.signal != "unknown") {
-			t.Fatalf("parse %q=%+v", tc.text, signal)
-		}
-	}
-}
-func r284ExitCode(code int64) *int64 { return &code }
-func TestR284ReconnectLogTailIgnoresPreviousExit(t *testing.T) {
-	root := t.TempDir()
-	file := filepath.Join(root, "2026_LeagueClient.log")
-	if err := os.WriteFile(file, []byte("gameflow: game exited with code: 0\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	tail := reconnectLogTail{roots: []string{root}}
-	if signal := tail.read(); signal.ClientLogParsed {
-		t.Fatal("old game exit reused")
-	}
-	appendFile, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = appendFile.WriteString("gameflow: game exited with code: 1\n")
-	appendFile.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if signal := tail.read(); signal.ExitSignal != "crash" || signal.ExitCode == nil || *signal.ExitCode != 1 {
-		t.Fatalf("new exit not read: %+v", signal)
-	}
-	if signal := tail.read(); signal.ClientLogParsed {
-		t.Fatal("old line consumed twice")
-	}
-}
-
 func TestR284ReconnectCannotForgetSettlementInSameGame(t *testing.T) {
-	f := r284Reconnect(t, watchReconnectSignal{ExitSignal: "unknown"})
+	f := r284Reconnect(t, watchReconnectSignal{})
 	f.start(t)
 	f.now.Store(3000)
 	f.phase.Store("WaitingForStats")
@@ -352,65 +285,30 @@ func TestR284ReconnectCrashDetectionUsesNamesOnly(t *testing.T) {
 	}
 }
 
-func TestR284ReconnectRotatedLogDoesNotReplayPreviousGame(t *testing.T) {
-	root := t.TempDir()
-	oldFile := filepath.Join(root, "1_LeagueClient.log")
-	nextFile := filepath.Join(root, "2_LeagueClient.log")
-	if err := os.WriteFile(oldFile, []byte("gameflow: game exited with code: 0\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	at := time.Unix(1700000000, 0)
-	if err := os.Chtimes(oldFile, at, at); err != nil {
-		t.Fatal(err)
-	}
-	tail := reconnectLogTail{roots: []string{root}}
-	tail.read()
-	if err := os.WriteFile(nextFile, []byte("gameflow: game exited with code: 0\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chtimes(nextFile, at.Add(time.Second), at.Add(time.Second)); err != nil {
-		t.Fatal(err)
-	}
-	if signal := tail.read(); signal.ClientLogParsed {
-		t.Fatal("rotation replayed a prior exit as the current game")
-	}
-	file, err := os.OpenFile(nextFile, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = file.WriteString("gameflow: game exited with code: 1\n")
-	file.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if signal := tail.read(); signal.ExitSignal != "crash" {
-		t.Fatalf("new rotated log append lost: %+v", signal)
-	}
-}
 func TestR284ReconnectSignalsCannotCrossUnknownGame(t *testing.T) {
 	client := &LCUClient{baseURL: "https://fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(*http.Request) (*http.Response, error) { return response2351(map[string]any{}), nil })}}
 	r := newWatchRunner(nil, nil)
-	r.reconnectMonitor = &watchReconnectMonitor{client: client, gameID: 284, signal: watchReconnectSignal{ExitSignal: "normal", GameEndSeen: true}}
-	r.reconnectAttempt = &watchReconnectAttempt{client: client, gameID: 285}
+	r.reconnectMonitor = &watchReconnectMonitor{client: client, gameID: 284, signal: watchReconnectSignal{MatchedMarker: "game-exit-early", GameEndSeen: true}}
+	r.reconnectAttempt = &watchReconnectAttempt{client: client, gameID: 284}
 	signal := r.readReconnectSignal(context.Background(), client)
-	if signal.ExitSignal == "normal" || signal.GameEndSeen {
+	if signal.MatchedMarker == "game-exit-early" || signal.GameEndSeen {
 		t.Fatal("an unknown session read reused the previous game's exit signal")
 	}
 }
 
 func TestR284ReconnectCrashHandlerMustAppearNearExit(t *testing.T) {
-	monitor := &watchReconnectMonitor{gameID: 284}
+	monitor := &watchReconnectMonitor{gameID: 284, signal: watchReconnectSignal{ProcessKnown: true, ProcessGone: true}}
 	at := time.Unix(1700000000, 0)
 	monitor.observeCrashHandler(true, at)
-	if signal := monitor.snapshotForGame(284, at); signal.ExitSignal == "crash" || signal.CrashHandlerSeen {
+	if signal := monitor.snapshotForGame(284, at); signal.MatchedMarker == "crash-handler" || signal.CrashHandlerSeen {
 		t.Fatal("pre-existing handler attributed to current exit")
 	}
 	monitor.observeCrashHandler(false, at.Add(time.Second))
 	monitor.observeCrashHandler(true, at.Add(2*time.Second))
-	if signal := monitor.snapshotForGame(284, at.Add(15*time.Second)); signal.ExitSignal != "crash" || !signal.CrashHandlerSeen {
+	if signal := monitor.snapshotForGame(284, at.Add(15*time.Second)); signal.MatchedMarker != "crash-handler" || !signal.CrashHandlerSeen {
 		t.Fatal("new handler was not observed")
 	}
-	if signal := monitor.snapshotForGame(284, at.Add(33*time.Second)); signal.ExitSignal == "crash" {
+	if signal := monitor.snapshotForGame(284, at.Add(33*time.Second)); signal.MatchedMarker == "crash-handler" {
 		t.Fatal("old handler leaked into a later reconnect window")
 	}
 	if signal := monitor.snapshotForGame(285, at.Add(15*time.Second)); signal.CrashHandlerSeen {
