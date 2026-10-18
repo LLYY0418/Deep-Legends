@@ -4099,7 +4099,7 @@
   function scoreRankChip(rank, total) {
     if (!rank) return "";
     const tone = rank <= 3 ? ` is-rank-${rank}` : "";
-    return `<b class="match-rank-chip${tone}" data-tooltip="本场评分排名：全场 ${number(total)} 人中的第 ${number(rank)} 名" data-tooltip-size="compact">${ordinalLabel(rank)}</b>`;
+    return `<b class="match-rank-chip${tone}" data-tooltip="评分：全场第${number(rank)}名" data-tooltip-size="compact">${ordinalLabel(rank)}</b>`;
   }
 
   // 补位标签：只认后端下发的布尔 true。R121 P1-1 起后端总开关默认关闭，正常

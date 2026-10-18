@@ -44,7 +44,7 @@ test('R214 score tooltip uses safe DOM rows and actual normalized widths without
  const setup=compile(read('app.js'),['setupFloatingTooltips'],{document:w.document,window:w,Element:w.Element,Node:w.Node,requestAnimationFrame:()=>1,cancelAnimationFrame:()=>{}});
  setup.setupFloatingTooltips();main.firstElementChild.dispatchEvent(new w.Event('pointerover',{bubbles:true}));
  const tooltip=w.document.querySelector('#global-tooltip');
- assert.equal(tooltip.hidden,false);assert.match(tooltip.textContent,/本局评分 · 全场第 2/);assert.doesNotMatch(tooltip.textContent,/公式|基准|中位数|非官方|贡献=|v2|权重/);
+ assert.equal(tooltip.hidden,false);assert.match(tooltip.textContent,/评分：全场第2名/);assert.doesNotMatch(tooltip.textContent,/公式|基准|中位数|非官方|贡献=|v2|权重/);
  const rows=[...tooltip.querySelectorAll('.tooltip-score-row')];assert.equal(rows.length,record.parts.length);assert.equal(rows.length,5);
  rows.forEach((row,i)=>{assert.equal(row.firstChild.textContent,record.parts[i].label);assert.equal(row.querySelector('i').style.width,`${Math.round(record.parts[i].norm*10000)/100}%`);});
  assert.equal(rows[0].querySelector('i').style.width,'50%');assert.ok(parseFloat(rows[2].querySelector('i').style.width)<50);

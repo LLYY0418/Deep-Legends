@@ -6,7 +6,7 @@ const current=fs.readFileSync(path.join(__dirname,'r272-browser-checks.cjs'),'ut
 function sampling(source){const end=source.indexOf("results.push({r272:'score-placement-native-narrow'");const start=source.lastIndexOf('  await evaluate(',source.indexOf('  const score=await evaluate(',0));const atomic=source.indexOf('  const score=await evaluate(');return source.slice(start>source.indexOf("for(const rank of")&&source.slice(start,atomic).includes("row.style.width='35px'")?start:atomic,end);}
 async function scenario(source,{breakFit=false}={}){
  const dom=new JSDOM('<main></main>',{runScripts:'outside-only'}),w=dom.window,list=w.document.querySelector('main');
- const markup='<article class="match-entry"><div class="match-tags-collection"><span data-match-tag data-match-tag-pinned>1st<i data-tooltip="本场评分排名：全场 16 人中的第 1"></i></span><span data-match-tag>五杀</span><button data-match-tags-more></button></div></article>';
+ const markup='<article class="match-entry"><div class="match-tags-collection"><span data-match-tag data-match-tag-pinned>1st<i data-tooltip="评分：全场第1名"></i></span><span data-match-tag>五杀</span><button data-match-tags-more></button></div></article>';
  Object.defineProperty(w.HTMLElement.prototype,'clientWidth',{get(){return this.style.width==='35px'?35:168;}});w.HTMLElement.prototype.getBoundingClientRect=()=>({width:40});const reset=()=>{list.innerHTML=markup;list.querySelector('.match-tags-collection').checkVisibility=()=>true;};reset();
  const fit=compile(fs.readFileSync(path.join(__dirname,'../backend/web/gameplay.js'),'utf8'),['fitMatchTags'],{bindMatchTagsPopover:()=>({anchor:null})}).fitMatchTags;
  w.__r272List=list;w.__r266Game={fitMatchTags:breakFit?()=>{}:fit};

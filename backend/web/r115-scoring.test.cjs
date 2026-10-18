@@ -9,7 +9,7 @@ const between = (name, next) => source.slice(source.indexOf(`function ${name}(`)
 test('score tooltip renders backend parts with no methodology',()=>{
  const score={score:6.2,rank:2,total:10,parts:[{key:'kda',value:3,norm:.5},{key:'kp',value:.6,norm:.55}]};
  const chip=new Function(`${between('scoreChip','scorePlacementChip')};return scoreChip;`)();
- assert.match(chip(score),/本局评分 · 全场第/);
+ assert.match(chip(score),/评分：全场第2名/);
  assert.match(chip(score),/data-tooltip-score=/);
  assert.doesNotMatch(chip(score),/公式|基准|中位数|非官方|贡献=|v2/);
 });
