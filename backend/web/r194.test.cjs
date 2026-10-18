@@ -41,7 +41,12 @@ test('R194 actual backend quickplay response renders our anonymous TOP among fiv
     assert.equal(top.querySelector('img').getAttribute('data-champion-id'), '1');
     assert.doesNotMatch(top.textContent, /未定级|—/);
     assert.equal(top.textContent.split('客户端未公开该玩家').length - 1, 1);
-    assert.equal(top.nextElementSibling.tagName, 'ARTICLE');
+    const history = top.nextElementSibling;
+    assert(history.classList.contains('insight-match-row'));
+    assert.equal(history.getAttribute('aria-hidden'), 'true');
+    assert.equal(history.childElementCount, 0);
+    assert.equal(history.textContent, '');
+    assert.equal(history.nextElementSibling.tagName, 'ARTICLE');
     assert.doesNotMatch(doc.querySelector('.live-refresh-status')?.textContent || '', /数据尚未完整/);
     assert.equal(h.liveSnapshotComplete(fixture), true);
   } finally { d.window.close(); }
