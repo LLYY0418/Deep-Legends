@@ -215,7 +215,7 @@ func TestR87ReconnectRequiresSustainedPhase(t *testing.T) {
 	r.handlePhase(&LCUClient{}, "Reconnect")
 	select {
 	case d := <-waiting:
-		if d < 15*time.Second {
+		if d < 5*time.Second {
 			t.Fatalf("reconnect armed after %s", d)
 		}
 	case <-time.After(time.Second):

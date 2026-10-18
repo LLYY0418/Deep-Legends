@@ -4,6 +4,7 @@ const root=path.resolve(__dirname,'..'),out=path.resolve(process.argv[2]),tmp=fs
 function check(name,r){const log=(r.stdout||'')+(r.stderr||'');fs.writeFileSync(path.join(out,name+'.log'),log);const killed=r.status!==0&&/AssertionError|ERR_ASSERTION|--- FAIL:/.test(log)&&!/build failed|SyntaxError|Cannot find module|operation not permitted/.test(log);results.push({name,killed,exit:r.status});assert(killed,name+' survived or failed outside assertion');console.log(name+' KILLED')}
 try{
  for(const [name,file,from,to,pattern] of [
+  ['P5-guard-http','backend/features.go','"match_autoload_client":          {"bound": true, "requested": true, "blocked": true, "started": true, "guard": true}','"match_autoload_client":          {"bound": true, "requested": true, "blocked": true, "started": true}','TestR285AutoloadGuardDiagnosticSurvivesStorage'],
   ['P2-cancel-inflight','backend/watch_reconnect.go','postCtx, postCancel := context.WithTimeout(parent, 8*time.Second)','postCtx, postCancel := context.WithTimeout(ctx, 8*time.Second)','TestR285ReconnectHTTPAndPhaseConfirmation/sse-before-http'],
   ['P3-zero-minimum','backend/watch_reconnect.go','reconnectSettlementDelayMS = 5000','reconnectSettlementDelayMS = 0','TestR285ReconnectDelayChoicesAndSettlement'],
   ['P7-unsplit','backend/arena_fame_discovery.go','for _, part := range arenaFameDiscoveryParts(event) {\n\t\ta.recordDiagnostic(part)\n\t}','a.recordDiagnostic(event)','TestR285ArenaDiscoveryPartsRoundTrip']]){

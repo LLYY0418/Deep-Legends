@@ -167,6 +167,7 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	t.Cleanup(server.Close)
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	runner := newWatchRunner(nil, func(event string) { events <- event })
+	runner.reconnectSignals = func(context.Context, *LCUClient) watchReconnectSignal { return r285CrashSignal() }
 	fire := make(chan struct{})
 	waiting := make(chan time.Duration, 1)
 	runner.wait = func(ctx context.Context, d time.Duration) error {
@@ -185,13 +186,13 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	runner.handlePhase(client, "Reconnect")
 	select {
 	case event := <-events:
-		if event != "watch:armed:reconnect:15000" {
+		if event != "watch:armed:reconnect:5000" {
 			t.Fatalf("armed event = %q", event)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("reconnect was not armed")
 	}
-	if delay := <-waiting; delay != 15*time.Second {
+	if delay := <-waiting; delay != 5*time.Second {
 		t.Fatalf("delay=%v", delay)
 	}
 	select {

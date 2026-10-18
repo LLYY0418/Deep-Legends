@@ -313,7 +313,7 @@ var clientDiagnosticEvents = map[string]map[string]bool{
 	"history_outage_retry":           {"recovered": true, "still_down": true},
 	"history_outage_ui":              {"shown": true, "recovered": true},
 	"overview_reference_fallback":    {"empty-revision": true, "missing": true, "mismatch": true},
-	"match_autoload_client":          {"bound": true, "requested": true, "blocked": true, "started": true},
+	"match_autoload_client":          {"bound": true, "requested": true, "blocked": true, "started": true, "guard": true},
 	"collection_new_marker":          {"skin": true},
 	"overview_reload_reason":         {"section-return": true, "head-probe": true, "manual": true, "zoom": true, "outage-recovery": true},
 	"announcement_state":             {"shown": true, "read": true, "dismissed": true, "fetch-failed": true},

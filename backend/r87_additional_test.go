@@ -78,6 +78,7 @@ func TestR87ReconnectPreflightRejectsLostEndEvent(t *testing.T) {
 				return response2351(phase), nil
 			})}}
 			r := newWatchRunner(nil, nil)
+			r.reconnectSignals = func(context.Context, *LCUClient) watchReconnectSignal { return r285CrashSignal() }
 			t.Cleanup(func() { r.cancelPending("reconnect") })
 			waiting := make(chan time.Duration, 1)
 			release := make(chan struct{})
@@ -104,7 +105,7 @@ func TestR87ReconnectPreflightRejectsLostEndEvent(t *testing.T) {
 			r.handlePhase(c, "Reconnect")
 			select {
 			case d := <-waiting:
-				if d < 15*time.Second {
+				if d < 5*time.Second {
 					t.Fatal("no debounce")
 				}
 			case <-time.After(time.Second):

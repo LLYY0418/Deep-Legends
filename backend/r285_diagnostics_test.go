@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
@@ -11,7 +12,11 @@ func TestR285AutoloadGuardDiagnosticSurvivesStorage(t *testing.T) {
 	for i, guard := range []string{"near", "requested", "frame-pending", "container", "service-down"} {
 		raw, _ := json.Marshal(map[string]any{"bound": true, "near": true, "requested": true, "started": false, "blocked_reason": guard, "generation": i + 1})
 		w := httptest.NewRecorder()
-		a.recordR278Diagnostic(w, clientDiagnosticRequest{Event: "match_autoload_client", Reason: "guard", R278: raw})
+		body, err := json.Marshal(clientDiagnosticRequest{Event: "match_autoload_client", Reason: "guard", R278: raw})
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.handleClientDiagnostic(w, httptest.NewRequest("POST", "/api/diagnostics/client", bytes.NewReader(body)))
 		if w.Code != 204 {
 			t.Fatal(w.Code, w.Body.String())
 		}
