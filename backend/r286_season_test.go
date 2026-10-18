@@ -162,3 +162,18 @@ func TestR286SameScanCannotAgeEmpty(t *testing.T) {
 		t.Fatal(s.cache)
 	}
 }
+
+func TestR286KnownOutageSnapshotDoesNotFlashCollecting(t *testing.T) {
+	a := r175App(t)
+	a.sgp = newSGPProvider()
+	ref := strings.Repeat("q", 48)
+	player := Summoner{PUUID: ref}
+	a.sgp.historyCircuits = map[string]*sgpHistoryCircuit{"HN1": {until: time.Now().Add(time.Minute)}}
+	season, _ := currentRankedSeason(time.Now())
+	hash := a.storage.accountHash(player)
+	a.seasonBackfills = map[string]struct{}{sourceScopedKey(seasonStatsSource, hash+"|"+season): {}}
+	_, p, _, _ := a.loadSeasonChampionStatsSnapshot(gameplayReference{ServerID: "HN1"}, player, ref)
+	if !p.Paused || p.Collecting {
+		t.Fatalf("known outage flashed collecting: %+v", p)
+	}
+}

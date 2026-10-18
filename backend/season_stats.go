@@ -848,7 +848,8 @@ func (a *app) loadSeasonChampionStatsSnapshot(reference gameplayReference, playe
 	}
 	_, running := a.seasonBackfills[sourceScopedKey(seasonStatsSource, hash+"|"+season)]
 	a.seasonBackfillMu.Unlock()
-	progress := seasonStatsProgress{Season: season, Collecting: running, Message: "正在后台读取本赛季对局"}
+	paused := a.sgp.historyCircuitCooling(serverID, "SUMMARY", false)
+	progress := seasonStatsProgress{Season: season, Paused: paused, Collecting: running && !paused, Message: "正在后台读取本赛季对局"}
 	if a.storage == nil {
 		return nil, progress, nil, nil
 	}
@@ -864,6 +865,7 @@ func (a *app) loadSeasonChampionStatsSnapshot(reference gameplayReference, playe
 	progress.Scanned = seasonStatsCount(cache.Stats)
 	progress.TableSupported = progress.Scanned >= 20 && len(cache.ChampionTable) > 0
 	progress.Complete = cache.Complete
+	progress.Paused = progress.Paused || paused
 	progress.Collecting = running && !cache.Complete && !progress.Paused
 	if cache.Complete {
 		progress.Message = fmt.Sprintf("已统计 %d 场", progress.Scanned)

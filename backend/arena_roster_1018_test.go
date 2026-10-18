@@ -45,10 +45,10 @@ func TestArenaKarmaRosterRetriesToEighteen(t *testing.T) {
 			})
 			now := time.Now()
 			f.app.liveClientPlayerListNow = func() time.Time { return now }
-			probes := 0
+			var probes atomic.Int64
 			f.app.liveClientPlayerList = func(context.Context) ([]byte, int, error) {
-				probes++
-				if probes <= 3 && firstSource != "alias-delayed" {
+				n := probes.Add(1)
+				if n <= 3 && firstSource != "alias-delayed" {
 					if firstSource == "unavailable" {
 						return nil, 503, fmt.Errorf("not started")
 					}
@@ -102,8 +102,8 @@ func TestArenaKarmaRosterRetriesToEighteen(t *testing.T) {
 			if firstSource == "alias-delayed" {
 				expectedProbes = 1
 			}
-			if probes != expectedProbes {
-				t.Fatal("incomplete playerlist cached permanently", probes)
+			if probes.Load() != int64(expectedProbes) {
+				t.Fatal("incomplete playerlist cached permanently", probes.Load())
 			}
 			events := r175Events(t, f.app, "arena_identity_recovery")
 			found := false

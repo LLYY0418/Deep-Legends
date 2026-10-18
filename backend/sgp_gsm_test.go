@@ -134,8 +134,13 @@ func TestGSMRoutesCacheFailuresAndScopes(t *testing.T) {
 			p.sessionOwner, p.sessionToken, p.sessionAt = client, "test-league-token", time.Now()
 			p.retryWait = func(context.Context, time.Duration) error { return nil }
 			var requests atomic.Int64
+			var observationsMu sync.Mutex
 			var observations []map[string]any
-			p.observe = func(e map[string]any) { observations = append(observations, e) }
+			p.observe = func(e map[string]any) {
+				observationsMu.Lock()
+				defer observationsMu.Unlock()
+				observations = append(observations, e)
+			}
 			p.http = &http.Client{Transport: sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 				requests.Add(1)
 				if r.Method != "GET" || r.URL.Host != "hn1-k8s-sgp.lol.qq.com:21019" || r.URL.Path != "/gsm/v1/ledge/region/HN1/puuid/"+r161Ref(6) || r.Header.Get("Authorization") != "Bearer test-league-token" {
@@ -169,7 +174,9 @@ func TestGSMRoutesCacheFailuresAndScopes(t *testing.T) {
 					t.Fatal("cache was mutated")
 				}
 			}
+			observationsMu.Lock()
 			encoded, _ := json.Marshal(observations)
+			observationsMu.Unlock()
 			for _, secret := range []string{r161Ref(6), gsmHiddenRef, "test-league-token", "secret-key", "secret-ip"} {
 				if strings.Contains(string(encoded), secret) {
 					t.Fatal("diagnostic identity/credential leak")
@@ -247,9 +254,10 @@ func TestGSMRefreshFailureRetainsVerifiedRosterTTL(t *testing.T) {
 	p := newSGPProvider()
 	p.sessionOwner, p.sessionToken, p.sessionAt = client, "test-token", time.Now()
 	p.retryWait = func(context.Context, time.Duration) error { return nil }
-	status, calls := 200, 0
+	status := 200
+	var calls atomic.Int64
 	p.http = &http.Client{Transport: sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		calls++
+		calls.Add(1)
 		data, _ := json.Marshal(gsmFixtureResponse())
 		return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(string(data))), Header: make(http.Header)}, nil
 	})}
@@ -273,8 +281,8 @@ func TestGSMRefreshFailureRetainsVerifiedRosterTTL(t *testing.T) {
 	if !retained.At.Equal(entry.At) || retained.TTL != entry.TTL {
 		t.Fatal("failure refreshed successful TTL")
 	}
-	before := calls
-	if got := p.liveGameRoster(context.Background(), client, key.Server, key.Player, key.GameID, key.QueueID); !got.Stale || calls != before {
+	before := calls.Load()
+	if got := p.liveGameRoster(context.Background(), client, key.Server, key.Player, key.GameID, key.QueueID); !got.Stale || calls.Load() != before {
 		t.Fatal("stale retry backoff failed")
 	}
 }
@@ -283,9 +291,9 @@ func TestGSMCacheSeparatesClientAccountAndServer(t *testing.T) {
 	client := &LCUClient{}
 	p := newSGPProvider()
 	p.sessionOwner, p.sessionToken, p.sessionAt = client, "test-token", time.Now()
-	var calls int
+	var calls atomic.Int64
 	p.http = &http.Client{Transport: sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		calls++
+		calls.Add(1)
 		data, _ := json.Marshal(gsmFixtureResponse())
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(string(data))), Header: make(http.Header)}, nil
 	})}
@@ -302,27 +310,27 @@ func TestGSMCacheSeparatesClientAccountAndServer(t *testing.T) {
 	if got := p.liveGameRoster(context.Background(), client, "HN1", r161Ref(6), 9025638917, 420); got.Cached || got.State != capabilityAvailable {
 		t.Fatal("new client inherited roster")
 	}
-	if calls != 5 {
-		t.Fatal(calls)
+	if calls.Load() != 5 {
+		t.Fatal(calls.Load())
 	}
 }
 
 func TestGSMRefreshesLeagueTokenAndNeverForwardsRedirect(t *testing.T) {
 	client := &LCUClient{baseURL: "http://127.0.0.1", token: "lcu-secret"}
-	var tokenReads int
+	var tokenReads atomic.Int64
 	client.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Path != "/lol-league-session/v1/league-session-token" {
 			t.Error("wrong token source")
 		}
-		tokenReads++
+		tokenReads.Add(1)
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`"fresh-league-token"`)), Header: make(http.Header)}, nil
 	})}
 	p := newSGPProvider()
 	p.sessionOwner, p.sessionToken, p.sessionAt = client, "expired-league-token", time.Now()
-	calls := 0
+	var calls atomic.Int64
 	p.http = &http.Client{Transport: sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		calls++
-		if calls == 1 {
+		calls.Add(1)
+		if calls.Load() == 1 {
 			return &http.Response{StatusCode: 401, Body: io.NopCloser(strings.NewReader(`{}`)), Header: make(http.Header)}, nil
 		}
 		if r.Header.Get("Authorization") != "Bearer fresh-league-token" {
@@ -331,8 +339,8 @@ func TestGSMRefreshesLeagueTokenAndNeverForwardsRedirect(t *testing.T) {
 		data, _ := json.Marshal(gsmFixtureResponse())
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(string(data))), Header: make(http.Header)}, nil
 	})}
-	if got := p.liveGameRoster(context.Background(), client, "HN1", r161Ref(6), 9025638917, 420); got.State != capabilityAvailable || calls != 2 || tokenReads != 1 {
-		t.Fatal(got, calls, tokenReads)
+	if got := p.liveGameRoster(context.Background(), client, "HN1", r161Ref(6), 9025638917, 420); got.State != capabilityAvailable || calls.Load() != 2 || tokenReads.Load() != 1 {
+		t.Fatal(got, calls.Load(), tokenReads.Load())
 	}
 	p.http = &http.Client{Transport: sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Host != "hn1-k8s-sgp.lol.qq.com:21019" {
@@ -376,6 +384,7 @@ func TestGSMLuluEndToEndWithoutChampSelect(t *testing.T) {
 				game.ParticipantIdentities, game.Participants = []lcuParticipantIdentity{identity}, []lcuParticipant{participant}
 				var history lcuMatchHistory
 				history.Games.GameCount, history.Games.Games = 1, []lcuGame{game}
+				var requestsMu *sync.Mutex = &f.mu
 				f.client.http.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 					var value any
 					switch r.URL.Path {
@@ -399,9 +408,9 @@ func TestGSMLuluEndToEndWithoutChampSelect(t *testing.T) {
 					default:
 						return base.RoundTrip(r)
 					}
-					f.mu.Lock()
+					requestsMu.Lock()
 					f.requests[r.URL.Path]++
-					f.mu.Unlock()
+					requestsMu.Unlock()
 					data, _ := json.Marshal(value)
 					return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(string(data))), Header: make(http.Header)}, nil
 				})

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -143,6 +144,8 @@ func arenaProgressionGroups(raw json.RawMessage) []arenaProgressionGroup {
 
 // Keep numeric leaves only. Dynamic account keys, identifiers, names, tokens and
 // payload strings are discarded rather than forwarded to diagnostics.
+var arenaProgressionPrivate = regexp.MustCompile(`(?i)puuid|uuid|game.?name|display.?name|tag.?line|^(?:(?:access|refresh|auth|session|entitlements)?token|(?:summoner|account|player)?id)$|Id$`)
+
 func arenaProgressionNumbers(raw json.RawMessage) map[string]float64 {
 	out := map[string]float64{}
 	var root any
@@ -166,7 +169,7 @@ func arenaProgressionNumbers(raw json.RawMessage) map[string]float64 {
 			}
 			sort.Strings(keys)
 			for _, k := range keys {
-				if !arenaDiscoveryIdentifier.MatchString(k) || arenaDiscoveryPrivate.MatchString(k) || len(k) >= 36 {
+				if !arenaDiscoveryIdentifier.MatchString(k) || arenaProgressionPrivate.MatchString(k) || len(k) >= 36 {
 					continue
 				}
 				p := k

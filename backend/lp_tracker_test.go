@@ -656,7 +656,7 @@ func TestR182SeasonFallbackSkippedAndDiagnosticsDedup(t *testing.T) {
 	raw.Losses = 0
 	raw.WinRate = -1
 	a := &app{}
-	filled, _ := a.applySeasonRankWinRateFallback([]gameplayRank{raw}, EndpointCapability{}, seasonStatsProgress{Complete: true}, map[int64]gameplayAggregate{420: {Games: 25, Wins: 12, Losses: 13, WinRate: 48}})
+	filled, _ := a.applySeasonRankWinRateFallback([]gameplayRank{raw}, EndpointCapability{}, seasonStatsProgress{Complete: true, RankedComplete: true}, map[int64]gameplayAggregate{420: {Games: 25, Wins: 12, Losses: 13, WinRate: 48}})
 	if !filled[0].seasonFallback {
 		t.Fatal("fallback provenance missing")
 	}

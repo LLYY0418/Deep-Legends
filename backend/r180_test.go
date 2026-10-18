@@ -406,9 +406,10 @@ func TestR180RealRosterStageDiagnostics(t *testing.T) {
 	}
 	current := Summoner{PUUID: f.a.summoner.PUUID, GameName: "Player0", TagLine: "CN1"}
 	for tick := 0; tick < 3; tick++ {
-		progressCount, earlyHistory := 0, false
+		var progressCount atomic.Int64
+		var earlyHistory atomic.Bool
 		ctx := context.WithValue(context.Background(), liveProgressPublisherKey{}, func(value gameplayLiveResponse) {
-			progressCount++
+			progressCount.Add(1)
 			pending, ready := 0, 0
 			for _, player := range value.Players {
 				if player.HistoryState == "pending" {
@@ -419,7 +420,7 @@ func TestR180RealRosterStageDiagnostics(t *testing.T) {
 				}
 			}
 			if pending > 0 && ready > 0 {
-				earlyHistory = true
+				earlyHistory.Store(true)
 			}
 			encoded, _ := json.Marshal(value)
 			for i := 0; i < 10; i++ {
@@ -429,8 +430,8 @@ func TestR180RealRosterStageDiagnostics(t *testing.T) {
 			}
 		})
 		response := f.a.loadGameplayLive(ctx, f.c, current, "ChampSelect")
-		if progressCount < 11 || !earlyHistory {
-			t.Fatal("real roster did not progressively publish", progressCount, earlyHistory)
+		if progressCount.Load() < 11 || !earlyHistory.Load() {
+			t.Fatal("real roster did not progressively publish", progressCount.Load(), earlyHistory.Load())
 		}
 		costs := r175Events(t, f.a, "live_load_cost")
 		if len(costs) == 0 {

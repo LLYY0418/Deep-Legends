@@ -6404,7 +6404,7 @@ test("R45 mutation probes reject every documented A, B, and C regression", () =>
       "localPlayerCellID = champSelect.LocalPlayerCellID",
       "localPlayerCellID = nil",
     ))],
-    ["C5 local cell argument", () => assertR45Contracts(gameplayScript, gameplayStyles, gameplayBackend.replace(
+    ["C5 local cell argument", () => assertR45Contracts(gameplayScript, gameplayStyles, gameplayBackend.replaceAll(
       "gameplayLivePlayerIsCurrent(reference, current.PUUID, raw.player.CellID, localPlayerCellID)",
       "gameplayLivePlayerIsCurrent(reference, current.PUUID, raw.player.CellID, nil)",
     ))],

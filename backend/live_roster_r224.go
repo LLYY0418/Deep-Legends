@@ -140,6 +140,7 @@ func (a *app) recoverArenaPlayerList(ctx context.Context, client *LCUClient, res
 		}
 		wait.Add(1)
 		go func(i int) {
+			defer a.recoverPanic("arena.identity-profile")
 			defer wait.Done()
 			select {
 			case sem <- struct{}{}:

@@ -717,49 +717,49 @@
     "file": "backend/lp_tracker_test.go",
     "line": 44,
     "target": "events",
-    "source_sha256": "9ec0f4e2d647d177e49e82be04cde80344801a5622fb926043c3419017447571",
+    "source_sha256": "319b6ad49c398cf3293d27dc09a66a5505982b001dc1e6e085cd2b1329ae076a",
     "comment": "r276-capture-safe: captureLPObservations: observe, capture and takeGameStart are called synchronously by its callers; each returns before the captured event slice is inspected; Gameflow event tests use a separate synchronized observer"
   },
   {
     "file": "backend/lp_tracker_test.go",
     "line": 227,
     "target": "calls",
-    "source_sha256": "9ec0f4e2d647d177e49e82be04cde80344801a5622fb926043c3419017447571",
+    "source_sha256": "319b6ad49c398cf3293d27dc09a66a5505982b001dc1e6e085cd2b1329ae076a",
     "comment": "r276-capture-safe: TestLPTrackerCaptureTimeoutDiagnostics: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/lp_tracker_test.go",
     "line": 512,
     "target": "calls",
-    "source_sha256": "9ec0f4e2d647d177e49e82be04cde80344801a5622fb926043c3419017447571",
+    "source_sha256": "319b6ad49c398cf3293d27dc09a66a5505982b001dc1e6e085cd2b1329ae076a",
     "comment": "r276-capture-safe: r182Capture: tracker.capture invokes its rank callback serially and returns before this helper returns calls"
   },
   {
     "file": "backend/lp_tracker_test.go",
     "line": 726,
     "target": "waits",
-    "source_sha256": "9ec0f4e2d647d177e49e82be04cde80344801a5622fb926043c3419017447571",
+    "source_sha256": "319b6ad49c398cf3293d27dc09a66a5505982b001dc1e6e085cd2b1329ae076a",
     "comment": "r276-capture-safe: TestR182StartRetryBudgetAndPhaseDedup: the audited fixture operations in this test invoke this callback serially and return before waits is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/lp_tracker_test.go",
     "line": 729,
     "target": "calls",
-    "source_sha256": "9ec0f4e2d647d177e49e82be04cde80344801a5622fb926043c3419017447571",
+    "source_sha256": "319b6ad49c398cf3293d27dc09a66a5505982b001dc1e6e085cd2b1329ae076a",
     "comment": "r276-capture-safe: TestR182StartRetryBudgetAndPhaseDedup: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/lp_tracker_test.go",
     "line": 745,
     "target": "calls",
-    "source_sha256": "9ec0f4e2d647d177e49e82be04cde80344801a5622fb926043c3419017447571",
+    "source_sha256": "319b6ad49c398cf3293d27dc09a66a5505982b001dc1e6e085cd2b1329ae076a",
     "comment": "r276-capture-safe: TestR182StartRetryBudgetAndPhaseDedup: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/lp_tracker_test.go",
     "line": 920,
     "target": "calls",
-    "source_sha256": "9ec0f4e2d647d177e49e82be04cde80344801a5622fb926043c3419017447571",
+    "source_sha256": "319b6ad49c398cf3293d27dc09a66a5505982b001dc1e6e085cd2b1329ae076a",
     "comment": "r276-capture-safe: TestR182NoStartKeepsFirstEligibleDecision: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
