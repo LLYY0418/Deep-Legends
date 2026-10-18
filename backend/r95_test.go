@@ -108,8 +108,10 @@ func TestR95MissingKnownSquadMemberAndTruth(t *testing.T) {
 				t.Fatal(missing)
 			}
 			list := missing[0]["missing"].([]any)
-			if len(list) != 1 || list[0].(map[string]any)["index"] != float64(0) || list[0].(map[string]any)["is_current"] != true {
-				t.Fatal(list)
+			// Identity recovery now restores remembered members before enrichment.
+			// This diagnostic compares the final queryable roster with playerlist.
+			if len(list) != 0 || missing[0]["session_count"] != float64(18) || missing[0]["playerlist_count"] != float64(18) {
+				t.Fatal(missing[0])
 			}
 			info := r90TruthInfo()
 			if wrong {
