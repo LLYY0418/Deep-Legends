@@ -3709,7 +3709,7 @@ func rankMilestonesForRegion(region string, milestones *gameplayRankMilestones) 
 // aggregate for that exact queue. Incomplete scans keep the upstream empty
 // state so the capability detail remains reachable by the client.
 func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability EndpointCapability, progress seasonStatsProgress, seasonByQueue map[int64]gameplayAggregate) ([]gameplayRank, EndpointCapability) {
-	if !progress.Complete {
+	if !progress.RankedComplete {
 		return ranks, capability
 	}
 	filled := 0
@@ -8015,6 +8015,9 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	response.Available = true
 	rawPlayers = a.supplementLiveGSMRoster(ctx, client, current, &response, rawPlayers)
 	arenaMode := isArenaQueue(response.QueueID, response.GameMode)
+	if arenaMode && (phase == "ChampSelect" || phase == "GameStart") {
+		a.startArenaProgressionDiscovery(client, phase)
+	}
 	aramMode := isARAMFamilyGameMode(response.GameMode)
 	switch queueModeGroupFor(response.QueueID, response.GameMode, response.MapID) {
 	case "aram", "hextech-aram", "hextech-classic":

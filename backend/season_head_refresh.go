@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-func (a *app) recordSeasonHeadRecent(fresh bool, scanned int, complete bool) {
-	a.recordDiagnostic(map[string]any{"event": "season_stats_head_refresh", "fresh": fresh, "use_history_cache": false, "skipped": true, "skip_reason": "recent", "new_games": 0, "sgp_requests": 0, "sgp_bytes": 0, "sgp_history_calls": 0, "sgp_history_cache_hits": 0, "decode_failed": 0, "scanned": scanned, "complete": complete})
+func (a *app) recordSeasonHeadRecent(fresh bool, progress seasonStatsProgress) {
+	a.recordDiagnostic(map[string]any{"event": "season_stats_head_refresh", "fresh": fresh, "use_history_cache": false, "skipped": true, "skip_reason": "recent", "new_games": 0, "sgp_requests": 0, "sgp_bytes": 0, "sgp_history_calls": 0, "sgp_history_cache_hits": 0, "decode_failed": 0, "scanned": progress.Scanned, "complete": progress.Complete, "paused": progress.Paused, "ranked_complete": progress.RankedComplete})
 }
 
 // The unfiltered marker includes games outside the season's tracked queues.
@@ -20,6 +20,12 @@ func (a *app) refreshSeasonHead(ctx context.Context, client *LCUClient, referenc
 	progress.applyUpstreamBoundary(cache)
 	infos, consumed, _, err := a.sgp.matchHistoryFilteredOn(ctx, client, reference.ServerID, playerRef, 0, 1, nil, false)
 	if err != nil || len(infos) < consumed {
+		progress.Paused, progress.Collecting = true, false
+		cache.SchemaVersion, cache.Source, cache.Season, cache.AccountHash = seasonStatsCacheSchemaVersion, seasonStatsSource, season, hash
+		cache.Paused = true
+		if _, saveErr := a.storage.saveSeasonStatsReported(cache); saveErr != nil {
+			a.recordDiagnostic(map[string]any{"event": "season_stats_save_failed", "reason": "pause"})
+		}
 		progress.Message = "赛季统计暂时中断，已保留当前进度"
 		return progress, false, "", 0
 	}
@@ -39,6 +45,11 @@ func (a *app) refreshSeasonHead(ctx context.Context, client *LCUClient, referenc
 		}
 	}
 	if known {
+		cache.Paused, progress.Paused = false, false
+		progress.Collecting = !cache.Complete
+		if _, err := a.storage.saveSeasonStatsReported(cache); err != nil {
+			a.recordDiagnostic(map[string]any{"event": "season_stats_save_failed", "reason": "resume"})
+		}
 		cache.HeadGameID, cache.HeadCheckedAt = latest, time.Now()
 		if err := a.storage.saveSeasonHeadMarker(seasonStatsSource, hash, season, latest, time.Now()); err != nil {
 			a.recordDiagnostic(map[string]any{"event": "season_head_marker_save_failed", "error_kind": "local_write"})
@@ -60,7 +71,7 @@ func (a *app) refreshSeasonHead(ctx context.Context, client *LCUClient, referenc
 			added++
 		}
 	}
-	if progress.Message != "赛季统计暂时中断，已保留当前进度" {
+	if !progress.Paused {
 		final.HeadGameID, final.HeadCheckedAt = latest, time.Now()
 		if err := a.storage.saveSeasonHeadMarker(seasonStatsSource, hash, season, latest, time.Now()); err != nil {
 			a.recordDiagnostic(map[string]any{"event": "season_head_marker_save_failed", "error_kind": "local_write"})

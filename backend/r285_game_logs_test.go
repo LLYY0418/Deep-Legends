@@ -17,7 +17,11 @@ type r285GameLogFixture struct {
 
 func r285GameLogFixtures(t *testing.T) []r285GameLogFixture {
 	t.Helper()
-	raw, err := os.ReadFile("testdata/r285-game-log-signatures.json")
+	fixturePath := os.Getenv("R286_RECONNECT_FIXTURES")
+	if fixturePath == "" {
+		fixturePath = "testdata/r285-game-log-signatures.json"
+	}
+	raw, err := os.ReadFile(fixturePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +65,7 @@ func TestR285RealGameLogReconnectDecisions(t *testing.T) {
 		t.Run(sample.Directory, func(t *testing.T) {
 			s := r285FixtureSignal(t, sample)
 			outcome, marker := "canceled-voluntary", "game-exit-early"
-			if strings.Contains(sample.Directory, "13-49-36") {
+			if strings.Contains(sample.Directory, "13-49-36") || strings.Contains(sample.Directory, "22-58-32") {
 				outcome, marker = "fired", "game-truncated"
 			}
 			if strings.Contains(sample.Directory, "14-14-35") {

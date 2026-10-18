@@ -3,16 +3,19 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"time"
 )
 
 // R235: fetch the two head streams concurrently, but fold pages on one goroutine.
 // Each worker waits for its fold decision before requesting another page.
 func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, serverID, playerRef string, scan *seasonScanState, budget int, useCache bool) {
 	scan.interrupted = false
+	scan.scanID = time.Now().UnixNano()
+	scan.cache.Paused = false
 	pageSize := sgpPageSize
 	// Incremental heads read one game at a time, stopping at the first saved ID.
 	// Cold scans retain the existing batched path and background continuation.
-	if len(scan.seen) > 0 {
+	if len(scan.seen) > 0 && scan.cache.Complete {
 		pageSize = 1
 		budget = max(budget, seasonScanBackgroundPages*seasonBackfillMaxRounds*sgpPageSize)
 	}
@@ -35,6 +38,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 		more     bool
 		err      error
 		next     chan bool
+		empty    []sgpEmptyHistoryEntry
 	}
 	pages := make(chan page, 2)
 	done := make(chan struct{}, 2)
@@ -54,10 +58,11 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 			defer a.recoverPanic("season.head")
 			start := 0
 			for n := 0; n < budget; n++ {
-				infos, consumed, more, err := a.sgp.matchHistoryFilteredOn(ctx, client, serverID, playerRef, start, pageSize, seasonStreamTags[stream], useCache)
+				var empty []sgpEmptyHistoryEntry
+				infos, consumed, more, err := a.sgp.matchHistoryFilteredWithDecodeOn(ctx, client, serverID, playerRef, start, pageSize, seasonStreamTags[stream], useCache, &empty)
 				reply := make(chan bool, 1)
 				select {
-				case pages <- page{stream, start, infos, consumed, more, err, reply}:
+				case pages <- page{stream, start, infos, consumed, more, err, reply, empty}:
 				case <-ctx.Done():
 					return
 				}
@@ -83,10 +88,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 				p.next <- false
 				continue
 			}
-			decodeIncomplete := len(p.infos) < p.consumed
-			if decodeIncomplete {
-				scan.interrupted = true
-			}
+			decodeIncomplete := scan.seasonDecodeIncomplete(p.stream, len(p.infos), p.consumed, p.empty)
 			if scan.newInfos == nil {
 				scan.newInfos = map[int64]*riotMatchInfo{}
 			}
@@ -109,7 +111,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 				}
 				if scan.seen[info.GameID] {
 					hit = true
-					break
+					continue
 				}
 				scan.seen[info.GameID] = true
 				scan.cache.GameIDs = append(scan.cache.GameIDs, info.GameID)
@@ -119,7 +121,8 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 				seasonAccumulateChampionTable(&scan.cache, info, playerRef, scan.seasonStartMillis)
 				seasonRecordRankedMatch(&scan.cache, info, playerRef)
 			}
-			if decodeIncomplete {
+			if decodeIncomplete && !boundary {
+				scan.interrupted = true
 				// Retain valid games without advancing past an undecodable entry.
 				// A later refresh can retry it; the season must remain incomplete.
 				cursor.Complete = false
@@ -139,6 +142,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 				cursor.ResumeIndex = p.offset + p.consumed
 				cursor.PendingIndex = cursor.ResumeIndex
 			}
+			scan.cache.Paused = scan.interrupted
 			scan.cache.Streams[p.stream] = cursor
 			scan.cache.Complete = len(scan.cache.Streams) == 2
 			scan.cache.CappedByUpstream = false
@@ -149,7 +153,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 			if scan.onPage != nil {
 				scan.onPage(scan)
 			}
-			a.recordDiagnostic(map[string]any{"event": "season_backfill_round", "stream": p.stream, "head": true, "stop_reason": cursor.StopReason, "oldest_created_at": cursor.OldestCreatedAt, "capped_by_upstream": cursor.CappedByUpstream})
+			a.recordDiagnostic(map[string]any{"event": "season_backfill_round", "stream": p.stream, "head": true, "stop_reason": cursor.StopReason, "oldest_created_at": cursor.OldestCreatedAt, "capped_by_upstream": cursor.CappedByUpstream, "skipped_undecodable": scan.cache.SkippedUndecodable})
 			p.next <- !decodeIncomplete && !boundary && p.more && !hit
 		}
 	}
@@ -158,12 +162,13 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 	if ctx.Err() != nil {
 		scan.interrupted = true
 	}
+	scan.cache.Paused = scan.interrupted
 }
 
 func (a *app) publishSeasonSnapshot(reference gameplayReference, playerRef string, cache seasonStatsCache) {
 	stats := seasonStatsResponse(cache.Stats)
 	progress := seasonStatsProgress{Season: cache.Season, Scanned: seasonStatsCount(cache.Stats), Complete: cache.Complete, Collecting: !cache.Complete, TableSupported: len(cache.ChampionTable) > 0 && seasonStatsCount(cache.Stats) >= 20}
 	progress.applyUpstreamBoundary(cache)
-	event, _ := json.Marshal(map[string]any{"type": "season-progress", "season": cache.Season, "account": a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: playerRef})), "scanned": progress.Scanned, "complete": progress.Complete, "snapshot": map[string]any{"seasonChampionStats": stats, "seasonOverall": seasonStatsOverall(stats), "seasonStatsProgress": progress, "seasonQueueStats": cache.QueueStats}})
+	event, _ := json.Marshal(map[string]any{"type": "season-progress", "season": cache.Season, "account": a.registerGameplayReferenceDetails(mergeGameplayReferences(reference, gameplayReference{PlayerRef: playerRef})), "scanned": progress.Scanned, "complete": progress.Complete, "paused": progress.Paused, "rankedComplete": progress.RankedComplete, "snapshot": map[string]any{"seasonChampionStats": stats, "seasonOverall": seasonStatsOverall(stats), "seasonStatsProgress": progress, "seasonQueueStats": cache.QueueStats}})
 	a.broadcastEvent(string(event))
 }

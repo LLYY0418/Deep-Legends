@@ -283,217 +283,217 @@
     "file": "backend/gameplay_test.go",
     "line": 403,
     "target": "expire",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestGameplayOverviewReturnsPartialBeforeTwentySeconds: the audited fixture operations in this test invoke this callback serially and return before expire is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 513,
     "target": "gotQuery",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestGameplayHistoryUsesRequestedPageWindow: the audited fixture operations in this test invoke this callback serially and return before gotQuery is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 587,
     "target": "requests[r.URL.Path]",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestGameplayPerkCatalogCachesLCUFiles: the audited fixture operations in this test invoke this callback serially and return before requests[r.URL.Path] is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 684,
     "target": "requests[r.URL.Path]",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestLCUSingleParticipantSummaryFetchesFullGameDetail: the audited fixture operations in this test invoke this callback serially and return before requests[r.URL.Path] is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 1127,
     "target": "requests",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestLoadSGPMatchHistoryPageFlexUsesOneQueueTagRequest: the audited fixture operations in this test invoke this callback serially and return before requests is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 1384,
     "target": "lcuCalls",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestRankedStatsPreferCompleteLCUWithoutCallingSGP: the audited fixture operations in this test invoke this callback serially and return before lcuCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 1389,
     "target": "sgpCalls",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestRankedStatsPreferCompleteLCUWithoutCallingSGP: the audited fixture operations in this test invoke this callback serially and return before sgpCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 1415,
     "target": "lcuCalls",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestRankedStatsFallBackToSGPWhenLCUFails: the audited fixture operations in this test invoke this callback serially and return before lcuCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 1420,
     "target": "sgpCalls",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestRankedStatsFallBackToSGPWhenLCUFails: the audited fixture operations in this test invoke this callback serially and return before sgpCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 1444,
     "target": "lcuCalls",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestRankedStatsCompletionGateStopsOnlyUnproductiveLCUFallbacks: the audited fixture operations in this test invoke this callback serially and return before lcuCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 1453,
     "target": "sgpCalls",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestRankedStatsCompletionGateStopsOnlyUnproductiveLCUFallbacks: the audited fixture operations in this test invoke this callback serially and return before sgpCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 1494,
     "target": "lcuCalls",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestPlayerRankScoreCachesSGPFallbackUnderPreferredLCUKey: the audited fixture operations in this test invoke this callback serially and return before lcuCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 1499,
     "target": "sgpCalls",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestPlayerRankScoreCachesSGPFallbackUnderPreferredLCUKey: the audited fixture operations in this test invoke this callback serially and return before sgpCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 2876,
     "target": "now",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestR62ArenaPlayerListRetriesAndGroupsSeventeenPlayers: the audited fixture operations in this test invoke this callback serially and return before now is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3650,
     "target": "requests",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestApplyRunePageCreatesNewPageAndMakesItCurrent: the audited fixture operations in this test invoke this callback serially and return before requests is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3700,
     "target": "requests",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestApplyRunePageFullWithOnlyUserPagesNeverDeletes: the audited fixture operations in this test invoke this callback serially and return before requests is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3724,
     "target": "requests",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestApplyRunePageFullDeletesOnlyOldestOwnedPageThenCreates: the audited fixture operations in this test invoke this callback serially and return before requests is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3727,
     "target": "inventoryReads",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestApplyRunePageFullDeletesOnlyOldestOwnedPageThenCreates: the audited fixture operations in this test invoke this callback serially and return before inventoryReads is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3760,
     "target": "inventoryReads",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestApplyRunePageSortsMissingLastModifiedByID: the audited fixture operations in this test invoke this callback serially and return before inventoryReads is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3765,
     "target": "deleted",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestApplyRunePageSortsMissingLastModifiedByID: the audited fixture operations in this test invoke this callback serially and return before deleted is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3827,
     "target": "inventoryReads",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestApplyRunePageRecycleLoopStopsAfterFiveDeletes: the audited fixture operations in this test invoke this callback serially and return before inventoryReads is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3832,
     "target": "deleted",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestApplyRunePageRecycleLoopStopsAfterFiveDeletes: the audited fixture operations in this test invoke this callback serially and return before deleted is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3879,
     "target": "requests",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestRuneApplyHandlerNeverWritesOutsideChampionSelect: the audited fixture operations in this test invoke this callback serially and return before requests is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3899,
     "target": "requests",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestRuneApplyHandlerExplainsClientPageLimit: the audited fixture operations in this test invoke this callback serially and return before requests is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 3992,
     "target": "paths",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestRuneApplySummonerSpellPatchAndPartialSuccess: the audited fixture operations in this test invoke this callback serially and return before paths is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 4303,
     "target": "detailPaths",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestGameplayRecommendationsHandlerResolvesPositionThroughHTTP: the audited fixture operations in this test invoke this callback serially and return before detailPaths is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 4573,
     "target": "retryDelays",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestR69LiveHistoryStatesDistinguishUnavailableEmptyAndFailed: the audited fixture operations in this test invoke this callback serially and return before retryDelays is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 5167,
     "target": "callbackBlocked",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestDiagnosticRotationCallbackRunsOutsideGeneralStorageMutex: the callback probes store.mu with TryLock and unlocks it immediately; log rotation invokes the callback synchronously before callbackBlocked is asserted"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 5668,
     "target": "putCount",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestItemSetApplyPreservesUserSetsAndStoresIdempotently: the audited fixture operations in this test invoke this callback serially and return before putCount is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 5673,
     "target": "document",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestItemSetApplyPreservesUserSetsAndStoresIdempotently: the audited fixture operations in this test invoke this callback serially and return before document is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/gameplay_test.go",
     "line": 6040,
     "target": "requests",
-    "source_sha256": "101789b2d6b08486a8f9c75c6523493d99c1eec99bd4540c48e81b34439167b2",
+    "source_sha256": "8bf35ed5743ce1d8e9a1ed799f7792c3df425ea5c05ed0776a9a338230208650",
     "comment": "r276-capture-safe: TestItemSetApplyNeverReadsOrWritesSetsOutsideChampionSelect: the audited fixture operations in this test invoke this callback serially and return before requests is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

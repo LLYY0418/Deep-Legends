@@ -31,6 +31,7 @@ type arenaFameDiscoveryState struct {
 	stops          []func()
 	operations     []lcuHelpOperation
 	baseline       map[string]map[string]float64
+	progression    *arenaProgressionProbe
 }
 
 var arenaDiscoveryName = regexp.MustCompile(`(?i)cherry|arena|fame|gladiator|progression|eog|end-of-game|pre-end-of-game`)
@@ -161,6 +162,13 @@ func arenaDiscoveryShape(raw json.RawMessage) ([]string, map[string]float64) {
 	return keys, numbers
 }
 func arenaDiscoveryHelp(raw json.RawMessage) []lcuHelpOperation {
+	ops := arenaDiscoveryHelpAll(raw)
+	if len(ops) > 60 {
+		ops = ops[:60]
+	}
+	return ops
+}
+func arenaDiscoveryHelpAll(raw json.RawMessage) []lcuHelpOperation {
 	var root any
 	if json.Unmarshal(raw, &root) != nil {
 		return nil
@@ -199,20 +207,11 @@ func arenaDiscoveryHelp(raw json.RawMessage) []lcuHelpOperation {
 			if path != "" && strings.HasPrefix(path, "/lol-") && arenaDiscoveryName.MatchString(path) && !strings.ContainsAny(path, "?#") {
 				// A static path can still require query/body arguments. Do not probe it.
 				for _, label := range []string{"arguments", "parameters"} {
-					if params, ok := node[label].([]any); ok {
-						for _, param := range params {
-							if arg, ok := param.(map[string]any); ok {
-								optional, _ := arg["optional"].(bool)
-								required, _ := arg["required"].(bool)
-								name := firstString(arg, "name")
-								if (required || !optional) && !strings.Contains(path, "{"+name+"}") {
-									method = "GET_REQUIRES_PARAMETERS"
-								}
-							}
-						}
+					if arenaHelpRequiredOutsidePath(node[label], path) {
+						method = "GET_REQUIRES_PARAMETERS"
 					}
 				}
-				op := lcuHelpOperation{Method: method, Path: path}
+				op := lcuHelpOperation{Method: method, Path: path, Name: name}
 				if !slices.Contains(ops, op) {
 					ops = append(ops, op)
 				}
@@ -231,9 +230,7 @@ func arenaDiscoveryHelp(raw json.RawMessage) []lcuHelpOperation {
 	}
 	walk(root, "")
 	slices.SortFunc(ops, func(a, b lcuHelpOperation) int { return strings.Compare(a.Path+a.Name, b.Path+b.Name) })
-	if len(ops) > 60 {
-		ops = ops[:60]
-	}
+
 	return ops
 }
 func arenaDiscoveryGETPath(template string, self Summoner) string {
@@ -311,7 +308,7 @@ func (a *app) discoverArenaFame(client *LCUClient) {
 				row["name"] = op.Name
 			}
 			row["method"] = op.Method
-			if op.Method == http.MethodGet {
+			if op.Method == http.MethodGet && arenaProgressionKind(op) == "" {
 				if path := arenaDiscoveryGETPath(op.Path, self); path != "" {
 					var raw json.RawMessage
 					probe, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -401,7 +398,7 @@ func arenaFameDiscoveryParts(event map[string]any) []map[string]any {
 		} // Observations contain only JSON values.
 		chunk := ""
 		emit := func() {
-			parts = append(parts, map[string]any{"event": "arena_fame_discovery", "discovery_id": id, "part": key, "encoding": "json-fragments", "data": chunk})
+			parts = append(parts, map[string]any{"event": event["event"], "discovery_id": id, "part": key, "encoding": "json-fragments", "data": chunk})
 			chunk = ""
 		}
 		for _, r := range string(raw) {
@@ -452,6 +449,7 @@ func (a *app) observeArenaDiscoveryPhase(client *LCUClient, phase string) {
 	if client == nil {
 		return
 	}
+	a.observeArenaProgressionPhase(client, phase)
 	s := client.arenaDiscoveryState()
 	s.mu.Lock()
 	previous := s.lastPhase
@@ -519,7 +517,7 @@ func (a *app) probeArenaFamePostGame(client *LCUClient, s *arenaFameDiscoverySta
 	}
 	rows := []map[string]any{}
 	for _, op := range ops {
-		if op.Method != http.MethodGet {
+		if op.Method != http.MethodGet || arenaProgressionKind(op) != "" {
 			continue
 		}
 		path := arenaDiscoveryGETPath(op.Path, self)
@@ -547,4 +545,45 @@ func (a *app) probeArenaFamePostGame(client *LCUClient, s *arenaFameDiscoverySta
 		return
 	}
 	s.event["post_game"] = rows
+}
+
+// Full help uses both arrays and name-keyed maps for arguments. Unknown nonempty
+// parameter shapes are unresolved; no query/body argument is guessed.
+func arenaHelpRequiredOutsidePath(value any, path string) bool {
+	switch n := value.(type) {
+	case nil:
+		return false
+	case []any:
+		for _, v := range n {
+			if arenaHelpRequiredOutsidePath(v, path) {
+				return true
+			}
+		}
+		return false
+	case map[string]any:
+		if len(n) == 0 {
+			return false
+		}
+		if name := firstString(n, "name"); name != "" {
+			optional, _ := n["optional"].(bool)
+			required, _ := n["required"].(bool)
+			return (required || !optional) && !strings.Contains(path, "{"+name+"}")
+		}
+		for key, v := range n {
+			if arg, ok := v.(map[string]any); ok {
+				copy := map[string]any{"name": key}
+				for k, x := range arg {
+					copy[k] = x
+				}
+				if arenaHelpRequiredOutsidePath(copy, path) {
+					return true
+				}
+			} else {
+				return true
+			}
+		}
+		return false
+	default:
+		return true
+	}
 }

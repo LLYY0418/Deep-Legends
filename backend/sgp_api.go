@@ -886,6 +886,14 @@ func (p *sgpProvider) cacheHistoryPage(serverID, puuid string, startIndex, pageS
 // official client ecosystem. Multiple queue tags are sent as an OR query; the
 // caller validates the returned queues before treating the filter as supported.
 func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUClient, serverID, puuid string, start, count int, tags []string, useCache bool) ([]*riotMatchInfo, int, bool, error) {
+	return p.matchHistoryFilteredWithDecodeOn(ctx, client, serverID, puuid, start, count, tags, useCache, nil)
+}
+
+type sgpEmptyHistoryEntry struct{ Offset int }
+
+func (p *sgpProvider) matchHistoryFilteredWithDecodeOn(ctx context.Context, client *LCUClient, serverID, puuid string, start, count int, tags []string, useCache bool, empty *[]sgpEmptyHistoryEntry) ([]*riotMatchInfo, int, bool, error) {
+	// Successful cached pages remain reusable. A failed page must be read again
+	// upstream before it can count as a second empty-record observation.
 	overviewCostFromContext(ctx).addHistoryCall()
 	p.mu.Lock()
 	generation := p.historyGeneration
@@ -923,7 +931,7 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 					break
 				}
 			}
-			if cached, cachedPageSize, ok := p.cachedHistoryPage(serverID, puuid, pageStart, pageSize, tags); ok {
+			if cached, cachedPageSize, ok := p.cachedHistoryPage(serverID, puuid, pageStart, pageSize, tags); ok && (empty == nil || cached.decodeFailed == 0) {
 				overviewCostFromContext(ctx).addHistoryCacheHit()
 				games = append(games, cached.games...)
 				recordSGPDecodeCount(ctx, cached.decodeFailed)
@@ -963,9 +971,12 @@ func (p *sgpProvider) matchHistoryFilteredOn(ctx context.Context, client *LCUCli
 		participantKeys := make(map[string]struct{})
 		parsedPageGames := make([]*riotMatchInfo, 0, len(page.Games))
 		decodeFailed := 0
-		for _, game := range page.Games {
+		for index, game := range page.Games {
 			decoded, decodeErr := decodeSGPHistoryGame(game.JSON)
 			if decodeErr != nil {
+				if empty != nil && (len(strings.TrimSpace(string(game.JSON))) == 0 || strings.TrimSpace(string(game.JSON)) == "null" || strings.TrimSpace(string(game.JSON)) == `""`) {
+					*empty = append(*empty, sgpEmptyHistoryEntry{Offset: pageStart + index})
+				}
 				decodeFailed++
 				p.recordObservation(sgpGameDecodeDiagnostic(decodeErr, game.JSON))
 				continue

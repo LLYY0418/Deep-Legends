@@ -1367,7 +1367,8 @@
         }
         if (append) appendOverviewMatches(tab, appendAdditions);
         else rerenderTab(tab,"loadOverview");
-        if(tab.historyRecoveryPending && historyRecoveryActive(tab))void retryHistoryRegion(tab,'outage-recovery');
+        if(tab.seasonRecoveryPending && !tab.closed && !state.destroyed){delete tab.seasonRecoveryPending;void loadOverview(tab,true,false,true,true,0,false,!historyRecoveryActive(tab));}
+        else if(tab.historyRecoveryPending && historyRecoveryActive(tab))void retryHistoryRegion(tab,'outage-recovery');
         delete tab.detailRetryRunning;
 	  }
 	  if (reloadAfterAppend) {
@@ -1439,11 +1440,16 @@
 	// 页签不在前台时先记下，回到这个页签再强制刷新一次。
 	function markSeasonRefreshPending(detail) {
 	  const account = String(detail?.account || "");
-	  if (!account || detail?.complete !== true) return;
+	  if (!account) return;
 	  for (const tab of [...(state.tabs || []), ...(state.overlay || [])]) {
 		if (!tab?.data) continue;
 		const tabAccount = String(tab.data?.player?.playerRef || tab.playerRef || "");
-		if (tabAccount === account && tab.data.seasonStatsProgress?.complete === false) tab.seasonRefreshPending = true;
+		if (tabAccount !== account) continue;
+        const progress=tab.data.seasonStatsProgress || {};
+        if(detail.complete===true || detail.rankedComplete===true || detail.paused!==progress.paused) {
+          tab.seasonRefreshPending = true;
+          if(state.section!=="overview" || activeTab(overviewGroupForSection())!==tab)void refreshSeasonSummary(tab,detail.snapshot || null);
+        }
 	  }
 	}
 
@@ -1456,7 +1462,7 @@
       tab.data={...tab.data,seasonChampionStats:data.seasonChampionStats,seasonOverall:data.seasonOverall,seasonStatsProgress:data.seasonStatsProgress,seasonQueueStats:data.seasonQueueStats};
       tab.data.rankedQueues={...(tab.data.rankedQueues || {})};
       for(const [key,queue] of Object.entries(data.rankedQueues || {}))tab.data.rankedQueues[key]={...tab.data.rankedQueues[key],seasonGames:queue.seasonGames};
-      if(data.seasonStatsProgress?.complete) {
+      if(data.seasonStatsProgress?.rankedComplete) {
         tab.seasonRanksFilled ||= new Set();
         tab.data.ranks=(tab.data.ranks || []).map(rank=>{
           const key=rank.queueType==="RANKED_SOLO_5x5" ? "420" : rank.queueType==="RANKED_FLEX_SR" ? "440" : "";
@@ -1555,7 +1561,14 @@
   function handleHistoryServiceRecovered(detail) {
     if(state.section==="live" && state.live?.historyServiceDown)void loadLive(true,"outage-recovery");
     for(const tab of [...state.tabs,...state.overlay]){
-      if(riotTab(tab) || !historyServiceState(tab) || detail?.serverId && tabServerID(tab)!==detail.serverId)continue;
+      if(riotTab(tab) || detail?.serverId && tabServerID(tab)!==detail.serverId)continue;
+      if(tab.data?.seasonStatsProgress?.paused) {
+        if(tab.loading){tab.seasonRecoveryPending=true;continue;}
+        // A forced head refresh also restarts persisted backfill, including hidden tabs.
+        void loadOverview(tab,true,false,true,true,0,false,!historyRecoveryActive(tab));
+        continue;
+      }
+      if(!historyServiceState(tab))continue;
       tab.historyRecoveryPending=true;
       if(historyRecoveryActive(tab) && !tab.loading)retryHistoryRegion(tab,'outage-recovery');
     }
@@ -1623,7 +1636,7 @@
     const official=status.kind==="official",title=official?"战绩服务暂时中断":"外服战绩连接较慢";
     const copy=official?"英雄联盟官方战绩服务器暂时无法返回对局数据，游戏客户端里的战绩也会受影响。恢复后会自动重新读取。":"暂时没有读取到对局，恢复后会自动补齐。";
     const waiting=Boolean(tab.historyRetryPending || tab.loading || tab.loadingMore),retryCopy=tab.historyRetryPending?'<span class="mini-loading" aria-hidden="true"></span>正在重试':tab.historyRetryStillDown?"仍未恢复":waiting?"读取中":null,disabled=waiting?' disabled aria-busy="true"':'';
-    if(compact)return `<div class="service-outage-compact" role="status">${serviceOutageIcon()}<span>${title}${official?"，以下为已保存的对局":""}</span><button class="text-button" type="button" data-gameplay-retry${disabled}>${retryCopy || (official?"重试":"重试补齐")}</button></div>`;
+    if(compact)return `<div class="service-outage-compact" role="status">${serviceOutageIcon()}<span>${official?"官方":""}${title}${official?"，以下为已保存的对局":""}</span><button class="text-button" type="button" data-gameplay-retry${disabled}>${retryCopy || (official?"重试":"重试补齐")}</button></div>`;
     return `<div class="service-outage" role="status"><div class="service-outage-disc">${serviceOutageIcon()}</div><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-gameplay-retry${disabled}>${retryCopy || "立即重试"}</button></div>`;
   }
   function historyStatsPending(data,tab) {
@@ -1701,7 +1714,8 @@
 
 	async function handleSeasonProgress(detail, now = Date.now()) {
 	  if (!detail || detail.type !== "season-progress") return false;
-	  if (state.section !== "overview") { markSeasonRefreshPending(detail); return false; }
+	  markSeasonRefreshPending(detail);
+      if (state.section !== "overview") return false;
 	  const group = overviewGroupForSection();
 	  const tab = activeTab(group);
 	  const progress = tab?.data?.seasonStatsProgress;
@@ -1709,7 +1723,7 @@
 	  const account = String(detail.account || "");
 	  const tabAccount = String(tab.data?.player?.playerRef || tab.playerRef || "");
 	  if (account && tabAccount && account !== tabAccount) { markSeasonRefreshPending(detail); return false; }
-	  const completed = detail.complete === true && progress.complete === false;
+	  const completed = detail.complete === true && progress.complete === false || detail.rankedComplete === true && !progress.rankedComplete || typeof detail.paused === "boolean" && detail.paused !== Boolean(progress.paused);
 	  const advanced = Number(detail.scanned || 0) > Number(progress.scanned || 0);
 	  if (!completed && !advanced) return false;
 	  const refreshKey = account || tabAccount || tab.key;
@@ -3154,9 +3168,18 @@
       if ((!rank || !rank.tier) && !rankedCapability && tab?.loading) return `<div class="rank-row gameplay-skeleton"><span class="rank-crest"></span><div><span></span><span></span></div><div class="rank-record"><span></span><span></span></div></div>`;
       if (!rank || !rank.tier) return `<div class="rank-row"><span class="rank-crest is-unranked" aria-hidden="true">◇</span><div><strong>${label}</strong></div><b>未定级</b></div>`;
       const recordKnown = Number(rank.winRate) >= 0;
-      const collecting = !recordKnown && seasonProgress?.collecting === true;
-      const record = recordKnown ? `${number(rank.wins)}胜 ${number(rank.losses)}负` : collecting ? `${number(rank.wins)}胜 · 正在统计中` : `${number(rank.wins)}胜 · 负场未提供`;
-	  const unavailableDetail = collecting ? "正在统计中" : (rankedCapability?.detail || "上游未提供负场，无法计算胜率");
+      const paused = !recordKnown && seasonProgress?.paused === true;
+      const collecting = !recordKnown && !paused && seasonProgress?.collecting === true;
+      const recordState = recordKnown ? "known" : paused ? "paused" : collecting ? "collecting" : "unavailable";
+      if(tab) {
+        tab.rankRecordStates ||= {};
+        if(tab.rankRecordStates[queue]!==recordState) {
+          tab.rankRecordStates[queue]=recordState;
+          window.reportFlowDiagnostic?.("rank_record_state",recordState,{queue:queue==="RANKED_SOLO_5x5"?"solo":"flex",state:recordState});
+        }
+      }
+      const record = recordKnown ? `${number(rank.wins)}胜 ${number(rank.losses)}负` : paused ? `${number(rank.wins)}胜 · 统计已暂停` : collecting ? `${number(rank.wins)}胜 · 正在统计中` : `${number(rank.wins)}胜 · 负场未提供`;
+	  const unavailableDetail = paused ? "官方战绩服务暂时中断，恢复后自动继续统计" : collecting ? "正在统计中" : (rankedCapability?.detail || "上游未提供负场，无法计算胜率");
 	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 <b class="win-rate-value">${percent(rank.winRate)}</b>` : collecting ? "正在统计中" : "胜率暂不可用"}</span></div></div>`;
     }).join("");
     return `<section class="career-section rank-career-section"><header><h3>排位</h3><div class="rank-header-tools"><span>当前赛季</span>${mmr}</div></header><div class="rank-list${rows.includes('gameplay-skeleton')?' career-pending':''}">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;

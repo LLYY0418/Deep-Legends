@@ -74,6 +74,7 @@ type rendererPerfGroup struct {
 	MaxMS   float64 `json:"maxMs"`
 }
 type clientDiagnosticRequest struct {
+	RankRecordQueue   string          `json:"queue,omitempty"`
 	OverviewPage      string          `json:"page,omitempty"`
 	OverviewFrom      string          `json:"from,omitempty"`
 	R278              json.RawMessage `json:"r278,omitempty"`
@@ -294,6 +295,7 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"rank_record_state":              {"known": true, "collecting": true, "paused": true, "unavailable": true},
 	"build_spells_client":            {"render": true},
 	"augment_description_client":     {"ok": true, "retry": true, "unavailable": true},
 	"overview_art_client":            {"summary": true},
@@ -452,6 +454,15 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	event := map[string]any{"event": request.Event, "reason": request.Reason}
+	if request.Event == "rank_record_state" {
+		if !slices.Contains([]string{"solo", "flex"}, request.RankRecordQueue) || request.ClientViewState != request.Reason {
+			http.Error(w, "invalid rank state", 400)
+			return
+		}
+		a.recordDiagnostic(map[string]any{"event": request.Event, "queue": request.RankRecordQueue, "state": request.ClientViewState})
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if request.Event == "overview_subpage_open" {
 		if !slices.Contains([]string{"champion-table", "masteries"}, request.OverviewPage) || !slices.Contains([]string{"dialog", "page"}, request.OverviewFrom) {
 			http.Error(w, "invalid subpage diagnostic", 400)

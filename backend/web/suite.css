@@ -270,7 +270,7 @@
 .facade-write-list dt { color: var(--ink); }
 .facade-write-list dd { margin: 0; color: var(--muted); }
 .facade-write-note { border-left: 3px solid var(--muted); }
-.facade-background-card .suite-card-head { margin-bottom: 10px; }
+.facade-background-card .suite-card-head { min-height: 38px; align-items: center; margin-bottom: 10px; }
 .facade-selections { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
 .facade-selections .select-wrap { min-width: 150px; }
 .facade-background-card .suite-select { min-height: 32px; }

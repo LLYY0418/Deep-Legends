@@ -1,0 +1,12 @@
+{
+ "help":{"functions":{
+  "GetLolProgressionV1GroupsConfiguration":{"url":"/lol-progression/v3/catalog/groups/configuration","http_method":"GET","arguments":[]},
+  "GetLolProgressionV1GroupsByGroupIdInstanceData":{"url":"/lol-progression/v3/catalog/groups/{groupId}/instance-data","http_method":"GET","arguments":[{"name":"groupId","required":true}]},
+  "GetLolInventoryV1CherryInventory":{"url":"/lol-inventory/v6/bags/cherry","http_method":"GET","arguments":[]},
+  "PostLolProgressionV1Reset":{"url":"/lol-progression/v3/reset","http_method":"POST","arguments":[]}
+ }},
+ "configuration":{"groups":[{"groupId":"cherry-season","name":"ArenaSeason","puuid":"PRIVATE-CONFIG-ID"}]},
+ "before":{"instance":{"counters":{"fame":10,"totalGames":3,"unchanged":99},"playerId":123456,"puuid":"PRIVATE-PUUID","gameName":"PRIVATE-NAME"},"inventory":{"fameBalance":4,"accountId":654321,"displayName":"PRIVATE-NAME"}},
+ "after":{"instance":{"counters":{"fame":25,"totalGames":4,"unchanged":99},"playerId":123456,"puuid":"PRIVATE-PUUID","gameName":"PRIVATE-NAME"},"inventory":{"fameBalance":5,"accountId":654321,"displayName":"PRIVATE-NAME"}},
+ "unresolvedHelp":{"functions":{"GetLolProgressionV1GroupsConfiguration":"No HTTP path or method","GetLolProgressionV1GroupsByGroupIdInstanceData":"No HTTP path or method","GetLolInventoryV1CherryInventory":"No HTTP path or method"}}
+}

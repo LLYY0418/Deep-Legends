@@ -226,6 +226,12 @@
     await sendFlowDiagnostic(body, JSON.stringify(body), 1, 1500);
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
+    if(event==="rank_record_state") {
+      if(!["solo","flex"].includes(fields.queue) || !["known","collecting","paused","unavailable"].includes(fields.state) || reason!==fields.state)return;
+      const body={event,reason,queue:fields.queue,state:fields.state},encoded=JSON.stringify(body);
+      if(flowPending.size>=32 || flowPending.has(encoded))return;
+      flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
+    }
     if(['build_spells_client','augment_description_client','overview_art_client','career_cards_render','match_virtual_client','pool_render_client','history_outage_retry','client_follow_client','history_outage_ui','overview_reference_fallback','match_autoload_client','collection_new_marker','overview_reload_reason','announcement_state'].includes(event)){
       const allowed=['mode','spell1Id_missing','spell1Id_zero','spell1Id_value','spell2Id_missing','spell2Id_zero','spell2Id_value','augment_id','retry_count','error_kind','gave_up','video_path_present','reduced_motion','video_rendered','src_set','playing','error_code','media_http_status','rerender_count','card','games','generation','view','item_count','rendered_cards','result','duration_ms','collapsed','hydrated','height_mismatch_max_px','zoom','from_group','to_group','search_from','search_to','applied','source','count','bound','near','requested','started','blocked_reason','latency_ms','matches_before','matches_after','id','notice_revision','durationMs'];
       const r278={};for(const key of allowed)if(Object.hasOwn(fields,key))r278[key]=fields[key];
