@@ -803,7 +803,7 @@
   }
 
   function paginationCopyFor(tab) {
-    if((tab.data?.pagination?.historyServiceDown || historyServiceState(tab)?.kind==="official") && !tab.data?.pagination?.localHasMore)return '<span>官方战绩服务暂时中断，部分玩家战绩无法读取，恢复后点「刷新对局」</span>';
+    if((tab.data?.pagination?.historyServiceDown || historyServiceState(tab)?.kind==="official") && !tab.data?.pagination?.localHasMore)return '<span>战绩服务暂时中断</span>';
     if(matchesPending(tab) || globalThis.deepLegendsHistoryFilters?.active(tab) || !(tab.data?.matches?.length) && (tab.initialPageError || tab.error))return "";
 	const data = tab.data || {};
 	const pagination = data.pagination || { hasMore: false };
@@ -9508,6 +9508,7 @@
     closeCareerDialog();
   });
   nodes.careerDialog?.addEventListener("close", () => {
+    if (nodes.careerDialog.open) return;
     state.careerDialogObserver?.disconnect();
     state.careerDialogObserver = null;
     nodes.careerDialog.style.removeProperty("--career-dialog-width");

@@ -1,10 +1,16 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('../../desktop/node_modules/jsdom'),{compile,escapeHTML}=require('./r188-harness.cjs');
 const source=()=>fs.readFileSync(process.env.R284_GAME_SOURCE||__dirname+'/gameplay.js','utf8');
-test('R284 P3 exhausted outage footer has the approved reason and no action',()=>{
+test('R284 P3 exhausted overview outage reuses its title without match-page copy or actions',()=>{
  const f=compile(source(),['paginationCopyFor','normalizedPagination'],{MAX_BROWSE_MATCHES:1000,number:String,escapeHTML,historyServiceState:()=>({kind:'official'}),matchesPending:()=>false});
- for(const count of [20,4]){const tab={data:{matches:Array.from({length:count},()=>({})),pagination:{hasMore:true,historyServiceDown:true,localHasMore:false}}};const html=f.paginationCopyFor(tab);assert(html.includes('官方战绩服务暂时中断，部分玩家战绩无法读取，恢复后点「刷新对局」'));assert(!html.includes('<button'));tab.data.pagination.localHasMore=true;assert(f.paginationCopyFor(tab).includes('data-load-more'),'retained tail must remain browsable');}
+ for(const count of [20,4]){const tab={data:{matches:Array.from({length:count},()=>({})),pagination:{hasMore:true,historyServiceDown:true,localHasMore:false}}};const html=f.paginationCopyFor(tab);assert.equal(html,'<span>战绩服务暂时中断</span>');assert.doesNotMatch(html,/<button|刷新对局|部分玩家/);tab.data.pagination.localHasMore=true;assert(f.paginationCopyFor(tab).includes('data-load-more'),'retained tail must remain browsable');}
  const p=f.normalizedPagination({matches:[],pagination:{begIndex:20,count:0,hasMore:false,historyServiceDown:true,localHasMore:false}},20);assert.equal(p.hasMore,true,'unknown upstream tail must remain resumable');assert.equal(p.nextBegIndex,20);
+});
+test('R284 match-page official outage keeps its original reason',()=>{
+ const f=compile(source(),['renderLiveRefreshStatus'],{state:{beacon:{phase:'InProgress'}},liveGamePhase:()=>true,serviceOutageIcon:()=>'',escapeHTML});
+ const html=f.renderLiveRefreshStatus({phase:'InProgress',historyServiceDown:true});
+ assert(html.includes('官方战绩服务暂时中断，部分玩家战绩无法读取，恢复后点「刷新对局」'));
+ assert.doesNotMatch(html,/<button/);
 });
 test('R284 P3 outage sentinel blocks with a diagnostic, retained and normal tails still load',()=>{
  for(const down of ['pagination','capability','failure',false])for(const local of [true,false]){

@@ -12,7 +12,7 @@ test('R278 P1 login overrides recent manual group choice; ordinary refresh prese
 test('R278 P2 official outage has no countdown, terminal zero or frontend polling',()=>{
  const tab={data:{matches:[],capabilities:[{name:'match-history',state:'failed',historyStatus:'official',retryAfter:1}]}};
  const f=compile(source,['historyServiceState','renderHistoryServiceStatus','paginationCopyFor','scheduleHistoryServerRetry'],{riotTab:()=>false,serviceOutageIcon:()=>'',matchesPending:()=>false,number:String,escapeHTML,state:{},clearTimeout:()=>{},setTimeout:()=>assert.fail('official outage must await backend recovery')});
- assert.doesNotMatch(f.renderHistoryServiceStatus(tab),/秒后|data-history-countdown/);assert.equal(f.paginationCopyFor(tab),'<span>官方战绩服务暂时中断，部分玩家战绩无法读取，恢复后点「刷新对局」</span>');assert.doesNotMatch(f.paginationCopyFor(tab),/<button/);f.scheduleHistoryServerRetry(tab);
+ assert.doesNotMatch(f.renderHistoryServiceStatus(tab),/秒后|data-history-countdown/);assert.equal(f.paginationCopyFor(tab),'<span>战绩服务暂时中断</span>');assert.doesNotMatch(f.paginationCopyFor(tab),/<button|刷新对局|部分玩家/);f.scheduleHistoryServerRetry(tab);
 });
 test('R278 P3 empty revision round trips and malformed reference carries silent fallback reason',()=>{
  const f=compile(source,['resolveOverviewFrame'],{}),stream={matches:new Map(),overview:{}};
