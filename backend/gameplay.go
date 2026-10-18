@@ -1421,38 +1421,17 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		a.startRankedSplitProbe(client, playerRef, current.SummonerID)
 		capabilities = append(capabilities, summonerCapability)
 	} else if reference.ServerID != "" && isTencentClient(client) {
-		var loaded sgpSummoner
-		var loadErr error
-		if a.sgp == nil {
-			loadErr = errors.New("SGP 召唤师数据源不可用")
-		} else {
-			loaded, loadErr = a.sgp.summonerByPUUIDOn(ctx, client, reference.ServerID, playerRef)
-		}
-		capability := EndpointCapability{Name: "summoner", Path: "sgp: /summoner-ledge/v1/regions/{server}/summoners/puuids"}
-		if loadErr != nil {
-			if isCancellation(loadErr) {
-				capability.State = capabilityCanceled
-			} else if a.sgp == nil {
-				capability.State = capabilityUnsupported
-				capability.Detail = "当前未启用跨服召唤师数据源"
-			} else {
-				capability.State = capabilityFailed
-				capability.Detail = "所选服务器暂时无法读取召唤师资料"
-			}
+		loaded, capability := a.loadSGPGameplaySummoner(ctx, client, reference)
+		if capability.State != capabilityAvailable {
 			player = summonerFromGameplayReference(reference)
 			if strings.TrimSpace(player.DisplayName) == "" && strings.TrimSpace(player.GameName) == "" {
 				player.DisplayName = "隐藏玩家"
 			}
 			profileHidden = true
 		} else {
-			capability.State = capabilityAvailable
-			capability.Count = 1
-			player = mergeSummonerIdentity(Summoner{
-				PUUID: loaded.PUUID, DisplayName: loaded.Name, ProfileIconID: loaded.ProfileIconID,
-				SummonerLevel: loaded.Level, Privacy: loaded.Privacy,
-			}, summonerFromGameplayReference(reference))
+			player = mergeSummonerIdentity(loaded, summonerFromGameplayReference(reference))
 			reference = mergeGameplayReferences(gameplayReferenceFromSummoner(player), reference)
-			profileHidden = strings.TrimSpace(player.GameName) == "" && strings.TrimSpace(player.DisplayName) == ""
+			profileHidden = !gameplaySummonerHasName(player)
 		}
 		capabilities = append(capabilities, capability)
 	} else {
@@ -8034,6 +8013,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		return response
 	}
 	response.Available = true
+	rawPlayers = a.supplementLiveGSMRoster(ctx, client, current, &response, rawPlayers)
 	arenaMode := isArenaQueue(response.QueueID, response.GameMode)
 	aramMode := isARAMFamilyGameMode(response.GameMode)
 	switch queueModeGroupFor(response.QueueID, response.GameMode, response.MapID) {
@@ -8085,7 +8065,10 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	if phase == "InProgress" || phase == "Reconnect" {
 		expectedArenaPlayers := 0
 		if arenaMode {
-			expectedArenaPlayers = max(6, len(rawPlayers))
+			expectedArenaPlayers = liveGSMRosterSize(response.QueueID)
+			if expectedArenaPlayers == 0 {
+				expectedArenaPlayers = max(6, len(rawPlayers))
+			}
 		}
 		liveClientSnapshotValue, _ = a.liveClientSnapshotForGame(ctx, response.GameID, phase, expectedArenaPlayers, response.QueueID)
 	}
@@ -8096,6 +8079,10 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	a.observeLiveHistoryGame(client, phase, response.GameID, response.QueueID)
 	freshness := a.liveHistoryFreshnessForGame(client, response.GameID, response.QueueID)
 	names := a.overviewChampionNames(ctx)
+	if arenaMode {
+		rawPlayers = a.restoreArenaIdentityRoster(&response, rawPlayers)
+		rawPlayers = a.recoverArenaPlayerList(ctx, client, &response, rawPlayers, liveClientSnapshotValue, names)
+	}
 	recoveredPositionStart := len(rawPlayers)
 	if (phase == "InProgress" || phase == "Reconnect") && len(rawPlayers) < 10 {
 		scope := liveRosterRecoveryScope{response.GameID, response.QueueID, phase, response.RawCount}
@@ -8126,7 +8113,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	progress := response
 	progress.Players = make([]gameplayLivePlayer, len(rawPlayers))
 	for index, raw := range rawPlayers {
-		ref := normalizeGameplayReference(gameplayReference{ClientIdentity: true, PlayerRef: visibleLivePlayerReference(raw.player), SummonerID: raw.player.SummonerID, AlternatePlayerRef: raw.player.ObfuscatedPUUID, AlternateSummonerID: raw.player.ObfuscatedSummonerID, GameName: raw.player.GameName, TagLine: raw.player.TagLine, DisplayName: raw.player.SummonerName, ProfileIconID: raw.player.ProfileIconID, Region: clientRiotPlatform(client), ServerID: clientTencentServerID(client)})
+		ref := liveGameplayReference(client, raw.player)
 		summoner := summonerFromGameplayReference(ref)
 		hidden, unresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
 		self := gameplayLivePlayerIsCurrent(ref, current.PUUID, raw.player.CellID, localPlayerCellID)
@@ -8146,15 +8133,37 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			defer func() { <-semaphore }()
 			playerStarted := time.Now()
 			raw := rawPlayers[index]
-			visiblePlayerRef := visibleLivePlayerReference(raw.player)
-			reference := normalizeGameplayReference(gameplayReference{
-				ClientIdentity: true, PlayerRef: visiblePlayerRef, AlternatePlayerRef: raw.player.ObfuscatedPUUID,
-				SummonerID: raw.player.SummonerID, AlternateSummonerID: raw.player.ObfuscatedSummonerID,
-				DisplayName: raw.player.SummonerName, GameName: raw.player.GameName, TagLine: raw.player.TagLine,
-				ProfileIconID: raw.player.ProfileIconID, Region: clientRiotPlatform(client), ServerID: clientTencentServerID(client),
-			})
+			reference := liveGameplayReference(client, raw.player)
+			profileIsCurrent := gameplayLivePlayerIsCurrent(reference, current.PUUID, raw.player.CellID, localPlayerCellID)
+			if profileIsCurrent && validPlayerReference(current.PUUID) {
+				reference.PlayerRef, reference.AlternatePlayerRef = current.PUUID, ""
+			}
 			summoner := summonerFromGameplayReference(reference)
-			if loaded, capability := loadGameplaySummoner(client, reference); capability.State == capabilityAvailable {
+			visibility := raw.player.NameVisibilityType
+			var loaded Summoner
+			var capability EndpointCapability
+			if profileIsCurrent {
+				// Like the self overview, use the authenticated account identity;
+				// a champ-select cell alias must not trigger an unrelated SGP query.
+				loaded, capability = loadGameplaySummonerContext(ctx, client, reference)
+				if gameplaySummonerHasName(current) {
+					loaded = mergeSummonerIdentity(current, loaded)
+					capability.State = capabilityAvailable
+				}
+			} else {
+				loaded, capability = a.loadLiveGameplaySummoner(ctx, client, reference)
+			}
+			if capability.State == capabilityAvailable {
+				// HIDDEN describes the source row, not a successfully resolved profile.
+				if gameplaySummonerHasName(loaded) {
+					if strings.EqualFold(strings.TrimSpace(visibility), "HIDDEN") {
+						// The source may contain a champion alias. Never merge it back
+						// over the queried account's name or attach its tag to that name.
+						summoner.GameName, summoner.TagLine, summoner.DisplayName = "", "", ""
+						reference.GameName, reference.TagLine, reference.DisplayName = "", "", ""
+					}
+					visibility = "UNHIDDEN"
+				}
 				summoner = mergeSummonerIdentity(loaded, summoner)
 				reference = mergeGameplayReferences(gameplayReferenceFromSummoner(summoner), reference)
 			}
@@ -8249,7 +8258,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			if response.QueueID == 420 || response.QueueID == 440 {
 				rankedRecord = recentRankedRecord(recentGames)
 			}
-			hidden, identityUnresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
+			hidden, identityUnresolved := livePlayerIdentityFlags(visibility, summoner.GameName, summoner.DisplayName)
 			response.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(summoner.Privacy), "PRIVATE"), Autofill: raw.player.IsAutofilled, IsCurrent: isCurrent, reference: reference}, IdentityUnresolved: identityUnresolved, TeamID: raw.team, IsAlly: isAlly, Bravery: arenaMode && phase == "ChampSelect" && (isCurrent || isAlly) && (raw.player.ChampionID == -3 || raw.player.ChampionPickIntent == -3 || raw.player.Bravery), ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
 			response.Players[index].SoloRank, response.Players[index].FlexRank = soloRank, flexRank
 			if arenaMode {
@@ -8336,7 +8345,6 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	a.finalizeLiveClientPlayerListShape(response.GameID, positionMatchSources["summonerName"]+positionMatchSources["riotId"], positionMatchSources)
 	if arenaMode {
 		a.recordArenaMissingSession(current, &response, liveClientSnapshotValue)
-		a.recoverArenaPlayerList(ctx, client, current, &response, liveClientSnapshotValue, names)
 		// R263 P1：小队卡片本身已表达归属，不再在卡片下方重复说明横幅。
 		a.markRememberedArenaSquad(&response)
 	}

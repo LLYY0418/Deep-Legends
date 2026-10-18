@@ -160,7 +160,7 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 		c.revision++
 	}
 	ttl := 20 * time.Second
-	if phase == "ChampSelect" || phase == "GameStart" || c.response.ArenaGroupingRetryable || gameplayLivePositionsPending(c.response) ||
+	if phase == "ChampSelect" || phase == "GameStart" || c.response.ArenaGroupingRetryable || arenaLiveIdentityPending(c.response) || gameplayLivePositionsPending(c.response) ||
 		((phase == "InProgress" || phase == "Reconnect") && liveTenPlayerRosterQueue(c.response.QueueID) && !gameplayLiveSnapshotComplete(c.response)) {
 		ttl = 3 * time.Second
 	}
@@ -343,9 +343,15 @@ func gameplayLiveSnapshotComplete(response gameplayLiveResponse) bool {
 	if !response.Available || len(response.Players) == 0 {
 		return false
 	}
+	if arenaLiveIdentityPending(response) {
+		return false
+	}
 	if liveTenPlayerRosterQueue(response.QueueID) {
 		teams := map[int64]int{}
 		for _, player := range response.Players {
+			if player.Hidden || player.IdentityUnresolved {
+				return false
+			}
 			teams[player.TeamID]++
 		}
 		if teams[100] != 5 || teams[200] != 5 || len(response.Players) != 10 {

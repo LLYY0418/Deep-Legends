@@ -202,7 +202,18 @@ func TestR194QuickplaySnapshotComplete(t *testing.T) {
 	if gameplayLiveSnapshotComplete(response) {
 		t.Fatal("9-player quickplay snapshot must remain refreshable")
 	}
-	if !gameplayLiveSnapshotComplete(f.load("InProgress")) {
-		t.Fatal("recovered 5+5 quickplay snapshot must be complete")
+	loaded := f.load("InProgress")
+	if gameplayLiveSnapshotComplete(loaded) {
+		t.Fatal("anonymous 5+5 quickplay snapshot must remain refreshable")
+	}
+	for i := range loaded.Players {
+		if loaded.Players[i].Hidden || loaded.Players[i].IdentityUnresolved {
+			loaded.Players[i].Hidden, loaded.Players[i].IdentityUnresolved = false, false
+			loaded.Players[i].GameName, loaded.Players[i].PlayerRef = "Resolved", "player_resolved"
+			loaded.Players[i].HistoryState = "empty"
+		}
+	}
+	if !gameplayLiveSnapshotComplete(loaded) {
+		t.Fatal("resolved 5+5 quickplay snapshot must be complete")
 	}
 }

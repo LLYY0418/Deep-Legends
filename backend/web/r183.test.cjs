@@ -19,7 +19,7 @@ function extract(name) {
   }
   assert.fail(name + ' unbalanced');
 }
-test('R183 ranked backend response renders an anonymous enemy in middle and stops incomplete retries', () => {
+test('R183 ranked backend response renders an anonymous enemy in middle and remains incomplete until its identity is resolved', () => {
   const response = JSON.parse(fs.readFileSync(path.join(__dirname, '../testdata/r183-ranked-anonymous-live.json'), 'utf8'));
   const names = ['playerLabel', 'maskedPlayerName', 'liveHistoryStateOf', 'liveHistorySettled', 'renderLivePlayer', 'champSelectEnemyPlaceholder', 'livePremadeRoster', 'clusterPremadePlayers', 'orderLivePlayers', 'insightTeamLayout', 'isSummonersRiftMatch', 'renderLiveInsights', 'liveClientPositionsPending', 'liveSnapshotComplete', 'liveAutoRefreshStopped', 'renderLiveRefreshStatus'];
   const deps = {
@@ -36,7 +36,7 @@ test('R183 ranked backend response renders an anonymous enemy in middle and stop
   const functions = Function(...Object.keys(deps), require('./r220-harness-support.cjs').prelude(source,deps)+names.map(extract).join('\n') + ';return {renderLiveInsights, liveSnapshotComplete, renderLiveRefreshStatus};')(...Object.values(deps));
   for (const queueId of [440, 420]) {
     const data = { ...response, queueId };
-    assert.equal(functions.liveSnapshotComplete(data), true);
+    assert.equal(functions.liveSnapshotComplete(data), false);
     const dom = new JSDOM(functions.renderLiveRefreshStatus(data) + functions.renderLiveInsights(data));
     try {
       const doc = dom.window.document;

@@ -186,6 +186,7 @@ type sgpProvider struct {
 	summonerCache      map[string]sgpSummonerCacheEntry
 	credentialVersions map[sgpCredentialIdentity]string
 	credentialOrder    []sgpCredentialIdentity
+	gsm                sgpGSMCache
 }
 
 type sgpHistoryCacheEntry struct {
@@ -718,7 +719,11 @@ func (p *sgpProvider) getJSONWithToken(ctx context.Context, client *LCUClient, k
 				continue
 			}
 			lastStatus = response.StatusCode
-			body, readErr := readLimited(response.Body, sgpResponseMax)
+			responseLimit := int64(sgpResponseMax)
+			if route == "GSM" {
+				responseLimit = 1 << 20
+			}
+			body, readErr := readLimited(response.Body, responseLimit)
 			response.Body.Close()
 			if response.StatusCode != http.StatusOK {
 				p.observeHistoryCircuit(serverID, route, response.StatusCode, probe)

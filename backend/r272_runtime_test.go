@@ -177,10 +177,10 @@ func TestR272ArenaPlayerListRecoveryThenKnownSquad(t *testing.T) {
 			if !present {
 				found := false
 				for _, p := range result.Players {
-					found = found || p.MySquad && p.ChampionID == 3 && p.Hidden
+					found = found || p.MySquad && p.ChampionID == 3 && !p.Hidden && p.GameName == "R62Arena03" && p.reference.PlayerRef == "r90-player-identity-03"
 				}
 				if !found {
-					t.Fatal("missing known hidden placeholder")
+					t.Fatal("known identity did not resolve through the live profile pipeline")
 				}
 			}
 		})

@@ -161,8 +161,13 @@
   function liveSnapshotComplete(data) {
     if (liveClientPositionsPending(data)) return false;
     if (!data?.available || !Array.isArray(data.players) || !data.players.length) return false;
+    if ([1700, 1710, 1750].includes(Number(data.queueId)) && ["GameStart", "InProgress", "Reconnect"].includes(data.phase)) {
+      if (data.players.length < (Number(data.queueId) === 1750 ? 18 : 16)) return false;
+      if (data.players.some(player => player.hidden || player.identityUnresolved || (player.gameName && !player.playerRef))) return false;
+    }
     // Mirror the 5v5 queues in queue_groups.go.
     if ([400, 420, 430, 440, 450, 480, 490, 700, 720, 900, 930, 1900, 2300, 2400, 3220, 3270].includes(Number(data.queueId))) {
+      if (data.players.some(player => player.hidden || player.identityUnresolved)) return false;
       const blue = data.players.filter((player) => Number(player.teamId) === 100).length;
       const red = data.players.filter((player) => Number(player.teamId) === 200).length;
       if (data.players.length !== 10 || blue !== 5 || red !== 5) return false;

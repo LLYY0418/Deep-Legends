@@ -48,7 +48,7 @@ test('R194 actual backend quickplay response renders our anonymous TOP among fiv
     assert.equal(history.textContent, '');
     assert.equal(history.nextElementSibling.tagName, 'ARTICLE');
     assert.doesNotMatch(doc.querySelector('.live-refresh-status')?.textContent || '', /数据尚未完整/);
-    assert.equal(h.liveSnapshotComplete(fixture), true);
+    assert.equal(h.liveSnapshotComplete(fixture), false);
   } finally { d.window.close(); }
 });
 
@@ -65,7 +65,11 @@ test('R194 quickplay nine-player snapshots keep five-second retries until recove
   assert.match(require('./r188-harness.cjs').extract(source,'renderSessionSummary'), /liveAutoRefreshStopped\(data\)/);
   h.state.live = fixture; h.state.liveRetryAttempts = 0;
   h.scheduleLiveRefresh();
-  assert.equal(h.timers.length, 1, 'complete roster must not add another timer');
+  assert.equal(h.timers.length, 2, 'anonymous roster must continue identity retries');
+  h.state.live = {...fixture, players: fixture.players.map(p => p.hidden ? {...p, hidden:false, identityUnresolved:false, gameName:'Resolved', playerRef:'player_resolved'} : p)};
+  assert.equal(h.liveSnapshotComplete(h.state.live), true);
+  h.scheduleLiveRefresh();
+  assert.equal(h.timers.length, 2, 'resolved roster must stop adding timers');
 });
 
 test('R194 browser roster gate mirrors backend registered 5v5 PvP queue groups', () => {
@@ -73,7 +77,7 @@ test('R194 browser roster gate mirrors backend registered 5v5 PvP queue groups',
   const allowed = new Set(['solo', 'flex', 'match', 'aram', 'hextech-aram', 'clash', 'urf']);
   const h = harness(fixture), nine = fixture.players.filter(p => !p.hidden);
   for (const match of groups.matchAll(/\{(\d+), "[^"]+", "([^"]+)"/g)) {
-    const queueId = Number(match[1]), expectedComplete = !allowed.has(match[2]);
+    const queueId = Number(match[1]), expectedComplete = !allowed.has(match[2]) && ![1700,1710,1750].includes(queueId);
     assert.equal(h.liveSnapshotComplete({...fixture, queueId, players: nine}), expectedComplete, `queue ${queueId}: ${match[2]}`);
   }
   assert.equal(h.liveSnapshotComplete({...fixture, queueId: 999999, players: nine}), true);

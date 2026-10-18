@@ -167,13 +167,18 @@ func (a *app) applyArenaLiveGrouping(client *LCUClient, current Summoner, respon
 	// Prefer stable identity; unique champions only recover that already-known cell.
 	for _, ally := range remembered {
 		matchIndex := -1
+		allyRef := visibleLivePlayerReference(ally)
 		for i, p := range response.Players {
-			if ally.PUUID != "" && ally.PUUID != emptyLCUPlayerPUUID && ally.PUUID == p.reference.PlayerRef || ally.SummonerID > 0 && ally.SummonerID == p.reference.SummonerID {
+			if validPlayerReference(allyRef) && allyRef != emptyLCUPlayerPUUID && allyRef == p.reference.PlayerRef || ally.SummonerID > 0 && ally.SummonerID == p.reference.SummonerID {
+				matchIndex = i
+				break
+			}
+			if key := arenaRiotIDKey(ally.GameName, ally.TagLine); key != "" && key == arenaRiotIDKey(p.GameName, p.TagLine) {
 				matchIndex = i
 				break
 			}
 		}
-		if matchIndex < 0 && ally.ChampionID > 0 {
+		if matchIndex < 0 && (!validPlayerReference(allyRef) || allyRef == emptyLCUPlayerPUUID) && ally.ChampionID > 0 {
 			candidate, count := -1, 0
 			for i, p := range response.Players {
 				if p.ChampionID == ally.ChampionID {
@@ -188,6 +193,9 @@ func (a *app) applyArenaLiveGrouping(client *LCUClient, current Summoner, respon
 		if matchIndex >= 0 {
 			response.Players[matchIndex].champSelectSquad = true
 			response.Players[matchIndex].MySquad = true
+			continue
+		}
+		if arenaLiveRosterAtCapacity(*response) {
 			continue
 		}
 		ref := normalizeGameplayReference(gameplayReference{PlayerRef: ally.PUUID, SummonerID: ally.SummonerID, GameName: ally.GameName, TagLine: ally.TagLine, DisplayName: ally.SummonerName, ServerID: clientTencentServerID(client)})

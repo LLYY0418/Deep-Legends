@@ -52,6 +52,10 @@ func r180Fixture(t *testing.T) *r180HistoryFixture {
 		return r178JSON(map[string]any{"games": map[string]any{"games": games}}, 200), nil
 	})}
 	a.sgp.http = &http.Client{Transport: sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if strings.HasPrefix(r.URL.Path, "/gsm/v1/ledge/") {
+			// No active GSM game in this history fixture.
+			return r178JSON(map[string]any{}, 404), nil
+		}
 		if strings.Contains(r.URL.Path, "/leagues-ledge/") {
 			return r178JSON(map[string]any{"queues": []any{}}, 200), nil
 		}
