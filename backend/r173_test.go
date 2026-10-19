@@ -348,6 +348,15 @@ func TestR173StartupUsesOnlyDiskProfilesThenPageRefreshes(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	a := &app{storage: store, champions: cp, proRefreshContext: ctx}
+	t.Cleanup(func() {
+		// The request-start signal precedes profile persistence and queued writes.
+		r281WaitUntil(t, "R173 scoped refresh cleanup", func() bool {
+			a.proProfiles.mu.Lock()
+			defer a.proProfiles.mu.Unlock()
+			return len(a.proProfiles.inflight) == 0
+		})
+		r274CloseApp(t, a, context.Background())
+	})
 	a.warmProPlayersCaches()
 	if requests.Load() != 0 {
 		t.Fatal("startup downloaded profiles", requests.Load())
