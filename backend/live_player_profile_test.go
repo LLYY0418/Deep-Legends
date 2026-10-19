@@ -14,6 +14,8 @@ func TestLivePlayerProfileResolvesWithoutPreviousEncounter(t *testing.T) {
 	for _, scenario := range []string{"lcu-failed-sgp-name", "lcu-empty-sgp-name", "lcu-display-only", "both-unavailable", "wrong-sgp-identity"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newR183Fixture(t)
+			// Overview starts season cache work; drain it before the fixture store/TempDir close.
+			waitGameplaySeasonJobsBeforeCleanup(t, f.app)
 			const realName = "首次遇见的玩家"
 			var flow lcuGameflowSession
 			flow.GameData.GameID, flow.GameData.Queue.ID, flow.GameData.Queue.GameMode = 100018, 1750, "CHERRY"
