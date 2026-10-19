@@ -32,7 +32,7 @@
     },
     "jobs": {
       "quality-go": {
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "steps": [
           {
             "uses": "actions/checkout@v4"
@@ -148,7 +148,7 @@
         ]
       },
       "quality-web": {
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "steps": [
           {
             "uses": "actions/checkout@v4"
@@ -243,7 +243,7 @@
         ]
       },
       "quality-mutations": {
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "steps": [
           {
             "uses": "actions/checkout@v4",
@@ -388,7 +388,7 @@
         ]
       },
       "r277-proof-linux-1": {
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "steps": [
           {
             "uses": "actions/checkout@v4",
@@ -479,7 +479,7 @@
         ]
       },
       "r277-proof-linux-2": {
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "steps": [
           {
             "uses": "actions/checkout@v4",
@@ -588,7 +588,7 @@
         ]
       },
       "r277-browser-matrix": {
-        "runs-on": "${{ matrix.os }}",
+        "runs-on": "${{ matrix.os == 'ubuntu-latest' && 'ubuntu-24.04' || matrix.os }}",
         "strategy": {
           "fail-fast": false,
           "matrix": {
@@ -684,7 +684,7 @@
         ]
       },
       "r277-browser-mutations": {
-        "runs-on": "${{ matrix.os }}",
+        "runs-on": "${{ matrix.os == 'ubuntu-latest' && 'ubuntu-24.04' || matrix.os }}",
         "strategy": {
           "fail-fast": false,
           "matrix": {
@@ -1095,7 +1095,7 @@
         ]
       },
       "browser-main": {
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "steps": [
           {
             "uses": "actions/checkout@v4",
@@ -1144,7 +1144,7 @@
         ]
       },
       "mutations-1": {
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "steps": [
           {
             "uses": "actions/checkout@v4",
@@ -1193,7 +1193,7 @@
         ]
       },
       "mutations-3": {
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "steps": [
           {
             "uses": "actions/checkout@v4",
@@ -1258,7 +1258,7 @@
           "r277-browser-mutations",
           "mutations-3"
         ],
-        "runs-on": "ubuntu-latest",
+        "runs-on": "ubuntu-24.04",
         "permissions": {
           "contents": "read",
           "actions": "read"

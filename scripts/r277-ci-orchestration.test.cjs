@@ -12,7 +12,7 @@ test('R287 approved CI snapshot pins every reassigned proof and preserves produc
  require('./lib/ci-contracts.cjs').verifyMutationRouting(ci);
 });
 test('R277 actual mutations are independent steps with always-uploaded original failures',()=>{
- const job={steps:['r277-proof-linux-1','r277-proof-linux-2'].flatMap(n=>ci.jobs[n].steps)};for(const n of ['r277-proof-linux-1','r277-proof-linux-2'])assert.equal(ci.jobs[n]['runs-on'],'ubuntu-latest');
+ const job={steps:['r277-proof-linux-1','r277-proof-linux-2'].flatMap(n=>ci.jobs[n].steps)};for(const n of ['r277-proof-linux-1','r277-proof-linux-2'])assert.equal(ci.jobs[n]['runs-on'],'ubuntu-24.04');
  for(const runner of ['r277-ci-branch-mutations.cjs','r277-client-mutations.py --out','r277-http-refresh-proof.py --out','r277-riot-scope-proof.py --out','r277-wire-diagnostic-mutations.py --out','r277-riot-proof.py --out','r277-ci-orchestrate.cjs frontend-mutants','r277-ci-cn-score.cjs mutants --out','r277-ci-orchestrate.cjs deferred-unit --out'])assert.equal(job.steps.filter(step=>step.run?.includes(runner)).length,1,runner);
  for(const name of ['r277-proof-linux-1','r277-proof-linux-2','windows-build','r277-browser-matrix','r277-browser-mutations']){
   const current=ci.jobs[name];assert(!current['continue-on-error']);
