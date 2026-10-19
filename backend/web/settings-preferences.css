@@ -9,6 +9,8 @@ main.shell:has(> #settings-panel:not([hidden])) { padding: 28px 46px; }
 .settings-build-identity small { margin-right: 6px; color: var(--muted); font: 600 13px var(--font); }
 .settings-github { display: inline-flex; height: 40px; flex: none; align-items: stretch; margin-top: 4px; padding: 0; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 10px; text-decoration: none; overflow: hidden; font-size:13px; }
 .settings-github, .settings-github * { cursor:pointer; }
+/* One link owns hit testing across the icons, swapped copy and star count. */
+.settings-github * { pointer-events:none; }
 .settings-github-main { display:flex; align-items:center; gap:8px; padding-inline:12px; }
 .settings-github-label { display:grid; }
 .settings-github-label > span { grid-area:1/1; }
