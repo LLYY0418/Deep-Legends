@@ -5,6 +5,7 @@ const read=f=>fs.readFileSync(path.join(__dirname,'../backend/web',f),'utf8');
 test('2244 skill summary uses real main/sub priorities after R, without repeated labels',()=>{
  const dom=new JSDOM('',{runScripts:'outside-only'}),w=dom.window;
  try {
+  w.eval(read('runtime.js'));
   const source=read('gameplay.js');
   const fn=source.slice(source.indexOf('  function renderSkillPlan('),source.indexOf('  function abilityTooltip('));
   w.eval(`const escapeHTML=x=>String(x);const assetIcon=()=>'';const abilityTooltip=()=>'';${fn};window.renderSkillPlan=renderSkillPlan;`);

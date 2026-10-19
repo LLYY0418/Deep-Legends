@@ -171,17 +171,9 @@ function renderItemRoute(timeline) {
   }
 
 function skillPrioritySummary(order) {
-    const counts = { 1: 0, 2: 0, 3: 0 };
-    const maxedAt = {};
-    order.forEach((up, index) => {
-      if (up.slot < 1 || up.slot > 3) return;
-      counts[up.slot] += 1;
-      if (counts[up.slot] === 5 && maxedAt[up.slot] === undefined) maxedAt[up.slot] = index;
-    });
-    const ranked = [1, 2, 3].filter((slot) => counts[slot] > 0)
-      .sort((left, right) => (maxedAt[left] ?? 99) - (maxedAt[right] ?? 99) || counts[right] - counts[left]);
+    const ranked = window.deepLegendsRuntime.skillPriority(order.map(up => SKILL_SLOT_LETTERS[up.slot]));
     if (ranked.length < 2) return "";
-    return `<span class="match-skill-priority">主升 <b class="is-slot-${ranked[0]}">${SKILL_SLOT_LETTERS[ranked[0]]}</b> · 副升 <b class="is-slot-${ranked[1]}">${SKILL_SLOT_LETTERS[ranked[1]]}</b></span>`;
+    return `<span class="match-skill-priority">主升 <b class="is-slot-${"QWE".indexOf(ranked[0]) + 1}">${ranked[0]}</b> · 副升 <b class="is-slot-${"QWE".indexOf(ranked[1]) + 1}">${ranked[1]}</b></span>`;
   }
 
 function renderSkillOrder(timeline) {

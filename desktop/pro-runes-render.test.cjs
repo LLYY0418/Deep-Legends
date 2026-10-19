@@ -69,6 +69,7 @@ test(`R75/R76 actual page: pro rows, degradation ${coverage ? coverage.failedGam
     assert.ok(live.querySelector(".specialist-game-row"));
     assert.equal(live.querySelectorAll(".specialist-game-row .skill-plan .skill-order > span").length,4,"pro record uses the existing skill order presenter");
     assert.match(live.querySelector(".specialist-game-row .skill-order").textContent,/Q1W2E3R4/);
+    assert.equal(live.querySelector(".specialist-game-row .skill-priority-summary")?.textContent,"主Q副W");
     assert.match(live.querySelector(".pro-player-record").getAttribute("aria-label"),/^0胜1负/);
     assert.ok(requests.some(r => r.url.includes("championId=69")));
     if (coverage) {

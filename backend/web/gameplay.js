@@ -8553,7 +8553,7 @@
 
   function renderSkillPlan(build, abilities, statsHTML = "") {
     const bySlot = new Map((abilities || []).map((ability) => [String(ability.slot || "").toUpperCase(), ability]));
-    const skillPriority = (build.skillPriority || []).map((slot) => String(slot).toUpperCase());
+    const skillPriority = (build.skillPriority?.length ? build.skillPriority : window.deepLegendsRuntime.skillPriority(build.skillOrder || [])).map((slot) => String(slot).toUpperCase());
     const priority = ["Q", "W", "E", "R"].map((key) => {
       const ability = bySlot.get(key) || { slot: key, name: key, description: `${key} 技能` };
       const icon = ability.iconPath ? assetIcon(ability.iconPath, ability.name || key, "large", false) : `<span class="skill-letter">${escapeHTML(key)}</span>`;

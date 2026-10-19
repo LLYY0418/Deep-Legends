@@ -89,7 +89,19 @@
     const score=value=>{if(value===query)return 100;if(value.startsWith(query))return 80-Math.min(20,value.length-query.length);const index=value.indexOf(query);if(index>=0)return 60-Math.min(20,index);if(query.length<3 || value.length>Math.max(48,query.length*8))return 0;let i=0;for(const c of value)if(c===query[i])i++;return i===query.length?10:0;};
     return Math.max(0,...[label,value,meta?.key,meta?.slug,meta?.nameZh,meta?.titleZh,meta?.nameEn,meta?.titleEn,...(meta?.searchTerms || [])].map(normalize).filter(Boolean).map(score));
   }
-  window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options), escapeHTML, gradeRank, gradeBadge, scoreChampionSearchOption });
+  // Shared by actual match timelines and recommendation skill plans.
+  function skillPriority(order) {
+    const counts = { Q: 0, W: 0, E: 0 }, maxedAt = {};
+    (order || []).forEach((key, index) => {
+      if (!Object.hasOwn(counts, key)) return;
+      counts[key] += 1;
+      if (counts[key] === 5 && maxedAt[key] === undefined) maxedAt[key] = index;
+    });
+    const ranked = ["Q", "W", "E"].filter(key => counts[key] > 0)
+      .sort((left, right) => (maxedAt[left] ?? 99) - (maxedAt[right] ?? 99) || counts[right] - counts[left]);
+    return ranked.length >= 2 ? ranked : [];
+  }
+  window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options), escapeHTML, gradeRank, gradeBadge, scoreChampionSearchOption, skillPriority });
   const flowSamples = new Map();
   const flowPending = new Set();
   const sampledPending = new Set();

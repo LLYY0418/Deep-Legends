@@ -1,0 +1,370 @@
+{
+  "verifiedAt": "2026-10-19",
+  "pages": [
+    "https://esports.op.gg/lpl/standings",
+    "https://esports.op.gg/lck/standings"
+  ],
+  "teams": [
+    {
+      "id": "632",
+      "acronym": "BLG",
+      "name": "Bilibili Gaming",
+      "region": "LPL"
+    },
+    {
+      "id": "698",
+      "acronym": "AL",
+      "name": "Anyone's Legend",
+      "region": "LPL"
+    },
+    {
+      "id": "415",
+      "acronym": "TES",
+      "name": "Top Esports",
+      "region": "LPL"
+    },
+    {
+      "id": "380",
+      "acronym": "JDG",
+      "name": "JD Gaming",
+      "region": "LPL"
+    },
+    {
+      "id": "379",
+      "acronym": "WE",
+      "name": "Team WE",
+      "region": "LPL"
+    },
+    {
+      "id": "585",
+      "acronym": "LGD",
+      "name": "LGD Gaming",
+      "region": "LPL"
+    },
+    {
+      "id": "645",
+      "acronym": "TT",
+      "name": "ThunderTalk Gaming",
+      "region": "LPL"
+    },
+    {
+      "id": "374",
+      "acronym": "EDG",
+      "name": "EDward Gaming",
+      "region": "LPL"
+    },
+    {
+      "id": "858",
+      "acronym": "NIP",
+      "name": "Ninjas in Pyjamas",
+      "region": "LPL"
+    },
+    {
+      "id": "371",
+      "acronym": "IG",
+      "name": "Invictus Gaming",
+      "region": "LPL"
+    },
+    {
+      "id": "699",
+      "acronym": "WB",
+      "name": "Weibo Gaming",
+      "region": "LPL"
+    },
+    {
+      "id": "592",
+      "acronym": "LNG",
+      "name": "LNG Esports",
+      "region": "LPL"
+    },
+    {
+      "id": "591",
+      "acronym": "HLE",
+      "name": "Hanwha Life Esports",
+      "region": "LCK"
+    },
+    {
+      "id": "385",
+      "acronym": "T1",
+      "name": "T1",
+      "region": "LCK"
+    },
+    {
+      "id": "416",
+      "acronym": "GEN",
+      "name": "Gen.G",
+      "region": "LCK"
+    },
+    {
+      "id": "384",
+      "acronym": "KT",
+      "name": "KT Rolster",
+      "region": "LCK"
+    },
+    {
+      "id": "1681",
+      "acronym": "DK",
+      "name": "Dplus KIA",
+      "region": "LCK"
+    },
+    {
+      "id": "670",
+      "acronym": "BRO",
+      "name": "HANJIN BRION",
+      "region": "LCK"
+    },
+    {
+      "id": "1755",
+      "acronym": "BFX",
+      "name": "BNK FEARX",
+      "region": "LCK"
+    },
+    {
+      "id": "590",
+      "acronym": "KRX",
+      "name": "Kiwoom DRX",
+      "region": "LCK"
+    },
+    {
+      "id": "669",
+      "acronym": "NS",
+      "name": "Nongshim Red Force",
+      "region": "LCK"
+    },
+    {
+      "id": "1791",
+      "acronym": "DNS",
+      "name": "DN SOOPers",
+      "region": "LCK"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://esports.op.gg/matches/graphql/__query__TournamentStandings",
+      "httpStatus": 200,
+      "request": {
+        "operationName": "TournamentStandings",
+        "query": "query TournamentStandings($tournamentId:ID!){standings(tournamentId:$tournamentId){teamId team{id name acronym}}}",
+        "variables": {
+          "tournamentId": "1422"
+        }
+      },
+      "response": {
+        "data": {
+          "standings": [
+            {
+              "teamId": "632",
+              "team": {
+                "id": "632",
+                "name": "Bilibili Gaming",
+                "acronym": "BLG"
+              }
+            },
+            {
+              "teamId": "698",
+              "team": {
+                "id": "698",
+                "name": "Anyone's Legend",
+                "acronym": "AL"
+              }
+            },
+            {
+              "teamId": "415",
+              "team": {
+                "id": "415",
+                "name": "Top Esports",
+                "acronym": "TES"
+              }
+            },
+            {
+              "teamId": "380",
+              "team": {
+                "id": "380",
+                "name": "JD Gaming",
+                "acronym": "JDG"
+              }
+            },
+            {
+              "teamId": "379",
+              "team": {
+                "id": "379",
+                "name": "Team WE",
+                "acronym": "WE"
+              }
+            },
+            {
+              "teamId": "585",
+              "team": {
+                "id": "585",
+                "name": "LGD Gaming",
+                "acronym": "LGD"
+              }
+            },
+            {
+              "teamId": "645",
+              "team": {
+                "id": "645",
+                "name": "ThunderTalk Gaming",
+                "acronym": "TT"
+              }
+            },
+            {
+              "teamId": "374",
+              "team": {
+                "id": "374",
+                "name": "EDward Gaming",
+                "acronym": "EDG"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "url": "https://esports.op.gg/matches/graphql/__query__TournamentStandings",
+      "httpStatus": 200,
+      "request": {
+        "operationName": "TournamentStandings",
+        "query": "query TournamentStandings($tournamentId:ID!){standings(tournamentId:$tournamentId){teamId team{id name acronym}}}",
+        "variables": {
+          "tournamentId": "1423"
+        }
+      },
+      "response": {
+        "data": {
+          "standings": [
+            {
+              "teamId": "858",
+              "team": {
+                "id": "858",
+                "name": "Ninjas in Pyjamas",
+                "acronym": "NIP"
+              }
+            },
+            {
+              "teamId": "371",
+              "team": {
+                "id": "371",
+                "name": "Invictus Gaming",
+                "acronym": "IG"
+              }
+            },
+            {
+              "teamId": "699",
+              "team": {
+                "id": "699",
+                "name": "Weibo Gaming",
+                "acronym": "WB"
+              }
+            },
+            {
+              "teamId": "592",
+              "team": {
+                "id": "592",
+                "name": "LNG Esports",
+                "acronym": "LNG"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "url": "https://esports.op.gg/matches/graphql/__query__TournamentStandings",
+      "httpStatus": 200,
+      "request": {
+        "operationName": "TournamentStandings",
+        "query": "query TournamentStandings($tournamentId:ID!){standings(tournamentId:$tournamentId){teamId team{id name acronym}}}",
+        "variables": {
+          "tournamentId": "1386"
+        }
+      },
+      "response": {
+        "data": {
+          "standings": [
+            {
+              "teamId": "591",
+              "team": {
+                "id": "591",
+                "name": "Hanwha Life Esports",
+                "acronym": "HLE"
+              }
+            },
+            {
+              "teamId": "385",
+              "team": {
+                "id": "385",
+                "name": "T1",
+                "acronym": "T1"
+              }
+            },
+            {
+              "teamId": "416",
+              "team": {
+                "id": "416",
+                "name": "Gen.G",
+                "acronym": "GEN"
+              }
+            },
+            {
+              "teamId": "384",
+              "team": {
+                "id": "384",
+                "name": "KT Rolster",
+                "acronym": "KT"
+              }
+            },
+            {
+              "teamId": "1681",
+              "team": {
+                "id": "1681",
+                "name": "Dplus KIA",
+                "acronym": "DK"
+              }
+            },
+            {
+              "teamId": "670",
+              "team": {
+                "id": "670",
+                "name": "HANJIN BRION",
+                "acronym": "BRO"
+              }
+            },
+            {
+              "teamId": "1755",
+              "team": {
+                "id": "1755",
+                "name": "BNK FEARX",
+                "acronym": "BFX"
+              }
+            },
+            {
+              "teamId": "590",
+              "team": {
+                "id": "590",
+                "name": "Kiwoom DRX",
+                "acronym": "KRX"
+              }
+            },
+            {
+              "teamId": "669",
+              "team": {
+                "id": "669",
+                "name": "Nongshim Red Force",
+                "acronym": "NS"
+              }
+            },
+            {
+              "teamId": "1791",
+              "team": {
+                "id": "1791",
+                "name": "DN SOOPers",
+                "acronym": "DNS"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -276,6 +276,11 @@ func proOPGGRecommendations(rows []proOPGGBuild, championID int, position, name 
 	}
 	sort.SliceStable(selected, func(i, j int) bool {
 		a, b := selected[i], selected[j]
+		// Region belongs to the team, including at international events.
+		ap, bp := proOPGGTeamRegion(a.Team.ID) != "", proOPGGTeamRegion(b.Team.ID) != ""
+		if ap != bp {
+			return ap
+		}
 		if !a.Game.BeginAt.Equal(b.Game.BeginAt) {
 			return a.Game.BeginAt.After(b.Game.BeginAt)
 		}
@@ -290,7 +295,9 @@ func proOPGGRecommendations(rows []proOPGGBuild, championID int, position, name 
 		partial     bool
 	}
 	records := map[string]record{}
+	games := map[string]bool{}
 	for _, r := range selected {
+		games[r.Game.ID] = true
 		key := r.Team.ID + "/" + r.Player.ID
 		v := records[key]
 		if r.Game.Winner == nil || r.Game.Winner.ID == "" {
@@ -305,9 +312,10 @@ func proOPGGRecommendations(rows []proOPGGBuild, championID int, position, name 
 	}
 	result := []gameplayRecommendationRune{}
 	counts := map[string]int{}
-	games := map[string]bool{}
 	for _, r := range selected {
-		games[r.Game.ID] = true
+		if len(result) >= 5 {
+			break
+		}
 		key := r.Team.ID + "/" + r.Player.ID
 		if counts[key] >= 5 {
 			continue
