@@ -161,22 +161,27 @@ function printSummary(base, selection, total) {
   if (selection.recommendProbe) console.log("\n→ 建议：本地只跑静态门禁，然后直接推 probe 分支，用 CI 做完整验证。");
 }
 
-function runBrowsers(selection) {
+function runBrowsers(selection, {runCommand=run, cleanCommand=(env)=>cp.spawnSync("go",["clean","-cache","-testcache"],{cwd:root,env,encoding:"utf8"})} = {}) {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "preflight-browsers-"));
   const results = [];
   const names = selection.browserGuards.map((g) => g.name).filter((n) => n !== R277_STRICT);
   try {
   if (names.length) {
-    results.push(run(`浏览器守卫 ${names.join(",")}`, process.execPath, ["scripts/r276-browser-job.cjs", "all", path.join(out, "guards")], { env: { R276_BROWSER_ONLY: names.join(",") } }));
+    results.push(runCommand(`浏览器守卫 ${names.join(",")}`, process.execPath, ["scripts/r276-browser-job.cjs", "all", path.join(out, "guards")], { env: { R276_BROWSER_ONLY: names.join(",") } }));
   }
   if (selection.browserGuards.some((g) => g.name === R277_STRICT)) {
     const backend = path.join(out, process.platform === "win32" ? "r277.exe" : "r277-browser-public");
     const target = path.join(out, "r277");
-    results.push(run("R277 构建浏览器后端", process.execPath, ["scripts/r277-ci-orchestrate.cjs", "build-browser", "--backend", backend, "--out", target]));
-    if (results.at(-1).ok) results.push(run("R277 严格几何矩阵", process.execPath, ["scripts/r277-ci-orchestrate.cjs", "browser", "--backend", backend, "--out", target]));
+    results.push(runCommand("R277 构建浏览器后端", process.execPath, ["scripts/r277-ci-orchestrate.cjs", "build-browser", "--backend", backend, "--out", target], {env:{PI_SCRATCH_DIR:out}}));
+    if (results.at(-1).ok) results.push(runCommand("R277 严格几何矩阵", process.execPath, ["scripts/r277-ci-orchestrate.cjs", "browser", "--backend", backend, "--out", target], {env:{PI_SCRATCH_DIR:out}}));
   }
   return results;
-  } finally { fs.rmSync(out,{recursive:true,force:true}); }
+  } finally {
+    try {
+      const cache=path.join(out,'r277-browser-gocache');
+      if(fs.existsSync(cache)){const result=cleanCommand({...process.env,GOCACHE:cache});if(result.status!==0)throw Error('Browser GOCACHE cleanup failed: '+(result.stderr||result.error));}
+    } finally { fs.rmSync(out,{recursive:true,force:true}); }
+  }
 }
 
 async function main() {
@@ -272,4 +277,4 @@ if (require.main === module) {
   main().then((code) => { process.exitCode = code; }, (error) => { console.error(error.stack || error); process.exitCode = 2; }).finally(cleanupCaches);
 }
 
-module.exports = { parseArgs, resolveBase, changedFiles, loadIndex, staticGates, runScriptTests, behaviorChecks, cleanupCaches };
+module.exports = { parseArgs, resolveBase, changedFiles, loadIndex, staticGates, runScriptTests, behaviorChecks, cleanupCaches, runBrowsers };

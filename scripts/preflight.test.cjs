@@ -104,3 +104,13 @@ test("argument parsing", () => {
   assert.deepEqual(parseArgs(["--list", "--base", "abc", "--files", "a.js, b.js", "--json", "out.json", "--browsers"]), { base: "abc", list: true, json: "out.json", files: ["a.js", "b.js"], browsers: true, help: false });
   assert.throws(() => parseArgs(["--nope"]), /未知参数/);
 });
+
+test('explicit browser preflight owns and cleans its dedicated cache and outputs on success or failure',()=>{
+ const fs=require('node:fs'),path=require('node:path'),{runBrowsers}=require('./preflight.cjs');
+ for(const fail of [false,true]){
+  let scratch,cleaned=false;
+  const invoke=()=>runBrowsers({browserGuards:[{name:R277_STRICT}]},{runCommand:(label,cmd,args,options)=>{scratch=options.env.PI_SCRATCH_DIR;fs.mkdirSync(path.join(scratch,'r277-browser-gocache'),{recursive:true});if(fail&&args.includes('browser'))throw Error('fixture browser failure');return {ok:true};},cleanCommand:env=>{assert.equal(env.GOCACHE,path.join(scratch,'r277-browser-gocache'));cleaned=true;return {status:0};}});
+  if(fail)assert.throws(invoke,/fixture browser failure/);else assert.equal(invoke().length,2);
+  assert(cleaned);assert(!fs.existsSync(scratch));
+ }
+});
