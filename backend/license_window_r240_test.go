@@ -99,9 +99,14 @@ func TestR240CachedActiveStartupHasExactlyOneRenewInFirstFiveSeconds(t *testing.
 	go func() { defer close(done); restored.Run(ctx) }()
 	defer func() { cancel(); <-done }()
 	start := time.Now()
-	select {
-	case <-started:
-	case <-time.After(500 * time.Millisecond):
+	if !r287WaitSelect(t, "backend/license_window_r240_test.go:102 wait", 500*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("first startup renew was postponed")
 	}
 	// Hold the first request over a 1s Run tick. The old implementation queued a

@@ -35,3 +35,22 @@ test('missing API proof requires the original errors assertion, not the same-lin
 test('a helper timeout records its real source line and never becomes retryable performance',()=>{
  const r=classifyAttempt({code:1,error:'CDP timeout Runtime.evaluate',log:'Error: CDP timeout Runtime.evaluate\n    at fail (/checkout/scripts/lib/cdp-progress-request.cjs:8:2)'});assert.equal(r.kind,'invalid');assert.deepEqual(r.location,{file:'scripts/lib/cdp-progress-request.cjs',line:8,column:2});
 });
+
+function wrappedAttempt(label,value){
+ const helper=fs.readFileSync(path.join(__dirname,'lib/timing-retry.cjs'),'utf8').split('\n').findIndex(s=>s.includes('const error=Error('))+1;
+ const caller=fs.readFileSync(path.join(__dirname,'r266-browser.cjs'),'utf8').split('\n').findIndex(s=>s.includes("label:'"+label+"'"))+1;
+ const error=`${label}: 1 timing measurement(s) exceeded the unchanged limit; attempts=${JSON.stringify([value])}`;
+ return {code:1,error,log:`Error: ${error}\n    at timingRetry (/checkout/scripts/lib/timing-retry.cjs:${helper}:14)\n    at async start (/checkout/scripts/r266-browser.cjs:${caller}:23) {\n  code: 'TIMING_LIMIT'\n}`};
+}
+test('R287 wrapped single measurements preserve the existing preceding-performance classification',async()=>{
+ for(const [label,value] of [['click long tasks <=100ms',101],['five filter cycles long tasks <=1000ms',1001],['collection first screen <=300ms',{count:40,ms:490.0999999999767}],['collection long task <=200ms',207],['filter close total<=300ms max<=200ms',{nodes:100,images:10,tasks:[{duration:201}]}]]){
+  const item=wrappedAttempt(label,value);assert.equal(classifyAttempt(item).kind,'known-performance',label);
+  const r=await simulate([item,target()]);assert.equal(r.verified,true);assert.equal(r.calls,2);assert.deepEqual(r.attempts.map(a=>a.kind),['known-performance','target']);
+ }
+});
+test('R287 wrapped failures cannot widen the existing performance allowlist or prove a kill',async()=>{
+ const valid=wrappedAttempt('collection first screen <=300ms',{count:40,ms:490.1});
+ const invalid=[wrappedAttempt('collection first screen <=300ms',{count:40,ms:299}),wrappedAttempt('collection first screen <=300ms',{count:39,ms:490.1}),wrappedAttempt('filter close total<=300ms max<=200ms',{nodes:15001,images:10,tasks:[{duration:201}]}),{...valid,error:valid.error.replace('1 timing','2 timing')},{...valid,log:valid.log.replace('r266-browser.cjs:','other-browser.cjs:')},{...valid,log:valid.log.replace(/r266-browser.cjs:\d+:/,'r266-browser.cjs:1:')},{...valid,log:valid.log.replace('TIMING_LIMIT','OTHER')},wrappedAttempt('wait for progress',{ok:false,ms:90000,reason:'hard-limit'})];
+ for(const item of invalid){const r=await simulate([item,target()]);assert.equal(r.verified,false);assert.equal(r.calls,1);}
+ const exhausted=await simulate([valid]);assert.equal(exhausted.verified,false);assert.equal(exhausted.calls,3);
+});

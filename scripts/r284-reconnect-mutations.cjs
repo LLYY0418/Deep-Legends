@@ -1,4 +1,5 @@
 'use strict';
+process.env.R287_MUTATION_PATH='1'; // Negative cases only; child baselines use their own explicit mode.
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),cp=require('node:child_process'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=path.resolve(process.argv[2]),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'r284-reconnect-mutants-')),results=[];
 fs.mkdirSync(out,{recursive:true});

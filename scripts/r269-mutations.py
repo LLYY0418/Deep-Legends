@@ -6,7 +6,7 @@ import runpy
 _proof=runpy.run_path(str(ROOT/'scripts/mutation-source-proof.py'));_snapshot=_proof['snapshot'](ROOT)
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);p.add_argument('--browser',action='store_true');ARGS=p.parse_args();OUT=ARGS.out;OUT.mkdir(parents=True,exist_ok=True);results=[]
 def run(name,cmd,cwd=ROOT,extra=None,negative=False):
- start=time.monotonic();r=subprocess.run(cmd,cwd=cwd,env={**os.environ,'RIOT_API_KEY':'RGAPI-00000000-0000-0000-0000-000000000000',**(extra or {})},capture_output=True,text=True,timeout=180);log=r.stdout+r.stderr;(OUT/(name+'.log')).write_text(log);ok=r.returncode!=0 if negative else r.returncode==0
+ start=time.monotonic();r=subprocess.run(cmd,cwd=cwd,env={**os.environ,'RIOT_API_KEY':'RGAPI-00000000-0000-0000-0000-000000000000',**(extra or {}),'R287_MUTATION_PATH':'1' if negative else '0'},capture_output=True,text=True,timeout=180);log=r.stdout+r.stderr;(OUT/(name+'.log')).write_text(log);ok=r.returncode!=0 if negative else r.returncode==0
  if negative:ok=ok and any(s in log for s in ['FAIL','AssertionError','✖','not ok']) and not any(s in log for s in ['build failed','SyntaxError:','Cannot find module','no tests to run'])
  results.append(dict(name=name,exitCode=r.returncode,negative=negative,assertionVerified=ok,seconds=round(time.monotonic()-start,3)));(OUT/'result.json').write_text(json.dumps(results,indent=2));print(json.dumps(results[-1]),flush=True);assert ok,name
 with tempfile.TemporaryDirectory(prefix='r269-mutants-') as temp:

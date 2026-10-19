@@ -119,45 +119,54 @@ func TestOverviewUnavailableArtKeepsVerifiedFallback(t *testing.T) {
 }
 
 func TestOverviewSlowCatalogDoesNotSkipBackdropOrBlockStatus(t *testing.T) {
-	a := r175App(t)
-	current := Summoner{SummonerID: 7}
-	entered, done := make(chan struct{}), make(chan struct{})
-	a.lcu = &LCUClient{baseURL: "http://fixture", token: "fixture-token", http: &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		body := ""
-		switch r.URL.Path {
-		case "/lol-game-data/assets/v1/skins.json":
-			close(entered)
-			<-r.Context().Done()
-			close(done)
-			return nil, r.Context().Err()
-		case "/lol-game-data/v1/skins.json":
-			return nil, r.Context().Err()
-		case "/lol-summoner/v1/current-summoner/summoner-profile":
-			body = `{"backgroundSkinId":0}`
-		case "/lol-collections/v1/inventories/7/backdrop":
-			body = `{"summonerId":7,"championId":103,"backdropType":"highest-mastery","backdropImage":"` + coldOverviewPoster + `"}`
-		default:
-			t.Errorf("unexpected endpoint %s", r.URL.Path)
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		a := r175App(t)
+		current := Summoner{SummonerID: 7}
+		entered, done := make(chan struct{}), make(chan struct{})
+		a.lcu = &LCUClient{baseURL: "http://fixture", token: "fixture-token", http: &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			body := ""
+			switch r.URL.Path {
+			case "/lol-game-data/assets/v1/skins.json":
+				close(entered)
+				<-r.Context().Done()
+				close(done)
+				return nil, r.Context().Err()
+			case "/lol-game-data/v1/skins.json":
+				return nil, r.Context().Err()
+			case "/lol-summoner/v1/current-summoner/summoner-profile":
+				body = `{"backgroundSkinId":0}`
+			case "/lol-collections/v1/inventories/7/backdrop":
+				body = `{"summonerId":7,"championId":103,"backdropType":"highest-mastery","backdropImage":"` + coldOverviewPoster + `"}`
+			default:
+				t.Errorf("unexpected endpoint %s", r.URL.Path)
+			}
+			return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}, nil
+		})}}
+		ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+		defer cancel()
+		output := make(chan gameplayPlayer, 1)
+		go func() { output <- a.loadOverviewBackground(ctx, a.lcu, current, true) }()
+		if !r287WaitSelect(t, "backend/maintenance_overview_test.go:148 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-entered:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
+			t.Fatal("catalog fixture was not reached")
 		}
-		return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}, nil
-	})}}
-	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
-	defer cancel()
-	output := make(chan gameplayPlayer, 1)
-	go func() { output <- a.loadOverviewBackground(ctx, a.lcu, current, true) }()
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
-		t.Fatal("catalog fixture was not reached")
-	}
-	start := time.Now()
-	_, _, _, _ = a.cachedOverviewSkinMedia(a.lcu, 103086)
-	if time.Since(start) > 50*time.Millisecond {
-		t.Fatal("status waited behind catalog network request")
-	}
-	player := <-output
-	<-done
-	if player.BackgroundPosterPath != coldOverviewPoster || player.BackgroundSkinID != 0 {
-		t.Fatal("slow catalog skipped actual backdrop", player)
-	}
+
+		start := time.Now()
+		_, _, _, _ = a.cachedOverviewSkinMedia(a.lcu, 103086)
+		if r287TooSlow(r287Context, t, "backend/maintenance_overview_test.go:157 duration", time.Since(start), 50*time.Millisecond, false) {
+			t.Fatal("status waited behind catalog network request")
+		}
+		player := <-output
+		<-done
+		if player.BackgroundPosterPath != coldOverviewPoster || player.BackgroundSkinID != 0 {
+			t.Fatal("slow catalog skipped actual backdrop", player)
+		}
+	})
 }

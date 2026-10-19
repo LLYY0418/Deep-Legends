@@ -107,9 +107,14 @@ func TestR285UnknownAndRunningReconnect(t *testing.T) {
 	f = r284Reconnect(t, running)
 	f.start(t)
 	f.release <- struct{}{}
-	select {
-	case <-f.waiting:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r285_game_logs_test.go:110 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-f.waiting:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("running game was not awaited")
 	}
 	select {

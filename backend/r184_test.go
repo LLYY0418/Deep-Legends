@@ -86,8 +86,9 @@ func newR184Fixture(t *testing.T) *r184Fixture {
 }
 func r184WaitStage(t *testing.T, f *r184Fixture, stage string, count int) []map[string]any {
 	t.Helper()
-	until := time.Now().Add(3 * time.Second)
-	for time.Now().Before(until) {
+	until := r287NewClockDeadline(t, "backend/r184_test.go:89 poll", 3*time.Second)
+	defer until.Stop()
+	for until.Pending() {
 		rows := r175Events(t, f.a, "game_settings_watch")
 		out := []map[string]any{}
 		for _, row := range rows {
@@ -100,6 +101,7 @@ func r184WaitStage(t *testing.T, f *r184Fixture, stage string, count int) []map[
 		}
 		time.Sleep(time.Millisecond)
 	}
+	until.Stop()
 	t.Fatalf("missing stage %s count %d", stage, count)
 	return nil
 }

@@ -106,12 +106,17 @@ func TestAcceptFocusCanceledJobHasTerminalRecord(t *testing.T) {
 		t.Fatal("not armed")
 	}
 	runner.cancelPending("accept")
-	select {
-	case event := <-ended:
-		if event["request_attempted"] != false || event["context_canceled"] != true {
-			t.Fatal(event)
+	if !r287WaitSelect(t, "backend/accept_focus_trace_test.go:109 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-ended:
+			if event["request_attempted"] != false || event["context_canceled"] != true {
+				t.Fatal(event)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("missing terminal event")
 	}
 }

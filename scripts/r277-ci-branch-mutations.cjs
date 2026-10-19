@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..'),sourceFile=path.join(root,'.github/workf
 const expression="startsWith(github.ref, 'refs/heads/codex/release-')",special="github.ref == 'refs/heads/codex/ci-hardening-r276'";
 const out=path.resolve(process.argv[2]||path.join(os.tmpdir(),'r277-ci-branch-mutations'));fs.mkdirSync(out,{recursive:true});
 const positions=[];let at=0;while((at=source.indexOf(expression,at))!==-1){positions.push(at);at+=expression.length;}
-assert.equal(positions.length,5,'all five original acceptance conditions must be checked');assert(!source.includes(special),'baseline must remove R276 special branch');
+assert.equal(positions.length,2,'both Windows acceptance conditions must be checked');assert(!source.includes(special),'baseline must remove R276 special branch');
 const rows=[];
 function run(name,text,want){
  const workflow=path.join(out,name+'.yml');fs.writeFileSync(workflow,text);
@@ -15,4 +15,5 @@ function run(name,text,want){
 }
 run('baseline',source,0);
 for(const [index,position] of positions.entries())run('restore-r276-condition-'+(index+1),source.slice(0,position)+'('+expression+' || '+special+')'+source.slice(position+expression.length),1);
+for(const name of ['mutations-1','r277-proof-linux-2','mutations-3']){const workflow=require('../desktop/node_modules/js-yaml').load(source);workflow.jobs[name].if='false';const changed=require('../desktop/node_modules/js-yaml').dump(workflow,{lineWidth:-1});const file=path.join(out,name+'-gated.yml');fs.writeFileSync(file,changed);const r=spawnSync(process.execPath,['--test','scripts/r276-workflow.test.cjs'],{cwd:root,env:{...process.env,R276_CI_WORKFLOW_SOURCE:file},encoding:'utf8'});fs.writeFileSync(path.join(out,name+'-gated.log'),(r.stdout||'')+(r.stderr||''));assert.notEqual(r.status,0,'gated mutation must fail routing oracle');rows.push({name:name+'-gated',exitCode:r.status,assertionVerified:true});}
 run('restored',source,0);assert.equal(fs.readFileSync(sourceFile,'utf8'),source,'mutations must not alter checkout');console.log(JSON.stringify(rows));

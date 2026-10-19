@@ -164,8 +164,9 @@ func r266CardTimingServer(t *testing.T, output string) {
 	if err := os.WriteFile(output, ready, 0600); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(60 * time.Second)
-	for time.Now().Before(deadline) {
+	deadline := r287NewClockDeadline(t, "backend/r266_timing_test.go:167 poll", 60*time.Second)
+	defer deadline.Stop()
+	for deadline.Pending() {
 		if _, err := os.Stat(output + ".done"); err == nil {
 			f.mu.Lock()
 			data, _ := json.Marshal(f.calls)
@@ -175,5 +176,6 @@ func r266CardTimingServer(t *testing.T, output string) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+	deadline.Stop()
 	t.Fatal("fake card timing browser did not finish")
 }

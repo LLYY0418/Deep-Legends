@@ -44,32 +44,40 @@ func TestR258ShutdownStatusAndRecentEventRestore(t *testing.T) {
 }
 
 func TestR258SignaledStreamCloseDisconnectsWithoutProbe(t *testing.T) {
-	var reads atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { reads.Add(1); <-r.Context().Done() }))
-	defer server.Close()
-	client := &LCUClient{baseURL: server.URL, http: server.Client(), token: "fixture-token"}
-	a := &app{lcu: client, connected: true, shutdownClient: client}
-	started := time.Now()
-	if err := a.probeAfterEventStreamClose(context.Background(), client); err == nil {
-		t.Fatal("shutdown remained connected")
-	}
-	if reads.Load() != 0 || a.connected || time.Since(started) > 50*time.Millisecond {
-		t.Fatalf("shutdown took %s, probes=%d, connected=%v", time.Since(started), reads.Load(), a.connected)
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		var reads atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { reads.Add(1); <-r.Context().Done() }))
+		defer server.Close()
+		client := &LCUClient{baseURL: server.URL, http: server.Client(), token: "fixture-token"}
+		a := &app{lcu: client, connected: true, shutdownClient: client}
+
+		started := time.Now()
+		if err := a.probeAfterEventStreamClose(context.Background(), client); err == nil {
+			t.Fatal("shutdown remained connected")
+		}
+		if reads.Load() != 0 || a.connected || r287TooSlow(r287Context, t, "backend/r258_test.go:56 duration", time.Since(started), 50*time.Millisecond, false) {
+			t.Fatalf("shutdown took %s, probes=%d, connected=%v", time.Since(started), reads.Load(), a.connected)
+		}
+	})
 }
 
 func TestR258UnsignaledStreamCloseHasShortProbe(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
-	defer server.Close()
-	client := &LCUClient{baseURL: server.URL, http: server.Client(), token: "fixture-token"}
-	a := &app{lcu: client, connected: true}
-	started := time.Now()
-	if err := a.probeAfterEventStreamClose(context.Background(), client); err == nil {
-		t.Fatal("hung client remained connected")
-	}
-	if a.connected || time.Since(started) > 2*time.Second {
-		t.Fatalf("short probe took %s, connected=%v", time.Since(started), a.connected)
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
+		defer server.Close()
+		client := &LCUClient{baseURL: server.URL, http: server.Client(), token: "fixture-token"}
+		a := &app{lcu: client, connected: true}
+
+		started := time.Now()
+		if err := a.probeAfterEventStreamClose(context.Background(), client); err == nil {
+			t.Fatal("hung client remained connected")
+		}
+		if a.connected || r287TooSlow(r287Context, t, "backend/r258_test.go:70 duration", time.Since(started), 2*time.Second, false) {
+			t.Fatalf("short probe took %s, connected=%v", time.Since(started), a.connected)
+		}
+	})
 }
 
 func TestR258StatusDoesNotWaitForGatewayDiscovery(t *testing.T) {
@@ -85,9 +93,14 @@ func TestR258StatusDoesNotWaitForGatewayDiscovery(t *testing.T) {
 		a.handleStatus(w, httptest.NewRequest(http.MethodGet, "/api/status", nil))
 		close(done)
 	}()
-	select {
-	case <-done:
-	case <-time.After(100 * time.Millisecond):
+	if !r287WaitSelect(t, "backend/r258_test.go:88 wait", 100*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("status waited for gateway discovery")
 	}
 }

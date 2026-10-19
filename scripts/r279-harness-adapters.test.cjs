@@ -26,7 +26,7 @@ test('mutation: breaking the legacy declaration must fail the actual deferred 50
 
 // Exercise the extracted consumer with the real shared watchdog and a virtual
 // clock as well, so the compatibility stubs above cannot mask broken wiring.
-test('real R265 page watchdog retains held-fetch diagnostics after exactly 10s idle',async()=>{
+test('real R265 page watchdog retains held-fetch diagnostics after two unchanged 10s idle observations',async()=>{
  const {waitForPage,PAGE_PROGRESS_EXPRESSION}=require('./lib/wait-progress.cjs');
  const {PausedRequests,timeoutDiagnostic}=require('./fetch-paused-diagnostics.cjs');
  let time=0,polls=0,sleeps=0;const tracker=new PausedRequests(()=>time);tracker.attach('raw-session','raw-target');
@@ -35,6 +35,6 @@ test('real R265 page watchdog retains held-fetch diagnostics after exactly 10s i
  const evaluate=async expr=>{if(expr===PAGE_PROGRESS_EXPRESSION)return {ready:'complete'};if(expr==='fixtureReady'){polls++;return false;}return {ready:'complete'};};
  const until=vm.runInNewContext(source.slice(start,end)+'until',{pausedRequests:tracker,timeoutDiagnostic,JSON,Promise,Error,evaluate,
   waitForPage:(evaluate,expr,options)=>waitForPage(evaluate,expr,{...options,now:()=>time,sleep:async ms=>{assert.equal(ms,50);time+=ms;sleeps++;}})});
- await assert.rejects(until('fixtureReady'),error=>{assert.match(error.message,/timeout fixtureReady/);assert.match(error.message,/demo-data.js/);assert.match(error.message,/"dwellMs":10000/);assert.doesNotMatch(error.message,/SECRET|raw-request|raw-session|raw-target/);return true;});
- assert.equal(time,10000);assert.equal(sleeps,200);assert.equal(polls,201,'shared watchdog rechecks the condition at the idle boundary');
+ await assert.rejects(until('fixtureReady'),error=>{assert.match(error.message,/timeout fixtureReady/);assert.match(error.message,/demo-data.js/);assert.match(error.message,/"dwellMs":20000/);assert.doesNotMatch(error.message,/SECRET|raw-request|raw-session|raw-target/);return true;});
+ assert.equal(time,20000);assert.equal(sleeps,400);assert.equal(polls,402,'shared watchdog rechecks the condition at the idle boundary');
 });

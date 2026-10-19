@@ -38,9 +38,14 @@ func TestRetryExhaustionStopsPresentingTheBlankRecordAsNotSyncedYet(t *testing.T
 			t.Fatalf("record was settled before retry %d ran", attempt)
 		}
 		a.collectionDataRetry.Reset(time.Millisecond)
-		select {
-		case <-a.refreshRequests:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/loot_blank_test.go:41 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-a.refreshRequests:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("retry not requested")
 		}
 		a.mu.Lock()

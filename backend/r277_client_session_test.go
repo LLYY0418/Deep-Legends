@@ -106,9 +106,14 @@ func TestR277ShutdownCancelsOldCollectionProbe(t *testing.T) {
 	go func() { a.refreshCollectionWithClient(old); close(done) }()
 	<-entered
 	a.observeClientShutdownEvent(old, LCUEvent{URI: "/riotclient/pre-shutdown/begin"}, time.Now())
-	select {
-	case <-done:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r277_client_session_test.go:109 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		close(emergency)
 		<-done
 		t.Error("old probe not cancelled within 1s of shutdown")
@@ -165,20 +170,35 @@ func TestR277SessionProcessesShutdownWhileCollectionBlocked(t *testing.T) {
 	sessionDone := make(chan error, 1)
 	go func() { sessionDone <- a.runConnectedSession(ctx, client) }()
 	a.queueCollectionRefresh("user_refresh")
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r277_client_session_test.go:168 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-entered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("probe not entered")
 	}
 	close(sendShutdown)
-	select {
-	case <-sessionDone:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r277_client_session_test.go:174 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-sessionDone:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("blocked collection prevented shutdown handling")
 	}
-	select {
-	case <-probeDone:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r277_client_session_test.go:179 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-probeDone:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("old probe survived session")
 	}
 	a.mu.RLock()

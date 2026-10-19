@@ -20,7 +20,7 @@ function releasePlan(files){
  return {schema:policy.schema,classification:product.length?'product':'test-infrastructure',productFiles:product,
   local:'explicitly stage task files, then node scripts/preflight.cjs',
   diagnostic:{...policy.diagnostic,command:'push a diagnostic branch or manually run the diagnostic workflow; never use its result as release evidence'},
-  acceptance:{sameSha:true,workflow:policy.formal.workflow,rounds:Array.from({length:rounds},(_,i)=>({event:i?policy.formal.subsequentEvent:policy.formal.firstEvent,...(i?{inputs:{measure_windows_renderers:true}}:{})})),actualWindowsGoAndRendererRequired:true,retry:{...policy.formal.retry}},
+  acceptance:{branchPrefix:'codex/release-',branchAdvice:'Formal push evidence requires a branch starting with codex/release-; workflow_dispatch is diagnostic only.',sameSha:true,workflow:policy.formal.workflow,rounds:Array.from({length:rounds},(_,i)=>({event:i?policy.formal.subsequentEvent:policy.formal.firstEvent,...(i?{inputs:{measure_windows_renderers:true}}:{})})),actualWindowsGoAndRendererRequired:true,retry:{...policy.formal.retry}},
   sweep:'diagnostic only; never a release gate',
   targets:policy.targets};
 }

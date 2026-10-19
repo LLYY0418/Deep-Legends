@@ -12,6 +12,7 @@ const fs = require("node:fs"), path = require("node:path"), os = require("node:o
 const cp = require("node:child_process");
 const { buildIndex, select, R277_STRICT } = require("./lib/preflight-select.cjs");
 const root = path.resolve(__dirname, "..");
+let preflightGocache=process.env.GOCACHE,ownedGocache=false;
 const {planExecution}=require("./lib/preflight-cost.cjs");
 
 function git(args, options = {}) {
@@ -80,7 +81,7 @@ function behaviorChecks(base,changes,cwd=root) {
 function run(label, command, args, options = {}) {
   const started = Date.now();
   console.log(`\n▶ ${label}\n  $ ${[command, ...args].join(" ").slice(0, 300)}`);
-  const result = cp.spawnSync(command, args, { cwd: root, stdio: "inherit", env: { ...process.env, ...options.env } });
+  const result = cp.spawnSync(command, args, { cwd: root, stdio: "inherit", env: { ...process.env, ...(preflightGocache?{GOCACHE:preflightGocache}:{}), ...options.env } });
   const ms = Date.now() - started;
   const ok = result.status === 0;
   console.log(`${ok ? "✔" : "✘"} ${label}（${(ms / 1000).toFixed(1)}s）`);
@@ -112,7 +113,9 @@ function staticGates(selection, base) {
   gates.push({ label: "本地笔记与助手指令未被跟踪", command: process.execPath, args: ["scripts/verify-no-docs-tracked.cjs"] });
   for (const file of jsFiles) gates.push({ label: `语法检查 ${file}`, command: process.execPath, args: ["--check", file] });
   if (goFiles.length) gates.push({ label: "gofmt", command: process.execPath, args: ["scripts/r279-static-go.cjs",...goFiles] });
-  if (selection.staticGates.includes("go-vet-backend")) gates.push({ label: "go vet ./backend", command: "go", args: ["vet", "./backend"] });
+  gates.push({label:"go vet ./...",command:"go",args:["vet","./..."]});
+  gates.push({label:"Windows amd64 交叉编译",command:process.execPath,args:["scripts/preflight-build.cjs"]});
+  gates.push({label:"发布清单",command:process.execPath,args:["scripts/make-release.cjs","--check-notes"]});
   const testsOrWorkflowsTouched = selection.changed.some((c) => /\.test\.[cm]js$|_test\.go$|^\.github\/workflows\//.test(c.file));
   if (testsOrWorkflowsTouched) gates.push({ label: "CI 测试过滤器校验", command: process.execPath, args: ["scripts/verify-ci-test-filters.cjs"] });
   if(selection.staticGates.includes("pinned-contracts"))gates.push({label:"pinned-contracts",command:process.execPath,args:["scripts/pinned-contracts-check.cjs"]});
@@ -158,20 +161,27 @@ function printSummary(base, selection, total) {
   if (selection.recommendProbe) console.log("\n→ 建议：本地只跑静态门禁，然后直接推 probe 分支，用 CI 做完整验证。");
 }
 
-function runBrowsers(selection) {
+function runBrowsers(selection, {runCommand=run, cleanCommand=(env)=>cp.spawnSync("go",["clean","-cache","-testcache"],{cwd:root,env,encoding:"utf8"})} = {}) {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "preflight-browsers-"));
   const results = [];
   const names = selection.browserGuards.map((g) => g.name).filter((n) => n !== R277_STRICT);
+  try {
   if (names.length) {
-    results.push(run(`浏览器守卫 ${names.join(",")}`, process.execPath, ["scripts/r276-browser-job.cjs", "all", path.join(out, "guards")], { env: { R276_BROWSER_ONLY: names.join(",") } }));
+    results.push(runCommand(`浏览器守卫 ${names.join(",")}`, process.execPath, ["scripts/r276-browser-job.cjs", "all", path.join(out, "guards")], { env: { R276_BROWSER_ONLY: names.join(",") } }));
   }
   if (selection.browserGuards.some((g) => g.name === R277_STRICT)) {
     const backend = path.join(out, process.platform === "win32" ? "r277.exe" : "r277-browser-public");
     const target = path.join(out, "r277");
-    results.push(run("R277 构建浏览器后端", process.execPath, ["scripts/r277-ci-orchestrate.cjs", "build-browser", "--backend", backend, "--out", target]));
-    if (results.at(-1).ok) results.push(run("R277 严格几何矩阵", process.execPath, ["scripts/r277-ci-orchestrate.cjs", "browser", "--backend", backend, "--out", target]));
+    results.push(runCommand("R277 构建浏览器后端", process.execPath, ["scripts/r277-ci-orchestrate.cjs", "build-browser", "--backend", backend, "--out", target], {env:{PI_SCRATCH_DIR:out}}));
+    if (results.at(-1).ok) results.push(runCommand("R277 严格几何矩阵", process.execPath, ["scripts/r277-ci-orchestrate.cjs", "browser", "--backend", backend, "--out", target], {env:{PI_SCRATCH_DIR:out}}));
   }
   return results;
+  } finally {
+    try {
+      const cache=path.join(out,'r277-browser-gocache');
+      if(fs.existsSync(cache)){const result=cleanCommand({...process.env,GOCACHE:cache});if(result.status!==0)throw Error('Browser GOCACHE cleanup failed: '+(result.stderr||result.error));}
+    } finally { fs.rmSync(out,{recursive:true,force:true}); }
+  }
 }
 
 async function main() {
@@ -204,9 +214,13 @@ async function main() {
   console.log(`成本估算：Node worker约${Math.round(execution.estimate.nodeWorkerMs/1000)}s，已测文件成本占比${Math.round(execution.estimate.nodeFileCostShare*100)}%；未知Node成本${execution.estimate.unknownNodeFiles.length}文件；Go ${execution.estimate.goCases}用例（无耗时档案）；浏览器串行约${execution.estimate.browserSerialMs===null?"未知":Math.round(execution.estimate.browserSerialMs/1000)+"s"}。估算不是预算或通过证据。`);
   if(execution.deferAssociated)console.log(`关联验证延后CI：${execution.reasons.join("; ")}；直接改动测试仍回归。`);
   if(execution.deferBrowser)console.log("浏览器工作量超出本地反馈目标，保留完整清单交Windows诊断/CI；显式 --full --browsers 可本地完整执行。");
-  const report = { base, gateBase, generatedAt: new Date().toISOString(), totals: total, selection, execution, behavior, results: [] };
-  let exitCode = 0;
+  const staleValues=require('./lib/stale-values.cjs').scanRepository(root,gateBase);
+  for(const hit of staleValues)console.log(`仍断言旧值：${hit.file}:${hit.line} ${JSON.stringify(hit.value)}（来自 ${hit.from}）`);
+  const report = { staleValues, base, gateBase, generatedAt: new Date().toISOString(), totals: total, selection, execution, behavior, results: [] };
+  let exitCode = staleValues.length?1:0;
   if (!options.list) {
+    if(!preflightGocache){preflightGocache=fs.mkdtempSync(path.join(os.tmpdir(),'r287-preflight-gocache-'));ownedGocache=true;}
+    if(staleValues.length){exitCode=1;report.results.push({label:'旧值扫描',ok:false,hits:staleValues});}
     if(behavior.fixtureAlignment?.issues.length){exitCode=1;report.results.push({label:'启动夹具对齐',ok:false,issues:behavior.fixtureAlignment.issues});}
     for (const gate of staticGates(selection, gateBase)) {
       const result = run(gate.label, gate.command, gate.args);
@@ -231,7 +245,7 @@ async function main() {
     }
     if (exitCode===0 && execution.goTestNames.length) {
       const pattern = `^(${execution.goTestNames.join("|")})$`;
-      const result = run(`Go 测试（${execution.goTestNames.length} 个用例，-race）`, "go", ["test", "-race", "-count=1", "-run", pattern, "./backend"]);
+      const result = run(`Go 测试（${execution.goTestNames.length} 个用例${options.full?"，-race":""}）`, "go", ["test", ...(options.full?["-race"]:[]), "-count=1", "-run", pattern, "./backend"]);
       report.results.push(result);
       if (!result.ok) exitCode = 1;
     }
@@ -248,8 +262,19 @@ async function main() {
   return exitCode;
 }
 
-if (require.main === module) {
-  main().then((code) => { process.exitCode = code; }, (error) => { console.error(error.stack || error); process.exitCode = 2; });
+function cleanupCaches(){
+  if(!preflightGocache)return;
+  const env={...process.env};delete env.GOCACHE;
+  for(const [label,cacheEnv]of [['default',env],['dedicated',{...env,GOCACHE:preflightGocache}]]){
+    const result=cp.spawnSync('go',['clean','-cache','-testcache'],{cwd:root,env:cacheEnv,encoding:'utf8'});
+    console.log(JSON.stringify({cleanup:'go clean -cache -testcache',cache:label,ok:result.status===0}));
+    if(result.status!==0){console.error(result.stderr||result.error);process.exitCode=1;}
+  }
+  if(ownedGocache)fs.rmSync(preflightGocache,{recursive:true,force:true});
 }
 
-module.exports = { parseArgs, resolveBase, changedFiles, loadIndex, staticGates, runScriptTests, behaviorChecks };
+if (require.main === module) {
+  main().then((code) => { process.exitCode = code; }, (error) => { console.error(error.stack || error); process.exitCode = 2; }).finally(cleanupCaches);
+}
+
+module.exports = { parseArgs, resolveBase, changedFiles, loadIndex, staticGates, runScriptTests, behaviorChecks, cleanupCaches, runBrowsers };

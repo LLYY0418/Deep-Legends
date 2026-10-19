@@ -40,7 +40,7 @@ for(const testFile of targets){
   mutant=source.replace(boundary,boundary+' container.innerHTML = "<div>WRONG OVERVIEW CONTENT</div>"; return;');
  }else{throw new Error('mutation target must be explicitly reviewed: '+testFile);}
  fs.unlinkSync(path.join(sandbox,file));fs.writeFileSync(path.join(sandbox,file),mutant);
- const result=cp.spawnSync(process.execPath,[testFile],{cwd:sandbox,encoding:'utf8',timeout:90000,maxBuffer:16*1024*1024,env:{...process.env,NODE_OPTIONS:''}});
+ const result=cp.spawnSync(process.execPath,[testFile],{cwd:sandbox,encoding:'utf8',timeout:90000,maxBuffer:16*1024*1024,env:{...process.env,NODE_OPTIONS:'',R287_MUTATION_PATH:'1'}});
  const text=result.stdout+result.stderr;fs.writeFileSync(path.join(output,path.basename(testFile)+'.log'),text);
  const killed=result.status!==0&&!result.error&&/AssertionError|ERR_ASSERTION/.test(text)&&!/SyntaxError|Cannot find module/.test(text);
  rows.push({file:testFile,mutated_business_file:file,assertion_killed:killed,exit_code:result.status,error:result.error?.message||null});

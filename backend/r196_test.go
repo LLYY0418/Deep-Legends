@@ -121,12 +121,15 @@ func TestR196ProbeSelectsFastMirror(t *testing.T) {
 	u.mu.Lock()
 	done := u.downloadDone
 	u.mu.Unlock()
-	probeWatchdog := time.After(10 * time.Second)
+	probeWatchdogR287Timing := r287NewDeadline(t, "backend/r196_test.go:124 deadline", 10*time.Second)
+	defer probeWatchdogR287Timing.Stop()
+	probeWatchdog := probeWatchdogR287Timing.C
 	select {
 	case <-done:
 	case <-probeWatchdog:
 		t.Fatal("probe race stuck")
 	}
+	probeWatchdogR287Timing.Stop()
 	mu.Lock()
 	got := selected
 	mu.Unlock()
@@ -451,13 +454,18 @@ func TestR196RestartRestoresReadySnapshot(t *testing.T) {
 		return nil, fmt.Errorf("unexpected network")
 	})}
 	restored.Start()
-	select {
-	case status := <-readySnapshot:
-		waitUpdateCheck(t, restored)
-		if status.Latest != manifest.Version || restored.Status().State != "ready" {
-			t.Fatalf("ready restore=%+v", status)
+	if !r287WaitSelect(t, "backend/r196_test.go:454 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case status := <-readySnapshot:
+			waitUpdateCheck(t, restored)
+			if status.Latest != manifest.Version || restored.Status().State != "ready" {
+				t.Fatalf("ready restore=%+v", status)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("restart did not publish ready")
 	}
 }

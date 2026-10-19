@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {bootDemoApp,installWindowCleanup}=require('./overview-render-helpers.cjs');
 const {prefix}=require('./r230-fixture.cjs');
 installWindowCleanup(test);
-const wait=async predicate=>{const deadline=Date.now()+10000;while(!predicate()&&Date.now()<deadline)await new Promise(r=>setTimeout(r,20));assert.ok(predicate(),'UI state did not arrive')};
+const wait=predicate=>require('../scripts/lib/wait-progress.cjs').waitFor(predicate,{idleMs:10000,hardMs:10000,intervalMs:20,label:'UI state did not arrive'});
 test('R230 three repeated champion/mastery round trips retain all career cards and scroll, including player overlay',async()=>{
  const {window:w,errors}=bootDemoApp({gameplaySourceTransform:source=>prefix+source});
  await wait(()=>w.document.querySelector('#overview-content [data-overview-subpage="champion-table"]'));

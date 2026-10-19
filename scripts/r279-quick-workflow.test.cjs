@@ -22,7 +22,7 @@ test('quick Windows workflow is manual, complete browser scope and has no publis
 test('mutation: adding a publishing step must fail',()=>assert.throws(()=>verify(source+'\n# gh release create vTEST\n')));
 test('real CI passes only supported options to the r277 orchestration adapter',()=>{
  const ci=yaml.load(fs.readFileSync(path.join(__dirname,'../.github/workflows/ci.yml'),'utf8'));const adapter=require('./r277-ci-orchestrate.cjs');
- for(const job of Object.values(ci.jobs))for(const step of job.steps||[]){const m=/node scripts\/r277-ci-orchestrate\.cjs (\S+) (.*)/.exec(step.run||'');if(!m)continue;const args=[m[1],...m[2].match(/"[^"]*"|'[^']*'|\S+/g).map(s=>s.replace(/^['"]|['"]$/g,''))];assert.doesNotThrow(()=>adapter.parse(args));}
+ for(const job of Object.values(ci.jobs))for(const step of job.steps||[]){const m=/node scripts\/r277-ci-orchestrate\.cjs (\S+) (.*)/.exec(step.run||'');if(!m)continue;const expanded=m[2].replace(/\$\{\{ matrix\.shard \}\}/g,'1');const args=[m[1],...expanded.match(/"[^"]*"|'[^']*'|\S+/g).map(s=>s.replace(/^['"]|['"]$/g,''))];assert.doesNotThrow(()=>adapter.parse(args));}
 });
 
 test('mutation: losing a partition or the evidence coverage job must fail',()=>{

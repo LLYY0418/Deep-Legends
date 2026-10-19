@@ -9,9 +9,18 @@ const repo = "LLYY0418/Deep-Legends";
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 
 function latestNotes(changelog, version) {
-  const section = changelog.match(/^##\s+(\S+)\s+—\s+\d{4}-\d{2}-\d{2}\s*\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/m);
+  const section = changelog.match(/^##[^\S\n]+(\S+)[^\S\n]+[—·][^\S\n]+\d{4}-\d{2}-\d{2}[^\S\n]*\r?\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/m);
   if (!section || section[1] !== version || !section[2].trim()) throw new Error("CHANGELOG 最新一节必须与发布版本一致且包含更新内容");
   return section[2].trim();
+}
+function checkNotes(root = path.resolve(__dirname, '..')) {
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'desktop/package.json'), 'utf8'));
+  const lock = JSON.parse(fs.readFileSync(path.join(root, 'desktop/package-lock.json'), 'utf8'));
+  if (!/^\d+\.\d+\.\d+$/.test(pkg.version) || lock.version !== pkg.version || lock.packages?.['']?.version !== pkg.version) throw Error('package/lock 发布版本必须一致且合法');
+  const changelog = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+  const first = changelog.match(/^##\s+[^\n]*/m)?.[0];
+  if (!first || !new RegExp('^##\\s+' + pkg.version.replaceAll('.', '\\.') + '\\s+[—·]\\s+\\d{4}-\\d{2}-\\d{2}\\s*$').test(first)) throw Error('CHANGELOG 最新一节必须与发布版本一致且包含更新内容');
+  return {version: pkg.version, notes: latestNotes(changelog, pkg.version)};
 }
 function releaseName(name) {
   if (/\s/.test(name) || path.basename(name) !== name) throw new Error(`发布资产名不能包含空格或路径：${name}`);
@@ -46,9 +55,10 @@ function makeRelease({ root = path.resolve(__dirname, ".."), fingerprint, publis
   } finally {fs.rmSync(staging,{recursive:true,force:true});}
   return manifest;
 }
-module.exports = {makeRelease,latestNotes,releaseName};
+module.exports = {makeRelease,latestNotes,releaseName,checkNotes};
 if (require.main === module) {
   try {
+    if (process.argv[2] === '--check-notes') { console.log(JSON.stringify(checkNotes())); process.exit(0); }
     const manifest=makeRelease({fingerprint:process.argv[2]});
     console.log(`已生成 dist/release/ 的三个发布文件（Setup、latest.json、SHA256SUMS-public.txt）：v${manifest.version} · ${manifest.fingerprint}`);
     console.log(`Setup SHA-256: ${manifest.asset.sha256}`);

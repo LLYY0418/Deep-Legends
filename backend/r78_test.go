@@ -131,12 +131,17 @@ func TestR78PickableFailureStillSwapsBench(t *testing.T) {
 	fixture.runner.champSelect.benchFirstSeen[1] = time.Now().Add(-2 * time.Second)
 	fixture.runner.mu.Unlock()
 	fixture.runner.evaluateChampSelect(fixture.client, fixture.runner.currentWatch().ChampSelect)
-	select {
-	case path := <-fixture.benchSwapCh:
-		if path != "/lol-champ-select/v1/session/bench/swap/1" {
-			t.Fatalf("bench POST = %q", path)
+	if !r287WaitSelect(t, "backend/r78_test.go:134 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case path := <-fixture.benchSwapCh:
+			if path != "/lol-champ-select/v1/session/bench/swap/1" {
+				t.Fatalf("bench POST = %q", path)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("pickable failure prevented bench POST")
 	}
 	if fixture.benchSwaps.Load() != 1 || fixture.patches.Load() != 0 {
@@ -267,12 +272,17 @@ func TestR78ChampSelectExhaustedEmitsAndDoesNotPatch(t *testing.T) {
 	fixture := newR78ChampSelectFixture(t, "normal", "ban", 0, []int64{}, map[int64]champSelectGridSelectionStatus{1: {IsBanned: true}})
 	fixture.enable("normal", "ban", []int64{1})
 	fixture.runner.evaluateChampSelect(fixture.client, fixture.runner.currentWatch().ChampSelect)
-	select {
-	case event := <-fixture.events:
-		if event != "watch:failed:champselect-ban:exhausted" {
-			t.Fatalf("event = %q", event)
+	if !r287WaitSelect(t, "backend/r78_test.go:270 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-fixture.events:
+			if event != "watch:failed:champselect-ban:exhausted" {
+				t.Fatalf("event = %q", event)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("missing exhausted event")
 	}
 	if fixture.patches.Load() != 0 {
@@ -306,12 +316,17 @@ func TestR78ChampSelectUserTakeoverCancelsAutomation(t *testing.T) {
 	fixture := newR78ChampSelectFixture(t, "normal", "pick", 99, []int64{1}, map[int64]champSelectGridSelectionStatus{1: {}})
 	fixture.enable("normal", "pick", []int64{1})
 	fixture.runner.evaluateChampSelect(fixture.client, fixture.runner.currentWatch().ChampSelect)
-	select {
-	case event := <-fixture.events:
-		if event != "watch:canceled:champselect-pick" {
-			t.Fatalf("event = %q", event)
+	if !r287WaitSelect(t, "backend/r78_test.go:309 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-fixture.events:
+			if event != "watch:canceled:champselect-pick" {
+				t.Fatalf("event = %q", event)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("missing takeover cancellation")
 	}
 	if fixture.patches.Load() != 0 {
@@ -400,10 +415,12 @@ func (fixture *r78ChampSelectFixture) enableLane(groupID, side, lane string, cha
 
 func (fixture *r78ChampSelectFixture) waitPatch(t *testing.T) r78PatchRequest {
 	t.Helper()
+	timer := r287NewDeadline(t, "R78 PATCH wait", time.Second)
+	defer timer.Stop()
 	select {
 	case request := <-fixture.patchCh:
 		return request
-	case <-time.After(time.Second):
+	case <-timer.C:
 		t.Fatal("missing PATCH")
 		return r78PatchRequest{}
 	}

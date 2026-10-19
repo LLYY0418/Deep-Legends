@@ -23,7 +23,7 @@ exports.verify = async ({call, evaluate, output}) => {
     };
     document.getElementById('overview-refresh').click();
   }`);
-  const waitFor = expression => evaluate(`new Promise((resolve,reject)=>{const start=Date.now();const timer=setInterval(()=>{if(${expression}){clearInterval(timer);resolve();}else if(Date.now()-start>10000){clearInterval(timer);reject(Error('missing expected UI '+JSON.stringify({liveHidden:document.querySelector('#live-panel')?.hidden,buildHidden:document.querySelector('#recommendation-panel-build')?.hidden,buildClass:document.querySelector('#recommendation-panel-build')?.className,body:document.querySelector('#live-content')?.textContent.slice(-700)})));}},40);})`);
+  const waitFor = expression => require('../scripts/lib/wait-progress.cjs').waitFor(()=>evaluate(expression),{idleMs:10000,hardMs:10000,intervalMs:40,label:'expected layout UI did not settle'});
   await waitFor(`document.querySelector('.summoner-level-row .player-tab-hidden')`);
   const overview = await evaluate(`({badgeInTabs:document.querySelectorAll('.player-tab .player-tab-hidden').length,badgeInBanner:document.querySelectorAll('.summoner-level-row .player-tab-hidden').length,players:document.querySelectorAll('.current-game-player').length})`);
   assert.equal(overview.badgeInTabs, 0); assert.equal(overview.badgeInBanner, 1); assert.equal(overview.players, 10);

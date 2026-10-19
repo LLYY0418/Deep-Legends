@@ -235,9 +235,14 @@ func TestSpecialistRunesScansTopPlayersConcurrently(t *testing.T) {
 		result <- runes
 	}()
 	for range players {
-		select {
-		case <-started:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/specialist_runes_test.go:238 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-started:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			close(release)
 			t.Fatal("top-player scans did not run concurrently")
 		}
@@ -338,27 +343,35 @@ func TestSpecialistRiotStepsCarryIndependentDeadlines(t *testing.T) {
 }
 
 func TestRiotSpecialistQueueLimitReturnsThrottled(t *testing.T) {
-	provider := newRiotProvider(newChampionProvider())
-	now := time.Now()
-	provider.longWindow = make([]time.Time, 90)
-	for index := range provider.longWindow {
-		provider.longWindow[index] = now
-	}
-	started := time.Now()
-	err := provider.wait(withRiotQueueLimit(context.Background(), 20*time.Millisecond))
-	if !errors.Is(err, errThrottled) || time.Since(started) > 250*time.Millisecond {
-		t.Fatalf("specialist queue wait = %v after %v", err, time.Since(started))
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		provider := newRiotProvider(newChampionProvider())
+		now := time.Now()
+		provider.longWindow = make([]time.Time, 90)
+		for index := range provider.longWindow {
+			provider.longWindow[index] = now
+		}
+
+		started := time.Now()
+		err := provider.wait(withRiotQueueLimit(context.Background(), 20*time.Millisecond))
+		if !errors.Is(err, errThrottled) || r287TooSlow(r287Context, t, "backend/specialist_runes_test.go:351 duration", time.Since(started), 250*time.Millisecond, false) {
+			t.Fatalf("specialist queue wait = %v after %v", err, time.Since(started))
+		}
+	})
 }
 
 func TestSpecialistSlotQueueReturnsThrottled(t *testing.T) {
-	slots := make(chan struct{}, 1)
-	slots <- struct{}{}
-	started := time.Now()
-	err := acquireSpecialistSlot(context.Background(), slots, 20*time.Millisecond)
-	if !errors.Is(err, errThrottled) || time.Since(started) > 250*time.Millisecond {
-		t.Fatalf("specialist slot wait = %v after %v", err, time.Since(started))
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		slots := make(chan struct{}, 1)
+		slots <- struct{}{}
+
+		started := time.Now()
+		err := acquireSpecialistSlot(context.Background(), slots, 20*time.Millisecond)
+		if !errors.Is(err, errThrottled) || r287TooSlow(r287Context, t, "backend/specialist_runes_test.go:361 duration", time.Since(started), 250*time.Millisecond, false) {
+			t.Fatalf("specialist slot wait = %v after %v", err, time.Since(started))
+		}
+	})
 }
 
 func TestRiotAccountCacheStoresSuccessAndBacksOffFailures(t *testing.T) {
@@ -663,69 +676,80 @@ func (body specialistCancelOnClose) Close() error {
 }
 
 func TestSpecialistRunesTimeoutReturnsCompletedPartialResults(t *testing.T) {
-	t.Setenv("RIOT_API_KEY", "RGAPI-test")
-	if specialistRuneRequestBudget > 90 {
-		t.Fatalf("specialist request budget = %d, exceeds Riot long-window limit", specialistRuneRequestBudget)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	secondStarted := make(chan struct{})
-	players := []championTopPlayer{{Name: "First", Tagline: "KR1"}, {Name: "Second", Tagline: "KR1"}}
-	provider := specialistTestProvider(gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		switch {
-		case request.URL.Host == opggPageHost:
-			return specialistTestResponse(request, http.StatusOK, specialistLeaderboardBody(players...))
-		case strings.Contains(request.URL.Path, "/accounts/by-riot-id/First/"):
-			return specialistTestResponse(request, http.StatusOK, `{"puuid":"first-puuid"}`)
-		case strings.Contains(request.URL.Path, "/accounts/by-riot-id/Second/"):
-			close(secondStarted)
-			<-request.Context().Done()
-			return nil, request.Context().Err()
-		case strings.Contains(request.URL.Path, "/by-puuid/first-puuid/ids"):
-			return specialistTestResponse(request, http.StatusOK, `["KR_1"]`)
-		case strings.Contains(request.URL.Path, "/lol/match/v5/matches/KR_1"):
-			select {
-			case <-secondStarted:
-			case <-ctx.Done():
-				return nil, ctx.Err()
+
+	// Cancel only after the complete detail response has been consumed,
+	// and the second player has entered its deliberately blocked request.
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		t.Setenv("RIOT_API_KEY", "RGAPI-test")
+		if specialistRuneRequestBudget > 90 {
+			t.Fatalf("specialist request budget = %d, exceeds Riot long-window limit", specialistRuneRequestBudget)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		secondStarted := make(chan struct{})
+		players := []championTopPlayer{{Name: "First", Tagline: "KR1"}, {Name: "Second", Tagline: "KR1"}}
+		provider := specialistTestProvider(gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+			switch {
+			case request.URL.Host == opggPageHost:
+				return specialistTestResponse(request, http.StatusOK, specialistLeaderboardBody(players...))
+			case strings.Contains(request.URL.Path, "/accounts/by-riot-id/First/"):
+				return specialistTestResponse(request, http.StatusOK, `{"puuid":"first-puuid"}`)
+			case strings.Contains(request.URL.Path, "/accounts/by-riot-id/Second/"):
+				close(secondStarted)
+				<-request.Context().Done()
+				return nil, request.Context().Err()
+			case strings.Contains(request.URL.Path, "/by-puuid/first-puuid/ids"):
+				return specialistTestResponse(request, http.StatusOK, `["KR_1"]`)
+			case strings.Contains(request.URL.Path, "/lol/match/v5/matches/KR_1"):
+				select {
+				case <-secondStarted:
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+				response, err := specialistTestResponse(request, http.StatusOK, specialistMatchBodyAtPosition("KR_1", "first-puuid", 64, "complete", "MIDDLE", true, false))
+
+				response.Body = specialistCancelOnClose{ReadCloser: response.Body, cancel: cancel}
+				return response, err
+			default:
+				return specialistTestResponse(request, http.StatusNotFound, `{}`)
 			}
-			response, err := specialistTestResponse(request, http.StatusOK, specialistMatchBodyAtPosition("KR_1", "first-puuid", 64, "complete", "MIDDLE", true, false))
-			// Cancel only after the complete detail response has been consumed,
-			// and the second player has entered its deliberately blocked request.
-			response.Body = specialistCancelOnClose{ReadCloser: response.Body, cancel: cancel}
-			return response, err
-		default:
-			return specialistTestResponse(request, http.StatusNotFound, `{}`)
+		}))
+
+		started := time.Now()
+		type result struct {
+			runes   []gameplayRecommendationRune
+			outcome specialistOutcome
 		}
-	}))
-	started := time.Now()
-	type result struct {
-		runes   []gameplayRecommendationRune
-		outcome specialistOutcome
-	}
-	done := make(chan result, 1)
-	go func() {
-		runes, outcome := provider.specialistRunes(ctx, 64, "leesin", "李青", "mid")
-		done <- result{runes, outcome}
-	}()
-	watchdog := time.NewTimer(4 * time.Second)
-	defer watchdog.Stop()
-	var got result
-	select {
-	case got = <-done:
-	case <-watchdog.C:
-		cancel()
+		done := make(chan result, 1)
+		go func() {
+			runes, outcome := provider.specialistRunes(ctx, 64, "leesin", "李青", "mid")
+			done <- result{runes, outcome}
+		}()
+		watchdog := time.NewTimer(4 * time.Second)
+		defer watchdog.Stop()
+		var got result
 		select {
-		case <-done:
-		case <-time.After(time.Second):
-			t.Error("specialist request did not stop after watchdog cancellation")
+		case got = <-done:
+		case <-watchdog.C:
+			cancel()
+			if !r287WaitSelect(t, "backend/specialist_runes_test.go:736 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-done:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
+				t.Error("specialist request did not stop after watchdog cancellation")
+			}
+			t.Fatal("specialist partial-result request exceeded watchdog")
 		}
-		t.Fatal("specialist partial-result request exceeded watchdog")
-	}
-	runes, outcome := got.runes, got.outcome
-	if len(runes) != 1 || outcome != specialistOutcomeSuccess || runes[0].PlayerName != "First" || time.Since(started) > time.Second {
-		t.Fatalf("timeout partial result = runes:%#v outcome:%q duration:%v", runes, outcome, time.Since(started))
-	}
+		runes, outcome := got.runes, got.outcome
+		if len(runes) != 1 || outcome != specialistOutcomeSuccess || runes[0].PlayerName != "First" || r287TooSlow(r287Context, t, "backend/specialist_runes_test.go:728 duration", time.Since(started), time.Second, false) {
+			t.Fatalf("timeout partial result = runes:%#v outcome:%q duration:%v", runes, outcome, time.Since(started))
+		}
+	})
 }
 
 func TestSpecialistRunesTimeoutIsNotReportedAsNoPositionSample(t *testing.T) {

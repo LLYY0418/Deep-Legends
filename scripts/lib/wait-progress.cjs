@@ -23,7 +23,7 @@ async function snapshot(progress) {
 
 // Returns {ok:true, polls, ms} when `check` became truthy, or {ok:false, reason, progress, polls, ms}.
 // Never throws because of the wait itself; errors thrown by `check` propagate.
-async function waitOutcome(check, options = {}) {
+async function waitOnce(check, options = {}) {
   const idleMs = options.idleMs ?? DEFAULTS.idleMs;
   const hardMs = Math.max(options.hardMs ?? DEFAULTS.hardMs, idleMs);
   const intervalMs = options.intervalMs ?? DEFAULTS.intervalMs;
@@ -45,6 +45,20 @@ async function waitOutcome(check, options = {}) {
   }
 }
 
+// Each failed temporal observation gets one fresh window with the identical limits.
+async function waitOutcome(check, options = {}) {
+  const {timingRetry}=require('./timing-retry.cjs');
+  let last;
+  const measurement=async()=>{last=await waitOnce(check,options);return last;};
+  try {
+    const result=await timingRetry({label:options.label||'wait for progress',measure:measurement,within:value=>value.ok,record:options.recordTiming});
+    return {...result.value,attempts:result.attempts.map(a=>a.ms),measurements:result.attempts};
+  } catch(error) {
+    if(error.code!=='TIMING_LIMIT'||error.measurement!==measurement)throw error;
+    return {...last,attempts:error.attempts.map(a=>a.ms),measurements:error.attempts};
+  }
+}
+
 // Throwing flavour for plain callers.
 async function waitFor(check, options = {}) {
   const outcome = await waitOutcome(check, options);
@@ -54,6 +68,7 @@ async function waitFor(check, options = {}) {
   const error = new Error(`${label}: ${detail}; last progress ${outcome.progress}`);
   error.code = outcome.reason === "stalled" ? "WAIT_STALLED" : "WAIT_HARD_LIMIT";
   error.progress = outcome.progress;
+  error.attempts = outcome.attempts;
   throw error;
 }
 

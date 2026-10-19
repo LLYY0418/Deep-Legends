@@ -1,0 +1,7 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {disposition,context}=require('./release-draft.cjs');
+const sha='a'.repeat(40),other='b'.repeat(40),version=require('../desktop/package.json').version;
+test('tag event already published by prebuilt draft succeeds only at identical target',()=>{assert.equal(disposition({event:'push',release:{draft:false},sha,target:sha}),'already-published');assert.throws(()=>disposition({event:'push',release:{draft:false},sha,target:other}),/target mismatch/);assert.throws(()=>disposition({event:'workflow_dispatch',release:{draft:false},sha,target:sha}),/refusing/);});
+test('absent release builds; existing draft retains delete/recreate path',()=>{assert.equal(disposition({event:'push',release:null,sha}),'build');assert.equal(disposition({event:'workflow_dispatch',release:{draft:true},sha,target:other}),'replace-draft');});
+test('dispatch accepts release prefix with suffix, rejects developer/probe refs and mismatched tags',()=>{const env={GITHUB_REPOSITORY:'LLYY0418/Deep-Legends',GITHUB_SHA:sha,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/codex/release-0.12.92-r287'};assert.equal(context(env).sha,sha);for(const ref of ['refs/heads/codex/r287-fast-release','refs/heads/codex/probe-r287'])assert.throws(()=>context({...env,GITHUB_REF:ref}),/release-/);assert.equal(context({...env,GITHUB_EVENT_NAME:'push',GITHUB_REF:`refs/tags/v${version}`}).tag,`v${version}`);assert.throws(()=>context({...env,GITHUB_EVENT_NAME:'push',GITHUB_REF:'refs/tags/v99.99.99'}),/Tag/);});

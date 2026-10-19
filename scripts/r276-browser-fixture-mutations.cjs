@@ -12,7 +12,7 @@ async function main(){
   const execute=async number=>{
    const attemptFolder=path.join(folder,'attempt-'+number);fs.mkdirSync(attemptFolder,{recursive:true});
    const logfile=path.join(attemptFolder,'browser.log'),fd=fs.openSync(logfile,'w'),at=Date.now();
-   try{result=await runOffline(process.execPath,['-e',code],{env:{R266_CASE_ONE:'1',R266_EXTRAS:'1',R266_BROWSER_OUT:attemptFolder},stdio:['ignore',fd,fd],output:path.join(attemptFolder,'offline.json')});}finally{fs.closeSync(fd);}
+   try{result=await runOffline(process.execPath,['-e',code],{env:{R287_MUTATION_PATH:route?'1':'0',R266_CASE_ONE:'1',R266_EXTRAS:'1',R266_BROWSER_OUT:attemptFolder},stdio:['ignore',fd,fd],output:path.join(attemptFolder,'offline.json')});}finally{fs.closeSync(fd);}
    const log=fs.readFileSync(logfile,'utf8');process.stdout.write(log);
    for(const file of ['failure.json','result.json'])if(fs.existsSync(path.join(attemptFolder,file)))fs.copyFileSync(path.join(attemptFolder,file),path.join(folder,file));
    const failure=fs.existsSync(path.join(attemptFolder,'failure.json'))?JSON.parse(fs.readFileSync(path.join(attemptFolder,'failure.json'))):{};

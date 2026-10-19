@@ -20,14 +20,14 @@ test('R192 imported until keeps the mount label, original window floor and progr
  assert.match(source,/fetch:\(input,init\)=>\{activity\.fetches\+\+;/);
 });
 test('R192 slow progress succeeds, frozen mount and endless progress still fail',async()=>{
- let clock=0,ticks=0;
- const until=untilWith((check,o)=>waitFor(check,{...o,now:()=>clock,sleep:async(ms)=>{clock+=ms;ticks++;}}));
+ let clock=0,ticks=0;const records=[];
+ const until=untilWith((check,o)=>waitFor(check,{...o,recordTiming:row=>records.push(row),now:()=>clock,sleep:async(ms)=>{clock+=ms;ticks++;}}));
  await until(()=>ticks>1600,'slow mount',5000,()=>ticks);
  assert.ok(clock>15000);
  clock=0;ticks=0;
  await assert.rejects(until(()=>false,'full app did not mount',5000,()=>0),error=>error.code==='WAIT_STALLED'&&/full app did not mount/.test(error.message));
- assert.equal(clock,15000);
+ assert.equal(clock,2*15000);assert.deepEqual(records.at(-1).attempts.map(row=>row.ms),[15000,15000]);
  clock=0;ticks=0;
  await assert.rejects(until(()=>false,'endless mount',5000,()=>ticks),error=>error.code==='WAIT_HARD_LIMIT');
- assert.equal(clock,120000);
+ assert.equal(clock,2*120000);assert.deepEqual(records.at(-1).attempts.map(row=>row.ms),[120000,120000]);
 });

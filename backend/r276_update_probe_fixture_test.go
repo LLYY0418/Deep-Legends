@@ -61,12 +61,15 @@ func TestR276UpdateProbeDiagnosticsWaitForCanceledSource(t *testing.T) {
 	u.mu.Lock()
 	done := u.downloadDone
 	u.mu.Unlock()
-	watchdog := time.After(10 * time.Second)
+	watchdogR287Timing := r287NewDeadline(t, "backend/r276_update_probe_fixture_test.go:64 deadline", 10*time.Second)
+	defer watchdogR287Timing.Stop()
+	watchdog := watchdogR287Timing.C
 	select {
 	case <-done:
 	case <-watchdog:
 		t.Fatal("download did not complete")
 	}
+	watchdogR287Timing.Stop()
 	select {
 	case <-blocked:
 	case <-watchdog:

@@ -91,25 +91,29 @@ func TestR74FacadeConnectionChangeInvalidatesStaleCatalog(t *testing.T) {
 }
 
 func TestR74RiotBudgetExhaustionReturnsRetryAfterWithoutWaitingForTimeout(t *testing.T) {
-	p := newRiotProvider(newChampionProvider())
-	for i := 0; i < 90; i++ {
-		p.longWindow = append(p.longWindow, time.Now())
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 18*time.Second)
-	defer cancel()
-	started := time.Now()
-	err := p.wait(ctx)
-	if riotErrorStatus(err) != 429 || time.Since(started) > time.Second {
-		t.Fatalf("budget failure must be immediate, err=%v", err)
-	}
-	recorder := httptest.NewRecorder()
-	writeRiotHTTPError(recorder, err)
-	if recorder.Code != 429 || recorder.Header().Get("Retry-After") == "" || !strings.Contains(recorder.Body.String(), "额度正在恢复") {
-		t.Fatalf("missing recovery hint: %+v", recorder)
-	}
-	if len(p.longWindow) != 90 {
-		t.Fatal("failed wait must not reserve another request")
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		p := newRiotProvider(newChampionProvider())
+		for i := 0; i < 90; i++ {
+			p.longWindow = append(p.longWindow, time.Now())
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 18*time.Second)
+		defer cancel()
+
+		started := time.Now()
+		err := p.wait(ctx)
+		if riotErrorStatus(err) != 429 || r287TooSlow(r287Context, t, "backend/r74_regression_test.go:102 duration", time.Since(started), time.Second, false) {
+			t.Fatalf("budget failure must be immediate, err=%v", err)
+		}
+		recorder := httptest.NewRecorder()
+		writeRiotHTTPError(recorder, err)
+		if recorder.Code != 429 || recorder.Header().Get("Retry-After") == "" || !strings.Contains(recorder.Body.String(), "额度正在恢复") {
+			t.Fatalf("missing recovery hint: %+v", recorder)
+		}
+		if len(p.longWindow) != 90 {
+			t.Fatal("failed wait must not reserve another request")
+		}
+	})
 }
 
 func TestR74RecommendationInventoryFindsOtherNamespacesWithoutModifyingFiles(t *testing.T) {

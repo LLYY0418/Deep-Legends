@@ -21,75 +21,79 @@ func TestR245SlowNetwork(t *testing.T) {
 		for _, phase := range []string{"headers10s", "body12s"} {
 			t.Run(kind+"_"+phase, func(t *testing.T) {
 				t.Parallel()
-				issuer := newLicenseTestIssuer(t)
-				m := issuer.Manager(&licenseTestStore{})
-				m.options.Elapsed = time.Now
-				if kind == "renew" {
-					testActivate(t, m, false)
-				}
-				store := newStartupTestStore(t)
-				a := &app{storage: store}
-				m.options.Observe = a.recordDiagnostic
-				server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					recorder := httptest.NewRecorder()
-					issuer.ServeHTTP(recorder, r)
-					delay := 10 * time.Second
-					if phase == "body12s" {
-						delay = 12 * time.Second
-						w.Header().Set("Content-Type", "application/json")
-						w.WriteHeader(recorder.Code)
-						w.(http.Flusher).Flush()
+
+				r287TimingScenario(t, func(r287Context *r287TimingContext) {
+					issuer := newLicenseTestIssuer(t)
+					m := issuer.Manager(&licenseTestStore{})
+					m.options.Elapsed = time.Now
+					if kind == "renew" {
+						testActivate(t, m, false)
 					}
-					select {
-					case <-time.After(delay):
-					case <-r.Context().Done():
-						return
+					store := newStartupTestStore(t)
+					a := &app{storage: store}
+					m.options.Observe = a.recordDiagnostic
+					server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						recorder := httptest.NewRecorder()
+						issuer.ServeHTTP(recorder, r)
+						delay := 10 * time.Second
+						if phase == "body12s" {
+							delay = 12 * time.Second
+							w.Header().Set("Content-Type", "application/json")
+							w.WriteHeader(recorder.Code)
+							w.(http.Flusher).Flush()
+						}
+						select {
+						case <-time.After(delay):
+						case <-r.Context().Done():
+							return
+						}
+						if phase == "headers10s" {
+							w.WriteHeader(recorder.Code)
+						}
+						w.Write(recorder.Body.Bytes())
+					}))
+					defer server.Close()
+					m.options.Client = server.Client()
+					m.options.Origin = server.URL
+
+					start := time.Now()
+					var err error
+					if kind == "activate" {
+						err = m.Activate(context.Background(), strings.Repeat("0", 20))
+					} else {
+						err = m.Renew(context.Background())
 					}
-					if phase == "headers10s" {
-						w.WriteHeader(recorder.Code)
+					if err != nil || !m.Allowed() {
+						t.Fatalf("R245 slow %s %s must succeed: %v", kind, phase, err)
 					}
-					w.Write(recorder.Body.Bytes())
-				}))
-				defer server.Close()
-				m.options.Client = server.Client()
-				m.options.Origin = server.URL
-				start := time.Now()
-				var err error
-				if kind == "activate" {
-					err = m.Activate(context.Background(), strings.Repeat("0", 20))
-				} else {
-					err = m.Renew(context.Background())
-				}
-				if err != nil || !m.Allowed() {
-					t.Fatalf("R245 slow %s %s must succeed: %v", kind, phase, err)
-				}
-				if time.Since(start) > 35*time.Second {
-					t.Fatal("R245 activation budget exceeded")
-				}
-				rows := readDiagnosticEvents(t, store, "license_renew")
-				row := rows[len(rows)-1]
-				for _, key := range []string{"dns_ms", "connect_ms", "tls_ms", "ttfb_ms", "body_ms"} {
-					if _, ok := row[key]; !ok {
-						t.Fatalf("missing timing %s: %#v", key, row)
+					if r287TooSlow(r287Context, t, "backend/license_r245_test.go:66 duration", time.Since(start), 35*time.Second, false) {
+						t.Fatal("R245 activation budget exceeded")
 					}
-				}
-				if row["kind"] != kind || row["result"] != "ok" {
-					t.Fatal(row)
-				}
-				if phase == "headers10s" && row["ttfb_ms"].(float64) < 9900 {
-					t.Fatal("slow header timing lost", row)
-				}
-				if phase == "body12s" && (row["body_ms"].(float64) < 11900 || row["ttfb_ms"].(float64) > 1000) {
-					t.Fatal("slow body not distinguished from TTFB", row)
-				}
-				if row["connect_ms"] == nil || row["tls_ms"] == nil {
-					t.Fatal("real TLS trace missing", row)
-				}
-				rr := httptest.NewRecorder()
-				a.handleDiagnosticLog(rr, httptest.NewRequest("GET", "/api/diagnostics/log", nil))
-				if strings.Contains(rr.Body.String(), "127.0.0.1") || strings.Contains(rr.Body.String(), strings.Repeat("0", 20)) {
-					t.Fatal("trace leaked IP or code")
-				}
+					rows := readDiagnosticEvents(t, store, "license_renew")
+					row := rows[len(rows)-1]
+					for _, key := range []string{"dns_ms", "connect_ms", "tls_ms", "ttfb_ms", "body_ms"} {
+						if _, ok := row[key]; !ok {
+							t.Fatalf("missing timing %s: %#v", key, row)
+						}
+					}
+					if row["kind"] != kind || row["result"] != "ok" {
+						t.Fatal(row)
+					}
+					if phase == "headers10s" && row["ttfb_ms"].(float64) < 9900 {
+						t.Fatal("slow header timing lost", row)
+					}
+					if phase == "body12s" && (row["body_ms"].(float64) < 11900 || row["ttfb_ms"].(float64) > 1000) {
+						t.Fatal("slow body not distinguished from TTFB", row)
+					}
+					if row["connect_ms"] == nil || row["tls_ms"] == nil {
+						t.Fatal("real TLS trace missing", row)
+					}
+					rr := httptest.NewRecorder()
+					a.handleDiagnosticLog(rr, httptest.NewRequest("GET", "/api/diagnostics/log", nil))
+					if strings.Contains(rr.Body.String(), "127.0.0.1") || strings.Contains(rr.Body.String(), strings.Repeat("0", 20)) {
+						t.Fatal("trace leaked IP or code")
+					}
+				})
 			})
 		}
 	}

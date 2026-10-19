@@ -62,15 +62,19 @@ func TestR258TokenHotSingleFlightAndEventWins(t *testing.T) {
 }
 
 func TestR258OverviewTokenWaitIsBounded(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
-	defer server.Close()
-	client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client()}
-	p := newSGPProvider()
-	ctx := context.WithValue(t.Context(), overviewLoadCostContextKey{}, &overviewLoadCost{})
-	start := time.Now()
-	if _, err := p.entitlementsTokenContext(ctx, client, false); err == nil || time.Since(start) > 2*time.Second {
-		t.Fatal("unbounded token wait", err, time.Since(start))
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
+		defer server.Close()
+		client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client()}
+		p := newSGPProvider()
+		ctx := context.WithValue(t.Context(), overviewLoadCostContextKey{}, &overviewLoadCost{})
+
+		start := time.Now()
+		if _, err := p.entitlementsTokenContext(ctx, client, false); err == nil || r287TooSlow(r287Context, t, "backend/r258_priority_test.go:71 duration", time.Since(start), 2*time.Second, false) {
+			t.Fatal("unbounded token wait", err, time.Since(start))
+		}
+	})
 }
 
 func TestR258ConnectionPriorityAndIdleObjective(t *testing.T) {
@@ -91,9 +95,14 @@ func TestR258ConnectionPriorityAndIdleObjective(t *testing.T) {
 	case <-time.After(30 * time.Millisecond):
 	}
 	a.observeConnectionFirstCard()
-	select {
-	case <-p1:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r258_priority_test.go:94 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-p1:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("first card did not release P1")
 	}
 	select {
@@ -117,9 +126,14 @@ func TestR258ConnectionPriorityAndIdleObjective(t *testing.T) {
 	a.gameplayFlow.mu.Lock()
 	a.gameplayFlow.phase = "None"
 	a.gameplayFlow.mu.Unlock()
-	select {
-	case <-idle:
-	case <-time.After(1500 * time.Millisecond):
+	if !r287WaitSelect(t, "backend/r258_priority_test.go:120 wait", 1500*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-idle:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("idle objective not released")
 	}
 }
@@ -141,9 +155,14 @@ func TestR258ConnectedSessionDoesNotProbeObjectiveBeforeCard(t *testing.T) {
 	go func() { defer close(done); _ = a.runConnectedSession(ctx, client) }()
 	time.Sleep(100 * time.Millisecond)
 	cancel()
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "backend/r258_priority_test.go:144 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("session did not cancel")
 	}
 	if probes.Load() != 0 {
@@ -240,51 +259,60 @@ func TestR258HeadMarkerIncludesGamesAbsentFromVisibleList(t *testing.T) {
 }
 
 func TestR258TencentSnapshotImmediateAndAccountScoped(t *testing.T) {
-	a, client, _ := r258HeadFixture(t, []int64{500})
-	a.storage = r175App(t).storage
-	t.Cleanup(func() {
-		a.mu.Lock()
-		a.connected = false
-		a.mu.Unlock()
-		var done []chan struct{}
-		clientHistoryFlights.Range(func(key, value any) bool {
-			if k, ok := key.(struct {
-				a      *app
-				client *LCUClient
-				puuid  string
-				count  int
-			}); ok && k.a == a {
-				done = append(done, value.(*clientHistoryFlight).done)
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		a, client, _ := r258HeadFixture(t, []int64{500})
+		a.storage = r175App(t).storage
+		t.Cleanup(func() {
+			a.mu.Lock()
+			a.connected = false
+			a.mu.Unlock()
+			var done []chan struct{}
+			clientHistoryFlights.Range(func(key, value any) bool {
+				if k, ok := key.(struct {
+					a      *app
+					client *LCUClient
+					puuid  string
+					count  int
+				}); ok && k.a == a {
+					done = append(done, value.(*clientHistoryFlight).done)
+				}
+				return true
+			})
+			for _, ch := range done {
+				if !r287WaitSelect(t, "backend/r258_priority_test.go:283 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+					select {
+					case <-ch:
+						return true
+					case <-r287Deadline:
+						return false
+					}
+				}) {
+					t.Error("history background did not finish before TempDir cleanup")
+				}
 			}
-			return true
 		})
-		for _, ch := range done {
-			select {
-			case <-ch:
-			case <-time.After(2 * time.Second):
-				t.Error("history background did not finish before TempDir cleanup")
-			}
+		a.connected = true
+		ref := gameplayReference{ServerID: "HN1", PlayerRef: a.summoner.PUUID}
+		key := a.clientHistorySnapshotKey("", ref.ServerID, ref.PlayerRef)
+		if key == a.clientHistorySnapshotKey("", "HN10", ref.PlayerRef) || key == a.clientHistorySnapshotKey("", "HN1", r161Ref(9)) {
+			t.Fatal("snapshot scope collision")
+		}
+		raw, _ := json.Marshal(clientHistorySnapshot{Matches: []gameplayMatch{{GameID: 500}}, Capabilities: []EndpointCapability{{Name: "match-history", State: capabilityAvailable}}})
+		if err := writeLocalStoreFile(a.storage, key, raw); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		g := a.beginConnectionPriority(ctx, client)
+		_ = g
+
+		start := time.Now()
+		matches, _, _, _ := a.loadCurrentHistoryFast(ctx, client, ref, ref.PlayerRef, 20, nil, nil)
+		if len(matches) != 1 || matches[0].GameID != 500 || r287TooSlow(r287Context, t, "backend/r258_priority_test.go:291 duration", time.Since(start), 100*time.Millisecond, false) {
+			t.Fatal("Tencent snapshot missed", matches, time.Since(start))
 		}
 	})
-	a.connected = true
-	ref := gameplayReference{ServerID: "HN1", PlayerRef: a.summoner.PUUID}
-	key := a.clientHistorySnapshotKey("", ref.ServerID, ref.PlayerRef)
-	if key == a.clientHistorySnapshotKey("", "HN10", ref.PlayerRef) || key == a.clientHistorySnapshotKey("", "HN1", r161Ref(9)) {
-		t.Fatal("snapshot scope collision")
-	}
-	raw, _ := json.Marshal(clientHistorySnapshot{Matches: []gameplayMatch{{GameID: 500}}, Capabilities: []EndpointCapability{{Name: "match-history", State: capabilityAvailable}}})
-	if err := writeLocalStoreFile(a.storage, key, raw); err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	g := a.beginConnectionPriority(ctx, client)
-	_ = g
-	start := time.Now()
-	matches, _, _, _ := a.loadCurrentHistoryFast(ctx, client, ref, ref.PlayerRef, 20, nil, nil)
-	if len(matches) != 1 || matches[0].GameID != 500 || time.Since(start) > 100*time.Millisecond {
-		t.Fatal("Tencent snapshot missed", matches, time.Since(start))
-	}
 }
 
 func TestR258VersionedCatalogSurvivesReconnectAndRestart(t *testing.T) {

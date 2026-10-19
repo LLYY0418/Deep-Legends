@@ -75,7 +75,6 @@
       "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
     },
     "scripts/r264-browser.cjs": {
-      "wall": 1,
       "early-ready": 5,
       "reason": "R281 P3 首次登记新类别现存命中；仅新增 silent-timeout / early-ready 分类，原有计时债务未增加。"
     },

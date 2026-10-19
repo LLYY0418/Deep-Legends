@@ -1,3 +1,4 @@
+import os
 """R274 slow-I/O gates exercise production cache code, even on fast disks."""
 import argparse,json,subprocess,tempfile,time,re
 from pathlib import Path
@@ -11,7 +12,7 @@ rows=[]
 def run(name,overlay=None,expected=()):
     selected='^('+ '|'.join(re.escape(test.split('/')[0]) for test in expected)+')$' if expected else pattern
     command=['go','test']+(['-overlay='+str(overlay)] if overlay else [])+['./backend','-run',selected,'-count=1','-v']
-    started=time.monotonic();result=subprocess.run(command,cwd=ROOT,capture_output=True,text=True,timeout=90)
+    started=time.monotonic();result=subprocess.run(command,cwd=ROOT,env={**os.environ,"R287_MUTATION_PATH":"1" if expected else "0"},capture_output=True,text=True,timeout=90)
     log=result.stdout+result.stderr;(args.out/(name+'.log')).write_text(log)
     if expected:
         verified=result.returncode!=0 and all('--- FAIL: '+test in log for test in expected) and not any(x in log for x in ['build failed','undefined:','syntax error:','bind: operation not permitted'])

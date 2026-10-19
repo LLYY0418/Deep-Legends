@@ -20,7 +20,9 @@ func r258ViewFixture() (*app, *LCUClient, chan string) {
 }
 func r258ReadView(t *testing.T, updates chan string) clientView {
 	t.Helper()
-	deadline := time.After(time.Second)
+	deadlineR287Timing := r287NewDeadline(t, "backend/r258_client_view_test.go:23 deadline", time.Second)
+	defer deadlineR287Timing.Stop()
+	deadline := deadlineR287Timing.C
 	for {
 		select {
 		case event := <-updates:
@@ -33,6 +35,7 @@ func r258ReadView(t *testing.T, updates chan string) clientView {
 			return clientView{}
 		}
 	}
+
 }
 func TestR258ClientViewSixEntrances(t *testing.T) {
 	now := time.Now()

@@ -27,6 +27,10 @@ func TestR282AugmentDescriptionFallbacks(t *testing.T) {
 	if cached.Source != "cache" || cached.Description != item.Description {
 		t.Fatalf("cache %#v", cached)
 	}
+	// Finish the queued fresh write before replacing it with the stale fixture.
+	if err := p.cache.flushDisk(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	key := augmentDescriptionKey(93)
 	p.cache.mu.Lock()
 	entry := p.cache.entries[key]
@@ -72,7 +76,8 @@ func TestR282AugmentDescriptionFallbacks(t *testing.T) {
 }
 func waitR282AugmentRefresh(t *testing.T, p *championProvider) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := r287NewClockDeadline(t, "backend/r282_augment_descriptions_test.go:75 poll", 2*time.Second)
+	defer deadline.Stop()
 	for {
 		p.augmentDescriptions.Lock()
 		n := len(p.augmentDescriptions.active)
@@ -80,7 +85,7 @@ func waitR282AugmentRefresh(t *testing.T, p *championProvider) {
 		if n == 0 {
 			return
 		}
-		if time.Now().After(deadline) {
+		if !deadline.Pending() {
 			t.Fatal("refresh did not settle")
 		}
 		time.Sleep(time.Millisecond)

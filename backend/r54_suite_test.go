@@ -80,11 +80,13 @@ func TestR54CollectionRefreshRunsProbeBeforeSnapshot(t *testing.T) {
 }
 
 func TestR54AcquisitionLoadersRunInParallel(t *testing.T) {
-	started := time.Now()
-	runParallelLoaders(func() { time.Sleep(300 * time.Millisecond) }, func() { time.Sleep(300 * time.Millisecond) })
-	if elapsed := time.Since(started); elapsed >= 500*time.Millisecond {
-		t.Fatalf("acquisition loaders took %s; expected parallel execution", elapsed)
-	}
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		started := time.Now()
+		runParallelLoaders(func() { time.Sleep(300 * time.Millisecond) }, func() { time.Sleep(300 * time.Millisecond) })
+		if elapsed := time.Since(started); r287TooSlow(r287Context, t, "backend/r54_suite_test.go:85 duration", elapsed, 500*time.Millisecond, true) {
+			t.Fatalf("acquisition loaders took %s; expected parallel execution", elapsed)
+		}
+	})
 }
 
 func TestR54IdentitySucceedsWhenProfileRequestFails(t *testing.T) {

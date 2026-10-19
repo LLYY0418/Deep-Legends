@@ -147,9 +147,14 @@ func TestR241CollectionRetriesSamplesPersistentNegativeTTLAndCatalogInvalidation
 			t.Fatal("retry missing", i)
 		}
 		a.collectionDataRetry.Reset(time.Millisecond)
-		select {
-		case <-a.refreshRequests:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/r241_test.go:150 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-a.refreshRequests:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("retry timeout")
 		}
 		a.mu.Lock()

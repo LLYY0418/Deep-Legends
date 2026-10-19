@@ -44,9 +44,14 @@ func TestR56ReadyCheckAcceptIsOncePerWindowAndResetsForNextRound(t *testing.T) {
 	for index := 0; index < 10; index++ {
 		runner.handleEvent(client, LCUEvent{URI: "/lol-matchmaking/v1/ready-check", Data: []byte(`{"state":"InProgress"}`)}, Summoner{})
 		if index == 0 {
-			select {
-			case <-fired:
-			case <-time.After(time.Second):
+			if !r287WaitSelect(t, "backend/r56_test.go:47 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-fired:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Fatal("initial accept not fired")
 			}
 		}

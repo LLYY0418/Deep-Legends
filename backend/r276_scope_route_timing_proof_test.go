@@ -92,9 +92,14 @@ func TestR276RecoveryScopeFixtureControlsCooldown(t *testing.T) {
 			go func() {
 				done <- p.get(ctx, p.clusterHost(), "/lol/match/v5/matches/by-puuid/foreign-key-token/ids", nil, &firstIDs)
 			}()
-			select {
-			case <-started:
-			case <-time.After(r274NoProgressLimit):
+			if !r287WaitSelect(t, "backend/r276_scope_route_timing_proof_test.go:95 wait", r274NoProgressLimit, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-started:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Fatal("first account fallback did not reach controlled gate")
 			}
 			// Hold the global policy in its cooling state independent of elapsed wall
@@ -103,12 +108,17 @@ func TestR276RecoveryScopeFixtureControlsCooldown(t *testing.T) {
 			riotUserKeys.routeUntil = time.Now().Add(time.Hour)
 			riotUserKeys.mu.Unlock()
 			releaseOnce.Do(func() { close(release) })
-			select {
-			case err := <-done:
-				if err != nil || len(firstIDs) != 1 {
-					t.Fatal(firstIDs, err)
+			if !r287WaitSelect(t, "backend/r276_scope_route_timing_proof_test.go:106 wait", r274NoProgressLimit, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case err := <-done:
+					if err != nil || len(firstIDs) != 1 {
+						t.Fatal(firstIDs, err)
+					}
+					return true
+				case <-r287Deadline:
+					return false
 				}
-			case <-time.After(r274NoProgressLimit):
+			}) {
 				t.Fatal("first recovery stalled")
 			}
 			wantTrace := []string{"direct:match", "direct:account", "relay:account", "relay:match"}

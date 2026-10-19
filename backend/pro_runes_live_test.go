@@ -17,108 +17,114 @@ import (
 
 // Opt-in, public read-only integration. Raw captures remain outside the repo.
 func TestProRuneLiveCaptureReplay(t *testing.T) {
-	root := os.Getenv("R75_CAPTURE")
-	if root == "" {
-		t.Skip("set R75_CAPTURE to the public capture directory")
-	}
-	cp := proTestProvider()
+
 	// Captured public catalog makes offline replay include real opponent IDs.
-	if data, err := os.ReadFile(filepath.Join(root, "champion-metadata.json")); err == nil {
-		var metadata map[int]championMetadata
-		if json.Unmarshal(data, &metadata) == nil {
-			cp.championMeta = metadata
-			for id, m := range metadata {
-				cp.championIDs[strings.ToLower(m.Key)] = id
-			}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		root := os.Getenv("R75_CAPTURE")
+		if root == "" {
+			t.Skip("set R75_CAPTURE to the public capture directory")
 		}
-	}
-	var mu sync.Mutex
-	requests := []string{}
-	cp.client = &http.Client{Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		name := "schedule"
-		if r.URL.Query().Get("pageToken") != "" {
-			name = "schedule-80"
-		}
-		if strings.HasSuffix(r.URL.Path, "getEventDetails") {
-			name = "event-" + r.URL.Query().Get("id")
-		}
-		if strings.Contains(r.URL.Path, "/window/") {
-			name = "window-" + filepath.Base(r.URL.Path)
-			if r.URL.Query().Get("startingTime") != "" {
-				name = "end-" + filepath.Base(r.URL.Path)
-			}
-		}
-		if strings.Contains(r.URL.Path, "/details/") {
-			name = "details-" + filepath.Base(r.URL.Path)
-		}
-		if r.Header.Get("Cookie") != "" || r.Header.Get("x-riot-token") != "" || r.Header.Get("Authorization") != "" {
-			t.Error("V8 private headers")
-		}
-		mu.Lock()
-		requests = append(requests, name)
-		mu.Unlock()
-		data, err := os.ReadFile(filepath.Join(root, name+".json"))
-		if err != nil || len(data) == 0 {
-			return nil, fmt.Errorf("capture missing %s", name)
-		}
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(string(data))), Header: http.Header{}}, nil
-	})}
-	p := newProRuneProvider(cp, trackTestStore(t, &localStore{root: t.TempDir()}), nil)
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	p.refresh(ctx, time.Date(2026, 9, 9, 4, 16, 0, 0, time.UTC))
-	for _, req := range requests {
-		if strings.HasPrefix(req, "details-") || strings.HasPrefix(req, "end-") {
-			t.Fatal("index eagerly supplements", req)
-		}
-	}
-	if len(p.snapshot.Games) < 90 {
-		t.Fatal("missing full index", len(p.snapshot.Games), p.failed)
-	}
-	games := []proRuneIndexGame{}
-	for _, g := range p.snapshot.Games {
-		games = append(games, g)
-	}
-	proParallel(ctx, games, func(g proRuneIndexGame) { p.terminal(ctx, g) })
-	total, unknown, rejected := 0, 0, 0
-	for _, e := range p.snapshot.Events {
-		winners, ok := proSeriesWinners(e, p.snapshot.Games, p.ends)
-		if !ok {
-			rejected++
-			continue
-		}
-		for _, g := range e.Match.Games {
-			if _, ok := p.snapshot.Games[g.ID]; ok {
-				total++
-				if winners[g.ID] == "" {
-					unknown++
+		cp := proTestProvider()
+
+		if data, err := os.ReadFile(filepath.Join(root, "champion-metadata.json")); err == nil {
+			var metadata map[int]championMetadata
+			if json.Unmarshal(data, &metadata) == nil {
+				cp.championMeta = metadata
+				for id, m := range metadata {
+					cp.championIDs[strings.ToLower(m.Key)] = id
 				}
 			}
 		}
-	}
-	t.Logf("UTC window 2026-08-10T04:16Z..2026-09-09T04:16Z: games=%d unknown=%d rate=%.2f%% rejected=%d indexFailures=%d", total, unknown, 100*float64(unknown)/float64(total), rejected, p.failed)
-	start := time.Now()
-	res := p.recommend(ctx, 69, "mid")
-	cold := time.Since(start)
-	start = time.Now()
-	hot := p.recommend(ctx, 69, "mid")
-	warm := time.Since(start)
-	if len(res.Pros) == 0 || len(hot.Pros) == 0 {
-		t.Fatal("production replay no champion hit", res)
-	}
-	counts := map[string]int{}
-	for _, row := range hot.Pros {
-		counts[row.Title]++
-		if counts[row.Title] > 5 || row.Position != "中路" {
-			t.Fatalf("per-player or selected-position contract violated: %+v", row)
+		var mu sync.Mutex
+		requests := []string{}
+		cp.client = &http.Client{Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			name := "schedule"
+			if r.URL.Query().Get("pageToken") != "" {
+				name = "schedule-80"
+			}
+			if strings.HasSuffix(r.URL.Path, "getEventDetails") {
+				name = "event-" + r.URL.Query().Get("id")
+			}
+			if strings.Contains(r.URL.Path, "/window/") {
+				name = "window-" + filepath.Base(r.URL.Path)
+				if r.URL.Query().Get("startingTime") != "" {
+					name = "end-" + filepath.Base(r.URL.Path)
+				}
+			}
+			if strings.Contains(r.URL.Path, "/details/") {
+				name = "details-" + filepath.Base(r.URL.Path)
+			}
+			if r.Header.Get("Cookie") != "" || r.Header.Get("x-riot-token") != "" || r.Header.Get("Authorization") != "" {
+				t.Error("V8 private headers")
+			}
+			mu.Lock()
+			requests = append(requests, name)
+			mu.Unlock()
+			data, err := os.ReadFile(filepath.Join(root, name+".json"))
+			if err != nil || len(data) == 0 {
+				return nil, fmt.Errorf("capture missing %s", name)
+			}
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(string(data))), Header: http.Header{}}, nil
+		})}
+		p := newProRuneProvider(cp, trackTestStore(t, &localStore{root: t.TempDir()}), nil)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		p.refresh(ctx, time.Date(2026, 9, 9, 4, 16, 0, 0, time.UTC))
+		for _, req := range requests {
+			if strings.HasPrefix(req, "details-") || strings.HasPrefix(req, "end-") {
+				t.Fatal("index eagerly supplements", req)
+			}
 		}
-	}
-	if warm >= 100*time.Millisecond {
-		t.Fatal("V7 replay warm exceeds budget", warm)
-	}
-	t.Logf("Production capture replay rows=%d fill=%s hot=%s", len(res.Pros), cold, warm)
-	data, _ := json.MarshalIndent(res, "", "  ")
-	os.WriteFile(filepath.Join(root, "production-response.json"), data, 0600)
+		if len(p.snapshot.Games) < 90 {
+			t.Fatal("missing full index", len(p.snapshot.Games), p.failed)
+		}
+		games := []proRuneIndexGame{}
+		for _, g := range p.snapshot.Games {
+			games = append(games, g)
+		}
+		proParallel(ctx, games, func(g proRuneIndexGame) { p.terminal(ctx, g) })
+		total, unknown, rejected := 0, 0, 0
+		for _, e := range p.snapshot.Events {
+			winners, ok := proSeriesWinners(e, p.snapshot.Games, p.ends)
+			if !ok {
+				rejected++
+				continue
+			}
+			for _, g := range e.Match.Games {
+				if _, ok := p.snapshot.Games[g.ID]; ok {
+					total++
+					if winners[g.ID] == "" {
+						unknown++
+					}
+				}
+			}
+		}
+		t.Logf("UTC window 2026-08-10T04:16Z..2026-09-09T04:16Z: games=%d unknown=%d rate=%.2f%% rejected=%d indexFailures=%d", total, unknown, 100*float64(unknown)/float64(total), rejected, p.failed)
+		start := time.Now()
+		res := p.recommend(ctx, 69, "mid")
+		cold := time.Since(start)
+
+		start = time.Now()
+		hot := p.recommend(ctx, 69, "mid")
+		warm := time.Since(start)
+		if len(res.Pros) == 0 || len(hot.Pros) == 0 {
+			t.Fatal("production replay no champion hit", res)
+		}
+		counts := map[string]int{}
+		for _, row := range hot.Pros {
+			counts[row.Title]++
+			if counts[row.Title] > 5 || row.Position != "中路" {
+				t.Fatalf("per-player or selected-position contract violated: %+v", row)
+			}
+		}
+		if r287TooSlow(r287Context, t, "backend/pro_runes_live_test.go:116 duration", warm, 100*time.Millisecond, true) {
+			t.Fatal("V7 replay warm exceeds budget", warm)
+		}
+		t.Logf("Production capture replay rows=%d fill=%s hot=%s", len(res.Pros), cold, warm)
+		data, _ := json.MarshalIndent(res, "", "  ")
+		os.WriteFile(filepath.Join(root, "production-response.json"), data, 0600)
+	})
 }
 
 func TestProRuneLiveSupplementLatency(t *testing.T) {

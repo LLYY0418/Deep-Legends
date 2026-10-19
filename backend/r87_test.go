@@ -162,38 +162,42 @@ func TestR87CollectionSharesPayloadsAndDoesNotCacheEmptyAcrossRefreshes(t *testi
 }
 
 func TestR87NineClaimsScanOnceEachAndTimeoutBudgetIncludesLock(t *testing.T) {
-	var scans atomic.Int32
-	c := &LCUClient{baseURL: "https://127.0.0.1:2999", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if r.URL.Path == "/lol-rewards/v1/grants" {
-			scans.Add(1)
-			return response2351([]map[string]any{{"info": map[string]any{"id": "r87", "status": "PENDING"}, "rewardGroup": map[string]any{"id": "group87", "rewards": []map[string]any{{"id": "reward87", "itemId": "item87", "itemType": "CURRENCY", "quantity": 1}}}}}), nil
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		var scans atomic.Int32
+		c := &LCUClient{baseURL: "https://127.0.0.1:2999", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			if r.URL.Path == "/lol-rewards/v1/grants" {
+				scans.Add(1)
+				return response2351([]map[string]any{{"info": map[string]any{"id": "r87", "status": "PENDING"}, "rewardGroup": map[string]any{"id": "group87", "rewards": []map[string]any{{"id": "reward87", "itemId": "item87", "itemType": "CURRENCY", "quantity": 1}}}}}), nil
+			}
+			return response2351([]any{}), nil
+		})}}
+		a := &app{connected: true, lcu: c}
+		for range 9 {
+			c.claimSettlements = claimSettlements{}
+			w := httptest.NewRecorder()
+			a.handleClaimExecute(w, httptest.NewRequest("POST", "/api/claim/execute", strings.NewReader(`{"items":[{"key":"grant:r87"}]}`)))
+			var result claimExecuteResponse
+			_ = json.Unmarshal(w.Body.Bytes(), &result)
+			if w.Code != 200 || result.Succeeded != 1 {
+				t.Fatalf("claim=%d %s", w.Code, w.Body.String())
+			}
 		}
-		return response2351([]any{}), nil
-	})}}
-	a := &app{connected: true, lcu: c}
-	for range 9 {
-		c.claimSettlements = claimSettlements{}
+		if scans.Load() != 9 {
+			t.Fatalf("nine claims caused %d full scans", scans.Load())
+		}
+		c.claimExecutionMu.Lock()
+		defer c.claimExecutionMu.Unlock()
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+		defer cancel()
 		w := httptest.NewRecorder()
-		a.handleClaimExecute(w, httptest.NewRequest("POST", "/api/claim/execute", strings.NewReader(`{"items":[{"key":"grant:r87"}]}`)))
-		var result claimExecuteResponse
-		_ = json.Unmarshal(w.Body.Bytes(), &result)
-		if w.Code != 200 || result.Succeeded != 1 {
-			t.Fatalf("claim=%d %s", w.Code, w.Body.String())
+
+		start := time.Now()
+		a.handleClaimExecute(w, httptest.NewRequest("POST", "/api/claim/execute", strings.NewReader(`{"items":[{"key":"grant:r87"}]}`)).WithContext(ctx))
+		if w.Code != 504 || r287TooSlow(r287Context, t, "backend/r87_test.go:194 duration", time.Since(start), 200*time.Millisecond, false) {
+			t.Fatal("mutex wait ignored handler budget")
 		}
-	}
-	if scans.Load() != 9 {
-		t.Fatalf("nine claims caused %d full scans", scans.Load())
-	}
-	c.claimExecutionMu.Lock()
-	defer c.claimExecutionMu.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
-	defer cancel()
-	w := httptest.NewRecorder()
-	start := time.Now()
-	a.handleClaimExecute(w, httptest.NewRequest("POST", "/api/claim/execute", strings.NewReader(`{"items":[{"key":"grant:r87"}]}`)).WithContext(ctx))
-	if w.Code != 504 || time.Since(start) > 200*time.Millisecond {
-		t.Fatal("mutex wait ignored handler budget")
-	}
+	})
 }
 
 func TestR87ReconnectRequiresSustainedPhase(t *testing.T) {
@@ -213,18 +217,28 @@ func TestR87ReconnectRequiresSustainedPhase(t *testing.T) {
 	s.Rules.AutoReconnect.DelayMS = 0
 	r.apply(s)
 	r.handlePhase(&LCUClient{}, "Reconnect")
-	select {
-	case d := <-waiting:
-		if d < 5*time.Second {
-			t.Fatalf("reconnect armed after %s", d)
+	if !r287WaitSelect(t, "backend/r87_test.go:216 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case d := <-waiting:
+			if d < 5*time.Second {
+				t.Fatalf("reconnect armed after %s", d)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("no sustained wait")
 	}
 	r.handlePhase(&LCUClient{}, "WaitingForStats")
-	select {
-	case <-canceled:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r87_test.go:225 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-canceled:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("false reconnect not canceled")
 	}
 }

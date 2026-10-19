@@ -59,52 +59,61 @@ func TestR264ExportKeepsTenMBAndNewestFirst(t *testing.T) {
 }
 
 func TestR264ExportSlowThirtyFiveSecondProbeCannotConsumeWriteDeadline(t *testing.T) {
-	release := make(chan struct{})
-	var once sync.Once
-	var probes atomic.Int32
-	client := &LCUClient{baseURL: "https://fixture", token: "fixture", region: "kr", rsoPlatform: "KR", http: &http.Client{Transport: sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		probes.Add(1)
-		once.Do(func() {
-			select {
-			case <-time.After(35 * time.Second):
-			case <-release:
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		release := make(chan struct{})
+		var once sync.Once
+		var probes atomic.Int32
+		client := &LCUClient{baseURL: "https://fixture", token: "fixture", region: "kr", rsoPlatform: "KR", http: &http.Client{Transport: sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			probes.Add(1)
+			once.Do(func() {
+				select {
+				case <-time.After(35 * time.Second):
+				case <-release:
+				}
+			})
+			return nil, context.DeadlineExceeded
+		})}}
+		a := &app{storage: r264ExportFixture(t), connected: true, identityReady: true, lcu: client, summoner: Summoner{SummonerID: 1, PUUID: "fixture"}}
+		server := httptest.NewUnstartedServer(http.HandlerFunc(a.handleDiagnosticLog))
+		server.Config.WriteTimeout = 30 * time.Second
+		server.Start()
+		defer func() { close(release); server.Close() }()
+		done := make(chan error, 1)
+
+		started := time.Now()
+		go func() {
+			response, err := server.Client().Get(server.URL)
+			if err != nil {
+				done <- err
+				return
 			}
-		})
-		return nil, context.DeadlineExceeded
-	})}}
-	a := &app{storage: r264ExportFixture(t), connected: true, identityReady: true, lcu: client, summoner: Summoner{SummonerID: 1, PUUID: "fixture"}}
-	server := httptest.NewUnstartedServer(http.HandlerFunc(a.handleDiagnosticLog))
-	server.Config.WriteTimeout = 30 * time.Second
-	server.Start()
-	defer func() { close(release); server.Close() }()
-	done := make(chan error, 1)
-	started := time.Now()
-	go func() {
-		response, err := server.Client().Get(server.URL)
-		if err != nil {
+			defer response.Body.Close()
+			data, err := io.ReadAll(response.Body)
+			if err == nil && (len(data) < 10_000_000 || data[len(data)-1] != '\n') {
+				err = fmt.Errorf("truncated: %d", len(data))
+			}
 			done <- err
-			return
+		}()
+		if !r287WaitSelect(t, "backend/r264_export_test.go:95 wait", 7*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case err := <-done:
+				if err != nil {
+					t.Fatal(err)
+				}
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
+			server.CloseClientConnections()
+			t.Fatal("35s probe blocked export beyond total 5s budget")
 		}
-		defer response.Body.Close()
-		data, err := io.ReadAll(response.Body)
-		if err == nil && (len(data) < 10_000_000 || data[len(data)-1] != '\n') {
-			err = fmt.Errorf("truncated: %d", len(data))
+		if r287TooSlow(r287Context, t, "backend/r264_export_test.go:106 duration", time.Since(started), 7*time.Second, false) {
+			t.Fatal("export exceeded budget")
 		}
-		done <- err
-	}()
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
+		if probes.Load() == 0 {
+			t.Fatal("slow probe was not exercised")
 		}
-	case <-time.After(7 * time.Second):
-		server.CloseClientConnections()
-		t.Fatal("35s probe blocked export beyond total 5s budget")
-	}
-	if time.Since(started) > 7*time.Second {
-		t.Fatal("export exceeded budget")
-	}
-	if probes.Load() == 0 {
-		t.Fatal("slow probe was not exercised")
-	}
+	})
 }

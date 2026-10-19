@@ -67,31 +67,42 @@ func r265TLSRelays(t *testing.T, mode string, delay time.Duration) (*riotProvide
 	return newRiotProvider(cp), m, &slowCalls, &fastCalls, canceled
 }
 func TestR265TLSHedgeBackupWinsAndCancelsSlowWithSharedSlots(t *testing.T) {
-	p, m, a, b, canceled := r265TLSRelays(t, "auto", 5*time.Second)
+
 	// Four earlier logical GETs make the fifth request eligible for the 20%
 	// budget. These are explicit warm-up fixtures, outside the measured request.
-	for i := 0; i < 4; i++ {
-		m.beginGET()
-	}
-	shared := make(chan struct{}, 4)
-	shared <- struct{}{}
-	ctx := context.WithValue(t.Context(), riotDetailSlotsKey{}, shared)
-	started := time.Now()
-	r := p.candidateGET(ctx, m, m.choose(nil), riotClusterHost, "/lol/match/v5/matches/KR_265", nil, 1<<20)
-	if r.err != nil || r.entry.Label != "B1" || a.Load() != 1 || b.Load() != 1 {
-		t.Fatalf("backup did not win exactly two requests: %+v %d %d", r, a.Load(), b.Load())
-	}
-	if time.Since(started) < 1500*time.Millisecond || time.Since(started) > 3*time.Second {
-		t.Fatal("hedge threshold changed", time.Since(started))
-	}
-	select {
-	case <-canceled:
-	case <-time.After(time.Second):
-		t.Fatal("slow request was not canceled")
-	}
-	if len(m.slots) != 0 || len(shared) != 1 {
-		t.Fatal("hedge leaked slots", len(m.slots), len(shared))
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		p, m, a, b, canceled := r265TLSRelays(t, "auto", 5*time.Second)
+
+		for i := 0; i < 4; i++ {
+			m.beginGET()
+		}
+		shared := make(chan struct{}, 4)
+		shared <- struct{}{}
+		ctx := context.WithValue(t.Context(), riotDetailSlotsKey{}, shared)
+
+		started := time.Now()
+		r := p.candidateGET(ctx, m, m.choose(nil), riotClusterHost, "/lol/match/v5/matches/KR_265", nil, 1<<20)
+		if r.err != nil || r.entry.Label != "B1" || a.Load() != 1 || b.Load() != 1 {
+			t.Fatalf("backup did not win exactly two requests: %+v %d %d", r, a.Load(), b.Load())
+		}
+		if time.Since(started) < 1500*time.Millisecond || r287TooSlow(r287Context, t, "backend/r265_relay_entries_test.go:84 duration", time.Since(started), 3*time.Second, false) {
+			t.Fatal("hedge threshold changed", time.Since(started))
+		}
+		if !r287WaitSelect(t, "backend/r265_relay_entries_test.go:87 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-canceled:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
+			t.Fatal("slow request was not canceled")
+		}
+		if len(m.slots) != 0 || len(shared) != 1 {
+			t.Fatal("hedge leaked slots", len(m.slots), len(shared))
+		}
+	})
 }
 func TestR265TLSNoHedgeForNormal429BudgetFixedOrSingle(t *testing.T) {
 	for _, test := range []struct {
@@ -334,26 +345,38 @@ func TestR265TabCancellationCancelsBothTLSRequests(t *testing.T) {
 	go func() {
 		done <- p.candidateGET(ctx, m, m.choose(nil), riotClusterHost, "/lol/match/v5/matches/KR_265", nil, 1<<20)
 	}()
-	deadline := time.Now().Add(3 * time.Second)
-	for (a.Load() != 1 || b.Load() != 1) && time.Now().Before(deadline) {
+	deadline := r287NewClockDeadline(t, "backend/r265_relay_entries_test.go:348 poll", 3*time.Second)
+	defer deadline.Stop()
+	for (a.Load() != 1 || b.Load() != 1) && deadline.Pending() {
 		time.Sleep(10 * time.Millisecond)
 	}
+	deadline.Stop()
 	if a.Load() != 1 || b.Load() != 1 {
 		cancel()
 		t.Fatal("both requests did not start")
 	}
 	cancel()
-	select {
-	case r := <-done:
-		if r.err != context.Canceled {
-			t.Fatal(r.err)
+	if !r287WaitSelect(t, "backend/r265_relay_entries_test.go:346 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case r := <-done:
+			if r.err != context.Canceled {
+				t.Fatal(r.err)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("tab cancellation left hedges in flight")
 	}
-	select {
-	case <-canceled:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r265_relay_entries_test.go:354 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-canceled:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("primary TLS request not canceled")
 	}
 	if len(m.slots) != 0 {

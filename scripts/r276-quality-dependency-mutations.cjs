@@ -10,6 +10,6 @@ function run(name,workflow,negative){
 run('baseline',null,false);
 const directory=fs.mkdtempSync(path.join(os.tmpdir(),'r276-quality-dependency-'));
 try{
- const needle='      - name: Install quality fixture Node dependencies\n        run: npm ci --prefix desktop\n';assert.equal(source.split(needle).length,2);const changed=path.join(directory,'ci.yml');fs.writeFileSync(changed,source.replace(needle,''));run('missing-quality-npm-preparation',changed,true);
+ const needle='      - name: Install quality fixture Node dependencies\n        if: ${{ !cancelled() }}\n        run: npm ci --prefix desktop\n';const start=source.indexOf('  quality-mutations:\n'),end=source.indexOf('  r277-proof-linux-1:\n',start),block=source.slice(start,end);assert.equal(block.split(needle).length,2);const changed=path.join(directory,'ci.yml');fs.writeFileSync(changed,source.slice(0,start)+block.replace(needle,'')+source.slice(end));run('missing-quality-npm-preparation',changed,true);
 }finally{fs.rmSync(directory,{recursive:true,force:true});}
 assert.equal(fs.readFileSync(file,'utf8'),source);run('restored',null,false);

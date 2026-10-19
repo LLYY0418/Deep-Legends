@@ -490,9 +490,14 @@ func TestExecutionLateAcknowledgementCannotReviveCanceledAction(t *testing.T) {
 				}
 			}
 			f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
-			select {
-			case <-started:
-			case <-time.After(time.Second):
+			if !r287WaitSelect(t, "backend/champselect_execution_test.go:493 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-started:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Fatal("write never started")
 			}
 			switch change {
@@ -511,9 +516,14 @@ func TestExecutionLateAcknowledgementCannotReviveCanceledAction(t *testing.T) {
 				f.r.handleChampSelectPhase("ChampSelect")
 			}
 			close(release)
-			select {
-			case <-disposed:
-			case <-time.After(time.Second):
+			if !r287WaitSelect(t, "backend/champselect_execution_test.go:514 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-disposed:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Fatal("callback never completed")
 			}
 			f.r.mu.Lock()

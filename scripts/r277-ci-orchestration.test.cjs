@@ -2,32 +2,26 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..'),yaml=require('../desktop/node_modules/js-yaml'),ciText=fs.readFileSync(path.join(root,'.github/workflows/ci.yml'),'utf8'),ci=yaml.load(ciText);
 const adapter=require('./r277-ci-orchestrate.cjs');
-test('R277 independent jobs leave every legacy shard, timing budget and branch gate unchanged',()=>{
- // Exact CI-only baseline, hashed independently of HEAD and available in shallow CI clones.
- const bytes=fs.readFileSync(path.join(__dirname,'r277-ci-legacy-baseline.json'));assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'),'d44263b1cd692a9c25bcc1fab52a1f95b77ebca90f66e81ff6a7000b6918d256');
- const baseline=JSON.parse(bytes);assert.equal(baseline.ci_cleanup_sha,'dfd6fc2a830ea999b36b7365f6ea75e12bb06624');const old=baseline.workflow;
- const normalized=JSON.parse(JSON.stringify(ci.jobs));
- const probeGate="(startsWith(github.ref, 'refs/heads/codex/release-') || startsWith(github.ref, 'refs/heads/codex/probe-0.12.85-'))";
- let gates=0;for(const name of ['mutations-1','mutations-2','mutations-3','windows-tests']){
-  const job=normalized[name];const replace=value=>{assert(value.includes(probeGate));gates++;return value.replace(probeGate,"startsWith(github.ref, 'refs/heads/codex/release-')");};
-  if(name!=='windows-tests')job.if=replace(job.if);else for(const step of job.steps)if(step.if?.includes(probeGate))step.if=replace(step.if);
- }
- assert.equal(gates,5,'only the five approved complete probe gates may change');
- for(const [name,job] of Object.entries(old.jobs))assert.deepEqual(normalized[name],job,`legacy ${name} must not change outside approved R278 probe gates`);
- assert.deepEqual(ci.on,require('./lib/ci-routing.cjs').fullTriggers(old.on),'only the newly authorized diagnostic push prefix may leave full CI; PR/dispatch/tag/release behavior stays exact');assert.equal((ciText.match(/startsWith\(github.ref, 'refs\/heads\/codex\/release-'\)/g)||[]).length,5);
- assert(!ciText.includes("github.ref == 'refs/heads/codex/ci-hardening-r276'"));
+test('R287 approved CI snapshot pins every reassigned proof and preserves product budgets',()=>{
+ const bytes=fs.readFileSync(path.join(__dirname,'r277-ci-legacy-baseline.json'));
+ assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'),require('./pinned-contracts-registry.json').legacyBaselineSha);
+ const baseline=JSON.parse(bytes);assert.match(baseline.approval,/R287.*approved/);
+ assert.equal(baseline.ci_cleanup_sha,'dfd6fc2a830ea999b36b7365f6ea75e12bb06624');
+ assert.deepEqual(ci,baseline.workflow,'R287 approved exact CI job definitions must remain pinned');
+ assert(!ciText.includes('codex/probe-0.12.85-'));
+ require('./lib/ci-contracts.cjs').verifyMutationRouting(ci);
 });
 test('R277 actual mutations are independent steps with always-uploaded original failures',()=>{
- const job=ci.jobs['r277-proof-linux'];assert.equal(job['runs-on'],'ubuntu-latest');
+ const job={steps:['r277-proof-linux-1','r277-proof-linux-2'].flatMap(n=>ci.jobs[n].steps)};for(const n of ['r277-proof-linux-1','r277-proof-linux-2'])assert.equal(ci.jobs[n]['runs-on'],'ubuntu-24.04');
  for(const runner of ['r277-ci-branch-mutations.cjs','r277-client-mutations.py --out','r277-http-refresh-proof.py --out','r277-riot-scope-proof.py --out','r277-wire-diagnostic-mutations.py --out','r277-riot-proof.py --out','r277-ci-orchestrate.cjs frontend-mutants','r277-ci-cn-score.cjs mutants --out','r277-ci-orchestrate.cjs deferred-unit --out'])assert.equal(job.steps.filter(step=>step.run?.includes(runner)).length,1,runner);
- for(const name of ['r277-proof-linux','r277-native-windows','r277-browser-matrix']){
+ for(const name of ['r277-proof-linux-1','r277-proof-linux-2','windows-build','r277-browser-matrix','r277-browser-mutations']){
   const current=ci.jobs[name];assert(!current['continue-on-error']);
   for(const step of current.steps){assert(!step['continue-on-error']);assert(!step.run?.includes('|| true'));}
-  const upload=current.steps.find(step=>step.uses==='actions/upload-artifact@v4');assert.equal(upload.if,'always()');assert.equal(upload.with['if-no-files-found'],'error');assert(upload.with.path.includes('/history/reports/r277/ci-integration/'));assert(upload.with.path.endsWith('/**'));
+  const upload=current.steps.find(step=>step.uses==='actions/upload-artifact@v4'&&String(step.with?.path).includes('/history/reports/r277/ci-integration/'));assert.equal(upload.if,'always()');assert.equal(upload.with['if-no-files-found'],'error');assert(upload.with.path.includes('/history/reports/r277/ci-integration/'));assert(upload.with.path.endsWith('/**'));
  }
 });
 test('R277 job-level environment uses no unavailable runner context',()=>{
- for(const name of ['r277-proof-linux','r277-native-windows','r277-browser-matrix']){
+ for(const name of ['r277-proof-linux-1','r277-proof-linux-2','windows-build','r277-browser-matrix','r277-browser-mutations']){
   for(const value of Object.values(ci.jobs[name].env||{}))assert(!String(value).includes('runner.'),'runner context unavailable in job-level env');
  }
  const source=fs.readFileSync(path.join(__dirname,'r277-ci-orchestrate.cjs'),'utf8');assert(source.includes('process.env.RUNNER_TEMP'));
@@ -36,7 +30,7 @@ test('R277 Python proof I/O works with simulated Windows cp1252 defaults',()=>{
  const result=require('node:child_process').spawnSync(process.platform==='win32'?'python':'python3',[path.join(__dirname,'r277-python-encoding.test.py'),'-v'],{cwd:root,encoding:'utf8'});assert.equal(result.status,0,(result.stdout||'')+(result.stderr||''));
 });
 test('Windows P11 is native race/GC proof and newly declared R277 tests are measured',()=>{
- const job=ci.jobs['r277-native-windows'];assert.equal(job['runs-on'],'windows-latest');assert.equal(job.env.GODEBUG,'invalidptr=1');
+ const job=ci.jobs['windows-build'];assert.equal(job['runs-on'],'windows-latest');assert.equal(job.steps.find(s=>s.name==='Measure every native R277 Go test including reopen and L5').env.GODEBUG,'invalidptr=1');
  assert(job.steps.some(step=>step.run?.includes('r277-installer-callbacks.py --native --out')));
  assert(job.steps.some(step=>step.run?.includes('r277-ci-proof.py --out')));
  assert(job.steps.some(step=>step.name==='Require native Windows race compiler'));
@@ -46,7 +40,10 @@ test('Windows P11 is native race/GC proof and newly declared R277 tests are meas
 });
 test('Linux and Windows strict browser matrix cannot inherit measure-only or baseline assertions',()=>{
  const job=ci.jobs['r277-browser-matrix'];assert.deepEqual(job.strategy.matrix.os,['ubuntu-latest','windows-latest']);assert.equal(job.env.R277_MEASURE_ONLY,'0');
- for(const mode of ['build-browser','browser','browser-mutants','deferred-browser','cleanup-browser'])assert.equal(job.steps.filter(step=>step.run?.includes(`r277-ci-orchestrate.cjs ${mode} --backend`)).length,1);
+ for(const mode of ['build-browser','browser','deferred-browser','cleanup-browser'])assert.equal(job.steps.filter(step=>step.run?.includes(`r277-ci-orchestrate.cjs ${mode} --backend`)).length,1);
+ assert(!job.steps.some(s=>s.run?.includes('browser-mutants')));
+ const mutation=ci.jobs['r277-browser-mutations'];assert.deepEqual(mutation.strategy.matrix,{os:['ubuntu-latest','windows-latest'],shard:[1,2,3]});
+ assert(mutation.steps.some(s=>s.run?.includes('browser-mutants --shard ${{ matrix.shard }}')));
  const cleanup=job.steps.find(step=>step.name?.startsWith('Clean only R277'));assert.equal(cleanup.if,'always()');
  const source=fs.readFileSync(path.join(__dirname,'r277-ci-orchestrate.cjs'),'utf8');assert(source.includes("R277_MEASURE_ONLY:'0'"));assert(source.includes('delete env.R266_MATRIX_BASELINE'));
 });
@@ -57,13 +54,13 @@ test('R277 browser output adapter only changes the report destination, preservin
 });
 
 test('R277 Windows performance is actual same-fixture old/new append, record-only without a timing gate',()=>{
- const job=ci.jobs['r277-browser-matrix'],step=job.steps.find(s=>s.run?.includes('r277-perf-compare.cjs'));assert(step);assert.equal(step.if,"matrix.os == 'windows-latest'");assert(step.run.includes('--backend'));assert(!step.run.includes('--chrome'));assert(!step.run.includes('C:/Program Files'));assert(step.run.includes('p9-before-after'));
+ const job=ci.jobs['r277-browser-matrix'],step=job.steps.find(s=>s.run?.includes('r277-perf-compare.cjs'));assert(step);assert.equal(step.if,"${{ !cancelled() && steps.fixture_build.outcome == 'success' && matrix.os == 'windows-latest' }}");assert(step.run.includes('--backend'));assert(!step.run.includes('--chrome'));assert(!step.run.includes('C:/Program Files'));assert(step.run.includes('p9-before-after'));
  const source=fs.readFileSync(path.join(__dirname,'r277-perf-compare.cjs'),'utf8');assert(source.includes('867ca1d7cb627a23af79e6de489a0d4b3c7389ea'));assert(source.includes("record_only:true"));assert(source.includes('fixture_sha256'));assert(source.includes("require('./r277-ci-orchestrate.cjs').chrome(env)"));
  const checks=fs.readFileSync(path.join(__dirname,'r277-perf-browser-checks.cjs'),'utf8');assert(checks.includes("assert.equal(sample.entries,sample.matches"));assert(checks.includes("sample.nodes<=25000"));assert(checks.includes('crypto.subtle.digest'));
 });
 
 test('R277 CN proofs require actual HTTP completion and four real mutants, with awaited cleanup',()=>{
- const linux=ci.jobs['r277-proof-linux'],browser=ci.jobs['r277-browser-matrix'];
+ const linux={steps:['r277-proof-linux-1','r277-proof-linux-2'].flatMap(n=>ci.jobs[n].steps)},browser=ci.jobs['r277-browser-matrix'];
  assert.equal(linux.steps.filter(s=>s.run?.includes('r277-ci-cn-score.cjs mutants --out')).length,1);
  assert.equal(browser.steps.filter(s=>s.run?.includes('r277-ci-cn-score.cjs browser --backend')).length,1);
  const source=fs.readFileSync(path.join(__dirname,'r277-ci-cn-score.cjs'),'utf8');

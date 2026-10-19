@@ -94,10 +94,15 @@ func TestR106RanksStartBeforeMatchIDsReturn(t *testing.T) {
 		done <- err
 	}()
 	<-idsEntered
-	select {
-	case <-rankStarted:
-		close(release)
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r106_test.go:97 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-rankStarted:
+			close(release)
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		close(release)
 		<-done
 		t.Fatal("rank read waited behind match IDs")

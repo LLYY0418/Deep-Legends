@@ -302,24 +302,28 @@ func TestR104SeedRank24HourCacheSeparateFromOverview(t *testing.T) {
 	}
 }
 func TestR101SeedRankRespectsQuotaBudget(t *testing.T) {
-	count := 0
-	p := r101SeedProvider(t, r101SoloEntries, &count)
-	a := &app{riot: p}
-	previous := a.loadProSeedAccounts(context.Background(), nil, []proSeedAccount{r102RookieSeed()})
-	p.resolveProSeed(context.Background(), r102RookieSeed(), 0)
-	now := time.Now().Add(24*time.Hour + time.Second)
-	p.identityDisk.now = func() time.Time { return now }
-	p.fetchAccountByPUUID(context.Background(), "fixture-seed")
-	p.shortWindow = nil
-	for i := 0; i < 15; i++ {
-		p.shortWindow = append(p.shortWindow, time.Now())
-	}
-	before := count
-	started := time.Now()
-	rows := a.loadProSeedAccounts(context.Background(), previous, []proSeedAccount{r102RookieSeed()})
-	if count != before || time.Since(started) > time.Second || !reflect.DeepEqual(rows, previous) {
-		t.Fatal("quota failure lost seed snapshot or issued HTTP", count, before)
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		count := 0
+		p := r101SeedProvider(t, r101SoloEntries, &count)
+		a := &app{riot: p}
+		previous := a.loadProSeedAccounts(context.Background(), nil, []proSeedAccount{r102RookieSeed()})
+		p.resolveProSeed(context.Background(), r102RookieSeed(), 0)
+		now := time.Now().Add(24*time.Hour + time.Second)
+		p.identityDisk.now = func() time.Time { return now }
+		p.fetchAccountByPUUID(context.Background(), "fixture-seed")
+		p.shortWindow = nil
+		for i := 0; i < 15; i++ {
+			p.shortWindow = append(p.shortWindow, time.Now())
+		}
+		before := count
+
+		started := time.Now()
+		rows := a.loadProSeedAccounts(context.Background(), previous, []proSeedAccount{r102RookieSeed()})
+		if count != before || !reflect.DeepEqual(rows, previous) || r287TooSlow(r287Context, t, "backend/r101_test.go:320 duration", time.Since(started), time.Second, false) {
+			t.Fatal("quota failure lost seed snapshot or issued HTTP", count, before)
+		}
+	})
 }
 
 func TestR101IconOwnershipCacheIsClientScoped(t *testing.T) {

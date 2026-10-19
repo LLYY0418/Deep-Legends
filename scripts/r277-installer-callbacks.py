@@ -95,7 +95,7 @@ def main():
         started = time.monotonic()
         log_path = out / (label + ".log")
         try:
-            completed = subprocess.run(command, cwd=cwd, env={**env, **(overrides or {})},
+            completed = subprocess.run(command, cwd=cwd, env={**env, **(overrides or {}), "R287_MUTATION_PATH": "1" if expect_failure else "0"},
                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=300, encoding="utf-8")
         except subprocess.TimeoutExpired as error:
             output = error.stdout or ""

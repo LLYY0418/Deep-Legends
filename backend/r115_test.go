@@ -220,9 +220,14 @@ func TestR115_BroadcastUncertainWriteIsNotRetried(t *testing.T) {
 		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
 	})}}
 	r.handleChampSelect(client, Summoner{})
-	select {
-	case <-done:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r115_test.go:223 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("no write")
 	}
 	// Wait until the action worker actually exits, not merely until it emitted.

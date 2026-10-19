@@ -15,7 +15,7 @@ for name,target,edits,envkey in mutations:
   source=source.replace(old,new,1)
  with tempfile.TemporaryDirectory(prefix='r258-filter-mutant-') as directory:
   replacement=pathlib.Path(directory)/pathlib.Path(target).name;replacement.write_text(source)
-  result=subprocess.run(['node','--test','backend/web/r258-filters.test.cjs'],cwd=root,env={**os.environ,envkey:str(replacement)},stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+  result=subprocess.run(['node','--test','backend/web/r258-filters.test.cjs'],cwd=root,env={**os.environ,'R287_MUTATION_PATH':'1',envkey:str(replacement)},stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
   (out/(name+'.log')).write_text(result.stdout)
   killed=result.returncode!=0 and ('AssertionError' in result.stdout or 'ERR_ASSERTION' in result.stdout) and 'SyntaxError:' not in result.stdout and 'ReferenceError:' not in result.stdout
   row={'name':name,'assertion_killed':killed,'exit_code':result.returncode};rows.append(row);print(json.dumps(row),flush=True)

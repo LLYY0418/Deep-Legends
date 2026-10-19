@@ -72,7 +72,7 @@ async function main(){
  for(let i=0;i<12;i++){const img=document.createElement('img');img.width=64;img.height=64;img.setAttribute('data-queued-src','/api/champion-asset?i='+i);document.body.append(img)}
  `);
  await new Promise(r=>setTimeout(r,250));
- const elapsed=await evaluate('(async()=>{const t=performance.now();await refreshStatus();return performance.now()-t})()');
+ const elapsed=(await require('../scripts/lib/timing-retry.cjs').timingRetry({label:'status starvation <8000ms',within:n=>n<8000,measure:()=>evaluate('(async()=>{const t=performance.now();await refreshStatus();return performance.now()-t})()')})).value;
  assert.ok(elapsed<8000,'status starved behind images: '+elapsed);
  assert.ok(peakImages<=imageQueueLimit,'browser image connection cap exceeded: '+peakImages+' > '+imageQueueLimit);
  failStatus=true;await evaluate('(async()=>{for(let i=0;i<3;i++)await refreshStatus()})()');

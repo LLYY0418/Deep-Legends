@@ -155,39 +155,43 @@ func TestR231SeasonSummaryIsNetworkFree(t *testing.T) {
 	}
 }
 func TestR231RelayForceBackoffAndSlowBody(t *testing.T) {
-	r206RelayFixture(t)
-	state := &riotRelayState{}
-	var calls atomic.Int32
-	client := &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
-		if calls.Add(1) == 1 {
-			return nil, errors.New("temporary network failure")
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		r206RelayFixture(t)
+		state := &riotRelayState{}
+		var calls atomic.Int32
+		client := &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
+			if calls.Add(1) == 1 {
+				return nil, errors.New("temporary network failure")
+			}
+			return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(&r231SlowReader{})}, nil
+		})}
+		if _, err := state.ensureForce(t.Context(), client, nil, false); !errors.Is(err, errRiotRelayUnavailable) {
+			t.Fatal(err)
 		}
-		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(&r231SlowReader{})}, nil
-	})}
-	if _, err := state.ensureForce(t.Context(), client, nil, false); !errors.Is(err, errRiotRelayUnavailable) {
-		t.Fatal(err)
-	}
-	began := time.Now()
-	if _, err := state.ensureForce(t.Context(), client, nil, true); err != nil || time.Since(began) > time.Second || calls.Load() != 2 {
-		t.Fatal(err, time.Since(began), calls.Load())
-	}
-	state.failed("https://relay.example")
-	if state.unavailable() {
-		t.Fatal("single request failure locked relay")
-	}
-	state.failed("https://relay.example")
-	if state.unavailable() {
-		t.Fatal("second failure locked relay")
-	}
-	state.failed("https://relay.example")
-	if !state.unavailable() {
-		t.Fatal("three failures did not back off")
-	}
-	for i, want := range []int{15, 30, 60, 120, 120} {
-		if got := int(relayBackoff(i + 1).Seconds()); got != want {
-			t.Fatal(got, want)
+
+		began := time.Now()
+		if _, err := state.ensureForce(t.Context(), client, nil, true); err != nil || calls.Load() != 2 || r287TooSlow(r287Context, t, "backend/r231_test.go:171 duration", time.Since(began), time.Second, false) {
+			t.Fatal(err, time.Since(began), calls.Load())
 		}
-	}
+		state.failed("https://relay.example")
+		if state.unavailable() {
+			t.Fatal("single request failure locked relay")
+		}
+		state.failed("https://relay.example")
+		if state.unavailable() {
+			t.Fatal("second failure locked relay")
+		}
+		state.failed("https://relay.example")
+		if !state.unavailable() {
+			t.Fatal("three failures did not back off")
+		}
+		for i, want := range []int{15, 30, 60, 120, 120} {
+			if got := int(relayBackoff(i + 1).Seconds()); got != want {
+				t.Fatal(got, want)
+			}
+		}
+	})
 }
 
 type r231SlowReader struct{}
@@ -246,69 +250,87 @@ func TestR231RatingTemporaryAndNotRecordedTTL(t *testing.T) {
 }
 
 func TestR231CurrentForeignHistoryDoesNotWaitForRiot(t *testing.T) {
-	t.Setenv("RIOT_API_KEY", "RGAPI-r231-fixture")
-	block := make(chan struct{})
-	champs := newChampionProvider()
-	champs.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		select {
-		case <-block:
-		case <-r.Context().Done():
+	var r287CaptureMu sync.Mutex
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		t.Setenv("RIOT_API_KEY", "RGAPI-r231-fixture")
+		block := make(chan struct{})
+		champs := newChampionProvider()
+		champs.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			select {
+			case <-block:
+			case <-r.Context().Done():
+			}
+			return nil, errors.New("Riot unavailable")
+		})}
+		client := newLCUClient(1, "fixture")
+		client.region, client.rsoPlatform = "JP", "JP1"
+		client.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			game := `{"gameId":231,"queueId":420,"gameDuration":1800,"gameType":"MATCHED_GAME","participants":[{"participantId":1,"teamId":100,"championId":1,"stats":{"win":true}}],"participantIdentities":[{"participantId":1,"player":{"puuid":"r231-local-player"}}]}`
+			if strings.Contains(r.URL.Path, "/games/") {
+				return proHTTPBody([]byte(game)), nil
+			}
+			return proHTTPBody([]byte(`{"games":{"games":[` + game + `]}}`)), nil
+		})}
+		a := &app{riot: newRiotProvider(champs), lcu: client, summoner: Summoner{PUUID: "r231-local-player", GameName: "Fixture", TagLine: "JP1"}}
+		defer func() {
+			close(block)
+			err := r281AwaitProgress("background fixture did not stop", func() (bool, int, string) {
+				a.mu.RLock()
+				pending := len(a.currentRiotDetailFlights)
+				a.mu.RUnlock()
+				return pending == 0, pending, fmt.Sprint(pending)
+			}, r281WaitOptions{})
+			if err != nil {
+				t.Error(err)
+			}
+		}()
+
+		began := time.Now()
+		matches, caps, _ := a.loadDetailedMatches(t.Context(), client, gameplayReferenceFromSummoner(a.summoner), a.summoner.PUUID, true, 0, 10, "all", nil, nil)
+		if len(matches) != 1 || matches[0].GameID != 231 || caps[0].State != capabilityAvailable || r287TooSlow(r287Context, t, "backend/r231_test.go:283 duration", time.Since(began), time.Second, false) {
+			t.Fatal(time.Since(began), matches, caps)
 		}
-		return nil, errors.New("Riot unavailable")
-	})}
-	client := newLCUClient(1, "fixture")
-	client.region, client.rsoPlatform = "JP", "JP1"
-	client.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		game := `{"gameId":231,"queueId":420,"gameDuration":1800,"gameType":"MATCHED_GAME","participants":[{"participantId":1,"teamId":100,"championId":1,"stats":{"win":true}}],"participantIdentities":[{"participantId":1,"player":{"puuid":"r231-local-player"}}]}`
-		if strings.Contains(r.URL.Path, "/games/") {
-			return proHTTPBody([]byte(game)), nil
-		}
-		return proHTTPBody([]byte(`{"games":{"games":[` + game + `]}}`)), nil
-	})}
-	a := &app{riot: newRiotProvider(champs), lcu: client, summoner: Summoner{PUUID: "r231-local-player", GameName: "Fixture", TagLine: "JP1"}}
-	defer func() {
-		close(block)
-		err := r281AwaitProgress("background fixture did not stop", func() (bool, int, string) {
-			a.mu.RLock()
-			pending := len(a.currentRiotDetailFlights)
-			a.mu.RUnlock()
-			return pending == 0, pending, fmt.Sprint(pending)
-		}, r281WaitOptions{})
-		if err != nil {
-			t.Error(err)
-		}
-	}()
-	began := time.Now()
-	matches, caps, _ := a.loadDetailedMatches(t.Context(), client, gameplayReferenceFromSummoner(a.summoner), a.summoner.PUUID, true, 0, 10, "all", nil, nil)
-	if time.Since(began) > time.Second || len(matches) != 1 || matches[0].GameID != 231 || caps[0].State != capabilityAvailable {
-		t.Fatal(time.Since(began), matches, caps)
-	}
-	a.connected = true
-	began = time.Now()
-	overview := a.loadGameplayOverview(t.Context(), client, a.summoner, gameplayReferenceFromSummoner(a.summoner), 0, 10, "all", false)
-	if time.Since(began) > time.Second || len(overview.Matches) != 1 || overview.Matches[0].GameID != 231 {
-		t.Fatal("full overview blocked", time.Since(began), overview.Matches)
-	}
+		a.connected = true
+		r287TimingScenario(t, func(r287Context *r287TimingContext) {
+			r287CaptureMu.Lock()
+			began = time.Now()
+			r287CaptureMu.Unlock()
+			overview := a.loadGameplayOverview(t.Context(), client, a.summoner, gameplayReferenceFromSummoner(a.summoner), 0, 10, "all", false)
+			if len(overview.Matches) != 1 || overview.Matches[0].GameID != 231 || r287TooSlow(r287Context, t, "backend/r231_test.go:289 duration", time.Since(began), time.Second, false) {
+				t.Fatal("full overview blocked", time.Since(began), overview.Matches)
+			}
+		})
+	})
 }
 
 func TestR231QueueLabelsReturnBeforeSlowLCU(t *testing.T) {
-	client := newLCUClient(1, "fixture")
-	done := make(chan struct{})
-	client.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		<-r.Context().Done()
-		close(done)
-		return nil, r.Context().Err()
-	})}
-	began := time.Now()
-	labels := loadQueueLabelsContext(t.Context(), client)
-	if time.Since(began) > time.Second || labels[420] == "" {
-		t.Fatal(time.Since(began), labels)
-	}
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("queue refresh exceeded 1.5s budget")
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		client := newLCUClient(1, "fixture")
+		done := make(chan struct{})
+		client.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			<-r.Context().Done()
+			close(done)
+			return nil, r.Context().Err()
+		})}
+
+		began := time.Now()
+		labels := loadQueueLabelsContext(t.Context(), client)
+		if labels[420] == "" || r287TooSlow(r287Context, t, "backend/r231_test.go:304 duration", time.Since(began), time.Second, false) {
+			t.Fatal(time.Since(began), labels)
+		}
+		if !r287WaitSelect(t, "backend/r231_test.go:307 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-done:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
+			t.Fatal("queue refresh exceeded 1.5s budget")
+		}
+	})
 }
 
 func TestR231OPGGZeroIsExplicitAndRegionCopy(t *testing.T) {

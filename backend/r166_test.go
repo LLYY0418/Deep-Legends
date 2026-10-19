@@ -84,9 +84,14 @@ func TestR166MayhemRSCPrefetchMergesWithDetailFlight(t *testing.T) {
 	if first.Code != http.StatusAccepted {
 		t.Fatalf("prefetch status %d", first.Code)
 	}
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r166_test.go:87 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-entered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		close(release)
 		t.Fatal("RSC prefetch did not start")
 	}
@@ -150,20 +155,35 @@ func TestR166ArenaAggregateStartsBeforeOPGGVersionCompletes(t *testing.T) {
 	})}
 	done := make(chan struct{})
 	go func() { _, _ = provider.loadStructuredDetail(context.Background(), "arena", "67", "", ""); close(done) }()
-	select {
-	case <-versionEntered:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r166_test.go:153 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-versionEntered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("OP.GG versions request did not start")
 	}
-	select {
-	case <-aggregateEntered:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r166_test.go:158 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-aggregateEntered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("YOUR.GG aggregate waited for OP.GG versions")
 	}
 	unblock()
-	select {
-	case <-done:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r166_test.go:164 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("detail did not finish after releasing versions")
 	}
 }

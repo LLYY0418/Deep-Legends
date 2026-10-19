@@ -1,4 +1,5 @@
 'use strict';
+process.env.R287_MUTATION_PATH='1'; // Negative cases only; child baselines use their own explicit mode.
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),cp=require('node:child_process'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=process.env.R283_MUTATION_OUT||path.join(os.tmpdir(),'r283-mutations'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'r283-mutants-'));fs.mkdirSync(out,{recursive:true});
 const js=[

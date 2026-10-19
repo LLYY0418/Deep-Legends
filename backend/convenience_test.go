@@ -112,20 +112,30 @@ func TestConvenienceReadyCheckPostsAcceptOnce(t *testing.T) {
 	runner.apply(settings)
 	runner.handlePhase(client, "ReadyCheck")
 	runner.handlePhase(client, "ReadyCheck")
-	select {
-	case got := <-requests:
-		if got != "GET /lol-gameflow/v1/session" {
-			t.Fatalf("got %q", got)
+	if !r287WaitSelect(t, "backend/convenience_test.go:115 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case got := <-requests:
+			if got != "GET /lol-gameflow/v1/session" {
+				t.Fatalf("got %q", got)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(2 * time.Second):
+	}) {
 		t.Fatal("ready-check preflight was not requested")
 	}
-	select {
-	case got := <-requests:
-		if got != "POST /lol-matchmaking/v1/ready-check/accept" {
-			t.Fatalf("got %q", got)
+	if !r287WaitSelect(t, "backend/convenience_test.go:123 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case got := <-requests:
+			if got != "POST /lol-matchmaking/v1/ready-check/accept" {
+				t.Fatalf("got %q", got)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(2 * time.Second):
+	}) {
 		t.Fatal("accept was not posted after the non-custom preflight")
 	}
 	select {
@@ -184,12 +194,17 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	settings.Rules.AutoReconnect.DelayMS = 3000
 	runner.apply(settings)
 	runner.handlePhase(client, "Reconnect")
-	select {
-	case event := <-events:
-		if event != "watch:armed:reconnect:5000" {
-			t.Fatalf("armed event = %q", event)
+	if !r287WaitSelect(t, "backend/convenience_test.go:187 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-events:
+			if event != "watch:armed:reconnect:5000" {
+				t.Fatalf("armed event = %q", event)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("reconnect was not armed")
 	}
 	if delay := <-waiting; delay != 5*time.Second {
@@ -201,20 +216,30 @@ func TestConvenienceReconnectPostsAndNotifies(t *testing.T) {
 	default:
 	}
 	close(fire)
-	select {
-	case got := <-done:
-		if got != "POST /lol-gameflow/v1/reconnect" {
-			t.Fatalf("got %q", got)
+	if !r287WaitSelect(t, "backend/convenience_test.go:204 wait", 4*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case got := <-done:
+			if got != "POST /lol-gameflow/v1/reconnect" {
+				t.Fatalf("got %q", got)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(4 * time.Second):
+	}) {
 		t.Fatal("reconnect was not posted")
 	}
-	select {
-	case event := <-events:
-		if event != "watch:fired:reconnect" {
-			t.Fatalf("event = %q", event)
+	if !r287WaitSelect(t, "backend/convenience_test.go:212 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-events:
+			if event != "watch:fired:reconnect" {
+				t.Fatalf("event = %q", event)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(2 * time.Second):
+	}) {
 		t.Fatal("reconnect event was not broadcast")
 	}
 }

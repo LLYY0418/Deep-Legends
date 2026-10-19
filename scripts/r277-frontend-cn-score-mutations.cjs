@@ -1,4 +1,5 @@
 'use strict';
+process.env.R287_MUTATION_PATH='1'; // All children are intentionally mutated cases.
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..'),report=path.resolve(process.env.R277_REPORT_DIR||path.join(process.env.PI_SCRATCH_DIR||os.tmpdir(),'r277-cn-score-proof')),scratch=process.env.PI_SCRATCH_DIR||os.tmpdir();
 fs.mkdirSync(report,{recursive:true});

@@ -156,29 +156,33 @@ func TestLootNamingPublicCatalogFallbackIsCachedAndPrivate(t *testing.T) {
 }
 
 func TestLootNamingSharedDeadlineAndOfflineFallback(t *testing.T) {
-	var active, peak atomic.Int32
-	provider := newChampionProvider()
-	provider.client = &http.Client{Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		current := active.Add(1)
-		defer active.Add(-1)
-		for seen := peak.Load(); current > seen && !peak.CompareAndSwap(seen, current); seen = peak.Load() {
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		var active, peak atomic.Int32
+		provider := newChampionProvider()
+		provider.client = &http.Client{Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			current := active.Add(1)
+			defer active.Add(-1)
+			for seen := peak.Load(); current > seen && !peak.CompareAndSwap(seen, current); seen = peak.Load() {
+			}
+			<-r.Context().Done()
+			return nil, r.Context().Err()
+		})}
+		ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+		defer cancel()
+
+		started := time.Now()
+		metadata := loadLootMetadata(ctx, nil, provider, nil)
+		if peak.Load() != int32(len(lootMetadataCatalogs)) || len(metadata) != 0 || r287TooSlow(r287Context, t, "backend/loot_metadata_test.go:173 duration", time.Since(started), time.Second, false) {
+			t.Fatalf("catalogs did not share a concurrent deadline: peak=%d, entries=%d", peak.Load(), len(metadata))
 		}
-		<-r.Context().Done()
-		return nil, r.Context().Err()
-	})}
-	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
-	defer cancel()
-	started := time.Now()
-	metadata := loadLootMetadata(ctx, nil, provider, nil)
-	if time.Since(started) > time.Second || peak.Load() != int32(len(lootMetadataCatalogs)) || len(metadata) != 0 {
-		t.Fatalf("catalogs did not share a concurrent deadline: peak=%d, entries=%d", peak.Load(), len(metadata))
-	}
-	items := enrichLootItemsWithMetadata([]LootItem{{LootID: "CHEST_128", Count: 1}, {LootID: "MATERIAL_clashtickets", Count: 1}}, nil, nil, nil)
-	for _, item := range items {
-		if item.DisplayName != lootNames0912[item.LootID] || item.Asset == "" {
-			t.Fatalf("verified legacy fallback failed offline: %#v", item)
+		items := enrichLootItemsWithMetadata([]LootItem{{LootID: "CHEST_128", Count: 1}, {LootID: "MATERIAL_clashtickets", Count: 1}}, nil, nil, nil)
+		for _, item := range items {
+			if item.DisplayName != lootNames0912[item.LootID] || item.Asset == "" {
+				t.Fatalf("verified legacy fallback failed offline: %#v", item)
+			}
 		}
-	}
+	})
 }
 
 func TestLootNamingPreservesLocalNamesAndReportsUnresolvedCategories(t *testing.T) {

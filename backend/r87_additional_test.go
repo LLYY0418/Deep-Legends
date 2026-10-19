@@ -103,21 +103,31 @@ func TestR87ReconnectPreflightRejectsLostEndEvent(t *testing.T) {
 			s.Rules.AutoReconnect.DelayMS = 0
 			r.apply(s)
 			r.handlePhase(c, "Reconnect")
-			select {
-			case d := <-waiting:
-				if d < 5*time.Second {
-					t.Fatal("no debounce")
+			if !r287WaitSelect(t, "backend/r87_additional_test.go:106 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case d := <-waiting:
+					if d < 5*time.Second {
+						t.Fatal("no debounce")
+					}
+					return true
+				case <-r287Deadline:
+					return false
 				}
-			case <-time.After(time.Second):
+			}) {
 				t.Fatal("not scheduled")
 			}
 			if writes.Load() != 0 {
 				t.Fatal("wrote during debounce")
 			}
 			close(release)
-			select {
-			case <-done:
-			case <-time.After(time.Second):
+			if !r287WaitSelect(t, "backend/r87_additional_test.go:118 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-done:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Fatal("no preflight completion")
 			}
 			want := int32(0)
@@ -209,9 +219,14 @@ func TestR87CollectionThreeComparisonsAndBoundedPendingRetry(t *testing.T) {
 			t.Fatal("retry missing")
 		}
 		a.collectionDataRetry.Reset(time.Millisecond)
-		select {
-		case <-a.refreshRequests:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/r87_additional_test.go:212 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-a.refreshRequests:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("retry not requested")
 		}
 		a.mu.Lock()

@@ -24,81 +24,85 @@ import (
 func TestR243ActivationRetriesFreshSignedRequest(t *testing.T) {
 	for _, mode := range []string{"timeout", "connect", "dns", "5xx", "unsigned", "service"} {
 		t.Run(mode, func(t *testing.T) {
-			issuer := newLicenseTestIssuer(t)
-			m := issuer.Manager(&licenseTestStore{})
-			original := m.options.Client.Transport
-			var requests []licenseRequest
-			var events []map[string]any
-			m.options.Observe = func(row map[string]any) { events = append(events, row) }
-			m.options.Client = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) {
-				body, _ := io.ReadAll(r.Body)
-				r.Body = io.NopCloser(bytes.NewReader(body))
-				var request licenseRequest
-				json.Unmarshal(body, &request)
-				requests = append(requests, request)
-				deadline, ok := r.Context().Deadline()
-				if !ok || time.Until(deadline) > licenseTimeout {
-					t.Fatal("attempt timeout not bounded")
-				}
-				if len(requests) == 1 {
-					switch mode {
-					case "timeout":
-						<-r.Context().Done()
-						return nil, r.Context().Err()
-					case "connect":
-						return nil, &net.OpError{Op: "dial", Err: errors.New("test secret must not be logged")}
-					case "dns":
-						return nil, &net.DNSError{Err: "test secret", Name: "private.test", IsNotFound: true}
-					case "5xx", "unsigned":
-						w := httptest.NewRecorder()
-						w.Header().Set("CF-Ray", "abc123-SJC")
-						w.WriteHeader(503)
-						if mode == "5xx" {
-							w.WriteString("upstream failed")
-						} else {
-							w.WriteString(`{"error":"SERVICE_UNAVAILABLE","secret":"must-not-be-exported"}`)
+
+			r287TimingScenario(t, func(r287Context *r287TimingContext) {
+				issuer := newLicenseTestIssuer(t)
+				m := issuer.Manager(&licenseTestStore{})
+				original := m.options.Client.Transport
+				var requests []licenseRequest
+				var events []map[string]any
+				m.options.Observe = func(row map[string]any) { events = append(events, row) }
+				m.options.Client = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) {
+					body, _ := io.ReadAll(r.Body)
+					r.Body = io.NopCloser(bytes.NewReader(body))
+					var request licenseRequest
+					json.Unmarshal(body, &request)
+					requests = append(requests, request)
+					deadline, ok := r.Context().Deadline()
+					if !ok || time.Until(deadline) > licenseTimeout {
+						t.Fatal("attempt timeout not bounded")
+					}
+					if len(requests) == 1 {
+						switch mode {
+						case "timeout":
+							<-r.Context().Done()
+							return nil, r.Context().Err()
+						case "connect":
+							return nil, &net.OpError{Op: "dial", Err: errors.New("test secret must not be logged")}
+						case "dns":
+							return nil, &net.DNSError{Err: "test secret", Name: "private.test", IsNotFound: true}
+						case "5xx", "unsigned":
+							w := httptest.NewRecorder()
+							w.Header().Set("CF-Ray", "abc123-SJC")
+							w.WriteHeader(503)
+							if mode == "5xx" {
+								w.WriteString("upstream failed")
+							} else {
+								w.WriteString(`{"error":"SERVICE_UNAVAILABLE","secret":"must-not-be-exported"}`)
+							}
+							return w.Result(), nil
+						case "service":
+							pub, _ := rawURLDecode(request.DevicePub, 32)
+							w := httptest.NewRecorder()
+							w.WriteHeader(503)
+							json.NewEncoder(w).Encode(testSignedEnvelope(issuer.key, "test-issuer", "DL-LICENSE-RESPONSE-V1", licensePayload{Version: 1, RequestID: request.RequestID, DeviceHash: licenseDeviceHash(pub), ServerTime: issuer.clock.Now().Unix(), Status: "ERROR", Error: "SERVICE_UNAVAILABLE"}))
+							return w.Result(), nil
 						}
-						return w.Result(), nil
-					case "service":
-						pub, _ := rawURLDecode(request.DevicePub, 32)
-						w := httptest.NewRecorder()
-						w.WriteHeader(503)
-						json.NewEncoder(w).Encode(testSignedEnvelope(issuer.key, "test-issuer", "DL-LICENSE-RESPONSE-V1", licensePayload{Version: 1, RequestID: request.RequestID, DeviceHash: licenseDeviceHash(pub), ServerTime: issuer.clock.Now().Unix(), Status: "ERROR", Error: "SERVICE_UNAVAILABLE"}))
-						return w.Result(), nil
+					}
+					return original.RoundTrip(r)
+				})}
+
+				start := time.Now()
+				if err := m.Activate(context.Background(), strings.Repeat("0", 20)); err != nil {
+					t.Fatal(err)
+				}
+				if len(requests) != 2 || !m.Allowed() || r287TooSlow(r287Context, t, "backend/license_r243_test.go:76 duration", time.Since(start), licenseActivationTimeout, false) {
+					t.Fatal("activation retry missing or over budget")
+				}
+				if requests[0].RequestID == requests[1].RequestID || requests[0].Counter == requests[1].Counter || requests[0].Signature == requests[1].Signature {
+					t.Fatal("retry reused signed request")
+				}
+				var failed map[string]any
+				for _, row := range events {
+					if row["result"] == "failed" {
+						failed = row
 					}
 				}
-				return original.RoundTrip(r)
-			})}
-			start := time.Now()
-			if err := m.Activate(context.Background(), strings.Repeat("0", 20)); err != nil {
-				t.Fatal(err)
-			}
-			if time.Since(start) > licenseActivationTimeout || len(requests) != 2 || !m.Allowed() {
-				t.Fatal("activation retry missing or over budget")
-			}
-			if requests[0].RequestID == requests[1].RequestID || requests[0].Counter == requests[1].Counter || requests[0].Signature == requests[1].Signature {
-				t.Fatal("retry reused signed request")
-			}
-			var failed map[string]any
-			for _, row := range events {
-				if row["result"] == "failed" {
-					failed = row
+				want := mode
+				if mode == "5xx" || mode == "service" {
+					want = "http_status"
 				}
-			}
-			want := mode
-			if mode == "5xx" || mode == "service" {
-				want = "http_status"
-			}
-			if mode == "unsigned" {
-				want = "unsigned_error"
-			}
-			if failed["kind"] != "activate" || failed["failure"] != want {
-				t.Fatalf("failure classification: %#v", failed)
-			}
-			encoded, _ := json.Marshal(events)
-			if strings.Contains(string(encoded), "secret") || strings.Contains(string(encoded), strings.Repeat("0", 20)) {
-				t.Fatal("sensitive diagnostic content")
-			}
+				if mode == "unsigned" {
+					want = "unsigned_error"
+				}
+				if failed["kind"] != "activate" || failed["failure"] != want {
+					t.Fatalf("failure classification: %#v", failed)
+				}
+				encoded, _ := json.Marshal(events)
+				if strings.Contains(string(encoded), "secret") || strings.Contains(string(encoded), strings.Repeat("0", 20)) {
+					t.Fatal("sensitive diagnostic content")
+				}
+			})
 		})
 	}
 }
@@ -136,41 +140,49 @@ func TestR243BusinessErrorsAndInvalidProofDoNotRetry(t *testing.T) {
 	}
 }
 func TestR243QueuedActivationSharesTotalBudget(t *testing.T) {
-	issuer := newLicenseTestIssuer(t)
-	m := issuer.Manager(&licenseTestStore{})
-	m.opMu.Lock()
-	defer m.opMu.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
-	defer cancel()
-	start := time.Now()
-	if m.Activate(ctx, strings.Repeat("0", 20)) == nil || time.Since(start) > time.Second || issuer.requests.Load() != 0 {
-		t.Fatal("queued activation escaped total deadline")
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		issuer := newLicenseTestIssuer(t)
+		m := issuer.Manager(&licenseTestStore{})
+		m.opMu.Lock()
+		defer m.opMu.Unlock()
+		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+		defer cancel()
+
+		start := time.Now()
+		if m.Activate(ctx, strings.Repeat("0", 20)) == nil || issuer.requests.Load() != 0 || r287TooSlow(r287Context, t, "backend/license_r243_test.go:146 duration", time.Since(start), time.Second, false) {
+			t.Fatal("queued activation escaped total deadline")
+		}
+	})
 }
 func TestR243DeadlineCancellationAndRenewBackoff(t *testing.T) {
-	issuer := newLicenseTestIssuer(t)
-	m := issuer.Manager(&licenseTestStore{})
-	testActivate(t, m, false)
-	calls := 0
-	m.options.Client = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) {
-		calls++
-		<-r.Context().Done()
-		return nil, r.Context().Err()
-	})}
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
-	defer cancel()
-	start := time.Now()
-	if m.Activate(ctx, strings.Repeat("0", 20)) == nil || calls != 1 || time.Since(start) > time.Second {
-		t.Fatal("parent deadline ignored")
-	}
-	m.options.Client = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) { return nil, context.DeadlineExceeded })}
-	m.failures = 0
-	for _, want := range []time.Duration{15 * time.Second, 30 * time.Second, 60 * time.Second} {
-		m.Renew(context.Background())
-		if got := m.nextRenew.Sub(issuer.clock.Elapsed()); got != want {
-			t.Fatalf("renew backoff %s != %s", got, want)
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		issuer := newLicenseTestIssuer(t)
+		m := issuer.Manager(&licenseTestStore{})
+		testActivate(t, m, false)
+		calls := 0
+		m.options.Client = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) {
+			calls++
+			<-r.Context().Done()
+			return nil, r.Context().Err()
+		})}
+		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+		defer cancel()
+
+		start := time.Now()
+		if m.Activate(ctx, strings.Repeat("0", 20)) == nil || calls != 1 || r287TooSlow(r287Context, t, "backend/license_r243_test.go:163 duration", time.Since(start), time.Second, false) {
+			t.Fatal("parent deadline ignored")
 		}
-	}
+		m.options.Client = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) { return nil, context.DeadlineExceeded })}
+		m.failures = 0
+		for _, want := range []time.Duration{15 * time.Second, 30 * time.Second, 60 * time.Second} {
+			m.Renew(context.Background())
+			if got := m.nextRenew.Sub(issuer.clock.Elapsed()); got != want {
+				t.Fatalf("renew backoff %s != %s", got, want)
+			}
+		}
+	})
 }
 func TestR243FailureDiagnosticsReachExportAndSanitize(t *testing.T) {
 	store := newStartupTestStore(t)
@@ -320,9 +332,14 @@ func TestR243ExpiredCacheRecoveryElectronFixture(t *testing.T) {
 	if err := os.WriteFile(filepath.Clean(ready), []byte(server.URL), 0600); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case <-finished:
-	case <-time.After(60 * time.Second):
+	if !r287WaitSelect(t, "backend/license_r243_test.go:323 wait", 60*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-finished:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("Electron fixture did not finish")
 	}
 	if !m.Allowed() {

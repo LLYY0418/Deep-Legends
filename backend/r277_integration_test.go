@@ -106,7 +106,9 @@ func TestR277ReopenDiscoveryIdentityGatewayProductionPath(t *testing.T) {
 					session: func(ctx context.Context, c *LCUClient) error {
 						clockMu.Lock()
 						defer clockMu.Unlock()
-						deadline := time.After(3 * time.Second)
+						deadlineR287Timing := r287NewDeadline(t, "backend/r277_integration_test.go:109 deadline", 3*time.Second)
+						defer deadlineR287Timing.Stop()
+						deadline := deadlineR287Timing.C
 						for {
 							if view := a.currentClientView(); view.State == "ready" {
 								if c != next || view.ServerID != "HN10" || !view.SGPReady || a.shutdownClient != nil || now.Sub(discoveredAt) > 3*time.Second {
@@ -124,6 +126,7 @@ func TestR277ReopenDiscoveryIdentityGatewayProductionPath(t *testing.T) {
 							case <-time.After(time.Millisecond):
 							}
 						}
+
 					},
 				})
 				r274CloseApp(t, a, ctx)

@@ -4,7 +4,7 @@ const {branchRuns,fullTriggers,isDiagnosticBranch}=require('./lib/ci-routing.cjs
 const old=require('./r277-ci-legacy-baseline.json').workflow;
 const full=yaml.load(fs.readFileSync(require('node:path').join(__dirname,'../.github/workflows/ci.yml'),'utf8'));
 const quick=yaml.load(fs.readFileSync(require('node:path').join(__dirname,'../.github/workflows/probe-windows-browser.yml'),'utf8'));
-function verify(spec){assert.deepEqual(spec.on,fullTriggers(old.on));for(const name of Object.keys(old.jobs))assert(spec.jobs[name],name+' remains mandatory');}
+function verify(spec){assert.deepEqual(spec.on,fullTriggers({...old.on,push:{...old.on.push,branches:["**"]}}));for(const name of Object.keys(old.jobs))assert(spec.jobs[name],name+' remains mandatory');}
 test('only the new diagnostic namespace avoids full CI; all existing release/probe/main/PR/dispatch protections remain',()=>{
  verify(full);for(const branch of ['main','feature/nested','codex/ci-lean-r279','codex/probe-0.12.85-1','codex/release-0.12.85','codex/release-0.12.86']){const ref='refs/heads/'+branch;assert(branchRuns(full.on.push,ref));assert(!branchRuns(quick.on.push,ref));}
  const ref='refs/heads/codex/diagnostic-r279-speedup';assert(isDiagnosticBranch(ref));assert(!branchRuns(full.on.push,ref));assert(branchRuns(quick.on.push,ref));assert(Object.hasOwn(full.on,'pull_request'));assert.equal(full.on.workflow_dispatch.inputs.measure_windows_renderers.default,true);

@@ -204,142 +204,153 @@ func TestR244ProbeReasonsAndTimeout(t *testing.T) {
 	}
 }
 func TestR244ColdConnectionSequenceAndSummonerEvent(t *testing.T) {
-	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
-	eventAt := make(chan time.Time, 1)
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !websocket.IsWebSocketUpgrade(r) {
-			http.Error(w, "starting", 404)
-			return
-		}
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer conn.Close()
-		if _, _, err = conn.ReadMessage(); err != nil {
-			return
-		}
-		eventAt <- time.Now()
-		conn.WriteJSON([]any{8, "OnJsonApiEvent", map[string]any{"uri": "/lol-summoner/v1/current-summoner", "eventType": "Update", "data": map[string]any{"summonerId": 44, "puuid": r161Ref(0)}}})
-		for {
+	var r287CaptureMu sync.Mutex
+	r287TimingScenario(t, func(r287Extra *r287TimingContext) {
+		upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+		eventAt := make(chan time.Time, 1)
+		var identityElapsed time.Duration
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !websocket.IsWebSocketUpgrade(r) {
+				http.Error(w, "starting", 404)
+				return
+			}
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer conn.Close()
 			if _, _, err = conn.ReadMessage(); err != nil {
 				return
 			}
+			eventAt <- time.Now()
+			conn.WriteJSON([]any{8, "OnJsonApiEvent", map[string]any{"uri": "/lol-summoner/v1/current-summoner", "eventType": "Update", "data": map[string]any{"summonerId": 44, "puuid": r161Ref(0)}}})
+			for {
+				if _, _, err = conn.ReadMessage(); err != nil {
+					return
+				}
+			}
+		}))
+		defer server.Close()
+		u, _ := url.Parse(server.URL)
+		port, _ := strconv.Atoi(u.Port())
+		client := newLCUClient(port, "fixture")
+		defer client.Close()
+		a := r175App(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		attempts := 0
+		delays := []time.Duration{}
+		a.runConnectionManagerWith(ctx, connectionLoopOps{
+			discover: func() (*LCUClient, LCUDiscoveryStatus, error) {
+				attempts++
+				now := time.Now()
+				r := LCUDiscoveryStatus{AttemptAt: now}
+				switch attempts {
+				case 1, 2, 3:
+					r.Result = "process-not-found"
+					return nil, r, errLCUNotFound
+				case 4:
+					r.ProcessCount = 1
+					r.Result = "credentials-unreadable"
+					r.CommandLineCount = 1
+					r.CommandLineAt = now
+					return nil, r, errLCUCredentialsUnreadable
+				case 5:
+					r.ProcessCount = 1
+					r.Result = "probe-failed"
+					r.CredentialCandidates = 1
+					r.CredentialsAt = now
+					r.ProbeErrorKind = "refused"
+					return nil, r, errLCUProbeFailed
+				default:
+					r.ProcessCount = 1
+					r.Result = "probe-failed"
+					r.PortOpen = true
+					r.PortOpenAt = now
+					r.ProbeErrorKind = "no-summoner"
+					return client, r, errLCUProbeFailed
+				}
+			},
+			identity: func(c *LCUClient) bool {
+				at := <-eventAt
+				r287CaptureMu.Lock()
+				identityElapsed = time.Since(at)
+				r287CaptureMu.Unlock()
+				c.mu.RLock()
+				seed := c.discoverySummoner
+				c.mu.RUnlock()
+				if seed == nil || seed.SummonerID != 44 {
+					t.Error(seed)
+				}
+				return true
+			},
+			session: func(context.Context, *LCUClient) error {
+				a.observeColdLaunchMilestone("overview_first_card_ms", time.Now())
+				a.observeColdLaunchMilestone("overlay_hidden_ms", time.Now())
+				a.observeColdLaunchMilestone("overlay_hidden_ms", time.Now())
+				cancel()
+				return nil
+			},
+			wait: func(_ context.Context, d time.Duration) bool { delays = append(delays, d); return true },
+		})
+		if r287TooSlow(r287Extra, t, "R244 summoner event", identityElapsed, 100*time.Millisecond, false) {
+			t.Error("event delayed", identityElapsed)
 		}
-	}))
-	defer server.Close()
-	u, _ := url.Parse(server.URL)
-	port, _ := strconv.Atoi(u.Port())
-	client := newLCUClient(port, "fixture")
-	defer client.Close()
-	a := r175App(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	attempts := 0
-	delays := []time.Duration{}
-	a.runConnectionManagerWith(ctx, connectionLoopOps{
-		discover: func() (*LCUClient, LCUDiscoveryStatus, error) {
-			attempts++
-			now := time.Now()
-			r := LCUDiscoveryStatus{AttemptAt: now}
-			switch attempts {
-			case 1, 2, 3:
-				r.Result = "process-not-found"
-				return nil, r, errLCUNotFound
-			case 4:
-				r.ProcessCount = 1
-				r.Result = "credentials-unreadable"
-				r.CommandLineCount = 1
-				r.CommandLineAt = now
-				return nil, r, errLCUCredentialsUnreadable
-			case 5:
-				r.ProcessCount = 1
-				r.Result = "probe-failed"
-				r.CredentialCandidates = 1
-				r.CredentialsAt = now
-				r.ProbeErrorKind = "refused"
-				return nil, r, errLCUProbeFailed
-			default:
-				r.ProcessCount = 1
-				r.Result = "probe-failed"
-				r.PortOpen = true
-				r.PortOpenAt = now
-				r.ProbeErrorKind = "no-summoner"
-				return client, r, errLCUProbeFailed
+		if fmt.Sprint(delays) != fmt.Sprint([]time.Duration{time.Second, time.Second, time.Second, time.Second, 500 * time.Millisecond}) {
+			t.Fatal(delays)
+		}
+		events := r175Events(t, a, "client_cold_launch_timeline")
+		if len(events) != 1 {
+			t.Fatal(events)
+		}
+		for _, name := range coldLaunchMilestones {
+			if _, ok := events[0][name]; !ok {
+				t.Fatal(name, events)
 			}
-		},
-		identity: func(c *LCUClient) bool {
-			at := <-eventAt
-			if time.Since(at) > 100*time.Millisecond {
-				t.Error("event delayed", time.Since(at))
-			}
-			c.mu.RLock()
-			seed := c.discoverySummoner
-			c.mu.RUnlock()
-			if seed == nil || seed.SummonerID != 44 {
-				t.Error(seed)
-			}
-			return true
-		},
-		session: func(context.Context, *LCUClient) error {
-			a.observeColdLaunchMilestone("overview_first_card_ms", time.Now())
-			a.observeColdLaunchMilestone("overlay_hidden_ms", time.Now())
-			a.observeColdLaunchMilestone("overlay_hidden_ms", time.Now())
-			cancel()
-			return nil
-		},
-		wait: func(_ context.Context, d time.Duration) bool { delays = append(delays, d); return true },
+		}
+		if events[0]["client_running_at_app_start"] != false || events[0]["process_ms"] != float64(0) || events[0]["summoner_ready_ms"].(float64) < 0 {
+			t.Fatal(events)
+		}
 	})
-	if fmt.Sprint(delays) != fmt.Sprint([]time.Duration{time.Second, time.Second, time.Second, time.Second, 500 * time.Millisecond}) {
-		t.Fatal(delays)
-	}
-	events := r175Events(t, a, "client_cold_launch_timeline")
-	if len(events) != 1 {
-		t.Fatal(events)
-	}
-	for _, name := range coldLaunchMilestones {
-		if _, ok := events[0][name]; !ok {
-			t.Fatal(name, events)
-		}
-	}
-	if events[0]["client_running_at_app_start"] != false || events[0]["process_ms"] != float64(0) || events[0]["summoner_ready_ms"].(float64) < 0 {
-		t.Fatal(events)
-	}
 }
 func TestR244OverviewParallelAndEarlyMatches(t *testing.T) {
-	a, _, _ := newGameplayOverviewSGPFixture(t, true)
-	a.summoner.PUUID = strings.Repeat("o", 48)
-	started := time.Now()
-	phases := newOverviewPhaseTimings(started)
-	old := a.sgp.http.Transport
-	var count atomic.Int32
-	a.sgp.http.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if strings.Contains(r.URL.Path, "/match-history-query/") {
-			count.Add(1)
-			time.Sleep(500 * time.Millisecond)
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		a, _, _ := newGameplayOverviewSGPFixture(t, true)
+		a.summoner.PUUID = strings.Repeat("o", 48)
+
+		started := time.Now()
+		phases := newOverviewPhaseTimings(started)
+		old := a.sgp.http.Transport
+		var count atomic.Int32
+		a.sgp.http.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			if strings.Contains(r.URL.Path, "/match-history-query/") {
+				count.Add(1)
+				time.Sleep(500 * time.Millisecond)
+			}
+			return old.RoundTrip(r)
+		})
+		var progressAt time.Time
+		var firstCardRequests int32
+		ctx := context.WithValue(context.Background(), overviewPhasesContextKey{}, phases)
+		ctx = context.WithValue(ctx, localOverviewProgressKey{}, func(partial gameplayOverview) {
+			progressAt = time.Now()
+			firstCardRequests = count.Load()
+			if len(partial.Matches) == 0 || strings.Contains(partial.Player.PlayerRef, a.summoner.PUUID) {
+				t.Error("bad early page", partial)
+			}
+		})
+		response := a.loadGameplayOverview(ctx, a.lcu, a.summoner, gameplayReference{}, 0, 20, "all", false)
+		elapsed := time.Since(started)
+		if progressAt.IsZero() || len(response.Matches) == 0 || firstCardRequests != 1 || r287TooSlow(r287Context, t, "backend/r244_test.go:335 duration", elapsed, 800*time.Millisecond, true) {
+			t.Fatal(elapsed, progressAt, firstCardRequests, count.Load())
 		}
-		return old.RoundTrip(r)
-	})
-	var progressAt time.Time
-	var firstCardRequests int32
-	ctx := context.WithValue(context.Background(), overviewPhasesContextKey{}, phases)
-	ctx = context.WithValue(ctx, localOverviewProgressKey{}, func(partial gameplayOverview) {
-		progressAt = time.Now()
-		firstCardRequests = count.Load()
-		if len(partial.Matches) == 0 || strings.Contains(partial.Player.PlayerRef, a.summoner.PUUID) {
-			t.Error("bad early page", partial)
+		snapshot := phases.snapshot(time.Now())
+		spans := snapshot["spans"].(map[string][][2]int64)
+		if spans["recent_ranked"][0][0] > spans["detailed_matches"][0][0]+50 {
+			t.Fatal(snapshot)
 		}
 	})
-	response := a.loadGameplayOverview(ctx, a.lcu, a.summoner, gameplayReference{}, 0, 20, "all", false)
-	elapsed := time.Since(started)
-	if elapsed >= 800*time.Millisecond || progressAt.IsZero() || len(response.Matches) == 0 || firstCardRequests != 1 {
-		t.Fatal(elapsed, progressAt, firstCardRequests, count.Load())
-	}
-	snapshot := phases.snapshot(time.Now())
-	spans := snapshot["spans"].(map[string][][2]int64)
-	if spans["recent_ranked"][0][0] > spans["detailed_matches"][0][0]+50 {
-		t.Fatal(snapshot)
-	}
 }
 func TestR244OverviewProgressDoesNotMutateAggregation(t *testing.T) {
 	a, _, _ := newGameplayOverviewSGPFixture(t, true)

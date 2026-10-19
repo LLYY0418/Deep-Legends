@@ -104,9 +104,14 @@ func TestR68HonorContinuationFiresCanceledPlayAgainExactlyOnce(t *testing.T) {
 	runner.champSelect.phase = "EndOfGame"
 	runner.handleHonor(client, json.RawMessage(`{"eligiblePlayers":[]}`), Summoner{}, watchHonorRule{Enabled: true, Strategy: "abstain"})
 	waitForWatchDiagnostic(t, diagnostics, "play-again", "canceled")
-	select {
-	case <-playAgain:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "backend/r68_test.go:107 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-playAgain:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("deferred play-again was swallowed by markRun")
 	}
 	select {
@@ -518,9 +523,14 @@ func TestR68PositionBroadcastModesTeamLookupAndRetryGate(t *testing.T) {
 	runner.handleChampSelect(client, Summoner{})
 	waitForWatchDiagnostic(t, diagnostics, "position-broadcast", "skipped_no_bench")
 	runner.handleChampSelect(client, Summoner{})
-	select {
-	case <-message:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "backend/r68_test.go:521 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-message:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("second ready champ-select frame was blocked by first-frame gate")
 	}
 }

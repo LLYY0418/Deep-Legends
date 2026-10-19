@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -263,6 +264,7 @@ func TestR122SGPMatchHistoryEventCarriesAutofillCounts(t *testing.T) {
 // 第 3 层：sgp_summary_history_succeeded 也带这三个键，且数值与详情页事件一致。
 // 变异：删掉窗口事件的合并循环、或把它的实参换成零值汇总 → 本测试 FAIL。
 func TestR122SGPSummaryHistoryEventCarriesAutofillCounts(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	if autofillLabelGate {
 		t.Fatal("本用例必须在标签总开关关闭的前提下运行")
 	}
@@ -326,9 +328,17 @@ func TestR122SGPSummaryHistoryEventCarriesAutofillCounts(t *testing.T) {
 		result <- a.loadGameplayOverview(context.Background(), client, a.summoner, gameplayReference{PlayerRef: playerRef, ServerID: "HN1"}, 0, 20, "all", false)
 	}()
 	var overview gameplayOverview
-	select {
-	case overview = <-result:
-	case <-time.After(30 * time.Second):
+	if !r287WaitSelect(t, "backend/r122_autofill_diagnostic_test.go:329 wait", 30*time.Second, func(r287Deadline <-chan time.Time) bool {
+		r287CaptureMu.Lock()
+		defer r287CaptureMu.Unlock()
+		select {
+		case r287Value := <-result:
+			overview = r287Value
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("loadGameplayOverview 未在 30 秒内返回")
 	}
 	// 前置条件必须真的成立：三场都是 CUSTOM_GAME，会被 isCustomGameplayMatch

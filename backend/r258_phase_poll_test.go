@@ -25,9 +25,14 @@ func TestR258ChampSelectTickerOnlyInConfirmedLivePhase(t *testing.T) {
 	if !poll.sync(a, client) || poll.ticker == nil {
 		t.Fatal("selection ticker absent")
 	}
-	select {
-	case <-poll.ticks:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r258_phase_poll_test.go:28 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-poll.ticks:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("active selection never ticks")
 	}
 	original := poll.ticker

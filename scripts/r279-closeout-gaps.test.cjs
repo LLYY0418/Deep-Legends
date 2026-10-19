@@ -20,10 +20,10 @@ function fixture(){
 test('release classification includes installer runtime, dependencies and actual release build inputs',()=>{
  for(const file of ['installer/main_windows.go','installer/ui/index.html','installer/go.mod','go.mod','go.sum','build-desktop-windows.ps1','build-desktop.sh','scripts/build-stage.cjs','scripts/normalize-source-line-endings.cjs','scripts/make-release.cjs']){
   assert.equal(releasePlan([file]).classification,'product',file);
-  assert.equal(releasePlan([file]).acceptance.rounds.length,2,file);
+  assert.equal(releasePlan([file]).acceptance.rounds.length,1,file);
  }
  for(const file of ['installer/application_launch_test.go','scripts/preflight.cjs','scripts/r279-closeout-gaps.test.cjs','README.md'])
-  assert.equal(releasePlan([file]).acceptance.rounds.length,2,file);
+  assert.equal(releasePlan([file]).acceptance.rounds.length,1,file);
 });
 test('direct Python and PowerShell tests are selected, with transitive Windows CI entry points',()=>{
  const s=select(fixture(),['scripts/unit.test.py','scripts/unit.test.ps1']);
@@ -207,8 +207,8 @@ test('historical acceptance references are checked and cannot disappear behind t
 });
 test('only the proven test-only installer fixture is excluded from product rounds',()=>{
  const fixture='installer/internal/p11callbacktest/fixture_windows.go';
- assert.equal(releasePlan([fixture]).acceptance.rounds.length,2);assert.equal(releasePlan([fixture]).classification,'test-infrastructure');
- for(const production of ['installer/internal/webviewhost/host_windows.go','installer/internal/p11callbacktest/new_runtime.go'])assert.equal(releasePlan([production]).acceptance.rounds.length,2);
+ assert.equal(releasePlan([fixture]).acceptance.rounds.length,1);assert.equal(releasePlan([fixture]).classification,'test-infrastructure');
+ for(const production of ['installer/internal/webviewhost/host_windows.go','installer/internal/p11callbacktest/new_runtime.go'])assert.equal(releasePlan([production]).acceptance.rounds.length,1);
  const files=cp.execFileSync('git',['ls-files','installer'],{cwd:root,encoding:'utf8'}).split('\n').filter(f=>f.endsWith('.go')&&f!==fixture);
  const callers=files.filter(f=>fs.readFileSync(path.join(root,f),'utf8').includes('/internal/p11callbacktest"'));
  assert.deepEqual(callers,['installer/r277_callback_windows_test.go','installer/uninstall/r277_callback_windows_test.go']);

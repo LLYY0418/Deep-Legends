@@ -65,7 +65,7 @@ class Proof:
         if not selected:
             raise RuntimeError('empty Go test selection: ' + label)
         with log.open('w', encoding="utf-8") as stdout, stderr.open('w', encoding="utf-8") as errors:
-            process = subprocess.run(command, cwd=self.root, env=self.env, stdout=stdout, stderr=errors, timeout=self.timeout)
+            process = subprocess.run(command, cwd=self.root, env={**self.env,"R287_MUTATION_PATH":"1" if expected_fail else "0"}, stdout=stdout, stderr=errors, timeout=self.timeout)
         events = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
         terminal = {row['Test']: row['Action'] for row in events if row.get('Test') and row['Action'] in {'pass', 'fail', 'skip'}}
         elapsed = {row['Test']: row.get('Elapsed') for row in events if row.get('Test') and row['Action'] in {'pass', 'fail', 'skip'}}

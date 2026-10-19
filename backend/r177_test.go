@@ -104,24 +104,28 @@ func TestR177StarterForegroundReserve(t *testing.T) {
 }
 
 func TestR177StarterFullQuotaHasRetryWithoutFailureCooldown(t *testing.T) {
-	a, calls := r177StarterApp(t, 100, 200)
-	started := time.Now()
-	response := r177StarterRequest(t, a, 1, 2)
-	if time.Since(started) >= 6*time.Second {
-		t.Fatal("queue bound exceeded")
-	}
-	var retry int
-	_ = json.Unmarshal(response["retryAfterSeconds"], &retry)
-	if retry != 60 || calls.Load() != 0 {
-		t.Fatalf("retry=%d calls=%d response=%s", retry, calls.Load(), response)
-	}
-	if len(a.riot.starterFailures) != 0 {
-		t.Fatal("rate limit entered match failure cooldown", a.riot.starterFailures)
-	}
-	events := r175Events(t, a, "rune_starter_batch")
-	if len(events) != 1 || events[0]["rows_requested"] != float64(2) || events[0]["success"] != float64(0) || events[0]["rate_limit"] != float64(2) || events[0]["other_failed"] != float64(0) || events[0]["retry_after_s"] != float64(60) {
-		t.Fatal("batch counts", events)
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		a, calls := r177StarterApp(t, 100, 200)
+
+		started := time.Now()
+		response := r177StarterRequest(t, a, 1, 2)
+		if r287TooSlow(r287Context, t, "backend/r177_test.go:110 duration", time.Since(started), 6*time.Second, true) {
+			t.Fatal("queue bound exceeded")
+		}
+		var retry int
+		_ = json.Unmarshal(response["retryAfterSeconds"], &retry)
+		if retry != 60 || calls.Load() != 0 {
+			t.Fatalf("retry=%d calls=%d response=%s", retry, calls.Load(), response)
+		}
+		if len(a.riot.starterFailures) != 0 {
+			t.Fatal("rate limit entered match failure cooldown", a.riot.starterFailures)
+		}
+		events := r175Events(t, a, "rune_starter_batch")
+		if len(events) != 1 || events[0]["rows_requested"] != float64(2) || events[0]["success"] != float64(0) || events[0]["rate_limit"] != float64(2) || events[0]["other_failed"] != float64(0) || events[0]["retry_after_s"] != float64(60) {
+			t.Fatal("batch counts", events)
+		}
+	})
 }
 
 func TestR177StarterOtherErrorsKeepCooldown(t *testing.T) {

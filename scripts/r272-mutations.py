@@ -6,7 +6,7 @@ import runpy
 _proof=runpy.run_path(str(ROOT/'scripts/mutation-source-proof.py'));_snapshot=_proof['snapshot'](ROOT)
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);args=p.parse_args();args.out=args.out.resolve();args.out.mkdir(parents=True,exist_ok=True);rows=[]
 def run(name,command,env=None,negative=False):
- started=time.monotonic();result=subprocess.run(command,cwd=ROOT,env={**os.environ,**(env or {})},capture_output=True,text=True,timeout=120)
+ started=time.monotonic();result=subprocess.run(command,cwd=ROOT,env={**os.environ,**(env or {}),'R287_MUTATION_PATH':'1' if negative else '0'},capture_output=True,text=True,timeout=120)
  log=result.stdout+result.stderr;(args.out/(name+'.log')).write_text(log)
  ok=result.returncode!=0 and any(s in log for s in ['--- FAIL:','AssertionError']) and not any(s in log for s in ['build failed','SyntaxError','ReferenceError','TypeError','ENOENT']) if negative else result.returncode==0
  rows.append(dict(name=name,negative=negative,exitCode=result.returncode,assertionVerified=ok,seconds=round(time.monotonic()-started,3)))

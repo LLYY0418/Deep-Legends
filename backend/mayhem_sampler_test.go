@@ -87,9 +87,14 @@ func TestR136MayhemSamplerStopsWhenGameflowLeaves(t *testing.T) {
 		return false
 	}
 	a.startMayhemSampler(client, 13603, "InProgress")
-	select {
-	case <-waiting:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "backend/mayhem_sampler_test.go:90 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-waiting:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("sampler did not start")
 	}
 	a.stopMayhemSamplerForClient("gameflow-left", client)
@@ -111,9 +116,14 @@ func TestR136MayhemSamplerIsSingletonPerGame(t *testing.T) {
 	a.liveClientPlayerList = func(context.Context) ([]byte, int, error) { return nil, 0, syscall.ECONNREFUSED }
 	a.mayhemSamplerWait = func(ctx context.Context, _ time.Duration) bool { <-ctx.Done(); return false }
 	a.startMayhemSampler(client, 13604, "InProgress")
-	select {
-	case <-calls:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "backend/mayhem_sampler_test.go:114 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-calls:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("sampler did not start")
 	}
 	a.startMayhemSampler(client, 13604, "Reconnect")

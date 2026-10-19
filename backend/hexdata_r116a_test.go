@@ -680,7 +680,9 @@ func TestR148MayhemDetailRunsHeroAndAggregatesConcurrently(t *testing.T) {
 	})
 	done := make(chan error, 1)
 	go func() { _, err := provider.loadMayhemDetail(context.Background(), "157"); done <- err }()
-	deadline := time.After(3 * time.Second)
+	deadlineR287Timing := r287NewDeadline(t, "backend/hexdata_r116a_test.go:683 deadline", 3*time.Second)
+	defer deadlineR287Timing.Stop()
+	deadline := deadlineR287Timing.C
 	for entered.Load() < 3 {
 		select {
 		case err := <-done:
@@ -693,6 +695,7 @@ func TestR148MayhemDetailRunsHeroAndAggregatesConcurrently(t *testing.T) {
 			time.Sleep(time.Millisecond)
 		}
 	}
+	deadlineR287Timing.Stop()
 	close(release)
 	if err := <-done; err != nil {
 		t.Fatal(err)

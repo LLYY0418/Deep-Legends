@@ -6,10 +6,11 @@ const modes=['contracts','frontend-mutants','build-browser','browser','browser-m
 function parse(args){
  const options={};
  const mode=args.shift();assert(modes.includes(mode),`mode must be one of ${modes.join(', ')}`);
- while(args.length){const key=args.shift();assert(['--out','--backend'].includes(key),`unknown option ${key}`);assert(args.length&&!options[key],`missing/duplicate ${key}`);options[key]=path.resolve(args.shift());}
+ while(args.length){const key=args.shift();assert(['--out','--backend','--shard'].includes(key),`unknown option ${key}`);assert(args.length&&!options[key],`missing/duplicate ${key}`);options[key]=key==='--shard'?args.shift():path.resolve(args.shift());}
  assert(options['--out'],'--out is required');
  if(mode.includes('browser'))assert(options['--backend'],'--backend is required');
- return {mode,out:options['--out'],backend:options['--backend']};
+ if(options['--shard'])assert(mode==='browser-mutants'&&/^[123]$/.test(options['--shard']),'shard must be 1, 2 or 3 for browser-mutants');
+ return {mode,out:options['--out'],backend:options['--backend'],shard:options['--shard']};
 }
 function chrome(env){
  const candidates=[env.CHROME_BIN];
@@ -22,8 +23,14 @@ function browserMutationCommand(){
  assert(fs.readFileSync(file,'utf8').includes('process.env.R277_REPORT_DIR'),'native mutation output support required');
  return [file];
 }
+function browserMutationIds(shard){
+ const ids=[...fs.readFileSync(browserMutationCommand()[0],'utf8').matchAll(/\['(p\d+-[^']+)'/g)].map(m=>m[1]);
+ assert.equal(new Set(ids).size,ids.length);assert(ids.length>0);
+ if(shard!==undefined)assert(/^[123]$/.test(String(shard)),'invalid browser mutation shard');
+ return shard===undefined?ids:ids.filter((_,i)=>i%3===Number(shard)-1);
+}
 async function main(args){
- const {mode,out,backend}=parse([...args]);fs.mkdirSync(out,{recursive:true});
+ const {mode,out,backend,shard}=parse([...args]);fs.mkdirSync(out,{recursive:true});
  const scratch=process.env.PI_SCRATCH_DIR||process.env.RUNNER_TEMP||os.tmpdir();
  if(backend){const relative=path.relative(path.resolve(scratch),backend);assert(relative&&!relative.startsWith('..')&&!path.isAbsolute(relative),'browser executable must be scratch-owned, never a released installer');}
  const env={...process.env,PI_SCRATCH_DIR:scratch,GOCACHE:path.join(scratch,'r277-browser-gocache'),R277_REPORT_DIR:out,R277_MEASURE_ONLY:'0'};
@@ -50,7 +57,8 @@ async function main(args){
     result.runs.push({label:'strict-browser',exit:child.exit,progress:child.progress});persist();assert.equal(child.exit,0,'strict-browser failed; original log retained');
    }else if(mode==='deferred-browser'){env.R277_DEFERRED_REPORT_DIR=out;run('deferred-browser',process.execPath,['scripts/r277-deferred-assets-proof.cjs','browser']);}
    else {
-    const command=browserMutationCommand(),source=fs.readFileSync(command[0],'utf8'),ids=[...source.matchAll(/\['(p\d+-[^']+)'/g)].map(match=>match[1]);
+    const command=browserMutationCommand(),ids=browserMutationIds(shard);
+    env.R287_BROWSER_MUTANTS=ids.join(',');result.mutantIds=ids;
     let child;
     try{child=await require('./lib/progress-child.cjs').runProgressChild({command:process.execPath,args:command,cwd:root,env,directory:out,logFile:path.join(out,'browser-mutants.log'),ids});}
     catch(error){result.runs.push({label:'browser-mutants',command:[process.execPath,...command],exit:null,error:error.message,progress:error.progressSnapshot});persist();throw error;}
@@ -66,5 +74,5 @@ async function main(args){
   persist();
  }
 }
-module.exports={parse,chrome,browserMutationCommand};
+module.exports={parse,chrome,browserMutationCommand,browserMutationIds};
 if(require.main===module)main(process.argv.slice(2)).catch(error=>{console.error(error.stack);process.exitCode=1;});

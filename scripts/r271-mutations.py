@@ -9,7 +9,7 @@ p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);p.ad
 def run(name,env=None,negative=False,cmd=None,target=None,assertion=None):
  t=time.monotonic()
  try:
-  r=subprocess.run(cmd or ['node','--test','--test-reporter=tap','backend/web/r271.test.cjs'],cwd=ROOT,env={**os.environ,**(env or {})},capture_output=True,text=True,timeout=180)
+  r=subprocess.run(cmd or ['node','--test','--test-reporter=tap','backend/web/r271.test.cjs'],cwd=ROOT,env={**os.environ,**(env or {}),'R287_MUTATION_PATH':'1' if negative else '0'},capture_output=True,text=True,timeout=180)
   log=r.stdout+r.stderr
  except subprocess.TimeoutExpired as error:
   from types import SimpleNamespace

@@ -53,12 +53,17 @@ func TestR285ReconnectHTTPAndPhaseConfirmation(t *testing.T) {
 					status = 0
 				}
 			}
-			select {
-			case d := <-f.decisions:
-				if d["outcome"] != want || d["confirmed_by"] != by || d["http_status"] != status {
-					t.Fatalf("%s decision=%v", kind, d)
+			if !r287WaitSelect(t, "backend/r285_reconnect_test.go:56 wait", 7*time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case d := <-f.decisions:
+					if d["outcome"] != want || d["confirmed_by"] != by || d["http_status"] != status {
+						t.Fatalf("%s decision=%v", kind, d)
+					}
+					return true
+				case <-r287Deadline:
+					return false
 				}
-			case <-time.After(7 * time.Second):
+			}) {
 				t.Fatal("missing bounded decision")
 			}
 			if f.posts.Load() != 1 {

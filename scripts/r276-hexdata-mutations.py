@@ -1,3 +1,4 @@
+import os
 """Restart barrier mutants execute assertions via overlays; no checkout edits."""
 import argparse,hashlib,json,subprocess,tempfile,time
 from pathlib import Path
@@ -7,7 +8,7 @@ rows=[]
 def run(name,overlay=None,pattern='^TestR276HexdataRestartWaitsForStateAndUsesDisk$'):
     command=['go','test','-race','./backend','-count=1','-run',pattern]
     if overlay:command.insert(2,'-overlay='+str(overlay))
-    start=time.monotonic();r=subprocess.run(command,cwd=root,capture_output=True,text=True);log=r.stdout+r.stderr;(a.out/(name+'.log')).write_text(log)
+    start=time.monotonic();r=subprocess.run(command,cwd=root,env={**os.environ,"R287_MUTATION_PATH":"1" if overlay else "0"},capture_output=True,text=True);log=r.stdout+r.stderr;(a.out/(name+'.log')).write_text(log)
     signature='restart barrier returned while state writer gate was closed' if name=='state-owner-omitted' else 'hexdata-state.json was deleted by the prune' if name=='prune-state-owner-omitted' else 'restart made 1 additional same-hero requests'
     ok=(r.returncode!=0 and signature in log and '--- FAIL:' in log) if overlay else r.returncode==0
     rows.append({'name':name,'exitCode':r.returncode,'assertionVerified':ok,'seconds':time.monotonic()-start});(a.out/'result.json').write_text(json.dumps(rows,indent=2)+'\n');print(json.dumps(rows[-1]),flush=True);assert ok,name

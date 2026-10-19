@@ -50,39 +50,48 @@ func TestR86ConnectionBackoffResetsAfterSuccessfulDiscovery(t *testing.T) {
 }
 
 func TestR86ManualDisconnectPausesDiscoveryUntilRefresh(t *testing.T) {
-	a := &app{manualDisconnected: true, refreshRequests: make(chan struct{}, 1)}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	called := make(chan struct{}, 1)
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		a.runConnectionManagerWith(ctx, connectionLoopOps{
-			discover: func() (*LCUClient, LCUDiscoveryStatus, error) {
-				called <- struct{}{}
-				cancel()
-				return nil, LCUDiscoveryStatus{}, errLCUNotFound
-			},
-			wait: func(context.Context, time.Duration) bool { return false },
-		})
-	}()
-	select {
-	case <-called:
-		t.Fatal("discovered while paused")
-	case <-time.After(30 * time.Millisecond):
-	}
-	a.requestRefresh()
-	select {
-	case <-called:
-	case <-time.After(time.Second):
-		t.Fatal("refresh did not resume discovery")
-	}
-	<-done
-	a.refreshRequests <- struct{}{}
-	start := time.Now()
-	if !a.waitForDiscovery(context.Background(), time.Hour) || time.Since(start) > 100*time.Millisecond {
-		t.Fatal("refresh did not wake long backoff")
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		a := &app{manualDisconnected: true, refreshRequests: make(chan struct{}, 1)}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		called := make(chan struct{}, 1)
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			a.runConnectionManagerWith(ctx, connectionLoopOps{
+				discover: func() (*LCUClient, LCUDiscoveryStatus, error) {
+					called <- struct{}{}
+					cancel()
+					return nil, LCUDiscoveryStatus{}, errLCUNotFound
+				},
+				wait: func(context.Context, time.Duration) bool { return false },
+			})
+		}()
+		select {
+		case <-called:
+			t.Fatal("discovered while paused")
+		case <-time.After(30 * time.Millisecond):
+		}
+		a.requestRefresh()
+		if !r287WaitSelect(t, "backend/connection_manager_test.go:75 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-called:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
+			t.Fatal("refresh did not resume discovery")
+		}
+		<-done
+
+		a.refreshRequests <- struct{}{}
+		start := time.Now()
+		if !a.waitForDiscovery(context.Background(), time.Hour) || r287TooSlow(r287Context, t, "backend/connection_manager_test.go:85 duration", time.Since(start), 100*time.Millisecond, false) {
+			t.Fatal("refresh did not wake long backoff")
+		}
+	})
 }
 
 func TestR86WebsocketDropKeepsLiveLCUConnection(t *testing.T) {
@@ -125,18 +134,29 @@ func TestR86WebsocketDropKeepsLiveLCUConnection(t *testing.T) {
 	go func() { done <- a.runConnectedSession(ctx, client) }()
 	defer func() {
 		cancel()
-		select {
-		case <-done:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/connection_manager_test.go:137 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-done:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Error("session failed to stop")
 		}
 	}()
-	select {
-	case <-reconnected:
-	case err := <-done:
-		done <- err
-		t.Fatalf("session stopped after WS-only drop: %v", err)
-	case <-time.After(8 * time.Second):
+	if !r287WaitSelect(t, "backend/connection_manager_test.go:134 wait", 8*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-reconnected:
+			return true
+		case err := <-done:
+			done <- err
+			t.Fatalf("session stopped after WS-only drop: %v", err)
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("event stream not retried")
 	}
 	a.mu.RLock()

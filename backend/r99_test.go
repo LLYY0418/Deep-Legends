@@ -353,21 +353,25 @@ func TestR99SeedAppearsMergesAndNeverLeaks(t *testing.T) {
 	}
 }
 func TestR99SeedRespectsQuotaBudget(t *testing.T) {
-	var calls atomic.Int32
-	p := r99SeedProvider(t, t.TempDir(), func(*http.Request) (*http.Response, error) { calls.Add(1); return nil, errors.New("must not request") })
-	p.limitSleep = func(context.Context, time.Duration) error {
-		t.Error("seed waited beyond queue budget")
-		return context.DeadlineExceeded
-	}
-	for i := 0; i < 15; i++ {
-		p.shortWindow = append(p.shortWindow, time.Now())
-	}
-	previous := []opggProTeam{{ID: 371, Members: []opggProMember{{Nickname: "Rookie", Summoners: []opggProAccount{{Source: "seed", PUUID: "fixture-stable", GameName: "Previous", TagLine: "KR1"}}}}}}
-	started := time.Now()
-	rows := (&app{riot: p}).loadProSeedAccounts(context.Background(), previous, []proSeedAccount{r102RookieSeed()})
-	if time.Since(started) > 300*time.Millisecond || calls.Load() != 0 || len(rows) != 1 || rows[0].Members[0].Summoners[0].GameName != "Previous" {
-		t.Fatal("quota blocked or lost snapshot")
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		var calls atomic.Int32
+		p := r99SeedProvider(t, t.TempDir(), func(*http.Request) (*http.Response, error) { calls.Add(1); return nil, errors.New("must not request") })
+		p.limitSleep = func(context.Context, time.Duration) error {
+			t.Error("seed waited beyond queue budget")
+			return context.DeadlineExceeded
+		}
+		for i := 0; i < 15; i++ {
+			p.shortWindow = append(p.shortWindow, time.Now())
+		}
+		previous := []opggProTeam{{ID: 371, Members: []opggProMember{{Nickname: "Rookie", Summoners: []opggProAccount{{Source: "seed", PUUID: "fixture-stable", GameName: "Previous", TagLine: "KR1"}}}}}}
+
+		started := time.Now()
+		rows := (&app{riot: p}).loadProSeedAccounts(context.Background(), previous, []proSeedAccount{r102RookieSeed()})
+		if calls.Load() != 0 || len(rows) != 1 || rows[0].Members[0].Summoners[0].GameName != "Previous" || r287TooSlow(r287Context, t, "backend/r99_test.go:368 duration", time.Since(started), 300*time.Millisecond, false) {
+			t.Fatal("quota blocked or lost snapshot")
+		}
+	})
 }
 func TestR99SeedSourceHasNoCopiedStableID(t *testing.T) {
 	source := os.Getenv("R99_SEED_SOURCE")

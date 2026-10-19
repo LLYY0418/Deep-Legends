@@ -78,32 +78,49 @@ func TestLCUEventStreamAcceptsMessageAboveOneMiB(t *testing.T) {
 		errorsSeen <- client.ListenEvents(ctx, func() { ready <- struct{}{} }, func(event LCUEvent) { events <- event })
 	}()
 
-	select {
-	case <-ready:
-	case err := <-errorsSeen:
-		t.Fatalf("event stream failed before ready: %v", err)
-	case <-time.After(3 * time.Second):
+	if !r287WaitSelect(t, "backend/lcu_events_test.go:81 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-ready:
+			return true
+		case err := <-errorsSeen:
+			t.Fatalf("event stream failed before ready: %v", err)
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("event stream did not become ready")
 	}
 	for _, want := range []string{"/test/large", "/test/after-large"} {
-		select {
-		case event := <-events:
-			if event.URI != want {
-				t.Fatalf("event URI = %q, want %q", event.URI, want)
+		if !r287WaitSelect(t, "backend/lcu_events_test.go:89 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case event := <-events:
+				if event.URI != want {
+					t.Fatalf("event URI = %q, want %q", event.URI, want)
+				}
+				return true
+			case err := <-errorsSeen:
+				t.Fatalf("event stream dropped while reading %q: %v", want, err)
+				return true
+			case <-r287Deadline:
+				return false
 			}
-		case err := <-errorsSeen:
-			t.Fatalf("event stream dropped while reading %q: %v", want, err)
-		case <-time.After(3 * time.Second):
+		}) {
 			t.Fatalf("timed out waiting for %q", want)
 		}
 	}
 	cancel()
-	select {
-	case err := <-errorsSeen:
-		if !errors.Is(err, context.Canceled) {
-			t.Fatalf("ListenEvents after cancel = %v", err)
+	if !r287WaitSelect(t, "backend/lcu_events_test.go:101 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case err := <-errorsSeen:
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("ListenEvents after cancel = %v", err)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(3 * time.Second):
+	}) {
 		t.Fatal("event stream did not stop after cancel")
 	}
 }
@@ -142,27 +159,38 @@ func TestLCUEventStreamReadLimitReportsRecentTopURIs(t *testing.T) {
 	go func() {
 		errorsSeen <- client.ListenEvents(t.Context(), nil, func(event LCUEvent) { events <- event })
 	}()
-	select {
-	case event := <-events:
-		if event.URI != "/lol-test/v1/recent-large" {
-			t.Fatalf("first event URI = %q", event.URI)
+	if !r287WaitSelect(t, "backend/lcu_events_test.go:145 wait", 5*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-events:
+			if event.URI != "/lol-test/v1/recent-large" {
+				t.Fatalf("first event URI = %q", event.URI)
+			}
+			return true
+		case err := <-errorsSeen:
+			t.Fatalf("stream failed before recording recent URI: %v", err)
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case err := <-errorsSeen:
-		t.Fatalf("stream failed before recording recent URI: %v", err)
-	case <-time.After(5 * time.Second):
+	}) {
 		t.Fatal("large event was not delivered")
 	}
-	select {
-	case err := <-errorsSeen:
-		dropped, oversize := eventStreamDropDiagnostics(err)
-		top, ok := dropped["top_uris"].([]lcuEventURIStat)
-		if eventStreamDropReason(err) != "read-limit" || !ok || len(top) == 0 || top[0].URI != "/lol-test/v1/recent-large" || top[0].LastBytes <= 1024*1024 {
-			t.Fatalf("read-limit diagnostics = dropped:%#v oversize:%#v err:%v", dropped, oversize, err)
+	if !r287WaitSelect(t, "backend/lcu_events_test.go:155 wait", 5*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case err := <-errorsSeen:
+			dropped, oversize := eventStreamDropDiagnostics(err)
+			top, ok := dropped["top_uris"].([]lcuEventURIStat)
+			if eventStreamDropReason(err) != "read-limit" || !ok || len(top) == 0 || top[0].URI != "/lol-test/v1/recent-large" || top[0].LastBytes <= 1024*1024 {
+				t.Fatalf("read-limit diagnostics = dropped:%#v oversize:%#v err:%v", dropped, oversize, err)
+			}
+			if oversize == nil || oversize["event"] != "lcu_event_stream_oversize" {
+				t.Fatalf("missing oversize event: %#v", oversize)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-		if oversize == nil || oversize["event"] != "lcu_event_stream_oversize" {
-			t.Fatalf("missing oversize event: %#v", oversize)
-		}
-	case <-time.After(5 * time.Second):
+	}) {
 		t.Fatal("oversized event did not trip the 8 MiB read limit")
 	}
 }

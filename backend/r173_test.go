@@ -94,9 +94,14 @@ func TestR173SpecialistListNeverWaitsForStarterTimeline(t *testing.T) {
 			a.handleGameplaySpecialistRunes(rec, httptest.NewRequest("GET", "/api/gameplay/specialist-runes?championId=64&position=mid", nil).WithContext(ctx))
 			close(done)
 		}()
-		select {
-		case <-done:
-		case <-time.After(2 * time.Second):
+		if !r287WaitSelect(t, "backend/r173_test.go:97 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-done:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("rune list waited for opening timeline")
 		}
 		if rec.Code != 200 {
@@ -127,9 +132,14 @@ func TestR173SpecialistListNeverWaitsForStarterTimeline(t *testing.T) {
 		a.handleGameplayRuneStarters(rec, httptest.NewRequest("POST", "/api/gameplay/rune-starters", strings.NewReader(string(body))))
 		close(done)
 	}()
-	select {
-	case <-started:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "backend/r173_test.go:130 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("second-stage timeline not requested")
 	}
 	list()
@@ -137,9 +147,14 @@ func TestR173SpecialistListNeverWaitsForStarterTimeline(t *testing.T) {
 		t.Fatal("opening consumed specialist list budget", budget.Load())
 	}
 	releaseTimeline()
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "backend/r173_test.go:140 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("starter response did not finish")
 	}
 	var result struct{ Starters []runeStarterRow }
@@ -283,9 +298,14 @@ func TestR173ProOpeningWorkersReserveForegroundSlot(t *testing.T) {
 		}(i)
 	}
 	for i := 0; i < 3; i++ {
-		select {
-		case <-started:
-		case <-time.After(2 * time.Second):
+		if !r287WaitSelect(t, "backend/r173_test.go:286 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-started:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("background slots failed to start")
 		}
 	}
@@ -349,9 +369,14 @@ func TestR173StartupUsesOnlyDiskProfilesThenPageRefreshes(t *testing.T) {
 	}
 	requestBody, _ := json.Marshal(map[string]any{"team": "all", "accounts": []string{proLadderAccountKey(account.GameName, account.TagLine)}, "manual": true})
 	a.handleProScopedRefresh(httptest.NewRecorder(), httptest.NewRequest("POST", "/api/pro-players/refresh", strings.NewReader(string(requestBody))))
-	select {
-	case <-profiles:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "R173 explicit visible profile refresh", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-profiles:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("explicit visible refresh did not fetch selected profile", requests.Load(), rec.Body.String())
 	}
 	mainSource, err := os.ReadFile("main.go")
@@ -429,9 +454,14 @@ func TestR173BackgroundTerminalAndOpeningShareThreeSlots(t *testing.T) {
 		}(i)
 	}
 	for i := 0; i < 3; i++ {
-		select {
-		case <-started:
-		case <-time.After(2 * time.Second):
+		if !r287WaitSelect(t, "backend/r173_test.go:427 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-started:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("existing background did not start")
 		}
 	}

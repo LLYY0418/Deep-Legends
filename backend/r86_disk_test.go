@@ -137,9 +137,14 @@ func TestR86ChampionDiskMigrationPruneAndThrottle(t *testing.T) {
 	done := c.pruneDone
 	c.pruneMu.Unlock()
 	if done != nil {
-		select {
-		case <-done:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/r86_disk_test.go:140 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-done:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("async prune stuck")
 		}
 	}

@@ -79,9 +79,14 @@ func r246Run(t *testing.T, m *licenseManager) {
 	go func() { defer close(stopped); m.Run(ctx) }()
 	t.Cleanup(func() {
 		cancel()
-		select {
-		case <-stopped:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/license_r246_test.go:82 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-stopped:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Error("license runner did not stop")
 		}
 	})

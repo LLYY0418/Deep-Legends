@@ -79,6 +79,7 @@ func TestExecuteWarmConfigDefaultsOffAndReadsBothFiles(t *testing.T) {
 }
 
 func TestExecuteWarmConfigExplicitOneRetainsExecutionAndBothReads(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	for _, outcome := range []string{"ok", "failed", "still_running"} {
 		t.Run(outcome, func(t *testing.T) {
 			unsetWarmEnvironment(t, "DEEP_LEGENDS_STARTUP_PREWARM")
@@ -121,10 +122,17 @@ func TestExecuteWarmConfigExplicitOneRetainsExecutionAndBothReads(t *testing.T) 
 			w.Poll(w.started.Add(400*time.Millisecond), finished)
 			seen := make(map[string]bool)
 			for range 2 {
-				select {
-				case target := <-entered:
-					seen[target.Path] = target.NodeMode
-				case <-time.After(time.Second):
+				if !r287WaitSelect(t, "installer/execute_warm_config_test.go:124 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+					r287CaptureMu.Lock()
+					defer r287CaptureMu.Unlock()
+					select {
+					case target := <-entered:
+						seen[target.Path] = target.NodeMode
+						return true
+					case <-r287Deadline:
+						return false
+					}
+				}) {
 					t.Fatal("explicit opt-in did not execute both files during NSIS")
 				}
 			}
@@ -150,19 +158,24 @@ func TestExecuteWarmConfigExplicitOneRetainsExecutionAndBothReads(t *testing.T) 
 				}, startupPrewarmBudget, func(int) {})
 				done <- completion{result, status}
 			}()
-			select {
-			case got := <-done:
-				valid := 0
-				if outcome == "ok" {
-					valid = 2
+			if !r287WaitSelect(t, "installer/execute_warm_config_test.go:153 wait", 500*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case got := <-done:
+					valid := 0
+					if outcome == "ok" {
+						valid = 2
+					}
+					if got.status.ExecuteValid != valid || len(got.status.Paths) != 2-valid {
+						t.Fatal("opt-in changed execution classification", got.status)
+					}
+					if !reflect.DeepEqual(reads, paths) || got.result.Files != 2 || got.result.Failures != 0 || got.result.TimedOut {
+						t.Fatal("execution outcome changed the two-file read warmup", reads, got.result)
+					}
+					return true
+				case <-r287Deadline:
+					return false
 				}
-				if got.status.ExecuteValid != valid || len(got.status.Paths) != 2-valid {
-					t.Fatal("opt-in changed execution classification", got.status)
-				}
-				if !reflect.DeepEqual(reads, paths) || got.result.Files != 2 || got.result.Failures != 0 || got.result.TimedOut {
-					t.Fatal("execution outcome changed the two-file read warmup", reads, got.result)
-				}
-			case <-time.After(500 * time.Millisecond):
+			}) {
 				releaseWarm()
 				<-done
 				t.Fatal("opt-in blocked read warmup on an execution process")

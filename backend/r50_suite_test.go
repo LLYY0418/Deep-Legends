@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -90,9 +91,14 @@ func TestWatchApplyCancelsPendingActionsWhenDisabled(t *testing.T) {
 	runner.mu.Unlock()
 	settings.MasterEnabled = false
 	runner.apply(settings)
-	select {
-	case <-ctx.Done():
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r50_suite_test.go:93 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-ctx.Done():
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("pending play-again was not canceled")
 	}
 	runner.mu.Lock()
@@ -137,6 +143,7 @@ func TestWatchReadFailuresBroadcastAndDoNotWrite(t *testing.T) {
 }
 
 func TestWatchEventsRouteSkipCelebrationAndInvitationPolicies(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	writes := make(chan string, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -172,10 +179,17 @@ func TestWatchEventsRouteSkipCelebrationAndInvitationPolicies(t *testing.T) {
 
 	seen := map[string]bool{}
 	for len(seen) < 3 {
-		select {
-		case path := <-writes:
-			seen[path] = true
-		case <-time.After(2 * time.Second):
+		if !r287WaitSelect(t, "backend/r50_suite_test.go:175 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+			r287CaptureMu.Lock()
+			defer r287CaptureMu.Unlock()
+			select {
+			case path := <-writes:
+				seen[path] = true
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatalf("timed out waiting for watch writes; seen=%#v", seen)
 		}
 	}
@@ -228,17 +242,27 @@ func TestWatchHonorEventNeverSelectsEnemy(t *testing.T) {
 		Data: json.RawMessage(`{"eligiblePlayers":[{"puuid":"enemy","isEnemy":true,"isAlly":false},{"puuid":"ally","isEnemy":false,"isAlly":true}]}`),
 	}, Summoner{PUUID: "self"})
 
-	select {
-	case recipient := <-recipients:
-		if recipient != "ally" {
-			t.Fatalf("honor recipient = %q, want ally", recipient)
+	if !r287WaitSelect(t, "backend/r50_suite_test.go:231 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case recipient := <-recipients:
+			if recipient != "ally" {
+				t.Fatalf("honor recipient = %q, want ally", recipient)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(2 * time.Second):
+	}) {
 		t.Fatal("timed out waiting for honor request")
 	}
-	select {
-	case <-ballots:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "backend/r50_suite_test.go:239 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-ballots:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("timed out waiting for honor ballot completion")
 	}
 }

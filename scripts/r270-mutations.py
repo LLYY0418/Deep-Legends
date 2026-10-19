@@ -4,7 +4,7 @@ root=pathlib.Path(__file__).resolve().parents[1];out=pathlib.Path(args.out).reso
 import runpy
 _proof=runpy.run_path(str(root/'scripts/mutation-source-proof.py'));_snapshot=_proof['snapshot'](root)
 def run(name,command,extra,negative,signature=None):
-    env=dict(os.environ,RIOT_API_KEY='RGAPI-00000000-0000-0000-0000-000000000000',**extra);start=time.monotonic()
+    env=dict(os.environ,RIOT_API_KEY='RGAPI-00000000-0000-0000-0000-000000000000',**extra, R287_MUTATION_PATH='1' if negative else '0');start=time.monotonic()
     result=subprocess.run(command,cwd=root,env=env,capture_output=True,text=True,timeout=180);log=result.stdout+result.stderr;(out/(name+'.log')).write_text(log)
     verified=result.returncode==0 if not negative else result.returncode==1 and signature in log and 'SyntaxError' not in log
     row=dict(name=name,negative=negative,exitCode=result.returncode,assertionVerified=verified,seconds=round(time.monotonic()-start,3));rows.append(row);(out/'result.json').write_text(json.dumps(rows,indent=2)+'\n');assert verified,row

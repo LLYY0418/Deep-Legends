@@ -13,6 +13,7 @@ import (
 )
 
 func TestFinalDirectoryReadsBothFilesForEveryExecutionOutcome(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	for _, outcome := range []string{"ok", "mixed", "failed", "still_running", "timeout", "voided", "missing", "not_started", "no_manager", "read_error"} {
 		t.Run(outcome, func(t *testing.T) {
 			entered, release := make(chan struct{}, 2), make(chan struct{})
@@ -47,16 +48,26 @@ func TestFinalDirectoryReadsBothFilesForEveryExecutionOutcome(t *testing.T) {
 					attempts = 1
 				}
 				for range attempts {
-					select {
-					case <-entered:
-					case <-time.After(time.Second):
+					if !r287WaitSelect(t, "installer/prewarm_completion_test.go:50 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+						select {
+						case <-entered:
+							return true
+						case <-r287Deadline:
+							return false
+						}
+					}) {
 						t.Fatal("execution did not start")
 					}
 				}
 				if outcome == "timeout" {
-					select {
-					case <-w.ctx.Done():
-					case <-time.After(time.Second):
+					if !r287WaitSelect(t, "installer/prewarm_completion_test.go:57 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+						select {
+						case <-w.ctx.Done():
+							return true
+						case <-r287Deadline:
+							return false
+						}
+					}) {
 						t.Fatal("execution budget ignored")
 					}
 				}
@@ -94,9 +105,17 @@ func TestFinalDirectoryReadsBothFilesForEveryExecutionOutcome(t *testing.T) {
 				done <- completed{result, status}
 			}()
 			var got completed
-			select {
-			case got = <-done:
-			case <-time.After(500 * time.Millisecond):
+			if !r287WaitSelect(t, "installer/prewarm_completion_test.go:97 wait", 500*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+				r287CaptureMu.Lock()
+				defer r287CaptureMu.Unlock()
+				select {
+				case r287Value := <-done:
+					got = r287Value
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				releaseOnce()
 				<-done
 				t.Fatal("reads or Finish waited for execution")
@@ -129,6 +148,7 @@ func TestFinalDirectoryReadsBothFilesForEveryExecutionOutcome(t *testing.T) {
 }
 
 func TestFinalDirectoryExecutionPathsAreExactlyInstalledPaths(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	directory := filepath.Join(t.TempDir(), "最终目录 Deep Legends")
 	paths := startupPrewarmPaths(directory)
 	started := make(chan warmTarget, 2)
@@ -147,16 +167,23 @@ func TestFinalDirectoryExecutionPathsAreExactlyInstalledPaths(t *testing.T) {
 	w.Poll(w.started.Add(400*time.Millisecond), finished)
 	got := map[string]bool{}
 	for range 2 {
-		select {
-		case target := <-started:
-			got[target.Path] = true
-			ctx, cancel := context.WithCancel(context.Background())
-			command := executeWarmCommand(ctx, target)
-			cancel()
-			if command.Path != target.Path || command.Dir != filepath.Dir(target.Path) {
-				t.Fatal("command redirected execution", command.Path, command.Dir)
+		if !r287WaitSelect(t, "installer/prewarm_completion_test.go:150 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			r287CaptureMu.Lock()
+			defer r287CaptureMu.Unlock()
+			select {
+			case target := <-started:
+				got[target.Path] = true
+				ctx, cancel := context.WithCancel(context.Background())
+				command := executeWarmCommand(ctx, target)
+				cancel()
+				if command.Path != target.Path || command.Dir != filepath.Dir(target.Path) {
+					t.Fatal("command redirected execution", command.Path, command.Dir)
+				}
+				return true
+			case <-r287Deadline:
+				return false
 			}
-		case <-time.After(time.Second):
+		}) {
 			t.Fatal("final execution did not start")
 		}
 	}
@@ -189,12 +216,17 @@ func TestFinalDirectoryUpgradeExecutesOnlyChangedFiles(t *testing.T) {
 	writeWarmFile(t, paths[0], "new installed executable")
 	w.Poll(w.started.Add(2*time.Second), finished)
 	w.Poll(w.started.Add(2400*time.Millisecond), finished)
-	select {
-	case path := <-entered:
-		if path != paths[0] {
-			t.Fatal(path)
+	if !r287WaitSelect(t, "installer/prewarm_completion_test.go:192 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case path := <-entered:
+			if path != paths[0] {
+				t.Fatal(path)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("changed executable did not start")
 	}
 	awaitWarmResult(t, &w.states[0])

@@ -78,7 +78,9 @@ test("R86 CI uses the package version, installs test dependencies and needs no p
   assert.match(windows, /--expected-tests=1 --test-name-pattern="setup-only Windows CI skip" scripts\/setup-only-build\.test\.cjs/);
   const release = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8");
   assert.match(release, /-Version \$env:RELEASE_VERSION -SkipTestsInCI/);
-  assert.match(release, /gh release create[^\n]+--draft/);
+  assert.match(release, /run: node scripts\/release-draft\.cjs create/);
+  const draft = fs.readFileSync(path.join(root, "scripts/release-draft.cjs"), "utf8");
+  assert.match(draft, /gh\(\['release','create',c.tag,[^\n]*'--draft'/);
   assert.ok(windows.indexOf("npm ci --prefix desktop") < windows.indexOf("./build-desktop-windows.ps1"));
   assert.match(fs.readFileSync(path.join(root, "build-desktop-windows.ps1"), "utf8"), /if \(-not \$Version\) \{ \$Version = \$package.version \}/);
   const retired = fs.readFileSync(path.join(root, "build-windows.ps1"), "utf8");

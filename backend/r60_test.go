@@ -31,6 +31,22 @@ func TestR60FacadeLCUEventsBroadcastOnlyForFacadePrefixes(t *testing.T) {
 			if got := a.handleFacadeLCUEvent(LCUEvent{URI: test.uri}); got != test.want {
 				t.Fatalf("handleFacadeLCUEvent(%q) = %v, want %v", test.uri, got, test.want)
 			}
+			if test.want {
+				if !r287WaitSelect(t, "R60 facade event", 20*time.Millisecond, func(deadline <-chan time.Time) bool {
+					select {
+					case event := <-events:
+						if event != "facade:changed" {
+							t.Fatalf("broadcast = %q, want facade:changed", event)
+						}
+						return true
+					case <-deadline:
+						return false
+					}
+				}) {
+					t.Fatal("facade URI did not broadcast facade:changed")
+				}
+				return
+			}
 			select {
 			case event := <-events:
 				if !test.want {
@@ -219,9 +235,14 @@ func TestR117FacadeChallengeCatalogRetriesAfterFailureAndSharesFlight(t *testing
 			results <- err
 		}()
 	}
-	select {
-	case <-started:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r60_test.go:222 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("challenge catalog request did not start")
 	}
 	select {

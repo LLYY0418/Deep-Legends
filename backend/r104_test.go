@@ -300,7 +300,8 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 		trace("foreground_returned")
 		result <- outcome{data, err}
 	}()
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := r287NewClockDeadline(t, "backend/r104_test.go:328 poll", 3*time.Second)
+	defer deadline.Stop()
 	for {
 		p.limitMu.Lock()
 		queued := len(p.limitQueue)
@@ -308,11 +309,12 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 		if queued >= 2 {
 			break
 		}
-		if time.Now().After(deadline) {
+		if !deadline.Pending() {
 			t.Fatal("foreground never queued")
 		}
 		time.Sleep(time.Millisecond)
 	}
+	deadline.Stop()
 	before := background.Load()
 	a.refreshProScope(map[string]opggProAccount{"pro-profile-v2|" + proLadderAccountKey(visible[1].GameName, visible[1].TagLine): visible[1]}, false)
 	if background.Load() != before {
@@ -321,12 +323,17 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 	release()
 	trace("foreground_fifo_released")
 	released = true
-	select {
-	case got := <-result:
-		if got.err != nil || len(got.data.Matches) != 20 {
-			t.Fatalf("foreground must finish 20/20 without throttling: %d %v", len(got.data.Matches), got.err)
+	if !r287WaitSelect(t, "backend/r104_test.go:347 wait", 5*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case got := <-result:
+			if got.err != nil || len(got.data.Matches) != 20 {
+				t.Fatalf("foreground must finish 20/20 without throttling: %d %v", len(got.data.Matches), got.err)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(5 * time.Second):
+	}) {
 		t.Fatal("foreground search stuck")
 	}
 	if background.Load() != before || foreground.Load() != 25 {

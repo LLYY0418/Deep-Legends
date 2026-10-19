@@ -241,9 +241,14 @@ func TestQQ101ProbeCooldownIsScopedByPatch(t *testing.T) {
 		}
 	})}
 	provider.startQQ101Probe(t.Context(), "ryze", 13, "emerald_plus", "mid")
-	select {
-	case <-events:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "backend/qq101_test.go:244 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-events:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("first QQ101 probe did not complete")
 	}
 	waitProbe := func() {
@@ -275,12 +280,17 @@ func TestQQ101ProbeCooldownIsScopedByPatch(t *testing.T) {
 	provider.cache = newChampionDataCache(nil)
 	version.Store("16.18")
 	provider.startQQ101Probe(t.Context(), "ryze", 13, "emerald_plus", "mid")
-	select {
-	case event := <-events:
-		if event["patch"] != "16.18" {
-			t.Fatalf("patch-scoped probe event = %#v", event)
+	if !r287WaitSelect(t, "backend/qq101_test.go:278 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-events:
+			if event["patch"] != "16.18" {
+				t.Fatalf("patch-scoped probe event = %#v", event)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(2 * time.Second):
+	}) {
 		t.Fatal("new QQ101 patch was incorrectly suppressed by the old cooldown")
 	}
 	if got := atomic.LoadInt32(&buildCalls); got != firstCalls+1 {
@@ -460,9 +470,10 @@ func TestStructuredDetailReportsBothItemDepthFailures(t *testing.T) {
 // 前面测试留下的 HTTP/2 空闲连接会自己收掉，不等就会把余波误报成泄漏。
 func r120SettledGoroutines(t *testing.T) int {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := r287NewClockDeadline(t, "backend/qq101_test.go:473 poll", 5*time.Second)
+	defer deadline.Stop()
 	previous, stable := -1, 0
-	for time.Now().Before(deadline) {
+	for deadline.Pending() {
 		now := runtime.NumGoroutine()
 		if now == previous {
 			if stable++; stable >= 5 {
@@ -474,6 +485,7 @@ func r120SettledGoroutines(t *testing.T) int {
 		previous = now
 		time.Sleep(20 * time.Millisecond)
 	}
+	deadline.Stop()
 	return runtime.NumGoroutine()
 }
 
@@ -533,13 +545,14 @@ func TestStructuredDetailQQ101TimeoutDoesNotLeakGoroutines(t *testing.T) {
 	if qq101Hits.Load() == 0 {
 		t.Fatal("QQ101 上游一次都没被命中，fixture 根本没走到超时路径")
 	}
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := r287NewClockDeadline(t, "backend/qq101_test.go:546 poll", 10*time.Second)
+	defer deadline.Stop()
 	for {
 		if now := runtime.NumGoroutine(); now <= baseline {
 			t.Logf("P2-1 无泄漏：baseline=%d now=%d qq101Hits=%d", baseline, now, qq101Hits.Load())
 			return
 		}
-		if time.Now().After(deadline) {
+		if !deadline.Pending() {
 			t.Fatalf("QQ101 超时路径泄漏了 goroutine：baseline=%d now=%d qq101Hits=%d（晚到的结果发进了 nil 通道）\n%s",
 				baseline, runtime.NumGoroutine(), qq101Hits.Load(), r120GoroutineDump())
 		}

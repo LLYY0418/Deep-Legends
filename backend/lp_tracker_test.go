@@ -858,15 +858,25 @@ func TestR182GameflowEventsStartThenSettlement(t *testing.T) {
 	defer func() {
 		finish()
 		cancel()
-		select {
-		case <-done:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/lp_tracker_test.go:861 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-done:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Error("session did not stop")
 		}
 	}()
-	select {
-	case <-started:
-	case <-time.After(3 * time.Second):
+	if !r287WaitSelect(t, "backend/lp_tracker_test.go:867 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("InProgress did not write a game-start baseline")
 	}
 	tracker.mu.Lock()
@@ -877,9 +887,14 @@ func TestR182GameflowEventsStartThenSettlement(t *testing.T) {
 	}
 	settled.Store(true)
 	finish()
-	select {
-	case <-recorded:
-	case <-time.After(3 * time.Second):
+	if !r287WaitSelect(t, "backend/lp_tracker_test.go:880 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-recorded:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("WaitingForStats did not record loss")
 	}
 	tracker.mu.Lock()
