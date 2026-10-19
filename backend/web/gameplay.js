@@ -2525,9 +2525,7 @@
   }
 
 
-  // 渲染期一旦抛异常（例如上游多出一个没预料到的字段形状），容器会永远停在
-  // 骨架屏上，用户只能看到“一直在加载”。这里兜住异常并切到可重试的错误态，
-  // 保证任何单点渲染故障都不会把整页锁死。
+  // Turn render exceptions into retryable errors rather than endless skeletons.
   function renderOverviewBody(container, tab) {
     window.reportFlowDiagnostic?.('overview_rerender_client','render',{reason:tab.overviewRenderReason || 'renderOverview',tabType:tab.current?'self':tabGroup(tab)==='pro' || tab.data?.player?.proPlayer?'pro':riotTab(tab)?'riot':'cn',filterRetained:Boolean(container.querySelector('.match-filterbar')),modalOpen:Boolean(tab.advancedMenu?.open)});
     if(tab.advancedMenu?.open && container._afBoundTab===tab){tab.overviewRenderDeferred=true;globalThis.deepLegendsHistoryFilters?.refresh(container,tab,advancedFilterContext(tab));return;}
@@ -4753,9 +4751,7 @@
               if (Number.isFinite(Number(value?.score))) playerScores.set(ref, Number(value.score));
             }
           } catch (_) {
-            // 一批失败不能连累另一批：只记下这批的人没拿到分数，其余批次照常回填。
-            // 之前用 Promise.all 整体 reject，会提前清掉全部 flight 占位，让还在跑的
-            // 那一批变成没人管的孤儿，重绘时又会重复发一次。
+            // Settle score batches independently; a failed batch must not clear other flights.
             batchFailed = true;
             for (const ref of batch.refs) failedRefs.add(ref);
           }
@@ -6636,10 +6632,7 @@
         gameId: target.scopeGameId || target.gameId, championId: target.championId,
         gameMode: target.gameMode, mapId: target.mapId, tier: target.tier, at: Date.now(),
       });
-      // R116-D：记住这份缓存是按哪个阵容算出来的。阵容一变（选人阶段逐个锁定、
-      // 或进入对局后拿到敌方 5 人）下一次轮询就会重新取，克制/协同提示才不会
-      // 停在旧阵容上。推荐缓存 key 的格式被 champions.test.cjs 钉死（不含阵容），
-      // 所以用这张旁表而不是改 key。
+      // R116-D: track roster provenance separately from stable recommendation keys.
       if (rosterSignature) state.liveRecommendationRosters?.set?.(targetKey, rosterSignature);
       state.liveRecommendationFailures.delete(targetKey);
       recordItemSetClientDiagnostic("live_recommendations_client", "received", {
@@ -6900,11 +6893,11 @@
     for (const row of nodes.liveContent.querySelectorAll(".specialist-game-row[data-rune-choice]")) {
       const config = byKey.get(row.dataset.runeChoice);
       if (!config?.starterItemIds?.length) continue;
-      const current = row.querySelector(".specialist-game-items");
+      const current = row.querySelector(".sg-items");
       if (!current) continue;
       const next = document.createElement("div");
       next.innerHTML = renderRuneEquipment(config);
-      const equipment = next.firstElementChild;
+      const equipment = next.querySelector(".sg-items");
       if (equipment) { current.replaceWith(equipment); prepareImages(equipment); }
     }
     rememberLiveRecommendationMarkup();
@@ -7071,9 +7064,7 @@
     if (nodes.liveContent._recommendationMarkup === markup && nodes.liveContent.querySelector("[data-live-body]")) {
       return;
     }
-    // R129 P2：markup 变了也先试按面板替换，只有外壳（提示条、页签行、面板数量
-    // 与顺序）真的变了才整块重建。队友战绩读完只会重绘隐藏的「详情」面板，用户
-    // 正在看的海克斯与出装面板里的图标节点保持不动。
+    // R129 P2: patch panels first; preserve visible icons unless the shell changes.
     if (updateLivePanels(markup)) {
       nodes.liveContent._recommendationMarkup = markup;
       return;
@@ -7948,9 +7939,7 @@
     return String(match?.championName || "").trim();
   }
 
-  // counterDelta / synergyDelta 是上游原值（0..1 的胜率差），换算成百分点展示；
-  // 符号由 direction 决定，不从 delta 自己的正负推断（上游 weakAgainst 的
-  // counterDelta 实测是正数，表示「对手那边」的胜率抬升）。
+  // Convert upstream deltas to percentage points; direction determines the sign.
   function liveDeltaPoints(value) {
     return (Math.abs(Number(value) || 0) * 100).toFixed(1);
   }
@@ -7964,9 +7953,7 @@
 
   function liveEvidenceSuffix(notice) {
     const evidence = String(notice?.evidence || "").trim();
-    // 评审 6.5：evidence/confidenceLow/confidenceHigh 必须透传。实测全部是
-    // "supported"，但上游若放宽阈值出现非显著项，这里必须明确降级，
-    // 不能把一个不显著的效果量当成结论展示。
+    // Keep evidence and confidence bounds so non-significant deltas can degrade.
     if (!evidence) return "上游未标注证据等级";
     if (evidence !== "supported") return `上游证据等级：${evidence}（未达显著性）`;
     return "";
@@ -8023,9 +8010,7 @@
     return `<span class="team-portrait-tags"${tooltip ? ` data-tooltip="${escapeHTML(tooltip)}" tabindex="0"` : ""}>${labels.map((label) => `<b class="team-portrait-tag" data-portrait-gap="${escapeHTML(String(label.key || ""))}">${escapeHTML(String(label.label))}</b>`).join("")}</span>`;
   }
 
-  // R116-D：签名多了第二个参数 payload（推荐数据）。champions.test.cjs 里两处
-  // 用 compileFunctions 单独编译本函数时只传一个参数，payload 因此是 undefined，
-  // 下面所有读取都走可选链 → 克制/协同/画像整块不渲染，既有断言一字不变。
+  // R116-D: payload is optional for legacy focused render callers.
   function renderLiveInsights(data, payload) {
     const seenPlayerKeys = new Set();
     let duplicatesDropped = 0;
@@ -8295,23 +8280,38 @@
 	  const opponentRank = opponentRankText
 	    ? `<span class="specialist-opponent-rank">${config.opponentTier ? rankCrestIcon(config.opponentTier) : ""}<small>${escapeHTML(opponentRankTitle)}${opponentRankTitle && opponentWinRate ? " · " : ""}${opponentWinRate ? `胜率 <b class="win-rate-value">${Math.round(Number(config.opponentWinRate))}%</b>` : ""}</small></span>`
 	    : "";
-      const items = renderRuneEquipment(config);
-      const skills = source === "pro" && config.build?.skillOrder?.length
-        ? `<section class="skill-plan build-summary-skill"><div class="skill-plan-head"><h3>技能加点</h3></div>${renderSkillPlan(config.build, liveRecommendationsFor(state.live)?.hero?.abilities || [])}</section>` : "";
-	      return `<div class="specialist-game-row ${tone}${selected ? " is-selected" : ""}" role="radio" aria-checked="${selected}" tabindex="0" data-rune-choice="${escapeHTML(choiceKey)}"><div class="specialist-game-head"><span class="specialist-game-choice"><span class="radio-mark" aria-hidden="true"></span>${championIcon}<span class="specialist-game-title"><strong>${escapeHTML(title)}</strong><span class="specialist-game-meta">${position ? `<span class="rune-position-tag">${escapeHTML(position)}</span>` : ""}${config.eventLabel ? `<span class="pro-event-label">${escapeHTML(config.eventLabel)}</span>` : ""}${config.winKnown === false ? '<span data-tooltip="该局胜负未获官方确认">胜负未确认</span>' : ""}</span></span></span><span class="specialist-opponent is-${tone.slice(3)}"><span class="specialist-result-dot" aria-hidden="true"></span>${config.opponentChampionId ? iconFigure("champion", config.opponentChampionId, opponentName, "small") : ""}<span class="specialist-opponent-copy"><b>${escapeHTML(opponentName)}</b><small>${escapeHTML(opponentPlayer)}</small></span>${opponentRank}</span></div><div class="specialist-game-content"><div class="specialist-game-runes">${renderUnifiedRuneBoard(config)}${items}${skills}${config.selectedComplete === false ? '<p class="pro-rune-status">属性碎片：上游未提供完整槽位；这套数据尚不完整，暂时不能应用。</p>' : ""}</div></div></div>`;
+      const skills = source === "pro" ? renderProSkillOrder(config.build) : "";
+      const items = renderRuneEquipment(config, skills);
+      const cornerSpells = renderRuneSpellIcons(config);
+	      return `<div class="specialist-game-row ${tone}${selected ? " is-selected" : ""}" role="radio" aria-checked="${selected}" tabindex="0" data-rune-choice="${escapeHTML(choiceKey)}"><div class="specialist-game-head"><span class="specialist-game-choice"><span class="radio-mark" aria-hidden="true"></span>${championIcon}<span class="specialist-game-title"><strong>${escapeHTML(title)}</strong><span class="specialist-game-meta">${position ? `<span class="rune-position-tag">${escapeHTML(position)}</span>` : ""}${config.eventLabel ? `<span class="pro-event-label">${escapeHTML(config.eventLabel)}</span>` : ""}${config.winKnown === false ? '<span data-tooltip="该局胜负未获官方确认">胜负未确认</span>' : ""}</span></span></span><span class="specialist-opponent is-${tone.slice(3)}"><span class="specialist-result-dot" aria-hidden="true"></span>${config.opponentChampionId ? iconFigure("champion", config.opponentChampionId, opponentName, "small") : ""}<span class="specialist-opponent-copy"><b>${escapeHTML(opponentName)}</b><small>${escapeHTML(opponentPlayer)}</small></span>${opponentRank}</span></div><div class="specialist-game-content"><div class="specialist-game-runes${skills ? " has-skills" : ""}">${renderUnifiedRuneBoard(config, cornerSpells)}${items}${config.selectedComplete === false ? '<p class="pro-rune-status">属性碎片：上游未提供完整槽位；这套数据尚不完整，暂时不能应用。</p>' : ""}</div></div></div>`;
     }).join("");
     return `<div class="specialist-player-tabs" role="tablist" aria-label="${source === "pro" ? "职业选手" : "绝活哥玩家"}">${tabs}</div><div class="specialist-player-games" role="radiogroup" aria-label="${source === "pro" ? "职业比赛符文" : "绝活哥最近对局符文"}">${rows || '<p class="section-empty">暂无最近对局符文数据</p>'}</div>`;
   }
 
-  function renderRuneEquipment(config) {
-    const itemIDs = (config.itemIds || config.itemIDs || []).map(Number).filter((id) => Number.isInteger(id) && id > 0).slice(0, 7);
+  function renderRuneSpellIcons(config) {
     const spellIDs = [config.spell1Id, config.spell2Id].map(Number);
-    const spells = spellIDs.every(id => Number.isInteger(id) && id > 0 && id <= 100000) && spellIDs[0] !== spellIDs[1]
-      ? '<div class="specialist-game-spells">' + spellIDs.map(id => renderSummonerSpellIcon(id)).join("") + '</div>' : "";
-    if (!itemIDs.length) return spells ? '<div class="specialist-game-items">' + spells + '</div>' : "";
+    return spellIDs.every(id => Number.isInteger(id) && id > 0 && id <= 100000) && spellIDs[0] !== spellIDs[1]
+      ? spellIDs.map(id => renderSummonerSpellIcon(id)).join("") : "";
+  }
+
+  function renderProSkillOrder(build) {
+    const order = build?.skillOrder;
+    if (!Array.isArray(order) || !order.length) return "";
+    const priority = window.deepLegendsRuntime.skillPriority(order);
+    const summary = priority.length >= 2
+      ? `<strong class="skill-priority-summary">主<b class="is-${priority[0].toLowerCase()}">${priority[0]}</b>副<b class="is-${priority[1].toLowerCase()}">${priority[1]}</b></strong>` : "";
+    const cells = order.map((key, index) => `<span class="is-${String(key).toLowerCase()}" data-tooltip="第 ${index + 1} 级：升级 ${escapeHTML(key)}" data-tooltip-size="compact"><b>${escapeHTML(key)}</b><small>${index + 1}</small></span>`).join("");
+    return `<div class="sg-skills"><span class="sg-label">技能加点</span>${summary}<div class="skill-order" aria-label="技能升级顺序">${cells}</div></div>`;
+  }
+
+  function renderRuneEquipment(config, skills = "") {
+    const itemIDs = (config.itemIds || config.itemIDs || []).map(Number).filter((id) => Number.isInteger(id) && id > 0).slice(0, 7);
+    const icons = renderRuneSpellIcons(config);
+    const spells = icons ? `<div class="sg-spells">${icons}</div>` : "";
     const starterIDs = (config.starterItemIds || []).map(Number).filter((id) => Number.isInteger(id) && id > 0).slice(0, 6);
     const starter = starterIDs.length ? `${starterIDs.map(id => renderItemIcon(id)).join("")}<span class="route-divider" aria-hidden="true"></span>` : "";
-    return `<div class="specialist-game-items"><span>${starterIDs.length ? "装备" : "最终装备"}</span><div>${starter}${itemIDs.map((id) => renderItemIcon(id)).join("")}</div>${spells}</div>`;
+    const items = itemIDs.length ? `<div class="sg-items"><span class="sg-label">${starterIDs.length ? "装备" : "最终装备"}</span><div class="sg-icons">${starter}${itemIDs.map((id) => renderItemIcon(id)).join("")}</div></div>` : "";
+    return items || spells || skills ? `<div class="specialist-game-footer">${items}${spells}${skills}</div>` : "";
   }
 
   function proRuneRecordLabel(config) {
@@ -8359,10 +8359,14 @@
     return `<article class="rune-choice-card${selected ? " is-selected" : ""}" role="radio" aria-checked="${selected}" tabindex="0" data-rune-choice="${escapeHTML(key)}"><div class="rune-choice-selector"><span class="radio-mark" aria-hidden="true"></span>${championIcon}${choiceCopy}${specialistStats}</div><div class="rune-choice-detail">${renderUnifiedRuneBoard(config)}${renderRuneSpellPair([config.spell1Id, config.spell2Id])}</div></article>`;
   }
 
-  function renderUnifiedRuneBoard(config) {
+  function renderUnifiedRuneBoard(config, cornerSpells = "") {
     const selectedIDs = (config.perkIds || config.selectedPerkIds || []).map(Number);
     const selected = new Set(selectedIDs);
-    if (!state.perks) return `<div class="selected-rune-strip">${[...selected].map((id) => iconFigure("perk", id, `符文 ${id}`, "rune")).join("")}</div><p class="muted rune-loading-copy">正在读取完整符文树…</p>`;
+    const corner = cornerSpells ? `<div class="rune-corner-spells">${cornerSpells}</div>` : "";
+    if (!state.perks) {
+      const loading = `<div class="selected-rune-strip">${[...selected].map((id) => iconFigure("perk", id, `符文 ${id}`, "rune")).join("")}</div><p class="muted rune-loading-copy">正在读取完整符文树…</p>`;
+      return corner ? `<div class="unified-rune-board"><div>${loading}</div><section class="unified-rune-column rune-shards" aria-label="属性碎片">${corner}</section></div>` : loading;
+    }
     const styles = state.perks.styles || [];
     const renderStyle = (styleID, secondary) => {
       const style = styles.find((item) => Number(item.id) === Number(styleID));
@@ -8376,7 +8380,7 @@
     // known slots are already highlighted in their actual rows.
     const knownShards = config.selectedComplete === false ? [...new Map(fragments.flatMap(slot => slot.perks || []).filter(perk => selected.has(Number(perk.id)) && !fragmentSelections.includes(Number(perk.id))).map(perk => [Number(perk.id), perk])).values()] : [];
     const incomplete = knownShards.length ? `<div class="pro-known-shards" aria-label="已取得的属性碎片，槽位未确认"><span>已取得的碎片（槽位未确认）</span>${knownShards.map(perk => renderRuneOption(perk, true)).join("")}</div>` : "";
-    return `<div class="unified-rune-board">${renderStyle(config.primaryStyleId, false)}${renderStyle(config.subStyleId, true)}<section class="unified-rune-column rune-shards" aria-label="属性碎片"><header aria-hidden="true"></header><div class="unified-rune-row is-spacer" aria-hidden="true"></div>${fragments.map((slot, rowIndex) => `<div class="unified-rune-row">${(slot.perks || []).map((perk) => renderRuneOption(perk, fragmentSelections[rowIndex] === Number(perk.id))).join("")}</div>`).join("")}</section></div>${incomplete}`;
+    return `<div class="unified-rune-board">${renderStyle(config.primaryStyleId, false)}${renderStyle(config.subStyleId, true)}<section class="unified-rune-column rune-shards" aria-label="属性碎片">${corner}<header aria-hidden="true"></header><div class="unified-rune-row is-spacer" aria-hidden="true"></div>${fragments.map((slot, rowIndex) => `<div class="unified-rune-row">${(slot.perks || []).map((perk) => renderRuneOption(perk, fragmentSelections[rowIndex] === Number(perk.id))).join("")}</div>`).join("")}</section></div>${incomplete}`;
   }
 
   function renderRuneOption(perk, selected, fallbackID = 0) {
@@ -9104,9 +9108,7 @@
   // Crop only the artwork vignette; keep the portrait box geometry identical to its placeholder.
   function iconFigure(kind, id, label, size = "", withTooltip = true) { return assetIcon(assetPath(kind, id), label || `${kind} ${id || ""}`, size, withTooltip, "", kind === "champion" ? "is-champion-art" : ""); }
   function maskedProfileIcon(size = "") { return `<span class="game-icon${size ? ` is-${size}` : ""}" data-tooltip="身份已遮罩" data-tooltip-size="compact"><span aria-hidden="true">◉</span></span>`; }
-  // 目录尚未加载时的占位图标：不发起注定 404 的猜测 URL 请求（客户端
-  // 的装备/技能/符文图标路径必须来自目录的 iconPath），目录加载完成后
-  // rerenderCatalogViews 会自动重绘补上真实图标，避免图标时有时无。
+  // Use catalog icon paths; never guess URLs before catalog hydration.
   function pendingCatalogIcon(label, size = "", withTooltip = true) { return `<span class="game-icon is-pending${size ? ` is-${size}` : ""}"${withTooltip ? ` data-tooltip="${escapeHTML(label)}" data-tooltip-size="compact"` : ""}><span aria-hidden="true"> </span></span>`; }
   // 装备/召唤师技能/符文图标一律使用目录里的 iconPath 与真实名称；
   // 目录未加载完成时先显示占位，加载完成后自动重绘。
@@ -9226,9 +9228,7 @@
 
 	window.deepLegendsGameIcons = { iconFigure, prepareImages };
 
-  // 页面 CSP 禁止 HTML 内联 style。百分比条与动态网格先以 data 属性
-  // 输出，再通过 CSSOM 写入；否则浏览器会忽略 style="width:..."，所有
-  // 伤害条都会退化成同样的满宽，蓝红对比也会固定成 50/50。
+  // CSP: emit data attributes, then apply dynamic metrics through CSSOM.
   function applyRenderedMetricStyles(container) {
     if (!container) return;
     for (const node of container.querySelectorAll("[data-bar-width], [data-blue-share], [data-win-rate], [data-table-winrate], [data-skill-count]")) {
@@ -9739,9 +9739,7 @@
       hidden: document.hidden, section: state.section, phaseChanged, liveRefreshQueued: Boolean(state.liveRefreshQueued) });
   }
 
-  // R129 P3：把「哪个部分被替换了几次、由什么触发」聚合成 60 秒一条诊断。
-  // 数据没变期间这些计数应该全是 0；一旦又出现重绘，日志能直接指出面板与来源
-  // （interval / sse / manual / catalog / direct）。
+  // R129 P3: aggregate panel replacement causes into one diagnostic per minute.
   function liveRenderTriggerLabel(source) {
     const value = String(source || "").trim().toLowerCase();
     if (value === "interval") return "interval";

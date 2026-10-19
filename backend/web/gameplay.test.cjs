@@ -135,7 +135,7 @@ function compile(names, dependencies = {}, script = source) {
   // R129 P1：历史状态判据抽成 liveHistoryStateOf / liveHistorySettled，编译
   // renderLivePlayer / renderInsightMatches 时按名字带上真实实现，不塞桩。
   for (const name of ["liveHistoryStateOf", "liveHistorySettled"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
-  for (const name of ["recommendedRuneSpellIDs", "renderRuneSpellPair", "renderRuneEquipment", "retainRuneStarterItems"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
+  for (const name of ["recommendedRuneSpellIDs", "renderRuneSpellPair", "renderRuneEquipment", "renderRuneSpellIcons", "renderProSkillOrder", "retainRuneStarterItems"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   for (let length = -1; length !== names.length;) {
     length = names.length;
     for (const name of ["bindLiveNode", "champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel", "liveClientPositionsPending", "clearRuneStarterRetries", "runeStarterTargetActive", "laneMatchupEnemies", "laneMatchupTier", "laneMatchupInference", "laneMatchupAvailability", "ensureLaneMatchupPositions", "laneMatchupPairKey", "laneMatchupOwnLocked", "ensureLaneMatchupPair", "recordLaneMatchupCandidateSkip", "laneMatchupUnavailableReason", "recordLaneMatchupCardDiagnostic", "liveRecommendationTier"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
@@ -526,11 +526,11 @@ test("R75 pro rows use shared game renderer, neutral unknown, real event and sam
   assert.match(html,/specialist-game-row is-unknown is-selected/);assert.match(html,/该局胜负未获官方确认/);
   assert.match(html,/LCK · 2026-09-06/);assert.match(html,/GEN Chovy/);assert.match(html,/最终装备/);
   assert.match(html,/上游未提供完整槽位/);assert.doesNotMatch(html,/specialist-opponent-rank/);
-  assert.doesNotMatch(html,/specialist-game-spells/,"pro record without verified spell IDs must omit the entire spell container");
+  assert.doesNotMatch(html,/sg-spells/,"pro record without verified spell IDs must omit the entire spell container");
   assert.doesNotMatch(html,/rune-spell-row/,"pro records must not render a separate spell row");
   html=fn.renderSpecialistPlayers([{...row,recordGames:3,recordWins:2}],"pro");assert.match(html,/aria-label="2胜1负，仅已确认场次"/);
   html=fn.renderSpecialistPlayers([{...row,spell1Id:4,spell2Id:11}],"specialist");
-  assert.match(html,/<div class="specialist-game-spells"><spell>4<\/spell><spell>11<\/spell><\/div>/);
+  assert.match(html,/<div class="sg-spells"><spell>4<\/spell><spell>11<\/spell><\/div>/);
   assert.doesNotMatch(html,/rune-spell-row|召唤师技能|闪现|惩戒/);
   html=fn.renderRuneSourceSection({key:"pro",items:[row],proStatus:{readAt:new Date(Date.now()-600000).toISOString()}},true);
   assert.doesNotMatch(html,/缓存数据|无法连接职业赛事数据源/);assert.match(html,/data-retry-pro-runes/);assert.match(html,/当前显示上次读取结果/);
@@ -989,7 +989,7 @@ test("R173 rune equipment places opening items, divider and seven final slots in
     renderItemIcon: id => '<i data-item="' + id + '"></i>',
   });
   const html = renderRuneEquipment({ starterItemIds: [1055, 2003, 2003, 1086, 1001, 1056, 9999], itemIds: [3006, 3072, 3031, 3085, 3036, 3139, 3364, 8888] });
-  const dom = new JSDOM(html), equipment = dom.window.document.querySelector(".specialist-game-items");
+  const dom = new JSDOM(html), equipment = dom.window.document.querySelector(".sg-items");
   assert.equal(equipment.children[0].textContent, "装备");
   assert.deepEqual([...equipment.children[1].children].map(node => node.classList.contains("route-divider") ? "|" : Number(node.dataset.item)),
     [1055, 2003, 2003, 1086, 1001, 1056, "|", 3006, 3072, 3031, 3085, 3036, 3139, 3364]);
@@ -997,10 +997,10 @@ test("R173 rune equipment places opening items, divider and seven final slots in
   assert.equal(equipment.querySelectorAll("[data-tooltip],[title]").length, 0);
 });
 
-test("R173 absent opening items retains byte-identical final equipment markup", () => {
+test("R293 absent opening items keeps exact final-only footer markup", () => {
   const renderItemIcon = id => '<i data-item="' + id + '"></i>';
   const { renderRuneEquipment } = compile(["renderRuneEquipment"], { renderItemIcon });
-  const itemIDs = [1055, 2003, 3006], old = '<div class="specialist-game-items"><span>最终装备</span><div>' + itemIDs.map(renderItemIcon).join("") + '</div></div>';
+  const itemIDs = [1055, 2003, 3006], old = '<div class="specialist-game-footer"><div class="sg-items"><span class="sg-label">最终装备</span><div class="sg-icons">' + itemIDs.map(renderItemIcon).join("") + '</div></div></div>';
   assert.equal(renderRuneEquipment({ itemIds: itemIDs }), old);
   assert.equal(renderRuneEquipment({ itemIds: itemIDs, starterItemIds: [] }), old);
   assert.equal(renderRuneEquipment({ itemIds: [], starterItemIds: [1055] }), "");
@@ -1008,7 +1008,7 @@ test("R173 absent opening items retains byte-identical final equipment markup", 
 
 test("R173 delayed equipment patch preserves row identity, order and selected state", () => {
   const { JSDOM } = require("../../desktop/node_modules/jsdom");
-  const dom = new JSDOM('<section><div data-rune-choice="new" class="specialist-game-row is-selected" aria-checked="true"><div class="specialist-game-items"><span>最终装备</span><div></div></div></div><div data-rune-choice="old" class="specialist-game-row" aria-checked="false"><div class="specialist-game-items"><span>最终装备</span><div></div></div></div></section>');
+  const dom = new JSDOM('<section><div data-rune-choice="new" class="specialist-game-row is-selected" aria-checked="true"><div class="sg-items"><span>最终装备</span><div></div></div></div><div data-rune-choice="old" class="specialist-game-row" aria-checked="false"><div class="sg-items"><span>最终装备</span><div></div></div></div></section>');
   const document = dom.window.document, root = document.querySelector("section"), before = [...root.children];
   let remembered = 0;
   const { patchRuneStarterEquipment } = compile(["patchRuneStarterEquipment"], {
@@ -1105,13 +1105,13 @@ function r174EquipmentRenderer() {
 test("R174 equipment then spells are direct children and spells contain only two icons", () => {
   const { JSDOM } = require("../../desktop/node_modules/jsdom");
   const html = r174EquipmentRenderer()({ itemIds: [3006, 3031], spell1Id: 4, spell2Id: 11 });
-  const row = new JSDOM(html).window.document.querySelector(".specialist-game-items");
-  assert.equal(row.children.length, 3);
-  assert.equal(row.children[0].tagName, "SPAN");
-  assert.equal(row.children[0].textContent, "最终装备");
-  assert.deepEqual([...row.children[1].children].map(node => Number(node.dataset.item)), [3006, 3031]);
+  const row = new JSDOM(html).window.document.querySelector(".specialist-game-footer");
+  assert.equal(row.children.length, 2);
+  assert.equal(row.children[0].className, "sg-items");
+  assert.equal(row.querySelector(".sg-label").textContent, "最终装备");
+  assert.deepEqual([...row.querySelector(".sg-icons").children].map(node => Number(node.dataset.item)), [3006, 3031]);
   const spells = row.lastElementChild;
-  assert.equal(spells.className, "specialist-game-spells");
+  assert.equal(spells.className, "sg-spells");
   assert.deepEqual([...spells.children].map(node => Number(node.dataset.spell)), [4, 11]);
   assert.equal(spells.querySelectorAll("small,span,label,[data-tooltip],[title]").length, 0);
   assert.equal(spells.textContent, "");
@@ -1121,32 +1121,32 @@ test("R174 equipment then spells are direct children and spells contain only two
 test("R174 opening inventory and divider precede final inventory and rightmost spells", () => {
   const { JSDOM } = require("../../desktop/node_modules/jsdom");
   const html = r174EquipmentRenderer()({ starterItemIds: [1055, 2003, 2003], itemIds: [3006, 3031, 3364], spell1Id: 4, spell2Id: 11 });
-  const row = new JSDOM(html).window.document.querySelector(".specialist-game-items");
-  assert.equal(row.children[0].textContent, "装备");
-  assert.deepEqual([...row.children].map(node => node.className || node.tagName), ["SPAN", "DIV", "specialist-game-spells"]);
-  assert.deepEqual([...row.children[1].children].map(node => node.classList.contains("route-divider") ? "|" : Number(node.dataset.item)), [1055, 2003, 2003, "|", 3006, 3031, 3364]);
+  const row = new JSDOM(html).window.document.querySelector(".specialist-game-footer");
+  assert.equal(row.querySelector(".sg-label").textContent, "装备");
+  assert.deepEqual([...row.children].map(node => node.className), ["sg-items", "sg-spells"]);
+  assert.deepEqual([...row.querySelector(".sg-icons").children].map(node => node.classList.contains("route-divider") ? "|" : Number(node.dataset.item)), [1055, 2003, 2003, "|", 3006, 3031, 3364]);
   assert.deepEqual([...row.lastElementChild.children].map(node => Number(node.dataset.spell)), [4, 11]);
 });
 
-test("R174 invalid or absent spell pair retains byte-identical equipment markup", () => {
+test("R293 invalid or absent spell pair retains exact equipment-only footer markup", () => {
   const render = r174EquipmentRenderer();
-  const oldFinal = '<div class="specialist-game-items"><span>最终装备</span><div><i data-item="3006"></i></div></div>';
-  const oldOpening = '<div class="specialist-game-items"><span>装备</span><div><i data-item="1055"></i><span class="route-divider" aria-hidden="true"></span><i data-item="3006"></i></div></div>';
+  const oldFinal = '<div class="specialist-game-footer"><div class="sg-items"><span class="sg-label">最终装备</span><div class="sg-icons"><i data-item="3006"></i></div></div></div>';
+  const oldOpening = '<div class="specialist-game-footer"><div class="sg-items"><span class="sg-label">装备</span><div class="sg-icons"><i data-item="1055"></i><span class="route-divider" aria-hidden="true"></span><i data-item="3006"></i></div></div></div>';
   for (const [spell1Id, spell2Id] of [[undefined, undefined], [undefined, 11], [4, 0], [0, 11], [4, 4], [-1, 4], [4.5, 11], [4, Infinity], [4, 100001]]) {
     assert.equal(render({ itemIds: [3006], spell1Id, spell2Id }), oldFinal);
     assert.equal(render({ itemIds: [3006], starterItemIds: [1055], spell1Id, spell2Id }), oldOpening);
     assert.equal(render({ itemIds: [], spell1Id, spell2Id }), "");
   }
-  assert.match(render({ itemIds: [3006], spell1Id: "4", spell2Id: "11" }), /specialist-game-spells/);
+  assert.match(render({ itemIds: [3006], spell1Id: "4", spell2Id: "11" }), /sg-spells/);
 });
 
 test("R174 spells without final inventory render one right-aligned container without labels or empty group", () => {
   const { JSDOM } = require("../../desktop/node_modules/jsdom");
   const html = r174EquipmentRenderer()({ starterItemIds: [1055], itemIds: [], spell1Id: 4, spell2Id: 11 });
-  const row = new JSDOM(html).window.document.querySelector(".specialist-game-items");
+  const row = new JSDOM(html).window.document.querySelector(".specialist-game-footer");
   assert.ok(row, "spells cannot disappear when final equipment is absent");
   assert.equal(row.children.length, 1);
-  assert.equal(row.children[0].className, "specialist-game-spells");
+  assert.equal(row.children[0].className, "sg-spells");
   assert.equal(row.querySelector(":scope > span"), null);
   assert.equal(row.querySelectorAll("[data-item]").length, 0);
   assert.deepEqual([...row.children[0].children].map(node => Number(node.dataset.spell)), [4, 11]);
@@ -1166,7 +1166,7 @@ test("R174 full specialist and pro templates have no standalone spell row", () =
     const html = funcs.renderSpecialistPlayers([{ key: "game-1", playerName: "Fixture", itemIds: [3006], spell1Id: 4, spell2Id: 11, recordGames: 1, recordWins: 1 }], source);
     const doc = new JSDOM(html).window.document;
     assert.equal(doc.querySelectorAll(".rune-spell-row").length, 0);
-    assert.equal(doc.querySelectorAll(".specialist-game-items > .specialist-game-spells").length, 1);
+    assert.equal(doc.querySelectorAll(".specialist-game-footer > .sg-spells").length, 1);
     assert.equal(doc.querySelectorAll("[data-spell]").length, 2);
   }
 });
@@ -1190,21 +1190,23 @@ test("R174 async opening inventory replacement preserves rightmost spell pair an
   assert.equal(rows[1].getAttribute("aria-checked"), "false");
   assert.deepEqual(rows.map(row => [...row.querySelectorAll("[data-spell]")].map(node => Number(node.dataset.spell))), beforePairs);
   for (const row of rows) {
-    assert.equal(row.querySelector(".specialist-game-items").lastElementChild.className, "specialist-game-spells");
-    assert.equal(row.querySelectorAll(".specialist-game-spells").length, 1);
+    assert.equal(row.querySelector(".specialist-game-footer").lastElementChild.className, "sg-spells");
+    assert.equal(row.querySelectorAll(".sg-spells").length, 1);
     assert.equal(row.querySelectorAll(".rune-spell-row").length, 0);
   }
 });
 
-test("R174 standalone spell renderer remains byte-identical; R179 inventory keeps a fixed height", () => {
+test("R293 standalone spell renderer remains byte-identical; adaptive footer is vertically centered", () => {
   const { renderRuneSpellPair } = compile(["renderRuneSpellPair"], {
     state: { summonerSpells: { spells: [{ id: 4, name: "闪现" }, { id: 11, name: "惩戒" }] } },
     escapeHTML: x => String(x), renderSummonerSpellIcon: id => '<i data-spell="' + id + '"></i>',
   });
   assert.equal(renderRuneSpellPair([4, 11]), '<div class="rune-spell-row"><span>召唤师技能</span><div class="rune-spell-items"><span class="rune-spell-item"><i data-spell="4"></i><small>闪现</small></span><span class="rune-spell-item"><i data-spell="11"></i><small>惩戒</small></span></div></div>');
-  const rule = cssSource.match(/\.specialist-game-spells\s*\{([^}]+)\}/)[1];
-  for (const declaration of ["display: flex", "flex: 0 0 auto", "flex-wrap: nowrap", "margin-left: auto", "min-width: auto"]) assert.ok(rule.includes(declaration), declaration);
-  assert.match(cssSource, /\.specialist-game-items > div:not\(\.specialist-game-spells\).*flex-wrap: nowrap/);
+  const rule = cssSource.match(/\.sg-spells\s*\{([^}]+)\}/)[1];
+  for (const declaration of ["display: flex", "flex: 0 0 auto", "align-items: center", "margin-left: auto"]) assert.ok(rule.includes(declaration), declaration);
+  assert.match(cssSource, /\.specialist-game-footer\s*\{[^}]*align-items: center/);
+  assert.match(cssSource, /@container sgrow \(min-width: 1000px\)/);
+  assert.doesNotMatch(cssSource, /\.specialist-game-items|\.specialist-game-spells/);
 });
 
 function r177FakeClock() {
@@ -1311,10 +1313,10 @@ test("R177 starter retry success patches opening items and retains rightmost R17
     await h.funcs.ensureRuneStarterItems(h.state.live);
     await h.clock.advance(8000);
     assert.deepEqual(h.runes[0].starterItemIds, [1055, 2003]);
-    const row = h.dom.window.document.querySelector(".specialist-game-items");
+    const row = h.dom.window.document.querySelector(".specialist-game-footer");
     assert.deepEqual([...row.querySelectorAll("[data-item]")].map(icon => Number(icon.dataset.item)), [1055, 2003, 3006, 3031]);
     assert.ok(row.querySelector(".route-divider"));
-    assert.equal(row.lastElementChild.className, "specialist-game-spells");
+    assert.equal(row.lastElementChild.className, "sg-spells");
     assert.deepEqual([...row.lastElementChild.children].map(icon => Number(icon.dataset.spell)), [4, 11]);
     assert.equal(h.clock.timers.size, 0, "completed row does not retry even with a stale hint");
   } finally { h.dom.window.close(); }

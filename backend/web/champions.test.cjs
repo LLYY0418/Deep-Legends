@@ -202,7 +202,7 @@ function compileFunctions(source, names, dependencies = {}) {
   for (const name of ["proRunesFor", "proRequestTarget", "proBadgeAttributes", "renderProIdentityBadge", "proContextFromButton"]) {
     if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
   }
-  for (const name of ["recommendedRuneSpellIDs", "renderRuneSpellPair", "renderRuneEquipment", "retainRuneStarterItems", "clearRuneStarterRetries", "liveClientPositionsPending"]) {
+  for (const name of ["recommendedRuneSpellIDs", "renderRuneSpellPair", "renderRuneEquipment", "renderRuneSpellIcons", "renderProSkillOrder", "retainRuneStarterItems", "clearRuneStarterRetries", "liveClientPositionsPending"]) {
     if (!names.includes(name) && !compiledDependencies[name] && bodies.some(body => body.includes(`${name}(`))) bodies.push(functionSource(source, name));
   }
   // R116-B 评审整改（清 R116-D 账本 §11.7 的两笔技术债）：renderLiveInsights 的七个
@@ -4715,8 +4715,10 @@ test("live skill plan distinguishes primary, secondary, final, and ultimate cont
   const classes = [...markup.matchAll(/<button class="([^"]+)"/g)].map((match) => match[1]);
   assert.deepEqual(classes, ["skill-icon-button is-priority", "skill-icon-button", "skill-icon-button is-secondary", "skill-icon-button is-ultimate"]);
   assert.match(gameplayStyles, /\.skill-icon-button\s*\{[^}]*color:\s*var\(--ink\)/s);
-  assert.match(gameplayStyles, /\.skill-order \.is-q b\s*\{[^}]*#57A6FF/s);
-  assert.match(gameplayStyles, /\.skill-order \.is-w b\s*\{[^}]*#61C992/s);
+  assert.match(cssBlockAfter(gameplayStyles, ":root {"), /--skill-q:\s*#57A6FF\s*;/);
+  assert.match(cssBlockAfter(gameplayStyles, ":root {"), /--skill-w:\s*#61C992\s*;/);
+  assert.match(gameplayStyles, /\.skill-order \.is-q b\s*\{[^}]*color:\s*var\(--skill-q\)/s);
+  assert.match(gameplayStyles, /\.skill-order \.is-w b\s*\{[^}]*color:\s*var\(--skill-w\)/s);
   assert.match(gameplayStyles, /\.skill-order \.is-e b\s*\{[^}]*var\(--rarity-gold\)/s);
 });
 

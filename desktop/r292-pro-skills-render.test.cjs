@@ -27,7 +27,7 @@ for (const [name, order, expected] of [
   });
 }
 
-test("R292 real pro renderer keeps 14/15/18 actual steps after equipment, hides missing data, and tolerates unloaded abilities", async () => {
+test("R293 real pro footer keeps 14/15/18 actual steps beside equipment without ability introductions or missing-data placeholders", async () => {
   const {window:w, errors} = bootDemoApp({gameplaySourceTransform:source => source.replace(/\}\)\(\);\s*$/, "window.__r292={state,renderSpecialistPlayers};\n})();")});
   try {
     await waitForOverview(w);
@@ -40,20 +40,19 @@ test("R292 real pro renderer keeps 14/15/18 actual steps after equipment, hides 
     const games = root.querySelectorAll(".specialist-game-row");
     assert.equal(games.length,4);
     for (const [index,length] of [14,15,18].entries()) {
-      const game = games[index], plan = game.querySelector(".skill-plan");
+      const game = games[index], plan = game.querySelector(".specialist-game-footer > .sg-skills");
       assert.ok(plan);
-      assert.equal(plan.querySelectorAll(".skill-icon-button img").length,4);
-      assert.equal(plan.querySelectorAll(".skill-icon-button[data-tooltip]").length,4);
-      assert.match(plan.querySelector(".skill-icon-button").getAttribute("aria-label"),/技能Q/);
+      assert.equal(game.querySelectorAll(".skill-icon-button,.skill-plan,h3").length,0);
       assert.equal(plan.querySelector(".skill-priority-summary")?.textContent,"主Q副W");
       assert.equal(plan.querySelectorAll(".skill-order > span").length,length);
       assert.equal(plan.querySelector(".skill-order > span:last-child small").textContent,String(length));
-      assert.ok(game.querySelector(".specialist-game-items").compareDocumentPosition(plan)&w.Node.DOCUMENT_POSITION_FOLLOWING);
+      assert.ok(game.querySelector(".sg-items").compareDocumentPosition(plan)&w.Node.DOCUMENT_POSITION_FOLLOWING);
+      assert.equal(plan.querySelector(".skill-order > span").getAttribute("data-tooltip"),"第 1 级：升级 Q");
     }
-    assert.equal(games[3].querySelector(".skill-plan"),null,"missing skill data has no placeholder block");
+    assert.equal(games[3].querySelector(".sg-skills"),null,"missing skill data has no placeholder block");
     state.live.recommendations.hero.abilities = [];
     root.innerHTML = renderSpecialistPlayers(rows,"pro");
-    assert.equal(root.querySelectorAll(".specialist-game-row:first-child .skill-letter").length,4);
+    assert.equal(root.querySelectorAll(".skill-icon-button,.skill-letter").length,0);
     assert.equal(root.querySelector(".skill-priority-summary")?.textContent,"主Q副W");
     assert.deepEqual(errors,[]);
   } finally { w.close(); }

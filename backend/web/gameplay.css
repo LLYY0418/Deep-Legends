@@ -1,3 +1,4 @@
+:root { --skill-q: #57A6FF; --skill-w: #61C992; --skill-q-light: #18569c; --skill-w-light: #145c35; --skill-e-light: #765003; }
 :root { --identity-chip-gap: 6px; --skeleton-base: color-mix(in oklab,var(--surface-strong) 92%,var(--ink)); --skeleton-glint: light-dark(color-mix(in oklab,var(--surface-strong) 98%,var(--ink)),color-mix(in oklab,var(--surface-strong) 82%,var(--ink))); }
 
 .connection {
@@ -1253,14 +1254,59 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .specialist-game-head time { color: inherit; font-size: inherit; white-space: nowrap; }
 .specialist-result-dot { display: inline-block; width: 8px; height: 8px; flex: 0 0 8px; background: currentColor; border-radius: 50%; }
 .specialist-game-content { display: block; min-width: 0; }
-.specialist-game-runes { min-width: 0; overflow: visible; }
-.specialist-game-runes > .skill-plan { padding: 10px; border-top: 1px solid var(--line); }
-.specialist-game-items { display: flex; box-sizing: border-box; height: 48px; min-height: 44px; align-items: center; gap: 8px; padding: 7px 10px 10px; border-top: 1px solid var(--line); }
-.specialist-game-items > span { flex: 0 0 auto; color: var(--muted); font-size: 9px; }
-.specialist-game-items > div:not(.specialist-game-spells) { display: flex; min-width: 0; overflow-x: auto; flex-wrap: nowrap; align-items: center; gap: 4px; }
-.specialist-game-items .item-option-button { width: 30px; height: 30px; padding: 2px; }
-.specialist-game-items .game-icon { width: 24px; height: 24px; flex-basis: 24px; }
-.specialist-game-spells { display: flex; flex: 0 0 auto; align-items: center; flex-wrap: nowrap; min-width: auto; gap: 6px; margin-left: auto; }
+.specialist-game-runes { min-width: 0; overflow: visible; container: sgrow / inline-size; }
+
+
+.specialist-game-runes .unified-rune-column.rune-shards { position: relative; }
+.rune-corner-spells { position: absolute; top: 12px; right: 16px; z-index: 1; display: none; flex-direction: row; gap: 8px; }
+.rune-corner-spells .item-option-button, .sg-spells .item-option-button { width: 38px; height: 38px; flex: 0 0 38px; padding: 0; border-radius: 10px; box-shadow: 0 0 0 1px color-mix(in oklab,var(--primary) 34%,var(--line)), 0 3px 8px rgb(0 0 0 / .26); }
+.rune-corner-spells .game-icon, .sg-spells .game-icon { width: 38px; height: 38px; flex-basis: 38px; border: 0; border-radius: 10px; }
+
+
+.specialist-game-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 0; row-gap: 10px; padding: 11px 14px 12px; border-top: 1px solid var(--line); background: linear-gradient(180deg,color-mix(in oklab,var(--surface-strong) 46%,transparent),transparent); }
+.sg-items, .sg-skills { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.sg-items { flex: 0 0 auto; }
+.sg-spells { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; }
+.sg-label { flex: 0 0 auto; color: var(--muted); font-size: 9px; letter-spacing: .04em; white-space: nowrap; }
+.sg-icons { display: flex; gap: 5px; }
+.sg-icons .item-option-button { width: 32px; height: 32px; flex: 0 0 32px; padding: 0; border-radius: 8px; }
+.sg-icons .game-icon { width: 32px; height: 32px; flex-basis: 32px; border-radius: 8px; }
+
+
+.sg-skills { flex: 1 1 100%; flex-wrap: wrap; row-gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.sg-skills .skill-priority-summary { flex: 0 0 auto; margin: 0; font-size: 15px; letter-spacing: .12em; }
+.sg-skills .skill-priority-summary b { font-weight: 800; }
+.sg-skills .skill-priority-summary b.is-q { color: var(--skill-q); }
+.sg-skills .skill-priority-summary b.is-w { color: var(--skill-w); }
+.sg-skills .skill-priority-summary b.is-e { color: var(--rarity-gold); }
+[data-theme="light"] .sg-skills .skill-priority-summary b.is-q { color: var(--skill-q-light); }
+[data-theme="light"] .sg-skills .skill-priority-summary b.is-w { color: var(--skill-w-light); }
+[data-theme="light"] .sg-skills .skill-priority-summary b.is-e { color: var(--skill-e-light); }
+
+.sg-skills .skill-order { display: flex; min-width: 0; flex: 1 1 100%; flex-wrap: nowrap; gap: 3px; margin: 0; }
+.sg-skills .skill-order span { position: relative; display: grid; min-width: 0; max-width: 30px; height: 34px; flex: 1 1 0; place-items: center; align-content: center; gap: 1px; background: var(--bg); border-radius: 6px; }
+.sg-skills .skill-order b { font-size: 12px; line-height: 1; }
+.sg-skills .skill-order small { font-size: 8px; line-height: 1; font-variant-numeric: tabular-nums; }
+.sg-skills .skill-order .is-q { background: color-mix(in oklab,var(--skill-q) 13%,var(--bg)); }
+.sg-skills .skill-order .is-w { background: color-mix(in oklab,var(--skill-w) 13%,var(--bg)); }
+.sg-skills .skill-order .is-e { background: color-mix(in oklab,var(--rarity-gold) 14%,var(--bg)); }
+.sg-skills .skill-order .is-r { background: var(--primary-soft); box-shadow: inset 0 -2px 0 var(--primary); }
+
+
+@container sgrow (min-width: 1000px) {
+  .specialist-game-runes.has-skills .specialist-game-footer { flex-wrap: nowrap; }
+  .specialist-game-runes.has-skills .sg-items { padding-right: 22px; }
+  .specialist-game-runes.has-skills .sg-skills { flex: 1 1 0; flex-wrap: nowrap; padding: 0; padding-left: 22px; border-top: 0; border-left: 1px solid var(--line); }
+  .specialist-game-runes.has-skills .sg-skills .skill-order { flex: 1 1 auto; }
+  .specialist-game-runes.has-skills .rune-corner-spells { display: flex; }
+  .specialist-game-runes.has-skills .sg-spells { display: none; }
+}
+
+@media (max-width: 700px) {
+  .rune-corner-spells .item-option-button, .sg-spells .item-option-button,
+  .rune-corner-spells .game-icon, .sg-spells .game-icon { width: 34px; height: 34px; flex-basis: 34px; }
+}
+
 .specialist-opponent { display: flex; min-width: 0; align-items: center; justify-self: end; justify-content: flex-end; gap: 7px; overflow: hidden; }
 .specialist-opponent-copy { display: flex; min-width: 0; align-items: baseline; gap: 6px; overflow: hidden; }
 .specialist-opponent.is-win { color: var(--accent); }
@@ -1505,8 +1551,8 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .skill-order span { display: grid; min-width: 0; height: 40px; place-items: center; align-content: center; background: var(--bg); border-radius: 6px; }
 .skill-order b { color: var(--accent); font-size: 11px; }
 .skill-order small { color: var(--muted); font-size: 8px; }
-.skill-order .is-q b { color: #57A6FF; }
-.skill-order .is-w b { color: #61C992; }
+.skill-order .is-q b { color: var(--skill-q); }
+.skill-order .is-w b { color: var(--skill-w); }
 .skill-order .is-e b { color: var(--rarity-gold); }
 .skill-order .is-r { background: var(--primary-soft); }
 .skill-order .is-r b { color: var(--primary-strong); }
@@ -2373,9 +2419,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 :root:not([data-theme="light"]) .specialist-game-row .game-icon>span,:root:not([data-theme="light"]) .match-stat>em{color:#a5afc0}
 :root:not([data-theme="light"]) .pro-player-record .is-loss{color:#f28484}
 
-[data-theme="light"] .skill-order .is-q b{color:#18569c}
-[data-theme="light"] .skill-order .is-w b{color:#145c35}
-[data-theme="light"] .skill-order .is-e b{color:#765003}
+[data-theme="light"] .skill-order .is-q b{color:var(--skill-q-light)}
+[data-theme="light"] .skill-order .is-w b{color:var(--skill-w-light)}
+[data-theme="light"] .skill-order .is-e b{color:var(--skill-e-light)}
 [data-theme="light"] :is(.live-arena-build-section,.late-option-band).is-prismatic>h3{color:#683280}
 
 .live-player-copy>.live-player-rank{display:flex;align-items:center;gap:4px;height:18px;line-height:18px}.live-rank-crest{width:16px;height:16px;object-fit:contain;flex:none}
