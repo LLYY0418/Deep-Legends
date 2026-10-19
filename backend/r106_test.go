@@ -65,7 +65,7 @@ func TestR106ProfileUnrankedIsExplicitAndHistoryIsExcluded(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, _ := normalizeProAccount(row)
-	if a.RankStatus != "unranked" || proProfileTTL(row) != 72*time.Hour {
+	if a.RankStatus != "unranked" || proProfileTTL(row) != 3*time.Hour {
 		t.Fatalf("%+v", a)
 	}
 	if _, err := parseProProfile(r106ProfilePage(ref.GameName, ref.TagLine, ``), ref); err == nil {
@@ -135,7 +135,7 @@ func TestR106AllReviewedAccountsBatchAndPersistentCache(t *testing.T) {
 	seeds := new(app).loadProSeeds(context.Background(), nil)
 	result := app1.enrichProProfiles(context.Background(), seeds)
 	page := app1.buildReviewedProPlayers(result)
-	if requests.Load() != 53 || maximum.Load() > 6 || maximum.Load() < 2 {
+	if requests.Load() != 53 || maximum.Load() > 2 || maximum.Load() < 2 {
 		t.Fatalf("requests=%d parallel=%d", requests.Load(), maximum.Load())
 	}
 	for _, team := range page.Teams {

@@ -122,17 +122,49 @@ func (a *app) announcementState() *announcementCache {
 }
 func mergeAnnouncements(bundled, remote []announcement) []announcement {
 	out := append([]announcement(nil), remote...)
-	ids := map[string]bool{}
-	for _, n := range out {
-		ids[n.ID] = true
+	ids := map[string]int{}
+	for i, n := range out {
+		ids[n.ID] = i
 	}
 	for _, n := range bundled {
-		if !ids[n.ID] {
+		if i, ok := ids[n.ID]; !ok {
 			out = append(out, n)
+		} else {
+			bundleAt, _ := time.Parse(time.RFC3339, n.UpdatedAt)
+			remoteAt, _ := time.Parse(time.RFC3339, out[i].UpdatedAt)
+			if bundleAt.After(remoteAt) {
+				out[i] = n
+			}
 		}
 	}
 	return out
 }
+func fetchAnnouncementDocument(ctx context.Context, client *http.Client) ([]byte, []announcement, error) {
+	for _, name := range []string{"announcements.v2.json", "announcements.json"} {
+		attempt, cancel := context.WithTimeout(ctx, 2*time.Second)
+		for _, prefix := range updateMirrors {
+			req, _ := http.NewRequestWithContext(attempt, "GET", prefix+announcementBranchURL+name, nil)
+			resp, err := client.Do(req)
+			if err != nil {
+				continue
+			}
+			raw, err := readLimited(resp.Body, 256<<10)
+			resp.Body.Close()
+			if err != nil || resp.StatusCode != 200 {
+				continue
+			}
+			notices, err := decodeAnnouncements(raw)
+			if err != nil {
+				continue
+			}
+			cancel()
+			return raw, notices, nil
+		}
+		cancel()
+	}
+	return nil, nil, errors.New("notice fetch failed")
+}
+
 func (a *app) fetchAnnouncements() {
 	c := a.announcementState()
 	c.mu.Lock()
@@ -148,21 +180,8 @@ func (a *app) fetchAnnouncements() {
 		ctx, cancel := context.WithTimeout(a.licenseBusinessContext(), 4*time.Second)
 		defer cancel()
 		client := a.externalHTTPClient(&http.Client{Timeout: 2 * time.Second})
-		for _, prefix := range updateMirrors {
-			req, _ := http.NewRequestWithContext(ctx, "GET", prefix+announcementBranchURL+"announcements.json", nil)
-			resp, err := client.Do(req)
-			if err != nil {
-				continue
-			}
-			raw, err := readLimited(resp.Body, 256<<10)
-			resp.Body.Close()
-			if err != nil || resp.StatusCode != 200 {
-				continue
-			}
-			notices, err := decodeAnnouncements(raw)
-			if err != nil {
-				continue
-			}
+		raw, notices, err := fetchAnnouncementDocument(ctx, client)
+		if err == nil {
 			bundle, _ := decodeAnnouncements(bundledAnnouncements)
 			c.mu.Lock()
 			c.notices = mergeAnnouncements(bundle, notices)

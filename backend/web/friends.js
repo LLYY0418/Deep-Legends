@@ -234,16 +234,18 @@
 
   function renderFriendRow(friend, offlineSection) {
     const kind = presenceKind(friend);
-    const nameTitle = `${friend.gameName}${friend.tagLine ? ` #${friend.tagLine}` : ""}`;
-    const note = friend.note ? `<span class="friend-note">· ${escapeHTML(friend.note)}</span>` : "";
-    const tag = friend.tagLine ? `<span class="friend-tag">#${escapeHTML(friend.tagLine)}</span>` : "";
+    const masked=window.deepLegendsPrivacy?.masked();
+    const displayName=masked?window.deepLegendsPrivacy.name(friend,{index:Math.max(0,state.friends.indexOf(friend)),context:"friends"}):friend.gameName;
+    const nameTitle = masked?displayName:`${friend.gameName}${friend.tagLine ? ` #${friend.tagLine}` : ""}`;
+    const note = !masked && friend.note ? `<span class="friend-note">· ${escapeHTML(friend.note)}</span>` : "";
+    const tag = !masked && friend.tagLine ? `<span class="friend-tag">#${escapeHTML(friend.tagLine)}</span>` : "";
     const champion = !offlineSection && kind === "ingame" && ["inGame", "championSelect"].includes(friend.gameStatus) && friend.championId && (friend.product || "league_of_legends") === "league_of_legends"
       ? `<img class="friend-champion" data-queued-src="${championIcon(friend.championId)}" alt="" loading="lazy" decoding="async">`
       : "";
-    return `<button class="friend-row${offlineSection ? " is-offline" : ""}" type="button" role="listitem" data-player-ref="${escapeHTML(friend.playerRef || "")}" data-game-name="${escapeHTML(friend.gameName)}" data-tag-line="${escapeHTML(friend.tagLine || "")}" data-tooltip="${escapeHTML(nameTitle)}" data-tooltip-overflow=".friend-game-name" data-tooltip-size="compact"${friend.playerRef ? "" : " disabled"}>
-      <span class="friend-avatar"><img data-queued-src="${profileIcon(friend.icon)}" alt="" loading="lazy" decoding="async"><span class="friend-presence ${kind}"></span></span>
+    return `<button class="friend-row${offlineSection ? " is-offline" : ""}" type="button" role="listitem" data-player-ref="${escapeHTML(friend.playerRef || "")}" data-tooltip="${escapeHTML(nameTitle)}" data-tooltip-overflow=".friend-game-name" data-tooltip-size="compact"${friend.playerRef ? "" : " disabled"}>
+      <span class="friend-avatar">${masked?'<span class="game-icon" aria-hidden="true">◉</span>':`<img data-queued-src="${profileIcon(friend.icon)}" alt="" loading="lazy" decoding="async">`}<span class="friend-presence ${kind}"></span></span>
       <span class="friend-copy">
-        <span class="friend-name"><span class="friend-player-name"><span class="friend-game-name">${escapeHTML(friend.gameName)}</span>${tag}</span>${note}</span>
+        <span class="friend-name"><span class="friend-player-name"><span class="friend-game-name">${escapeHTML(displayName)}</span>${tag}</span>${note}</span>
         <span class="friend-status ${kind}">${statusHTML(friend, kind)}</span>
       </span>
       ${champion}<span class="friend-open-hint" aria-hidden="true">战绩 ›</span>
@@ -324,6 +326,7 @@
     }
   }
 
+  window.addEventListener("deep-legends:privacy-changed",render);
   /* ---------- 事件 ---------- */
   el.toggle.addEventListener("click", () => setOpen(!state.open));
   el.close.addEventListener("click", () => setOpen(false));
@@ -349,8 +352,9 @@
     }
     const row = event.target.closest(".friend-row");
     if (!row?.dataset.playerRef) return;
+    const friend=state.friends.find(value=>value.playerRef===row.dataset.playerRef);
     window.dispatchEvent(new CustomEvent("deep-legends:open-player", {
-      detail: { playerRef: row.dataset.playerRef, gameName: row.dataset.gameName, tagLine: row.dataset.tagLine, region: "cn", source: "search" },
+      detail: { playerRef: row.dataset.playerRef, gameName: friend?.gameName, tagLine: friend?.tagLine, region: "cn", source: "search" },
     }));
     setOpen(false);
   });

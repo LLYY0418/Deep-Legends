@@ -3,11 +3,11 @@
  const escape=s=>String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function safeLink(s){try{const u=new URL(s);return ['https:','http:'].includes(u.protocol) && !u.username && !u.password?u.href:'';}catch{return '';}}
  function markdown(text,images=[]){
-  text=String(text).replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi,'').replace(/<[^>]*>/g,'');
+  text=String(text).replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi,'');
   const inline=s=>{
    const tokens=[];
    s=s.replace(/(!?)\[([^\]]*)\]\(([^\s)]+)\)/g,(_,img,label,url)=>{const index=images.indexOf(url);let html='';if(img){if(index>=0)html=`<img src="/api/announcements/image?path=${encodeURIComponent(url)}" alt="${escape(label)}" loading="lazy">`;}else{const href=safeLink(url);html=href?`<a href="${escape(href)}" target="_blank" rel="noopener noreferrer">${escape(label)}</a>`:escape(label);}tokens.push(html);return `\u0000${tokens.length-1}\u0000`;});
-   return escape(s).replace(/\u0000(\d+)\u0000/g,(_,i)=>tokens[Number(i)]);
+   return escape(s).replace(/\*\*([^*\n]+)\*\*/g,'<strong class="announcement-em">$1</strong>').replace(/\u0000(\d+)\u0000/g,(_,i)=>tokens[Number(i)] ?? '');
   };
   let list=false,result='';for(const line of text.split('\n')){const bullet=/^\s*[-*] (.*)$/.exec(line);if(bullet){if(!list){result+='<ul>';list=true;}result+=`<li>${inline(bullet[1])}</li>`;continue;}if(list){result+='</ul>';list=false;}const heading=/^(#{1,3}) (.*)$/.exec(line);if(heading)result+=`<h${heading[1].length+1}>${inline(heading[2])}</h${heading[1].length+1}>`;else if(/^> /.test(line))result+=`<blockquote>${inline(line.slice(2))}</blockquote>`;else if(line.trim())result+=`<p>${inline(line)}</p>`;}return result+(list?'</ul>':'');
  }

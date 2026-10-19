@@ -59,6 +59,10 @@ type opggProMember struct {
 	FetchedAt  time.Time        `json:"-"`
 }
 type opggProAccount struct {
+	IdentityUnavailable bool            `json:"identity_unavailable,omitempty"`
+	LastSuccessAt       string          `json:"last_success_at,omitempty"`
+	LastMatchID         string          `json:"last_match_id,omitempty"`
+	Failures            int             `json:"failures,omitempty"`
 	ActivityFailed      bool            `json:"activity_failed,omitempty"`
 	ActivityPending     bool            `json:"activity_pending,omitempty"`
 	CheckedAt           string          `json:"checked_at,omitempty"`
@@ -133,6 +137,8 @@ type proPlayer struct {
 	Accounts []proAccount `json:"accounts"`
 }
 type proAccount struct {
+	IdentityUnavailable bool   `json:"identityUnavailable,omitempty"`
+	NextRefreshAt       string `json:"nextRefreshAt,omitempty"`
 	CheckedAt           string `json:"checkedAt,omitempty"`
 	CheckFailed         bool   `json:"checkFailed,omitempty"`
 	Reviewed            bool   `json:"reviewed,omitempty"`
@@ -175,6 +181,9 @@ func (a *app) handleProPlayers(w http.ResponseWriter, r *http.Request) {
 	updating := a.proPlayers.updating || a.proPlayers.firstScreenFlight || a.proPlayers.flight != nil
 	a.proPlayers.mu.Unlock()
 	result := a.buildReviewedProPlayers(teams)
+	a.proProfiles.mu.Lock()
+	updating = updating || len(a.proProfiles.inflight) > 0
+	a.proProfiles.mu.Unlock()
 	result.Updating = updating
 	result.FetchedAt = fetchedAt
 	result.RosterVerifiedAt = proRosterVerifiedAt
@@ -575,7 +584,11 @@ var proTierOrder = map[string]int{"IRON": 1, "BRONZE": 2, "SILVER": 3, "GOLD": 4
 func normalizeProAccount(raw opggProAccount) (proAccount, bool) {
 	lastMatchAt, lastMatchKnown := proRealLastMatchAt(raw)
 	account := proAccount{LastMatchAt: lastMatchAt, LastMatchAtKnown: lastMatchKnown, DirectoryRevisionAt: proDirectoryRevisionAt(raw), GameName: strings.TrimSpace(raw.GameName), TagLine: strings.TrimSpace(raw.TagLine), RankStatus: "unavailable", Source: "OP.GG", Inactive: raw.Inactive, Dormant: raw.Inactive, Stale: raw.Stale, LadderRank: raw.LadderRank, LadderRankKnown: raw.LadderRankKnown}
+	account.IdentityUnavailable = raw.IdentityUnavailable
 	account.CheckedAt, account.CheckFailed = raw.CheckedAt, raw.CheckFailed
+	if at, err := time.Parse(time.RFC3339Nano, raw.CheckedAt); err == nil {
+		account.NextRefreshAt = at.Add(proProfileTTL(raw)).UTC().Format(time.RFC3339Nano)
+	}
 	if raw.PUUID == "" {
 		account.Confidence = "low"
 	}

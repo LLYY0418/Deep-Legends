@@ -3,6 +3,7 @@
 .announcements-dialog>header h2{margin:0;font-size:14px}
 .announcements-dialog [data-announcements-content]{max-height:60vh;overflow:auto;padding:14px}
 .announcement-markdown{font-size:13px;line-height:1.6}
+.announcement-em{color:var(--primary-strong);font-weight:700}
 .announcement-markdown :is(h2,h3,h4){margin:14px 0 4px;color:var(--primary-strong);font-size:14px}
 .announcement-markdown :is(h2,h3,h4):first-child{margin-top:0}
 .announcement-markdown p{margin:4px 0}.announcement-markdown ul{margin:4px 0 0;padding-left:20px}

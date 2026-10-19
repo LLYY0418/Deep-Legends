@@ -100,7 +100,7 @@ function functionSource(script, name) {
   const asyncStart = script.lastIndexOf("async ", markerStart);
   const start = asyncStart >= 0 && asyncStart + 6 === markerStart ? asyncStart : markerStart;
   assert.notEqual(start, -1, `missing ${name}`);
-  const bodyStart = script.indexOf("{", start);
+  const bodyStart = script.indexOf("{", script.indexOf(")", start));
   let depth = 0;
   let quote = "";
   let escaped = false;
@@ -140,7 +140,9 @@ function compile(names, dependencies = {}, script = source) {
     length = names.length;
     for (const name of ["bindLiveNode", "champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel", "liveClientPositionsPending", "clearRuneStarterRetries", "runeStarterTargetActive", "laneMatchupEnemies", "laneMatchupTier", "laneMatchupInference", "laneMatchupAvailability", "ensureLaneMatchupPositions", "laneMatchupPairKey", "laneMatchupOwnLocked", "ensureLaneMatchupPair", "recordLaneMatchupCandidateSkip", "laneMatchupUnavailableReason", "recordLaneMatchupCardDiagnostic", "liveRecommendationTier"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   }
+  for (const helper of ["privacyName", "renderRankWindowNote", "liveTagVisible"]) if (!dependencies[helper] && !names.includes(helper) && names.some(name => functionSource(script,name).includes(helper+"("))) names.push(helper);
   dependencies = { readSetting: (_key, fallback) => fallback, recordItemSetClientDiagnostic: () => {}, document: { hidden: false, hasFocus:()=>true }, setTimeout, clearTimeout, riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, isSummonersRiftMatch: data => Number(data?.mapId) === 11, clusterPremadePlayers: players => players, window: {}, ...dependencies };
+  dependencies.window = {deepLegendsPrivacy:require("./privacy.js"),...dependencies.window};
   const keys = Object.keys(dependencies);
   return Function(...keys, `"use strict";\n${require("./r220-harness-support.cjs").prelude(script,dependencies)}${names.map((name) => functionSource(script, name)).join("\n")}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
 }

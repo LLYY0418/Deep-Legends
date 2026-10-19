@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld("desktopTheme", {
 });
 
 contextBridge.exposeInMainWorld("desktopShare", {
+  setSaveDirectory(directory) { return ipcRenderer.invoke("desktop-share-set-directory", directory); },
   onDirectoryChanged(callback) {
     if (typeof callback !== "function") return;
     const listener = (_event, value) => callback(value);
@@ -109,4 +110,11 @@ contextBridge.exposeInMainWorld("desktopBackend", {
 
 contextBridge.exposeInMainWorld("desktopUpdate", {
   ready() { ipcRenderer.send("desktop-update-ready"); },
+});
+
+contextBridge.exposeInMainWorld("desktopPreferences", {
+  get() { return ipcRenderer.invoke("desktop-preferences-get"); },
+  update(patch) { return ipcRenderer.invoke("desktop-preferences-update", patch); },
+  openDirectory(kind) { return ipcRenderer.invoke("desktop-open-directory", kind); },
+  openGithub() { return ipcRenderer.invoke("desktop-open-github"); },
 });

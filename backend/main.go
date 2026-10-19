@@ -211,6 +211,7 @@ type app struct {
 	liveClientPlayerListNow         func() time.Time
 	clientLauncher                  func(clientInstallation) (clientLaunchResult, error)
 	clientLaunch                    clientLaunchState
+	clientAutostart                 clientAutostartState
 	clientLaunchTiming              clientLaunchTimingState
 	coldLaunch                      coldLaunchTimeline
 	coldDiscovery                   coldLCUDiscovery
@@ -641,6 +642,11 @@ func main() {
 	mux.Handle("GET /", staticFiles)
 	mux.HandleFunc("GET /api/license/status", a.authorized(a.handleLicenseStatus))
 	mux.HandleFunc("POST /api/license/activate", a.authorized(a.handleLicenseActivate))
+	mux.HandleFunc("POST /api/pro-players/refresh", a.authorized(a.handleProScopedRefresh))
+	mux.HandleFunc("GET /api/client-autostart", a.authorized(a.handleClientAutostart))
+	mux.HandleFunc("POST /api/client-autostart", a.authorized(a.handleClientAutostart))
+	mux.HandleFunc("GET /api/release-notes", a.authorized(a.handleReleaseNotes))
+	mux.HandleFunc("GET /api/client-launch/status", a.authorized(a.handleClientLaunchStatus))
 	mux.HandleFunc("GET /api/status", a.authorized(a.handleStatus))
 	mux.HandleFunc("POST /api/gameplay/history-head", a.authorized(a.handleGameplayHistoryHead))
 	mux.HandleFunc("GET /api/announcements", a.authorized(a.handleAnnouncements))
@@ -787,6 +793,7 @@ func main() {
 	a.runtimeMetricsDone = make(chan struct{})
 	a.goSafe("backend_runtime_metrics", func() { defer close(a.runtimeMetricsDone); a.runBackendRuntimeMetrics(runtimeContext, nil, nil) })
 	a.startApplicationBusiness(runtimeContext)
+	a.goSafe("client-autostart-startup", a.scanClientAutostart)
 	a.updates.Start()
 	if !*noBrowser && !*desktopMode {
 		go func() {

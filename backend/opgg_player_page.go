@@ -97,7 +97,7 @@ func (a *app) readOPGGPlayerPage(ctx context.Context, ref gameplayReference, met
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("OP.GG profile HTTP %d", resp.StatusCode)
+		return nil, &riotStatusError{message: fmt.Sprintf("OP.GG profile HTTP %d", resp.StatusCode), status: resp.StatusCode}
 	}
 	return readLimited(resp.Body, opggGamesResponseMax)
 }

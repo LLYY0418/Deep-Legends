@@ -43,6 +43,12 @@ function createDiagnosticsDirectoryController({app,dialog,fileSystem:fs,isTruste
   }
   return {
     getDirectory,
+    setSaveDirectory(event,directory){
+      if(!trusted(event))throw Error("untrusted renderer");
+      if(typeof directory!=="string"||directory.length>4096)throw Error("invalid directory");
+      persist(directory ? inspect(directory) : null);
+      return {directory:getDirectory()};
+    },
     getSaveDirectory(event){if(!trusted(event))throw Error("untrusted renderer");return {directory:getDirectory()};},
     chooseSaveDirectory(event){if(!trusted(event))throw Error("untrusted renderer");return choose();},
     rememberFile(file){persist(inspect(path.dirname(file)));},

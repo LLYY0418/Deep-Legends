@@ -504,6 +504,7 @@
 
   function activateSection(name) {
     const previous = state.section;
+    if (previous === "live" && name !== "live" && state.autoLiveEntered) state.autoLiveLeft = true;
     state.section = name;
     if (name !== "live") clearRuneStarterRetries();
     clearTimeout(state.liveTimer);
@@ -716,7 +717,7 @@
         nodes.playerOverlay.hidden = !entry;
         if (entry) {
           nodes.playerOverlay.dataset.entryKey = entry.key;
-          if (nodes.playerOverlayTitle) nodes.playerOverlayTitle.textContent = state.settings.maskNames ? "玩家" : entry.label;
+          if (nodes.playerOverlayTitle) nodes.playerOverlayTitle.textContent = state.settings.maskNames ? privacyName(entry.data?.player || entry.identity || {playerRef:entry.key},{context:"identity"}) : entry.label;
           syncOverlayAddButton(entry);
         } else {
           delete nodes.playerOverlay.dataset.entryKey;
@@ -1830,8 +1831,8 @@
     const mixedRegions=group==="kr" && new Set(indexedTabs.map(({tab})=>tab.region || tab.data?.player?.region)).size>1;
     const markup = indexedTabs.length ? indexedTabs.map(({ tab, index }) => {
       const selected = tab.key === state.activeTabs[group];
-      const masked = state.settings.maskNames && !tab.current;
-      const label = masked ? (tab.data?.player?.hidden ? "隐藏玩家" : `玩家 ${String(index).padStart(2, "0")}`) : tab.label;
+      const masked = state.settings.maskNames;
+      const label = masked ? privacyName(tab.data?.player || tab.identity || tab.riotId || {playerRef:tab.key},{index,context:"identity"}) : tab.label;
       const icon = !masked && tab.icon ? assetIcon(assetPath("profile", tab.icon), "", "", false) : '<span class="player-tab-placeholder" aria-hidden="true">◉</span>';
       const regionBadge = mixedRegions ? `<small class="player-tab-region">${escapeHTML(tabServerLabel(tab))}</small>` : "";
       const selfBadge = tab.current ? '<span class="player-tab-self" data-tooltip="当前登录的召唤师" data-tooltip-size="compact" aria-hidden="true">★</span>' : "";
@@ -2568,8 +2569,8 @@
   }
 
   function renderSummonerStrip(data,tab,pending=false) {
-    const player=data?.player || tab.identity || tab.riotId || {},masked=state.settings.maskNames && !player.isCurrent;
-    const profileName=masked?(player.hidden?'隐藏玩家':`玩家 ${String(Math.max(1,state.tabs.findIndex(t=>t.key===tab.key))).padStart(2,'0')}`):(player.gameName || player.displayName || tab.riotId?.gameName || tab.label || '');
+    const player=data?.player || tab.identity || tab.riotId || {},masked=state.settings.maskNames;
+    const profileName=masked?privacyName(player,{index:Math.max(0,state.tabs.findIndex(t=>t.key===tab.key)),context:"identity"}):(player.gameName || player.displayName || tab.riotId?.gameName || tab.label || '');
     const tag=`<span class="summoner-tag${!masked && player.tagLine?'':' is-identity-placeholder'}">${!masked && player.tagLine?'#'+escapeHTML(player.tagLine):'&nbsp;'}</span>`;
     const meta=tag+summonerRegionChip(tab)+renderOverviewStreak(tab.overviewStreak)+(!masked?summonerProChip(tab):'');
     const copy=!masked && !player.hidden && profileName?`${profileName}${player.tagLine?'#'+player.tagLine:''}`:'';
@@ -2847,7 +2848,7 @@
     const positions = { top: "上路", jungle: "打野", middle: "中路", bottom: "下路", utility: "辅助" };
     const mask = state.settings.maskNames;
     const playerRow = (player, index) => {
-      const name = mask ? `玩家 ${index + 1}` : player.gameName || player.displayName || "隐藏玩家";
+      const name = mask ? privacyName(player,{championName:player.championName,index,context:"live"}) : player.gameName || player.displayName || "隐藏玩家";
       const tag = !mask && player.tagLine ? `#${player.tagLine}` : "";
       const position = positions[player.preferredPosition];
       const positionTip = `首选位置：${position}`;
@@ -3152,6 +3153,13 @@
     </div>`;
   }
 
+  function renderRankWindowNote(progress) {
+    const oldest=Number(progress?.rankedOldestAt),date=new Date(oldest);
+    if(!progress?.upstreamCapped || !Number.isFinite(oldest) || oldest<=Date.UTC(2026,0,8) || !Number.isFinite(date.getTime()))return "";
+    const copy=`官方接口仅提供 ${date.getMonth()+1}月${date.getDate()}日 之后的对局`;
+    return `<button type="button" class="season-data-note" aria-label="数据说明" data-tooltip="${escapeHTML(copy)}" data-tooltip-size="compact"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7v4M8 4.5v.5"/></svg></button>`;
+  }
+
   function renderRanks(ranks, capabilities, historicalRanks, rankMilestones, seasonProgress = null, tab = null) {
     const rankedCapability = capabilities.find((item) => item.name === "ranked-stats");
     const mmr = renderRankMMRPopover(tab);
@@ -3182,7 +3190,7 @@
 	  const unavailableDetail = paused ? "官方战绩服务暂时中断，恢复后自动继续统计" : collecting ? "正在统计中" : (rankedCapability?.detail || "上游未提供负场，无法计算胜率");
 	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 <b class="win-rate-value">${percent(rank.winRate)}</b>` : collecting ? "正在统计中" : "胜率暂不可用"}</span></div></div>`;
     }).join("");
-    return `<section class="career-section rank-career-section"><header><h3>排位</h3><div class="rank-header-tools"><span>当前赛季</span>${mmr}</div></header><div class="rank-list${rows.includes('gameplay-skeleton')?' career-pending':''}">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;
+    return `<section class="career-section rank-career-section"><header><h3>排位</h3><div class="rank-header-tools"><span>当前整个赛季</span>${renderRankWindowNote(seasonProgress)}${mmr}</div></header><div class="rank-list${rows.includes('gameplay-skeleton')?' career-pending':''}">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;
   }
 
   async function loadMayhemRating(tab, quietStart = false) {
@@ -3634,7 +3642,7 @@
 
   function overviewShareFileName(tab) {
     const player = tab?.data?.player || {};
-    const playerName = String(player.gameName || player.displayName || "overview")
+    const playerName = String(state.settings.maskNames ? privacyName(player,{context:"identity"}) : player.gameName || player.displayName || "overview")
       .replace(/[<>:"/\\|?*\x00-\x1f]/g, "-")
       .replace(/[. ]+$/g, "")
       .trim()
@@ -3751,8 +3759,8 @@
     const returnScroll=Math.max(0,Number(returning?.scrollTop || 0));
     const player = data.player || {};
     const playerIndex = Math.max(1, state.tabs.findIndex((item) => item.key === tab.key));
-    const maskProfile = state.settings.maskNames && !player.isCurrent;
-    const profileName = maskProfile ? (player.hidden ? "隐藏玩家" : `玩家 ${String(playerIndex).padStart(2, "0")}`) : (player.gameName || player.displayName || "隐藏玩家");
+    const maskProfile = state.settings.maskNames;
+    const profileName = maskProfile ? privacyName(player,{index:playerIndex,context:"identity"}) : (player.gameName || player.displayName || "隐藏玩家");
     const riotID = !maskProfile && player.tagLine ? `${profileName}#${player.tagLine}` : profileName;
 
     state.careerDialogOpener = opener;
@@ -7327,6 +7335,15 @@
     return phase === "ChampSelect" && !player.isAlly && !player.isCurrent && selfTeam > 0 && Number(player.teamId) > 0 && Number(player.teamId) !== selfTeam;
   }
 
+  function liveTagVisible(key) {
+    try {
+      const raw = readSetting("live-tags", "");
+      if (!raw) return true;
+      const selected = JSON.parse(raw);
+      return !Array.isArray(selected) || selected.includes(key);
+    } catch (_) { return true; }
+  }
+
   function renderLivePlayer(player, index, arenaMode = false, currentChampionId = 0, premadePlayers = [], recentPositions = "", aramMode = false, hextechMode = false, phase = "", displayPosition = "", identityKind = "") {
     if (champSelectEnemyPlaceholder(player, phase, premadePlayers)) {
       return `<article class="live-player">${iconFigure("champion", liveDisplayedChampionId(player, currentChampionId), player.championName, "live")}<div class="live-player-copy live-player-placeholder">暂无玩家信息，进入游戏后显示</div></article>`;
@@ -7346,14 +7363,14 @@
     const contextCopy = player.hidden === true ? (player.position ? positionLabel(player.position) : "") : arenaMode || aramMode ? "" : `${positionLabel(displayPosition || player.position)} · ${rankCopy}`;
     const liveArena = identityKind ? globalThis.deepLegendsLiveArena : null;
     const rowTone = (player.isCurrent ? " is-self" : player.isAlly ? " is-ally" : "") + (player.hidden === true ? " is-hidden" : "");
-    const hiddenChip = `${player.privateHistory === true ? '<span class="player-tab-hidden">隐藏战绩</span>' : ""}${player.hidden === true ? '<span class="player-tab-hidden">隐藏身份</span>' : player.identityUnresolved === true ? '<span class="player-tab-hidden">身份待公开</span>' : ""}`;
-    const liveAutofillChip = player.autofill === true ? '<span class="match-autofill-chip">补位</span>' : "";
-    const premadeTag = renderLivePremadeTag(player, premadePlayers, currentChampionId);
+    const hiddenChip = !liveTagVisible("hidden") ? "" : `${player.privateHistory === true ? '<span class="player-tab-hidden">隐藏战绩</span>' : ""}${player.hidden === true ? '<span class="player-tab-hidden">隐藏身份</span>' : player.identityUnresolved === true ? '<span class="player-tab-hidden">身份待公开</span>' : ""}`;
+    const liveAutofillChip = liveTagVisible("autofill") && player.autofill === true ? '<span class="match-autofill-chip">补位</span>' : "";
+    const premadeTag = !liveTagVisible("premade") ? "" : renderLivePremadeTag(player, premadePlayers, currentChampionId);
 	const emptySummary = historyState === "unavailable" ? player.identityUnresolved === true ? "身份尚未公开" : "客户端未公开该玩家" : historyState === "failed" ? "读取失败" : "本模式暂无战绩";
 	const historySummary = historyPending
 	  ? '<dl class="is-history-pending" aria-label="战绩读取中"><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div></dl>'
 	  : liveArena?.arenaSummary(player, identityKind, emptySummary) || `<dl><div><dt>${recordGames ? `近 ${number(recordGames)} 局` : "当前模式"}</dt><dd class="live-record-value">${displayStats.games ? `${number(displayStats.wins)}胜 ${number(displayStats.losses)}负` : emptySummary}</dd></div>${player.hidden === true && !displayStats.games ? "" : `<div><dt>胜率</dt><dd class="win-rate-value">${displayStats.games ? percent(displayStats.winRate) : "—"}</dd></div><div><dt>KDA</dt><dd class="live-kda-value">${displayStats.games ? `${kda(displayStats.kda)}:1` : "—"}</dd></div>`}</dl>`;
-	return `<article class="live-player${rowTone}">${portrait}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}" ${proBadgeAttributes(player)}` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${hiddenChip}${liveAutofillChip}${premadeTag}${player.mySquad && !(identityKind === "arena" && liveArena) ? '<span class="my-squad-chip">我的小队</span>' : ""}${renderProIdentityBadge(player)}</div>${liveArena ? liveArena.identityLine(player, identityKind, contextCopy) : contextCopy ? `<span>${phase!=='ChampSelect' || player.hidden || arenaMode || aramMode?escapeHTML(contextCopy):`${escapeHTML(positionLabel(displayPosition || player.position))} · <b class="live-rank-title">${escapeHTML(rankCopy)}</b>`}</span>` : ""}${recentPositions}</div>${historySummary}</article>`;
+	return `<article class="live-player${rowTone}">${portrait}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}" ${proBadgeAttributes(player)}` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${liveTagVisible("self") && player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${hiddenChip}${liveAutofillChip}${premadeTag}${liveTagVisible("squad") && player.mySquad && !(identityKind === "arena" && liveArena) ? '<span class="my-squad-chip">我的小队</span>' : ""}${liveTagVisible("pro") ? renderProIdentityBadge(player) : ""}</div>${liveArena ? liveArena.identityLine(player, identityKind, contextCopy) : contextCopy ? `<span>${phase!=='ChampSelect' || player.hidden || arenaMode || aramMode?escapeHTML(contextCopy):`${escapeHTML(positionLabel(displayPosition || player.position))} · <b class="live-rank-title">${escapeHTML(rankCopy)}</b>`}</span>` : ""}${liveTagVisible("positions") ? recentPositions : ""}</div>${historySummary}</article>`;
   }
 
 	  function orderLivePlayers(players, groupByTeam = true) {
@@ -8237,12 +8254,20 @@
       activeKey = limited[0]?.[0] || "";
       state.specialistPlayerTabs.set(tabKey, activeKey);
     }
-    const tabs = limited.map(([key, games]) => {
+    const tabs = limited.map(([key, games], playerIndex) => {
       const config = games[0]?.config;
       const active = key === activeKey;
       const name = String(config?.playerName || "").trim();
       const tagLine = String(config?.tagLine || "").trim();
+      const visibleName=privacyName({gameName:name,tagLine},{context:"recommendation"});
       const canOpen = source === "specialist" && name && tagLine && config?.region === "kr";
+      if(state.settings?.maskNames) {
+        const choice = `${tabKey}:${playerIndex}`;
+        state.specialistOverviewTargets ||= new Map();
+        state.specialistOverviewTargets.set(choice,{gameName:name,tagLine});
+        const nameButton = `<button type="button" role="tab" class="specialist-player-name" data-specialist-player="${escapeHTML(key)}" data-player-source="${source}" aria-selected="${active}">${escapeHTML(visibleName)}</button>`;
+        return canOpen ? `<div class="specialist-player-tab specialist-player-split${active ? " is-active" : ""}">${nameButton}<button type="button" class="specialist-player-overview" data-specialist-overview data-specialist-choice="${escapeHTML(choice)}" aria-label="查看 ${escapeHTML(visibleName)} 的总览">总览</button></div>` : `<div class="specialist-player-tab${active ? " is-active" : ""}">${nameButton}</div>`;
+      }
       if (!canOpen) return `<button type="button" role="tab" class="specialist-player-tab${source === "pro" ? " pro-player-tab" : ""}${active ? " is-active" : ""}" data-specialist-player="${escapeHTML(key)}" data-player-source="${source}" aria-selected="${active}">${source === "pro" ? `<span class="pro-player-name">${escapeHTML(config?.title || key)}</span>${proRuneRecordLabel(config)}` : escapeHTML(key)}</button>`;
       return `<div class="specialist-player-tab specialist-player-split${active ? " is-active" : ""}"><button type="button" role="tab" class="specialist-player-name" data-specialist-player="${escapeHTML(key)}" data-player-source="specialist" aria-selected="${active}" aria-label="查看 ${escapeHTML(name)} 的推荐符文">${escapeHTML(name)}</button><button type="button" class="specialist-player-overview" data-specialist-overview data-player-name="${escapeHTML(name)}" data-player-tag="${escapeHTML(tagLine)}" aria-label="查看 ${escapeHTML(name)}#${escapeHTML(tagLine)} 的总览">总览</button></div>`;
     }).join("");
@@ -8260,7 +8285,7 @@
         : '<span class="rune-choice-champion-placeholder" aria-hidden="true"></span>';
       const title = runeConfigurationTitle(config);
       const opponentPlayer = config.opponentPlayerName
-        ? `${config.opponentPlayerName}${config.opponentTagLine ? `#${config.opponentTagLine}` : ""}`
+        ? privacyName({gameName:config.opponentPlayerName,tagLine:config.opponentTagLine},{championName:config.opponentChampionName,context:"match"})
         : "暂无召唤师信息";
 	  const opponentRankTitle = config.opponentTier ? rankTitle({ tier: config.opponentTier, division: config.opponentDivision }) : "";
 	  const opponentWinRate = config.opponentWinRate != null && Number.isFinite(Number(config.opponentWinRate))
@@ -8318,7 +8343,7 @@
     const winRate = stats.winRate ?? stats.win_rate ?? (stats.win != null && games ? stats.win * 100 / games : null);
     const pickRate = stats.pickRate ?? stats.pick_rate;
     const specialistStats = `<dl class="rune-player-stats"><div><dt>胜率</dt><dd class="win-rate-value">${rate(winRate)}</dd></div><div><dt>场次</dt><dd>${compactNumber(games)}</dd></div><div><dt>选用率</dt><dd>${rate(pickRate)}</dd></div></dl>`;
-    const riotID = `${config.playerName || ""}${config.tagLine ? `#${config.tagLine}` : ""}`;
+    const riotID = privacyName({gameName:config.playerName,tagLine:config.tagLine},{context:"recommendation"});
     const specialistRank = config.tier ? rankTitle({ tier: config.tier, division: config.division }) : "";
     const played = relativeTime(config.playedAt);
     const result = config.result === "win" ? "胜利" : config.result === "loss" ? "失败" : config.result === "remake" ? "重开" : "";
@@ -8739,8 +8764,9 @@
       refreshLiveRuneWorkspace(`[data-rune-source="${CSS.escape(source)}"]`);
     });
     for (const button of root?.querySelectorAll("[data-specialist-overview]") || []) bindLiveNode(button, "click", "specialist-overview", () => {
-      const gameName = button.dataset.playerName;
-      const tagLine = button.dataset.playerTag;
+      const target = state.specialistOverviewTargets?.get(button.dataset.specialistChoice);
+      const gameName = target?.gameName || button.dataset.playerName;
+      const tagLine = target?.tagLine || button.dataset.playerTag;
       if (!gameName || !tagLine) return;
       window.dispatchEvent(new CustomEvent("deep-legends:open-player", {
         // 绝活哥数据源固定选取韩服榜单。
@@ -8928,6 +8954,20 @@
   }
 
   function bindSettings() {
+    const autoLive = document.getElementById("setting-auto-live");
+    if (autoLive) {
+      autoLive.checked = readSetting("auto-live", "false") === "true";
+      autoLive.addEventListener("change", () => writeSetting("auto-live", autoLive.checked));
+    }
+    const tagRoot = document.getElementById("setting-live-tags");
+    const renderTags = () => {
+      if (!tagRoot) return;
+      tagRoot.innerHTML = [["self","自己"],["premade","组队 / 预组"],["pro","职业选手"],["hidden","隐藏战绩 / 身份"],["autofill","补位"],["squad","我的小队"],["positions","常用位置"]].map(([key,label]) => `<label><input type="checkbox" value="${key}" ${liveTagVisible(key) ? "checked" : ""}><span>${label}</span></label>`).join("");
+    };
+    renderTags();
+    tagRoot?.addEventListener("change", () => { writeSetting("live-tags", JSON.stringify([...tagRoot.querySelectorAll("input:checked")].map(node => node.value))); renderLive("settings"); });
+    document.getElementById("setting-live-tags-reset")?.addEventListener("click", () => { localStorage.removeItem("lol-loot-live-tags"); renderTags(); renderLive("settings"); });
+    window.addEventListener("deep-legends:settings-imported", () => { renderTags(); renderLive("settings"); });
     nodes.settingDefaultPage.value = state.settings.defaultPage;
     nodes.settingMatchCount.value = String(state.settings.matchCount);
     nodes.settingDefaultMatchFilter.value = state.settings.defaultMatchFilter;
@@ -8948,14 +8988,32 @@
     nodes.settingLiveInterval.disabled = !state.settings.liveRefresh;
     nodes.settingLiveInterval.addEventListener("change", () => { state.settings.liveInterval = normalizeLiveInterval(nodes.settingLiveInterval.value); writeSetting("live-interval", state.settings.liveInterval); scheduleLiveRefresh(); renderLive("settings"); });
 	    nodes.settingLiveOrder.addEventListener("change", () => { state.settings.liveOrder = normalizeLiveOrder(nodes.settingLiveOrder.value); writeSetting("live-order", state.settings.liveOrder); renderLive("settings"); });
-    nodes.settingMaskNames.addEventListener("change", () => { state.settings.maskNames = nodes.settingMaskNames.checked; writeSetting("mask-names", state.settings.maskNames); renderPlayerTabs(); renderOverview(overviewGroupForSection()); renderLive("settings"); if (state.overlay.length) renderOverlay(); });
+    nodes.settingMaskNames.addEventListener("change", () => {
+      // Retained match lists belong to the previous privacy policy. Invalidate
+      // all workspaces and filter fragments before reusing their DOM.
+      for (const tab of new Set([...(state.tabs || []), ...(state.overlay || [])])) {
+        tab.matchViewRevision = Number(tab.matchViewRevision || 0) + 1;
+        for (const view of tab.matchViews?.values() || []) {
+          if (view.list) disposeMatchRowHeight(view.list);
+          delete view.list; delete view.fragment;
+        }
+      }
+      state.settings.maskNames = nodes.settingMaskNames.checked; writeSetting("mask-names", state.settings.maskNames); window.dispatchEvent(new CustomEvent("deep-legends:privacy-changed")); renderPlayerTabs(); renderOverview(overviewGroupForSection()); renderLive("settings"); if (state.overlay.length) renderOverlay(); });
     nodes.settingConfirmReplay.addEventListener("change", () => { state.settings.confirmReplay = nodes.settingConfirmReplay.checked; writeSetting("confirm-replay", state.settings.confirmReplay); });
   }
 
   function renderCapabilitySettings() {
     const labels = { summoner: "召唤师资料", "ranked-stats": "排位数据", "match-history": "战绩列表", "seven-day-history": "7 天统计样本", "match-details": "对局详情", "champion-mastery": "英雄熟练度", gameflow: "游戏流程", "gameflow-session": "当前对局", "champ-select": "英雄选择", "live-player-analysis": "队伍分析", "client-rune-recommendation": "客户端推荐符文", "champion-abilities": "英雄技能" };
 	const capabilities = (state.lastCapabilities || []).filter((item) => item?.state !== "canceled").filter(item => !clientRegion() || !String(item.path || "").startsWith("sgp:"));
-	nodes.gameplaySettingsStatus.innerHTML = capabilities.length ? `<div class="gameplay-capabilities">${capabilities.map((item) => `<div><span class="capability-dot is-${escapeHTML(item.state)}" aria-hidden="true"></span><span><strong>${escapeHTML(labels[item.name] || item.name)}</strong><small>${escapeHTML(item.detail || capabilityAttemptSummary(item) || (item.state === "available" ? `已读取 ${number(item.count)} 项` : "当前不可用"))}</small></span><b>${item.state === "available" ? "可用" : item.state === "unsupported" ? "不支持" : "读取失败"}</b></div>`).join("")}</div>` : '<p class="muted">打开总览或对局后显示能力状态。</p>';
+	const list = capabilities.length ? `<div class="gameplay-capabilities">${capabilities.map((item) => `<div><span class="capability-dot is-${escapeHTML(item.state)}" aria-hidden="true"></span><span><strong>${escapeHTML(labels[item.name] || item.name)}</strong><small>${escapeHTML(item.detail || capabilityAttemptSummary(item) || (item.state === "available" ? `已读取 ${number(item.count)} 项` : "当前不可用"))}</small></span><b>${item.state === "available" ? "可用" : item.state === "unsupported" ? "不支持" : "读取失败"}</b></div>`).join("")}</div>` : '<p class="muted">打开总览或对局后显示能力状态。</p>';
+    const available = capabilities.filter(item => item.state === "available").length;
+    const degraded = capabilities.length - available;
+    nodes.gameplaySettingsStatus.innerHTML = `<span>${available} 项可用${degraded ? ` <span class="settings-capability-degraded">· ${degraded} 项降级</span>` : ""}</span><button class="text-button" type="button">查看</button>`;
+    nodes.gameplaySettingsStatus.querySelector("button")?.addEventListener("click", async () => {
+      await window.deepLegendsSections.load("settings-preferences");
+      const content = document.createElement("div"); content.innerHTML = list;
+      window.deepLegendsSettingsModal("客户端接口", content);
+    });
   }
 
 	function capabilityAttemptSummary(capability) {
@@ -8972,9 +9030,11 @@
   function emptyState(title, copy, retry, icon = "⬡") { return `<div class="gameplay-empty"><span aria-hidden="true">${escapeHTML(icon)}</span><strong>${escapeHTML(title)}</strong><p>${escapeHTML(copy)}</p>${retry ? '<button class="text-button" type="button" data-gameplay-retry>重试</button>' : ""}</div>`; }
   function summonerLabel(summoner) { return `${summoner.gameName || summoner.displayName || "当前召唤师"}${summoner.tagLine ? `#${summoner.tagLine}` : ""}`; }
   function playerLabel(player) { if (player.identityUnresolved === true) return "身份待公开"; if (player.hidden === true) return "隐藏玩家"; return `${player.gameName || player.displayName || "隐藏玩家"}${player.tagLine ? `#${player.tagLine}` : ""}`; }
-  function maskedPlayerName(player, index) { if (player.identityUnresolved === true) return "身份待公开"; if (player.hidden === true) return "隐藏玩家"; if (!state.settings.maskNames || player.isCurrent) return playerLabel(player); return `玩家 ${String(index + 1).padStart(2, "0")}`; }
-  function maskedListName(player, index) { if (player.identityUnresolved === true) return "身份待公开"; if (player.hidden === true) return "隐藏玩家"; if (!state.settings.maskNames) return player.displayName || "隐藏玩家"; return `玩家 ${String(index + 1).padStart(2, "0")}`; }
-  function playerParticipantName(player, index) { if (player.identityUnresolved === true) return "身份待公开"; if (player.hidden === true) return "隐藏玩家"; if (!state.settings.maskNames) return `${player.gameName || player.displayName || "隐藏玩家"}${player.tagLine ? `#${player.tagLine}` : ""}`; return `玩家 ${String(index + 1).padStart(2, "0")}`; }
+  function privacyName(player, options = {}) { return window.deepLegendsPrivacy.name(player,{masked:state.settings?.maskNames===true,...options}); }
+  function maskedPlayerName(player, index) { return state.settings.maskNames ? privacyName(player,{championName:player.championName,index,context:"live"}) : playerLabel(player); }
+  function maskedListName(player, index) { if(state.settings.maskNames)return privacyName(player,{index,context:"recent"});if(player.identityUnresolved)return "身份待公开";if(player.hidden)return "隐藏玩家";return player.displayName || "隐藏玩家"; }
+  function playerParticipantName(player, index) { return state.settings.maskNames ? privacyName(player,{championName:player.championName,index,context:"match"}) : playerLabel(player); }
+
   function rankTitle(rank) { const tier = String(rank.tier || "").toLowerCase(); const tierName = ({ iron: "黑铁", bronze: "青铜", silver: "白银", gold: "黄金", platinum: "铂金", emerald: "翡翠", diamond: "钻石", master: "大师", grandmaster: "宗师", challenger: "王者" })[tier] || rank.tier || "未定级"; return `${tierName}${rank.division && !["master", "grandmaster", "challenger"].includes(tier) ? ` ${rank.division}` : ""}`; }
   function rankTierMark(tier) { return ({ IRON: "I", BRONZE: "B", SILVER: "S", GOLD: "G", PLATINUM: "P", EMERALD: "E", DIAMOND: "D", MASTER: "M", GRANDMASTER: "GM", CHALLENGER: "C" })[String(tier).toUpperCase()] || "◇"; }
   function rankCrestIcon(tier) {
@@ -9764,6 +9824,14 @@
       updateBeacon(phase);
       markOverviewAfterGame(phase, nextId || previousId, finishedQueueId);
     } else if (!nextId) scheduleBeaconPoll(0);
+    if (!liveGamePhase(phase)) { state.autoLiveEntered = false; state.autoLiveLeft = false; }
+    else {
+      if (gameChanged) { state.autoLiveEntered = false; state.autoLiveLeft = false; }
+      if ((phaseChanged || gameChanged) && ["ChampSelect", "GameStart", "InProgress"].includes(phase) && readSetting("auto-live", "false") === "true" && !state.autoLiveLeft) {
+        state.autoLiveEntered = true;
+        window.dispatchEvent(new CustomEvent("deep-legends:navigate", {detail:{section:"live"}}));
+      }
+    }
     if (phaseChanged || gameChanged) { state.liveRenderTrigger = "sse"; renderLive(); }
     if (phaseChanged || gameChanged || changed) queueLiveEventRefresh(source, phaseChanged || gameChanged);
   }

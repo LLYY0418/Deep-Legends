@@ -56,7 +56,7 @@ test('R164 non-Rift teammates stay adjacent by verified premade group while Rift
 });
 
 test('R165 live chips distinguish private history, hidden identity, and direct autofill', () => {
-  const names = ['liveHistoryStateOf', 'liveHistorySettled', 'renderLivePlayer','champSelectEnemyPlaceholder'];
+  const names = ['liveTagVisible','liveHistoryStateOf', 'liveHistorySettled', 'renderLivePlayer','champSelectEnemyPlaceholder'];
   const render = Function('liveDisplayedChampionId', 'maskedPlayerName', 'renderLivePremadeTag', 'renderProIdentityBadge', 'proBadgeAttributes', 'iconFigure', 'escapeHTML', 'positionLabel', 'rankTitle', 'number', 'percent', 'kda', `${names.map(extract).join('\n')}; return renderLivePlayer;`)(
     () => 0, (player) => player.displayName, () => '', () => '', () => '', () => '<icon></icon>', String, () => '', () => '', String, String, String,
   );
@@ -75,7 +75,7 @@ test('R165 live chips distinguish private history, hidden identity, and direct a
 });
 
 test('R168 live identity copy separates unresolved champ select names from explicit privacy', () => {
-  const names = ['playerLabel', 'maskedPlayerName', 'maskedListName', 'playerParticipantName', 'liveHistoryStateOf', 'liveHistorySettled', 'renderLivePlayer', 'renderInsightMatches','champSelectEnemyPlaceholder'];
+  const names = ['liveTagVisible','playerLabel', 'maskedPlayerName', 'maskedListName', 'playerParticipantName', 'liveHistoryStateOf', 'liveHistorySettled', 'renderLivePlayer', 'renderInsightMatches','champSelectEnemyPlaceholder'];
   const helpers = Function('state', 'liveDisplayedChampionId', 'renderLivePremadeTag', 'renderProIdentityBadge', 'proBadgeAttributes', 'iconFigure', 'escapeHTML', 'positionLabel', 'rankTitle', 'number', 'percent', 'kda', `${names.map(extract).join('\n')}; return { playerLabel, maskedPlayerName, maskedListName, playerParticipantName, renderLivePlayer, renderInsightMatches };`)(
     { settings: { maskNames: false } }, () => 0, () => '', () => '', () => '', () => '<icon></icon>', String, () => '', () => '', String, String, String,
   );

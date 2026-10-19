@@ -41,6 +41,7 @@ button.insight-match:focus-visible { outline: 2px solid var(--focus); outline-of
 .live-teams.is-arena.is-squads.is-squad-size-2 > .live-team.is-squad { grid-row: span 5; }
 .live-teams.is-arena.is-squads.is-squad-size-4 > .live-team.is-squad { grid-row: span 9; }
 .live-teams.is-arena.is-squads .live-player-list.is-insight { display: contents; }
+.live-teams.is-arena.is-squads .insight-match-row { align-content: flex-start; align-items: flex-start; }
 .live-team.is-squad > header { min-height: 34px; }
 .live-team.is-squad-premade { box-shadow: inset 3px 0 0 var(--accent); }
 .live-team.is-squad-unknown { box-shadow: inset 3px 0 0 var(--line); }

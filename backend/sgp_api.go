@@ -1011,10 +1011,15 @@ func (p *sgpProvider) matchHistoryFilteredWithDecodeOn(ctx context.Context, clie
 				p.mu.Lock()
 				store := p.historyGamesLocked()
 				p.mu.Unlock()
-				store.putSGP(serverID, &info)
+				// The freshly decoded value already belongs to this caller.
+				// Only materialize a cached value if a complete detail won the
+				// cache write; cold season scans avoid a second JSON decode.
+				stored := store.putSGP(serverID, &info)
 				immutable := &info
-				if cached, ok := store.sgp(serverID, info.GameID, true); ok {
-					immutable = cached
+				if !stored {
+					if cached, ok := store.sgp(serverID, info.GameID, true); ok {
+						immutable = cached
+					}
 				}
 				games = append(games, immutable)
 				parsedPageGames = append(parsedPageGames, immutable)

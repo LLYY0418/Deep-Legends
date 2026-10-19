@@ -189,7 +189,7 @@ func fetchOPGGLadderRank(ctx context.Context, provider *championProvider, gameNa
 		}
 		defer response.Body.Close()
 		if response.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("pro ladder HTTP %d", response.StatusCode)
+			return nil, &riotStatusError{message: fmt.Sprintf("pro ladder HTTP %d", response.StatusCode), status: response.StatusCode}
 		}
 		return readLimited(response.Body, proLadderMaxBytes)
 	})

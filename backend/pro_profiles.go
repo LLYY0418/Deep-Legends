@@ -3,11 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,163 +14,25 @@ import (
 )
 
 type proProfileCache struct {
-	mu      sync.Mutex
-	disk    *championDataCache
-	entries map[string]opggProAccount
+	mu         sync.Mutex
+	disk       *championDataCache
+	entries    map[string]opggProAccount
+	now        func() time.Time
+	inflight   map[string]bool
+	manual     map[string]time.Time
+	slots      chan struct{}
+	identities map[string]string
 }
 
 func proProfileTTL(row opggProAccount) time.Duration {
-	if row.CheckFailed || row.ActivityFailed {
-		return 30 * time.Second
+	if row.CheckFailed || row.ActivityFailed || row.ActivityPending {
+		return proProfileRetry(row.Failures)
 	}
-	account, _ := normalizeProAccount(row)
-	if account.RankStatus == "unranked" {
-		return 72 * time.Hour
-	}
-	return 15 * time.Minute
+	return proProfileRefreshInterval
 }
 
 func (a *app) readProProfile(ctx context.Context, old opggProAccount) opggProAccount {
-	key := "pro-profile-v2|" + proLadderAccountKey(old.GameName, old.TagLine)
-	old.LastMatchAt, old.LastMatchAtKnown = proRealLastMatchAt(old)
-	// Directory rows may have a rank but no timestamp/PUUID and therefore do
-	// not qualify as Riot anchors. Keep that exact account's known rank if the
-	// independent public-page read fails.
-	if len(old.Rank) == 0 {
-		a.proPlayers.mu.Lock()
-		for _, team := range a.proPlayers.teams {
-			for _, member := range team.Members {
-				for _, row := range member.Summoners {
-					if proLadderAccountKey(row.GameName, row.TagLine) == proLadderAccountKey(old.GameName, old.TagLine) && len(row.Rank) > 0 {
-						old.Rank, old.UpdatedAt = row.Rank, row.UpdatedAt
-					}
-				}
-			}
-		}
-		a.proPlayers.mu.Unlock()
-	}
-	c := &a.proProfiles
-	c.mu.Lock()
-	initialize := c.entries == nil
-	c.mu.Unlock()
-	var disk *championDataCache
-	if initialize {
-		disk = newPublicBinaryCache(a.storage, "pro-profiles", 64, 4<<20)
-	}
-	c.mu.Lock()
-	if c.entries == nil {
-		c.entries = map[string]opggProAccount{}
-		c.disk = disk
-	}
-	pruneProProfilesLocked(c, time.Now())
-	cached, found := c.entries[key]
-	disk = c.disk
-	c.mu.Unlock()
-	directoryRevision := proDirectoryRevisionAt(old)
-	directoryRevisionLegacy := old.RevisionAt
-	if !found && disk != nil {
-		if entry, err := disk.readDisk(key); err == nil {
-			cached, found = decodeProProfileSnapshot(entry.Data)
-		}
-	}
-	at, _ := time.Parse(time.RFC3339Nano, cached.CheckedAt)
-	if found && !at.IsZero() && time.Since(at) >= 0 && time.Since(at) < proProfileTTL(cached) {
-		c.mu.Lock()
-		c.entries[key] = cached
-		c.mu.Unlock()
-		cached.SeedKey, cached.Source, cached.PUUID = old.SeedKey, old.Source, old.PUUID
-		if directoryRevision != "" {
-			cached.DirectoryRevisionAt = directoryRevision
-			if directoryRevisionLegacy != "" {
-				cached.RevisionAt = directoryRevisionLegacy
-			}
-		}
-		return cached
-	}
-	if found && cached.CheckedAt > old.CheckedAt {
-		old = cached
-		if directoryRevision != "" {
-			old.DirectoryRevisionAt = directoryRevision
-			if directoryRevisionLegacy != "" {
-				old.RevisionAt = directoryRevisionLegacy
-			}
-		}
-	}
-	if waitProBackground(ctx) != nil {
-		return old
-	}
-	if _, ok := ctx.Value(proBackgroundGateKey{}).(*riotProvider); ok && !a.admitProAccountRefresh(key, time.Now()) {
-		a.recordDiagnostic(map[string]any{"event": "pro_seed_skipped", "reason": "interval"})
-		return old
-	}
-	ref := gameplayReference{Region: "kr", GameName: old.GameName, TagLine: old.TagLine}
-	requestCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
-	defer cancel()
-	data, err := a.readOPGGPlayerPage(requestCtx, ref, http.MethodGet, "", nil)
-	var next opggProAccount
-	if err == nil {
-		next, err = parseProProfile(data, ref)
-	}
-	if err == nil {
-		old.Rank, old.UpdatedAt = next.Rank, next.UpdatedAt
-		// JSON-LD startTime is the authoritative public activity timestamp;
-		// directory revision_at is never compared with it.
-		if next.LastMatchAtKnown {
-			old.LastMatchAt, old.LastMatchAtKnown = next.LastMatchAt, true
-		}
-		old.ActivityFailed = false
-		old.ActivityPending = false
-		account, _ := normalizeProAccount(next)
-		// Public pages omit older histories for some ranked accounts. Only
-		// those missing histories use the shared, foreground-reserving Riot
-		// limiter; never issue a second rank lookup or reuse OP.GG's PUUID.
-		var activityErr error
-		if !next.LastMatchAtKnown && account.RankStatus == "ranked" && a.riot != nil && riotKeyConfigured() {
-			activityCtx, stop := context.WithTimeout(withRiotBackground(ctx), 6*time.Second)
-			identity, lookupErr := a.riot.accountByRiotID(activityCtx, old.GameName, old.TagLine)
-			activityErr = lookupErr
-			if lookupErr == nil {
-				at, known, readErr := a.riot.lastMatchStartCached(activityCtx, identity.PUUID, "proprofile-lastmatch:v2:", 15*time.Minute)
-				activityErr = readErr
-				if readErr == nil && known {
-					// Riot match-v5 is a real game start and unconditionally
-					// replaces any older cached activity value.
-					setProLastMatch(&old, at, true)
-				}
-			}
-			stop()
-			switch {
-			case activityErr == nil:
-				old.ActivityFailed, old.ActivityPending = false, false
-			case errors.Is(activityErr, errThrottled):
-				old.ActivityFailed, old.ActivityPending = false, true
-			default:
-				old.ActivityFailed, old.ActivityPending = true, false
-			}
-		}
-		if next.LadderRankKnown {
-			old.LadderRank, old.LadderRankKnown = next.LadderRank, true
-		}
-		old.Stale = false
-	} else {
-		old.Stale = len(old.Rank) > 0
-	}
-	old.CheckedAt, old.CheckFailed = time.Now().UTC().Format(time.RFC3339Nano), err != nil
-	c.mu.Lock()
-	c.entries[key] = old
-	pruneProProfilesLocked(c, time.Now())
-	// Only normalized public account facts are persisted, never full HTML or
-	// account identifiers from the page, cookies, auth tokens or request headers.
-	if c.disk != nil && err == nil {
-		safe := old
-		safe.PUUID = ""
-		body, _ := json.Marshal(proProfileSnapshot{Account: safe, LastMatchAt: safe.LastMatchAt, LastMatchAtKnown: safe.LastMatchAtKnown, DirectoryRevisionAt: safe.DirectoryRevisionAt, RevisionAt: safe.RevisionAt})
-		hash := sha256.Sum256(body)
-		now := time.Now()
-		c.disk.enqueueDiskWrite(championCacheEnvelope{Schema: championCacheSchema, Key: key, FetchedAt: now, ExpiresAt: now.Add(proProfileTTL(old)), StaleUntil: now.Add(7 * 24 * time.Hour), Hash: hex.EncodeToString(hash[:]), Data: body})
-	}
-	c.mu.Unlock()
-	return old
+	return a.readScopedProProfile(ctx, old)
 }
 
 func (a *app) enrichProProfiles(ctx context.Context, seeds []opggProTeam) []opggProTeam {
@@ -182,7 +41,7 @@ func (a *app) enrichProProfiles(ctx context.Context, seeds []opggProTeam) []opgg
 	jobs := make(chan *opggProAccount)
 	var workers sync.WaitGroup
 	started := time.Now()
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 2; i++ {
 		workers.Add(1)
 		go func() {
 			defer a.recoverPanic("pro_profiles.enrichProProfiles.1")
@@ -344,10 +203,33 @@ func proNodeText(n *xhtml.Node) string {
 	return strings.TrimSpace(b.String())
 }
 
+func expireProProfileFacts(row opggProAccount, now time.Time) opggProAccount {
+	at, _ := time.Parse(time.RFC3339Nano, row.LastSuccessAt)
+	if at.IsZero() && !row.CheckFailed {
+		at, _ = time.Parse(time.RFC3339Nano, row.CheckedAt)
+	}
+	if !at.IsZero() && !now.Before(at.Add(7*24*time.Hour)) {
+		row.Rank, row.LastMatchAt, row.LastMatchID = nil, "", ""
+		row.LastMatchAtKnown, row.LadderRankKnown = false, false
+		row.LadderRank, row.LastSuccessAt = 0, ""
+	}
+	return row
+}
+
+func proProfileRetainedUntil(row opggProAccount, now time.Time) time.Time {
+	at, _ := time.Parse(time.RFC3339Nano, row.LastSuccessAt)
+	if at.IsZero() {
+		at, _ = time.Parse(time.RFC3339Nano, row.CheckedAt)
+	}
+	if at.IsZero() {
+		at = now
+	}
+	return at.Add(7 * 24 * time.Hour)
+}
+
 func pruneProProfilesLocked(c *proProfileCache, now time.Time) {
 	for key, row := range c.entries {
-		at, _ := time.Parse(time.RFC3339Nano, row.CheckedAt)
-		if at.IsZero() || now.Sub(at) >= 7*24*time.Hour {
+		if !now.Before(proProfileRetainedUntil(row, now)) {
 			delete(c.entries, key)
 		}
 	}

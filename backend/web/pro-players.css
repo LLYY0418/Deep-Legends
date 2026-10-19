@@ -128,3 +128,5 @@
 .pro-rank-cell .pro-rank { justify-content: center; }
 
 .pro-account-meta { color: color-mix(in oklab, var(--muted) 78%, var(--surface)); }
+
+.pro-rank-skeleton { display:inline-block; width:78px; height:12px; border-radius:4px; background:var(--surface-strong); }

@@ -54,6 +54,7 @@ func TestR235HeadStreamsConcurrentAndFirstPagePush(t *testing.T) {
 	base := a.sgp.http.Transport
 	var mu sync.Mutex
 	starts := map[string]time.Time{}
+	var rankedFinished time.Time
 	a.sgp.http = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 		stream := r.URL.Query().Get("tag")
 		offset := r.URL.Query().Get("startIndex")
@@ -67,7 +68,13 @@ func TestR235HeadStreamsConcurrentAndFirstPagePush(t *testing.T) {
 		} else {
 			time.Sleep(400 * time.Millisecond)
 		}
-		return base.RoundTrip(r)
+		response, err := base.RoundTrip(r)
+		if stream == "q_420" {
+			mu.Lock()
+			rankedFinished = time.Now()
+			mu.Unlock()
+		}
+		return response, err
 	})}
 	scan := r231Scan(ref)
 	scan.headOnly = true
@@ -85,18 +92,9 @@ func TestR235HeadStreamsConcurrentAndFirstPagePush(t *testing.T) {
 	if len(starts) != 2 {
 		t.Fatal(starts)
 	}
-	var first time.Time
-	for _, at := range starts {
-		if first.IsZero() {
-			first = at
-		}
-		delta := at.Sub(first)
-		if delta < 0 {
-			delta = -delta
-		}
-		if delta >= 50*time.Millisecond {
-			t.Fatalf("streams serialized: %v", delta)
-		}
+	// R288 supersedes parallel heads: mayhem must not contend with ranked.
+	if rankedFinished.IsZero() || starts["q_2300"].Before(rankedFinished) {
+		t.Fatalf("mayhem started before ranked finished: %v / %v", starts, rankedFinished)
 	}
 	if pushed < 2 || scan.scanned != 100 {
 		t.Fatal(pushed, scan.scanned)

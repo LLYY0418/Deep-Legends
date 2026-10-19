@@ -767,8 +767,7 @@
     if (safeHTTPURL(data.poolSource)) el.poolSource.href = data.poolSource; else el.poolSource.removeAttribute("href");
     el.poolSource.textContent = `${data.poolVersion || "当前"} 奖池清单`;
     if (el.settingsBuildIdentity) {
-      const fingerprint = String(data.buildFingerprint || "dev");
-      el.settingsBuildIdentity.textContent = `版本 ${data.version || "未知"} · 构建 ${fingerprint}`;
+      el.settingsBuildIdentity.innerHTML = `<small>版本</small>${escapeHTML(data.version || "未知")}`;
     }
     renderNotice(data);
     renderLaunchpad();
@@ -816,13 +815,15 @@
     return true;
   }
 
+  window.addEventListener("deep-legends:privacy-changed",()=>{renderClientConnection();if(state.section==="favorites")renderItems();});
   function renderClientConnection() {
     el.connection.className = "connection";
     const selfReady = state.clientView?.state === "ready";
     const summoner = state.clientView?.summoner || {};
-    const name = summoner.gameName || summoner.displayName || "当前召唤师";
-    const tag = summoner.tagLine ? `#${summoner.tagLine}` : "";
-    if (selfReady && summoner.profileIconId) {
+    const masked=window.deepLegendsPrivacy?.masked();
+    const name = masked ? window.deepLegendsPrivacy.name(summoner,{context:"identity"}) : summoner.gameName || summoner.displayName || "当前召唤师";
+    const tag = !masked && summoner.tagLine ? `#${summoner.tagLine}` : "";
+    if (selfReady && summoner.profileIconId && !masked) {
       el.connectionAvatar.hidden = false;
       el.connectionAvatar.setAttribute("data-queued-src", `/api/image?path=${encodeURIComponent(`/lol-game-data/assets/v1/profile-icons/${summoner.profileIconId}.jpg`)}`);
       el.connectionAvatar.onerror = () => { el.connectionAvatar.hidden = true; };
@@ -955,11 +956,6 @@
     if (state.clientLaunched && !state.clientLaunchWaiting?.[state.clientLaunched.id]) {
       state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting[state.clientLaunched.id] = state.clientLaunched;
     }
-    for (const [id, launched] of Object.entries(state.clientLaunchWaiting || {})) {
-      if (view?.state === "no-client" && Date.now() - launched.at >= 60_000) {
-        delete state.clientLaunchWaiting[id]; if (state.clientLaunched?.id === id) state.clientLaunched = null; state.officialLoginMessage = "";
-      }
-    }
     state.clientLaunched ||= Object.values(state.clientLaunchWaiting || {})[0] || null;
     const launchedID = ["tcls", "wegame", "riot"].includes(state.clientLaunched?.id) ? state.clientLaunched.id : "";
     const launchedTCLS = launchedID !== "" && launchedID !== "riot";
@@ -1001,6 +997,29 @@
     }
   }
 
+  let clientLaunchStatusTimer = 0;
+  function updateClientLaunchWaiting(status, now = Date.now()) {
+    for(const [id,launch] of Object.entries(state.clientLaunchWaiting || {})) {
+      if(status.leagueRunning) {launch.leagueSeen=true;continue;}
+      if(launch.leagueSeen)continue;
+      if(status.known && status.launchers?.[id]) {launch.seen=true;launch.absentAt=0;}
+      else if(status.known && launch.seen && !launch.absentAt)launch.absentAt=now;
+      if(!launch.seen && now-launch.at>=20000 || status.known && launch.absentAt && now-launch.absentAt>=3000) {
+        delete state.clientLaunchWaiting[id];
+        if(state.clientLaunched?.id===id)state.clientLaunched=null;
+        state.officialLoginMessage="";
+      }
+    }
+  }
+  function monitorClientLaunch() {
+    if(clientLaunchStatusTimer || !Object.values(state.clientLaunchWaiting || {}).some(v=>!v.leagueSeen))return;
+    clientLaunchStatusTimer=setTimeout(async()=>{
+      try {const status=await api("/api/client-launch/status",{},"client-launch-status",2000);updateClientLaunchWaiting(status);}
+      catch {updateClientLaunchWaiting({known:false});}
+      finally {clientLaunchStatusTimer=0;renderLaunchpad();monitorClientLaunch();}
+    },1000);
+  }
+
   async function launchOfficialLogin(button) {
     if (state.clientLaunchPending?.tcls || state.clientLaunchInFlight === "tcls" || button?.disabled) return;
     state.clientLaunchPending ||= {}; state.clientLaunchPending.tcls = true;
@@ -1016,6 +1035,7 @@
       state.clientLaunched = { id: "tcls", at: Date.now() };
       state.lastClientLaunchAt = Date.now();
       state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting.tcls = state.clientLaunched;
+      monitorClientLaunch();
       state.officialLoginMessage = "";
       renderLaunchpad();
       showToast("国服客户端已打开");
@@ -1046,6 +1066,7 @@
       state.clientLaunched = { id, at: Date.now() };
       state.lastClientLaunchAt = Date.now();
       state.clientLaunchWaiting ||= {}; state.clientLaunchWaiting[id] = state.clientLaunched;
+      monitorClientLaunch();
       renderLaunchpad();
       showToast("客户端已启动，登录并进入大厅后会自动连接");
       setTimeout(() => refreshStatus(false), 3000);
@@ -2634,9 +2655,11 @@
     el.privacyContent.innerHTML = '<p class="muted">正在读取隐私说明…</p>';
     try {
       const data = await api("/api/privacy", {}, "privacy");
-      if (data.licenseDisclosure) data.mayhemRatingDisclosure = `${data.licenseDisclosure} ${data.mayhemRatingDisclosure || ""}`;
-      el.privacyContent.innerHTML = `<div class="stat-grid"><div class="stat"><span>账号数据处理</span><strong>${data.localOnly ? "仅限本机" : "包含公开数据查询"}</strong></div><div class="stat"><span>账号密码</span><strong>${data.requiresPassword ? "需要" : "不需要"}</strong></div><div class="stat"><span>收藏数据上传</span><strong>${data.uploadsData ? "会上传" : "不会上传"}</strong></div></div><p class="muted">${escapeHTML(data.mayhemRatingDisclosure || "")} 客户端操作需主动点击；自动规则仅在开启后执行。</p>`;
-    } catch (error) { renderPanelError(el.privacyContent, "隐私说明读取失败", error.message, loadPrivacy); }
+      el.privacyContent.innerHTML = [data.localOnly ? "仅在本机处理" : "包含公开数据查询", data.requiresPassword ? "需要账号密码" : "不需要账号密码", data.uploadsData ? "上传收藏" : "不上传收藏"].map(text => `<span class="settings-fact">${escapeHTML(text)}</span>`).join("");
+    } catch (_) {
+      el.privacyContent.innerHTML = '<button class="text-button" type="button">读取失败 · 重试</button>';
+      el.privacyContent.querySelector("button").addEventListener("click", loadPrivacy);
+    }
   }
 
   function renderPanelError(container, title, message, retry) {
@@ -2732,6 +2755,7 @@
       stopHoverVideo();
     }
     state.section = name;
+    applySidebar();
     const sectionTitles = { "pro-players": ["职业选手", "一队选手 · 公开韩服账号"], overview: ["总览", "召唤师生涯与最近对局"], champions: ["英雄", "韩服梯度、符文与构建推荐"], live: ["对局", "实时队伍与赛前配置"], favorites: ["收藏", "皮肤、物品与三合一奖池"], suite: ["工具", "自动 · 维护 · 生涯 · 领奖 · 征召"], settings: ["设置", "显示、对局行为与隐私"] };
     const title = sectionTitles[name] || ["Deep Legends", "战绩 · 英雄 · 对局 · 收藏"];
     el.currentSectionTitle.textContent = title[0];
@@ -2926,6 +2950,7 @@
     const tab = el.settingsTabs.find((item) => item.dataset.settingsPage === name);
     if (!tab) return;
     if (state.settingsPage === "privacy" && name !== "privacy") resetDiagnosticsExport();
+    if (name === "app") { localStorage.setItem("lol-loot-settings-app-seen", "true"); document.querySelector(".settings-new-dot")?.setAttribute("hidden", ""); }
     state.settingsPage = name;
     activateTab(tab, el.settingsTabs, (selected) => {
       for (const panel of el.settingsPanels) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
@@ -3115,7 +3140,8 @@
   function sidebarConstraint() {
     const width = document.querySelector(".app-frame")?.clientWidth || window.innerWidth;
     const scale = Number(document.documentElement.dataset.uiScale) || 1;
-    return { forced: scale >= 1.5 || width <= 820, key: String(scale) + ':' + (width <= 820) };
+    const narrow = width <= 820 || state.section === "settings" && width <= 1000;
+    return { forced: scale >= 1.5 || narrow, key: String(scale) + ":" + narrow };
   }
   function applySidebar() {
     const constraint = sidebarConstraint();
@@ -3193,7 +3219,8 @@
     el.settingProxyMode.value = status.mode || "auto";
     el.settingProxyUrl.value = status.url || "";
     el.settingProxyUrlWrap.hidden = el.settingProxyMode.value !== "manual";
-    el.settingProxyState.textContent = status.active || "直连";
+    el.settingProxyState.textContent = status.active || "";
+    el.settingProxyState.hidden = !status.active;
   }
 
   async function loadChampionNetworkStatus(){try{renderChampionNetwork(await api("/api/champions/network",{},"champion-network-state",5000));}catch{}}
@@ -3519,7 +3546,7 @@
     };
     return `<svg viewBox="0 0 24 24" focusable="false">${paths[category] || paths["材料"]}</svg>`;
   }
-  function playerName(summoner) { const name = summoner.gameName || summoner.displayName || "当前召唤师"; return `${name}${summoner.tagLine ? `#${summoner.tagLine}` : ""}`; }
+  function playerName(summoner) { return window.deepLegendsPrivacy?.name(summoner,{context:"identity"}) || summoner.gameName || summoner.displayName || "当前召唤师"; }
   function rewardStatusLabel(value) { return ({ PENDING_SELECTION: "待选择", PENDING: "待领取", CREATED: "待处理" })[String(value || "").toUpperCase()] || value || "待处理"; }
   const integerFormatter = new Intl.NumberFormat("zh-CN");
   function formatNumber(value) { const number = Number(value); return Number.isFinite(number) ? integerFormatter.format(number) : "—"; }
@@ -4674,6 +4701,7 @@
       if(tooltip.parentElement!==document.body)document.body.append(tooltip);
       tooltip.style.zoom='';
     };
+    window.addEventListener("deep-legends:privacy-changed",()=>{hide();tooltip.replaceChildren();});
     const position = () => {
       frame = 0;
       if (!anchor?.isConnected || tooltip.hidden || !targetOf(anchor)) { hide(); return; }

@@ -94,6 +94,71 @@ const reportedStartupStages = new Set();
 
 app.setAppUserModelId(APP_ID);
 
+// Read before app.ready: this preference affects Chromium process creation.
+const desktopPreferencePath = path.join(app.getPath("userData"), "application-preferences.json");
+const desktopPreferenceDefaults = {contentProtection:false, closeBehavior:"exit", disableHardwareAcceleration:false};
+function validateDesktopPreferences(value) {
+  const result = {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("设置格式无效");
+  for (const key of ["contentProtection", "disableHardwareAcceleration"]) {
+    if (key in value) {
+      if (typeof value[key] !== "boolean") throw new Error("设置格式无效");
+      result[key] = value[key];
+    }
+  }
+  if ("closeBehavior" in value) {
+    if (!["exit", "tray"].includes(value.closeBehavior)) throw new Error("设置格式无效");
+    result.closeBehavior = value.closeBehavior;
+  }
+  return result;
+}
+let desktopPreferences = {...desktopPreferenceDefaults};
+try {
+  if (fs.statSync(desktopPreferencePath).size <= 4096) Object.assign(desktopPreferences, validateDesktopPreferences(JSON.parse(fs.readFileSync(desktopPreferencePath,"utf8"))));
+} catch (_) { /* Missing or invalid preferences use defaults. */ }
+const hardwareAccelerationDisabledAtStartup = desktopPreferences.disableHardwareAcceleration;
+if (hardwareAccelerationDisabledAtStartup) app.disableHardwareAcceleration();
+let applicationTray = null;
+function showMainWindow() {
+  if (quitting || !mainWindow || mainWindow.isDestroyed() || licenseEnabled && !licenseWindow?.canShow()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+function syncApplicationTray() {
+  if (desktopPreferences.closeBehavior !== "tray") {
+    applicationTray?.destroy(); applicationTray = null; return;
+  }
+  if (applicationTray) return;
+  const {Tray, Menu} = require("electron");
+  applicationTray = new Tray(iconPath());
+  applicationTray.setToolTip(require("./app-title.cjs"));
+  applicationTray.setContextMenu(Menu.buildFromTemplate([
+    {label:"显示主窗口", click:showMainWindow},
+    {label:"退出", click:()=>app.quit()},
+  ]));
+  applicationTray.on("click", showMainWindow);
+}
+function updateDesktopPreferences(patch) {
+  const next = {...desktopPreferences, ...validateDesktopPreferences(patch)};
+  fs.mkdirSync(path.dirname(desktopPreferencePath), {recursive:true});
+  fs.writeFileSync(`${desktopPreferencePath}.tmp`, JSON.stringify(next), {mode:0o600});
+  fs.renameSync(`${desktopPreferencePath}.tmp`, desktopPreferencePath);
+  desktopPreferences = next;
+  mainWindow?.setContentProtection(next.contentProtection);
+  syncApplicationTray();
+  return {...next, hardwareAccelerationDisabledAtStartup};
+}
+function backendDataDirectory() {
+  if (process.env.LOL_LOOT_DATA_DIR?.trim()) return path.resolve(process.env.LOL_LOOT_DATA_DIR.trim());
+  const home = app.getPath("home");
+  const cache = process.platform === "win32" ? process.env.LOCALAPPDATA || path.join(home,"AppData","Local")
+    : process.platform === "darwin" ? path.join(home,"Library","Caches")
+    : process.env.XDG_CACHE_HOME || path.join(home,".cache");
+  return path.join(cache,"LOLLootAssistant");
+}
+
+
 const hasInstanceLock = app.requestSingleInstanceLock();
 if (!hasInstanceLock) {
   app.quit();
@@ -387,6 +452,22 @@ function onBackendClosed(code, signal) {
 
 function setupBackendIPC() {
   const trusted = event => event.sender === mainWindow?.webContents && event.senderFrame === mainWindow?.webContents.mainFrame && isTrustedRenderer(event.sender);
+  for (const channel of ["desktop-preferences-get", "desktop-preferences-update", "desktop-open-directory", "desktop-open-github"]) ipcMain.removeHandler(channel);
+  ipcMain.handle("desktop-preferences-get", event => trusted(event) ? {...desktopPreferences, hardwareAccelerationDisabledAtStartup} : null);
+  ipcMain.handle("desktop-preferences-update", (event, patch) => {
+    if (!trusted(event)) throw new Error("untrusted renderer");
+    return updateDesktopPreferences(patch);
+  });
+  ipcMain.handle("desktop-open-directory", async (event, kind) => {
+    if (!trusted(event) || !["data", "logs"].includes(kind)) return false;
+    const directory = kind === "data" ? backendDataDirectory() : path.join(backendDataDirectory(), "logs");
+    fs.mkdirSync(directory, {recursive:true});
+    return (await shell.openPath(directory)) === "";
+  });
+  ipcMain.handle("desktop-open-github", event => {
+    if (!trusted(event)) return false;
+    return shell.openExternal("https://github.com/LLYY0418/Deep-Legends");
+  });
   ipcMain.removeAllListeners("desktop-license-observed");
   ipcMain.on("desktop-license-observed", event => {
     if (trusted(event)) void refreshLicenseWindow().then(() => { if (licenseWindow?.isActive()) return pushSystemProxy(); }).catch(() => {});
@@ -652,6 +733,8 @@ function createMainWindow() {
       ...(licenseEnabled ? { backgroundThrottling: false, additionalArguments: ["--deep-legends-license"] } : {}),
     },
   });
+  mainWindow.setContentProtection(desktopPreferences.contentProtection);
+  syncApplicationTray();
   reportStartupStage("main_window_created");
   mainWindow.on("page-title-updated", event => event.preventDefault());
   if (licenseEnabled) licenseWindow = require("./license-window.cjs").createLicenseWindowController({
@@ -684,9 +767,10 @@ function createMainWindow() {
   mainWindow.on("move", scheduleBoundsWrite);
   mainWindow.on("show",()=>mainWindow?.webContents.send("desktop-window-visible"));
   mainWindow.on("focus", () => {mainWindow?.flashFrame(false);void pushSystemProxy();});
-  mainWindow.on("close", () => {
+  mainWindow.on("close", event => {
     clearTimeout(boundsWriteTimer);
     persistBounds();
+    if (!quitting && desktopPreferences.closeBehavior === "tray") { event.preventDefault(); mainWindow.hide(); }
   });
   mainWindow.once("ready-to-show", async () => {
     reportStartupStage("main_window_ready_to_show");
@@ -760,6 +844,8 @@ function createMainWindow() {
   });
   shareExportController?.clear();
   const diagnosticsDirectory = require("./diagnostics-directory.cjs").createDiagnosticsDirectoryController({app,dialog,fileSystem:fs,isTrustedRenderer,getMainWindow:()=>mainWindow,onChanged:payload=>{if(!mainWindow?.webContents.isDestroyed())mainWindow.webContents.send("desktop-export-directory-changed",payload);}});
+  ipcMain.removeHandler("desktop-share-set-directory");
+  ipcMain.handle("desktop-share-set-directory",(event,directory)=>diagnosticsDirectory.setSaveDirectory(event,directory));
   const windowShareExportController = createShareExportController({
     directoryController: diagnosticsDirectory,
     BrowserWindow,
@@ -967,6 +1053,7 @@ app.on("activate", () => {
 
 app.on("before-quit", (event) => {
   clearTimeout(backendStartTimer);
+  applicationTray?.destroy(); applicationTray = null;
   if (quitting) return;
   event.preventDefault();
   quitting = true;

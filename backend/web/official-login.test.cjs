@@ -36,7 +36,17 @@ function functionSource(name) {
   assert.fail(`${name} body is not balanced`);
 }
 
+const launchMonitors=new WeakMap();
 function compileFunction(name, dependencies) {
+  if (["launchOfficialLogin","launchDetectedClient"].includes(name)) {
+    let monitor=launchMonitors.get(dependencies);
+    if(!monitor){
+      const keys=Object.keys(dependencies);
+      monitor=Function(...keys,'let clientLaunchStatusTimer=0;'+functionSource("updateClientLaunchWaiting")+functionSource("monitorClientLaunch")+';return monitorClientLaunch;')(...keys.map(key=>dependencies[key]));
+      launchMonitors.set(dependencies,monitor);
+    }
+    dependencies={...dependencies,monitorClientLaunch:monitor};
+  }
   const names = Object.keys(dependencies);
   return Function(...names, `"use strict"; ${require("./r220-harness-support.cjs").prelude(source,dependencies)} return (${functionSource(name)});`)(...names.map((key) => dependencies[key]));
 }
@@ -97,7 +107,7 @@ test("国服纯净入口动作只提交固定 tcls id 并进入等待登录状�
   assert.equal(state.clientLaunched.id, "tcls");
   assert.equal(state.officialLoginMessage, "");
   assert.ok(renderCalls.length >= 2);
-  assert.deepEqual(timers.map((timer) => timer.delay), [1200]);
+  assert.deepEqual(timers.map((timer) => timer.delay), [1000,1200]);
 });
 
 test("每个入口只锁定自己并在失败后恢复", async () => {
@@ -129,7 +139,7 @@ test("每个入口只锁定自己并在失败后恢复", async () => {
   await officialPromise;
   assert.equal(state.clientLaunchInFlight, "");
   assert.equal(state.clientLaunched.id, "tcls");
-  assert.deepEqual(timers.map((timer) => timer.delay), [3000,1200]);
+  assert.deepEqual(timers.map((timer) => timer.delay), [1000,3000,1200]);
 
   const failingState = { clientLaunchInFlight: "", clientLaunched: null, officialLoginMessage: "", status: { connected: false } };
   const launchFailingAlternative = compileFunction("launchDetectedClient", {
@@ -163,7 +173,7 @@ test("Riot 入口成功后进入对应等待状态并只安排状态刷新", asy
   assert.deepEqual(JSON.parse(calls[0][1].body), { id: "riot" });
   assert.equal(state.clientLaunchInFlight, "");
   assert.equal(state.clientLaunched.id, "riot");
-  assert.deepEqual(timers.map((timer) => timer.delay), [3000]);
+  assert.deepEqual(timers.map((timer) => timer.delay), [1000,3000]);
 });
 
 test("启动成功后入口保持显示，断开或超时恢复", () => {
@@ -217,7 +227,8 @@ test("启动成功后入口保持显示，断开或超时恢复", () => {
   assert.equal(el.launchpadTitle.textContent, "正在登录 Riot 客户端");
   assert.equal(el.launchpadDescription.textContent, "");
 
-  state.clientLaunched.processSeen = true;
+  const update = compileFunction("updateClientLaunchWaiting", {state});
+  update({known:true,launchers:{}},21002);
   render({state:"no-client"});
   assert.equal(state.clientLaunched, null);
   assert.equal(state.clientLaunchInFlight, "");

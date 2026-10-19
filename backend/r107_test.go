@@ -105,6 +105,8 @@ func TestR107MissingPublicActivityUsesOwnRiotIdentityAndCaches(t *testing.T) {
 						t.Error("must fetch only latest match")
 					}
 					return r99Response(`["KR_107"]`), nil
+				case strings.Contains(r.URL.Path, "/league/v4/entries/by-puuid/"):
+					return r99Response(`[]`), nil
 				case strings.HasSuffix(r.URL.Path, "/matches/KR_107"):
 					return r102Match("KR_107", 1789582800000), nil
 				default:
@@ -119,10 +121,7 @@ func TestR107MissingPublicActivityUsesOwnRiotIdentityAndCaches(t *testing.T) {
 			if !first.LastMatchAtKnown || first.ActivityFailed || second.LastMatchAt != first.LastMatchAt {
 				t.Fatalf("activity: %+v", first)
 			}
-			want := 3
-			if public {
-				want = 0
-			}
+			want := 4 // R288: Riot owns activity and rank even when OP.GG has history.
 			if calls != want {
 				t.Fatalf("requests=%d want=%d", calls, want)
 			}
@@ -424,7 +423,7 @@ func TestR117ProfileThrottleIsPendingWithoutShortTTL(t *testing.T) {
 	row := (&app{champions: cp, riot: p}).readProProfile(context.Background(), opggProAccount{
 		GameName: "Kimman", TagLine: "zxfkk", Region: "kr",
 	})
-	if !row.ActivityPending || row.ActivityFailed || proProfileTTL(row) != 15*time.Minute {
+	if !row.ActivityPending || row.ActivityFailed || proProfileTTL(row) != 5*time.Minute {
 		t.Fatalf("throttled activity collapsed profile TTL: %+v ttl=%s", row, proProfileTTL(row))
 	}
 }

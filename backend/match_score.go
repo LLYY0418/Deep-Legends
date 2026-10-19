@@ -284,18 +284,86 @@ func scoreMissingFields(raw map[string]json.RawMessage, riot bool) map[string]bo
 	}
 	return missing
 }
+
+// Decode score values and their presence in one pass. A missing/null field
+// stays absent; an observed zero remains a real value. Embedding the alias
+// preserves all other history fields without copying large challenge maps.
 func (p *riotParticipant) UnmarshalJSON(data []byte) error {
 	type plain riotParticipant
-	var v plain
-	if err := json.Unmarshal(data, &v); err != nil {
+	var decoded struct {
+		plain
+		Kills                       *int  `json:"kills"`
+		Deaths                      *int  `json:"deaths"`
+		Assists                     *int  `json:"assists"`
+		TotalDamageDealtToChampions *int  `json:"totalDamageDealtToChampions"`
+		GoldEarned                  *int  `json:"goldEarned"`
+		TotalMinionsKilled          *int  `json:"totalMinionsKilled"`
+		NeutralMinionsKilled        *int  `json:"neutralMinionsKilled"`
+		VisionScore                 *int  `json:"visionScore"`
+		WardsPlaced                 *int  `json:"wardsPlaced"`
+		WardsKilled                 *int  `json:"wardsKilled"`
+		Win                         *bool `json:"win"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	*p = riotParticipant(v)
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
+	*p = riotParticipant(decoded.plain)
+	p.scoreMissing = map[string]bool{}
+	if decoded.Kills == nil {
+		p.scoreMissing["combat"] = true
+	} else {
+		p.Kills = *decoded.Kills
 	}
-	p.scoreMissing = scoreMissingFields(raw, true)
+	if decoded.Deaths == nil {
+		p.scoreMissing["combat"] = true
+	} else {
+		p.Deaths = *decoded.Deaths
+	}
+	if decoded.Assists == nil {
+		p.scoreMissing["combat"] = true
+	} else {
+		p.Assists = *decoded.Assists
+	}
+	if decoded.TotalDamageDealtToChampions == nil {
+		p.scoreMissing["damage"] = true
+	} else {
+		p.TotalDamageDealtToChampions = *decoded.TotalDamageDealtToChampions
+	}
+	if decoded.GoldEarned == nil {
+		p.scoreMissing["gold"] = true
+	} else {
+		p.GoldEarned = *decoded.GoldEarned
+	}
+	if decoded.TotalMinionsKilled == nil {
+		p.scoreMissing["cs"] = true
+	} else {
+		p.TotalMinionsKilled = *decoded.TotalMinionsKilled
+	}
+	if decoded.NeutralMinionsKilled == nil {
+		p.scoreMissing["cs"] = true
+	} else {
+		p.NeutralMinionsKilled = *decoded.NeutralMinionsKilled
+	}
+	if decoded.VisionScore == nil {
+		p.scoreMissing["vision"] = true
+	} else {
+		p.VisionScore = *decoded.VisionScore
+	}
+	if decoded.WardsPlaced == nil {
+		p.scoreMissing["wardsPlaced"] = true
+	} else {
+		p.WardsPlaced = *decoded.WardsPlaced
+	}
+	if decoded.WardsKilled == nil {
+		p.scoreMissing["wardsKilled"] = true
+	} else {
+		p.WardsKilled = *decoded.WardsKilled
+	}
+	if decoded.Win == nil {
+		p.scoreMissing["win"] = true
+	} else {
+		p.Win = *decoded.Win
+	}
 	return nil
 }
 func (p *gameplayParticipant) UnmarshalJSON(data []byte) error {

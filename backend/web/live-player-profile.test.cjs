@@ -19,7 +19,7 @@ test('a verified display-name-only profile renders its name and keeps the overvi
     const dom = new JSDOM(ui.renderLivePlayer(player,0));
     try {
       const button = dom.window.document.querySelector('.live-player-name');
-      assert.equal(button.textContent,maskNames?'玩家 01':'首次遇见的玩家');
+      assert.equal(button.textContent,maskNames?'召唤师 1':'首次遇见的玩家');
       assert.equal(button.getAttribute('data-player-ref'),'player_verified');
       assert.equal(button.disabled,false);
       assert.doesNotMatch(dom.window.document.body.textContent,/隐藏身份|隐藏玩家/);

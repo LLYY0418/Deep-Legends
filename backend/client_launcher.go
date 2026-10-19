@@ -113,6 +113,7 @@ func buildDetectedClientInstallations(gameRoots, riotExecutables []string, short
 }
 
 type clientInstallationScan struct {
+	Candidates                []clientCandidateObservation
 	RegistryWeGameFound       bool
 	PlatformSupported         bool
 	RegistryRootFound         bool
@@ -381,6 +382,7 @@ func (a *app) recordClientLaunchAttempt(id string, failure clientLaunchFailure) 
 
 func (a *app) recordClientLaunchStarted(id, source string) {
 	a.startClientLaunchTiming(id, time.Now())
+	a.scheduleClientAutostartScans(id)
 	event, safeID := safeClientLaunchEvent(id)
 	a.recordDiagnostic(map[string]any{
 		"event": event, "client_id": safeID, "result": "started", "source": safeClientLaunchSource(source),
@@ -402,7 +404,7 @@ func safeClientLaunchEvent(id string) (string, string) {
 
 func safeClientLaunchSource(source string) string {
 	switch source {
-	case "registry", "shortcut", "launcher", "tcls", "riot", "rc_default", "rc_live", "installs-json-other", "drive-guess":
+	case "registry", "shortcut", "launcher", "tcls", "riot", "rc_default", "rc_live", "installs-json-other", "drive-guess", "uninstall", "running":
 		return source
 	default:
 		return "unknown"
@@ -419,6 +421,18 @@ func safeClientLaunchStage(stage string) string {
 }
 
 func (a *app) recordClientInstallationScan(scan clientInstallationScan, items []clientInstallation) {
+	for _, observation := range scan.Candidates {
+		a.recordDiagnostic(map[string]any{"event": "client_launch_candidates", "source": observation.Source, "file_version": observation.FileVersion, "exists": observation.Exists, "chosen": observation.Chosen})
+	}
+	for _, item := range items {
+		if item.ID == "wegame" {
+			continue
+		}
+		for i, c := range item.candidates() {
+			a.recordDiagnostic(map[string]any{"event": "client_launch_candidates", "source": safeClientLaunchSource(c.Source), "file_version": "unresolved", "exists": true, "chosen": i == 0})
+		}
+	}
+
 	detected := make(map[string]bool, len(items))
 	for _, item := range items {
 		switch item.ID {

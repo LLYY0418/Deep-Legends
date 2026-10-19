@@ -20,6 +20,7 @@ function extract(source, name) {
   throw Error(`Unbalanced function ${name}`);
 }
 function compile(source, names, dependencies = {}) {
+  dependencies={...dependencies,window:{deepLegendsPrivacy:require("./privacy.js"),...(dependencies.window || {})}};
   names = require("./r211-harness-support.cjs").expand(source,names,dependencies);
   for (const name of ['scorePlacementChip','scoreRankChip','ordinalLabel','renderOverviewPendingPage','matchesPending','renderPendingMatches','reportDeferredMatchesCard','syncCollectionSession','requestOverviewWithReferenceRetry']) {
     if (!names.includes(name) && !dependencies[name] && source.includes(`function ${name}(`) && names.some(n => extract(source,n).includes(`${name}(`))) names.push(name);

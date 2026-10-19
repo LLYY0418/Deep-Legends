@@ -795,6 +795,11 @@ func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, clien
 	scan := &seasonScanState{
 		cache: cache, stats: stats, queueStats: queueStats, seen: seen,
 		seasonStartMillis: seasonStart.UnixMilli(), headOnly: true,
+		onStream: func(scan *seasonScanState, stream string) {
+			if stream == "ranked" && scan.cache.Streams[stream].Complete {
+				a.recordRankWindow(client, serverID, playerRef, scan)
+			}
+		},
 		onPage: func(scan *seasonScanState) {
 			a.finishSeasonScan(scan, names, accountHash)
 			a.publishSeasonSnapshot(reference, playerRef, scan.cache)
@@ -1029,6 +1034,7 @@ type seasonScanState struct {
 	interrupted       bool
 	scanID            int64
 	onPage            func(*seasonScanState)
+	onStream          func(*seasonScanState, string)
 }
 
 // seasonScanPagesWithHistoryCache 从 cache.ResumeIndex 开始往回翻页，最多翻 budget 页。
@@ -1055,10 +1061,12 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 		scan.cache.Streams = map[string]seasonStatsStream{}
 	}
 	scan.playerRef = playerRef
-	if scan.newInfos == nil {
-		scan.newInfos = map[int64]*riotMatchInfo{}
-	}
 	for _, stream := range []string{"ranked", "mayhem"} {
+		// Publishing a completed stream persists and clears newInfos. The next
+		// stream needs its own pending set while the same scan keeps running.
+		if scan.newInfos == nil {
+			scan.newInfos = map[int64]*riotMatchInfo{}
+		}
 		cursor := scan.cache.Streams[stream]
 		if cursor.Complete {
 			cursor.ResumeIndex = 0
@@ -1182,11 +1190,19 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 			}
 		}
 		scan.cache.Streams[stream] = cursor
+		scan.updateStreamProgress(ctx)
+		if scan.onStream != nil {
+			scan.onStream(scan, stream)
+		}
 		a.recordDiagnostic(map[string]any{"event": "season_backfill_round", "stream": stream, "round": scan.round, "stop_reason": cursor.StopReason, "oldest_created_at": cursor.OldestCreatedAt, "resume_index": cursor.ResumeIndex, "complete": cursor.Complete, "capped_by_upstream": cursor.CappedByUpstream, "head": scan.headOnly, "skipped_undecodable": scan.cache.SkippedUndecodable})
 		if scan.interrupted {
 			break
 		}
 	}
+	scan.updateStreamProgress(ctx)
+}
+
+func (scan *seasonScanState) updateStreamProgress(ctx context.Context) {
 	scan.cache.Paused = scan.interrupted || ctx.Err() != nil
 	scan.cache.Complete = len(scan.cache.Streams) == 2
 	scan.cache.CappedByUpstream = false
@@ -1317,6 +1333,14 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 			seen[id] = true
 		}
 		scan := &seasonScanState{cache: cache, stats: stats, queueStats: queueStats, seen: seen, seasonStartMillis: seasonStart.UnixMilli()}
+		scan.onStream = func(scan *seasonScanState, stream string) {
+			if stream == "ranked" && scan.cache.Streams[stream].Complete {
+				a.finishSeasonScan(scan, names, accountHash)
+				a.publishSeasonSnapshot(reference, playerRef, scan.cache)
+				a.recordRankWindow(client, serverID, playerRef, scan)
+				a.clearOverviewQuerySnapshots(playerRef)
+			}
+		}
 		defer func() {
 			if !scan.cache.Complete && !scan.cache.Paused {
 				scan.cache.Paused = true

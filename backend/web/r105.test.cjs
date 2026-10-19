@@ -3,7 +3,7 @@ const test = require("node:test"), assert = require("node:assert/strict"), fs = 
 const { JSDOM } = require("../../desktop/node_modules/jsdom");
 const settle=()=>new Promise(setImmediate);
 
-test("R105 all 53 reviewed accounts remain available after expanding unranked groups",async()=>{
+test("R105 all 53 reviewed pending accounts are visible immediately",async()=>{
   const doc=fs.readFileSync(path.join(__dirname,"../testdata/pro-accounts/pro-accounts-verification-2026-09-17.md"),"utf8");
   const teams=[];let team;
   for(const line of doc.split("\n")) {
@@ -21,7 +21,8 @@ test("R105 all 53 reviewed accounts remain available after expanding unranked gr
     const w=dom.window;w.fetch=async()=>({ok:true,json:async()=>({teams,playerCount:33,accountCount:53})});
     w.eval(fs.readFileSync(process.env.R105_PRO_SOURCE || path.join(__dirname,"pro-players.js"),"utf8"));
     w.dispatchEvent(new w.CustomEvent("deep-legends:section",{detail:{name:"pro-players"}}));await settle();
-    assert.equal(w.document.querySelectorAll("[data-pro-account]").length,0,"unknown accounts should start folded");
+    assert.equal(w.document.querySelectorAll("[data-pro-account]").length,53,"pending accounts must show immediately");
+    assert.equal(w.document.querySelectorAll(".pro-rank-skeleton").length,53);
     const keys=[...w.document.querySelectorAll("[data-pro-history]")].map(x=>x.dataset.proHistory);
     for(const key of keys) [...w.document.querySelectorAll("[data-pro-history]")].find(x=>x.dataset.proHistory===key).click();
     const buttons=w.document.querySelectorAll("[data-pro-account]");assert.equal(buttons.length,53);

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// R235: fetch the two head streams concurrently, but fold pages on one goroutine.
+// Ranked heads finish before mayhem starts; pages are folded on one goroutine.
 // Each worker waits for its fold decision before requesting another page.
 func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, serverID, playerRef string, scan *seasonScanState, budget int, useCache bool) {
 	scan.interrupted = false
@@ -41,7 +41,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 		empty    []sgpEmptyHistoryEntry
 	}
 	pages := make(chan page, 2)
-	done := make(chan struct{}, 2)
+	done := make(chan string, 2)
 	seed := map[string]bool{}
 	for _, stream := range []string{"ranked", "mayhem"} {
 		cursor := scan.cache.Streams[stream]
@@ -52,9 +52,9 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 		}
 		seed[stream] = !cursor.Complete && cursor.ResumeIndex == 0
 	}
-	for _, stream := range []string{"ranked", "mayhem"} {
+	startStream := func(stream string) {
 		go func(stream string) {
-			defer func() { done <- struct{}{} }()
+			defer func() { done <- stream }()
 			defer a.recoverPanic("season.head")
 			start := 0
 			for n := 0; n < budget; n++ {
@@ -78,10 +78,17 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 			}
 		}(stream)
 	}
+	startStream("ranked")
 	for workers := 2; workers > 0; {
 		select {
-		case <-done:
+		case stream := <-done:
 			workers--
+			if scan.onStream != nil {
+				scan.onStream(scan, stream)
+			}
+			if stream == "ranked" {
+				startStream("mayhem")
+			}
 		case p := <-pages:
 			if p.err != nil {
 				scan.interrupted = true

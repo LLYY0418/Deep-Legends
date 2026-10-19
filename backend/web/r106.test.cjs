@@ -51,13 +51,13 @@ test("R106 an unset career background does not invent an applied or pending back
   state.facade.profile.backgroundSkinId=103001;methods.hydrateFacadeDraft(true);
   assert.equal(state.facadeDraft.hero,"103");assert.equal(state.facadeDraft.skinId,103001);
 });
-test("R106 only ranked accounts start expanded and timestamps show only last match start",async t=>{
+test("R106 ranked and pending accounts start expanded, confirmed unranked stays folded and timestamps show only last match start",async t=>{
   const dom=new JSDOM(read("index.html"),{url:"http://localhost/",runScripts:"outside-only",pretendToBeVisual:true}),w=dom.window;
   t.after(()=>w.close());
   const account=(gameName,rankStatus,extra={})=>({gameName,tagLine:"KR1",rankStatus,...extra});
   w.fetch=async()=>({ok:true,json:async()=>({teams:[{code:"IG",name:"IG",players:[{key:"ig/test",name:"Fixture",accounts:[account("Ranked","ranked",{tier:"DIAMOND",lp:75,checkedAt:"2026-09-17T13:00:00Z",lastMatchAt:"2026-09-16T10:00:00Z",lastMatchAtKnown:true}),account("Unranked","unranked"),account("Failed","unavailable",{checkedAt:"2026-09-17T13:00:00Z",checkFailed:true})]}]}]})});
   w.eval(read("pro-players.js"));w.dispatchEvent(new w.CustomEvent("deep-legends:section",{detail:{name:"pro-players"}}));await new Promise(setImmediate);
-  assert.equal(w.document.querySelectorAll("[data-pro-account]").length,1);
+  assert.equal(w.document.querySelectorAll("[data-pro-account]").length,2);
   assert.match(w.document.querySelector("[data-pro-account]").textContent,/最近对局/);
   w.document.querySelector("[data-pro-history]").click();
   assert.equal(w.document.querySelectorAll("[data-pro-account]").length,3);

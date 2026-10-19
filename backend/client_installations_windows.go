@@ -48,7 +48,31 @@ func detectClientInstallationsWithScan() ([]clientInstallation, clientInstallati
 			sources[strings.ToLower(candidate.executable)] = candidate.Source
 		}
 	}
-	items := buildDetectedClientInstallations(uniquePaths(gameRoots), executables, shortcuts, regularFile)
+	var wegameCandidates []clientLaunchCandidate
+	var otherShortcuts []clientInstallation
+	for _, item := range shortcuts {
+		if item.ID != "wegame" {
+			otherShortcuts = append(otherShortcuts, item)
+			continue
+		}
+		candidate := clientLaunchCandidate{Source: "registry", executable: item.executable}
+		if item.shortcut != "" {
+			candidate.Source = "shortcut"
+			candidate.executable, _ = shellLinkTarget(item.shortcut)
+		}
+		wegameCandidates = append(wegameCandidates, candidate)
+	}
+	wegameCandidates = append(wegameCandidates, wegameUninstallCandidates()...)
+	for _, image := range windowsNamedProcessImages("WeGame.exe")["wegame.exe"] {
+		wegameCandidates = append(wegameCandidates, clientLaunchCandidate{Source: "running", executable: image})
+	}
+	chosen, observations, available := selectWeGameCandidate(wegameCandidates, inspectWindowsFileVersion)
+	report.Candidates = observations
+	items := buildDetectedClientInstallations(uniquePaths(gameRoots), executables, otherShortcuts, regularFile)
+	if available {
+		items = append(items, clientInstallation{ID: "wegame", Name: "WeGame", Kind: "wegame", Description: "打开 WeGame", Available: true, executable: chosen.executable, launchCandidates: []clientLaunchCandidate{chosen}})
+	}
+
 	for i := range items {
 		if items[i].ID == "riot" {
 			for j := range items[i].launchCandidates {

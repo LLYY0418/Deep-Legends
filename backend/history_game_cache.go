@@ -54,14 +54,14 @@ func (c *historyGameCache) get(key string, complete bool) (historyGameValue, boo
 	c.order.MoveToFront(element)
 	return value, true
 }
-func (c *historyGameCache) put(value historyGameValue) {
+func (c *historyGameCache) put(value historyGameValue) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if element := c.entries[value.key]; element != nil {
 		previous := element.Value.(historyGameValue)
 		if previous.complete {
 			c.order.MoveToFront(element)
-			return
+			return false
 		}
 		element.Value = value
 		c.order.MoveToFront(element)
@@ -73,21 +73,22 @@ func (c *historyGameCache) put(value historyGameValue) {
 		delete(c.entries, element.Value.(historyGameValue).key)
 		c.order.Remove(element)
 	}
+	return true
 }
-func (c *historyGameCache) putSGP(server string, game *riotMatchInfo) {
+func (c *historyGameCache) putSGP(server string, game *riotMatchInfo) bool {
 	if game == nil || game.GameID <= 0 {
-		return
+		return false
 	}
 	raw, err := json.Marshal(game)
 	if err != nil {
-		return
+		return false
 	}
 	missing := make([]map[string]bool, len(game.Participants))
 	for i, p := range game.Participants {
 		missing[i] = maps.Clone(p.scoreMissing)
 	}
 	summary := summarizeRiotParticipants([]*riotMatchInfo{game})
-	c.put(historyGameValue{key: historyGameKey(dataSourceSGP, server, game.GameID), data: raw, missing: missing, perkStatsStale: game.PerkStatsStale, complete: len(game.Participants) > 0 && summary.Incomplete == 0 && summary.MissingPlayerRefs == 0})
+	return c.put(historyGameValue{key: historyGameKey(dataSourceSGP, server, game.GameID), data: raw, missing: missing, perkStatsStale: game.PerkStatsStale, complete: len(game.Participants) > 0 && summary.Incomplete == 0 && summary.MissingPlayerRefs == 0})
 }
 func (c *historyGameCache) sgp(server string, id int64, requireComplete ...bool) (*riotMatchInfo, bool) {
 	value, ok := c.get(historyGameKey(dataSourceSGP, server, id), len(requireComplete) > 0 && requireComplete[0])

@@ -9,6 +9,7 @@ import (
 type milestoneCache struct {
 	mu      sync.Mutex
 	entries map[string]*gameplayRankMilestones
+	wins    map[string]map[string]int
 }
 
 func (a *app) rankMilestoneKey(client *LCUClient, playerRef, server string) string {
@@ -37,6 +38,7 @@ func (a *app) loadRanksWithFallback(ctx context.Context, client *LCUClient, play
 		serverID = clientTencentServerID(client)
 	}
 	ranks, milestones, capability := a.loadRanksWithFallbackRaw(ctx, client, playerRef, isCurrent, serverID, privacy, tierScope...)
+	a.rememberOfficialRankWins(client, playerRef, serverID, ranks)
 	if !isRiotRegion(serverID) {
 		milestones = a.rememberRankMilestones(client, playerRef, serverID, milestones)
 	}

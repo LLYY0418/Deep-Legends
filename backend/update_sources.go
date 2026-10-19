@@ -69,7 +69,8 @@ func (u *updateManager) rememberUpdateSource(prefix string) {
 		return
 	}
 	u.preferredSource = prefix
-	data, _ := json.Marshal(updateSettings{Mirrors: append([]string(nil), u.mirrors...), PreferredSource: prefix})
+	automatic := !u.autoDisabled
+	data, _ := json.Marshal(updateSettings{Automatic: &automatic, Mirrors: append([]string(nil), u.mirrors...), PreferredSource: prefix})
 	err := writeLocalStoreFile(u.store, "update-settings.json", data)
 	u.mu.Unlock()
 	if err != nil {
