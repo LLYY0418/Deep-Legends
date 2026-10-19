@@ -506,7 +506,7 @@ func (u *updateManager) Check(force bool) bool {
 			_ = writeLocalStoreFile(u.store, "update-manifest.json", data)
 		}
 		resultState := u.status.State
-		predownload := !force && u.autoPredownload && !u.autoDownloadDisabled && resultState == "available" && !u.status.ManualOnly
+		predownload := u.autoPredownload && !u.autoDownloadDisabled && resultState == "available" && !u.status.ManualOnly
 		u.mu.Unlock()
 		if err == nil && u.ctx.Err() == nil {
 			u.recordUpdateCheck(map[string]any{

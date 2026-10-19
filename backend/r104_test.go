@@ -33,7 +33,15 @@ func r104FixtureFlight(t *testing.T) []byte {
 		t.Fatal(err)
 	}
 	encoded, _ := json.Marshal("1:" + string(payload) + "\n")
-	return []byte("<script>self.__next_f.push([1," + string(encoded) + "])</script>")
+	page := "<script>self.__next_f.push([1," + string(encoded) + "])</script>"
+	// Preserve the 09-17 capture unchanged. New reviewed teams have empty
+	// directory records here; their reviewed accounts come from the new seeds.
+	for i, team := range proRoster[6:] {
+		data, _ := json.Marshal(map[string]any{"region": "kr", "team": opggProTeam{ID: team.OPGGID, Name: team.Name, ShortName: team.Code, Members: []opggProMember{}}})
+		line, _ := json.Marshal(fmt.Sprintf("%x:%s\n", 0xff00+i, data))
+		page += "<script>self.__next_f.push([1," + string(line) + "])</script>"
+	}
+	return []byte(page)
 }
 func r104Rows(teams []opggProTeam) []opggProAccount {
 	var result []opggProAccount

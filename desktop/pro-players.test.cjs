@@ -5,18 +5,19 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
 const { waitOutcome } = require("../scripts/lib/wait-progress.cjs");
+const { waitForRender } = require("./renderer-wait.cjs");
 const { runRendererScript } = require("./renderer-script-cache.cjs");
 const WEB = path.join(__dirname, "..", "backend", "web");
 const PRO_CSS = fs.readFileSync(path.join(WEB, "pro-players.css"), "utf8");
 const GAMEPLAY_CSS = fs.readFileSync(path.join(WEB, "gameplay.css"), "utf8");
 const tick = (ms = 60) => new Promise((resolve) => setTimeout(resolve, ms));
 function fixture() {
-  return { teams: ["BLG", "IG", "T1", "HLE", "GEN", "DK"].map((code) => ({ code, name: code, league: ["BLG", "IG"].includes(code) ? "LPL" : "LCK", players: [
+  return { teams: ["BLG", "IG", "T1", "HLE", "GEN", "DK", "AL", "TES"].map((code) => ({ code, name: code, league: ["BLG", "IG", "AL", "TES"].includes(code) ? "LPL" : "LCK", players: [
     { key: `${code}/fixture`, name: `${code} Fixture`, position: "middle", status: "available", accounts: [
       { gameName: `${code} One`, tagLine: "KR1", rankStatus: "ranked", tier: "CHALLENGER", lp: 1000, ladderRank: 42, ladderRankKnown: true, updatedAt: "2026-09-08T10:00:00Z" },
-      { gameName: `${code} Two`, tagLine: "KR2", rankStatus: "unavailable", lp: 0 },
+      { gameName: `${code} Two`, tagLine: "KR2", rankStatus: "unranked", lp: 0 },
     ] }, { key: `${code}/missing`, name: `${code} Missing`, position: "top", status: "missing", accounts: [] },
-  ] })), playerCount: 12, accountCount: 12, missingCount: 6, warnings: [], fetchedAt: "2026-09-08T11:00:00Z", rosterVerifiedAt: "2026-09-08" };
+  ] })).map(team=>({...team,players:team.players.map(player=>({...player,accounts:player.accounts.map(account=>({...account,nextRefreshAt:'2099-01-01T00:00:00Z'}))}))})), playerCount: 16, accountCount: 16, missingCount: 8, warnings: [], fetchedAt: "2026-09-08T11:00:00Z", rosterVerifiedAt: "2026-09-08" };
 }
 let compactProSource = "", compactProHTML = "";
 function proPageHTML(source) {
@@ -31,12 +32,22 @@ function proPageHTML(source) {
   }
   return compactProHTML;
 }
-function boot(t, { full = false, response = async () => fixture(), overviewStatus = 200, proMismatch = false, diagnosticsBridge, seasonSummary, currentGame, demoCurrentGame = false, noMatches = false, spellCatalog = async () => ({spells: [{id: 4, name: "闪现"}, {id: 11, name: "惩戒"}]}) } = {}) {
+function boot(t, { clock = false, full = false, response = async () => fixture(), overviewStatus = 200, proMismatch = false, diagnosticsBridge, seasonSummary, currentGame, demoCurrentGame = false, noMatches = false, spellCatalog = async () => ({spells: [{id: 4, name: "闪现"}, {id: 11, name: "惩戒"}]}) } = {}) {
   const sourceHTML = fs.readFileSync(process.env.R102_INDEX_SOURCE || path.join(WEB, "index.html"), "utf8");
   const dom = new JSDOM(full ? sourceHTML : proPageHTML(sourceHTML), { url: demoCurrentGame ? "http://localhost/?demo=current-game" : "http://localhost/?demo", runScripts: "outside-only", pretendToBeVisual: true });
   const w = dom.window, requests = [], errors = [];
  w.document.hasFocus=()=>true;
-  t.after(() => w.close());
+  let now=Date.now(), timerID=0;
+  const timers=new Map();
+  if(clock){
+    w.Date.now=()=>now;
+    w.setTimeout=(callback,delay)=>(timers.set(++timerID,{callback,at:now+delay}),timerID);
+    w.clearTimeout=id=>timers.delete(id);
+  }
+  // jsdom has no layout; model the visible account rows used by the real refresh planner.
+  w.HTMLElement.prototype.getBoundingClientRect=function(){return {top:100,bottom:140,height:40,width:800};};
+
+  t.after(() => {w.dispatchEvent(new w.CustomEvent('deep-legends:dispose'));w.close();});
   w.desktopDiagnostics = diagnosticsBridge;
   w.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
   w.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
@@ -50,7 +61,7 @@ function boot(t, { full = false, response = async () => fixture(), overviewStatu
   w.console.error = (...args) => errors.push(args.map(String).join(" "));
   w.fetch = async () => new w.Response("{}", { status: 200 });
   require("./license-render-fixture.cjs").installLicenseRenderFixture(w);
-  const scripts = full ? ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "gameplay.js", "pro-players.js"] : ["pro-players.js"];
+  const scripts = full ? ["privacy.js", "runtime.js", "demo-data.js", "license-ui.js", "app.js", "gameplay.js", "pro-players.js"] : ["pro-players.js"];
   for (const file of scripts) {
     if (file === "pro-players.js" || file === "app.js") {
       const original = w.fetch;
@@ -59,8 +70,8 @@ function boot(t, { full = false, response = async () => fixture(), overviewStatu
         if (url === "/api/pro-players/visibility") return new w.Response(null,{status:204});
         if (url.startsWith("/api/pro-players")) {
           requests.push({ url, init });
-          const data = await response();
-          return new w.Response(JSON.stringify(data));
+          const data = await response(url,init);
+          return new w.Response(JSON.stringify(url==='/api/pro-players/refresh'?{updating:true}:data));
         }
         if (file === "app.js") requests.push({ url, init });
         if (file === "app.js" && url === "/api/gameplay/summoner-spells") return new w.Response(JSON.stringify(await spellCatalog()));
@@ -86,7 +97,10 @@ function boot(t, { full = false, response = async () => fixture(), overviewStatu
   }
   if (full) w.document.dispatchEvent(new w.Event("DOMContentLoaded", { bubbles: true }));
   const section = () => w.dispatchEvent(new w.CustomEvent("deep-legends:section", { detail: { name: "pro-players" } }));
-  return { w, d: w.document, requests, errors, section };
+  return { w, d: w.document, requests, errors, section, advance(ms){
+    assert(clock,'controlled clock required');now+=ms;
+    for(const [id,timer] of [...timers])if(timer.at<=now){timers.delete(id);timer.callback();}
+  } };
 }
 
 test("职业页懒加载、所有分组/账号、缺失状态、筛选缓存与安全转义", async (t) => {
@@ -97,9 +111,9 @@ test("职业页懒加载、所有分组/账号、缺失状态、筛选缓存与�
   assert.equal(requests.length, 0);
   section(); await tick();
   assert.equal(requests.length, 1);
-  assert.equal(d.querySelectorAll(".pro-team").length, 6);
-  assert.equal(d.querySelectorAll("[data-pro-account]").length, 7);
-  assert.equal(d.querySelectorAll(".pro-missing").length, 6);
+  assert.equal(d.querySelectorAll(".pro-team").length, 8);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 9);
+  assert.equal(d.querySelectorAll(".pro-missing").length, 8);
   assert.equal(d.querySelector(".pro-description"), null);
   assert.equal(d.querySelector(".pro-footer"), null);
   assert.doesNotMatch(d.body.textContent, /账号与单双排段位以 OP\.GG 韩服目录为主/);
@@ -149,21 +163,21 @@ test("R280 network recovery retries visible failed pro page once despite fresh c
 
 test("加载互斥、失败保留旧表、恢复与来源不可用名单", async (t) => {
   let fail = false, release;
-  const { d, requests, section } = boot(t, { response: () => fail ? Promise.reject(new Error("network")) : new Promise((resolve) => { release = resolve; }) });
+  const { d, requests, section, advance } = boot(t, { clock:true, response: () => fail ? Promise.reject(new Error("network")) : new Promise((resolve) => { release = resolve; }) });
   section(); section();
   assert.equal(requests.length, 1);
   assert.equal(d.querySelector("#pro-players-refresh").disabled, true);
   release(fixture()); await tick();
   fail = true; d.querySelector("#pro-players-refresh").click(); await tick();
-  assert.equal(d.querySelectorAll("[data-pro-account]").length, 6);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 8);
   assert.match(d.querySelector("#pro-players-status").textContent, /刷新失败.*上次读取/);
-  assert.equal(d.querySelector("#pro-players-refresh").disabled, false);
-  fail = false; d.querySelector("#pro-players-refresh").click();
+  assert.equal(d.querySelector("#pro-players-refresh").disabled, true,'manual failure still obeys the 60s cooldown');
+  advance(60000);fail = false; d.querySelector("#pro-players-refresh").click();
   const unavailable = fixture(); unavailable.unavailable = true; unavailable.accountCount = 0;
   unavailable.warnings = ["OP.GG 账号来源暂不可用"];
   for (const team of unavailable.teams) for (const player of team.players) { player.accounts = []; player.status = "unavailable"; }
-  release(unavailable); await tick();
-  assert.equal(d.querySelectorAll(".pro-player").length, 12);
+  release(unavailable); await tick();advance(3000);await tick();release(unavailable);await tick();
+  assert.equal(d.querySelectorAll(".pro-player").length, 16);
   assert.equal(d.querySelectorAll("[data-pro-account]").length, 0);
   assert.match(d.querySelector("#pro-players-content").textContent, /账号来源暂不可用/);
 });
@@ -247,7 +261,7 @@ test("补充来源未更新保留提示，重新进入不重复阻塞整页，�
   const { d, requests, section } = boot(t, { response: async () => data });
   section(); await tick();
   assert.match(d.querySelector("#pro-players-status").textContent, /部分来源未更新/);
-  assert.equal(d.querySelectorAll("[data-pro-account]").length, 6);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 8);
   section(); await tick();
   assert.equal(requests.length, 1);
   d.querySelector("#pro-players-refresh").click(); await tick();
@@ -256,16 +270,17 @@ test("补充来源未更新保留提示，重新进入不重复阻塞整页，�
 
 test("职业列表后台补充自动更新，离开页面停止轮询", async t => {
   let calls = 0;
-  const {w,d,requests,section} = boot(t,{response:async()=>({...fixture(),updating:++calls<2})});
+  const {w,d,requests,section,advance} = boot(t,{clock:true,response:async()=>({...fixture(),updating:++calls<2})});
   section();await tick();
-  assert.equal(d.querySelectorAll("[data-pro-account]").length,6);
-  await tick(1650);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 8);
+  advance(2999);await tick();assert.equal(requests.length,1,"polling must wait at least 3 seconds");
+  advance(1);await tick();
   assert.equal(requests.length,2);
-  await tick(1650);
+  advance(3000);await tick();
   assert.equal(requests.length,2,"finished enrichment must stop polling");
   calls=0;d.querySelector("#pro-players-refresh").click();await tick();
   w.dispatchEvent(new w.CustomEvent("deep-legends:section",{detail:{name:"overview"}}));
-  await tick(1650);assert.equal(requests.length,3,"inactive page must not poll");
+  advance(3000);await tick();assert.equal(requests.length,3,"inactive page must not poll");
 });
 
 
@@ -277,17 +292,17 @@ test("R73 最近账号、历史折叠、只看最新账号及会话核验", asyn
   data.warnings = ["第一条提示", "第二条提示"];
   const {w, d, section, requests} = boot(t, {response: async () => data});
   section(); await tick();
-  assert.equal(d.querySelectorAll("[data-pro-account]").length, 6);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 8);
   assert.equal(d.querySelectorAll(".pro-main-badge").length, 0);
   assert.equal(d.querySelector(".pro-warnings"), null);
   assert.equal(d.querySelector("#pro-players-warnings"), null);
   assert.equal(d.querySelector(".pro-team-filter i"), null);
-  assert.equal(d.querySelectorAll("[data-pro-history]").length, 6);
+  assert.equal(d.querySelectorAll("[data-pro-history]").length, 8);
   d.querySelector("[data-pro-history]").click();
-  assert.equal(d.querySelectorAll("[data-pro-account]").length, 7);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 9);
   assert.equal(d.querySelector("[data-pro-history]").getAttribute("aria-expanded"), "true");
   d.querySelector("#pro-primary-only").click();
-  assert.equal(d.querySelectorAll("[data-pro-account]").length, 6);
+  assert.equal(d.querySelectorAll("[data-pro-account]").length, 8);
   assert.equal(d.querySelectorAll("[data-pro-history]").length, 0);
   for (const [i, body] of [...d.querySelectorAll(".pro-table tbody")].filter(body => body.querySelector("[data-pro-account]")).entries()) {
     assert.equal(body.querySelectorAll("[data-pro-account]").length, 1);
@@ -343,7 +358,7 @@ test("未知更新时间的补充账号保持展示，不出现120天未玩的�
  const data=fixture();Object.assign(data.teams[0].players[0].accounts[0],{source:'TrackingThePros',updatedAt:'',dormant:false});
  const {d,section}=boot(t,{response:async()=>data});section();await tick();
  assert.match(d.querySelector('.pro-account').textContent,/BLG One.*TTP.*最近对局时间暂不可用/);
- assert.equal(d.querySelectorAll('[data-pro-history]').length,6);
+ assert.equal(d.querySelectorAll('[data-pro-history]').length, 8);
  assert.doesNotMatch(d.querySelector('#pro-players-content').textContent,/120 天未更新|120天未玩/);
 });
 
@@ -525,6 +540,23 @@ test('国服总览保留战绩但不渲染或请求当前对局和观战', async
 });
 
 
+test("R291 AL and TES search and return preserve their team filter and account focus",async t=>{
+ for(const code of ['AL','TES']){
+  const {w,d,errors}=boot(t,{full:true});
+  w.dispatchEvent(new w.CustomEvent('deep-legends:navigate',{detail:{section:'pro-players'}}));
+  await waitForRender(w,()=>d.querySelector(`[data-pro-team="${code}"]`)&&d.querySelector(`[data-pro-row^="${code}/"]`),'new team did not render');
+  d.querySelector(`[data-pro-team="${code}"]`).click();
+  const search=d.getElementById('pro-players-search');search.value=`${code} One`;search.dispatchEvent(new w.Event('input'));
+  assert.equal(d.querySelectorAll('.pro-team').length,1);assert.equal(d.querySelector('.pro-team h2').textContent,code);
+  const account=d.querySelector('[data-pro-account]'),key=account.dataset.proAccount;account.click();
+  await waitForRender(w,()=>d.getElementById('pro-players-panel').hidden&&!d.getElementById('pro-players-return').hidden,'pro overview did not open');
+  d.getElementById('pro-players-return').click();
+  await waitForRender(w,()=>!d.getElementById('pro-players-panel').hidden,'return to pro list failed');
+  assert.equal(search.value,`${code} One`);assert.equal(d.querySelector(`[data-pro-team="${code}"]`).getAttribute('aria-pressed'),'true');
+  assert.equal(d.activeElement.dataset.proAccount,key);assert.deepEqual(errors,[]);
+ }
+});
+
 test("R97 management filters and rows exclude expanded and academy teams", async (t) => {
   const data = fixture();
   const extras = ["Winners", "Young Miracles", "Machi Esports", "Suning Gaming-S", "Anyone's Legend.Young", "Suning", "VSG", "T1 Academy"];
@@ -539,16 +571,16 @@ test("R97 management filters and rows exclude expanded and academy teams", async
   Object.assign(invalidSecondary, {name: "Excluded secondary T1", secondary: true});
   data.teams.push(invalidSecondary);
   const {w, d, section, errors} = boot(t, {response: async () => data});
-  const expected = ["all", "BLG", "IG", "T1", "HLE", "GEN", "DK"];
+  const expected = ["all", "BLG", "IG", "T1", "HLE", "GEN", "DK", "AL", "TES"];
   const filters = () => Array.from(d.querySelectorAll("[data-pro-team]"), b => b.dataset.proTeam);
-  assert.deepEqual(filters(), expected, "six filters exist before loading");
+  assert.deepEqual(filters(), expected, "eight filters exist before loading");
   section(); await tick();
   assert.deepEqual(filters(), expected);
   assert.deepEqual(Array.from(d.querySelectorAll(".pro-team h2"), n => n.textContent), expected.slice(1));
   const content = d.querySelector("#pro-players-content");
   for (const code of extras) assert.equal(content.textContent.includes(code), false, code);
   assert.doesNotMatch(content.textContent, /二队|学院队|Excluded/);
-  assert.equal(content.querySelectorAll("[data-pro-account]").length, 6);
+  assert.equal(content.querySelectorAll("[data-pro-account]").length, 8);
   let selected;
   w.addEventListener("deep-legends:open-player", event => { selected = event.detail; });
   d.querySelector('[data-pro-team="T1"]').click();
@@ -586,12 +618,12 @@ test("TestR102LatestOnlyTogglesShowsFirstAccountOnly", async t => {
  const data=fixture();
  for(const team of data.teams) { const accounts=team.players[0].accounts; accounts[0].tier='IRON';accounts[1].rankStatus='ranked';accounts[1].tier='CHALLENGER';accounts[1].primary=true; }
  const {d,section}=boot(t,{response:async()=>data});section();await tick();
- assert.equal(d.querySelectorAll('[data-pro-account]').length,12);
- assert.equal(d.querySelectorAll('tr.pro-primary').length,6);
+ assert.equal(d.querySelectorAll('[data-pro-account]').length, 16);
+ assert.equal(d.querySelectorAll('tr.pro-primary').length, 8);
  d.querySelector('#pro-primary-only').click();
- const rendered=[...d.querySelectorAll('[data-pro-account]')];assert.equal(rendered.length,6);
+ const rendered=[...d.querySelectorAll('[data-pro-account]')];assert.equal(rendered.length, 8);
  rendered.forEach((account,i)=> {assert.ok(account.textContent.includes(data.teams[i].players[0].accounts[0].gameName));assert.ok(account.closest('tr').classList.contains('pro-primary'));});
- d.querySelector('#pro-primary-only').click();assert.equal(d.querySelectorAll('[data-pro-account]').length,12);
+ d.querySelector('#pro-primary-only').click();assert.equal(d.querySelectorAll('[data-pro-account]').length, 16);
 });
 test("TestR102ButtonLabelSaysLatestNotPrimary", async t => {
  const {d}=boot(t);assert.equal(d.querySelector('#pro-primary-only').textContent.trim(),'只看最新账号');

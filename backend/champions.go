@@ -917,7 +917,7 @@ func (p *championProvider) fetchDirect(ctx context.Context, host, requestPath st
 }
 
 func allowedChampionHost(host string) bool {
-	return host == opggChampionHost || host == opggWebAPIHost || host == opggPageHost || host == opggAssetHost || host == dataDragonHost || host == prestigeArtworkHost || host == communityDragonHost || host == yourGGArenaHost || host == hexdataHost || host == hexdataAssetHost || host == qq101Host
+	return host == opggChampionHost || host == opggWebAPIHost || host == opggPageHost || host == esportsOPGGHost || host == opggAssetHost || host == dataDragonHost || host == prestigeArtworkHost || host == communityDragonHost || host == yourGGArenaHost || host == hexdataHost || host == hexdataAssetHost || host == qq101Host
 }
 
 func (a *app) handleChampionCatalog(w http.ResponseWriter, r *http.Request) {

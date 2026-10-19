@@ -4821,12 +4821,15 @@ type gameplayRecommendationRune struct {
 	Win                  *bool                       `json:"win,omitempty"`
 	SelectedComplete     *bool                       `json:"selectedComplete,omitempty"`
 	RecordGames          int                         `json:"recordGames,omitempty"`
-	RecordWins           int                         `json:"recordWins,omitempty"`
+	RecordWins           int                         `json:"recordWins"`
 	RecordPartial        bool                        `json:"recordPartial,omitempty"`
 	CacheReadAt          string                      `json:"cacheReadAt,omitempty"`
-	opponentPUUID        string
-	runeMatchID          string
-	runeParticipantID    int64
+
+	Build *gameplayRecommendationBuild `json:"build,omitempty"`
+
+	opponentPUUID     string
+	runeMatchID       string
+	runeParticipantID int64
 }
 
 type gameplayRecommendationStats struct {

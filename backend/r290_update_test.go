@@ -46,53 +46,61 @@ func TestR290AutoDownloadDefaultsAndSourceRewrite(t *testing.T) {
 	}
 }
 
-func TestR290AutoDownloadOnlyAfterAutomaticCheck(t *testing.T) {
-	for _, mode := range []string{"disabled", "reenabled", "manual"} {
-		t.Run(mode, func(t *testing.T) {
-			data := []byte("verified installer")
-			u := updateTestManager(t, data)
-			u.autoPredownload = true
-			disabled := false
-			if err := u.SetSettings(updateSettings{Mirrors: []string{""}, AutoDownload: &disabled}); err != nil {
-				t.Fatal(err)
-			}
-			if mode != "disabled" {
-				enabled := true
-				if err := u.SetSettings(updateSettings{Mirrors: []string{""}, AutoDownload: &enabled}); err != nil {
-					t.Fatal(err)
+func TestR290AutoDownloadForAutomaticAndManualChecks(t *testing.T) {
+	for _, force := range []bool{false, true} {
+		kind := "automatic"
+		if force {
+			kind = "manual"
+		}
+		for _, mode := range []string{"default", "disabled", "reenabled"} {
+			t.Run(kind+"/"+mode, func(t *testing.T) {
+				data := []byte("verified installer")
+				u := updateTestManager(t, data)
+				u.autoPredownload = true
+				disabled := false
+				if mode != "default" {
+					if err := u.SetSettings(updateSettings{Mirrors: []string{""}, AutoDownload: &disabled}); err != nil {
+						t.Fatal(err)
+					}
 				}
-			}
-			u.cache = updateCache{CheckedAt: u.now(), Current: u.status.Current, Manifest: *u.manifest}
-			var downloads atomic.Int32
-			u.client = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) {
-				if r.URL.String() == u.manifest.Asset.URL {
-					downloads.Add(1)
-					return updateResponse(200, data), nil
+				if mode == "reenabled" {
+					enabled := true
+					if err := u.SetSettings(updateSettings{Mirrors: []string{""}, AutoDownload: &enabled}); err != nil {
+						t.Fatal(err)
+					}
 				}
-				manifest, _ := json.Marshal(*u.manifest)
-				return updateResponse(200, manifest), nil
-			})}
-			if !u.Check(mode == "manual") {
-				t.Fatal("check rejected")
-			}
-			waitUpdateCheck(t, u)
-			if mode == "reenabled" {
-				waitUpdateDownload(t, u)
-				if downloads.Load() != 1 || u.Status().State != "ready" {
-					t.Fatal(downloads.Load(), u.Status())
+				u.cache = updateCache{CheckedAt: u.now(), Current: u.status.Current, Manifest: *u.manifest}
+				var downloads atomic.Int32
+				u.client = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) {
+					if r.URL.String() == u.manifest.Asset.URL {
+						downloads.Add(1)
+						return updateResponse(200, data), nil
+					}
+					manifest, _ := json.Marshal(*u.manifest)
+					return updateResponse(200, manifest), nil
+				})}
+				if !u.Check(force) {
+					t.Fatal("check rejected")
 				}
-			} else {
-				if downloads.Load() != 0 || u.Status().State != "available" {
-					t.Fatal("check downloaded without permission", downloads.Load(), u.Status())
+				waitUpdateCheck(t, u)
+				if mode != "disabled" {
+					waitUpdateDownload(t, u)
+					if downloads.Load() != 1 || u.Status().State != "ready" {
+						t.Fatal(downloads.Load(), u.Status())
+					}
+				} else {
+					if downloads.Load() != 0 || u.Status().State != "available" {
+						t.Fatal("check downloaded without permission", downloads.Load(), u.Status())
+					}
+					if err := u.Download(); err != nil {
+						t.Fatal(err)
+					}
+					waitUpdateDownload(t, u)
+					if downloads.Load() != 1 || u.Status().State != "ready" {
+						t.Fatal("explicit download disabled", downloads.Load(), u.Status())
+					}
 				}
-				if err := u.Download(); err != nil {
-					t.Fatal(err)
-				}
-				waitUpdateDownload(t, u)
-				if downloads.Load() != 1 || u.Status().State != "ready" {
-					t.Fatal("explicit download disabled", downloads.Load(), u.Status())
-				}
-			}
-		})
+			})
+		}
 	}
 }

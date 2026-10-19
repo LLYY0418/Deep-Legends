@@ -33,7 +33,7 @@ func TestR288ProFirstScreenIsLocalAndScopedPlanStaysVisible(t *testing.T) {
 	started := time.Now()
 	teams, _, _ := a.proPlayersFirstScreen(false)
 	response := a.buildReviewedProPlayers(teams)
-	if response.AccountCount != 53 {
+	if response.AccountCount != 64 {
 		t.Fatal(response.AccountCount)
 	}
 	if time.Since(started) > 300*time.Millisecond {

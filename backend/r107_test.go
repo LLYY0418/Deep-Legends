@@ -167,7 +167,7 @@ func TestR107LiveProfileActivityBatch(t *testing.T) {
 		}
 	}
 	t.Logf("accounts=%d ranked=%d known match starts=%d", total, ranked, known)
-	if total != 53 {
+	if total != 64 {
 		t.Fatal("incomplete roster")
 	}
 }

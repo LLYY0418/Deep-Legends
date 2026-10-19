@@ -15,6 +15,7 @@ test(`R75/R76 actual page: pro rows, degradation ${coverage ? coverage.failedGam
   const w = dom.window;
   try {
     const errors = [], requests = [];
+    const responseCapture=structuredClone(capture);responseCapture.pros[0].build={skillOrder:["Q","W","E","R"]};responseCapture.pros[0].recordGames=1;responseCapture.pros[0].recordWins=0;
     let offline = false;
     w.onerror = (_, __, ___, ____, error) => errors.push(String(error));
     w.console.error = (...args) => errors.push(args.join(" "));
@@ -30,7 +31,7 @@ test(`R75/R76 actual page: pro rows, degradation ${coverage ? coverage.failedGam
     // Keep the immutable capture inside its original 30-day validation window.
     w.Date.now = () => Date.parse("2026-09-09T04:16:00Z");
     require("./license-render-fixture.cjs").installLicenseRenderFixture(w);
-    for (const file of ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"]) {
+    for (const file of ["privacy.js", "runtime.js", "demo-data.js", "license-ui.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"]) {
       w.eval(fs.readFileSync(path.join(WEB, file), "utf8"));
       if (file !== "demo-data.js") continue;
       const demoFetch = w.fetch;
@@ -39,7 +40,7 @@ test(`R75/R76 actual page: pro rows, degradation ${coverage ? coverage.failedGam
         requests.push({ url, method: init?.method || "GET" });
         if (url.startsWith("/api/gameplay/pro-runes")) {
           if (offline) throw new Error("simulated offline");
-          return new Response(JSON.stringify(coverage ? {...capture,...coverage,readAt:"2026-09-09T04:16:00Z",stale:false,reason:"network-unavailable",preparing:false,outcomesLoading:false} : capture), { headers: { "Content-Type": "application/json" } });
+          return new Response(JSON.stringify(coverage ? {...responseCapture,...coverage,readAt:"2026-09-09T04:16:00Z",stale:false,reason:"network-unavailable",preparing:false,outcomesLoading:false} : responseCapture), { headers: { "Content-Type": "application/json" } });
         }
         const response = await demoFetch(input, init);
         if (!url.startsWith("/api/gameplay/live")) return response;
@@ -66,6 +67,9 @@ test(`R75/R76 actual page: pro rows, degradation ${coverage ? coverage.failedGam
     assert.match(live.textContent, /LCK · 2026-09-06/);
     assert.match(live.textContent, /DK ShowMaker/);
     assert.ok(live.querySelector(".specialist-game-row"));
+    assert.equal(live.querySelectorAll(".specialist-game-row .skill-plan .skill-order > span").length,4,"pro record uses the existing skill order presenter");
+    assert.match(live.querySelector(".specialist-game-row .skill-order").textContent,/Q1W2E3R4/);
+    assert.match(live.querySelector(".pro-player-record").getAttribute("aria-label"),/^0胜1负/);
     assert.ok(requests.some(r => r.url.includes("championId=69")));
     if (coverage) {
       const note = live.querySelector(".pro-rune-status")?.textContent || "";

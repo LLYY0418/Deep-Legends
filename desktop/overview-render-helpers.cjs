@@ -4,7 +4,7 @@ const fs = require("node:fs"), path = require("node:path");
 const { JSDOM } = require("jsdom");
 const { runRendererScript } = require("./renderer-script-cache.cjs");
 const WEB = path.join(__dirname, "..", "backend", "web");
-const SCRIPTS = ["runtime.js", "demo-data.js", "license-ui.js", "app.js", "favorites-facade.js", "section-loader.js", "match-details.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
+const SCRIPTS = ["privacy.js", "runtime.js", "demo-data.js", "license-ui.js", "app.js", "favorites-facade.js", "section-loader.js", "match-details.js", "gameplay.js", "champions.js", "friends.js", "suite.js"];
 const gameplaySource = require("../backend/web/r277-deferred-fixture.cjs").join(fs.readFileSync(process.env.R104_GAMEPLAY_SOURCE || path.join(WEB, "gameplay.js"), "utf8"));
 const suiteSource = fs.readFileSync(path.join(WEB, "suite.js"), "utf8");
 const appStyles = fs.readFileSync(path.join(WEB, "app.css"), "utf8");

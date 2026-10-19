@@ -26,7 +26,8 @@ type proSeedAccountRef struct {
 	TagLine  string
 }
 
-// R105: fully embedded from testdata/pro-accounts/pro-accounts-verification-2026-09-17.md.
+// Reviewed sources: testdata/pro-accounts/pro-accounts-verification-2026-09-17.md
+// and pro-accounts-verification-2026-10-19.md (appended AL/TES entries).
 // Keep account order stable: the index is the rename-resistant anchor identity.
 var proSeedAccounts = reviewedProSeeds([]proSeedAccount{
 	{TeamCode: "BLG", Player: "Bin", Accounts: []proSeedAccountRef{{"빈 스토리", "KR1"}}},
@@ -62,6 +63,17 @@ var proSeedAccounts = reviewedProSeeds([]proSeedAccount{
 	{TeamCode: "DK", Player: "ShowMaker", Accounts: []proSeedAccountRef{{"DK ShowMaker", "KR1"}, {"MIDKING", "asd"}}},
 	{TeamCode: "DK", Player: "Smash", Accounts: []proSeedAccountRef{{"DK Smash", "KR7"}, {"Smash", "KR2"}, {"사옥 지박령", "KR4"}}},
 	{TeamCode: "DK", Player: "Career", Accounts: []proSeedAccountRef{{"팽도리", "1015"}, {"인간 병기", "0829"}}},
+	{TeamCode: "AL", Player: "Breathe", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"aierlanxiaozhu", "01321"}}},
+	{TeamCode: "AL", Player: "Tarzan", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"타 잔", "KR1"}}},
+	{TeamCode: "AL", Player: "Shanks", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"mtrngrxsyl", "6146"}}},
+	{TeamCode: "AL", Player: "Hope", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"jusaka", "KR2"}}},
+	{TeamCode: "AL", Player: "Kael", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"AL Kael", "0211"}}},
+	{TeamCode: "TES", Player: "369", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"qsxmiocmio", "KR1"}}},
+	{TeamCode: "TES", Player: "ZUIAN", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"Pure Imagination", "ZZZZZ"}}},
+	{TeamCode: "TES", Player: "Tian", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"plokijuhyg", "yyc04"}}},
+	{TeamCode: "TES", Player: "Creme", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"livinli", "KR1"}}},
+	{TeamCode: "TES", Player: "JackeyLove", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"qweasdqweasdqw", "KR1"}}},
+	{TeamCode: "TES", Player: "Zhuo", Reviewed: "2026-10-19", Accounts: []proSeedAccountRef{{"Universe", "zy1"}}},
 })
 
 func reviewedProSeeds(seeds []proSeedAccount) []proSeedAccount {
@@ -74,7 +86,9 @@ func reviewedProSeeds(seeds []proSeedAccount) []proSeedAccount {
 			for _, player := range team.Players {
 				if player.Name == seed.Player {
 					seed.OPGGID, seed.RealName, seed.Position = team.OPGGID, player.Names[0], player.Position
-					seed.Reviewed = "2026-09-17"
+					if seed.Reviewed == "" {
+						seed.Reviewed = "2026-09-17"
+					}
 				}
 			}
 		}

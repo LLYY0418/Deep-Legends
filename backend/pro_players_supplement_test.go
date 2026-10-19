@@ -52,7 +52,7 @@ func TestProSupplementFailureDoesNotEraseOPGG(t *testing.T) {
 	})}
 	supplements := loadProSupplements(context.Background(), p)
 	result := (&app{}).buildProPlayers(supplements, proRoster)
-	if result.PlayerCount != 33 || len(result.Warnings) == 0 {
+	if result.PlayerCount != 44 || len(result.Warnings) == 0 {
 		t.Fatal("failure lost roster/warnings")
 	}
 	for _, player := range result.Teams[1].Players {

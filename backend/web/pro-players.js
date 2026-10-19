@@ -10,7 +10,7 @@
   const home = document.getElementById("pro-players-home");
   const back = document.getElementById("pro-players-return");
   const primaryOnly = document.getElementById("pro-primary-only");
-  const teams = ["BLG", "IG", "T1", "HLE", "GEN", "DK"];
+  const teams = ["BLG", "IG", "T1", "HLE", "GEN", "DK", "AL", "TES"];
   const positions = { top: "上单", jungle: "打野", middle: "中单", bottom: "下路", utility: "辅助" };
   const tiers = { IRON: "黑铁", BRONZE: "青铜", SILVER: "白银", GOLD: "黄金", PLATINUM: "铂金", EMERALD: "翡翠", DIAMOND: "钻石", MASTER: "超凡大师", GRANDMASTER: "傲世宗师", CHALLENGER: "最强王者" };
   const state = { data: null, team: "all", query: "", loading: false, error: "", loadedAt: 0, returnKey: "", primaryOnly: false, expanded: new Set(), mismatches: new Set(), attempts: new Map(), manualAt: 0, pollStarted: 0 };
@@ -54,7 +54,7 @@
     const data = state.data;
     if (!data) {
       status.classList.toggle("is-warning", Boolean(state.error));
-      status.textContent = state.error || "正在读取六支战队的公开账号…";
+      status.textContent = state.error || "正在读取八支战队的公开账号…";
       content.innerHTML = state.error ? '<div class="pro-empty"><strong>暂时无法读取账号</strong><p>请检查网络后点击“刷新账号”重试。一队名单不会被空结果替换。</p></div>' : '<div class="pro-skeleton" aria-label="正在加载职业选手"><span></span><span></span><span></span><span></span></div>';
       return;
     }
@@ -106,13 +106,13 @@
 
   let profileObserver=null, profileVisibilityTimer=0;
   function observeProRows() {
-    if(!window.IntersectionObserver)return;
+    if(disposed || !window.IntersectionObserver)return;
     profileObserver?.disconnect();
     profileObserver=new IntersectionObserver(()=>{clearTimeout(profileVisibilityTimer);profileVisibilityTimer=setTimeout(()=>void refreshVisibleProfiles(false),100);});
     for(const row of content.querySelectorAll('[data-pro-row]'))profileObserver.observe(row);
   }
   async function refreshVisibleProfiles(manual=false) {
-    if(!visible || document.hidden || !state.data || state.loading || manual && Date.now()-state.manualAt<60000)return;
+    if(disposed || !visible || document.hidden || !state.data || state.loading || manual && Date.now()-state.manualAt<60000)return;
     const accounts=[];
     const candidates=[];
     if(state.team!=="all") {
@@ -158,6 +158,7 @@
       if (disposed || typeof document==='undefined' || !content.isConnected) return;
       if (!Array.isArray(data.teams) || !data.teams.every((team) => typeof team.code === "string" && team.code && Array.isArray(team.players))) throw new Error("invalid response");
       changed ||= JSON.stringify(state.data) !== JSON.stringify(data);
+      if (data.updating && !poll) state.pollStarted = Date.now();
       state.data = data;
       state.loadedAt = Date.now();
     } catch (error) {

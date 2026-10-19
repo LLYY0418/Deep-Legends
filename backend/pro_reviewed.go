@@ -5,7 +5,7 @@ import "sort"
 // The reviewed list owns page membership and spelling. Cached directories only
 // decorate exact Riot IDs; an old owner, seed index or PUUID cannot replace it.
 // Apply at the response boundary so cold starts, restored snapshots and every
-// asynchronous enrichment publication obey the same 33-player/53-account rule.
+// asynchronous enrichment publication obey the same 44-player/64-account rule.
 func (a *app) buildReviewedProPlayers(source []opggProTeam) proPlayersResponse {
 	result := a.buildProPlayers(nil, proRoster)
 	metadata := map[string]opggProAccount{}

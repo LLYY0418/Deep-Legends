@@ -57,11 +57,11 @@ func proFixtureHTML(region string, overrides ...opggProTeam) []byte {
 func TestProDirectoryParsesAllFlightRecordsAndRequiresKR(t *testing.T) {
 	team := opggProTeam{ID: 632, Name: "Bilibili Gaming", ShortName: "BLG", Members: []opggProMember{proFixtureMember(632, "knight", "Zhuo Ding (卓定)", proFixtureAccount("one", "puuid1", "CHALLENGER", 1, 1000))}}
 	rows, err := parseOPGGProPlayers(proFixtureHTML("kr", team))
-	if err != nil || len(rows) != 6 {
+	if err != nil || len(rows) != 8 {
 		t.Fatalf("teams=%d err=%v", len(rows), err)
 	}
 	result := (&app{token: "test"}).buildProPlayers(rows, proRoster)
-	if result.PlayerCount != 33 || result.AccountCount != 1 || result.MissingCount != 32 {
+	if result.PlayerCount != 44 || result.AccountCount != 1 || result.MissingCount != 43 {
 		t.Fatalf("unexpected counts: players=%d accounts=%d missing=%d", result.PlayerCount, result.AccountCount, result.MissingCount)
 	}
 	for _, body := range [][]byte{nil, []byte("<html>challenge</html>"), proFixtureHTML("na", team), bytes.Repeat([]byte("x"), proPlayersMaxBytes+1)} {
@@ -263,7 +263,7 @@ func TestProCacheSingleflightRefreshBackoffAndStale(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			teams, _, err := a.loadProPlayers(context.Background(), true)
-			if err != nil || len(teams) != 42 {
+			if err != nil || len(teams) != 55 {
 				t.Errorf("load=%d err=%v", len(teams), err)
 			}
 		}()
@@ -283,7 +283,7 @@ func TestProCacheSingleflightRefreshBackoffAndStale(t *testing.T) {
 	a.proPlayers.fetchedAt = time.Now().Add(-proPlayersTTL - time.Minute)
 	a.proPlayers.mu.Unlock()
 	teams, at, err := a.loadProPlayers(context.Background(), false)
-	if err == nil || len(teams) != 42 || time.Since(at) < proPlayersTTL {
+	if err == nil || len(teams) != 55 || time.Since(at) < proPlayersTTL {
 		t.Fatal("failed load didn't retain explicitly stale data")
 	}
 	w := httptest.NewRecorder()
@@ -365,7 +365,7 @@ func TestProDirectoryPublishesBeforeSlowSupplements(t *testing.T) {
 	// 任何断言失效。所以「loadProPlayers 已经返回、而 supplementDone 仍是 0」就是
 	// 一个不依赖墙钟的证明：发布没有等过任何一次补充源请求的完成。
 	teams, _, err := a.loadProPlayers(ctx, false)
-	if err != nil || len(teams) != 42 {
+	if err != nil || len(teams) != 55 {
 		t.Fatalf("directory waited for supplement: %v (teams=%d)", err, len(teams))
 	}
 	// 只要发布路径等过补充源（哪怕等到它自己超时），这里必然非 0。
@@ -413,7 +413,7 @@ func TestProDirectoryFailureRetainsRosterAndAuth(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.Unavailable || result.PlayerCount != 33 || result.AccountCount != 53 || len(result.Teams) != 6 || result.Teams[0].Players[0].Status != "available" {
+	if !result.Unavailable || result.PlayerCount != 44 || result.AccountCount != 64 || len(result.Teams) != 8 || result.Teams[0].Players[0].Status != "available" {
 		t.Fatalf("failed source erased roster: unavailable=%t players=%d accounts=%d teams=%d", result.Unavailable, result.PlayerCount, result.AccountCount, len(result.Teams))
 	}
 	if w.Header().Get("Cache-Control") != "no-store" {
@@ -455,7 +455,7 @@ func TestProCapturedDirectory(t *testing.T) {
 		}
 	}
 	t.Logf("%d teams, %d roster players, %d accounts, %d without accounts", len(result.Teams), result.PlayerCount, result.AccountCount, result.MissingCount)
-	if len(result.Teams) != 6 || result.AccountCount < 40 {
+	if len(result.Teams) != 8 || result.AccountCount < 40 {
 		t.Fatal("unexpectedly incomplete live source")
 	}
 	if out := os.Getenv("PRO_PLAYERS_PUBLIC_OUTPUT"); out != "" && os.Getenv("PRO_PLAYERS_SUPPLEMENT_CAPTURE") == "" {
@@ -580,7 +580,7 @@ func TestR97ProAccountOptionalRegionSurvivesKRDirectory(t *testing.T) {
 	}
 }
 
-func TestR97ManagementAndBadgesShareReviewedSixTeams(t *testing.T) {
+func TestR97ManagementAndBadgesShareReviewedEightTeams(t *testing.T) {
 	var source []opggProTeam
 	for _, team := range proRoster {
 		p := team.Players[0]
@@ -609,8 +609,8 @@ func TestR97ManagementAndBadgesShareReviewedSixTeams(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &data); err != nil {
 		t.Fatal(err)
 	}
-	codes := []string{"BLG", "IG", "T1", "HLE", "GEN", "DK"}
-	if len(data.Teams) != 6 || data.PlayerCount != 33 || data.AccountCount != 53 {
+	codes := []string{"BLG", "IG", "T1", "HLE", "GEN", "DK", "AL", "TES"}
+	if len(data.Teams) != 8 || data.PlayerCount != 44 || data.AccountCount != 64 {
 		t.Fatalf("scope widened: %+v", data)
 	}
 	index := a.proIdentitySnapshot()
@@ -618,8 +618,8 @@ func TestR97ManagementAndBadgesShareReviewedSixTeams(t *testing.T) {
 		if team.Code != codes[i] || team.Secondary {
 			t.Fatal("unexpected team", team)
 		}
-		// R105 fixes page membership to the 53 reviewed accounts. The badge
-		// index still validates the seven independent upstream fixture rows.
+		// R105 fixes page membership to the 64 reviewed accounts. The badge
+		// index still validates the nine independent upstream fixture rows.
 		for _, p := range a.buildProPlayers(teams, proRoster).Teams[i].Players {
 			for _, account := range p.Accounts {
 				badge := a.matchProIdentity(index, "management", gameplayReference{Region: "kr", GameName: account.GameName, TagLine: account.TagLine})
@@ -629,10 +629,10 @@ func TestR97ManagementAndBadgesShareReviewedSixTeams(t *testing.T) {
 			}
 		}
 	}
-	if index.candidates != 7 {
+	if index.candidates != 9 {
 		t.Fatal("badge inputs exceed whitelist", index.candidates)
 	}
-	for _, team := range source[6 : len(source)-1] {
+	for _, team := range source[len(proRoster) : len(source)-1] {
 		account := team.Members[0].Summoners[0]
 		for _, surface := range []string{"match", "live", "overview", "current-game"} {
 			if a.matchProIdentity(index, surface, gameplayReference{Region: "kr", GameName: account.GameName, TagLine: account.TagLine, PlayerRef: account.PUUID}) != nil {

@@ -5,6 +5,7 @@ withBrowser(async({page,results,errors})=>{
  await p.evaluate(`localStorage.setItem('lol-loot-ui-scale','1');__r278App.applyUiScale();window.__r290Loading={frames:[],active:true};(()=>{const sample=()=>{const panel=document.getElementById('settings-panel'),link=document.querySelector('link[href="/settings-preferences.css"]'),icon=document.querySelector('#settings-github svg'),button=document.getElementById('settings-github'),r=icon.getBoundingClientRect();__r290Loading.frames.push({visible:!panel.hidden,styled:!!link?.sheet,rendered:icon.getClientRects().length>0,width:r.width,height:r.height,buttonHeight:button.getBoundingClientRect().height});if(__r290Loading.active)requestAnimationFrame(sample)};requestAnimationFrame(sample)})();__r278App.activateSection('settings')`);
  await p.until(`document.querySelector('link[href="/settings-preferences.css"]')&&!document.querySelector('link[href="/settings-preferences.css"]').sheet`);
  await p.shot('settings-style-pending');
+ await p.evaluate("fetch('/__r290/release-settings-css')");
  await p.until('window.deepLegendsSettingsBackup?.createBackup');
  await p.evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>{__r290Loading.active=false;r()})))');
  const frames=await p.evaluate('__r290Loading.frames');

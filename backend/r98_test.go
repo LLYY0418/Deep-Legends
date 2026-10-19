@@ -398,7 +398,7 @@ func TestR98ChovyNullRegionFlightToOverview(t *testing.T) {
 	}
 	a := &app{storage: trackTestStore(t, &localStore{root: root})}
 	a.proPlayers.teams = teams
-	if got := a.proIdentitySnapshot().candidates; got != 264 {
+	if got := a.proIdentitySnapshot().candidates; got != 352 {
 		t.Fatal("null-region directory pool collapsed", got)
 	}
 	response := gameplayOverview{Player: gameplayPlayer{PlayerRef: "fixture-private-Chovy-0", GameName: "허거덩", TagLine: "0303", Region: "kr", SummonerLevel: 760}}
@@ -407,7 +407,7 @@ func TestR98ChovyNullRegionFlightToOverview(t *testing.T) {
 		t.Fatal("Chovy did not match", response.Player.ProPlayer)
 	}
 	events := r90Events(t, a, "pro_identity_match")
-	if len(events) != 1 || events[0]["matched_by"] != "puuid" || events[0]["candidates"] != float64(264) {
+	if len(events) != 1 || events[0]["matched_by"] != "puuid" || events[0]["candidates"] != float64(352) {
 		t.Fatal("not exact stable-ID path", events)
 	}
 	encoded, _ := json.MarshalIndent(response, "", "  ")

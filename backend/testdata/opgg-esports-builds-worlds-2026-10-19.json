@@ -1,0 +1,514 @@
+{
+  "data": {
+    "builds": [
+      {
+        "id": "460416",
+        "championId": "103",
+        "position": "mid",
+        "gameVersion": "16.20",
+        "items": [
+          3364,
+          1082,
+          1058,
+          3157,
+          4645,
+          3118,
+          3173,
+          1206
+        ],
+        "spells": [
+          4,
+          12
+        ],
+        "perk": {
+          "primary": {
+            "style": 8100,
+            "selections": [
+              8112,
+              8139,
+              8137,
+              8106
+            ]
+          },
+          "sub": {
+            "style": 8400,
+            "selections": [
+              8444,
+              8242
+            ]
+          },
+          "stats": {
+            "offense": 5005,
+            "flex": 5008,
+            "defense": 5011
+          }
+        },
+        "skillLevelUps": [
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 4,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 4,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 4,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          }
+        ],
+        "player": {
+          "id": "1584",
+          "nickName": "Tutsz"
+        },
+        "team": {
+          "id": "563",
+          "acronym": "FUR"
+        },
+        "opponentGamePlayer": {
+          "championId": "134",
+          "player": {
+            "nickName": "Loki"
+          },
+          "team": {
+            "acronym": "C9"
+          }
+        },
+        "game": {
+          "id": "36811",
+          "length": 2392,
+          "beginAt": "2026-10-16T20:50:02.000Z",
+          "set": 1,
+          "winner": {
+            "id": "332"
+          },
+          "match": {
+            "id": "32707",
+            "homeTeam": {
+              "acronym": "FUR"
+            },
+            "awayTeam": {
+              "acronym": "C9"
+            }
+          }
+        }
+      },
+      {
+        "id": "460395",
+        "championId": "103",
+        "position": "mid",
+        "gameVersion": "16.20",
+        "items": [
+          3364,
+          1082,
+          1058,
+          3157,
+          3089,
+          3118,
+          3173,
+          1206
+        ],
+        "spells": [
+          4,
+          12
+        ],
+        "perk": {
+          "primary": {
+            "style": 8100,
+            "selections": [
+              8112,
+              8139,
+              8137,
+              8106
+            ]
+          },
+          "sub": {
+            "style": 8200,
+            "selections": [
+              8237,
+              8226
+            ]
+          },
+          "stats": {
+            "offense": 5005,
+            "flex": 5008,
+            "defense": 5011
+          }
+        },
+        "skillLevelUps": [
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 4,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 4,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 4,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          }
+        ],
+        "player": {
+          "id": "7038",
+          "nickName": "Kyeahoo"
+        },
+        "team": {
+          "id": "1751",
+          "acronym": "KC"
+        },
+        "opponentGamePlayer": {
+          "championId": "68",
+          "player": {
+            "nickName": "Chika"
+          },
+          "team": {
+            "acronym": "MVK"
+          }
+        },
+        "game": {
+          "id": "36809",
+          "length": 1983,
+          "beginAt": "2026-10-16T18:56:20.000Z",
+          "set": 2,
+          "winner": {
+            "id": "1751"
+          },
+          "match": {
+            "id": "32710",
+            "homeTeam": {
+              "acronym": "MVK"
+            },
+            "awayTeam": {
+              "acronym": "KC"
+            }
+          }
+        }
+      },
+      {
+        "id": "460360",
+        "championId": "103",
+        "position": "mid",
+        "gameVersion": "16.20",
+        "items": [
+          3364,
+          3041,
+          4632,
+          1058,
+          3089,
+          3118,
+          3175,
+          1206
+        ],
+        "spells": [
+          4,
+          12
+        ],
+        "perk": {
+          "primary": {
+            "style": 8100,
+            "selections": [
+              8112,
+              8139,
+              8137,
+              8106
+            ]
+          },
+          "sub": {
+            "style": 8200,
+            "selections": [
+              8226,
+              8237
+            ]
+          },
+          "stats": {
+            "offense": 5005,
+            "flex": 5008,
+            "defense": 5011
+          }
+        },
+        "skillLevelUps": [],
+        "player": {
+          "id": "7038",
+          "nickName": "Kyeahoo"
+        },
+        "team": {
+          "id": "1751",
+          "acronym": "KC"
+        },
+        "opponentGamePlayer": {
+          "championId": "777",
+          "player": {
+            "nickName": "Loki"
+          },
+          "team": {
+            "acronym": "C9"
+          }
+        },
+        "game": {
+          "id": "36804",
+          "length": 1881,
+          "beginAt": "2026-10-15T22:09:53.000Z",
+          "set": 5,
+          "winner": {
+            "id": "1751"
+          },
+          "match": {
+            "id": "32705",
+            "homeTeam": {
+              "acronym": "C9"
+            },
+            "awayTeam": {
+              "acronym": "KC"
+            }
+          }
+        }
+      },
+      {
+        "id": "75",
+        "championId": "103",
+        "position": "mid",
+        "gameVersion": "4.13",
+        "items": [
+          3341,
+          1026,
+          3116,
+          3135,
+          3174,
+          3250,
+          3128
+        ],
+        "spells": [
+          14,
+          4
+        ],
+        "perk": null,
+        "skillLevelUps": [
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 4,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 1,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 4,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 2,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 4,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          },
+          {
+            "skillSlot": 3,
+            "levelUpType": "NORMAL"
+          }
+        ],
+        "player": {
+          "id": "570",
+          "nickName": "Jesiz"
+        },
+        "team": {
+          "id": "450",
+          "acronym": "SK"
+        },
+        "opponentGamePlayer": {
+          "championId": "134",
+          "player": {
+            "nickName": "Morning"
+          },
+          "team": {
+            "acronym": "TPA"
+          }
+        },
+        "game": {
+          "id": "7",
+          "length": 2637,
+          "beginAt": "2014-09-19T18:00:49.000Z",
+          "set": 1,
+          "winner": {
+            "id": "584"
+          },
+          "match": {
+            "id": "13328",
+            "homeTeam": {
+              "acronym": "TPA"
+            },
+            "awayTeam": {
+              "acronym": "SK"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

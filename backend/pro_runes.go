@@ -137,6 +137,7 @@ type proRuneProvider struct {
 	sourceIncomplete bool
 	diskMu           sync.Mutex
 	cacheWriteFailed bool
+	opggBuilds       map[int]proOPGGCache
 }
 
 func newProRuneProvider(provider *championProvider, store *localStore, notify func()) *proRuneProvider {
@@ -705,10 +706,18 @@ func (a *app) handleGameplayProRunes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := a.proRuneSource()
-	p.kick(r.URL.Query().Get("refresh") == "1")
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
-	respondJSON(w, p.recommend(ctx, id, position))
+	response, err := p.opggRecommend(ctx, id, position, r.URL.Query().Get("refresh") == "1")
+	if err != nil {
+		// Successful empty or partial OP.GG results never mix in another source.
+		p.kick(r.URL.Query().Get("refresh") == "1")
+		fallback := p.recommend(ctx, id, position)
+		if len(fallback.Pros) > 0 || len(response.Pros) == 0 {
+			response = fallback
+		}
+	}
+	respondJSON(w, response)
 }
 
 // Tournament metadata is authoritative for participants in the allowed major leagues.

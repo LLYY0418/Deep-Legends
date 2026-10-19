@@ -110,6 +110,7 @@ function harness({source=mainSource, stored, width=1920, height=1080}={}) {
     isFullScreen(){return false;}
     setTitleBarOverlay(overlay){overlays.push(overlay);}
     setBackgroundColor(){}
+    setContentProtection(value){assert.equal(typeof value,"boolean");this.contentProtection=value;}
     loadURL(){return Promise.resolve();}
   }
   const electron={app,BrowserWindow,ipcMain,nativeTheme,screen,session:{},shell:{},dialog:{}};

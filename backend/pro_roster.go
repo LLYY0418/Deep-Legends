@@ -4,10 +4,11 @@ package main
 // OP.GG includes coaches, academy teams and historical team assignments. Keep
 // roster changes reviewable and retain the reviewed ownership.
 // Production directory rows and badges both use
-// these six reviewed teams; unreviewed directory rows do not widen this roster.
+// these eight reviewed teams; unreviewed directory rows do not widen this roster.
 // Exact PUUID/full Riot ID lookup is allowed;
 // never infer membership from an account name substring or team prefix.
-const proRosterVerifiedAt = "2026-09-08"
+// Latest roster addition; account-level review dates remain independent.
+const proRosterVerifiedAt = "2026-10-19"
 
 type proRosterPlayer struct {
 	Directory  bool  // Source-reported, not part of the reviewed roster.
@@ -70,5 +71,20 @@ var proRoster = []proRosterTeam{
 		{Name: "ShowMaker", Position: "middle", Names: []string{"Heo Su", "허수"}},
 		{Name: "Smash", Position: "bottom", Names: []string{"Shin Geum-jae", "신금재"}},
 		{Name: "Career", Position: "utility", Names: []string{"Oh Hyeong-seok", "Oh Hyung-seok", "오형석"}},
+	}},
+	{"AL", "Anyone's Legend", "LPL", 698, []proRosterPlayer{
+		{Name: "Breathe", Position: "top", Names: []string{"Chen Chen"}},
+		{Name: "Tarzan", Position: "jungle", Names: []string{"Lee Seung-yong", "이승용"}},
+		{Name: "Shanks", Position: "middle", Names: []string{"Cui Xiaojun", "崔校军"}},
+		{Name: "Hope", Position: "bottom", Names: []string{"Wang Jie"}},
+		{Name: "Kael", Position: "utility", Names: []string{"Kim Jin-hong", "金珍洪", "김진홍"}},
+	}},
+	{"TES", "Top Esports", "LPL", 415, []proRosterPlayer{
+		{Name: "369", Position: "top", Names: []string{"Bai Jia-Hao"}},
+		{Name: "ZUIAN", Position: "top", Names: []string{"Cheng Zihao"}},
+		{Name: "Tian", Position: "jungle", Names: []string{"Gao Tianliang"}},
+		{Name: "Creme", Position: "middle", Names: []string{"Lin Jian"}},
+		{Name: "JackeyLove", Position: "bottom", Names: []string{"Yu Wen-Bo"}},
+		{Name: "Zhuo", Position: "utility", Names: []string{"Wang Xu-Zhuo", "XU-ZHUO WANG", "王旭卓"}},
 	}},
 }

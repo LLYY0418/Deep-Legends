@@ -1254,6 +1254,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .specialist-result-dot { display: inline-block; width: 8px; height: 8px; flex: 0 0 8px; background: currentColor; border-radius: 50%; }
 .specialist-game-content { display: block; min-width: 0; }
 .specialist-game-runes { min-width: 0; overflow: visible; }
+.specialist-game-runes > .skill-plan { padding: 10px; border-top: 1px solid var(--line); }
 .specialist-game-items { display: flex; box-sizing: border-box; height: 48px; min-height: 44px; align-items: center; gap: 8px; padding: 7px 10px 10px; border-top: 1px solid var(--line); }
 .specialist-game-items > span { flex: 0 0 auto; color: var(--muted); font-size: 9px; }
 .specialist-game-items > div:not(.specialist-game-spells) { display: flex; min-width: 0; overflow-x: auto; flex-wrap: nowrap; align-items: center; gap: 4px; }

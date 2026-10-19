@@ -135,7 +135,7 @@ func TestR106AllReviewedAccountsBatchAndPersistentCache(t *testing.T) {
 	seeds := new(app).loadProSeeds(context.Background(), nil)
 	result := app1.enrichProProfiles(context.Background(), seeds)
 	page := app1.buildReviewedProPlayers(result)
-	if requests.Load() != 53 || maximum.Load() > 2 || maximum.Load() < 2 {
+	if requests.Load() != 64 || maximum.Load() > 2 || maximum.Load() < 2 {
 		t.Fatalf("requests=%d parallel=%d", requests.Load(), maximum.Load())
 	}
 	for _, team := range page.Teams {
@@ -150,7 +150,7 @@ func TestR106AllReviewedAccountsBatchAndPersistentCache(t *testing.T) {
 	r274Flush(t, app1.proProfiles.disk)
 	app2 := &app{storage: store, champions: &championProvider{client: client}}
 	app2.enrichProProfiles(context.Background(), seeds)
-	if requests.Load() != 53 {
+	if requests.Load() != 64 {
 		t.Fatalf("restart ignored public cache: %d", requests.Load())
 	}
 }
@@ -283,7 +283,7 @@ func TestR106LiveProfileBatch(t *testing.T) {
 		}
 	}
 	t.Logf("accounts=%d ranked=%d unranked=%d failed=%d source timestamps=%d duration=%s", page.AccountCount, ranked, unranked, failed, stamps, time.Since(started))
-	if page.AccountCount != 53 {
+	if page.AccountCount != 64 {
 		t.Fatal("incomplete reviewed roster")
 	}
 }

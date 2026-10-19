@@ -118,8 +118,8 @@ func TestR102SeedRealNameAndPositionComeFromRoster(t *testing.T) {
 		}
 	}
 }
-func TestR102AllThirtyThreePlayersHaveSeeds(t *testing.T) {
-	if len(proSeedAccounts) != 33 {
+func TestR102AllFortyFourPlayersHaveSeeds(t *testing.T) {
+	if len(proSeedAccounts) != 44 {
 		t.Fatalf("players: %d", len(proSeedAccounts))
 	}
 	got := map[string]int{}
@@ -132,7 +132,7 @@ func TestR102AllThirtyThreePlayersHaveSeeds(t *testing.T) {
 		}
 		seen[key] = true
 	}
-	want := map[string]int{"BLG": 7, "IG": 6, "T1": 5, "HLE": 5, "GEN": 5, "DK": 5}
+	want := map[string]int{"BLG": 7, "IG": 6, "T1": 5, "HLE": 5, "GEN": 5, "DK": 5, "AL": 5, "TES": 6}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatal(got)
 	}
@@ -160,12 +160,18 @@ func TestR102SeedAccountsMatchVerificationDoc(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	extra, err := os.ReadFile("testdata/pro-accounts/pro-accounts-verification-2026-10-19.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc = append(append(doc, '\n'), extra...)
 	documented := map[string][]string{}
 	team := ""
 	for _, line := range strings.Split(string(doc), "\n") {
 		if strings.HasPrefix(line, "## ") {
 			team = ""
-			for _, code := range []string{"BLG", "IG", "T1", "HLE", "GEN", "DK"} {
+			for _, code := range []string{"BLG", "IG", "T1", "HLE", "GEN", "DK", "AL", "TES"} {
 				if strings.HasPrefix(line, "## "+code+"（") {
 					team = code
 				}
@@ -189,10 +195,10 @@ func TestR102SeedAccountsMatchVerificationDoc(t *testing.T) {
 			actual[owner] = append(actual[owner], account.GameName+"#"+account.TagLine)
 		}
 	}
-	if len(documented) != 33 || !reflect.DeepEqual(actual, documented) {
+	if len(documented) != 44 || !reflect.DeepEqual(actual, documented) {
 		t.Fatalf("seed owners/account order differ from approved document: actual=%v documented=%v", actual, documented)
 	}
-	want := map[string]int{"BLG": 9, "IG": 15, "T1": 5, "HLE": 8, "GEN": 5, "DK": 11}
+	want := map[string]int{"BLG": 9, "IG": 15, "T1": 5, "HLE": 8, "GEN": 5, "DK": 11, "AL": 5, "TES": 6}
 	got := map[string]int{}
 	seen := map[string]bool{}
 	for _, s := range proSeedAccounts {
@@ -205,7 +211,7 @@ func TestR102SeedAccountsMatchVerificationDoc(t *testing.T) {
 			seen[key] = true
 		}
 	}
-	if len(seen) != 53 || !reflect.DeepEqual(got, want) {
+	if len(seen) != 64 || !reflect.DeepEqual(got, want) {
 		t.Fatalf("accounts: %d %v", len(seen), got)
 	}
 	for _, id := range []string{"JUGKlNG#kr", "강 철#샤 넬", "14小孩幻想赢对线#4453", "키보드에음료쏟아서고장내는이도윤#KR1"} {

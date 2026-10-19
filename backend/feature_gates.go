@@ -101,7 +101,7 @@ func (g *featureGates) refresh(ctx context.Context, client *http.Client, rawURL 
 
 func featureGateForChampionHost(host string) string {
 	switch strings.ToLower(strings.TrimSpace(host)) {
-	case opggChampionHost, opggWebAPIHost, opggPageHost:
+	case opggChampionHost, opggWebAPIHost, opggPageHost, esportsOPGGHost:
 		return featureGateOPGG
 	case hexdataHost, hexdataAssetHost:
 		return featureGateHexdata

@@ -27,16 +27,16 @@ func TestR105_EmbeddedAccountCounts(t *testing.T) {
 	for _, seed := range proSeedAccounts {
 		total += len(seed.Accounts)
 	}
-	if total != 53 {
-		t.Fatalf("total accounts = %d, want 53", total)
+	if total != 64 {
+		t.Fatalf("total accounts = %d, want 64", total)
 	}
 	TestR102SeedAccountsMatchVerificationDoc(t)
 }
 
 func TestR105_PlayerAccountCounts(t *testing.T) {
-	want := map[string]int{"Bin": 1, "Wenbo": 1, "Flandre": 1, "Xun": 2, "knight": 2, "Viper": 1, "ON": 1, "TheShy": 5, "Wei": 2, "Rookie": 4, "Assum": 1, "JiaQi": 2, "Meiko": 1, "Doran": 1, "Oner": 1, "Faker": 1, "Peyz": 1, "Keria": 1, "Zeus": 1, "Kanavi": 2, "Zeka": 2, "Gumayusi": 2, "Delight": 1, "Kiin": 1, "Canyon": 1, "Chovy": 1, "Ruler": 1, "Duro": 1, "Siwoo": 2, "Lucid": 2, "ShowMaker": 2, "Smash": 3, "Career": 2}
-	if len(proSeedAccounts) != 33 {
-		t.Fatal("want 33 players")
+	want := map[string]int{"Bin": 1, "Wenbo": 1, "Flandre": 1, "Xun": 2, "knight": 2, "Viper": 1, "ON": 1, "TheShy": 5, "Wei": 2, "Rookie": 4, "Assum": 1, "JiaQi": 2, "Meiko": 1, "Doran": 1, "Oner": 1, "Faker": 1, "Peyz": 1, "Keria": 1, "Zeus": 1, "Kanavi": 2, "Zeka": 2, "Gumayusi": 2, "Delight": 1, "Kiin": 1, "Canyon": 1, "Chovy": 1, "Ruler": 1, "Duro": 1, "Siwoo": 2, "Lucid": 2, "ShowMaker": 2, "Smash": 3, "Career": 2, "Breathe": 1, "Tarzan": 1, "Shanks": 1, "Hope": 1, "Kael": 1, "369": 1, "ZUIAN": 1, "Tian": 1, "Creme": 1, "JackeyLove": 1, "Zhuo": 1}
+	if len(proSeedAccounts) != 44 {
+		t.Fatal("want 44 players")
 	}
 	for name, count := range want {
 		if got := len(r105PlayerAccounts(name)); got != count {
@@ -75,7 +75,7 @@ func TestR105_SpecialCharacters(t *testing.T) {
 
 func r105AssertPage(t *testing.T, result proPlayersResponse) {
 	t.Helper()
-	if result.PlayerCount != 33 || result.AccountCount != 53 || len(result.Teams) != 6 {
+	if result.PlayerCount != 44 || result.AccountCount != 64 || len(result.Teams) != 8 {
 		t.Fatalf("page totals: %d/%d/%d", result.PlayerCount, result.AccountCount, len(result.Teams))
 	}
 	for _, team := range result.Teams {
@@ -145,7 +145,7 @@ func TestR105_ReviewedPageSurvivesOldSnapshotAndWrongOwner(t *testing.T) {
 			event = e
 		}
 	}
-	if event.Players != 33 || event.Accounts != 53 || event.TeamCount != 6 || len(event.Teams) != 0 {
+	if event.Players != 44 || event.Accounts != 64 || event.TeamCount != 8 || len(event.Teams) != 0 {
 		t.Fatalf("diagnostic totals/teams: %#v", event)
 	}
 	if strings.Contains(string(log), "old-puuid") {
