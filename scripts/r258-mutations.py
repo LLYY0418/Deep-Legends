@@ -1,5 +1,5 @@
 """R258 P1/P2/P3/P4/P5 assertion mutations; production files remain untouched."""
-import argparse, hashlib, json, pathlib, re, subprocess, tempfile
+import os,argparse, hashlib, json, pathlib, re, subprocess, tempfile
 parser=argparse.ArgumentParser();parser.add_argument('--output',required=True);args=parser.parse_args()
 root=pathlib.Path(__file__).resolve().parents[1];out=pathlib.Path(args.output);out.mkdir(parents=True,exist_ok=False)
 mutations=[
@@ -22,10 +22,10 @@ for name,target,old,new,check in mutations:
  with tempfile.TemporaryDirectory(prefix='r258-mutant-') as d:
   temp=pathlib.Path(d);replacement=temp/pathlib.Path(target).name;replacement.write_text(source.replace(old,new,1))
   if target.endswith('.go'):
-   overlay=temp/'overlay.json';overlay.write_text(json.dumps({'Replace':{str(root/target):str(replacement)}}));command=['go','test','-overlay',str(overlay),'-count=1','-run',check,'./backend'];env=None
+   overlay=temp/'overlay.json';overlay.write_text(json.dumps({'Replace':{str(root/target):str(replacement)}}));command=['go','test','-overlay',str(overlay),'-count=1','-run',check,'./backend'];env={**os.environ,'R287_MUTATION_PATH':'1'}
   else:
    import os
-   command=['node','--test','backend/web/r258.test.cjs'];env={**os.environ,check:str(replacement)}
+   command=['node','--test','backend/web/r258.test.cjs'];env={**os.environ,'R287_MUTATION_PATH':'1',check:str(replacement)}
   result=subprocess.run(command,cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
   (out/(name+'.log')).write_text(result.stdout)
   killed=result.returncode!=0 and (('--- FAIL: TestR258' in result.stdout) if target.endswith('.go') else ('AssertionError' in result.stdout)) and not re.search(r'build failed|setup failed|undefined:',result.stdout)

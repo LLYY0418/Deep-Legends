@@ -7,7 +7,7 @@ _proof=runpy.run_path(str(ROOT/'scripts/mutation-source-proof.py'));_snapshot=_p
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);args=p.parse_args();args.out=args.out.resolve();args.out.mkdir(parents=True,exist_ok=True);rows=[]
 js=['node','--test','backend/web/r273-first-chunk.test.cjs','backend/web/r272-score-tags.test.cjs']
 def run(name,env=None,negative=False,command=None):
- start=time.monotonic();r=subprocess.run(command or js,cwd=ROOT,env={**os.environ,**(env or {})},capture_output=True,text=True,timeout=90)
+ start=time.monotonic();r=subprocess.run(command or js,cwd=ROOT,env={**os.environ,**(env or {}),'R287_MUTATION_PATH':'1' if negative else '0'},capture_output=True,text=True,timeout=90)
  log=r.stdout+r.stderr;(args.out/(name+'.log')).write_text(log)
  valid=(r.returncode!=0 and any(x in log for x in ['AssertionError','--- FAIL:']) and not any(s in log for s in ['SyntaxError','ReferenceError','TypeError','ENOENT','build failed'])) if negative else r.returncode==0
  rows.append(dict(name=name,negative=negative,exitCode=r.returncode,assertionVerified=valid,seconds=round(time.monotonic()-start,3)))

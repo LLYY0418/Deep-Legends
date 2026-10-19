@@ -20,7 +20,7 @@ env = dict(os.environ, RIOT_API_KEY="RGAPI-00000000-0000-0000-0000-000000000000"
 
 def run(name, command, cwd=ROOT, extra=None, mutant=False):
     started = time.time()
-    completed = subprocess.run(command, cwd=cwd, env={**env, **(extra or {})}, capture_output=True, text=True, timeout=90)
+    completed = subprocess.run(command, cwd=cwd, env={**env, **(extra or {}), "R287_MUTATION_PATH": "1" if mutant else "0"}, capture_output=True, text=True, timeout=90)
     output = completed.stdout + completed.stderr
     (OUT / (name + ".log")).write_text(output)
     valid = completed.returncode != 0 if mutant else completed.returncode == 0

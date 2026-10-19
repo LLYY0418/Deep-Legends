@@ -7,7 +7,7 @@ file=ROOT/'backend/r276_fixture_test.go';source=file.read_text();before=hashlib.
 def run(name,command,signature=None):
     # Compilation is outside the fixture's behavior budget. Go's test timeout
     # and each fixture's no-progress watchdog still detect stalled test work.
-    start=time.monotonic();r=subprocess.run(command,cwd=ROOT,capture_output=True,text=True)
+    start=time.monotonic();r=subprocess.run(command,cwd=ROOT,env={**os.environ,"R287_MUTATION_PATH":"1" if signature is not None else "0"},capture_output=True,text=True)
     log=r.stdout+r.stderr;(a.out/(name+'.log')).write_text(log)
     ok=r.returncode==0 if signature is None else r.returncode!=0 and signature in log and '--- FAIL:' in log and not any(x in log for x in ['build failed','syntax error:','undefined:'])
     rows.append(dict(name=name,exitCode=r.returncode,assertionVerified=ok,seconds=time.monotonic()-start));(a.out/'result.json').write_text(json.dumps(rows,indent=2)+'\n');print(json.dumps(rows[-1]),flush=True);assert ok,name

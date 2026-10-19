@@ -13,8 +13,15 @@ import (
 
 var r287TimingLogMu sync.Mutex
 
+func r287TimingAttempts() int {
+	if os.Getenv("R287_MUTATION_PATH") == "1" {
+		return 1
+	}
+	return 2
+}
+
 // Only the supplied temporal observation is repeated. A failed content assertion
-// calls.Load() testing.T.Fatal normally and is never converted into a retry.
+// calls testing.T.Fatal normally and is never converted into a retry.
 func r287RecordTiming(t *testing.T, label string, limit time.Duration, attempts []float64, ok bool) {
 	t.Helper()
 	body, err := json.Marshal(struct {
@@ -46,7 +53,7 @@ func r287RecordTiming(t *testing.T, label string, limit time.Duration, attempts 
 func r287WaitSelect(t *testing.T, label string, limit time.Duration, observe func(<-chan time.Time) bool) bool {
 	t.Helper()
 	var attempts []float64
-	for number := 0; number < 2; number++ {
+	for number := 0; number < r287TimingAttempts(); number++ {
 		started := time.Now()
 		timer := time.NewTimer(limit)
 		ok := observe(timer.C)
@@ -63,7 +70,7 @@ func r287WaitSelect(t *testing.T, label string, limit time.Duration, observe fun
 func r287Measure(t *testing.T, label string, limit time.Duration, strict bool, measure func() time.Duration) time.Duration {
 	t.Helper()
 	var attempts []float64
-	for number := 0; number < 2; number++ {
+	for number := 0; number < r287TimingAttempts(); number++ {
 		elapsed := measure()
 		attempts = append(attempts, float64(elapsed)/float64(time.Millisecond))
 		ok := elapsed <= limit
@@ -75,11 +82,12 @@ func r287Measure(t *testing.T, label string, limit time.Duration, strict bool, m
 			return elapsed
 		}
 	}
-	t.Fatalf("%s: both measurements exceeded unchanged limit %s; attempts=%v", label, limit, attempts)
+	t.Fatalf("%s: %d measurement(s) exceeded unchanged limit %s; attempts=%v", label, len(attempts), limit, attempts)
 	return 0
 }
 
 func TestR287TimingMeasurementsRetryOnce(t *testing.T) {
+	t.Setenv("R287_MUTATION_PATH", "0")
 	var calls atomic.Int64
 	elapsed := r287Measure(t, "fixture <=100ms", 100*time.Millisecond, false, func() time.Duration {
 		calls.Add(1)
@@ -113,12 +121,12 @@ type r287TimingContext struct {
 func r287TimingScenario(t *testing.T, observe func(*r287TimingContext)) {
 	t.Helper()
 	if failure := r287RunTimingScenario(observe, t.Failed); failure != nil {
-		t.Fatalf("%s: both timing measurements exceeded unchanged limit", failure.label)
+		t.Fatalf("%s: %d timing measurement(s) exceeded unchanged limit", failure.label, r287TimingAttempts())
 	}
 }
 func r287RunTimingScenario(observe func(*r287TimingContext), failed func() bool) *r287TimingFailure {
 	context := &r287TimingContext{attempts: make(map[string][]float64), accepted: make(map[string]bool)}
-	for number := 0; number < 2; number++ {
+	for number := 0; number < r287TimingAttempts(); number++ {
 		observe(context)
 		if failed() {
 			return nil
@@ -135,7 +143,7 @@ func r287RunTimingScenario(observe func(*r287TimingContext), failed func() bool)
 		if exceeded == nil {
 			return nil
 		}
-		if number == 1 {
+		if number == r287TimingAttempts()-1 {
 			return exceeded
 		}
 	}
@@ -162,6 +170,7 @@ func r287TooSlow(context *r287TimingContext, t *testing.T, label string, elapsed
 }
 
 func TestR287TimingScenarioOnlyRetriesTemporalFailure(t *testing.T) {
+	t.Setenv("R287_MUTATION_PATH", "0")
 	for _, samples := range [][]time.Duration{{104 * time.Millisecond, 63 * time.Millisecond}, {104 * time.Millisecond, 105 * time.Millisecond}} {
 		var calls atomic.Int64
 		failure := r287RunTimingScenario(func(ctx *r287TimingContext) {
@@ -215,7 +224,7 @@ func r287StartDeadline(limit time.Duration, now func() time.Time, timer func(tim
 	go func() {
 		defer close(deadline.done)
 		var values []float64
-		for number := 0; number < 2; number++ {
+		for number := 0; number < r287TimingAttempts(); number++ {
 			started := now()
 			tick, stop := timer(limit)
 			select {
@@ -228,7 +237,7 @@ func r287StartDeadline(limit time.Duration, now func() time.Time, timer func(tim
 				stop()
 				values = append(values, float64(now().Sub(started))/float64(time.Millisecond))
 				record(append([]float64(nil), values...), false)
-				if number == 1 {
+				if number == r287TimingAttempts()-1 {
 					deadline.C <- now()
 					return
 				}
@@ -239,6 +248,7 @@ func r287StartDeadline(limit time.Duration, now func() time.Time, timer func(tim
 }
 
 func TestR287DeadlineRetriesOriginalWindowAndRecordsBothMeasurements(t *testing.T) {
+	t.Setenv("R287_MUTATION_PATH", "0")
 	for _, success := range []bool{true, false} {
 		var clock atomic.Int64
 		windows := make(chan chan time.Time, 2)
@@ -300,7 +310,7 @@ func (deadline *r287ClockDeadline) Pending() bool {
 	}
 	deadline.values = append(deadline.values, float64(elapsed)/float64(time.Millisecond))
 	r287RecordTiming(deadline.t, deadline.label, deadline.limit, deadline.values, false)
-	if len(deadline.values) == 2 {
+	if len(deadline.values) == r287TimingAttempts() {
 		deadline.stopped = true
 		return false
 	}
@@ -314,4 +324,23 @@ func (deadline *r287ClockDeadline) Stop() {
 	deadline.stopped = true
 	deadline.values = append(deadline.values, float64(time.Since(deadline.started))/float64(time.Millisecond))
 	r287RecordTiming(deadline.t, deadline.label, deadline.limit, deadline.values, true)
+}
+
+func TestR287MutationTimingNeverRetries(t *testing.T) {
+	t.Setenv("R287_MUTATION_PATH", "1")
+	var calls atomic.Int64
+	if r287TimingAttempts() != 1 {
+		t.Fatal("mutant retries enabled")
+	}
+	if r287WaitSelect(t, "mutant timeout", time.Millisecond, func(<-chan time.Time) bool { calls.Add(1); return false }) || calls.Load() != 1 {
+		t.Fatal("mutant wait retried", calls.Load())
+	}
+	calls.Store(0)
+	failure := r287RunTimingScenario(func(ctx *r287TimingContext) {
+		calls.Add(1)
+		ctx.note("mutant", 104*time.Millisecond, 100*time.Millisecond, false)
+	}, func() bool { return false })
+	if failure == nil || calls.Load() != 1 {
+		t.Fatal("mutant timing failure swallowed/retried", calls.Load())
+	}
 }

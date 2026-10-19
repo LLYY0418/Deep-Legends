@@ -1,4 +1,5 @@
 'use strict';
+process.env.R287_MUTATION_PATH='1'; // Negative cases only; child baselines use their own explicit mode.
 // Development checks only. Every source file is restored byte-for-byte in finally.
 const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'),out=path.resolve(process.argv[2] || path.join(root,'output/r280-mutations'));fs.mkdirSync(out,{recursive:true});const results=[];

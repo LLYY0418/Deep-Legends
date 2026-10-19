@@ -17,7 +17,7 @@ const children=[];fs.mkdirSync(out,{recursive:true});const baseline=path.join(ou
 try{
  const css=execFileSync('git',['show','c725ba27:backend/web/gameplay.css'],{cwd:root,encoding:'utf8'});fs.writeFileSync(path.join(temp,'gameplay.css'),css);
  const run=(folder,extra={})=>execFileSync(process.execPath,[path.join(root,'scripts/r266-browser.cjs')],{cwd:root,env:{...process.env,R266_BACKEND:process.env.R269_BACKEND || process.env.R266_BACKEND,R266_MATRIX:'1',R266_BROWSER_OUT:folder,...extra},stdio:'inherit',timeout:180000});
- run(baseline,{R266_WEB_OVERRIDE:temp,R266_MATRIX_BASELINE:'1'});if(!fs.existsSync(path.join(current,'result.json')))run(current);
+ run(baseline,{R287_MUTATION_PATH:'0',R266_WEB_OVERRIDE:temp,R266_MATRIX_BASELINE:'1'});if(!fs.existsSync(path.join(current,'result.json')))run(current);
  const a=JSON.parse(fs.readFileSync(path.join(baseline,'result.json'))).results,b=JSON.parse(fs.readFileSync(path.join(current,'result.json'))).results,key=r=>JSON.stringify([r.theme,r.w,r.zoom]),old=new Map(a.map(r=>[key(r),r]));assert.equal(a.length,60);assert.equal(b.length,60);let repaired=0,maxDifference=0;const differences=[];
  for(const row of b){const before=old.get(key(row));assert(before);assert.equal(row.overlaps.length,0,JSON.stringify(row));if(before.overlaps.length){repaired++;continue;}
   for(let i=0;i<row.rects.length;i++)for(let j=0;j<row.rects[i].blocks.length;j++){const x=before.rects[i].blocks[j],y=row.rects[i].blocks[j];assert.equal(x.visible,y.visible);if(!x.visible)continue;// P11 makes the KDA wrapper fill its grid track; its visible text stays protected.
