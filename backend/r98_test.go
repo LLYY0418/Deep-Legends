@@ -293,7 +293,9 @@ func TestR98OverviewQueueBudgetReturnsRateLimit(t *testing.T) {
 func TestR98LimiterFIFOHasOnlyOneSleepingHeadAndCanceledWaitersUseNoQuota(t *testing.T) {
 	p := newRiotProvider(newChampionProvider())
 	now := time.Now()
-	p.limitNow = func() time.Time { return now }
+	var clockNanos atomic.Int64
+	clockNanos.Store(now.UnixNano())
+	p.limitNow = func() time.Time { return time.Unix(0, clockNanos.Load()) }
 	p.longWindow = make([]time.Time, 90)
 	for i := range p.longWindow {
 		p.longWindow[i] = now
@@ -309,9 +311,7 @@ func TestR98LimiterFIFOHasOnlyOneSleepingHeadAndCanceledWaitersUseNoQuota(t *tes
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-release:
-			p.limitMu.Lock()
-			now = now.Add(2 * time.Minute)
-			p.limitMu.Unlock()
+			clockNanos.Add(int64(2 * time.Minute))
 			return nil
 		}
 	}

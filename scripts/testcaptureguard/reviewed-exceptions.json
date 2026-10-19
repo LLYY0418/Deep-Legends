@@ -764,38 +764,38 @@
   },
   {
     "file": "backend/main_test.go",
-    "line": 598,
+    "line": 601,
     "target": "attempted",
-    "source_sha256": "b3b55bc3306f491ca6867805a4472dd982f933cc557658920b961a40bfa88e0d",
-    "comment": "r276-capture-safe: TestLaunchClientCandidatesFallsBackInOrderAndStopsOnSuccess: the audited fixture operations in this test invoke this callback serially and return before attempted is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "8eb55953709a5f9805a4f36824a257d4561ec8a99e7ca331cb05f7a9c454862e",
+    "comment": "r276-capture-safe: TestLaunchClientCandidatesFallsBackInOrderAndStopsOnSuccess: launchClientCandidates (client_launcher.go) calls attempt in its ordinary ordered for loop on this test goroutine; it returns before attempted is read"
   },
   {
     "file": "backend/main_test.go",
-    "line": 654,
+    "line": 657,
     "target": "launched",
-    "source_sha256": "b3b55bc3306f491ca6867805a4472dd982f933cc557658920b961a40bfa88e0d",
-    "comment": "r276-capture-safe: TestOfficialLoginLaunchUsesOnlyDetectedTCLSAndRecordsSafeDiagnostics: the audited fixture operations in this test invoke this callback serially and return before launched is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "8eb55953709a5f9805a4f36824a257d4561ec8a99e7ca331cb05f7a9c454862e",
+    "comment": "r276-capture-safe: TestOfficialLoginLaunchUsesOnlyDetectedTCLSAndRecordsSafeDiagnostics: the test directly calls handleClientLaunch; launchDetectedClientInstallationContext invokes this injected launcher inline before that handler returns and launched is asserted; no server or second request runs"
   },
   {
     "file": "backend/main_test.go",
-    "line": 695,
+    "line": 698,
     "target": "launched",
-    "source_sha256": "b3b55bc3306f491ca6867805a4472dd982f933cc557658920b961a40bfa88e0d",
-    "comment": "r276-capture-safe: TestOfficialLoginLaunchRejectsCredentialFieldsBeforeLaunching: the audited fixture operations in this test invoke this callback serially and return before launched is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "8eb55953709a5f9805a4f36824a257d4561ec8a99e7ca331cb05f7a9c454862e",
+    "comment": "r276-capture-safe: TestOfficialLoginLaunchRejectsCredentialFieldsBeforeLaunching: the direct handleClientLaunch call rejects unknown credential fields before reaching the injected launcher; the same goroutine checks launched only after the handler returns"
   },
   {
     "file": "backend/main_test.go",
-    "line": 720,
+    "line": 723,
     "target": "launched",
-    "source_sha256": "b3b55bc3306f491ca6867805a4472dd982f933cc557658920b961a40bfa88e0d",
-    "comment": "r276-capture-safe: TestOfficialLoginLaunchRejectsTrailingJSONBeforeLaunching: the audited fixture operations in this test invoke this callback serially and return before launched is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "8eb55953709a5f9805a4f36824a257d4561ec8a99e7ca331cb05f7a9c454862e",
+    "comment": "r276-capture-safe: TestOfficialLoginLaunchRejectsTrailingJSONBeforeLaunching: the direct handleClientLaunch call rejects trailing JSON before reaching the injected launcher; the same goroutine checks launched only after the handler returns"
   },
   {
     "file": "backend/main_test.go",
-    "line": 745,
+    "line": 748,
     "target": "launched",
-    "source_sha256": "b3b55bc3306f491ca6867805a4472dd982f933cc557658920b961a40bfa88e0d",
-    "comment": "r276-capture-safe: TestOfficialLoginLaunchRejectsOversizedBodyBeforeLaunching: the audited fixture operations in this test invoke this callback serially and return before launched is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "8eb55953709a5f9805a4f36824a257d4561ec8a99e7ca331cb05f7a9c454862e",
+    "comment": "r276-capture-safe: TestOfficialLoginLaunchRejectsOversizedBodyBeforeLaunching: the direct handleClientLaunch call rejects the oversized body before reaching the injected launcher; the same goroutine checks launched only after the handler returns"
   },
   {
     "file": "backend/mayhem_sampler_test.go",
@@ -883,10 +883,10 @@
   },
   {
     "file": "backend/quality_test.go",
-    "line": 740,
+    "line": 743,
     "target": "events",
-    "source_sha256": "90faec28038f1c96ee25f5f2ee3b2063844e4fb5f5bade04d7523cc52160bed8",
-    "comment": "r276-capture-safe: TestLootFallbackDiagnosticRuntimePayloadNeverStoresItemDetails: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "211a5d3e93c08491e6cd0ba3927ee95a61ac323f3436f68279bbbf578a22a90f",
+    "comment": "r276-capture-safe: TestLootFallbackDiagnosticRuntimePayloadNeverStoresItemDetails: enrichLootItemsWithMetadata directly invokes observe in its synchronous item loop on the caller; this call returns before events is inspected or marshaled"
   },
   {
     "file": "backend/r100_test.go",
@@ -939,129 +939,129 @@
   },
   {
     "file": "backend/r102_test.go",
-    "line": 221,
+    "line": 227,
     "target": "calls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102LastMatchStartParsesGameStartTimestamp: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102LastMatchStartParsesGameStartTimestamp: the direct lastMatchStart call loads IDs then one detail sequentially through r99SeedProvider Transport.RoundTrip; it returns before calls is asserted; no account lookup or background refresh is started"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 239,
+    "line": 245,
     "target": "calls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102LastMatchStartHandlesNoMatches: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102LastMatchStartHandlesNoMatches: the direct lastMatchStart call performs only the IDs request through r99SeedProvider Transport.RoundTrip and returns before calls is asserted"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 255,
+    "line": 261,
     "target": "calls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102LastMatchStartCachedSevenDays: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102LastMatchStartCachedSevenDays: each read calls lastMatchStart synchronously; IDs/detail requests use the same calling goroutine and finish before counters are checked; disk flush and provider restart precede the next sequential read"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 257,
+    "line": 263,
     "target": "ids",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102LastMatchStartCachedSevenDays: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102LastMatchStartCachedSevenDays: each read calls lastMatchStart synchronously; the IDs handler increments ids before its response returns, and each read finishes before assertions or the next read"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 298,
+    "line": 304,
     "target": "calls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102LastMatchErrorsRemainUnknownAndRetry: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102LastMatchErrorsRemainUnknownAndRetry: each nonparallel subtest calls lastMatchStart and then retries sequentially; Transport.RoundTrip completes before reading calls or beginning the next request"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 383,
+    "line": 389,
     "target": "accountIndex",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102SeedOneAccountFailureDoesNotBlockOthers: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102SeedOneAccountFailureDoesNotBlockOthers: one worker calls loadProSeedAccounts; its nested seed/account loops invoke proSeedTimeout sequentially, not per-account goroutines; only that worker accesses accountIndex and completion is sent through completed"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 439,
+    "line": 445,
     "target": "calls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102SeedKeepsPerAccountLastSnapshotOnQuotaExhausted: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102SeedKeepsPerAccountLastSnapshotOnQuotaExhausted: the direct loadProSeedAccounts call traverses accounts sequentially and quota admission rejects every request; the test checks zero calls after that complete traversal returns"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 502,
+    "line": 508,
     "target": "calls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102UnrankedAccountBacksOffRankQuery: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102UnrankedAccountBacksOffRankQuery: each proSeedRank call runs its identity-cache loader and Transport.RoundTrip synchronously; it returns before calls is inspected, the fake clock advances or the provider restarts"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 531,
+    "line": 537,
     "target": "calls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102FailedQueryDoesNotTriggerBackoff: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102FailedQueryDoesNotTriggerBackoff: the two proSeedRank calls and their Transport.RoundTrip failures run sequentially on this test goroutine and return before calls is asserted; no account background refresh is involved"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 549,
+    "line": 555,
     "target": "rankCalls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102UnrankedBackoffDoesNotAffectLastMatchQuery: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102UnrankedBackoffDoesNotAffectLastMatchQuery: each loop synchronously completes proSeedRank before lastMatchStart, then advances the fake clock; both loops return before rankCalls is asserted"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 552,
+    "line": 558,
     "target": "matchCalls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102UnrankedBackoffDoesNotAffectLastMatchQuery: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102UnrankedBackoffDoesNotAffectLastMatchQuery: lastMatchStart invokes its IDs request inline after the rank request returns; all iterations finish before matchCalls is inspected"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 574,
+    "line": 580,
     "target": "calls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102NewlyRankedAccountResetsToNormalTTL: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102NewlyRankedAccountResetsToNormalTTL: proSeedRank and leagueEntries are invoked sequentially; each synchronous Transport.RoundTrip finishes before calls controls the next response or is asserted; disk flush separates the restart"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 623,
+    "line": 629,
     "target": "calls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102UpstreamActivityAndSnapshotRemainPrivate: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102UpstreamActivityAndSnapshotRemainPrivate: buildProPlayers is a local projection, not a network caller; no worker is started and the same goroutine verifies the configured transport was never invoked before snapshot persistence"
   },
   {
     "file": "backend/r102_test.go",
-    "line": 671,
+    "line": 677,
     "target": "calls",
-    "source_sha256": "c318e2b8070be25ed123e61e1532c2c0387f23c70a42ac982996c4321cf3a264",
-    "comment": "r276-capture-safe: TestR102ColdIdentityFailurePreservesReviewedAccounts: loadProSeedAccounts uses serial nested for loops, and direct lastMatchStart/proSeedRank transports complete before the test reads counters (pro_seed_accounts.go)"
+    "source_sha256": "2a1ca23f5e4277c2e2967ea39e36f0affd28b28c18c7bec5aeebd7950d60c1cd",
+    "comment": "r276-capture-safe: TestR102ColdIdentityFailurePreservesReviewedAccounts: loadProSeedAccounts resolves its three cold accounts in its synchronous nested loops; each failed Transport.RoundTrip returns before the next account, and the function returns before calls is asserted"
   },
   {
     "file": "backend/r104_test.go",
-    "line": 135,
+    "line": 143,
     "target": "calls",
-    "source_sha256": "5c4d3ef61d3e0d59b8f1dc846be4f20b19cd4cf4caf79daf0cf48886fc4f0d76",
-    "comment": "r276-capture-safe: TestR104ExactDirectoryMatchAvoidsRiotAndMissFallsBack: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "4a75b69b5526356f5ef09be35ccb8dc3225d6c991915435063e9e5ab0b207c57",
+    "comment": "r276-capture-safe: TestR104ExactDirectoryMatchAvoidsRiotAndMissFallsBack: the directly called loadProSeedAccounts traverses the directory hit and miss sequentially; only the missed account issues inline Transport.RoundTrip calls, all complete before calls is read"
   },
   {
     "file": "backend/r107_test.go",
     "line": 43,
     "target": "calls",
-    "source_sha256": "d30878ff6bec1bffc80a0458bb3eb1b30939dba72865b7bd91aa3b703a48068e",
-    "comment": "r276-capture-safe: TestR107ProfileCacheRestoresActivityAfterRestart: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "482473aed50d2e9fd04fd83b03f72f9e724b07fb578c63451544418336e739a9",
+    "comment": "r276-capture-safe: TestR107ProfileCacheRestoresActivityAfterRestart: the two direct readProProfile calls invoke readScopedProProfile synchronously with no Riot provider; its OP.GG Transport.RoundTrip returns before calls is read; r274Flush separates disk restart"
   },
   {
     "file": "backend/r107_test.go",
     "line": 99,
     "target": "calls",
-    "source_sha256": "d30878ff6bec1bffc80a0458bb3eb1b30939dba72865b7bd91aa3b703a48068e",
-    "comment": "r276-capture-safe: TestR107MissingPublicActivityUsesOwnRiotIdentityAndCaches: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "482473aed50d2e9fd04fd83b03f72f9e724b07fb578c63451544418336e739a9",
+    "comment": "r276-capture-safe: TestR107MissingPublicActivityUsesOwnRiotIdentityAndCaches: fresh review of the added league-response branch: readScopedProProfile requests own identity, IDs, match and league sequentially on the nonparallel subtest goroutine; both direct reads return before calls is asserted"
   },
   {
     "file": "backend/r107_test.go",
-    "line": 182,
+    "line": 181,
     "target": "calls",
-    "source_sha256": "d30878ff6bec1bffc80a0458bb3eb1b30939dba72865b7bd91aa3b703a48068e",
-    "comment": "r276-capture-safe: TestR107ImageBudgetReachesUnderlyingTransport: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "482473aed50d2e9fd04fd83b03f72f9e724b07fb578c63451544418336e739a9",
+    "comment": "r276-capture-safe: TestR107ImageBudgetReachesUnderlyingTransport: each nonparallel subtest directly calls one image handler; its remote cache loader and Transport.RoundTrip finish before the handler returns and calls is asserted"
   },
   {
     "file": "backend/r109_header_test.go",
@@ -1242,8 +1242,8 @@
     "file": "backend/r173_test.go",
     "line": 201,
     "target": "events",
-    "source_sha256": "fdd90f0725c6033e6f0e9437d3cf886f0fafddc1ebf1f23e7f7ba4c54bd39311",
-    "comment": "r276-capture-safe: TestR173ProOpeningCacheAndRawShapePrivacy: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "d2a2e4e81db31bf89ce0f5aae5b39ba7dc892abe2bd473cc86010f26ecb0b059",
+    "comment": "r276-capture-safe: TestR173ProOpeningCacheAndRawShapePrivacy: this test calls supplement/openingDetails sequentially, not starterRows or background preparation; gameResource invokes its loader inline and fetch calls recordDetailsShape/diag before returning; events is inspected only after those calls"
   },
   {
     "file": "backend/r175_test.go",
@@ -1807,24 +1807,24 @@
   },
   {
     "file": "backend/r235_test.go",
-    "line": 80,
+    "line": 87,
     "target": "pushed",
-    "source_sha256": "1cc761418dd6ab1be940d09d8a44bf01a92312eab027d6289827c6b1b685ae56",
-    "comment": "r276-capture-safe: TestR235HeadStreamsConcurrentAndFirstPagePush: parallel HTTP workers send results to the season scan owner; that owner invokes scan.onPage serially and seasonScanPagesWithHistoryCache returns before pushed is inspected"
+    "source_sha256": "f292b57193c906711544097bf825275b1092a61d55b23ecb08691d822ac02626",
+    "comment": "r276-capture-safe: TestR235HeadStreamsConcurrentAndFirstPagePush: seasonScanHeadConcurrent workers send pages to the owner channel; only its calling consumer invokes scan.onPage, and seasonScanPagesWithHistoryCache returns before pushed is inspected"
   },
   {
     "file": "backend/r235_test.go",
-    "line": 175,
+    "line": 174,
     "target": "event",
-    "source_sha256": "1cc761418dd6ab1be940d09d8a44bf01a92312eab027d6289827c6b1b685ae56",
-    "comment": "r276-capture-safe: TestR235RatingHeaderAndBodyBudgetsAndFailureRetry: client.lookup consumes the pipe body and emits the diagnostic on its calling goroutine before returning; the pipe writer does not modify event"
+    "source_sha256": "f292b57193c906711544097bf825275b1092a61d55b23ecb08691d822ac02626",
+    "comment": "r276-capture-safe: TestR235RatingHeaderAndBodyBudgetsAndFailureRetry: client.lookup consumes the pipe body then calls recordContext/observe inline before returning; the first failed cache entry is expired so this second lookup cannot start stale-success background refresh; the pipe writer never touches event"
   },
   {
     "file": "backend/r235_test.go",
-    "line": 298,
+    "line": 297,
     "target": "summary",
-    "source_sha256": "1cc761418dd6ab1be940d09d8a44bf01a92312eab027d6289827c6b1b685ae56",
-    "comment": "r276-capture-safe: TestR235RelayTTFBWindowAndPathCategories: state.flushSummary invokes the supplied summary observer synchronously before the assertion"
+    "source_sha256": "f292b57193c906711544097bf825275b1092a61d55b23ecb08691d822ac02626",
+    "comment": "r276-capture-safe: TestR235RelayTTFBWindowAndPathCategories: the test directly calls state.flushSummary; it constructs entries under its state lock then invokes the supplied observer in a synchronous loop before returning to the summary assertion"
   },
   {
     "file": "backend/r238_update_test.go",
@@ -1933,10 +1933,10 @@
   },
   {
     "file": "backend/r264_pro_test.go",
-    "line": 191,
+    "line": 194,
     "target": "got",
-    "source_sha256": "6501a68645aa3bcfadc1a523007f7bb5a7c844078c77753811426d278d2bacf1",
-    "comment": "r276-capture-safe: TestR264LateCardsSubscriberRetainsAlreadyReadFirstMatch: the audited fixture operations in this test invoke this callback serially and return before got is asserted; this source-bound exception does not permit a concurrent fixture caller"
+    "source_sha256": "fcb969b97e2ded08d42f624919f2a1d2bbae2c407504f48819752962fe039b60",
+    "comment": "r276-capture-safe: TestR264LateCardsSubscriberRetainsAlreadyReadFirstMatch: both publishOverviewCards calls finish before registration; subscribeOverview invokes the supplied card listener inline with its stored snapshot before returning; no publisher goroutine runs while got is inspected"
   },
   {
     "file": "backend/r265_embedded_assets_test.go",
@@ -2341,15 +2341,8 @@
     "file": "backend/r98_test.go",
     "line": 114,
     "target": "previews",
-    "source_sha256": "baeb42962ac22c01590132d85e89c3b1dd44a71faefeb028e9ba6af9b46c2819",
-    "comment": "r276-capture-safe: TestR98Timing: overview progress is serialized by the loader; the loader joins workers before returning and fake clock writes are synchronous"
-  },
-  {
-    "file": "backend/r98_test.go",
-    "line": 313,
-    "target": "now",
-    "source_sha256": "baeb42962ac22c01590132d85e89c3b1dd44a71faefeb028e9ba6af9b46c2819",
-    "comment": "r276-capture-safe: TestR98LimiterFIFOHasOnlyOneSleepingHeadAndCanceledWaitersUseNoQuota: overview progress is serialized by the loader; the loader joins workers before returning and fake clock writes are synchronous"
+    "source_sha256": "e91acf2e7b01058bfd2935b87912edf37be841864156df87468d6967dc63989e",
+    "comment": "r276-capture-safe: TestR98Timing: loadRiotOverview detail workers send results on completedDetails; its calling consumer alone invokes publishPartial/progress, and the direct load call returns before previews is read; workers never append to this slice"
   },
   {
     "file": "backend/r99_test.go",
@@ -2931,5 +2924,33 @@
     "target": "calls",
     "source_sha256": "f4c1697295a343f2f98c706805ca4896519079234a3c77e5f298332e79765435",
     "comment": "r276-capture-safe: TestSilentDispatchNeverCreatesWindow: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
+  },
+  {
+    "file": "backend/pro_runes_opgg_test.go",
+    "line": 89,
+    "target": "calls",
+    "source_sha256": "57ef391c1ffb9aedf7bff97ddad14a911ba904f5a32eeb6a5be343d5de1f1ac4",
+    "comment": "r276-capture-safe: TestProOPGGAnonymousTransportAndBoundaries: the test directly calls fetchOPGGBuilds sequentially; client.Do invokes this Transport.RoundTrip inline and returns before mode/calls changes or assertions; no opggRecommend fan-out runs in this test"
+  },
+  {
+    "file": "backend/pro_runes_opgg_test.go",
+    "line": 232,
+    "target": "calls",
+    "source_sha256": "57ef391c1ffb9aedf7bff97ddad14a911ba904f5a32eeb6a5be343d5de1f1ac4",
+    "comment": "r276-capture-safe: TestProOPGGPaginationStopsAtThirtyDaysAndRejectsDisorder: opggLeagueBuilds fetches pages in its ordinary synchronous for loop through fetchOPGGBuilds/client.Do; both direct calls return before calls is inspected or disorder is changed"
+  },
+  {
+    "file": "backend/r288_announcements_test.go",
+    "line": 15,
+    "target": "calls",
+    "source_sha256": "de55783f001d1a712c04ea9fdaf5f5976403a735bb89f0fc13832162ee0066ef",
+    "comment": "r276-capture-safe: TestR288AnnouncementV2AndLegacyFallback: each nonparallel subtest directly calls fetchAnnouncementDocument; its version/mirror nested loops issue client.Do sequentially and return before the calls slice is inspected"
+  },
+  {
+    "file": "backend/r290_github_test.go",
+    "line": 77,
+    "target": "requests",
+    "source_sha256": "884f2bd89347345d3e03fbe6f77379feca663d50ddf8482637075dfe64e59c61",
+    "comment": "r276-capture-safe: TestR290GithubStarsFailureCooldownAndZero: each nonparallel payload subtest directly calls handleGithubStars/githubStarCount sequentially; githubStarCount holds githubStars.mu and completes client.Do before returning; requests is checked only after the calls"
   }
 ]
