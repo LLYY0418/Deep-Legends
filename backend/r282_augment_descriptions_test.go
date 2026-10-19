@@ -27,6 +27,10 @@ func TestR282AugmentDescriptionFallbacks(t *testing.T) {
 	if cached.Source != "cache" || cached.Description != item.Description {
 		t.Fatalf("cache %#v", cached)
 	}
+	// Finish the queued fresh write before replacing it with the stale fixture.
+	if err := p.cache.flushDisk(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	key := augmentDescriptionKey(93)
 	p.cache.mu.Lock()
 	entry := p.cache.entries[key]
