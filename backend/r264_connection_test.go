@@ -86,21 +86,31 @@ func TestR264LateIdentityCannotResurrectClosedSession(t *testing.T) {
 	a := &app{lcu: client, connected: true}
 	done := make(chan bool, 1)
 	go func() { done <- a.refreshIdentityWithClient(client) }()
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r264_connection_test.go:89 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-entered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("identity request did not start")
 	}
 	a.mu.Lock()
 	a.clearSnapshotLocked("")
 	a.mu.Unlock()
 	close(release)
-	select {
-	case accepted := <-done:
-		if accepted {
-			t.Fatal("old identity resurrected the closed session")
+	if !r287WaitSelect(t, "backend/r264_connection_test.go:98 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case accepted := <-done:
+			if accepted {
+				t.Fatal("old identity resurrected the closed session")
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("identity completion stalled")
 	}
 	a.mu.RLock()

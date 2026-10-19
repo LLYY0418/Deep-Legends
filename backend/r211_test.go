@@ -72,14 +72,24 @@ func TestR211SGPForceSummaryFreshAndAllExpectedReusesFirstPage(t *testing.T) {
 	request("all", "")
 	// Cancellation is the scanner's existing completion signal: its cache write,
 	// diagnostic and season-progress broadcast occur before the deferred cancel.
-	select {
-	case ctx := <-background:
+	if !r287WaitSelect(t, "backend/r211_test.go:75 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
 		select {
-		case <-ctx.Done():
-		case <-time.After(3 * time.Second):
-			t.Fatal("season scan completion timeout")
+		case ctx := <-background:
+			if !r287WaitSelect(t, "backend/r211_test.go:77 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-ctx.Done():
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
+				t.Fatal("season scan completion timeout")
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(3 * time.Second):
+	}) {
 		t.Fatal("force did not trigger a season scan")
 	}
 	head := []map[string]any{}

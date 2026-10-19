@@ -65,9 +65,14 @@ func TestR92ProLadderStartsBeforeSupplementsFinish(t *testing.T) {
 	base := opggProTeam{ID: 632, Name: "Bilibili Gaming", Members: []opggProMember{proFixtureMember(632, "Bin", "Chen Ze-Bin (陈泽彬)", proFixtureAccount("fixtureaccount", "fixture", "CHALLENGER", 1, 1200))}}
 	p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Host == proSupplementHost {
-			select {
-			case <-baseStarted:
-			case <-time.After(500 * time.Millisecond):
+			if !r287WaitSelect(t, "R92 base concurrency", 500*time.Millisecond, func(deadline <-chan time.Time) bool {
+				select {
+				case <-baseStarted:
+					return true
+				case <-deadline:
+					return false
+				}
+			}) {
 				serial.Store(true)
 			}
 			name := strings.TrimPrefix(r.URL.Path, "/player/")

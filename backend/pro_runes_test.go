@@ -138,101 +138,114 @@ func TestProRuneWinnerConstraints(t *testing.T) {
 	}
 }
 func TestProRunePublicTransportAndAlignedSupplement(t *testing.T) {
-	p := proTestProvider()
-	g := proTestGame()
-	jar, _ := cookiejar.New(nil)
-	u, _ := url.Parse("https://feed.lolesports.com")
-	jar.SetCookies(u, []*http.Cookie{{Name: "secret", Value: "private"}})
-	var calls atomic.Int32
-	p.client = &http.Client{Jar: jar, Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		calls.Add(1)
-		if r.Header.Get("Cookie") != "" || r.Header.Get("x-riot-token") != "" || r.Header.Get("Authorization") != "" || strings.Contains(strings.ToLower(r.URL.String()), "puuid") {
-			t.Error("V8 credential leak", r.Header, r.URL)
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		p := proTestProvider()
+		g := proTestGame()
+		jar, _ := cookiejar.New(nil)
+		u, _ := url.Parse("https://feed.lolesports.com")
+		jar.SetCookies(u, []*http.Cookie{{Name: "secret", Value: "private"}})
+		var calls atomic.Int32
+		p.client = &http.Client{Jar: jar, Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			calls.Add(1)
+			if r.Header.Get("Cookie") != "" || r.Header.Get("x-riot-token") != "" || r.Header.Get("Authorization") != "" || strings.Contains(strings.ToLower(r.URL.String()), "puuid") {
+				t.Error("V8 credential leak", r.Header, r.URL)
+			}
+			if r.URL.Host == "feed.lolesports.com" && r.Header.Get("x-api-key") != "" {
+				t.Error("feed received API key")
+			}
+			stamp := r.URL.Query().Get("startingTime")
+			parsed, err := time.Parse(time.RFC3339, stamp)
+			status := 200
+			body := ""
+			if err != nil || parsed.Nanosecond() != 0 || parsed.Second()%10 != 0 {
+				status = 400
+				body = `{"error":"unaligned timestamp"}`
+			} else if strings.Contains(r.URL.Path, "/window/") {
+				data, _ := json.Marshal(proTestEnd(g))
+				body = string(data)
+			} else {
+				body = `{"frames":[{"rfc460Timestamp":"` + proStartingTime(g.Start.Add(30*time.Minute)) + `","participants":[{"participantId":3,"items":[3364,2031,6692],"perkMetadata":{"styleId":8100,"subStyleId":8400,"perks":[8112,8143,8137,8106,8401,8444,5008,5011]}}]}]}`
+			}
+			return &http.Response{StatusCode: status, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
+		})}
+		source := newProRuneProvider(p, trackTestStore(t, &localStore{root: t.TempDir()}), nil)
+		if _, err := source.supplement(context.Background(), g); err != nil {
+			t.Fatal("M5 supplement failed (HTTP 400 expected for unaligned mutation)", err)
 		}
-		if r.URL.Host == "feed.lolesports.com" && r.Header.Get("x-api-key") != "" {
-			t.Error("feed received API key")
+		if calls.Load() != 2 {
+			t.Fatal("two-stage requests", calls.Load())
 		}
-		stamp := r.URL.Query().Get("startingTime")
-		parsed, err := time.Parse(time.RFC3339, stamp)
-		status := 200
-		body := ""
-		if err != nil || parsed.Nanosecond() != 0 || parsed.Second()%10 != 0 {
-			status = 400
-			body = `{"error":"unaligned timestamp"}`
-		} else if strings.Contains(r.URL.Path, "/window/") {
-			data, _ := json.Marshal(proTestEnd(g))
-			body = string(data)
-		} else {
-			body = `{"frames":[{"rfc460Timestamp":"` + proStartingTime(g.Start.Add(30*time.Minute)) + `","participants":[{"participantId":3,"items":[3364,2031,6692],"perkMetadata":{"styleId":8100,"subStyleId":8400,"perks":[8112,8143,8137,8106,8401,8444,5008,5011]}}]}]}`
+
+		start := time.Now()
+		if _, err := source.supplement(context.Background(), g); err != nil {
+			t.Fatal(err)
 		}
-		return &http.Response{StatusCode: status, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
-	})}
-	source := newProRuneProvider(p, trackTestStore(t, &localStore{root: t.TempDir()}), nil)
-	if _, err := source.supplement(context.Background(), g); err != nil {
-		t.Fatal("M5 supplement failed (HTTP 400 expected for unaligned mutation)", err)
-	}
-	if calls.Load() != 2 {
-		t.Fatal("two-stage requests", calls.Load())
-	}
-	start := time.Now()
-	if _, err := source.supplement(context.Background(), g); err != nil {
-		t.Fatal(err)
-	}
-	if calls.Load() != 2 || time.Since(start) >= 100*time.Millisecond {
-		t.Fatal("V7 cached fill exceeded 100ms or fetched again")
-	}
-	reloaded := newProRuneProvider(p, trackTestStore(t, &localStore{root: filepath.Dir(source.root)}), nil)
-	if _, err := reloaded.supplement(context.Background(), g); err != nil || calls.Load() != 2 {
-		t.Fatal("immutable disk cache not reused", err)
-	}
-	// An initial-frame disk entry must not masquerade as final equipment.
-	corrupt := reloaded.details[g.ID]
-	corrupt.Frames[0].Timestamp = g.Start
-	reloaded.writeDisk("details-"+g.ID, corrupt)
-	fresh := newProRuneProvider(p, trackTestStore(t, &localStore{root: filepath.Dir(source.root)}), nil)
-	if _, err := fresh.supplement(context.Background(), g); err != nil || calls.Load() != 3 {
-		t.Fatal("nonterminal disk details were not refetched", err, calls.Load())
-	}
+		if calls.Load() != 2 || r287TooSlow(r287Context, t, "backend/pro_runes_test.go:181 duration", time.Since(start), 100*time.Millisecond, true) {
+			t.Fatal("V7 cached fill exceeded 100ms or fetched again")
+		}
+		reloaded := newProRuneProvider(p, trackTestStore(t, &localStore{root: filepath.Dir(source.root)}), nil)
+		if _, err := reloaded.supplement(context.Background(), g); err != nil || calls.Load() != 2 {
+			t.Fatal("immutable disk cache not reused", err)
+		}
+		// An initial-frame disk entry must not masquerade as final equipment.
+		corrupt := reloaded.details[g.ID]
+		corrupt.Frames[0].Timestamp = g.Start
+		reloaded.writeDisk("details-"+g.ID, corrupt)
+		fresh := newProRuneProvider(p, trackTestStore(t, &localStore{root: filepath.Dir(source.root)}), nil)
+		if _, err := fresh.supplement(context.Background(), g); err != nil || calls.Load() != 3 {
+			t.Fatal("nonterminal disk details were not refetched", err, calls.Load())
+		}
+	})
 }
 func TestProRuneColdIndexNonblockingAndConcurrency(t *testing.T) {
-	provider := proTestProvider()
-	release := make(chan struct{})
-	var active, peak atomic.Int32
-	provider.client = &http.Client{Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		n := active.Add(1)
-		defer active.Add(-1)
-		for prev := peak.Load(); n > prev && !peak.CompareAndSwap(prev, n); prev = peak.Load() {
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		provider := proTestProvider()
+		release := make(chan struct{})
+		var active, peak atomic.Int32
+		provider.client = &http.Client{Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			n := active.Add(1)
+			defer active.Add(-1)
+			for prev := peak.Load(); n > prev && !peak.CompareAndSwap(prev, n); prev = peak.Load() {
+			}
+			select {
+			case <-release:
+			case <-r.Context().Done():
+				return nil, r.Context().Err()
+			}
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":{"schedule":{"pages":{},"events":[]}}}`)), Header: http.Header{}}, nil
+		})}
+		done := make(chan struct{}, 4)
+		p := newProRuneProvider(provider, nil, func() { done <- struct{}{} })
+
+		start := time.Now()
+		p.kick(false)
+		res := p.recommend(context.Background(), 69, "mid")
+		if !res.Preparing || res.Reason != "preparing" || r287TooSlow(r287Context, t, "backend/pro_runes_test.go:218 duration", time.Since(start), 100*time.Millisecond, false) {
+			t.Fatal("V7 cold index blocked first response", res)
 		}
-		select {
-		case <-release:
-		case <-r.Context().Done():
-			return nil, r.Context().Err()
+		var wg sync.WaitGroup
+		for i := 0; i < 12; i++ {
+			wg.Add(1)
+			go func() { defer wg.Done(); p.kick(false) }()
 		}
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":{"schedule":{"pages":{},"events":[]}}}`)), Header: http.Header{}}, nil
-	})}
-	done := make(chan struct{}, 4)
-	p := newProRuneProvider(provider, nil, func() { done <- struct{}{} })
-	start := time.Now()
-	p.kick(false)
-	res := p.recommend(context.Background(), 69, "mid")
-	if time.Since(start) > 100*time.Millisecond || !res.Preparing || res.Reason != "preparing" {
-		t.Fatal("V7 cold index blocked first response", res)
-	}
-	var wg sync.WaitGroup
-	for i := 0; i < 12; i++ {
-		wg.Add(1)
-		go func() { defer wg.Done(); p.kick(false) }()
-	}
-	wg.Wait()
-	close(release)
-	select {
-	case <-done:
-	case <-time.After(3 * time.Second):
-		t.Fatal("index stuck")
-	}
-	if peak.Load() > 4 {
-		t.Fatal("network concurrency exceeded 4")
-	}
+		wg.Wait()
+		close(release)
+		if !r287WaitSelect(t, "backend/pro_runes_test.go:228 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-done:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
+			t.Fatal("index stuck")
+		}
+		if peak.Load() > 4 {
+			t.Fatal("network concurrency exceeded 4")
+		}
+	})
 }
 func TestProRuneRecommendationUnknownRecordAndOffline(t *testing.T) {
 	p := newProRuneProvider(proTestProvider(), nil, nil)
@@ -738,9 +751,14 @@ func TestProBackgroundWorkersLeaveForegroundSlot(t *testing.T) {
 	}()
 	defer func() { close(release); <-done }()
 	for i := 0; i < 3; i++ {
-		select {
-		case <-started:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/pro_runes_test.go:741 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-started:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("background work did not start")
 		}
 	}
@@ -749,10 +767,15 @@ func TestProBackgroundWorkersLeaveForegroundSlot(t *testing.T) {
 		t.Fatal("background consumed foreground capacity")
 	case <-time.After(20 * time.Millisecond):
 	}
-	select {
-	case gate <- struct{}{}:
-		<-gate
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/pro_runes_test.go:752 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case gate <- struct{}{}:
+			<-gate
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("no foreground capacity")
 	}
 }

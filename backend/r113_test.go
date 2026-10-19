@@ -84,7 +84,9 @@ func TestR113BroadcastEventStormIsBoundedAndRearmsNextSession(t *testing.T) {
 	for range 100 {
 		runner.handleChampSelect(client, Summoner{})
 	}
-	deadline := time.After(6 * time.Second)
+	deadlineR287Timing := r287NewDeadline(t, "backend/r113_test.go:87 deadline", 6*time.Second)
+	defer deadlineR287Timing.Stop()
+	deadline := deadlineR287Timing.C
 	for {
 		select {
 		case event := <-done:
@@ -96,6 +98,7 @@ func TestR113BroadcastEventStormIsBoundedAndRearmsNextSession(t *testing.T) {
 		}
 	}
 exhausted:
+	deadlineR287Timing.Stop()
 	for range 100 {
 		runner.handleChampSelect(client, Summoner{})
 	}
@@ -161,9 +164,14 @@ func TestR113ARAMLoadsRanksAndStartsRecommendationsBeforeHistory(t *testing.T) {
 			rankReads.Add(1)
 			io.WriteString(w, `{"queues":[{"queueType":"RANKED_SOLO_5x5","tier":"GOLD","division":"I"}]}`)
 		case strings.HasPrefix(req.URL.Path, "/lol-match-history/"):
-			select {
-			case <-warmed:
-			case <-time.After(time.Second):
+			if !r287WaitSelect(t, "backend/r113_test.go:166 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-warmed:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Error("recommendations waited for history")
 			}
 			io.WriteString(w, `{"games":{"gameCount":0,"games":[]}}`)
@@ -177,9 +185,14 @@ func TestR113ARAMLoadsRanksAndStartsRecommendationsBeforeHistory(t *testing.T) {
 	}}
 	client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client()}
 	got := a.loadGameplayLive(context.Background(), client, Summoner{PUUID: "r113-player-reference"}, "InProgress")
-	select {
-	case <-finished:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r113_test.go:180 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-finished:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("prewarm never started")
 	}
 	if !got.Available || len(got.Players) != 1 || !got.Players[0].IsCurrent {

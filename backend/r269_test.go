@@ -495,39 +495,48 @@ func TestR269DecryptRecoveryKeepsReturnedCredentialScope(t *testing.T) {
 	}
 }
 func TestR269MayhemCachedSuccessRefreshesWithoutBlocking(t *testing.T) {
-	started, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	var calls atomic.Int32
-	c := newAramkitTestClient(aramkitRoundTripFunc(func(*http.Request) (*http.Response, error) {
-		if calls.Add(1) == 2 {
-			close(started)
-			<-release
-			defer close(done)
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		started, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+		var calls atomic.Int32
+		c := newAramkitTestClient(aramkitRoundTripFunc(func(*http.Request) (*http.Response, error) {
+			if calls.Add(1) == 2 {
+				close(started)
+				<-release
+				defer close(done)
+			}
+			return aramkitJSONResponse(200, `{"code":200,"data":{"rating":2001}}`), nil
+		}))
+		c.refreshes = map[string]bool{}
+		first := c.lookup(context.Background(), "Fixture", "CN")
+		if !first.Available {
+			t.Fatal(first)
 		}
-		return aramkitJSONResponse(200, `{"code":200,"data":{"rating":2001}}`), nil
-	}))
-	c.refreshes = map[string]bool{}
-	first := c.lookup(context.Background(), "Fixture", "CN")
-	if !first.Available {
-		t.Fatal(first)
-	}
-	c.mu.Lock()
-	for key, entry := range c.cache {
-		entry.expiresAt = time.Now().Add(-time.Second)
-		c.cache[key] = entry
-	}
-	c.mu.Unlock()
-	at := time.Now()
-	cached := c.lookup(context.Background(), "Fixture", "CN")
-	if !cached.Available || time.Since(at) > 200*time.Millisecond {
-		t.Fatal("cached success blocked")
-	}
-	select {
-	case <-started:
-	case <-time.After(time.Second):
-		t.Fatal("silent refresh absent")
-	}
-	close(release)
-	<-done
+		c.mu.Lock()
+		for key, entry := range c.cache {
+			entry.expiresAt = time.Now().Add(-time.Second)
+			c.cache[key] = entry
+		}
+		c.mu.Unlock()
+
+		at := time.Now()
+		cached := c.lookup(context.Background(), "Fixture", "CN")
+		if !cached.Available || r287TooSlow(r287Context, t, "backend/r269_test.go:521 duration", time.Since(at), 200*time.Millisecond, false) {
+			t.Fatal("cached success blocked")
+		}
+		if !r287WaitSelect(t, "backend/r269_test.go:524 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-started:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
+			t.Fatal("silent refresh absent")
+		}
+		close(release)
+		<-done
+	})
 }
 
 func TestR269DiagnosticMessageAndUserScope(t *testing.T) {

@@ -23,9 +23,14 @@ func TestR272CollectionEventAndPostgame(t *testing.T) {
 			a.gameplayFlow.client = client
 			a.markCollectionDirty("inventory")
 			if phase == "Lobby" {
-				select {
-				case <-a.refreshRequests:
-				case <-time.After(5 * time.Second):
+				if !r287WaitSelect(t, "backend/r272_runtime_test.go:26 wait", 5*time.Second, func(r287Deadline <-chan time.Time) bool {
+					select {
+					case <-a.refreshRequests:
+						return true
+					case <-r287Deadline:
+						return false
+					}
+				}) {
 					t.Fatal("inventory did not refresh within5s")
 				}
 			} else {
@@ -36,9 +41,14 @@ func TestR272CollectionEventAndPostgame(t *testing.T) {
 				default:
 				}
 				a.observeGameplayPhase(context.Background(), client, "EndOfGame")
-				select {
-				case <-a.refreshRequests:
-				case <-time.After(time.Second):
+				if !r287WaitSelect(t, "backend/r272_runtime_test.go:39 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+					select {
+					case <-a.refreshRequests:
+						return true
+					case <-r287Deadline:
+						return false
+					}
+				}) {
 					t.Fatal("postgame discarded dirty inventory")
 				}
 			}

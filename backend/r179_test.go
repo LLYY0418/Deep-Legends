@@ -66,18 +66,28 @@ func TestR179SpecialistPrefetchCoalescesVisibleRows(t *testing.T) {
 		t.Fatalf("rows=%d outcome=%s", len(rows), outcome)
 	}
 	for i := 0; i < 2; i++ {
-		select {
-		case <-started:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/r179_test.go:69 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-started:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("first two prefetch workers not started")
 		}
 	}
 	// The async timeline calls remain blocked; the response cache lookup must return.
 	returned := make(chan struct{})
 	go func() { p.attachReadySpecialistStarters(rows); close(returned) }()
-	select {
-	case <-returned:
-	case <-time.After(200 * time.Millisecond):
+	if !r287WaitSelect(t, "backend/r179_test.go:78 wait", 200*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-returned:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("response waited for unfinished timeline")
 	}
 	for _, row := range rows {
@@ -98,12 +108,17 @@ func TestR179SpecialistPrefetchCoalescesVisibleRows(t *testing.T) {
 		t.Fatalf("preflight/visible duplicate calls=%d", timelines.Load())
 	}
 	unblock()
-	select {
-	case result := <-got:
-		if len(result) != 3 {
-			t.Fatal(result)
+	if !r287WaitSelect(t, "backend/r179_test.go:101 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case result := <-got:
+			if len(result) != 3 {
+				t.Fatal(result)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(2 * time.Second):
+	}) {
 		t.Fatal("merged request blocked")
 	}
 	r281RequireProgress(t, "specialist timeline completion", func() (bool, int, string) {

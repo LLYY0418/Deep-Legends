@@ -165,7 +165,8 @@ test('R117 item set skip diagnostics execute in both rejected branches', async (
 });
 function verifyR117ChromiumWiring(workflow, runner, catalog) {
   assert.doesNotMatch(JSON.stringify(workflow),/refs\/heads\/codex\/ci-hardening-r276/,'R276 special branch must not bypass release-only acceptance');
-  const quality = workflow.jobs.quality, browser = workflow.jobs['browser-main'];
+  require('../../scripts/lib/ci-contracts.cjs').verifyMutationRouting(workflow);
+  const quality = workflow.jobs['quality-web'], browser = workflow.jobs['browser-main'];
   assert.ok(quality && browser, 'quality and browser-main must exist');
   const allowedJobKeys = ['name','needs','runs-on','steps','permissions','environment','container','services','outputs'];
   for (const [name, job] of [['quality',quality],['browser-main',browser]]) {
@@ -200,7 +201,7 @@ function verifyR117ChromiumWiring(workflow, runner, catalog) {
   noShell(workflow.defaults);noShell(quality.defaults);noShell(browser.defaults);noShell(guard);
   for(const [label,env] of [['workflow',workflow.env],['quality',quality.env],['browser',browser.env]])for(const key of Object.keys(env??{}))assert.doesNotMatch(key,/_SOURCE$|NODE_OPTIONS|R276_BROWSER_ONLY/,label+' cannot override guarded source or selection');
   for(const [name,job] of [['quality',quality],['browser',browser]])for(const step of job.steps){if(typeof step.run==='string'&&step!==chrome)assert.doesNotMatch(step.run,/GITHUB_ENV|GITHUB_PATH/,name+' cannot inject guard environment');}
-  const frontend=quality.steps.find(s=>s.name==='Test frontend and desktop renderers');assert.ok(frontend);assert.equal(frontend.if,undefined);assert.equal(frontend['continue-on-error'],undefined);
+  const frontend=quality.steps.find(s=>s.name==='Test frontend and desktop renderers');assert.ok(frontend);assert.equal(frontend.if,'${{ !cancelled() }}');assert.equal(frontend['continue-on-error'],undefined);
   for(const [name,file,key] of [['r100','desktop/r100-browser.cjs','R100_BROWSER_OUTPUT'],['r117','desktop/r117-browser.cjs','R117_BROWSER_OUTPUT']]){
     const rows=catalog.guards.filter(r=>r[0]===name);assert.deepEqual(rows,[[name,file,key]],'each original guard must appear exactly once without source overrides');
     assert.equal(catalog.selectGuards('main').filter(r=>r[0]===name).length,1,'default main shard must select each guard');

@@ -131,21 +131,31 @@ func TestR204LiveProgressReplayAndCancellation(t *testing.T) {
 	defer cancel()
 	go func() { a.cachedGameplayLive(ctx, client, self, "ChampSelect"); close(done) }()
 	<-started
-	select {
-	case value := <-progress:
-		if value.Players[0].HistoryState != "ok" || value.Players[1].HistoryState != "pending" {
-			t.Fatal("did not publish early")
+	if !r287WaitSelect(t, "backend/r204_test.go:134 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case value := <-progress:
+			if value.Players[0].HistoryState != "ok" || value.Players[1].HistoryState != "pending" {
+				t.Fatal("did not publish early")
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("waited for all players")
 	}
 	replay := make(chan gameplayLiveResponse, 2)
 	joinCtx, joinCancel := context.WithCancel(context.WithValue(context.Background(), liveProgressListenerKey{}, func(r gameplayLiveResponse) { replay <- r }))
 	joinDone := make(chan struct{})
 	go func() { a.cachedGameplayLive(joinCtx, client, self, "ChampSelect"); close(joinDone) }()
-	select {
-	case <-replay:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r204_test.go:146 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-replay:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("joined flight did not replay")
 	}
 	joinCancel()

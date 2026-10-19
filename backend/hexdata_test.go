@@ -586,9 +586,14 @@ func TestHexdataSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNone(t *tes
 		}()
 	}
 	close(start)
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/hexdata_test.go:589 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-entered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("Hexdata request did not start")
 	}
 	close(release)

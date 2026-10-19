@@ -72,9 +72,14 @@ func TestR280ReviewProxyRecoveryAfterSpeedProbe(t *testing.T) {
 	clock.Add(61_000)
 	done := make(chan string, 1)
 	go func() { done <- request() }()
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r280_review_fixes_test.go:75 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-entered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		close(release)
 		t.Fatal("speed selection masked the 60-second proxy recovery")
 	}
@@ -83,12 +88,17 @@ func TestR280ReviewProxyRecoveryAfterSpeedProbe(t *testing.T) {
 		go func() { concurrent <- request() }()
 	}
 	for i := 0; i < 12; i++ {
-		select {
-		case got := <-concurrent:
-			if got != "direct" {
-				t.Fatal("concurrent recovery requests should use direct", got)
+		if !r287WaitSelect(t, "backend/r280_review_fixes_test.go:86 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case got := <-concurrent:
+				if got != "direct" {
+					t.Fatal("concurrent recovery requests should use direct", got)
+				}
+				return true
+			case <-r287Deadline:
+				return false
 			}
-		case <-time.After(time.Second):
+		}) {
 			t.Fatal("concurrent requests waited for the proxy recovery")
 		}
 	}

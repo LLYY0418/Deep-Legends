@@ -5,7 +5,7 @@ const path = require('node:path');
 
 // CHAMPSELECT_LAYOUT=1 CURRENT_GAME_SHOTS=/private/tmp/champselect-1505 node desktop/current-game-layout.cjs
 exports.verify = async ({call, evaluate, output}) => {
-  const waitFor = expression => evaluate(`new Promise((resolve,reject)=>{const start=Date.now();const timer=setInterval(()=>{if(${expression}){clearInterval(timer);resolve();}else if(Date.now()-start>8000){clearInterval(timer);reject(Error('champselect UI did not settle'));}},40);})`);
+  const waitFor = expression => require('../scripts/lib/wait-progress.cjs').waitFor(()=>evaluate(expression),{idleMs:8000,hardMs:8000,intervalMs:40,label:'expected layout UI did not settle'});
   await evaluate(`document.getElementById('section-suite').click();document.querySelector('[data-suite-tab="champselect"]').click()`);
   await waitFor(`document.querySelector('[data-cs-rail-side="ban"]')`);
   const timeline = await evaluate(`document.querySelector('.cs-live-timeline').textContent`);

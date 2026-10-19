@@ -69,12 +69,17 @@ func TestApplicationHandoffKeepsInstallerUntilItsWindow(t *testing.T) {
 	}
 	ready.Store(true)
 	ticks <- time.Now()
-	select {
-	case success := <-done:
-		if !success || !closed.Load() || stops.Load() != 1 {
-			t.Fatal("handoff did not close exactly after success")
+	if !r287WaitSelect(t, "installer/handoff_test.go:72 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case success := <-done:
+			if !success || !closed.Load() || stops.Load() != 1 {
+				t.Fatal("handoff did not close exactly after success")
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("visible application never released installer")
 	}
 }
@@ -115,12 +120,17 @@ func TestApplicationHandoffTimeoutAlsoBoundsBlockedOrFailedLaunch(t *testing.T) 
 				t.Fatal("closed before launch/timeout")
 			}
 			deadline <- time.Now()
-			select {
-			case success := <-done:
-				if success || closed.Load() != 1 {
-					t.Fatal("timeout must only close installer once")
+			if !r287WaitSelect(t, "installer/handoff_test.go:118 wait", 250*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case success := <-done:
+					if success || closed.Load() != 1 {
+						t.Fatal("timeout must only close installer once")
+					}
+					return true
+				case <-r287Deadline:
+					return false
 				}
-			case <-time.After(250 * time.Millisecond):
+			}) {
 				t.Fatal("20-second deadline no longer releases installer")
 			}
 		})

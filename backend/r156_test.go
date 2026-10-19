@@ -197,12 +197,17 @@ func TestR156IdleLCURequestBucketFlushesDuringSession(t *testing.T) {
 	}()
 	t.Cleanup(func() { cancel(); <-done })
 	ticks <- windowStart.Add(lcuRequestDiagnosticWindow + time.Second)
-	select {
-	case event := <-events:
-		if event["event"] != "lcu_request" || event["count"] != 1 || event["path"] != "/lol-lobby/v2/received-invitations" {
-			t.Fatalf("idle bucket event = %#v", event)
+	if !r287WaitSelect(t, "backend/r156_test.go:200 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-events:
+			if event["event"] != "lcu_request" || event["count"] != 1 || event["path"] != "/lol-lobby/v2/received-invitations" {
+				t.Fatalf("idle bucket event = %#v", event)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("idle request bucket did not flush without another request or Close")
 	}
 	cancel()

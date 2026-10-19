@@ -137,16 +137,20 @@ func r273LogTimings(t *testing.T, f *r98Fixture, p *r273Probe, stage string, sta
 func TestR273ColdKRSegmentTiming(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		t.Run(string(rune('0'+i)), func(t *testing.T) {
-			f := r98OverviewFixture(t, true)
-			ref := gameplayReference{GameName: "Fixture", TagLine: "KR1", Region: "kr"}
-			ctx, p := r273TimingContext(f.a.riot)
-			started := time.Now()
-			first, err := f.a.loadRiotOverview(ctx, ref, 0, 10)
-			firstElapsed := time.Since(started)
-			r273LogTimings(t, f, p, "cold-first-ten", started)
-			if err != nil || len(first.Matches) != 10 || firstElapsed > 3*time.Second {
-				t.Fatal("cold first10 budget", len(first.Matches), firstElapsed, err)
-			}
+
+			r287TimingScenario(t, func(r287Context *r287TimingContext) {
+				f := r98OverviewFixture(t, true)
+				ref := gameplayReference{GameName: "Fixture", TagLine: "KR1", Region: "kr"}
+				ctx, p := r273TimingContext(f.a.riot)
+
+				started := time.Now()
+				first, err := f.a.loadRiotOverview(ctx, ref, 0, 10)
+				firstElapsed := time.Since(started)
+				r273LogTimings(t, f, p, "cold-first-ten", started)
+				if err != nil || len(first.Matches) != 10 || r287TooSlow(r287Context, t, "backend/r273_riot_test.go:147 duration", firstElapsed, 3*time.Second, false) {
+					t.Fatal("cold first10 budget", len(first.Matches), firstElapsed, err)
+				}
+			})
 		})
 	}
 }
@@ -241,9 +245,14 @@ func TestR273ForegroundOvertakesBackgroundResumeFlight(t *testing.T) {
 				}
 				bgResult <- err
 			}()
-			select {
-			case <-entered:
-			case <-time.After(2 * time.Second):
+			if !r287WaitSelect(t, "backend/r273_riot_test.go:244 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-entered:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Fatal("background never reached controlled resume gate")
 			}
 			probe.beforeState = r273ProviderState(p)

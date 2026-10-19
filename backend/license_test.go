@@ -396,9 +396,14 @@ func TestR232HTTPAndLateResponseGate(t *testing.T) {
 	late := a.withLicenseProtection(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		testActivate(t, b, false)
 		_ = m.Renew(context.Background())
-		select {
-		case <-r.Context().Done():
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/license_test.go:399 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-r.Context().Done():
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("admitted request not canceled")
 		}
 		w.Write([]byte("private late result"))
@@ -431,7 +436,9 @@ func TestR232LCUWriteAndInFlightCancellation(t *testing.T) {
 	go func() {
 		done <- client.RequestJSON(context.Background(), "POST", "/lol-matchmaking/v1/ready-check/accept", nil, nil)
 	}()
-	deadline := time.After(time.Second)
+	deadlineR287Timing := r287NewDeadline(t, "backend/license_test.go:439 deadline", time.Second)
+	defer deadlineR287Timing.Stop()
+	deadline := deadlineR287Timing.C
 	for calls.Load() == 0 {
 		select {
 		case <-deadline:
@@ -440,15 +447,21 @@ func TestR232LCUWriteAndInFlightCancellation(t *testing.T) {
 			time.Sleep(time.Millisecond)
 		}
 	}
+	deadlineR287Timing.Stop()
 	b := s.Manager(&licenseTestStore{})
 	testActivate(t, b, false)
 	_ = m.Renew(context.Background())
-	select {
-	case err := <-done:
-		if err == nil {
-			t.Fatal("inflight write not canceled")
+	if !r287WaitSelect(t, "backend/license_test.go:446 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case err := <-done:
+			if err == nil {
+				t.Fatal("inflight write not canceled")
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("inflight write hung")
 	}
 	before := calls.Load()

@@ -17,7 +17,10 @@ cases.push(['p7-region-three-characters','app.js','Array.from(name).slice(0, 2).
 cases.push(['p7-compact-floor','app.css','#player-search-region-short {display:inline;text-overflow:clip;}','#player-search-region-short {display:none;text-overflow:clip;}','700px must retain compact region labels']);
 async function main(){
 const results=[];
-for(const [id,file,anchor,replacement,expected] of cases.filter(c=>!process.env.R278_BROWSER_MUTANT_ONLY || c[0]===process.env.R278_BROWSER_MUTANT_ONLY)){
+const selected=cases.filter(c=>(!process.env.R278_BROWSER_MUTANT_ONLY || c[0]===process.env.R278_BROWSER_MUTANT_ONLY)&&(!process.env.R287_BROWSER_MUTANTS||process.env.R287_BROWSER_MUTANTS.split(',').includes(c[0])));
+assert(selected.length>0,'no selected browser mutations');
+if(process.env.R287_BROWSER_MUTANTS)assert.deepEqual(selected.map(c=>c[0]).sort(),process.env.R287_BROWSER_MUTANTS.split(',').sort(),'all selected mutant ids must exist');
+for(const [id,file,anchor,replacement,expected] of selected){
  const temp=fs.mkdtempSync(path.join(scratch,'r277-frontend-browser-mutant-')),override=path.join(temp,'web'),out=path.join(temp,'output');fs.mkdirSync(override);
  try{
   for(const name of fs.readdirSync(web).filter(n=>/\.(css|js)$/.test(n)))fs.copyFileSync(path.join(web,name),path.join(override,name));

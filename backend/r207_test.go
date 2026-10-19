@@ -40,15 +40,22 @@ func TestR207HonorBallotOnlyAtEndgame(t *testing.T) {
 	for _, phase := range []string{"PreEndOfGame", "EndOfGame"} {
 		runner.handlePhase(client, phase)
 		runner.handleEvent(client, event, Summoner{})
-		select {
-		case got := <-triggers:
-			if got["phase"] != phase {
-				t.Fatalf("phase = %v", got)
+		if !r287WaitSelect(t, "backend/r207_test.go:43 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case got := <-triggers:
+				if got["phase"] != phase {
+					t.Fatalf("phase = %v", got)
+				}
+				return true
+			case <-r287Deadline:
+				return false
 			}
-		case <-time.After(time.Second):
+		}) {
 			t.Fatal("endgame ballot did not trigger")
 		}
-		deadline := time.After(time.Second)
+		deadlineR287Timing := r287NewDeadline(t, "backend/r207_test.go:56 deadline", time.Second)
+		defer deadlineR287Timing.Stop()
+		deadline := deadlineR287Timing.C
 	waitFinished:
 		for {
 			select {
@@ -60,8 +67,11 @@ func TestR207HonorBallotOnlyAtEndgame(t *testing.T) {
 				t.Fatal("honor did not complete")
 			}
 		}
-		// fired is emitted before handleHonor's defer clears honorInProgress.
-		// Wait for that cleanup before the next phase, within the same deadline.
+		deadlineR287Timing.
+			// fired is emitted before handleHonor's defer clears honorInProgress.
+			// Wait for that cleanup before the next phase, within the same deadline.
+			Stop()
+
 		for {
 			runner.mu.Lock()
 			inProgress := runner.honorInProgress
@@ -133,9 +143,14 @@ func TestR207HonorStopsWhenPhaseChangesDuringRead(t *testing.T) {
 	runner.apply(settings)
 	runner.handlePhase(client, "EndOfGame")
 	runner.handleEvent(client, LCUEvent{URI: "/lol-honor-v2/v1/ballot", Data: json.RawMessage(`{"eligiblePlayers":[{"puuid":"ally","isAlly":true}]}`)}, Summoner{})
-	select {
-	case <-reading:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r207_test.go:136 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-reading:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		close(resume)
 		t.Fatal("read did not start")
 	}

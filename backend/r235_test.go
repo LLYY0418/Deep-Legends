@@ -50,57 +50,66 @@ func TestR235UpstreamWindowAndSupplementDedup(t *testing.T) {
 	}
 }
 func TestR235HeadStreamsConcurrentAndFirstPagePush(t *testing.T) {
-	a, client, ref, _ := r231SeasonFixture(t, 100, false)
-	base := a.sgp.http.Transport
-	var mu sync.Mutex
-	starts := map[string]time.Time{}
-	a.sgp.http = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
-		stream := r.URL.Query().Get("tag")
-		offset := r.URL.Query().Get("startIndex")
-		mu.Lock()
-		if offset == "0" {
-			starts[stream] = time.Now()
+	var r287CaptureMu sync.Mutex
+	r287TimingScenario(t, func(r287Extra *r287TimingContext) {
+		a, client, ref, _ := r231SeasonFixture(t, 100, false)
+		base := a.sgp.http.Transport
+		var mu sync.Mutex
+		starts := map[string]time.Time{}
+		a.sgp.http = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
+			stream := r.URL.Query().Get("tag")
+			offset := r.URL.Query().Get("startIndex")
+			mu.Lock()
+			if offset == "0" {
+				starts[stream] = time.Now()
+			}
+			mu.Unlock()
+			if offset == "0" {
+				time.Sleep(100 * time.Millisecond)
+			} else {
+				time.Sleep(400 * time.Millisecond)
+			}
+			return base.RoundTrip(r)
+		})}
+		scan := r231Scan(ref)
+		scan.headOnly = true
+		pushed := 0
+		var firstPageElapsed time.Duration
+		started := time.Now()
+		scan.onPage = func(scan *seasonScanState) {
+			pushed++
+			if pushed == 1 {
+				r287CaptureMu.Lock()
+				firstPageElapsed = time.Since(started)
+				r287CaptureMu.Unlock()
+			}
 		}
-		mu.Unlock()
-		if offset == "0" {
-			time.Sleep(100 * time.Millisecond)
-		} else {
-			time.Sleep(400 * time.Millisecond)
-		}
-		return base.RoundTrip(r)
-	})}
-	scan := r231Scan(ref)
-	scan.headOnly = true
-	pushed := 0
-	started := time.Now()
-	scan.onPage = func(scan *seasonScanState) {
-		pushed++
-		if pushed == 1 && time.Since(started) > 300*time.Millisecond {
+		a.seasonScanPagesWithHistoryCache(t.Context(), client, "HN1", ref, scan, 2, false)
+		if r287TooSlow(r287Extra, t, "R235 first page", firstPageElapsed, 300*time.Millisecond, false) {
 			t.Fatal("first page waited for second page")
 		}
-	}
-	a.seasonScanPagesWithHistoryCache(t.Context(), client, "HN1", ref, scan, 2, false)
-	mu.Lock()
-	defer mu.Unlock()
-	if len(starts) != 2 {
-		t.Fatal(starts)
-	}
-	var first time.Time
-	for _, at := range starts {
-		if first.IsZero() {
-			first = at
+		mu.Lock()
+		defer mu.Unlock()
+		if len(starts) != 2 {
+			t.Fatal(starts)
 		}
-		delta := at.Sub(first)
-		if delta < 0 {
-			delta = -delta
+		var earliest, latest time.Time
+		for _, at := range starts {
+			if earliest.IsZero() || at.Before(earliest) {
+				earliest = at
+			}
+			if latest.IsZero() || at.After(latest) {
+				latest = at
+			}
 		}
-		if delta >= 50*time.Millisecond {
-			t.Fatalf("streams serialized: %v", delta)
+		if r287TooSlow(r287Extra, t, "R235 stream concurrency", latest.Sub(earliest), 50*time.Millisecond, true) {
+			t.Fatalf("streams serialized: %v", latest.Sub(earliest))
 		}
-	}
-	if pushed < 2 || scan.scanned != 100 {
-		t.Fatal(pushed, scan.scanned)
-	}
+
+		if pushed < 2 || scan.scanned != 100 {
+			t.Fatal(pushed, scan.scanned)
+		}
+	})
 }
 func TestR235RelayProbeIndependentBudgets(t *testing.T) {
 	state := &riotRelayState{config: "test"}
@@ -206,55 +215,59 @@ func TestR235ArenaResultBoundariesAndOptionalFields(t *testing.T) {
 	}
 }
 func TestR235CurrentHistorySnapshotImmediateAndSSE(t *testing.T) {
-	a := r175App(t)
-	ref := strings.Repeat("s", 48)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(6 * time.Second)
-		io.WriteString(w, `{"games":{"gameCount":0,"games":[]}}`)
-	}))
-	defer server.Close()
-	client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client(), region: "JP", rsoPlatform: "JP1", platformProbe: true}
-	a.lcu = client
-	a.summoner = Summoner{PUUID: ref}
-	events := make(chan string, 8)
-	a.eventSubscribers = map[chan string]struct{}{events: {}}
-	key := a.clientHistorySnapshotKey("jp1", "", ref)
-	raw, _ := json.Marshal(clientHistorySnapshot{Matches: []gameplayMatch{{GameID: 111, Result: "win"}}, Capabilities: []EndpointCapability{{Name: "match-history", State: capabilityAvailable}}})
-	if err := writeLocalStoreFile(a.storage, key, raw); err != nil {
-		t.Fatal(err)
-	}
-	started := time.Now()
-	matches, _, _, _ := a.loadCurrentHistoryFast(t.Context(), client, gameplayReference{PlayerRef: ref, Region: "jp1", ClientIdentity: true}, ref, 20, nil, nil)
-	if time.Since(started) > 300*time.Millisecond || len(matches) != 1 || matches[0].GameID != 111 {
-		t.Fatal(matches, time.Since(started))
-	}
-	flightKey := struct {
-		a      *app
-		client *LCUClient
-		puuid  string
-		count  int
-	}{a, client, ref, 20}
-	f, ok := clientHistoryFlights.Load(flightKey)
-	if !ok {
-		t.Fatal("history did not start")
-	}
-	r281WaitUntil(t, "history did not finish", func() bool {
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		a := r175App(t)
+		ref := strings.Repeat("s", 48)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(6 * time.Second)
+			io.WriteString(w, `{"games":{"gameCount":0,"games":[]}}`)
+		}))
+		defer server.Close()
+		client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client(), region: "JP", rsoPlatform: "JP1", platformProbe: true}
+		a.lcu = client
+		a.summoner = Summoner{PUUID: ref}
+		events := make(chan string, 8)
+		a.eventSubscribers = map[chan string]struct{}{events: {}}
+		key := a.clientHistorySnapshotKey("jp1", "", ref)
+		raw, _ := json.Marshal(clientHistorySnapshot{Matches: []gameplayMatch{{GameID: 111, Result: "win"}}, Capabilities: []EndpointCapability{{Name: "match-history", State: capabilityAvailable}}})
+		if err := writeLocalStoreFile(a.storage, key, raw); err != nil {
+			t.Fatal(err)
+		}
+
+		started := time.Now()
+		matches, _, _, _ := a.loadCurrentHistoryFast(t.Context(), client, gameplayReference{PlayerRef: ref, Region: "jp1", ClientIdentity: true}, ref, 20, nil, nil)
+		if len(matches) != 1 || matches[0].GameID != 111 || r287TooSlow(r287Context, t, "backend/r235_test.go:228 duration", time.Since(started), 300*time.Millisecond, false) {
+			t.Fatal(matches, time.Since(started))
+		}
+		flightKey := struct {
+			a      *app
+			client *LCUClient
+			puuid  string
+			count  int
+		}{a, client, ref, 20}
+		f, ok := clientHistoryFlights.Load(flightKey)
+		if !ok {
+			t.Fatal("history did not start")
+		}
+		r281WaitUntil(t, "history did not finish", func() bool {
+			select {
+			case <-f.(*clientHistoryFlight).done:
+				return true
+			default:
+				return false
+			}
+		})
 		select {
-		case <-f.(*clientHistoryFlight).done:
-			return true
+		case event := <-events:
+			var payload map[string]any
+			if json.Unmarshal([]byte(event), &payload) != nil || payload["type"] != "overview-matches" || payload["historyGeneration"].(float64) <= 0 {
+				t.Fatal(event)
+			}
 		default:
-			return false
+			t.Fatalf("refresh completed without SSE; result=%#v diagnostics=%#v", f.(*clientHistoryFlight).result, r175Events(t, a, "panic_recovered"))
 		}
 	})
-	select {
-	case event := <-events:
-		var payload map[string]any
-		if json.Unmarshal([]byte(event), &payload) != nil || payload["type"] != "overview-matches" || payload["historyGeneration"].(float64) <= 0 {
-			t.Fatal(event)
-		}
-	default:
-		t.Fatalf("refresh completed without SSE; result=%#v diagnostics=%#v", f.(*clientHistoryFlight).result, r175Events(t, a, "panic_recovered"))
-	}
 }
 
 func TestR235HistoryPublicReferencesDoNotMutateFlight(t *testing.T) {
@@ -328,75 +341,80 @@ func TestR235FastHistoryReturnsIndependentParticipantsForSharedFlight(t *testing
 }
 
 func TestR235SelfOverviewBypassesRelayAndColdHistory(t *testing.T) {
-	for _, cached := range []bool{true, false} {
-		t.Run(fmt.Sprint(cached), func(t *testing.T) {
-			r206RelayFixture(t)
-			a := r175App(t)
-			ref := strings.Repeat("j", 48)
-			champs := newChampionProvider()
-			var relayCalls atomic.Int32
-			champs.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
-				if r.URL.Host == "relay.example" {
-					relayCalls.Add(1)
-				}
-				return r206RelayResponse(404, []byte(`{}`)), nil
-			})}
-			a.champions = champs
-			a.riot = newRiotProvider(champs)
-			a.lpTracker = newLPTracker(a.storage)
-			var historyCalls atomic.Int32
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch {
-				case strings.Contains(r.URL.Path, "current-summoner/matches"):
-					historyCalls.Add(1)
-					time.Sleep(6 * time.Second)
-					io.WriteString(w, `{"games":{"gameCount":0,"games":[]}}`)
-				case strings.Contains(r.URL.Path, "lol-ranked"):
-					io.WriteString(w, `{"queues":[]}`)
-				default:
-					io.WriteString(w, `[]`)
-				}
-			}))
-			defer server.Close()
-			client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client(), region: "JP", rsoPlatform: "JP1", platformProbe: true}
-			a.lcu = client
-			a.connected = true
-			a.summoner = Summoner{PUUID: ref, GameName: "Fixture", TagLine: "JP"}
-			events := make(chan string, 8)
-			a.eventSubscribers = map[chan string]struct{}{events: {}}
-			if cached {
-				raw, _ := json.Marshal(clientHistorySnapshot{Matches: []gameplayMatch{{GameID: 111, QueueID: 420, Result: "win", CreatedAt: time.Now().UnixMilli()}}, Capabilities: []EndpointCapability{{Name: "match-history", State: capabilityAvailable}}})
-				if err := writeLocalStoreFile(a.storage, a.clientHistorySnapshotKey("jp1", "", ref), raw); err != nil {
-					t.Fatal(err)
-				}
-			}
-			started := time.Now()
-			result := a.loadGameplayOverview(t.Context(), client, a.summoner, gameplayReference{PlayerRef: ref, Region: "jp1", ClientIdentity: true}, 0, 20, "all", false)
-			elapsed := time.Since(started)
-			if cached && (elapsed > 600*time.Millisecond || len(result.Matches) != 1) {
-				t.Fatal(elapsed, len(result.Matches))
-			}
-			if !cached && elapsed > 3300*time.Millisecond {
-				t.Fatal("headers waited for cold history", elapsed)
-			}
-			if relayCalls.Load() != 0 {
-				t.Fatal("self overview waited for relay", relayCalls.Load())
-			}
-			timeout := time.After(8 * time.Second)
-			for {
-				select {
-				case event := <-events:
-					if strings.Contains(event, `"type":"overview-matches"`) {
-						if historyCalls.Load() != 1 {
-							t.Fatal("duplicate cold history", historyCalls.Load())
-						}
-						t.Logf("cached=%v overview=%v; history=6s; relay=%d", cached, elapsed, relayCalls.Load())
-						return
+	r287TimingScenario(t, func(r287Extra *r287TimingContext) {
+		for _, cached := range []bool{true, false} {
+			t.Run(fmt.Sprint(cached), func(t *testing.T) {
+				r206RelayFixture(t)
+				a := r175App(t)
+				ref := strings.Repeat("j", 48)
+				champs := newChampionProvider()
+				var relayCalls atomic.Int32
+				champs.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
+					if r.URL.Host == "relay.example" {
+						relayCalls.Add(1)
 					}
-				case <-timeout:
-					t.Fatal("missing history SSE")
+					return r206RelayResponse(404, []byte(`{}`)), nil
+				})}
+				a.champions = champs
+				a.riot = newRiotProvider(champs)
+				a.lpTracker = newLPTracker(a.storage)
+				var historyCalls atomic.Int32
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch {
+					case strings.Contains(r.URL.Path, "current-summoner/matches"):
+						historyCalls.Add(1)
+						time.Sleep(6 * time.Second)
+						io.WriteString(w, `{"games":{"gameCount":0,"games":[]}}`)
+					case strings.Contains(r.URL.Path, "lol-ranked"):
+						io.WriteString(w, `{"queues":[]}`)
+					default:
+						io.WriteString(w, `[]`)
+					}
+				}))
+				defer server.Close()
+				client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client(), region: "JP", rsoPlatform: "JP1", platformProbe: true}
+				a.lcu = client
+				a.connected = true
+				a.summoner = Summoner{PUUID: ref, GameName: "Fixture", TagLine: "JP"}
+				events := make(chan string, 8)
+				a.eventSubscribers = map[chan string]struct{}{events: {}}
+				if cached {
+					raw, _ := json.Marshal(clientHistorySnapshot{Matches: []gameplayMatch{{GameID: 111, QueueID: 420, Result: "win", CreatedAt: time.Now().UnixMilli()}}, Capabilities: []EndpointCapability{{Name: "match-history", State: capabilityAvailable}}})
+					if err := writeLocalStoreFile(a.storage, a.clientHistorySnapshotKey("jp1", "", ref), raw); err != nil {
+						t.Fatal(err)
+					}
 				}
-			}
-		})
-	}
+				started := time.Now()
+				result := a.loadGameplayOverview(t.Context(), client, a.summoner, gameplayReference{PlayerRef: ref, Region: "jp1", ClientIdentity: true}, 0, 20, "all", false)
+				elapsed := time.Since(started)
+				if cached && (len(result.Matches) != 1 || r287TooSlow(r287Extra, t, "R235 cached self overview", elapsed, 600*time.Millisecond, false)) {
+					t.Fatal(elapsed, len(result.Matches))
+				}
+				if !cached && r287TooSlow(r287Extra, t, "R235 cold self overview", elapsed, 3300*time.Millisecond, false) {
+					t.Fatal("headers waited for cold history", elapsed)
+				}
+				if relayCalls.Load() != 0 {
+					t.Fatal("self overview waited for relay", relayCalls.Load())
+				}
+				timeoutR287Timing := r287NewDeadline(t, "backend/r235_test.go:396 deadline", 8*time.Second)
+				defer timeoutR287Timing.Stop()
+				timeout := timeoutR287Timing.C
+				for {
+					select {
+					case event := <-events:
+						if strings.Contains(event, `"type":"overview-matches"`) {
+							if historyCalls.Load() != 1 {
+								t.Fatal("duplicate cold history", historyCalls.Load())
+							}
+							t.Logf("cached=%v overview=%v; history=6s; relay=%d", cached, elapsed, relayCalls.Load())
+							return
+						}
+					case <-timeout:
+						t.Fatal("missing history SSE")
+					}
+				}
+
+			})
+		}
+	})
 }

@@ -325,9 +325,14 @@ func TestR197PhaseLifecycleRetainsAndCancelsSnapshot(t *testing.T) {
 		t.Fatal("started too early")
 	}
 	f.a.observeGameplayPhase(ctx, f.client, "PreEndOfGame")
-	select {
-	case <-block:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r197_test.go:328 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-block:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("reveal not scheduled")
 	}
 	f.a.observeGameplayPhase(ctx, f.client, "EndOfGame")

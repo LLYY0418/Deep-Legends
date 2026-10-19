@@ -478,9 +478,14 @@ func TestR90EndPhaseTransitionRestartsCanceledTruthRead(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	a.observeGameplayPhase(ctx, a.lcu, "WaitingForStats")
-	select {
-	case <-started:
-	case <-time.After(2 * time.Second):
+	if !r287WaitSelect(t, "backend/r90_test.go:481 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("first truth read did not start")
 	}
 	a.observeGameplayPhase(ctx, a.lcu, "EndOfGame")

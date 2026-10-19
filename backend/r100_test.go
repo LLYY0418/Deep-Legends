@@ -57,43 +57,52 @@ func TestR100OverviewLongRoundUsesFreshSingleWaitBudget(t *testing.T) {
 }
 
 func TestR100QueueCallersKeepDistinctSemantics(t *testing.T) {
-	ctx := withRiotSingleWaitLimit(context.Background(), 100*time.Millisecond)
-	if _, ok := ctx.Value(riotQueueDeadlineKey{}).(time.Time); ok {
-		t.Fatal("single-wait stored an absolute deadline")
-	}
-	p := newRiotProvider(newChampionProvider())
-	p.shortWindow = make([]time.Time, 15)
-	for i := range p.shortWindow {
-		p.shortWindow[i] = time.Now()
-	}
-	started := time.Now()
-	err := p.wait(ctx)
-	if !errors.Is(err, errThrottled) || riotErrorStatus(err) != 429 || time.Since(started) > 250*time.Millisecond {
-		t.Fatal("seed single wait did not refuse busy quota", err)
-	}
-	seedProvider := r99SeedProvider(t, t.TempDir(), func(r *http.Request) (*http.Response, error) {
-		t.Error("busy seed should never reach HTTP")
-		return nil, errors.New("unexpected")
-	})
-	seedProvider.shortWindow = make([]time.Time, 15)
-	for i := range seedProvider.shortWindow {
-		seedProvider.shortWindow[i] = time.Now()
-	}
-	started = time.Now()
-	_, seedErr := seedProvider.resolveProSeed(context.Background(), r102RookieSeed(), 0)
-	if !errors.Is(seedErr, errThrottled) || time.Since(started) > 250*time.Millisecond {
-		t.Fatalf("actual seed caller lost 100ms bound: %v", seedErr)
-	}
+	var r287CaptureMu sync.Mutex
 
-	step, cancel := specialistStepContext(context.Background(), time.Second)
-	defer cancel()
-	deadline, ok := step.Value(riotQueueDeadlineKey{}).(time.Time)
-	if !ok || time.Until(deadline) > specialistRiotQueueTimeout {
-		t.Fatal("specialist step lost total queue budget")
-	}
-	if _, ok := step.Value(riotSingleWaitKey{}).(time.Duration); ok {
-		t.Fatal("specialist silently changed semantics")
-	}
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		ctx := withRiotSingleWaitLimit(context.Background(), 100*time.Millisecond)
+		if _, ok := ctx.Value(riotQueueDeadlineKey{}).(time.Time); ok {
+			t.Fatal("single-wait stored an absolute deadline")
+		}
+		p := newRiotProvider(newChampionProvider())
+		p.shortWindow = make([]time.Time, 15)
+		for i := range p.shortWindow {
+			p.shortWindow[i] = time.Now()
+		}
+
+		started := time.Now()
+		err := p.wait(ctx)
+		if !errors.Is(err, errThrottled) || riotErrorStatus(err) != 429 || r287TooSlow(r287Context, t, "backend/r100_test.go:71 duration", time.Since(started), 250*time.Millisecond, false) {
+			t.Fatal("seed single wait did not refuse busy quota", err)
+		}
+		seedProvider := r99SeedProvider(t, t.TempDir(), func(r *http.Request) (*http.Response, error) {
+			t.Error("busy seed should never reach HTTP")
+			return nil, errors.New("unexpected")
+		})
+		seedProvider.shortWindow = make([]time.Time, 15)
+		for i := range seedProvider.shortWindow {
+			seedProvider.shortWindow[i] = time.Now()
+		}
+		r287TimingScenario(t, func(r287Context *r287TimingContext) {
+			r287CaptureMu.Lock()
+			started = time.Now()
+			r287CaptureMu.Unlock()
+			_, seedErr := seedProvider.resolveProSeed(context.Background(), r102RookieSeed(), 0)
+			if !errors.Is(seedErr, errThrottled) || r287TooSlow(r287Context, t, "backend/r100_test.go:84 duration", time.Since(started), 250*time.Millisecond, false) {
+				t.Fatalf("actual seed caller lost 100ms bound: %v", seedErr)
+			}
+
+			step, cancel := specialistStepContext(context.Background(), time.Second)
+			defer cancel()
+			deadline, ok := step.Value(riotQueueDeadlineKey{}).(time.Time)
+			if !ok || time.Until(deadline) > specialistRiotQueueTimeout {
+				t.Fatal("specialist step lost total queue budget")
+			}
+			if _, ok := step.Value(riotSingleWaitKey{}).(time.Duration); ok {
+				t.Fatal("specialist silently changed semantics")
+			}
+		})
+	})
 }
 
 func TestR100SuccessfulDetailSurvivesCallerCancellation(t *testing.T) {
@@ -134,22 +143,26 @@ func TestR100SuccessfulDetailSurvivesCallerCancellation(t *testing.T) {
 
 func TestR100AssetHasWholeHandlerDeadline(t *testing.T) {
 	t.Parallel()
-	p := newChampionProvider()
-	p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		deadline, ok := r.Context().Deadline()
-		if !ok || time.Until(deadline) > 8100*time.Millisecond {
-			t.Error("asset missing whole-handler deadline")
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		p := newChampionProvider()
+		p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			deadline, ok := r.Context().Deadline()
+			if !ok || time.Until(deadline) > 8100*time.Millisecond {
+				t.Error("asset missing whole-handler deadline")
+			}
+			<-r.Context().Done()
+			return nil, r.Context().Err()
+		})}
+		a := &app{champions: p}
+
+		started := time.Now()
+		w := httptest.NewRecorder()
+		a.handleChampionAsset(w, httptest.NewRequest("GET", "/api/champion-asset?source=communitydragon&path=/latest/game/assets/ux/cherry/augments/icons/test_large.png", nil))
+		if w.Code != 404 || r287TooSlow(r287Context, t, "backend/r100_test.go:150 duration", time.Since(started), 8500*time.Millisecond, false) {
+			t.Fatalf("slow asset held socket: status=%d elapsed=%v", w.Code, time.Since(started))
 		}
-		<-r.Context().Done()
-		return nil, r.Context().Err()
-	})}
-	a := &app{champions: p}
-	started := time.Now()
-	w := httptest.NewRecorder()
-	a.handleChampionAsset(w, httptest.NewRequest("GET", "/api/champion-asset?source=communitydragon&path=/latest/game/assets/ux/cherry/augments/icons/test_large.png", nil))
-	if w.Code != 404 || time.Since(started) > 8500*time.Millisecond {
-		t.Fatalf("slow asset held socket: status=%d elapsed=%v", w.Code, time.Since(started))
-	}
+	})
 }
 
 func waitR100PerkEnrichment(t *testing.T, a *app, key string) {
@@ -166,85 +179,94 @@ func waitR100PerkEnrichment(t *testing.T, a *app, key string) {
 	}
 	a.perkCatalogMu.Unlock()
 	if done != nil {
-		select {
-		case <-done:
-		case <-time.After(4 * time.Second):
+		if !r287WaitSelect(t, "backend/r100_test.go:169 wait", 4*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-done:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("augment job stuck")
 		}
 	}
 }
 
 func TestR100PerksNeverWaitForOptionalAugmentsAndPersist(t *testing.T) {
-	p := newChampionProvider()
-	startedAugment := make(chan struct{})
-	var once sync.Once
-	p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		once.Do(func() { close(startedAugment) })
-		select {
-		case <-r.Context().Done():
-			return nil, r.Context().Err()
-		case <-time.After(12 * time.Second):
-			t.Error("optional 12s reached")
-			return nil, errors.New("fixture offline")
-		}
-	})}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.Contains(r.URL.Path, "perkstyles"):
-			_, _ = w.Write([]byte(`[{"id":8000,"name":"精密","slots":[{"perks":[8005]}]}]`))
-		case strings.Contains(r.URL.Path, "perks.json"):
-			_, _ = w.Write([]byte(`[{"id":8005,"name":"强攻","iconPath":"/lol-game-data/assets/v1/perks/8005.png"}]`))
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-	store := trackTestStore(t, &localStore{root: t.TempDir()})
-	client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client(), gameVersion: "26.19.1", region: "TENCENT", rsoPlatform: "HN1"}
-	a := &app{connected: true, lcu: client, champions: p, storage: store}
-	started := time.Now()
-	w := httptest.NewRecorder()
-	a.handleGameplayPerks(w, httptest.NewRequest("GET", "/api/gameplay/perks", nil))
-	if w.Code != 200 || time.Since(started) > 2*time.Second {
-		t.Fatal("perks waited for augments", w.Code, time.Since(started))
-	}
-	select {
-	case <-startedAugment:
-		t.Fatal("offline augment catalog unexpectedly used the slow remote source")
-	default:
-	}
-	if !a.perkCatalogMu.TryLock() {
-		t.Fatal("optional I/O holds catalog mutex")
-	}
-	a.perkCatalogMu.Unlock()
-	var wg sync.WaitGroup
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			w := httptest.NewRecorder()
-			a.handleGameplayPerks(w, httptest.NewRequest("GET", "/api/gameplay/perks", nil))
-			if w.Code != 200 {
-				t.Error(w.Code)
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		p := newChampionProvider()
+		startedAugment := make(chan struct{})
+		var once sync.Once
+		p.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			once.Do(func() { close(startedAugment) })
+			select {
+			case <-r.Context().Done():
+				return nil, r.Context().Err()
+			case <-time.After(12 * time.Second):
+				t.Error("optional 12s reached")
+				return nil, errors.New("fixture offline")
 			}
-		}()
-	}
-	wg.Wait()
-	if time.Since(started) > 2*time.Second {
-		t.Error("parallel perks blocked behind optional I/O")
-	}
-	key, _ := clientCatalogKey(client)
-	waitR100PerkEnrichment(t, a, key)
-	r274Flush(t, a.perkCatalogDisk)
-	r274Flush(t, a.clientCatalogCache)
-	reboot := &app{storage: store}
-	cached, err := reboot.cachedGameplayPerkCatalog(context.Background(), key, func() (gameplayPerkCatalogResponse, error) {
-		t.Error("restart fetched normalized catalog again")
-		return gameplayPerkCatalogResponse{}, errors.New("network unavailable")
+		})}
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case strings.Contains(r.URL.Path, "perkstyles"):
+				_, _ = w.Write([]byte(`[{"id":8000,"name":"精密","slots":[{"perks":[8005]}]}]`))
+			case strings.Contains(r.URL.Path, "perks.json"):
+				_, _ = w.Write([]byte(`[{"id":8005,"name":"强攻","iconPath":"/lol-game-data/assets/v1/perks/8005.png"}]`))
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		defer server.Close()
+		store := trackTestStore(t, &localStore{root: t.TempDir()})
+		client := &LCUClient{baseURL: server.URL, token: "fixture", http: server.Client(), gameVersion: "26.19.1", region: "TENCENT", rsoPlatform: "HN1"}
+		a := &app{connected: true, lcu: client, champions: p, storage: store}
+
+		started := time.Now()
+		w := httptest.NewRecorder()
+		a.handleGameplayPerks(w, httptest.NewRequest("GET", "/api/gameplay/perks", nil))
+		if w.Code != 200 || r287TooSlow(r287Context, t, "backend/r100_test.go:210 duration", time.Since(started), 2*time.Second, false) {
+			t.Fatal("perks waited for augments", w.Code, time.Since(started))
+		}
+		select {
+		case <-startedAugment:
+			t.Fatal("offline augment catalog unexpectedly used the slow remote source")
+		default:
+		}
+		if !a.perkCatalogMu.TryLock() {
+			t.Fatal("optional I/O holds catalog mutex")
+		}
+		a.perkCatalogMu.Unlock()
+		var wg sync.WaitGroup
+		for i := 0; i < 8; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				w := httptest.NewRecorder()
+				a.handleGameplayPerks(w, httptest.NewRequest("GET", "/api/gameplay/perks", nil))
+				if w.Code != 200 {
+					t.Error(w.Code)
+				}
+			}()
+		}
+		wg.Wait()
+		if r287TooSlow(r287Context, t, "backend/r100_test.go:235 duration", time.Since(started), 2*time.Second, false) {
+			t.Error("parallel perks blocked behind optional I/O")
+		}
+		key, _ := clientCatalogKey(client)
+		waitR100PerkEnrichment(t, a, key)
+		r274Flush(t, a.perkCatalogDisk)
+		r274Flush(t, a.clientCatalogCache)
+		reboot := &app{storage: store}
+		cached, err := reboot.cachedGameplayPerkCatalog(context.Background(), key, func() (gameplayPerkCatalogResponse, error) {
+			t.Error("restart fetched normalized catalog again")
+			return gameplayPerkCatalogResponse{}, errors.New("network unavailable")
+		})
+		if err != nil || len(cached.Perks) == 0 {
+			t.Fatal("normalized catalog not persisted", err)
+		}
 	})
-	if err != nil || len(cached.Perks) == 0 {
-		t.Fatal("normalized catalog not persisted", err)
-	}
 }
 
 func TestR100ProSnapshotAndLadderSurviveRestart(t *testing.T) {

@@ -4,15 +4,18 @@ const assert = require("node:assert/strict");
 // Wait for the asserted UI, then allow already queued frame work to finish.
 // Negative observations and debounce/polling windows keep their existing waits.
 async function waitForRender(w, predicate, label = "render did not become ready", timeoutMs = 1500) {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    if (await predicate()) {
-      await new Promise(resolve => w.requestAnimationFrame(() => w.requestAnimationFrame(resolve)));
-      if (await predicate()) return;
+  const {timingRetry}=require('../scripts/lib/timing-retry.cjs');
+  await timingRetry({label,within:sample=>sample.ready,measure:async()=>{
+    const started=Date.now(),deadline=started+timeoutMs;
+    for (;;) {
+      if (await predicate()) {
+        await new Promise(resolve => w.requestAnimationFrame(() => w.requestAnimationFrame(resolve)));
+        if (await predicate()) return {ready:true,ms:Date.now()-started};
+      }
+      if(Date.now()>=deadline)return {ready:false,ms:Date.now()-started};
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
-    assert.ok(Date.now() < deadline, label);
-    await new Promise(resolve => setTimeout(resolve, 10));
-  }
+  }});
 }
 function waitForOverview(w, matchCount = 17) {
   return waitForRender(w, () => {

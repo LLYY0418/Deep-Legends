@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -51,12 +52,17 @@ func TestR55ClaimSelectionShapes(t *testing.T) {
 				if err != nil {
 					t.Fatalf("executeClaimEntry() error = %v", err)
 				}
-				select {
-				case got := <-requests:
-					if strings.Join(got, ",") != strings.Join(test.wantIDs, ",") {
-						t.Fatalf("selections = %#v, want %#v", got, test.wantIDs)
+				if !r287WaitSelect(t, "backend/r55_test.go:54 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+					select {
+					case got := <-requests:
+						if strings.Join(got, ",") != strings.Join(test.wantIDs, ",") {
+							t.Fatalf("selections = %#v, want %#v", got, test.wantIDs)
+						}
+						return true
+					case <-r287Deadline:
+						return false
 					}
-				case <-time.After(time.Second):
+				}) {
 					t.Fatal("claim request was not issued")
 				}
 				return
@@ -183,7 +189,9 @@ func TestR66CustomReadyCheckNeverAutoAccepts(t *testing.T) {
 			settings.Rules.AutoAccept.DelayMS = 0
 			runner.apply(settings)
 			trigger.run(runner, client)
-			deadline := time.After(time.Second)
+			deadlineR287Timing := r287NewDeadline(t, "backend/r55_test.go:191 deadline", time.Second)
+			defer deadlineR287Timing.Stop()
+			deadline := deadlineR287Timing.C
 			for {
 				select {
 				case diagnostic := <-diagnostics:
@@ -195,6 +203,7 @@ func TestR66CustomReadyCheckNeverAutoAccepts(t *testing.T) {
 				}
 			}
 		skipped:
+			deadlineR287Timing.Stop()
 			time.Sleep(25 * time.Millisecond)
 			if got := accepts.Load(); got != 0 {
 				t.Fatalf("custom ReadyCheck accept requests = %d, want 0", got)
@@ -229,7 +238,9 @@ func TestR66AcceptTransitionRaceDoesNotToast(t *testing.T) {
 	runner.apply(settings)
 	runner.handlePhase(client, "ReadyCheck")
 
-	deadline := time.After(time.Second)
+	deadlineR287Timing := r287NewDeadline(t, "backend/r55_test.go:237 deadline", time.Second)
+	defer deadlineR287Timing.Stop()
+	deadline := deadlineR287Timing.C
 	var observedDiagnostics []map[string]any
 	for {
 		select {
@@ -247,6 +258,7 @@ func TestR66AcceptTransitionRaceDoesNotToast(t *testing.T) {
 	}
 
 observed:
+	deadlineR287Timing.Stop()
 	time.Sleep(25 * time.Millisecond)
 	for len(events) > 0 {
 		if event := <-events; strings.HasPrefix(event, "watch:failed:accept:") {
@@ -256,6 +268,7 @@ observed:
 }
 
 func TestR55PrimeWatchStateReadsPhaseAndLobby(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	var phaseReads atomic.Int32
 	var lobbyReads atomic.Int32
 	writes := make(chan string, 2)
@@ -290,10 +303,17 @@ func TestR55PrimeWatchStateReadsPhaseAndLobby(t *testing.T) {
 
 	seen := map[string]bool{}
 	for len(seen) < 2 {
-		select {
-		case path := <-writes:
-			seen[path] = true
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/r55_test.go:293 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			r287CaptureMu.Lock()
+			defer r287CaptureMu.Unlock()
+			select {
+			case path := <-writes:
+				seen[path] = true
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatalf("timed out waiting for primed actions; seen=%#v", seen)
 		}
 	}
@@ -335,7 +355,9 @@ func TestR55WatchFailureIncludesReasonAndRedactedDiagnostic(t *testing.T) {
 	runner.handlePhase(client, "ReadyCheck")
 
 	var failedEvent string
-	deadline := time.After(time.Second)
+	deadlineR287Timing := r287NewDeadline(t, "backend/r55_test.go:348 deadline", time.Second)
+	defer deadlineR287Timing.Stop()
+	deadline := deadlineR287Timing.C
 	for failedEvent == "" {
 		select {
 		case event := <-events:
@@ -346,11 +368,15 @@ func TestR55WatchFailureIncludesReasonAndRedactedDiagnostic(t *testing.T) {
 			t.Fatal("missing failed watch event")
 		}
 	}
+	deadlineR287Timing.Stop()
 	if !strings.Contains(failedEvent, ":400:ReadyCheckExpired:确认窗口已过期") {
 		t.Fatalf("failed event = %q", failedEvent)
 	}
 	var failedDiagnostic map[string]any
-	deadline = time.After(time.Second)
+	deadlineR287Timing.Stop()
+	deadlineR287Timing = r287NewDeadline(t, "backend/r55_test.go:363 deadline", time.Second)
+	defer deadlineR287Timing.Stop()
+	deadline = deadlineR287Timing.C
 	for failedDiagnostic == nil {
 		select {
 		case diagnostic := <-diagnostics:
@@ -361,6 +387,7 @@ func TestR55WatchFailureIncludesReasonAndRedactedDiagnostic(t *testing.T) {
 			t.Fatal("missing failed watch diagnostic")
 		}
 	}
+	deadlineR287Timing.Stop()
 	if len(failedDiagnostic) != 5 || failedDiagnostic["event"] != "watch_action" || failedDiagnostic["action"] != "accept" || failedDiagnostic["status_code"] != 400 || failedDiagnostic["error_code"] != "ReadyCheckExpired" {
 		t.Fatalf("diagnostic = %#v", failedDiagnostic)
 	}

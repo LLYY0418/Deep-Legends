@@ -117,12 +117,17 @@ func TestExecuteWarmCommandCancellationReapsOnlyItsChild(t *testing.T) {
 	cancel()
 	waited := make(chan error, 1)
 	go func() { waited <- cmd.Wait() }()
-	select {
-	case err := <-waited:
-		if err == nil {
-			t.Fatal("cancelled warm process returned success")
+	if !r287WaitSelect(t, "installer/application_launch_test.go:120 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case err := <-waited:
+			if err == nil {
+				t.Fatal("cancelled warm process returned success")
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		_ = cmd.Process.Kill()
 		<-waited
 		t.Fatal("warmup cancellation did not stop its child")

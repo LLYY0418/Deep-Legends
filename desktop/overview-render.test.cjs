@@ -379,11 +379,7 @@ test("好友真实数据恢复横条模式与计时，SSE 更新不重建战绩�
     availability:"dnd",product:"league_of_legends",gameStatus:"inGame",queueLabel:"排位赛 灵活排位",championName:"虚空掠夺者",gameStartedAt:now-852000};
   const { window: w, errors } = bootDemoApp({friendsPayload:()=>({groups:[{id:1,name:"默认分组"}],friends:[friend]}),onRequest:url=>requests.push(url)});
   w.Date.now = () => now;
-  const waitFor = async predicate => {
-    const deadline=Date.now()+10000;
-    while(!predicate() && Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,20));
-    assert.ok(predicate(),"expected friend UI state did not arrive");
-  };
+  const waitFor = predicate => require('../scripts/lib/wait-progress.cjs').waitFor(predicate,{idleMs:10000,hardMs:10000,intervalMs:20,label:'expected friend UI state did not arrive'});
   try {
     await settled();
     w.document.getElementById("friends-toggle").click();

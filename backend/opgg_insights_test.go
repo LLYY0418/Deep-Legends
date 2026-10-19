@@ -125,14 +125,24 @@ func TestOPGGHistoricalRanksStartDoesNotBlockCaller(t *testing.T) {
 		a.startOPGGHistoricalRanks(gameplayReference{PlayerRef: playerRef, Region: riotRegionKR}, "Player", "KR1", playerRef, "PUBLIC")
 		close(returned)
 	}()
-	select {
-	case <-returned:
-	case <-time.After(100 * time.Millisecond):
+	if !r287WaitSelect(t, "backend/opgg_insights_test.go:128 wait", 100*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-returned:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("OPGG historical ranks blocked the overview caller")
 	}
-	select {
-	case <-started:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/opgg_insights_test.go:133 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("OPGG historical rank background request did not start")
 	}
 	close(release)
@@ -214,9 +224,14 @@ func TestPlayerRankScoreCoalescesConcurrentLookup(t *testing.T) {
 	client := &LCUClient{baseURL: server.URL, token: "test", http: server.Client(), platformProbe: true, region: "TENCENT", rsoPlatform: "HN1"}
 	result := make(chan rankScoreEntry, 1)
 	go func() { result <- a.playerRankScore(context.Background(), client, playerPUUID, false, "", "") }()
-	select {
-	case <-started:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/opgg_insights_test.go:217 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("first ranked lookup did not start")
 	}
 	cancelled, cancel := context.WithCancel(context.Background())
@@ -253,9 +268,14 @@ func TestPlayerRankScoreAllConcurrentFollowersReceiveLeaderResult(t *testing.T) 
 	for index := 0; index < count; index++ {
 		go func() { results <- a.playerRankScore(context.Background(), client, playerPUUID, false, "", "") }()
 	}
-	select {
-	case <-started:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/opgg_insights_test.go:256 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("concurrent ranked lookup did not start")
 	}
 	close(release)
@@ -472,15 +492,25 @@ func TestGameplayMatchTiersKRFailureAndCancellationDegrade(t *testing.T) {
 		a.handleGameplayMatchTiers(recorder, request)
 		close(done)
 	}()
-	select {
-	case <-started:
-		cancel()
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/opgg_insights_test.go:475 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			cancel()
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("OP.GG request did not start")
 	}
-	select {
-	case <-done:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/opgg_insights_test.go:481 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("cancelled OP.GG request blocked the handler")
 	}
 	if recorder.Code != http.StatusServiceUnavailable || recorder.Header().Get("Retry-After") != "30" {
@@ -608,9 +638,14 @@ func TestOPGGGameTiersCoalescesConcurrentRequests(t *testing.T) {
 		}
 		results <- games
 	}()
-	select {
-	case <-started:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/opgg_insights_test.go:611 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("first request did not start")
 	}
 	go func() {
@@ -623,12 +658,17 @@ func TestOPGGGameTiersCoalescesConcurrentRequests(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	close(release)
 	for range 2 {
-		select {
-		case result := <-results:
-			if len(result) != 1 {
-				t.Fatalf("games = %d, want 1", len(result))
+		if !r287WaitSelect(t, "backend/opgg_insights_test.go:626 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case result := <-results:
+				if len(result) != 1 {
+					t.Fatalf("games = %d, want 1", len(result))
+				}
+				return true
+			case <-r287Deadline:
+				return false
 			}
-		case <-time.After(time.Second):
+		}) {
 			t.Fatal("coalesced request did not finish")
 		}
 	}

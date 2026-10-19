@@ -144,24 +144,34 @@ func TestSummonerIdentityEventDebouncesToLatestPayload(t *testing.T) {
 	if !a.handleSummonerIdentityEvent(client, json.RawMessage(`{"summonerId":7,"puuid":"`+current.PUUID+`","gameName":"最终值","profileIconId":8}`)) {
 		t.Fatal("second valid identity event was rejected")
 	}
-	select {
-	case event := <-updates:
-		var view clientView
-		if json.Unmarshal([]byte(event), &view) != nil || view.Type != "client-view" || view.Summoner.GameName != "最终值" {
-			t.Fatalf("view=%q", event)
+	if !r287WaitSelect(t, "backend/summoner_identity_test.go:147 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-updates:
+			var view clientView
+			if json.Unmarshal([]byte(event), &view) != nil || view.Type != "client-view" || view.Summoner.GameName != "最终值" {
+				t.Fatalf("view=%q", event)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("identity view did not broadcast")
 	}
 	// State is committed before broadcastEvent runs. Waiting for the state and
 	// then using a non-blocking receive races the publisher under -race/load.
 	// Wait for the observable event, then check the state it announces.
-	select {
-	case event := <-updates:
-		if event != "summoner-updated" {
-			t.Fatalf("event=%q", event)
+	if !r287WaitSelect(t, "backend/summoner_identity_test.go:159 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-updates:
+			if event != "summoner-updated" {
+				t.Fatalf("event=%q", event)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("debounced identity did not broadcast")
 	}
 	a.mu.RLock()
@@ -170,12 +180,17 @@ func TestSummonerIdentityEventDebouncesToLatestPayload(t *testing.T) {
 	if got.GameName != "最终值" || got.ProfileIconID != 8 {
 		t.Fatalf("debounced identity=%#v", got)
 	}
-	select {
-	case event := <-updates:
-		if event != "facade:changed" {
-			t.Fatalf("identity facade event=%q", event)
+	if !r287WaitSelect(t, "backend/summoner_identity_test.go:173 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case event := <-updates:
+			if event != "facade:changed" {
+				t.Fatalf("identity facade event=%q", event)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("debounced identity did not broadcast facade:changed")
 	}
 	select {

@@ -263,9 +263,14 @@ func TestR94ConnectedSessionForwardsIdentityThroughLCUEventCallback(t *testing.T
 	go func() { done <- a.runConnectedSession(ctx, client) }()
 	defer func() {
 		cancel()
-		select {
-		case <-done:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/r94_test.go:266 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-done:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Error("session failed to stop")
 		}
 	}()

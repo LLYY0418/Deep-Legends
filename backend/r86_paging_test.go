@@ -17,24 +17,28 @@ import (
 func TestR86OverviewDeadlineCancelsQueuesAndMastery(t *testing.T) {
 	for _, endpoint := range []string{"/lol-game-queues/v1/queues", "champion-mastery"} {
 		t.Run(endpoint, func(t *testing.T) {
-			a, ref, _ := newGameplayOverviewSGPFixture(t, true)
-			original := a.lcu.http.Transport
-			var hung atomic.Int32
-			a.lcu.http = &http.Client{Timeout: time.Second, Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-				if strings.Contains(r.URL.Path, endpoint) {
-					hung.Add(1)
-					<-r.Context().Done()
-					return nil, r.Context().Err()
+
+			r287TimingScenario(t, func(r287Context *r287TimingContext) {
+				a, ref, _ := newGameplayOverviewSGPFixture(t, true)
+				original := a.lcu.http.Transport
+				var hung atomic.Int32
+				a.lcu.http = &http.Client{Timeout: time.Second, Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+					if strings.Contains(r.URL.Path, endpoint) {
+						hung.Add(1)
+						<-r.Context().Done()
+						return nil, r.Context().Err()
+					}
+					return original.RoundTrip(r)
+				})}
+				ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+				defer cancel()
+
+				started := time.Now()
+				a.loadGameplayOverview(ctx, a.lcu, a.summoner, a.gameplayRefDetails[ref], 0, 20, "all", false)
+				if hung.Load() == 0 || r287TooSlow(r287Context, t, "backend/r86_paging_test.go:35 duration", time.Since(started), 200*time.Millisecond, false) {
+					t.Fatalf("elapsed=%v hang calls=%d", time.Since(started), hung.Load())
 				}
-				return original.RoundTrip(r)
-			})}
-			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-			defer cancel()
-			started := time.Now()
-			a.loadGameplayOverview(ctx, a.lcu, a.summoner, a.gameplayRefDetails[ref], 0, 20, "all", false)
-			if time.Since(started) > 200*time.Millisecond || hung.Load() == 0 {
-				t.Fatalf("elapsed=%v hang calls=%d", time.Since(started), hung.Load())
-			}
+			})
 		})
 	}
 }

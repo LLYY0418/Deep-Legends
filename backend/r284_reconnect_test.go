@@ -102,22 +102,34 @@ func (f *r284ReconnectFixture) start(t *testing.T) {
 	t.Helper()
 	f.phase.Store("Reconnect")
 	f.runner.handlePhase(f.client, "Reconnect")
-	select {
-	case delay := <-f.waiting:
-		if delay < 15*time.Second {
-			t.Fatalf("reconnect timer=%s, settlement window bypassed", delay)
+	if !r287WaitSelect(t, "backend/r284_reconnect_test.go:105 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case delay := <-f.waiting:
+			if delay < 15*time.Second {
+				t.Fatalf("reconnect timer=%s, settlement window bypassed", delay)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("reconnect timer missing")
 	}
-	select {
-	case <-f.sampled:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r284_reconnect_test.go:113 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-f.sampled:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("initial signals missing")
 	}
 }
 func (f *r284ReconnectFixture) decision(t *testing.T, want string) map[string]any {
 	t.Helper()
+	timer := r287NewDeadline(t, "R284 decision wait", 2*time.Second)
+	defer timer.Stop()
 	select {
 	case d := <-f.decisions:
 		if d["outcome"] != want {
@@ -130,7 +142,7 @@ func (f *r284ReconnectFixture) decision(t *testing.T, want string) map[string]an
 			}
 		}
 		return d
-	case <-time.After(2 * time.Second):
+	case <-timer.C:
 		t.Fatalf("missing decision %s", want)
 	}
 	return nil

@@ -48,19 +48,23 @@ func TestPrewarmSequentialAndFailureDoesNotStopNextFile(t *testing.T) {
 }
 
 func TestPrewarmBudgetDoesNotWaitForABlockedFileRead(t *testing.T) {
-	blocked := make(chan struct{})
-	defer close(blocked)
-	started := time.Now()
-	result := runStartupPrewarm([]string{"blocked", "must not read"}, func(_ context.Context, path string) error {
-		if path != "blocked" {
-			t.Error("read another file after deadline")
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		blocked := make(chan struct{})
+		defer close(blocked)
+
+		started := time.Now()
+		result := runStartupPrewarm([]string{"blocked", "must not read"}, func(_ context.Context, path string) error {
+			if path != "blocked" {
+				t.Error("read another file after deadline")
+			}
+			<-blocked
+			return nil
+		}, 10*time.Millisecond, func(int) { t.Error("progress after timeout") })
+		if !result.TimedOut || r287TooSlow(r287Context, t, "installer/prewarm_test.go:61 duration", time.Since(started), time.Second, false) {
+			t.Fatal("blocked IO delayed application launch", result)
 		}
-		<-blocked
-		return nil
-	}, 10*time.Millisecond, func(int) { t.Error("progress after timeout") })
-	if !result.TimedOut || time.Since(started) > time.Second {
-		t.Fatal("blocked IO delayed application launch", result)
-	}
+	})
 }
 
 func TestPrewarmReadsContentsWithoutChangingFiles(t *testing.T) {

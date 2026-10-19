@@ -22,9 +22,14 @@ func r206RelayFixture(t *testing.T) *riotKeyStore {
 		flight := owned.flight
 		owned.mu.Unlock()
 		if flight != nil {
-			select {
-			case <-flight:
-			case <-time.After(20 * time.Second):
+			if !r287WaitSelect(t, "backend/r206_relay_test.go:25 wait", 20*time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-flight:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Error("relay probe leaked")
 			}
 		}

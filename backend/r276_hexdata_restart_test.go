@@ -79,14 +79,20 @@ func TestR276HexdataRestartWaitsForStateAndUsesDisk(t *testing.T) {
 	defer close(clock.closed)
 	done := make(chan error, 1)
 	go func() { done <- r276HexdataRestartDrain(p, clock) }()
-	select {
-	case err := <-done:
-		t.Fatal("restart barrier returned while state writer gate was closed", err)
-	case state := <-clock.observed:
-		if state.running != 1 {
-			t.Fatal("restart did not observe blocked state owner", state)
+	if !r287WaitSelect(t, "backend/r276_hexdata_restart_test.go:82 wait", r274NoProgressLimit, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case err := <-done:
+			t.Fatal("restart barrier returned while state writer gate was closed", err)
+			return true
+		case state := <-clock.observed:
+			if state.running != 1 {
+				t.Fatal("restart did not observe blocked state owner", state)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(r274NoProgressLimit):
+	}) {
 		t.Fatal("restart barrier never reached state owner")
 	}
 	gate.unblock()

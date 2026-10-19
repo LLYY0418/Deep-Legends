@@ -12,6 +12,7 @@ import (
 )
 
 func TestR149AnswerAndTokenPageStartTogether(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	answer, _ := hexdataRankingFixtures(t)
 	meta := r116aMetaFixture(t, hexdataTestBuild)
 	insights := r116aInsightsFixture(t, 173, 211)
@@ -51,10 +52,17 @@ func TestR149AnswerAndTokenPageStartTogether(t *testing.T) {
 	go func() { _, err := provider.loadHexdataRankings(context.Background()); done <- err }()
 	seen := map[string]bool{}
 	for len(seen) < 2 {
-		select {
-		case path := <-entered:
-			seen[path] = true
-		case <-time.After(3 * time.Second):
+		if !r287WaitSelect(t, "backend/hexdata_r149_test.go:54 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+			r287CaptureMu.Lock()
+			defer r287CaptureMu.Unlock()
+			select {
+			case path := <-entered:
+				seen[path] = true
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			unblock()
 			t.Fatalf("answer and token page did not overlap: %v", seen)
 		}
@@ -68,6 +76,7 @@ func TestR149AnswerAndTokenPageStartTogether(t *testing.T) {
 }
 
 func TestR149MayhemCatalogsWarmConcurrentlyAndRestartFromDisk(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	root := t.TempDir()
 	var requests atomic.Int32
 	entered := make(chan string, 2)
@@ -103,10 +112,17 @@ func TestR149MayhemCatalogsWarmConcurrentlyAndRestartFromDisk(t *testing.T) {
 	provider.prefetchMayhemCatalogs()
 	seen := map[string]bool{}
 	for len(seen) < 2 {
-		select {
-		case path := <-entered:
-			seen[path] = true
-		case <-time.After(3 * time.Second):
+		if !r287WaitSelect(t, "backend/hexdata_r149_test.go:106 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+			r287CaptureMu.Lock()
+			defer r287CaptureMu.Unlock()
+			select {
+			case path := <-entered:
+				seen[path] = true
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			unblock()
 			t.Fatalf("Data Dragon and CommunityDragon prewarm did not overlap: %v", seen)
 		}
@@ -149,14 +165,24 @@ func TestR149PrimaryDecorationStartsBeforeRSCFinishes(t *testing.T) {
 	})
 	done := make(chan error, 1)
 	go func() { _, err := provider.loadMayhemDetail(context.Background(), "157"); done <- err }()
-	select {
-	case <-rscEntered:
-	case <-time.After(3 * time.Second):
+	if !r287WaitSelect(t, "backend/hexdata_r149_test.go:152 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-rscEntered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("RSC request never started")
 	}
-	select {
-	case <-decorateEntered:
-	case <-time.After(3 * time.Second):
+	if !r287WaitSelect(t, "backend/hexdata_r149_test.go:157 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-decorateEntered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		unblock()
 		t.Fatal("hero-json decoration waited for RSC")
 	}

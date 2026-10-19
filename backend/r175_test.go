@@ -56,13 +56,15 @@ func r175Events(t *testing.T, a *app, event string) []map[string]any {
 }
 func r175WaitEvent(t *testing.T, a *app, event string) []map[string]any {
 	t.Helper()
-	until := time.Now().Add(time.Second)
-	for time.Now().Before(until) {
+	until := r287NewClockDeadline(t, "backend/r175_test.go:59 poll", time.Second)
+	defer until.Stop()
+	for until.Pending() {
 		if rows := r175Events(t, a, event); len(rows) > 0 {
 			return rows
 		}
 		time.Sleep(time.Millisecond)
 	}
+	until.Stop()
 	t.Fatalf("missing %s", event)
 	return nil
 }
@@ -272,12 +274,17 @@ func TestR175CachePanicReleasesAllWaiters(t *testing.T) {
 	time.Sleep(30 * time.Millisecond)
 	close(release)
 	for i := 0; i < 3; i++ {
-		select {
-		case got := <-result:
-			if got.Phase != "InProgress" || got.Available || len(got.Players) != 0 {
-				t.Fatalf("panic response=%#v", got)
+		if !r287WaitSelect(t, "backend/r175_test.go:275 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case got := <-result:
+				if got.Phase != "InProgress" || got.Available || len(got.Players) != 0 {
+					t.Fatalf("panic response=%#v", got)
+				}
+				return true
+			case <-r287Deadline:
+				return false
 			}
-		case <-time.After(time.Second):
+		}) {
 			t.Fatal("panic stranded a flight waiter")
 		}
 	}
@@ -422,9 +429,14 @@ func TestR175PanicInPoolJobsDoesNotStrandProducer(t *testing.T) {
 		defer close(finished)
 		proParallelLimit(context.Background(), values, 4, func(int) { panic("fake-puuid-pool-secret") })
 	}()
-	select {
-	case <-finished:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r175_test.go:425 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-finished:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("panicking pool jobs stranded producer")
 	}
 	rows := r175Events(t, a, "backend_panic")

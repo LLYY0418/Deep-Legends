@@ -45,13 +45,15 @@ func (e *licenseR233Events) renewals() int {
 }
 func r233Wait(t *testing.T, predicate func() bool) {
 	t.Helper()
-	end := time.Now().Add(3 * time.Second)
-	for time.Now().Before(end) {
+	end := r287NewClockDeadline(t, "backend/license_r233_test.go:48 poll", 3*time.Second)
+	defer end.Stop()
+	for end.Pending() {
 		if predicate() {
 			return
 		}
 		time.Sleep(time.Millisecond)
 	}
+	end.Stop()
 	t.Fatal("license maintenance did not make expected progress")
 }
 func r233Run(t *testing.T, m *licenseManager) {
@@ -75,16 +77,26 @@ func r233Run(t *testing.T, m *licenseManager) {
 	go func() { defer close(done); m.Run(ctx) }()
 	t.Cleanup(func() {
 		cancel()
-		select {
-		case <-done:
-		case <-time.After(3 * time.Second):
+		if !r287WaitSelect(t, "backend/license_r233_test.go:78 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-done:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Error("manager did not stop")
 		}
 	})
 	if !terminal {
-		select {
-		case <-initial:
-		case <-time.After(3 * time.Second):
+		if !r287WaitSelect(t, "backend/license_r233_test.go:85 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-initial:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("initial heartbeat did not finish")
 		}
 	}

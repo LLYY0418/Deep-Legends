@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -350,6 +351,7 @@ func TestR104SeedTotalBudgetIsBoundedRegardlessOfAccountCount(t *testing.T) {
 	}
 }
 func TestR102SeedOneAccountFailureDoesNotBlockOthers(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	seed := r102FixtureSeed(3)
 	var timedOut atomic.Bool
 	abort := make(chan struct{})
@@ -397,9 +399,17 @@ func TestR102SeedOneAccountFailureDoesNotBlockOthers(t *testing.T) {
 		completed <- a.loadProSeedAccounts(context.Background(), nil, []proSeedAccount{seed})
 	}()
 	var rows []opggProTeam
-	select {
-	case rows = <-completed:
-	case <-time.After(8 * time.Second):
+	if !r287WaitSelect(t, "backend/r102_test.go:400 wait", 8*time.Second, func(r287Deadline <-chan time.Time) bool {
+		r287CaptureMu.Lock()
+		defer r287CaptureMu.Unlock()
+		select {
+		case r287Value := <-completed:
+			rows = r287Value
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		close(abort)
 		select {
 		case <-completed:

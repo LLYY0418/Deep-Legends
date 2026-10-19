@@ -273,13 +273,18 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 	awaitWait := func() {
 		t.Helper()
 		trace("await_worker_wait")
-		select {
-		case d := <-waits:
-			trace("worker_wait_observed")
-			if d != time.Minute {
-				t.Fatalf("drip interval=%s", d)
+		if !r287WaitSelect(t, "backend/r104_test.go:276 wait", 5*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case d := <-waits:
+				trace("worker_wait_observed")
+				if d != time.Minute {
+					t.Fatalf("drip interval=%s", d)
+				}
+				return true
+			case <-r287Deadline:
+				return false
 			}
-		case <-time.After(5 * time.Second):
+		}) {
 			t.Fatal("startup/worker stuck")
 		}
 	}
@@ -320,7 +325,8 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 		trace("foreground_returned")
 		result <- outcome{data, err}
 	}()
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := r287NewClockDeadline(t, "backend/r104_test.go:328 poll", 3*time.Second)
+	defer deadline.Stop()
 	for {
 		p.limitMu.Lock()
 		queued := len(p.limitQueue)
@@ -328,11 +334,12 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 		if queued >= 2 {
 			break
 		}
-		if time.Now().After(deadline) {
+		if !deadline.Pending() {
 			t.Fatal("foreground never queued")
 		}
 		time.Sleep(time.Millisecond)
 	}
+	deadline.Stop()
 	before := background.Load()
 	ticks <- struct{}{}
 	// P7 pauses this worker in its foreground gate until the overview completes;
@@ -344,21 +351,31 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 	release()
 	trace("foreground_fifo_released")
 	released = true
-	select {
-	case got := <-result:
-		if got.err != nil || len(got.data.Matches) != 20 {
-			t.Fatalf("foreground must finish 20/20 without throttling: %d %v", len(got.data.Matches), got.err)
+	if !r287WaitSelect(t, "backend/r104_test.go:347 wait", 5*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case got := <-result:
+			if got.err != nil || len(got.data.Matches) != 20 {
+				t.Fatalf("foreground must finish 20/20 without throttling: %d %v", len(got.data.Matches), got.err)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(5 * time.Second):
+	}) {
 		t.Fatal("foreground search stuck")
 	}
 	if background.Load() != before || foreground.Load() != 25 {
 		t.Fatalf("two-minute quota bg=%d fg=%d", background.Load(), foreground.Load())
 	}
 	cancel()
-	select {
-	case <-stopped:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r104_test.go:359 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-stopped:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("worker did not stop")
 	}
 	t.Logf("cold startup: 0 Riot; first minute: 4 background; second minute yields; foreground: 20/20, %d requests", foreground.Load())

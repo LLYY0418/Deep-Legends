@@ -330,67 +330,69 @@ func TestR127OPGGNearestRowGapExposesTheMissingEvidence(t *testing.T) {
 /* ---------- R127 P1-a：慢图不能堵住快图（后端侧） ---------- */
 
 func TestR127RemoteHostBackoffStopsRepeatedTimeouts(t *testing.T) {
-	instance := newR127DiagnosticApp(t)
-	const host = "raw.communitydragon.org"
-	calls := 0
-	timeoutLoader := func(context.Context) ([]byte, error) { calls++; return nil, context.DeadlineExceeded }
-	for index := 0; index < assetHostTimeoutThreshold; index++ {
-		key := fmt.Sprintf("cdragon:/fixture-%d.png", index)
-		if _, err := instance.loadAssetFromHost(context.Background(), host, key, 0, 0, timeoutLoader); !errors.Is(err, context.DeadlineExceeded) {
-			t.Fatalf("attempt %d err = %v, want DeadlineExceeded", index, err)
+	r287TimingScenario(t, func(r287Extra *r287TimingContext) {
+		instance := newR127DiagnosticApp(t)
+		const host = "raw.communitydragon.org"
+		calls := 0
+		timeoutLoader := func(context.Context) ([]byte, error) { calls++; return nil, context.DeadlineExceeded }
+		for index := 0; index < assetHostTimeoutThreshold; index++ {
+			key := fmt.Sprintf("cdragon:/fixture-%d.png", index)
+			if _, err := instance.loadAssetFromHost(context.Background(), host, key, 0, 0, timeoutLoader); !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("attempt %d err = %v, want DeadlineExceeded", index, err)
+			}
 		}
-	}
-	if calls != assetHostTimeoutThreshold {
-		t.Fatalf("calls = %d, want %d", calls, assetHostTimeoutThreshold)
-	}
-	// 退避窗口内：同一主机的其它资源必须快速失败，一次上游请求都不发。
-	started := time.Now()
-	for index := 0; index < 30; index++ {
-		key := fmt.Sprintf("cdragon:/other-%d.png", index)
-		if _, err := instance.loadAssetFromHost(context.Background(), host, key, 0, 0, timeoutLoader); !errors.Is(err, errCachedAssetFailure) {
-			t.Fatalf("backoff attempt %d err = %v, want errCachedAssetFailure", index, err)
+		if calls != assetHostTimeoutThreshold {
+			t.Fatalf("calls = %d, want %d", calls, assetHostTimeoutThreshold)
 		}
-	}
-	if calls != assetHostTimeoutThreshold {
-		t.Fatalf("退避期间仍然发上游请求：calls = %d", calls)
-	}
-	if elapsed := time.Since(started); elapsed > 500*time.Millisecond {
-		t.Fatalf("30 次快速失败耗时 %s，不该等满远程超时", elapsed)
-	}
-	// 其它主机不受牵连。
-	otherCalls := 0
-	if _, err := instance.loadAssetFromHost(context.Background(), dataDragonHost, "champion-asset:ddragon:/x.png", 0, 0,
-		func(context.Context) ([]byte, error) { otherCalls++; return nil, context.DeadlineExceeded }); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("other host err = %v", err)
-	}
-	if otherCalls != 1 {
-		t.Fatalf("其它主机被误伤：calls = %d", otherCalls)
-	}
-	// 浏览器自己取消不算主机故障，不触发退避。
-	instance.observeAssetHostResult("ddragon.leagueoflegends.com", context.Canceled)
-	instance.observeAssetHostResult("ddragon.leagueoflegends.com", context.Canceled)
-	instance.observeAssetHostResult("ddragon.leagueoflegends.com", context.Canceled)
-	if instance.assetHostBlocked(dataDragonHost) {
-		t.Fatal("Canceled 被当成主机超时，退避误伤前端取消")
-	}
-	// 主机恢复（任何非超时结果）必须解除退避。
-	instance.observeAssetHostResult(host, nil)
-	if instance.assetHostBlocked(host) {
-		t.Fatal("主机恢复后仍在退避")
-	}
-	found := false
-	for _, event := range r127DiagnosticEvents(t, instance) {
-		if event["event"] != "asset_host_backoff" {
-			continue
+		// 退避窗口内：同一主机的其它资源必须快速失败，一次上游请求都不发。
+		started := time.Now()
+		for index := 0; index < 30; index++ {
+			key := fmt.Sprintf("cdragon:/other-%d.png", index)
+			if _, err := instance.loadAssetFromHost(context.Background(), host, key, 0, 0, timeoutLoader); !errors.Is(err, errCachedAssetFailure) {
+				t.Fatalf("backoff attempt %d err = %v, want errCachedAssetFailure", index, err)
+			}
 		}
-		found = true
-		if event["host"] != host || event["consecutive_timeouts"] != float64(assetHostTimeoutThreshold) || event["backoff_seconds"] != float64(60) {
-			t.Fatalf("asset_host_backoff = %#v", event)
+		if calls != assetHostTimeoutThreshold {
+			t.Fatalf("退避期间仍然发上游请求：calls = %d", calls)
 		}
-	}
-	if !found {
-		t.Fatal("进入退避必须留下 asset_host_backoff 日志，否则下次还是查不出为什么图标全挂")
-	}
+		if elapsed := time.Since(started); r287TooSlow(r287Extra, t, "R127 backoff", elapsed, 500*time.Millisecond, false) {
+			t.Fatalf("30 次快速失败耗时 %s，不该等满远程超时", elapsed)
+		}
+		// 其它主机不受牵连。
+		otherCalls := 0
+		if _, err := instance.loadAssetFromHost(context.Background(), dataDragonHost, "champion-asset:ddragon:/x.png", 0, 0,
+			func(context.Context) ([]byte, error) { otherCalls++; return nil, context.DeadlineExceeded }); !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("other host err = %v", err)
+		}
+		if otherCalls != 1 {
+			t.Fatalf("其它主机被误伤：calls = %d", otherCalls)
+		}
+		// 浏览器自己取消不算主机故障，不触发退避。
+		instance.observeAssetHostResult("ddragon.leagueoflegends.com", context.Canceled)
+		instance.observeAssetHostResult("ddragon.leagueoflegends.com", context.Canceled)
+		instance.observeAssetHostResult("ddragon.leagueoflegends.com", context.Canceled)
+		if instance.assetHostBlocked(dataDragonHost) {
+			t.Fatal("Canceled 被当成主机超时，退避误伤前端取消")
+		}
+		// 主机恢复（任何非超时结果）必须解除退避。
+		instance.observeAssetHostResult(host, nil)
+		if instance.assetHostBlocked(host) {
+			t.Fatal("主机恢复后仍在退避")
+		}
+		found := false
+		for _, event := range r127DiagnosticEvents(t, instance) {
+			if event["event"] != "asset_host_backoff" {
+				continue
+			}
+			found = true
+			if event["host"] != host || event["consecutive_timeouts"] != float64(assetHostTimeoutThreshold) || event["backoff_seconds"] != float64(60) {
+				t.Fatalf("asset_host_backoff = %#v", event)
+			}
+		}
+		if !found {
+			t.Fatal("进入退避必须留下 asset_host_backoff 日志，否则下次还是查不出为什么图标全挂")
+		}
+	})
 }
 
 func TestR127RemoteImageBudgetSeparatesIconsFromArtwork(t *testing.T) {
@@ -724,69 +726,78 @@ func TestR127MatchTierLongTermCacheSkipsOPGGEntirely(t *testing.T) {
 // R127 复审第 1、2 条的回归锁：主机退避既不能被外层聚合错误抹掉，也不能误伤
 // 已经缓存在本地、根本不需要联网的图标。
 func TestR127HostBackoffSurvivesAggregateErrorsAndSparesCachedAssets(t *testing.T) {
-	instance := newR127DiagnosticApp(t)
-	const host = "raw.communitydragon.org"
 
 	// 生产形状：/api/image 的外层是「该 assetPath 全部候选均失败」的聚合键，
 	// 内层每个候选各自向同一台主机取图。
-	aggregate := func(key string) error {
-		_, err := instance.loadAssetFromHost(context.Background(), host, "cdragon-resolved:"+key, 0, communityImageResolveNegativeTTL,
-			func(context.Context) ([]byte, error) {
-				for index := 0; index < assetHostTimeoutThreshold; index++ {
-					_, _ = instance.loadAssetFromHost(context.Background(), host, fmt.Sprintf("cdragon:%s-%d", key, index), 0, 0,
-						func(context.Context) ([]byte, error) { return nil, context.DeadlineExceeded })
-				}
-				return nil, errCommunityImageCandidatesExhausted
-			})
-		return err
-	}
-	if err := aggregate("first"); !errors.Is(err, errCommunityImageCandidatesExhausted) {
-		t.Fatalf("aggregate err = %v", err)
-	}
-	if !instance.assetHostBlocked(host) {
-		t.Fatal("内层连续超时后必须进入主机退避")
-	}
+
 	// 退避生效期间，外层聚合键也必须直接快速失败：不再把 6 个候选重放一遍，
 	// 更不能用聚合错误把内层刚建立的退避抹掉。
-	if err := aggregate("second"); !errors.Is(err, errCachedAssetFailure) {
-		t.Fatalf("second aggregate err = %v, want errCachedAssetFailure（快速失败）", err)
-	}
-	if !instance.assetHostBlocked(host) {
-		t.Fatal("外层聚合错误把主机退避抹掉了：这条生产路径上退避等于没有")
-	}
 
 	// 退避只挡「真的要出网」的请求。
-	cachedCalls := 0
-	seed := func() []byte {
-		data, err := instance.loadAssetFromHost(context.Background(), dataDragonHost, "champion-asset:cached", 1<<20, 0,
-			func(context.Context) ([]byte, error) { cachedCalls++; return []byte("cached-image"), nil })
-		if err != nil {
-			t.Fatalf("cached load err = %v", err)
-		}
-		return data
-	}
-	if got := seed(); string(got) != "cached-image" || cachedCalls != 1 {
-		t.Fatalf("seed = %s calls = %d", got, cachedCalls)
-	}
-	for index := 0; index < assetHostTimeoutThreshold; index++ {
-		if _, err := instance.loadAssetFromHost(context.Background(), dataDragonHost, fmt.Sprintf("champion-asset:timeout-%d", index), 0, 0,
-			func(context.Context) ([]byte, error) { return nil, context.DeadlineExceeded }); !errors.Is(err, context.DeadlineExceeded) {
-			t.Fatalf("timeout %d err = %v", index, err)
-		}
-	}
-	if !instance.assetHostBlocked(dataDragonHost) {
-		t.Fatal("ddragon 连续超时后必须进入退避")
-	}
-	if got := seed(); string(got) != "cached-image" || cachedCalls != 1 {
-		t.Fatalf("退避期间已缓存的图必须照常返回：got %s loader calls = %d", got, cachedCalls)
-	}
-	// 退避窗口内未缓存的资源仍然快速失败，不再等满远程超时。
-	started := time.Now()
-	if _, err := instance.loadAssetFromHost(context.Background(), dataDragonHost, "champion-asset:brand-new", 0, 0,
-		func(context.Context) ([]byte, error) { t.Fatal("退避期间不该出网"); return nil, nil }); !errors.Is(err, errCachedAssetFailure) {
-		t.Fatalf("brand new err = %v, want errCachedAssetFailure", err)
-	}
-	if elapsed := time.Since(started); elapsed > 200*time.Millisecond {
-		t.Fatalf("快速失败耗时 %s", elapsed)
-	}
+
+	r287TimingScenario(
+		// 退避窗口内未缓存的资源仍然快速失败，不再等满远程超时。
+		t, func(r287Context *r287TimingContext) {
+			instance := newR127DiagnosticApp(t)
+			const host = "raw.communitydragon.org"
+
+			aggregate := func(key string) error {
+				_, err := instance.loadAssetFromHost(context.Background(), host, "cdragon-resolved:"+key, 0, communityImageResolveNegativeTTL,
+					func(context.Context) ([]byte, error) {
+						for index := 0; index < assetHostTimeoutThreshold; index++ {
+							_, _ = instance.loadAssetFromHost(context.Background(), host, fmt.Sprintf("cdragon:%s-%d", key, index), 0, 0,
+								func(context.Context) ([]byte, error) { return nil, context.DeadlineExceeded })
+						}
+						return nil, errCommunityImageCandidatesExhausted
+					})
+				return err
+			}
+			if err := aggregate("first"); !errors.Is(err, errCommunityImageCandidatesExhausted) {
+				t.Fatalf("aggregate err = %v", err)
+			}
+			if !instance.assetHostBlocked(host) {
+				t.Fatal("内层连续超时后必须进入主机退避")
+			}
+
+			if err := aggregate("second"); !errors.Is(err, errCachedAssetFailure) {
+				t.Fatalf("second aggregate err = %v, want errCachedAssetFailure（快速失败）", err)
+			}
+			if !instance.assetHostBlocked(host) {
+				t.Fatal("外层聚合错误把主机退避抹掉了：这条生产路径上退避等于没有")
+			}
+
+			cachedCalls := 0
+			seed := func() []byte {
+				data, err := instance.loadAssetFromHost(context.Background(), dataDragonHost, "champion-asset:cached", 1<<20, 0,
+					func(context.Context) ([]byte, error) { cachedCalls++; return []byte("cached-image"), nil })
+				if err != nil {
+					t.Fatalf("cached load err = %v", err)
+				}
+				return data
+			}
+			if got := seed(); string(got) != "cached-image" || cachedCalls != 1 {
+				t.Fatalf("seed = %s calls = %d", got, cachedCalls)
+			}
+			for index := 0; index < assetHostTimeoutThreshold; index++ {
+				if _, err := instance.loadAssetFromHost(context.Background(), dataDragonHost, fmt.Sprintf("champion-asset:timeout-%d", index), 0, 0,
+					func(context.Context) ([]byte, error) { return nil, context.DeadlineExceeded }); !errors.Is(err, context.DeadlineExceeded) {
+					t.Fatalf("timeout %d err = %v", index, err)
+				}
+			}
+			if !instance.assetHostBlocked(dataDragonHost) {
+				t.Fatal("ddragon 连续超时后必须进入退避")
+			}
+			if got := seed(); string(got) != "cached-image" || cachedCalls != 1 {
+				t.Fatalf("退避期间已缓存的图必须照常返回：got %s loader calls = %d", got, cachedCalls)
+			}
+
+			started := time.Now()
+			if _, err := instance.loadAssetFromHost(context.Background(), dataDragonHost, "champion-asset:brand-new", 0, 0,
+				func(context.Context) ([]byte, error) { t.Fatal("退避期间不该出网"); return nil, nil }); !errors.Is(err, errCachedAssetFailure) {
+				t.Fatalf("brand new err = %v, want errCachedAssetFailure", err)
+			}
+			if elapsed := time.Since(started); r287TooSlow(r287Context, t, "backend/r127_test.go:789 duration", elapsed, 200*time.Millisecond, false) {
+				t.Fatalf("快速失败耗时 %s", elapsed)
+			}
+		})
 }

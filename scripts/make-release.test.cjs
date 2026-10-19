@@ -44,3 +44,8 @@ test("invalid release identities and spaced assets are refused",()=>{
  assert.throws(()=>latestNotes("## 0.11.2 — 2026-09-11\n- old","0.12.0"));
  assert.throws(()=>latestNotes("## 0.12.0 — 2026-09-11\n\n","0.12.0"));
 });
+
+for(const separator of ['—','·'])test('latestNotes accepts '+separator+' and keeps version/empty guards',()=>{
+ const log=`## 0.1.2 ${separator} 2026-10-19\n- notes\n\n## 0.1.1 — 2026-10-18\n- old`;
+ assert.equal(latestNotes(log,'0.1.2'),'- notes');assert.throws(()=>latestNotes(log,'0.1.3'),/最新一节/);assert.throws(()=>latestNotes(`## 0.1.2 ${separator} 2026-10-19\n\n## 0.1.1 — 2026-10-18\n- old`,'0.1.2'),/最新一节/);
+});

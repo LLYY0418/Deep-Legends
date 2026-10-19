@@ -267,7 +267,9 @@ func TestR277CNScoreBrowserContract(t *testing.T) {
 	if err := os.WriteFile(readyFile, ready, 0600); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.After(90 * time.Second)
+	deadlineR287Timing := r287NewDeadline(t, "backend/r277_cn_score_test.go:270 deadline", 90*time.Second)
+	defer deadlineR287Timing.Stop()
+	deadline := deadlineR287Timing.C
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -286,6 +288,7 @@ func TestR277CNScoreBrowserContract(t *testing.T) {
 			}
 		}
 	}
+
 }
 
 func TestR277CNScoreSameServerOtherPlayer(t *testing.T) {

@@ -40,9 +40,14 @@ func TestR187InvalidatePlayerAllSourcesScopesAndFlights(t *testing.T) {
 	if len(cache.entries) != len(keys) || cache.recent.Len() != len(keys) {
 		t.Fatal("another player's entries removed")
 	}
-	select {
-	case <-old.done:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r187_test.go:43 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-old.done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("old waiter stranded")
 	}
 	if old.ctx.Err() != context.Canceled {
@@ -95,21 +100,31 @@ func TestR187InvalidatedWaiterAndLeaderReceiveFreshRank(t *testing.T) {
 	go func() { waiter <- a.playerRankScore(waiterCtx, client, ref, true, "HN1", "") }()
 	<-waiterCtx.waiting
 	a.invalidateRankPlayer(ref)
-	select {
-	case result := <-waiter:
-		if len(result.ranks) != 1 || result.ranks[0].LeaguePoints != 67 {
-			t.Fatal(result)
+	if !r287WaitSelect(t, "backend/r187_test.go:98 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case result := <-waiter:
+			if len(result.ranks) != 1 || result.ranks[0].LeaguePoints != 67 {
+				t.Fatal(result)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("waiter waited for old upstream")
 	}
 	once.Do(func() { close(release) })
-	select {
-	case result := <-leader:
-		if len(result.ranks) != 1 || result.ranks[0].LeaguePoints != 67 {
-			t.Fatal("leader returned old rank", result)
+	if !r287WaitSelect(t, "backend/r187_test.go:107 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case result := <-leader:
+			if len(result.ranks) != 1 || result.ranks[0].LeaguePoints != 67 {
+				t.Fatal("leader returned old rank", result)
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("leader stranded")
 	}
 	if calls.Load() != 2 {

@@ -71,9 +71,14 @@ func TestR87P7CanceledOldMatchmakingCannotPoisonNextGame(t *testing.T) {
 	}
 	t.Cleanup(func() { r.cancelPending("auto-matchmaking") })
 	r.scheduleAutoMatchmaking(c, 0)
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r87_addendum_test.go:74 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-entered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("search not started")
 	}
 	r.handlePhase(c, "WaitingForStats")
@@ -81,9 +86,14 @@ func TestR87P7CanceledOldMatchmakingCannotPoisonNextGame(t *testing.T) {
 		t.Fatal("reset did not permit next game")
 	}
 	close(release)
-	select {
-	case <-done:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r87_addendum_test.go:84 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("old action not canceled")
 	}
 	r.mu.Lock()

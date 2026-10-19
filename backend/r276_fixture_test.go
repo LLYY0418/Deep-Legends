@@ -201,14 +201,20 @@ func TestR276RefreshCompletionBarrierGated(t *testing.T) {
 		}
 		result <- nil
 	}()
-	select {
-	case count := <-counter.waiting:
-		if count != 2 {
-			t.Fatalf("blocked fixture completed %d requests, want 2", count)
+	if !r287WaitSelect(t, "backend/r276_fixture_test.go:204 wait", r274NoProgressLimit, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case count := <-counter.waiting:
+			if count != 2 {
+				t.Fatalf("blocked fixture completed %d requests, want 2", count)
+			}
+			return true
+		case err := <-result:
+			t.Fatalf("completion barrier returned while both refresh gates were closed: %v", err)
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case err := <-result:
-		t.Fatalf("completion barrier returned while both refresh gates were closed: %v", err)
-	case <-time.After(r274NoProgressLimit):
+	}) {
 		t.Fatal("completion waiter did not observe the controlled pending work")
 	}
 	if got := counter.load(); got != 2 {

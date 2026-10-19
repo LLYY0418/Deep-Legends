@@ -1,0 +1,8 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {scanValues}=require('./lib/stale-values.cjs');
+test('R287 recalls all three real 0.12.90 stale assertions',()=>{
+ const examples=[['backend/connection_manager.go','const minDelay = 15000','const minDelay = 5000','backend/reconnect_test.go','if delay != 15000 { t.Fatal(delay) }','15000'],['backend/web/gameplay.js','const label = "评分排名"','const label = "评分：全场第N名"','backend/web/rating.test.cjs','assert.equal(label,"评分排名")','评分排名'],['desktop/package.json','"version":"0.12.89"','"version":"0.12.90"','scripts/version.test.cjs','assert.equal(version,"0.12.89")','0.12.89']];
+ for(const [file,removed,added,testfile,source,value]of examples){const hits=scanValues([{file,removed,added}],{[testfile]:source});assert.equal(hits.length,1);assert.equal(hits[0].value,value);assert.equal(hits[0].line,1);}
+});
+test('unchanged literals, short strings and single digits do not produce noise; fixtures/scripts are scanned',()=>{assert.deepEqual(scanValues([{file:'backend/a.go',removed:'const x=1; const y="ab"; const z="same"',added:'const x=0; const y="xy"; const z="same"'}],{'backend/a_test.go':'1 ab same'}),[]);const change={file:'backend/a.go',removed:'const delay=15000',added:'const delay=5000'};assert.equal(scanValues([change],{'backend/testdata/input.json':'{"wait":15000}','scripts/fixture.cjs':'const expected=15000'}).length,2);assert.equal(scanValues([change],{'backend/a_test.go':'115000'}).length,0);assert.equal(scanValues([{...change,file:'scripts/test-only.cjs'}],{'scripts/test.test.cjs':'15000'}).length,0);});

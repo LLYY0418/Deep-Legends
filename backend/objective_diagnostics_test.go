@@ -162,9 +162,14 @@ func TestObjectiveEventRecorderDoesNotBlockSocketOnDiagnosticLock(t *testing.T) 
 		}
 		close(done)
 	}()
-	select {
-	case <-done:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/objective_diagnostics_test.go:165 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		client.objectiveDiagnostics.mu.Unlock()
 		t.Fatal("socket blocked")
 	}

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -84,6 +85,7 @@ func Test2351PreflightRejectsTeammatePickArrivingDuringDelay(t *testing.T) {
 // 策略必须钉成 lock-now：这是 forceHover 唯一承重的场景（show-then-lock 下未确认
 // 会话本来就不会锁，forceHover 改没改都一样，测不出退化）。
 func Test2351BanSentinelHoversOnceWithoutLocking(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	f := newR78ChampSelectFixture(t, "practice", "ban", 0, []int64{-1}, map[int64]champSelectGridSelectionStatus{141: {}})
 	f.enable("practice", "ban", []int64{141})
 	settings := f.runner.currentWatch()
@@ -94,9 +96,17 @@ func Test2351BanSentinelHoversOnceWithoutLocking(t *testing.T) {
 	f.runner.evaluateChampSelect(f.client, f.runner.currentWatch().ChampSelect)
 	// 1) 悬停 PATCH 由调度器异步发出：用 patchCh 等它，而不是立刻看计数赌调度快慢。
 	var hover r78PatchRequest
-	select {
-	case hover = <-f.patchCh:
-	case <-time.After(5 * time.Second):
+	if !r287WaitSelect(t, "backend/diagnostics_2351_test.go:97 wait", 5*time.Second, func(r287Deadline <-chan time.Time) bool {
+		r287CaptureMu.Lock()
+		defer r287CaptureMu.Unlock()
+		select {
+		case r287Value := <-f.patchCh:
+			hover = r287Value
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatalf("[-1] sentinel never hovered: no PATCH within 5s (patches=%d)", f.patches.Load())
 	}
 	// 2) 载荷必须是「ban / 配置内且未被禁的 141 / 未锁定」。

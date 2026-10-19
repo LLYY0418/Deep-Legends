@@ -104,22 +104,37 @@ func TestR203SkinDetailsPropagatesRequestCancellation(t *testing.T) {
 		a.handleSkinDetails(httptest.NewRecorder(), httptest.NewRequest("GET", "/api/skin-details?id=1", nil).WithContext(ctx))
 	}()
 	for i := 0; i < 2; i++ {
-		select {
-		case <-started:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/r203_test.go:107 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-started:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("detail request did not start")
 		}
 	}
 	cancel()
-	select {
-	case <-done:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r203_test.go:114 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("handler ignored cancellation")
 	}
 	for i := 0; i < 2; i++ {
-		select {
-		case <-finished:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "backend/r203_test.go:120 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-finished:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("worker ignored cancellation")
 		}
 	}

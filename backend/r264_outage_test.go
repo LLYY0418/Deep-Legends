@@ -101,9 +101,14 @@ func TestR264HistoryCircuitSingleProbeRecoveryAndServerIsolation(t *testing.T) {
 		var out map[string]any
 		done <- p.getJSON(context.WithValue(context.Background(), sgpBackgroundHistoryProbeKey{}, true), client, "HN1", "SUMMARY", "history", server.URL, &out)
 	}()
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/r264_outage_test.go:104 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-entered:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("missing probe")
 	}
 	for i := 0; i < 10; i++ {
@@ -125,51 +130,55 @@ func TestR264HistoryCircuitSingleProbeRecoveryAndServerIsolation(t *testing.T) {
 }
 
 func TestR264OverviewNonHistoryCardsArriveBeforeUnavailableHistory(t *testing.T) {
-	a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
-	old := a.sgp.http.Transport
-	a.sgp.retryWait = func(context.Context, time.Duration) error { return nil }
-	a.sgp.http.Transport = sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if strings.Contains(r.URL.Path, "match-history-query") {
-			select {
-			case <-time.After(3 * time.Second):
-			case <-r.Context().Done():
-				return nil, r.Context().Err()
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
+		old := a.sgp.http.Transport
+		a.sgp.retryWait = func(context.Context, time.Duration) error { return nil }
+		a.sgp.http.Transport = sgpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			if strings.Contains(r.URL.Path, "match-history-query") {
+				select {
+				case <-time.After(3 * time.Second):
+				case <-r.Context().Done():
+					return nil, r.Context().Err()
+				}
+				return &http.Response{StatusCode: 503, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("outage")), Request: r}, nil
 			}
-			return &http.Response{StatusCode: 503, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("outage")), Request: r}, nil
+			return old.RoundTrip(r)
+		})
+		oldLCU := a.lcu.http.Transport
+		a.lcu.http.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			if strings.Contains(r.URL.Path, "lol-match-history") {
+				return &http.Response{StatusCode: 503, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("outage")), Request: r}, nil
+			}
+			return oldLCU.RoundTrip(r)
+		})
+		server := httptest.NewServer(http.HandlerFunc(a.handleGameplayOverview))
+		defer server.Close()
+		request, _ := http.NewRequest(http.MethodPost, server.URL, strings.NewReader(`{"playerRef":"`+publicRef+`","serverId":"HN1","count":20}`))
+		request.Header.Set("Accept", "application/x-ndjson")
+		request.Header.Set("X-Overview-Cards", "1")
+		client := server.Client()
+		client.Timeout = 2 * time.Second
+
+		started := time.Now()
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatalf("non-history cards waited for history: %v", err)
 		}
-		return old.RoundTrip(r)
-	})
-	oldLCU := a.lcu.http.Transport
-	a.lcu.http.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if strings.Contains(r.URL.Path, "lol-match-history") {
-			return &http.Response{StatusCode: 503, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("outage")), Request: r}, nil
+		defer response.Body.Close()
+		line, err := bufio.NewReader(response.Body).ReadBytes('\n')
+		if err != nil {
+			t.Fatal(err)
 		}
-		return oldLCU.RoundTrip(r)
+		var frame struct {
+			Type     string           `json:"type"`
+			Overview gameplayOverview `json:"overview"`
+		}
+		if err = json.Unmarshal(line, &frame); err != nil || frame.Type != "cards" || len(frame.Overview.Capabilities) == 0 || r287TooSlow(r287Context, t, "backend/r264_outage_test.go:172 duration", time.Since(started), 2*time.Second, false) {
+			t.Fatalf("early cards missing: %s, %v", line, err)
+		}
 	})
-	server := httptest.NewServer(http.HandlerFunc(a.handleGameplayOverview))
-	defer server.Close()
-	request, _ := http.NewRequest(http.MethodPost, server.URL, strings.NewReader(`{"playerRef":"`+publicRef+`","serverId":"HN1","count":20}`))
-	request.Header.Set("Accept", "application/x-ndjson")
-	request.Header.Set("X-Overview-Cards", "1")
-	client := server.Client()
-	client.Timeout = 2 * time.Second
-	started := time.Now()
-	response, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("non-history cards waited for history: %v", err)
-	}
-	defer response.Body.Close()
-	line, err := bufio.NewReader(response.Body).ReadBytes('\n')
-	if err != nil {
-		t.Fatal(err)
-	}
-	var frame struct {
-		Type     string           `json:"type"`
-		Overview gameplayOverview `json:"overview"`
-	}
-	if err = json.Unmarshal(line, &frame); err != nil || frame.Type != "cards" || len(frame.Overview.Capabilities) == 0 || time.Since(started) > 2*time.Second {
-		t.Fatalf("early cards missing: %s, %v", line, err)
-	}
 }
 
 func TestR264LCU503HistoryAndTimelineUseOneShortOutageMessage(t *testing.T) {

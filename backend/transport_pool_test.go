@@ -68,9 +68,14 @@ func TestProviderTransportPoolsReuseEightConnections(t *testing.T) {
 					}()
 				}
 				for i := 0; i < 8; i++ {
-					select {
-					case <-arrived:
-					case <-time.After(15 * time.Second):
+					if !r287WaitSelect(t, "backend/transport_pool_test.go:71 wait", 15*time.Second, func(r287Deadline <-chan time.Time) bool {
+						select {
+						case <-arrived:
+							return true
+						case <-r287Deadline:
+							return false
+						}
+					}) {
 						close(release)
 						t.Fatal("requests did not overlap")
 					}

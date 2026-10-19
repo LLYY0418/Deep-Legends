@@ -178,18 +178,28 @@ func Test2244CustomTransitionCancelsAdmittedHTTPWrites(t *testing.T) {
 	runner := newWatchRunner(nil, nil)
 	done := make(chan error, 1)
 	go func() { done <- runner.requestWatchJSON(context.Background(), client, "POST", "/in-flight", nil) }()
-	select {
-	case <-started:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/diagnostics_2244_test.go:181 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("write not started")
 	}
 	runner.setCustomSession(true)
-	select {
-	case err := <-done:
-		if err == nil {
-			t.Fatal("active write was not canceled")
+	if !r287WaitSelect(t, "backend/diagnostics_2244_test.go:187 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case err := <-done:
+			if err == nil {
+				t.Fatal("active write was not canceled")
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(time.Second):
+	}) {
 		t.Fatal("write remained in flight")
 	}
 	if err := runner.requestWatchJSON(context.Background(), client, "POST", "/after-custom", nil); err == nil {

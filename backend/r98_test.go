@@ -221,12 +221,17 @@ func TestR98SummonerDoesNotGateProgressAndPreviewKeepsAdvancing(t *testing.T) {
 		}
 		done <- err
 	}()
-	select {
-	case partial := <-previews:
-		if len(partial.Matches) < 5 || len(partial.Matches) >= 8 {
-			t.Fatal("bad first preview", len(partial.Matches))
+	if !r287WaitSelect(t, "backend/r98_test.go:224 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case partial := <-previews:
+			if len(partial.Matches) < 5 || len(partial.Matches) >= 8 {
+				t.Fatal("bad first preview", len(partial.Matches))
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(2 * time.Second):
+	}) {
 		closeGate.Do(func() { close(gate) })
 		<-done
 		t.Fatal("summoner blocked details/preview")
@@ -245,37 +250,44 @@ func TestR98SummonerDoesNotGateProgressAndPreviewKeepsAdvancing(t *testing.T) {
 }
 
 func TestR98OverviewQueueBudgetReturnsRateLimit(t *testing.T) {
-	f := r98OverviewFixture(t, false)
-	p := f.a.riot
-	p.longWindow = make([]time.Time, 90)
-	for i := range p.longWindow {
-		p.longWindow[i] = time.Now()
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	started := time.Now()
-	done := make(chan error, 1)
-	go func() {
-		_, err := f.a.loadRiotOverview(ctx, gameplayReference{PlayerRef: "r98-subject", Region: "kr", Privacy: "PRIVATE"}, 0, 20)
-		done <- err
-	}()
-	select {
-	case err := <-done:
-		var statusError *riotStatusError
-		if !errors.As(err, &statusError) || riotErrorStatus(err) != 429 || statusError.retryAfter < 1 {
-			t.Fatal("missing quota recovery", err)
+	r287TimingScenario(t, func(r287Extra *r287TimingContext) {
+		f := r98OverviewFixture(t, false)
+		p := f.a.riot
+		p.longWindow = make([]time.Time, 90)
+		for i := range p.longWindow {
+			p.longWindow[i] = time.Now()
 		}
-		if time.Since(started) > 5*time.Second {
-			t.Fatal("overview exceeded queue budget")
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		started := time.Now()
+		done := make(chan error, 1)
+		go func() {
+			_, err := f.a.loadRiotOverview(ctx, gameplayReference{PlayerRef: "r98-subject", Region: "kr", Privacy: "PRIVATE"}, 0, 20)
+			done <- err
+		}()
+		if !r287WaitSelect(t, "backend/r98_test.go:262 wait", 1500*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case err := <-done:
+				var statusError *riotStatusError
+				if !errors.As(err, &statusError) || riotErrorStatus(err) != 429 || statusError.retryAfter < 1 {
+					t.Fatal("missing quota recovery", err)
+				}
+				if r287TooSlow(r287Extra, t, "R98 queue budget", time.Since(started), 5*time.Second, false) {
+					t.Fatal("overview exceeded queue budget")
+				}
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
+			cancel()
+			<-done
+			t.Fatal("overview queue escape missing; stuck waiting for quota")
 		}
-	case <-time.After(1500 * time.Millisecond):
-		cancel()
-		<-done
-		t.Fatal("overview queue escape missing; stuck waiting for quota")
-	}
-	if len(f.calls) != 0 {
-		t.Fatal("quota exhaustion still reached HTTP", f.calls)
-	}
+		if len(f.calls) != 0 {
+			t.Fatal("quota exhaustion still reached HTTP", f.calls)
+		}
+	})
 }
 
 func TestR98LimiterFIFOHasOnlyOneSleepingHeadAndCanceledWaitersUseNoQuota(t *testing.T) {
@@ -311,7 +323,8 @@ func TestR98LimiterFIFOHasOnlyOneSleepingHeadAndCanceledWaitersUseNoQuota(t *tes
 		cancels[i] = cancel
 		defer cancel()
 		go func() { done <- p.wait(ctx) }()
-		limit := time.Now().Add(time.Second)
+		limit := r287NewClockDeadline(t, "backend/r98_test.go:326 poll", time.Second)
+		defer limit.Stop()
 		for {
 			p.limitMu.Lock()
 			n := len(p.limitQueue)
@@ -319,7 +332,7 @@ func TestR98LimiterFIFOHasOnlyOneSleepingHeadAndCanceledWaitersUseNoQuota(t *tes
 			if n == i+1 {
 				break
 			}
-			if time.Now().After(limit) {
+			if !limit.Pending() {
 				t.Fatal("waiter missing")
 			}
 			time.Sleep(time.Millisecond)
@@ -427,31 +440,35 @@ func TestR98ChovyNullRegionFlightToOverview(t *testing.T) {
 // A real upstream 429 must keep its status/retry hint when the local queue
 // budget interrupts Retry-After, while specialist callers keep their sentinel.
 func TestR98Upstream429QueueBudgetKeepsTypedError(t *testing.T) {
-	t.Setenv("RIOT_API_KEY", "RGAPI-fixture")
-	var calls atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		w.Header().Set("Retry-After", "30")
-		w.WriteHeader(http.StatusTooManyRequests)
-	}))
-	defer server.Close()
-	target, _ := url.Parse(server.URL)
-	cp := newChampionProvider()
-	transport := server.Client().Transport
-	cp.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		clone := r.Clone(r.Context())
-		clone.URL.Scheme, clone.URL.Host = target.Scheme, target.Host
-		return transport.RoundTrip(clone)
-	})}
-	p := newRiotProvider(cp)
-	started := time.Now()
-	var out any
-	err := p.get(withRiotQueueLimit(context.Background(), 30*time.Millisecond), riotClusterHost, "/r98-quota", nil, &out)
-	var status *riotStatusError
-	if !errors.Is(err, errThrottled) || !errors.As(err, &status) || status.status != 429 || status.retryAfter != 30 {
-		t.Fatalf("lost throttle classification/retry: %v", err)
-	}
-	if calls.Load() != 1 || time.Since(started) > time.Second {
-		t.Fatalf("queue escape retried or stalled: calls=%d elapsed=%v", calls.Load(), time.Since(started))
-	}
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		t.Setenv("RIOT_API_KEY", "RGAPI-fixture")
+		var calls atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls.Add(1)
+			w.Header().Set("Retry-After", "30")
+			w.WriteHeader(http.StatusTooManyRequests)
+		}))
+		defer server.Close()
+		target, _ := url.Parse(server.URL)
+		cp := newChampionProvider()
+		transport := server.Client().Transport
+		cp.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			clone := r.Clone(r.Context())
+			clone.URL.Scheme, clone.URL.Host = target.Scheme, target.Host
+			return transport.RoundTrip(clone)
+		})}
+		p := newRiotProvider(cp)
+
+		started := time.Now()
+		var out any
+		err := p.get(withRiotQueueLimit(context.Background(), 30*time.Millisecond), riotClusterHost, "/r98-quota", nil, &out)
+		var status *riotStatusError
+		if !errors.Is(err, errThrottled) || !errors.As(err, &status) || status.status != 429 || status.retryAfter != 30 {
+			t.Fatalf("lost throttle classification/retry: %v", err)
+		}
+		if calls.Load() != 1 || r287TooSlow(r287Context, t, "backend/r98_test.go:458 duration", time.Since(started), time.Second, false) {
+			t.Fatalf("queue escape retried or stalled: calls=%d elapsed=%v", calls.Load(), time.Since(started))
+		}
+	})
 }

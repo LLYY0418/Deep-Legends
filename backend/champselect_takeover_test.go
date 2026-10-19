@@ -205,9 +205,14 @@ func TestTakeoverBenchOwnEchoBeforeLateAckAndAutomaticUpgrade(t *testing.T) {
 		return response, err
 	})
 	f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
-	select {
-	case <-started:
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "backend/champselect_takeover_test.go:208 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-started:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("bench write never started")
 	}
 	f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
@@ -367,24 +372,26 @@ func TestTakeoverLockDelayMigrationAndTimeAnchor(t *testing.T) {
 }
 
 func TestTakeoverDefaultPickWaitIsClampedToRemainingTurn(t *testing.T) {
-	f := prepareTakeoverPick(t, "arena", 1700, nil)
-	f.tick(t)
-	// R95: do not schedule the default ten-second wait beyond the turn.
-	f.mu.Lock()
-	f.session.Timer.AdjustedTimeLeftInPhase = 1000
-	f.mu.Unlock()
-	start := time.Now()
-	f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
-	deadline := start.Add(12 * time.Second)
-	for time.Now().Before(deadline) {
-		if f.count() == 2 {
-			if time.Since(start) > 2*time.Second || f.last().Body["completed"] != true {
-				t.Fatal("lock missed the remaining turn")
+	r287TimingScenario(t, func(r287Extra *r287TimingContext) {
+		f := prepareTakeoverPick(t, "arena", 1700, nil)
+		f.tick(t)
+		// R95: do not schedule the default ten-second wait beyond the turn.
+		f.mu.Lock()
+		f.session.Timer.AdjustedTimeLeftInPhase = 1000
+		f.mu.Unlock()
+		start := time.Now()
+		f.r.evaluateChampSelect(f.c, f.r.currentWatch().ChampSelect)
+		deadline := start.Add(12 * time.Second)
+		for time.Now().Before(deadline) {
+			if f.count() == 2 {
+				if f.last().Body["completed"] != true || r287TooSlow(r287Extra, t, "takeover remaining turn", time.Since(start), 2*time.Second, false) {
+					t.Fatal("lock missed the remaining turn")
+				}
+				waitTakeoverIdle(t, f)
+				return
 			}
-			waitTakeoverIdle(t, f)
-			return
+			time.Sleep(10 * time.Millisecond)
 		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatal("default lock did not fire")
+		t.Fatal("default lock did not fire")
+	})
 }

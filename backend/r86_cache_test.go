@@ -136,10 +136,15 @@ func TestR86RankCacheDoesNotAcquireApplicationLock(t *testing.T) {
 			wg.Wait()
 			close(done)
 		}()
-		select {
-		case <-done:
-			a.mu.Unlock()
-		case <-time.After(2 * time.Second):
+		if !r287WaitSelect(t, "backend/r86_cache_test.go:139 wait", 2*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-done:
+				a.mu.Unlock()
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			a.mu.Unlock()
 			<-done
 			t.Fatal("rank cache blocked on application lock")
@@ -237,19 +242,29 @@ func TestR86RiotQueuedDetailsExitWhileActiveRequestsHoldSlots(t *testing.T) {
 	t.Cleanup(func() {
 		cancel()
 		releaseOnce.Do(func() { close(release) })
-		select {
-		case err := <-finished:
-			if !errors.Is(err, context.Canceled) || completed.Load() != 4 {
-				t.Errorf("active requests did not finish normally after release: completed=%d err=%v", completed.Load(), err)
+		if !r287WaitSelect(t, "backend/r86_cache_test.go:245 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case err := <-finished:
+				if !errors.Is(err, context.Canceled) || completed.Load() != 4 {
+					t.Errorf("active requests did not finish normally after release: completed=%d err=%v", completed.Load(), err)
+				}
+				return true
+			case <-r287Deadline:
+				return false
 			}
-		case <-time.After(3 * time.Second):
+		}) {
 			t.Error("overview workers leaked after releasing the fake upstream")
 		}
 	})
 	for i := 0; i < 4; i++ {
-		select {
-		case <-started:
-		case <-time.After(3 * time.Second):
+		if !r287WaitSelect(t, "backend/r86_cache_test.go:250 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-started:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("could not fill the four detail slots")
 		}
 	}
@@ -347,12 +362,17 @@ func TestR86PlayAgainEarlierPhaseRearmsWithoutDuplicateOrPostponement(t *testing
 	if same != earlier {
 		t.Fatal("late phase postponed the earliest timer")
 	}
-	select {
-	case at := <-posted:
-		if at.Sub(start) < 1500*time.Millisecond {
-			t.Fatal("settle delay skipped")
+	if !r287WaitSelect(t, "backend/r86_cache_test.go:350 wait", 2500*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case at := <-posted:
+			if at.Sub(start) < 1500*time.Millisecond {
+				t.Fatal("settle delay skipped")
+			}
+			return true
+		case <-r287Deadline:
+			return false
 		}
-	case <-time.After(2500 * time.Millisecond):
+	}) {
 		t.Fatal("play-again retained obsolete ten-second delay")
 	}
 	select {

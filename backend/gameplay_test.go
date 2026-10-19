@@ -310,137 +310,146 @@ func TestGameplayOverviewRecordsCompletePhaseTiming(t *testing.T) {
 }
 
 func TestGameplayOverviewOverlapsIndependentUpstreams(t *testing.T) {
-	a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
-	store := trackTestStore(t, &localStore{root: t.TempDir()})
-	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	a.storage = store
-	a.sgp.observe = a.recordDiagnostic
 
-	originalSGPTransport := a.sgp.http.Transport
-	var delayedSGP atomic.Bool
-	a.sgp.http.Transport = gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		if strings.Contains(request.URL.Path, "/match-history-query/") && request.URL.Query().Get("count") == "20" && request.URL.Query().Get("tag") == "" && delayedSGP.CompareAndSwap(false, true) {
-			time.Sleep(150 * time.Millisecond)
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
+		store := trackTestStore(t, &localStore{root: t.TempDir()})
+		if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
+			t.Fatal(err)
 		}
-		return originalSGPTransport.RoundTrip(request)
+		a.storage = store
+		a.sgp.observe = a.recordDiagnostic
+
+		originalSGPTransport := a.sgp.http.Transport
+		var delayedSGP atomic.Bool
+		a.sgp.http.Transport = gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+			if strings.Contains(request.URL.Path, "/match-history-query/") && request.URL.Query().Get("count") == "20" && request.URL.Query().Get("tag") == "" && delayedSGP.CompareAndSwap(false, true) {
+				time.Sleep(150 * time.Millisecond)
+			}
+			return originalSGPTransport.RoundTrip(request)
+		})
+		originalLCUTransport := a.lcu.http.Transport
+		a.lcu.http.Transport = gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+			if strings.Contains(request.URL.Path, "/lol-ranked/") || strings.Contains(request.URL.Path, "/lol-champion-mastery/") {
+				time.Sleep(150 * time.Millisecond)
+			}
+			return originalLCUTransport.RoundTrip(request)
+		})
+
+		started := time.Now()
+		callGameplayOverviewForTest(t, a, publicRef)
+		if elapsed := time.Since(started); r287TooSlow(r287Context, t, "backend/gameplay_test.go:339 duration", elapsed, 400*time.Millisecond, true) {
+			t.Fatalf("independent overview upstreams were serialized: elapsed=%s", elapsed)
+		}
+
+		data, err := store.readDiagnosticLog()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var phases map[string]any
+		for _, line := range bytes.Split(bytes.TrimSpace(data), []byte("\n")) {
+			var event map[string]any
+			if json.Unmarshal(line, &event) == nil && event["event"] == "overview_phases_ms" {
+				phases, _ = event["load_phases_ms"].(map[string]any)
+			}
+		}
+		if phases == nil {
+			t.Fatalf("missing phase diagnostics: %s", data)
+		}
+		span := func(name string) [2]float64 {
+			values, _ := phases["spans"].(map[string]any)
+			entries, _ := values[name].([]any)
+			if len(entries) == 0 {
+				t.Fatalf("phase %q has no measured span: %#v", name, phases["spans"])
+			}
+			pair, ok := entries[0].([]any)
+			if !ok || len(pair) != 2 {
+				t.Fatalf("phase %q span has unexpected shape: %#v", name, entries[0])
+			}
+			return [2]float64{pair[0].(float64), pair[1].(float64)}
+		}
+		overlaps := func(left, right [2]float64) bool { return left[0] < right[1] && right[0] < left[1] }
+		detailed, ranks, mastery := span("detailed_matches"), span("ranks"), span("mastery")
+		if !overlaps(detailed, ranks) || !overlaps(detailed, mastery) {
+			t.Fatalf("expected detailed matches to overlap ranks and mastery: detailed=%v ranks=%v mastery=%v", detailed, ranks, mastery)
+		}
+		// Slow parallel upstreams must not be mislabeled as recent-player aggregation
+		// or JSON serialization. Both are local work after the upstream results arrive.
+		recent, _ := phases["recent_players"].(float64)
+		serialize, _ := phases["serialize"].(float64)
+		total, _ := phases["total"].(float64)
+		if total < 150 || recent >= 100 || serialize >= 100 {
+			t.Fatalf("parallel wait leaked into local phases: recent=%v serialize=%v total=%v", recent, serialize, total)
+		}
+		spans, _ := phases["spans"].(map[string]any)
+		if entries, _ := spans["recent_players"].([]any); len(entries) != 2 {
+			t.Fatalf("recent-player local aggregation must have two measured spans, got %#v", spans["recent_players"])
+		}
 	})
-	originalLCUTransport := a.lcu.http.Transport
-	a.lcu.http.Transport = gameplayRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		if strings.Contains(request.URL.Path, "/lol-ranked/") || strings.Contains(request.URL.Path, "/lol-champion-mastery/") {
-			time.Sleep(150 * time.Millisecond)
-		}
-		return originalLCUTransport.RoundTrip(request)
-	})
-
-	started := time.Now()
-	callGameplayOverviewForTest(t, a, publicRef)
-	if elapsed := time.Since(started); elapsed >= 400*time.Millisecond {
-		t.Fatalf("independent overview upstreams were serialized: elapsed=%s", elapsed)
-	}
-
-	data, err := store.readDiagnosticLog()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var phases map[string]any
-	for _, line := range bytes.Split(bytes.TrimSpace(data), []byte("\n")) {
-		var event map[string]any
-		if json.Unmarshal(line, &event) == nil && event["event"] == "overview_phases_ms" {
-			phases, _ = event["load_phases_ms"].(map[string]any)
-		}
-	}
-	if phases == nil {
-		t.Fatalf("missing phase diagnostics: %s", data)
-	}
-	span := func(name string) [2]float64 {
-		values, _ := phases["spans"].(map[string]any)
-		entries, _ := values[name].([]any)
-		if len(entries) == 0 {
-			t.Fatalf("phase %q has no measured span: %#v", name, phases["spans"])
-		}
-		pair, ok := entries[0].([]any)
-		if !ok || len(pair) != 2 {
-			t.Fatalf("phase %q span has unexpected shape: %#v", name, entries[0])
-		}
-		return [2]float64{pair[0].(float64), pair[1].(float64)}
-	}
-	overlaps := func(left, right [2]float64) bool { return left[0] < right[1] && right[0] < left[1] }
-	detailed, ranks, mastery := span("detailed_matches"), span("ranks"), span("mastery")
-	if !overlaps(detailed, ranks) || !overlaps(detailed, mastery) {
-		t.Fatalf("expected detailed matches to overlap ranks and mastery: detailed=%v ranks=%v mastery=%v", detailed, ranks, mastery)
-	}
-	// Slow parallel upstreams must not be mislabeled as recent-player aggregation
-	// or JSON serialization. Both are local work after the upstream results arrive.
-	recent, _ := phases["recent_players"].(float64)
-	serialize, _ := phases["serialize"].(float64)
-	total, _ := phases["total"].(float64)
-	if total < 150 || recent >= 100 || serialize >= 100 {
-		t.Fatalf("parallel wait leaked into local phases: recent=%v serialize=%v total=%v", recent, serialize, total)
-	}
-	spans, _ := phases["spans"].(map[string]any)
-	if entries, _ := spans["recent_players"].([]any); len(entries) != 2 {
-		t.Fatalf("recent-player local aggregation must have two measured spans, got %#v", spans["recent_players"])
-	}
 }
 
 func TestGameplayOverviewReturnsPartialBeforeTwentySeconds(t *testing.T) {
-	a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
-	store := trackTestStore(t, &localStore{root: t.TempDir()})
-	if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	a.storage = store
-	waitGameplaySeasonJobsBeforeCleanup(t, a)
-	a.sgp.observe = a.recordDiagnostic
-	var expire context.CancelFunc
-	a.overviewTimeout = func(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
-		if d != 18*time.Second {
-			t.Fatalf("budget=%v", d)
+
+	// Drive the real cancellation route after two completed pages.
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		a, publicRef, _ := newGameplayOverviewSGPFixture(t, true)
+		store := trackTestStore(t, &localStore{root: t.TempDir()})
+		if err := os.MkdirAll(filepath.Join(store.root, "logs"), 0o700); err != nil {
+			t.Fatal(err)
 		}
-		ctx, cancel := context.WithCancel(parent)
-		expire = cancel
-		return r86DeadlineContext{ctx}, cancel
-	}
-	var summaryCalls atomic.Int64
-	a.sgp.http = &http.Client{Transport: sgpRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		if !strings.HasSuffix(request.URL.Path, "/SUMMARY") {
-			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`[]`)), Request: request}, nil
+		a.storage = store
+		waitGameplaySeasonJobsBeforeCleanup(t, a)
+		a.sgp.observe = a.recordDiagnostic
+		var expire context.CancelFunc
+		a.overviewTimeout = func(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+			if d != 18*time.Second {
+				t.Fatalf("budget=%v", d)
+			}
+			ctx, cancel := context.WithCancel(parent)
+			expire = cancel
+			return r86DeadlineContext{ctx}, cancel
 		}
-		if len(request.URL.Query()["tag"]) > 0 {
-			return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"games":[]}`)), Request: request}, nil
+		var summaryCalls atomic.Int64
+		a.sgp.http = &http.Client{Transport: sgpRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+			if !strings.HasSuffix(request.URL.Path, "/SUMMARY") {
+				return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`[]`)), Request: request}, nil
+			}
+			if len(request.URL.Query()["tag"]) > 0 {
+				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"games":[]}`)), Request: request}, nil
+			}
+			if summaryCalls.Add(1) >= 3 {
+				expire()
+				<-request.Context().Done()
+				return nil, request.Context().Err()
+			}
+			start, _ := strconv.Atoi(request.URL.Query().Get("startIndex"))
+			games := make([]map[string]any, 0, 20)
+			for index := 0; index < 20; index++ {
+				games = append(games, map[string]any{"json": map[string]any{
+					"gameId": start + index + 1, "queueId": 420, "gameCreation": time.Now().UnixMilli(), "gameDuration": 1800,
+					"participants": []map[string]any{{"puuid": strings.Repeat("o", 48), "participantId": 1, "teamId": 100, "championId": 103, "win": true}},
+				}})
+			}
+			body, _ := json.Marshal(map[string]any{"games": games})
+			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(body)), ContentLength: int64(len(body)), Request: request}, nil
+		})}
+		requestContext, cancel := context.WithTimeout(context.Background(), 21*time.Second)
+		defer cancel()
+		request := httptest.NewRequest(http.MethodPost, "/api/gameplay/overview", strings.NewReader(`{"playerRef":"`+publicRef+`","count":50}`)).WithContext(requestContext)
+		recorder := httptest.NewRecorder()
+
+		started := time.Now()
+		a.handleGameplayOverview(recorder, request)
+		elapsed := time.Since(started)
+		var overview gameplayOverview
+		if err := json.Unmarshal(recorder.Body.Bytes(), &overview); err != nil {
+			t.Fatalf("partial overview response = status:%d body:%q err:%v", recorder.Code, recorder.Body.String(), err)
 		}
-		if summaryCalls.Add(1) >= 3 {
-			expire() // Drive the real cancellation route after two completed pages.
-			<-request.Context().Done()
-			return nil, request.Context().Err()
+		if recorder.Code != http.StatusOK || len(overview.Matches) == 0 || !overview.Pagination.Partial || !overview.Pagination.BudgetExceeded || !overview.Pagination.HasMore || summaryCalls.Load() < 3 || r287TooSlow(r287Context, t, "backend/gameplay_test.go:441 duration", elapsed, time.Second, true) {
+			t.Fatalf("budgeted overview = status:%d elapsed:%s matches:%d pagination:%#v calls:%d", recorder.Code, elapsed, len(overview.Matches), overview.Pagination, summaryCalls.Load())
 		}
-		start, _ := strconv.Atoi(request.URL.Query().Get("startIndex"))
-		games := make([]map[string]any, 0, 20)
-		for index := 0; index < 20; index++ {
-			games = append(games, map[string]any{"json": map[string]any{
-				"gameId": start + index + 1, "queueId": 420, "gameCreation": time.Now().UnixMilli(), "gameDuration": 1800,
-				"participants": []map[string]any{{"puuid": strings.Repeat("o", 48), "participantId": 1, "teamId": 100, "championId": 103, "win": true}},
-			}})
-		}
-		body, _ := json.Marshal(map[string]any{"games": games})
-		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(body)), ContentLength: int64(len(body)), Request: request}, nil
-	})}
-	requestContext, cancel := context.WithTimeout(context.Background(), 21*time.Second)
-	defer cancel()
-	request := httptest.NewRequest(http.MethodPost, "/api/gameplay/overview", strings.NewReader(`{"playerRef":"`+publicRef+`","count":50}`)).WithContext(requestContext)
-	recorder := httptest.NewRecorder()
-	started := time.Now()
-	a.handleGameplayOverview(recorder, request)
-	elapsed := time.Since(started)
-	var overview gameplayOverview
-	if err := json.Unmarshal(recorder.Body.Bytes(), &overview); err != nil {
-		t.Fatalf("partial overview response = status:%d body:%q err:%v", recorder.Code, recorder.Body.String(), err)
-	}
-	if recorder.Code != http.StatusOK || elapsed >= time.Second || len(overview.Matches) == 0 || !overview.Pagination.Partial || !overview.Pagination.BudgetExceeded || !overview.Pagination.HasMore || summaryCalls.Load() < 3 {
-		t.Fatalf("budgeted overview = status:%d elapsed:%s matches:%d pagination:%#v calls:%d", recorder.Code, elapsed, len(overview.Matches), overview.Pagination, summaryCalls.Load())
-	}
+	})
 }
 
 func TestGameplayOverviewHistoryWindowUsesCacheAcrossRequests(t *testing.T) {
@@ -1955,6 +1964,7 @@ func TestGameplayOverviewAppliesSeasonFallbackToIncompleteSGPRanks(t *testing.T)
 }
 
 func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	playerRef := strings.Repeat("z", 48)
 	seasonPageStarted := make(chan struct{}, 1)
 	releaseSeasonPage := make(chan struct{})
@@ -2010,9 +2020,17 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 		result <- a.loadGameplayOverview(context.Background(), client, a.summoner, gameplayReference{PlayerRef: playerRef, ServerID: "HN1"}, 0, 20, "all", false)
 	}()
 	var overview gameplayOverview
-	select {
-	case overview = <-result:
-	case <-time.After(750 * time.Millisecond):
+	if !r287WaitSelect(t, "backend/gameplay_test.go:2013 wait", 750*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+		r287CaptureMu.Lock()
+		defer r287CaptureMu.Unlock()
+		select {
+		case r287Value := <-result:
+			overview = r287Value
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("overview waited for the slow season scan")
 	}
 	if len(overview.Matches) == 0 || len(overview.Ranks) == 0 {
@@ -2021,9 +2039,14 @@ func TestGameplayOverviewReturnsCoreBeforeSlowSeasonScan(t *testing.T) {
 	if overview.SeasonOverall.Games < 0 || !overview.SeasonStatsProgress.Collecting || overview.SeasonStatsProgress.Complete {
 		t.Fatalf("initial season slice = stats=%#v overall=%#v progress=%#v", overview.SeasonChampionStats, overview.SeasonOverall, overview.SeasonStatsProgress)
 	}
-	select {
-	case <-seasonPageStarted:
-	case <-time.After(750 * time.Millisecond):
+	if !r287WaitSelect(t, "backend/gameplay_test.go:2024 wait", 750*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-seasonPageStarted:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("season scan was not started incrementally")
 	}
 	releaseSeason()

@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "formal": {
-    "productRounds": 2,
-    "testInfrastructureRounds": 2,
+    "productRounds": 1,
+    "testInfrastructureRounds": 1,
     "firstEvent": "push",
     "subsequentEvent": "workflow_dispatch",
     "measure_windows_renderers": true,

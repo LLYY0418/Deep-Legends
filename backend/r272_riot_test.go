@@ -38,47 +38,51 @@ func TestR272DetailDiskCrossCredential(t *testing.T) {
 func TestR272FiveColdKROverviewFirstTen(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			f := r98OverviewFixture(t, true)
-			ref := gameplayReference{GameName: "Fixture", TagLine: "KR1", Region: "kr"}
-			started := time.Now()
-			firstCtx, firstProbe := r273TimingContext(f.a.riot)
-			first, err := f.a.loadRiotOverview(firstCtx, ref, 0, 10)
-			firstElapsed := time.Since(started)
-			r273LogTimings(t, f, firstProbe, "cold-first-ten", started)
-			if err != nil || len(first.Matches) != 10 || firstElapsed > 3*time.Second {
-				t.Fatal("cold first10 budget", len(first.Matches), firstElapsed, err)
-			}
-			firstMS := firstElapsed.Milliseconds()
-			nextCtx, nextProbe := r273TimingContext(f.a.riot)
-			nextStarted := time.Now()
-			next, err := f.a.loadRiotOverview(withRiotBackground(nextCtx), ref, 10, 10)
-			r273LogTimings(t, f, nextProbe, "background-next-ten", nextStarted)
-			if err != nil || len(next.Matches) != 10 {
-				t.Fatal("background next10", err)
-			}
-			f.mu.Lock()
-			before := f.calls["detail"]
-			f.mu.Unlock()
-			for _, m := range append(first.Matches, next.Matches...) {
-				if _, _, err := f.a.riot.matchByIDWithCache(context.Background(), fmt.Sprintf("KR_%d", m.GameID)); err != nil {
+
+			r287TimingScenario(t, func(r287Context *r287TimingContext) {
+				f := r98OverviewFixture(t, true)
+				ref := gameplayReference{GameName: "Fixture", TagLine: "KR1", Region: "kr"}
+
+				started := time.Now()
+				firstCtx, firstProbe := r273TimingContext(f.a.riot)
+				first, err := f.a.loadRiotOverview(firstCtx, ref, 0, 10)
+				firstElapsed := time.Since(started)
+				r273LogTimings(t, f, firstProbe, "cold-first-ten", started)
+				if err != nil || len(first.Matches) != 10 || r287TooSlow(r287Context, t, "backend/r272_riot_test.go:48 duration", firstElapsed, 3*time.Second, false) {
+					t.Fatal("cold first10 budget", len(first.Matches), firstElapsed, err)
+				}
+				firstMS := firstElapsed.Milliseconds()
+				nextCtx, nextProbe := r273TimingContext(f.a.riot)
+				nextStarted := time.Now()
+				next, err := f.a.loadRiotOverview(withRiotBackground(nextCtx), ref, 10, 10)
+				r273LogTimings(t, f, nextProbe, "background-next-ten", nextStarted)
+				if err != nil || len(next.Matches) != 10 {
+					t.Fatal("background next10", err)
+				}
+				f.mu.Lock()
+				before := f.calls["detail"]
+				f.mu.Unlock()
+				for _, m := range append(first.Matches, next.Matches...) {
+					if _, _, err := f.a.riot.matchByIDWithCache(context.Background(), fmt.Sprintf("KR_%d", m.GameID)); err != nil {
+						t.Fatal(err)
+					}
+				}
+				again, err := f.a.loadRiotOverview(context.Background(), ref, 0, 10)
+				if err != nil || len(again.Matches) != 10 {
 					t.Fatal(err)
 				}
-			}
-			again, err := f.a.loadRiotOverview(context.Background(), ref, 0, 10)
-			if err != nil || len(again.Matches) != 10 {
-				t.Fatal(err)
-			}
-			f.mu.Lock()
-			defer f.mu.Unlock()
-			if f.calls["detail"] != before || before != 20 {
-				t.Fatal("repeated overview/details made extra detail requests", before, f.calls["detail"])
-			}
-			for _, event := range f.events {
-				if event["event"] == "riot_request" && event["foreground"] == true && strings.Contains(strings.ToLower(riotTestString(event["route"])), "relay") {
-					t.Error("foreground relay")
+				f.mu.Lock()
+				defer f.mu.Unlock()
+				if f.calls["detail"] != before || before != 20 {
+					t.Fatal("repeated overview/details made extra detail requests", before, f.calls["detail"])
 				}
-			}
-			t.Logf("synthetic player%d first10=%dms total20=%dms requests20 no repeated detail; observation ends before120s", i, firstMS, time.Since(started).Milliseconds())
+				for _, event := range f.events {
+					if event["event"] == "riot_request" && event["foreground"] == true && strings.Contains(strings.ToLower(riotTestString(event["route"])), "relay") {
+						t.Error("foreground relay")
+					}
+				}
+				t.Logf("synthetic player%d first10=%dms total20=%dms requests20 no repeated detail; observation ends before120s", i, firstMS, time.Since(started).Milliseconds())
+			})
 		})
 	}
 }

@@ -54,14 +54,20 @@ func TestInstallationSuccessAlwaysRunsHandoffIncludingUpdate(t *testing.T) {
 						},
 					})
 				}()
-				select {
-				case pid := <-queried:
-					if pid != 42 || closed.Load() {
-						t.Fatal("handoff did not wait for the launched application's window")
+				if !r287WaitSelect(t, "installer/completion_test.go:57 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+					select {
+					case pid := <-queried:
+						if pid != 42 || closed.Load() {
+							t.Fatal("handoff did not wait for the launched application's window")
+						}
+						return true
+					case <-done:
+						t.Fatal("successful installation bypassed application handoff")
+						return true
+					case <-r287Deadline:
+						return false
 					}
-				case <-done:
-					t.Fatal("successful installation bypassed application handoff")
-				case <-time.After(3 * time.Second):
+				}) {
 					t.Fatal("successful installation never entered application handoff")
 				}
 				if visible {
@@ -70,12 +76,17 @@ func TestInstallationSuccessAlwaysRunsHandoffIncludingUpdate(t *testing.T) {
 				} else {
 					deadline <- time.Now()
 				}
-				select {
-				case <-done:
-					if handoffs.Load() != 1 || !closed.Load() {
-						t.Fatal("handoff must finish exactly once")
+				if !r287WaitSelect(t, "installer/completion_test.go:73 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+					select {
+					case <-done:
+						if handoffs.Load() != 1 || !closed.Load() {
+							t.Fatal("handoff must finish exactly once")
+						}
+						return true
+					case <-r287Deadline:
+						return false
 					}
-				case <-time.After(3 * time.Second):
+				}) {
 					t.Fatal("handoff never released installer")
 				}
 			})
@@ -148,12 +159,17 @@ func TestInstallerExitOnlyClosesItsWindowAndKeepsChildAlive(t *testing.T) {
 	}()
 	readLine := func(want string) {
 		t.Helper()
-		select {
-		case got := <-lines:
-			if got != want {
-				t.Fatalf("child process was terminated or did not respond: %q", got)
+		if !r287WaitSelect(t, "installer/completion_test.go:151 wait", 5*time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case got := <-lines:
+				if got != want {
+					t.Fatalf("child process was terminated or did not respond: %q", got)
+				}
+				return true
+			case <-r287Deadline:
+				return false
 			}
-		case <-time.After(5 * time.Second):
+		}) {
 			t.Fatal("child process did not respond")
 		}
 	}

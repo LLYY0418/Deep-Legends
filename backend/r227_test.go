@@ -69,9 +69,14 @@ func TestR227GateChangesDuringSessionReadDoNotStopPick(t *testing.T) {
 				defer close(evaluated)
 				f.r.evaluateChampSelect(f.c, settings)
 			}()
-			select {
-			case <-reading:
-			case <-time.After(time.Second):
+			if !r287WaitSelect(t, "backend/r227_test.go:72 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-reading:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				close(release)
 				t.Fatal("evaluation did not reach session GET")
 			}
@@ -90,9 +95,14 @@ func TestR227GateChangesDuringSessionReadDoNotStopPick(t *testing.T) {
 				f.r.mu.Unlock()
 			}
 			close(release)
-			select {
-			case <-evaluated:
-			case <-time.After(time.Second):
+			if !r287WaitSelect(t, "backend/r227_test.go:93 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-evaluated:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Fatal("evaluation did not finish after session GET")
 			}
 			f.c.http.Transport = base

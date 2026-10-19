@@ -34,10 +34,15 @@ func writeWarmFile(t *testing.T, path, value string) {
 }
 func awaitWarmResult(t *testing.T, state *executableWarmState) {
 	t.Helper()
-	select {
-	case result := <-state.result:
-		state.result <- result
-	case <-time.After(time.Second):
+	if !r287WaitSelect(t, "installer/execute_prewarm_test.go:37 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case result := <-state.result:
+			state.result <- result
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("execution did not complete")
 	}
 }
@@ -72,9 +77,14 @@ func TestExecuteWarmupStartsBothProcessesWhileFakeNSISStillRunning(t *testing.T)
 	w.Poll(w.started.Add(400*time.Millisecond), finished)
 	// Both must enter without waiting for the other process or for NSIS exit.
 	for range 2 {
-		select {
-		case <-entered:
-		case <-time.After(time.Second):
+		if !r287WaitSelect(t, "installer/execute_prewarm_test.go:75 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+			select {
+			case <-entered:
+				return true
+			case <-r287Deadline:
+				return false
+			}
+		}) {
 			t.Fatal("warmup did not overlap running NSIS")
 		}
 	}
@@ -164,78 +174,103 @@ func TestExecuteWarmupCannotBeginAfterNSISExit(t *testing.T) {
 }
 
 func TestExecuteWarmupFailuresAndBlockedProcessNeverHoldInstallationHandoff(t *testing.T) {
+	var r287CaptureMu sync.Mutex
 	for _, failure := range []string{"nonzero", "blocked", "missing"} {
 		t.Run(failure, func(t *testing.T) {
-			release := make(chan struct{})
-			releaseWarm := sync.OnceFunc(func() { close(release) })
-			defer releaseWarm()
-			entered := make(chan struct{}, 2)
-			w, directory, finished, _ := warmFixture(t, 250*time.Millisecond, func(ctx context.Context, target warmTarget) warmExit {
-				entered <- struct{}{}
-				if failure == "blocked" {
-					<-release
-				} // even a runner ignoring cancellation cannot block Finish
-				return warmExit{Code: 7, Err: errors.New("synthetic failure")}
-			})
-			if failure != "missing" {
-				for _, file := range startupPrewarmPaths(directory) {
-					writeWarmFile(t, file, "complete")
-				}
-				w.Poll(w.started, finished)
-				w.Poll(w.started.Add(time.Second), finished)
-				for range 2 {
-					select {
-					case <-entered:
-					case <-time.After(time.Second):
-						t.Fatal("missing execution attempt")
+
+			// even a runner ignoring cancellation cannot block Finish
+
+			r287TimingScenario(t, func(r287Context *r287TimingContext) {
+				release := make(chan struct{})
+				releaseWarm := sync.OnceFunc(func() { close(release) })
+				defer releaseWarm()
+				entered := make(chan struct{}, 2)
+				w, directory, finished, _ := warmFixture(t, 250*time.Millisecond, func(ctx context.Context, target warmTarget) warmExit {
+					entered <- struct{}{}
+					if failure == "blocked" {
+						<-release
 					}
-				}
-				if failure == "blocked" {
-					select {
-					case <-w.ctx.Done():
-					case <-time.After(time.Second):
-						t.Fatal("8s execution budget was ignored")
+					return warmExit{Code: 7, Err: errors.New("synthetic failure")}
+				})
+				if failure != "missing" {
+					for _, file := range startupPrewarmPaths(directory) {
+						writeWarmFile(t, file, "complete")
 					}
-				} else {
-					for i := range w.states {
-						awaitWarmResult(t, &w.states[i])
-					}
-				}
-			}
-			close(finished)
-			started := time.Now()
-			planned := make(chan warmFallback, 1)
-			go func() { planned <- w.Finish() }()
-			var fallback warmFallback
-			select {
-			case fallback = <-planned:
-			case <-time.After(500 * time.Millisecond):
-				releaseWarm()
-				<-planned
-				t.Fatal("Finish waited for a blocked warm process")
-			}
-			if len(fallback.Paths) != 2 || fallback.ExecuteValid != 0 {
-				t.Fatal(fallback)
-			}
-			// Exercise the unchanged real completion and handoff policies too.
-			launched, closed := false, false
-			completeInstallation(installerOptions{}, installationResult{}, installationCompletionHooks{
-				Failed: func(failureMessage) { t.Error("warmup failed installation") }, Cleanup: func() {},
-				Handoff: func() {
-					completeStartupWarmup(directory, w, func(context.Context, string) error {
-						if failure == "missing" {
-							return os.ErrNotExist
+					w.Poll(w.started, finished)
+					w.Poll(w.started.Add(time.Second), finished)
+					for range 2 {
+						if !r287WaitSelect(t, "installer/execute_prewarm_test.go:187 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+							select {
+							case <-entered:
+								return true
+							case <-r287Deadline:
+								return false
+							}
+						}) {
+							t.Fatal("missing execution attempt")
 						}
-						return nil
-					}, time.Second, func(int) {})
-					runApplicationHandoff(handoffHooks{ShowStarting: func() {}, Start: func() (uint32, error) { return 42, nil },
-						HasWindow: func(pid uint32) bool { launched = pid == 42; return launched }, LaunchError: func(error) { t.Error("launch failed") },
-						CloseInstaller: func(visible bool) { closed = visible }}, realHandoffClock)
-				},
+					}
+					if failure == "blocked" {
+						if !r287WaitSelect(t, "installer/execute_prewarm_test.go:194 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+							select {
+							case <-w.ctx.Done():
+								return true
+							case <-r287Deadline:
+								return false
+							}
+						}) {
+							t.Fatal("8s execution budget was ignored")
+						}
+					} else {
+						for i := range w.states {
+							awaitWarmResult(t, &w.states[i])
+						}
+					}
+				}
+				close(finished)
+
+				started := time.Now()
+				planned := make(chan warmFallback, 1)
+				go func() { planned <- w.Finish() }()
+				var fallback warmFallback
+				if !r287WaitSelect(t, "installer/execute_prewarm_test.go:210 wait", 500*time.Millisecond, func(r287Deadline <-chan time.Time) bool {
+					r287CaptureMu.Lock()
+					defer r287CaptureMu.Unlock()
+					select {
+					case r287Value := <-planned:
+						fallback = r287Value
+						return true
+					case <-r287Deadline:
+						return false
+					}
+				}) {
+					releaseWarm()
+					<-planned
+					t.Fatal("Finish waited for a blocked warm process")
+				}
+				if len(fallback.Paths) != 2 || fallback.ExecuteValid != 0 {
+					t.Fatal(fallback)
+				}
+				// Exercise the unchanged real completion and handoff policies too.
+				launched, closed := false, false
+				completeInstallation(installerOptions{}, installationResult{}, installationCompletionHooks{
+					Failed: func(failureMessage) { t.Error("warmup failed installation") }, Cleanup: func() {},
+					Handoff: func() {
+						completeStartupWarmup(directory, w, func(context.Context, string) error {
+							if failure == "missing" {
+								return os.ErrNotExist
+							}
+							return nil
+						}, time.Second, func(int) {})
+						runApplicationHandoff(handoffHooks{ShowStarting: func() {}, Start: func() (uint32, error) { return 42, nil },
+							HasWindow: func(pid uint32) bool { launched = pid == 42; return launched }, LaunchError: func(error) { t.Error("launch failed") },
+							CloseInstaller: func(visible bool) { closed = visible }}, realHandoffClock)
+					},
+				})
+				if !launched || !closed || r287TooSlow(r287Context, t, "installer/execute_prewarm_test.go:246 duration", time.Since(started), 500*time.Millisecond, false) {
+					t.Fatal("warmup blocked completion or real launch")
+				}
 			})
-			if !launched || !closed || time.Since(started) > 500*time.Millisecond {
-				t.Fatal("warmup blocked completion or real launch")
-			}
 		})
 	}
 }

@@ -63,9 +63,14 @@ func waitUpdateCheck(t *testing.T, u *updateManager) {
 	u.mu.Lock()
 	done := u.checkDone
 	u.mu.Unlock()
-	select {
-	case <-done:
-	case <-time.After(3 * time.Second):
+	if !r287WaitSelect(t, "backend/update_test.go:66 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("check stuck")
 	}
 }
@@ -74,9 +79,14 @@ func waitUpdateDownload(t *testing.T, u *updateManager) {
 	u.mu.Lock()
 	done := u.downloadDone
 	u.mu.Unlock()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
+	if !r287WaitSelect(t, "backend/update_test.go:77 wait", 5*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("download stuck")
 	}
 }
@@ -252,9 +262,14 @@ func TestUpdateBusyOperationsRejectOverlappingWork(t *testing.T) {
 					go func() { applied <- u.Apply() }()
 				}
 			}
-			select {
-			case <-entered:
-			case <-time.After(3 * time.Second):
+			if !r287WaitSelect(t, "backend/update_test.go:255 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-entered:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Fatal("operation did not reach barrier")
 			}
 			before := u.Status()
@@ -282,12 +297,17 @@ func TestUpdateBusyOperationsRejectOverlappingWork(t *testing.T) {
 			if state == "checking" {
 				waitUpdateCheck(t, u)
 			} else if applied != nil {
-				select {
-				case err := <-applied:
-					if err != nil {
-						t.Fatal(err)
+				if !r287WaitSelect(t, "backend/update_test.go:285 wait", 3*time.Second, func(r287Deadline <-chan time.Time) bool {
+					select {
+					case err := <-applied:
+						if err != nil {
+							t.Fatal(err)
+						}
+						return true
+					case <-r287Deadline:
+						return false
 					}
-				case <-time.After(3 * time.Second):
+				}) {
 					t.Fatal("apply stuck")
 				}
 			} else {
@@ -775,9 +795,14 @@ func TestUpdateProgressAndStalledSourceFallback(t *testing.T) {
 		response := updateResponse(200, nil)
 		response.Body = &updateSlowBody{ctx: r.Context(), left: len(data), beforeRead: func() {
 			ticks <- time.Now()
-			select {
-			case <-progressSeen:
-			case <-time.After(time.Second):
+			if !r287WaitSelect(t, "backend/update_test.go:798 wait", time.Second, func(r287Deadline <-chan time.Time) bool {
+				select {
+				case <-progressSeen:
+					return true
+				case <-r287Deadline:
+					return false
+				}
+			}) {
 				t.Error("progress timer not observed")
 			}
 		}}
@@ -789,9 +814,14 @@ func TestUpdateProgressAndStalledSourceFallback(t *testing.T) {
 	u.mu.Lock()
 	done := u.downloadDone
 	u.mu.Unlock()
-	select {
-	case <-done:
-	case <-time.After(12 * time.Second):
+	if !r287WaitSelect(t, "backend/update_test.go:792 wait", 12*time.Second, func(r287Deadline <-chan time.Time) bool {
+		select {
+		case <-done:
+			return true
+		case <-r287Deadline:
+			return false
+		}
+	}) {
 		t.Fatal("stalled source never fell back")
 	}
 	if requests.Load() != 2 || progress.Load() < 2 || u.Status().State != "ready" {

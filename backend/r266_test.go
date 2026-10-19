@@ -432,20 +432,24 @@ func TestR266ProRiotIDResolutionAndRetriesJoinFlight(t *testing.T) {
 	}
 }
 func TestR266IDsTimeoutHasBoundedRetry(t *testing.T) {
-	f := r98OverviewFixture(t, false)
-	calls := 0
-	old := f.a.riot.champions.client.Transport
-	f.a.riot.champions.client.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if strings.HasSuffix(r.URL.Path, "/ids") {
-			calls++
-			<-r.Context().Done()
-			return nil, r.Context().Err()
+
+	r287TimingScenario(t, func(r287Context *r287TimingContext) {
+		f := r98OverviewFixture(t, false)
+		calls := 0
+		old := f.a.riot.champions.client.Transport
+		f.a.riot.champions.client.Transport = gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			if strings.HasSuffix(r.URL.Path, "/ids") {
+				calls++
+				<-r.Context().Done()
+				return nil, r.Context().Err()
+			}
+			return old.RoundTrip(r)
+		})
+
+		started := time.Now()
+		_, err := f.a.loadRiotOverview(context.Background(), gameplayReference{PlayerRef: "r98-subject", Region: "kr"}, 20, 10)
+		if err == nil || calls != 2 || r287TooSlow(r287Context, t, "backend/r266_test.go:448 duration", time.Since(started), 24500*time.Millisecond, false) {
+			t.Fatalf("timeout=%v calls=%d elapsed=%v", err, calls, time.Since(started))
 		}
-		return old.RoundTrip(r)
 	})
-	started := time.Now()
-	_, err := f.a.loadRiotOverview(context.Background(), gameplayReference{PlayerRef: "r98-subject", Region: "kr"}, 20, 10)
-	if err == nil || time.Since(started) > 24500*time.Millisecond || calls != 2 {
-		t.Fatalf("timeout=%v calls=%d elapsed=%v", err, calls, time.Since(started))
-	}
 }
