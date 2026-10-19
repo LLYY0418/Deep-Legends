@@ -251,51 +251,23 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 		return ctx.Err()
 	}
 	p.champions.championMeta = map[int]championMetadata{1: {NameZH: "安妮"}}
-	waits := make(chan time.Duration, 4)
-	ticks := make(chan struct{})
-	stopped := make(chan struct{})
 	a := &app{riot: p, champions: p.champions, proRefreshContext: ctx}
-	a.proPlayers.refreshNow = now
-	a.proPlayers.refreshWait = func(ctx context.Context, d time.Duration) error {
-		trace("worker_wait_enter")
-		waits <- d
-		select {
-		case <-ticks:
-			trace("worker_tick")
-			nanos.Add(int64(d))
-			return nil
-		case <-ctx.Done():
-			trace("worker_stopped")
-			close(stopped)
-			return ctx.Err()
-		}
-	}
-	awaitWait := func() {
-		t.Helper()
-		trace("await_worker_wait")
-		select {
-		case d := <-waits:
-			trace("worker_wait_observed")
-			if d != time.Minute {
-				t.Fatalf("drip interval=%s", d)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatal("startup/worker stuck")
-		}
-	}
-	trace("directory_start")
-	if _, _, err := a.loadProPlayers(ctx, false); err != nil {
+	a.warmProPlayersCaches()
+	teams, _, err := a.proPlayersFirstScreen(false)
+	if err != nil {
 		t.Fatal(err)
 	}
-	trace("directory_returned")
-	awaitWait() // final directory + supplements + ladder publication completed
-	if background.Load() != 0 || foreground.Load() != 0 || directoryCalls.Load() != 1 {
-		t.Fatalf("startup unexpectedly called Riot: bg=%d fg=%d directory=%d", background.Load(), foreground.Load(), directoryCalls.Load())
+	if background.Load() != 0 || foreground.Load() != 0 || directoryCalls.Load() != 0 {
+		t.Fatalf("local startup made requests: bg=%d fg=%d directory=%d", background.Load(), foreground.Load(), directoryCalls.Load())
 	}
-	ticks <- struct{}{}
-	awaitWait() // 60s, one cold fallback account
-	if got := background.Load(); got != 4 {
-		t.Fatalf("one-account minute must cost four cold Riot requests, got %d", got)
+	visible := r104Rows(teams)
+	if len(visible) < 2 {
+		t.Fatal("missing visible accounts")
+	}
+	a.initializeProProfileCache()
+	a.refreshProScope(map[string]opggProAccount{"pro-profile-v2|" + proLadderAccountKey(visible[0].GameName, visible[0].TagLine): visible[0]}, false)
+	if background.Load() != 4 {
+		t.Fatal("one visible cold account must cost four Riot requests", background.Load())
 	}
 	// Hold a foreground FIFO head while a real 20-match search joins behind it.
 	release, err := p.enterRiotLimitQueue(ctx)
@@ -334,10 +306,7 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 	before := background.Load()
-	ticks <- struct{}{}
-	// P7 pauses this worker in its foreground gate until the overview completes;
-	// it no longer returns to the next minute's timer while foreground is active.
-	time.Sleep(20 * time.Millisecond)
+	a.refreshProScope(map[string]opggProAccount{"pro-profile-v2|" + proLadderAccountKey(visible[1].GameName, visible[1].TagLine): visible[1]}, false)
 	if background.Load() != before {
 		t.Errorf("background inserted requests ahead of waiting foreground: %d -> %d", before, background.Load())
 	}
@@ -356,12 +325,7 @@ func TestR104ColdStartupDripProtectsForegroundTwentyMatches(t *testing.T) {
 		t.Fatalf("two-minute quota bg=%d fg=%d", background.Load(), foreground.Load())
 	}
 	cancel()
-	select {
-	case <-stopped:
-	case <-time.After(time.Second):
-		t.Fatal("worker did not stop")
-	}
-	t.Logf("cold startup: 0 Riot; first minute: 4 background; second minute yields; foreground: 20/20, %d requests", foreground.Load())
+	t.Logf("local startup: 0 Riot; one visible account: 4 background; next visible account yields; foreground: 20/20, %d requests", foreground.Load())
 }
 
 func TestR104RefreshDiagnosticsCountRequestsAndBudgetSkips(t *testing.T) {

@@ -8,7 +8,7 @@ test('R285 reconnect canceled card has no status sentence; failed and fired rema
  const d={key:'autoReconnect',action:'reconnect',phaseKey:'Reconnect',title:'断线自动重连'};
  for(const kind of ['canceled','failed','fired']){
   events.set('reconnect',{kind});const html=f.watchRuleCard(d,{enabled:true},true,{});
-  const foot=html.match(/<div class="watch-rule-foot">(.*?)<\/div>/)[1];
+  const foot=html.match(/<div class="watch-rule-foot status-text(?: is-(?:danger|warning))?">(.*?)<\/div>/)[1];
   if(kind==='canceled')assert.equal(foot,'');
   if(kind==='failed')assert(foot.includes('上次触发失败'));
   if(kind==='fired')assert(!foot.includes('上次触发失败'));

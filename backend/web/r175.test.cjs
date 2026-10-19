@@ -13,7 +13,7 @@ test('R175 real anonymous recovery response renders five allied cards with the e
  const names=['playerLabel','maskedPlayerName','liveHistoryStateOf','liveHistorySettled','renderLivePlayer','champSelectEnemyPlaceholder','livePremadeRoster','clusterPremadePlayers','orderLivePlayers','insightTeamLayout','isSummonersRiftMatch','renderLiveInsights'];
  const deps={state:{settings:{liveOrder:'team',maskNames:false}},SUMMONERS_RIFT_QUEUE_IDS:[420,440],liveDisplayedChampionId:()=>0,renderLivePremadeTag:()=>'',renderProIdentityBadge:()=>'',proBadgeAttributes:()=>'',iconFigure:()=>'<icon></icon>',escapeHTML:String,positionLabel:()=>'',rankTitle:()=>'',number:String,percent:String,kda:String,
  liveAugmentRecommendationSource:()=> 'hextech',recordLiveRosterRendered:()=>{},renderLiveRosterNoticeBars:()=>'',renderLiveTeamPortraitTags:()=>'',renderInsightMatches:()=>'',renderLiveRecentPositions:()=>'',isARAMRelatedMatch:()=>true,arenaLivePlayerGroups:()=>[]};
- const render=Function(...Object.keys(deps),names.map(extract).join('\n')+';return renderLiveInsights;')(...Object.values(deps));
+ const render=require('./r188-harness.cjs').compile(source,names,deps).renderLiveInsights;
  const dom=new JSDOM(render(response));try{
   const doc=dom.window.document,ally=doc.querySelector('.live-team.is-blue'),foe=doc.querySelector('.live-team.is-red');
   assert.equal(ally.querySelector('h3').textContent,'我方');assert.equal(ally.querySelectorAll('article.live-player').length,5);assert.equal(foe.querySelectorAll('article.live-player').length,5);

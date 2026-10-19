@@ -8,7 +8,7 @@ const desktop = path.resolve(__dirname, "..");
 const [baseUrl, token, directory, mode, sourcePath, buildFingerprint] = process.argv.slice(2);
 assert.ok(buildFingerprint, "Go test must supply the running build fingerprint");
 const source = fs.readFileSync(sourcePath || path.join(desktop, "main.cjs"), "utf8");
-const pending = new Set(), responses = [], windows = [], timers = new Map(), logs = [];
+const pending = new Set(), responses = [], windows = [], timers = new Map(), logs = [], preferenceFiles = new Map();
 let boot, child, now = 1000, timerID = 0;
 const app = new EventEmitter(), ipcMain = new EventEmitter(), screen = new EventEmitter(), nativeTheme = new EventEmitter();
 Object.assign(app, { isPackaged: true, setAppUserModelId() {}, requestSingleInstanceLock: () => true,
@@ -33,6 +33,7 @@ class Window extends EventEmitter {
   isMaximized() { return false; }
   getContentBounds() { return this.bounds; }
   getBounds() { return this.getContentBounds(); }
+  setContentProtection(value) { assert.equal(typeof value, "boolean"); this.contentProtection = value; }
   setMinimumSize() {}
   setResizable() {}
   setOpacity() {}
@@ -69,7 +70,9 @@ const context = vm.createContext({ __dirname: desktop, URL, Buffer, console,
       session: { defaultSession: { setPermissionCheckHandler() {}, setPermissionRequestHandler() {} } } };
     if (name === "node:http") return trackedHTTP;
     if (name === "node:fs") return {
-      readFileSync: () => Buffer.from("synthetic logo"), existsSync: file => file.endsWith("loot-service.exe") || fs.existsSync(file),
+      readFileSync: file => preferenceFiles.get(file) || Buffer.from("synthetic logo"),
+      writeFileSync: (file, data) => preferenceFiles.set(file, Buffer.from(data)),
+      renameSync: (from, to) => { assert(preferenceFiles.has(from)); preferenceFiles.set(to, preferenceFiles.get(from)); preferenceFiles.delete(from); }, existsSync: file => file.endsWith("loot-service.exe") || fs.existsSync(file),
       statSync: file => fs.statSync(file), mkdirSync() {}, appendFileSync: (_file, line) => logs.push(line),
     };
     if (name === "node:child_process") return { spawn() {
@@ -133,7 +136,7 @@ async function run() {
   now = 1150; splash.emit("ready-to-show");
   now = 1200; splash.webContents.emit("did-finish-load");
   now = 1400; child.stdout.emit("data", `LOOT_READY ${JSON.stringify({ baseUrl, bootstrapUrl: `${baseUrl}/?bootstrap=${token}`, token })}\n`);
-  const main = windows[1]; assert.ok(main); assert.equal(main.options.show, false);
+  const main = windows[1]; assert.ok(main); assert.equal(main.options.show, false); assert.equal(main.contentProtection, false);
   const expected = ["backend_ready", "main_window_created"];
   let events = await checkSnapshot(expected);
   assert.equal(main.visible, false); assert.equal(splash.visible, true);

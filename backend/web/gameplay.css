@@ -1018,7 +1018,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-position-mismatch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .live-toolbar > .text-button { flex: 0 0 auto; margin-left: 0; }
 .state-chip { display: inline-flex; width: fit-content; min-height: 26px; align-items: center; padding: 0 8px; color: var(--muted); background: var(--surface-strong); border-radius: 999px; font-size: 11px; font-weight: 650; }
-.state-chip.success { color: var(--success); background: var(--success-soft); }
+.state-chip.success { color: var(--primary-strong); background: var(--primary-soft); font-weight:600; }
 .live-teams { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; padding-top: 10px; }
 .live-teams.is-arena { grid-template-columns: 1fr; }
 .live-teams.is-arena.is-grouped { grid-template-columns: repeat(2,minmax(0,1fr)); }

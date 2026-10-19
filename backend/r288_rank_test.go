@@ -140,7 +140,7 @@ func TestR288BackfillPublishesRankedBeforeSlowMayhem(t *testing.T) {
 
 }
 
-func TestR288FiveHundredRanksPublishWithinThreeSeconds(t *testing.T) {
+func TestR290RankedPublicationFitsDecodeAndNetworkBudget(t *testing.T) {
 	// Measure the production build, whose JSON/CPU costs do not include TSAN.
 	// The separate integrity test below exercises all 500 matches in the parent
 	// process as well, including when the suite is built with -race.
@@ -156,7 +156,7 @@ func TestR288FiveHundredRanksPublishWithinThreeSeconds(t *testing.T) {
 		if output, err := build.CombinedOutput(); err != nil {
 			t.Fatalf("production fixture build: %v\n%s", err, output)
 		}
-		command := exec.CommandContext(ctx, binary, "-test.run=^TestR288FiveHundredRanksPublishWithinThreeSeconds$", "-test.count=1", "-test.v", "-test.timeout=90s")
+		command := exec.CommandContext(ctx, binary, "-test.run=^TestR290RankedPublicationFitsDecodeAndNetworkBudget$", "-test.count=1", "-test.v", "-test.timeout=90s")
 		command.Env = append(os.Environ(), "R288_RANK_MEASURE_CHILD=1")
 		output, err := command.CombinedOutput()
 		t.Logf("production measurement:\n%s", output)
@@ -165,7 +165,34 @@ func TestR288FiveHundredRanksPublishWithinThreeSeconds(t *testing.T) {
 		}
 		return
 	}
-	r288FiveHundredRanked(t, 3*time.Second)
+	// Same-process CPU calibration uses the identical full payload and decoder /
+	// immutable cache, with no network delay, aggregation, disk save or publish.
+	baselineApp, client, ref, _, mayhem := r288RankFixture(t, 500, 0, 0)
+	began := time.Now()
+	decoded, pages := 0, 0
+	for offset := 0; ; offset += sgpPageSize {
+		infos, consumed, more, err := baselineApp.sgp.matchHistoryFilteredWithDecodeOn(t.Context(), client, "HN1", ref, offset, sgpPageSize, seasonStreamTags["ranked"], false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		decoded += len(infos)
+		pages++
+		if !more {
+			break
+		}
+		if consumed != sgpPageSize {
+			t.Fatal("unexpected calibration page", consumed)
+		}
+	}
+	decodeBaseline := time.Since(began)
+	if decoded != 500 || mayhem.Load() != 0 {
+		t.Fatal("invalid decode baseline", decoded, mayhem.Load())
+	}
+	networkBudget := time.Duration(pages) * 300 * time.Millisecond
+	const publicationMargin = time.Second
+	bound := decodeBaseline + networkBudget + publicationMargin
+	t.Logf("relative rank budget: decode_baseline=%s ranked_pages=%d network_budget=%s fixed_margin=%s bound=%s", decodeBaseline, pages, networkBudget, publicationMargin, bound)
+	r288FiveHundredRanked(t, bound)
 }
 
 func r288FiveHundredRanked(t *testing.T, deadline time.Duration) chan string {

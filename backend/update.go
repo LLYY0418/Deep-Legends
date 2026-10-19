@@ -149,46 +149,48 @@ type updateCache struct {
 }
 type updateSettings struct {
 	Automatic       *bool    `json:"automatic,omitempty"`
+	AutoDownload    *bool    `json:"autoDownload,omitempty"`
 	Mirrors         []string `json:"mirrors"`
 	PreferredSource string   `json:"preferredSource"`
 }
 
 type updateManager struct {
-	trustKeys          map[string]ed25519.PublicKey
-	migrationDirectory func() (string, error)
-	startSourceTimer   func(time.Duration, func()) func()
-	progressTicks      func() (<-chan time.Time, func())
-	downloadClock      func() time.Time
-	sourceDefaults     []string
-	mu                 sync.Mutex
-	status             updateStatus
-	manifest           *updateManifest
-	cache              updateCache
-	lastManual         time.Time
-	store              *localStore
-	directory          string
-	installDir         string
-	installDetection   updateInstallDetection
-	migrate            func() error
-	portableDirectory  func() (string, error)
-	mirrors            []string
-	preferredSource    string
-	autoDisabled       bool
-	client             *http.Client
-	now                func() time.Time
-	freeBytes          func(string) (int64, error)
-	launch             func(string, string) error
-	notify             func(string, any)
-	diagnostic         func(map[string]any)
-	ctx                context.Context
-	stop               context.CancelFunc
-	quickDownloads     bool
-	autoPredownload    bool
-	predownloading     bool
-	foregroundBusy     func() bool
-	downloadCancel     context.CancelFunc
-	downloadDone       chan struct{}
-	checkDone          chan struct{}
+	trustKeys            map[string]ed25519.PublicKey
+	migrationDirectory   func() (string, error)
+	startSourceTimer     func(time.Duration, func()) func()
+	progressTicks        func() (<-chan time.Time, func())
+	downloadClock        func() time.Time
+	sourceDefaults       []string
+	mu                   sync.Mutex
+	status               updateStatus
+	manifest             *updateManifest
+	cache                updateCache
+	lastManual           time.Time
+	store                *localStore
+	directory            string
+	installDir           string
+	installDetection     updateInstallDetection
+	migrate              func() error
+	portableDirectory    func() (string, error)
+	mirrors              []string
+	preferredSource      string
+	autoDownloadDisabled bool
+	autoDisabled         bool
+	client               *http.Client
+	now                  func() time.Time
+	freeBytes            func(string) (int64, error)
+	launch               func(string, string) error
+	notify               func(string, any)
+	diagnostic           func(map[string]any)
+	ctx                  context.Context
+	stop                 context.CancelFunc
+	quickDownloads       bool
+	autoPredownload      bool
+	predownloading       bool
+	foregroundBusy       func() bool
+	downloadCancel       context.CancelFunc
+	downloadDone         chan struct{}
+	checkDone            chan struct{}
 }
 
 type updateCheckFailure struct {
@@ -263,6 +265,7 @@ func newUpdateManagerWithTrust(current string, store *localStore, notify func(st
 		if json.Unmarshal(data, &settings) == nil && validUpdateMirrors(settings.Mirrors) == nil {
 			u.mirrors = settings.Mirrors
 			u.autoDisabled = settings.Automatic != nil && !*settings.Automatic
+			u.autoDownloadDisabled = settings.AutoDownload != nil && !*settings.AutoDownload
 			if updateSourcePresent(u.sourcesLocked(), settings.PreferredSource) {
 				u.preferredSource = settings.PreferredSource
 			}
@@ -367,7 +370,8 @@ func (u *updateManager) Settings() updateSettings {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	automatic := !u.autoDisabled
-	return updateSettings{Automatic: &automatic, Mirrors: append([]string(nil), u.mirrors...), PreferredSource: u.preferredSource}
+	autoDownload := !u.autoDownloadDisabled
+	return updateSettings{Automatic: &automatic, AutoDownload: &autoDownload, Mirrors: append([]string(nil), u.mirrors...), PreferredSource: u.preferredSource}
 }
 
 func (u *updateManager) SetSettings(settings updateSettings) error {
@@ -393,11 +397,16 @@ func (u *updateManager) SetSettings(settings updateSettings) error {
 		automatic := !u.autoDisabled
 		settings.Automatic = &automatic
 	}
+	if settings.AutoDownload == nil {
+		autoDownload := !u.autoDownloadDisabled
+		settings.AutoDownload = &autoDownload
+	}
 	data, _ := json.Marshal(settings)
 	if err := writeLocalStoreFile(u.store, "update-settings.json", data); err != nil {
 		return err
 	}
 	u.autoDisabled = !*settings.Automatic
+	u.autoDownloadDisabled = !*settings.AutoDownload
 	u.mirrors = append([]string(nil), settings.Mirrors...)
 	u.preferredSource = settings.PreferredSource
 	u.lastManual = time.Time{}
@@ -497,7 +506,7 @@ func (u *updateManager) Check(force bool) bool {
 			_ = writeLocalStoreFile(u.store, "update-manifest.json", data)
 		}
 		resultState := u.status.State
-		predownload := u.autoPredownload && resultState == "available" && !u.status.ManualOnly
+		predownload := !force && u.autoPredownload && !u.autoDownloadDisabled && resultState == "available" && !u.status.ManualOnly
 		u.mu.Unlock()
 		if err == nil && u.ctx.Err() == nil {
 			u.recordUpdateCheck(map[string]any{

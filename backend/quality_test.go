@@ -676,6 +676,9 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
+	"github_stars.go":            1, // github-stars.json: fixed public repository star count and timestamp, six-hour cache; no user data.
+	"client_autostart.go":        1, // client-autostart.json: declared local original startup bytes for reversible changes.
+	"pro_scoped_refresh.go":      1, // pro-account-identities.json: declared permanent public roster Riot ID -> PUUID only; excludes the user/friends.
 	"announcements.go":           1, // Public notice cache; no account, player identity or read state.
 	"collection_retry_cache.go":  1, // R241: declared blank-entry failure digests + 1h expiry; no account/ownership/quantity.
 	"season_head_refresh.go":     1, // R241: existing declared season-stats file, latest GameID/freshness timestamp only; no new directory or source.

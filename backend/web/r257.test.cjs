@@ -79,7 +79,7 @@ test('R257 focus/Escape/hover/touch and body portal placement/lifecycle',async()
 });
 test('R257 assertions kill always-visible, wrong-stream and inverted official-total mutations',()=>{
  const mutations=[['cap','!progress?.upstreamCapped || ',''],['date','progress?.mayhemOldestAt : progress?.rankedOldestAt','progress?.rankedOldestAt : progress?.mayhemOldestAt'],['total','official>=games','official<games']];
- for(const [name,from,to] of mutations){const mutant=source.replace(from,to);assert.notEqual(mutant,source,name);assert.throws(()=>check(mutant),assert.AssertionError,name);}
+ for(const [name,from,to] of mutations){const target=require("./r188-harness.cjs").extract(source,"renderSeasonDataNote"),changed=target.replace(from,to);assert.notEqual(changed,target,name);const mutant=source.replace(target,changed);assert.notEqual(mutant,source,name);assert.throws(()=>check(mutant),assert.AssertionError,name);}
 });
 test('R257 copy respects existing static wording guards and reuses R241 styling',()=>{
  const {extract}=require('./r188-harness.cjs'),body=extract(source,'renderSeasonDataNote');assert.doesNotMatch(body,/统计口径|上游公布的/);

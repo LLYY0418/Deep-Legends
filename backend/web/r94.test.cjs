@@ -44,6 +44,8 @@ function harness() {
   // R131 §2.1-1：liveRenderTriggerLabel 是纯函数、无外部依赖，按真实实现抽取。
   const names = ["retainArenaBravery", "updateLiveLoadingVisibility", "loadLive", "liveRecommendationMarkup", "renderLive", "preserveLiveImages", "stampLiveRows", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "clearRuneStarterRetries", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveClientPositionsPending", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs", "liveRenderTriggerLabel"];
   for (const name of ["liveGamePhase", "invalidateLiveForNewGame", "resetDisconnectedLive", "normalizeLiveGameId", "liveGameIdComparison", "recordLiveObservation", "liveSnapshotBehindPhase"]) if (source.includes(`function ${name}(`)) names.push(name);
+  Object.assign(context,require("./r211-harness-support.cjs").environment(context));
+  names.push("readSetting");
   vm.runInNewContext(names.map(extract).join("\n") + "\n" + extract("pollGameflowPhase"), context);
   context.beaconPollDelay = () => 12000;
   const render = context.renderLive;

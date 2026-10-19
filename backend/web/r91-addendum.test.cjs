@@ -84,7 +84,7 @@ test('R91 addendum existing history remains readable during polling; new history
  const state={liveLoading:false,settings:{}};const deps={state,number:String,percent:String,kda:String,escapeHTML:String,iconFigure:()=>'<img>',maskedPlayerName:()=> 'Player',liveDisplayedChampionId:()=>1,renderLivePremadeTag:()=>'',rankTitle:()=> '白银 I',positionLabel:()=> '上单'};
  // R131 §2.1-5：R129 P1 把历史状态判据抽成 liveHistoryStateOf / liveHistorySettled。
  // 这两个函数正是本条测试要盯的 flicker 判据，按真实实现编译，不桩掉。
- vm.runInNewContext(require('./r220-harness-support.cjs').prelude(src)+['renderInsightMatches','insightScore','renderLivePlayer','champSelectEnemyPlaceholder','proBadgeAttributes','renderProIdentityBadge','liveHistoryStateOf','liveHistorySettled'].map(n=>extract(n)).join('\n'),deps);
+ Object.assign(deps,require('./r188-harness.cjs').compile(src,['renderInsightMatches','insightScore','renderLivePlayer','champSelectEnemyPlaceholder','proBadgeAttributes','renderProIdentityBadge','liveHistoryStateOf','liveHistorySettled'],deps));
  const player={playerRef:'p',historyState:'ok',rank:{tier:'SILVER'},modeStats:{games:1,wins:1,kda:3},recentGames:[{championId:1,kills:3,deaths:1,assists:0,win:true}]};
  const before=deps.renderInsightMatches(player)+deps.renderLivePlayer(player,0,true);state.liveLoading=true;
  assert.equal(deps.renderInsightMatches(player)+deps.renderLivePlayer(player,0,true),before);assert.doesNotMatch(before,/白银|未定级/);assert.match(deps.renderLivePlayer(player,0,false),/白银 I/);

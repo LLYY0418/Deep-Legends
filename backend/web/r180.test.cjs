@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
 const source=fs.readFileSync(path.join(__dirname,'gameplay.js'),'utf8');
 function extract(name){const start=source.indexOf(`function ${name}(`);assert.ok(start>=0,name);const body=source.indexOf(') {',start)+2;let depth=0,quote='',escaped=false;for(let i=body;i<source.length;i++){const c=source[i];if(quote){if(escaped)escaped=false;else if(c==='\\')escaped=true;else if(c===quote)quote='';continue;}if(c==='"'||c==="'"||c==='`'){quote=c;continue;}if(c==='{')depth++;if(c==='}'&&--depth===0)return source.slice(start,i+1);}assert.fail(name);}
-function compile(names,deps){return Function(...Object.keys(deps),names.map(extract).join('\n')+`\nreturn {${names.join(',')}};`)(...Object.values(deps));}
+function compile(names,deps){return require('./r188-harness.cjs').compile(source,names,deps);}
 test('R180 latest merged same-queue game updates one player row, reports actual count and keeps other nodes',()=>{
  const renderer=compile(['renderLivePlayer','renderInsightMatches','champSelectEnemyPlaceholder','liveHistoryStateOf','liveHistorySettled'],{
   maskedPlayerName:p=>p.displayName,liveDisplayedChampionId:p=>p.championId,rankTitle:()=> '未定级',positionLabel:p=>p,

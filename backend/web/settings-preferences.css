@@ -7,7 +7,18 @@ main.shell:has(> #settings-panel:not([hidden])) { padding: 28px 46px; }
 .settings-version-row { flex-wrap: nowrap; gap: 12px; margin-top: 10px; }
 .settings-head .settings-build-identity { margin: 0; color: var(--primary-strong); font-size: 16px; font-weight: 700; letter-spacing: .2px; white-space: nowrap; }
 .settings-build-identity small { margin-right: 6px; color: var(--muted); font: 600 13px var(--font); }
-.settings-github { display: grid; width: 40px; height: 40px; flex: none; place-items: center; margin-top: 4px; padding: 0; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.settings-github { display: inline-flex; height: 40px; flex: none; align-items: stretch; margin-top: 4px; padding: 0; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 10px; text-decoration: none; overflow: hidden; font-size:13px; }
+.settings-github-main { display:flex; align-items:center; gap:8px; padding-inline:12px; }
+.settings-github-label { display:grid; }
+.settings-github-label > span { grid-area:1/1; }
+.github-hover-copy { display:none; }
+.settings-github-label .github-default-copy { justify-self:start; }
+.settings-github-stars { display:flex; align-items:center; gap:6px; padding-inline:12px; border-left:1px solid var(--line); color:var(--primary-strong); font-family:Consolas,monospace; font-weight:600; }
+.github-star { color:var(--rarity-gold); }
+.settings-github:is(:hover,:focus-visible) .settings-github-main { background:var(--primary-soft); color:var(--primary-strong); }
+.settings-github:is(:hover,:focus-visible) .github-default-copy { display:none; }
+.settings-github:is(:hover,:focus-visible) .github-hover-copy { display:block; }
+@media(max-width:1000px) { .settings-github-label { display:none; } }
 .settings-github svg { width: 20px; height: 20px; }
 .settings-tabs { gap: 6px; }
 .settings-tabs .tab { height: 40px; border-radius: 9px; font-size: 14px; font-weight: 600; }
@@ -28,11 +39,11 @@ main.shell:has(> #settings-panel:not([hidden])) { padding: 28px 46px; }
 .setting-riot-key-input { width: 300px; }
 .settings-facts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .settings-fact { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.settings-fact::before { margin-right: 5px; color: var(--success); content: "✓"; }
-.settings-capability-summary { display: flex; align-items: center; gap: 10px; color: var(--success); }
+.settings-fact::before { margin-right: 5px; color: var(--primary-strong); content: "✓"; }
+.settings-capability-summary { display: flex; align-items: center; gap: 10px; color: var(--primary-strong); font-weight:600; }
 .settings-capability-degraded { color: var(--warning); }
-.settings-tag-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 16px; }
-.settings-tag-options label { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; font-size: 12px; }
+.settings-tag-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; }
+.settings-tag-options label { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; font-size: 12px; }
 .settings-tag-options input { accent-color: var(--primary); }
 .settings-modal { width: min(720px,calc(100vw - 40px)); max-height: 80vh; padding: 24px; overflow: auto; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
 .settings-modal header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
@@ -103,3 +114,5 @@ main.shell:has(> #settings-panel:not([hidden])) { padding-right: calc(46px - var
 .settings-facts { gap:8px; }
 .settings-fact { height:28px; padding:0 10px; color:var(--ink); background:var(--surface-strong); border-radius:7px; font-size:12.5px; line-height:28px; }
 .settings-fact::before { margin-right:4px; font-weight:700; }
+
+.setting-card.is-disabled { opacity: .5; }

@@ -9,14 +9,15 @@ const read = name => fs.readFileSync(path.join(__dirname, name), 'utf8');
 const source = fs.readFileSync(process.env.R210_GAMEPLAY_SOURCE || path.join(__dirname, 'gameplay.js'), 'utf8');
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
-test('R210 Riot Key is the third row with help, an embedded reveal button and shared field styles', () => {
+test('R210 Riot Key follows network and content protection with help, an embedded reveal button and shared field styles', () => {
   const dom = new JSDOM(read('index.html'));
   try {
     const doc = dom.window.document, card = doc.querySelector('.setting-riot-key-card'), network = doc.querySelector('.setting-network-card');
     assert.equal(card.parentElement, network.parentElement);
     assert(card.parentElement.classList.contains('settings-grid'));
     assert.equal(card.previousElementSibling, network);
-    assert.equal(card.parentElement.children.length, 3);
+    assert.equal(card.parentElement.children.length, 4);
+    assert(card.parentElement.querySelector("#setting-content-protection"));
     const helpIcon = card.querySelector('h3 .setting-riot-key-help');
     assert.equal(helpIcon.getAttribute('aria-label'), 'Riot API Key 说明');
     assert.match(helpIcon.dataset.tooltip, /共用一份官方接口额度/);

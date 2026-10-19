@@ -140,13 +140,13 @@
   function camel(value) { return value.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()); }
   function readSetting(key, fallback) {
     try {
-      const name=`lol-loot-${key}`,value=localStorage.getItem(name);
+      const name=`lol-loot-${key}`,value=(globalThis.deepLegendsPreferenceStorage || localStorage).getItem(name);
       if(value==null)return fallback;
-      if(key==="default-match-filter" && !["all","solo","flex"].includes(value) || ["mask-names","confirm-replay"].includes(key) && !["true","false"].includes(value)) {localStorage.removeItem(name);return fallback;}
+      if(key==="default-match-filter" && !["all","solo","flex"].includes(value) || ["mask-names","confirm-replay"].includes(key) && !["true","false"].includes(value)) {(globalThis.deepLegendsPreferenceStorage || localStorage).removeItem(name);return fallback;}
       return value;
     } catch (_) { return fallback; }
   }
-  function writeSetting(key, value) { try { localStorage.setItem(`lol-loot-${key}`, String(value)); } catch (_) {} }
+  function writeSetting(key, value) { try { (globalThis.deepLegendsPreferenceStorage || localStorage).setItem(`lol-loot-${key}`, String(value)); } catch (_) {} }
   function normalizeMatchCount(value) { const parsed = Number(value); return [10, 20, 30, 40, 50].includes(parsed) ? parsed : 20; }
   function normalizeMatchFilter(value) { return ["all", "solo", "flex"].includes(value) ? value : "all"; }
   function normalizeLiveInterval(value) { const parsed = Number(value); return [3, 5, 10, 15, 30, 60].includes(parsed) ? parsed : 3; }
@@ -8966,7 +8966,7 @@
     };
     renderTags();
     tagRoot?.addEventListener("change", () => { writeSetting("live-tags", JSON.stringify([...tagRoot.querySelectorAll("input:checked")].map(node => node.value))); renderLive("settings"); });
-    document.getElementById("setting-live-tags-reset")?.addEventListener("click", () => { localStorage.removeItem("lol-loot-live-tags"); renderTags(); renderLive("settings"); });
+    document.getElementById("setting-live-tags-reset")?.addEventListener("click", () => { try { (globalThis.deepLegendsPreferenceStorage || localStorage).removeItem("lol-loot-live-tags"); } catch (_) {} renderTags(); renderLive("settings"); });
     window.addEventListener("deep-legends:settings-imported", () => { renderTags(); renderLive("settings"); });
     nodes.settingDefaultPage.value = state.settings.defaultPage;
     nodes.settingMatchCount.value = String(state.settings.matchCount);
@@ -9005,10 +9005,10 @@
   function renderCapabilitySettings() {
     const labels = { summoner: "召唤师资料", "ranked-stats": "排位数据", "match-history": "战绩列表", "seven-day-history": "7 天统计样本", "match-details": "对局详情", "champion-mastery": "英雄熟练度", gameflow: "游戏流程", "gameflow-session": "当前对局", "champ-select": "英雄选择", "live-player-analysis": "队伍分析", "client-rune-recommendation": "客户端推荐符文", "champion-abilities": "英雄技能" };
 	const capabilities = (state.lastCapabilities || []).filter((item) => item?.state !== "canceled").filter(item => !clientRegion() || !String(item.path || "").startsWith("sgp:"));
-	const list = capabilities.length ? `<div class="gameplay-capabilities">${capabilities.map((item) => `<div><span class="capability-dot is-${escapeHTML(item.state)}" aria-hidden="true"></span><span><strong>${escapeHTML(labels[item.name] || item.name)}</strong><small>${escapeHTML(item.detail || capabilityAttemptSummary(item) || (item.state === "available" ? `已读取 ${number(item.count)} 项` : "当前不可用"))}</small></span><b>${item.state === "available" ? "可用" : item.state === "unsupported" ? "不支持" : "读取失败"}</b></div>`).join("")}</div>` : '<p class="muted">打开总览或对局后显示能力状态。</p>';
+	const list = capabilities.length ? `<div class="gameplay-capabilities">${capabilities.map((item) => `<div><span class="capability-dot is-${escapeHTML(item.state)}" aria-hidden="true"></span><span><strong>${escapeHTML(labels[item.name] || item.name)}</strong><small>${escapeHTML(item.detail || capabilityAttemptSummary(item) || (item.state === "available" ? `已读取 ${number(item.count)} 项` : "当前不可用"))}</small></span><b class="status-text${item.state === "available" ? "" : item.state === "unsupported" ? " is-warning" : " is-danger"}">${item.state === "available" ? "可用" : item.state === "unsupported" ? "不支持" : "读取失败"}</b></div>`).join("")}</div>` : '<p class="muted">打开总览或对局后显示能力状态。</p>';
     const available = capabilities.filter(item => item.state === "available").length;
     const degraded = capabilities.length - available;
-    nodes.gameplaySettingsStatus.innerHTML = `<span>${available} 项可用${degraded ? ` <span class="settings-capability-degraded">· ${degraded} 项降级</span>` : ""}</span><button class="text-button" type="button">查看</button>`;
+    nodes.gameplaySettingsStatus.innerHTML = `<span class="status-text">${available} 项可用${degraded ? ` <span class="settings-capability-degraded status-text is-warning">· ${degraded} 项降级</span>` : ""}</span><button class="text-button" type="button">查看</button>`;
     nodes.gameplaySettingsStatus.querySelector("button")?.addEventListener("click", async () => {
       await window.deepLegendsSections.load("settings-preferences");
       const content = document.createElement("div"); content.innerHTML = list;

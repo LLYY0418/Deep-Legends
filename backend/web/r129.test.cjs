@@ -54,9 +54,7 @@ function functionSource(source, name) {
 
 function compile(names, dependencies, source = gameplayScript) {
   for (const name of ["champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel"]) if (!names.includes(name) && names.some(n=>functionSource(source,n).includes(name + "("))) names.push(name);
-  const keys = Object.keys(dependencies);
-  const body = names.map((name) => functionSource(source, name)).join("\n");
-  return Function(...keys, `"use strict";\n${require("./r220-harness-support.cjs").prelude(source,dependencies)}${body}\nreturn {${names.join(",")}};`)(...keys.map((key) => dependencies[key]));
+  return require('./r188-harness.cjs').compile(source,names,dependencies);
 }
 
 // 海斗英雄选择快照：1 名本人玩家、historyState="ok"、当前模式没有近期对局与模式

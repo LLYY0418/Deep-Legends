@@ -167,8 +167,8 @@
   el.settingsPanels = [...document.querySelectorAll(".settings-subpanel")];
 
   function camel(value) { return value.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()); }
-  function preference(key, fallback) { try { return localStorage.getItem(`lol-loot-${key}`) ?? fallback; } catch (_) { return fallback; } }
-  function savePreference(key, value) { try { localStorage.setItem(`lol-loot-${key}`, String(value)); } catch (_) {} }
+  function preference(key, fallback) { try { return (globalThis.deepLegendsPreferenceStorage || localStorage).getItem(`lol-loot-${key}`) ?? fallback; } catch (_) { return fallback; } }
+  function savePreference(key, value) { try { (globalThis.deepLegendsPreferenceStorage || localStorage).setItem(`lol-loot-${key}`, String(value)); } catch (_) {} }
 
 	const nativeSelectSearchThreshold = 20;
 
@@ -2618,6 +2618,8 @@
 
   function renderRiotKeySettings(data) {
     if (el.settingRiotKeyState) el.settingRiotKeyState.textContent = ["embedded", "relay"].includes(data.source) && !["invalid","cooldown"].includes(data.status) ? "使用内置服务" : { cooldown:"内置服务冷却中", configured: "已配置", unverified:"已保存，暂未验证", unconfigured: "未配置", invalid: "无效" }[data.status] || "未配置";
+    el.settingRiotKeyState?.classList?.toggle("is-warning", data.status === "cooldown");
+    el.settingRiotKeyState?.classList?.toggle("is-danger", data.status === "invalid");
     state.riotHasUserKey=data.hasUserKey ?? ["user","personal"].includes(data.source);
     if(el.settingRiotKeyInput)el.settingRiotKeyInput.placeholder=state.riotHasUserKey?"已保存，粘贴新的 Key 可替换":"粘贴 Riot API Key";
     if(el.settingRiotKeyClear)el.settingRiotKeyClear.disabled=!state.riotHasUserKey;
@@ -2625,7 +2627,7 @@
   async function loadRiotKeySettings() {
     if (!el.settingRiotKeyState || state.riotKeyPending) return;
     try { renderRiotKeySettings(await api("/api/riot-key", {}, "riot-key-status", 10000)); }
-    catch (error) { if (error.name !== "RequestCancelled") showToast("Riot Key 状态读取失败"); }
+    catch (error) { if (error.name !== "RequestCancelled") { el.settingRiotKeyState.textContent="读取失败"; el.settingRiotKeyState.classList?.remove("is-warning"); el.settingRiotKeyState.classList?.add("is-danger"); showToast("Riot Key 状态读取失败"); } }
   }
   async function saveRiotKeySettings(clear = false) {
     if (state.riotKeyPending) return;
@@ -2655,9 +2657,9 @@
     el.privacyContent.innerHTML = '<p class="muted">正在读取隐私说明…</p>';
     try {
       const data = await api("/api/privacy", {}, "privacy");
-      el.privacyContent.innerHTML = [data.localOnly ? "仅在本机处理" : "包含公开数据查询", data.requiresPassword ? "需要账号密码" : "不需要账号密码", data.uploadsData ? "上传收藏" : "不上传收藏"].map(text => `<span class="settings-fact">${escapeHTML(text)}</span>`).join("");
+      el.privacyContent.innerHTML = [data.localOnly ? "仅在本机处理" : "包含公开数据查询", data.requiresPassword ? "需要账号密码" : "不需要账号密码", data.uploadsData ? "上传收藏" : "不上传收藏"].map(text => `<span class="settings-fact status-text">${escapeHTML(text)}</span>`).join("");
     } catch (_) {
-      el.privacyContent.innerHTML = '<button class="text-button" type="button">读取失败 · 重试</button>';
+      el.privacyContent.innerHTML = '<button class="text-button status-text is-danger" type="button">读取失败 · 重试</button>';
       el.privacyContent.querySelector("button").addEventListener("click", loadPrivacy);
     }
   }
@@ -2950,7 +2952,7 @@
     const tab = el.settingsTabs.find((item) => item.dataset.settingsPage === name);
     if (!tab) return;
     if (state.settingsPage === "privacy" && name !== "privacy") resetDiagnosticsExport();
-    if (name === "app") { localStorage.setItem("lol-loot-settings-app-seen", "true"); document.querySelector(".settings-new-dot")?.setAttribute("hidden", ""); }
+    if (name === "app") { savePreference("settings-app-seen", "true"); document.querySelector(".settings-new-dot")?.setAttribute("hidden", ""); }
     state.settingsPage = name;
     activateTab(tab, el.settingsTabs, (selected) => {
       for (const panel of el.settingsPanels) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
@@ -3220,6 +3222,7 @@
     el.settingProxyUrl.value = status.url || "";
     el.settingProxyUrlWrap.hidden = el.settingProxyMode.value !== "manual";
     el.settingProxyState.textContent = status.active || "";
+    el.settingProxyState.classList?.remove("is-warning","is-danger");
     el.settingProxyState.hidden = !status.active;
   }
 
@@ -3239,6 +3242,7 @@
       renderChampionNetwork(await api("/api/champions/network", {}, "champion-network", 5000));
     } catch (error) {
       el.settingProxyState.textContent = `读取失败：${error.message}`;
+      el.settingProxyState.hidden=false; el.settingProxyState.classList?.add("is-danger");
     }
   }
 
@@ -3247,17 +3251,20 @@
     const url = el.settingProxyUrl.value.trim();
     if (mode === "manual" && !url) {
       el.settingProxyState.textContent = "请填写代理地址";
+      el.settingProxyState.hidden=false; el.settingProxyState.classList?.add("is-danger");
       el.settingProxyUrl.focus();
       return;
     }
     el.settingProxySave.disabled = true;
     el.settingProxyState.textContent = "正在应用…";
+    el.settingProxyState.hidden=false; el.settingProxyState.classList?.remove("is-danger");
     try {
       const status = await api("/api/champions/network", { method: "POST", body: JSON.stringify({ mode, url }) }, "champion-network-save", 7000);
       renderChampionNetwork(status);
       showToast("英雄数据网络设置已保存");
     } catch (error) {
       el.settingProxyState.textContent = `保存失败：${error.message}`;
+      el.settingProxyState.hidden=false; el.settingProxyState.classList?.add("is-danger");
     } finally {
       el.settingProxySave.disabled = false;
     }
@@ -4134,8 +4141,8 @@
     event.preventDefault();
     const file = el.poolFile.files[0];
     if (!file) return;
-    if (file.size > 1024 * 1024) { el.poolImportStatus.textContent = "文件超过 1 MiB"; return; }
-    el.poolImportStatus.textContent = "正在校验…";
+    if (file.size > 1024 * 1024) { el.poolImportStatus.textContent = "文件超过 1 MiB"; el.poolImportStatus.classList.add("is-danger"); return; }
+    el.poolImportStatus.textContent = "正在校验…"; el.poolImportStatus.classList.remove("is-danger");
     try {
       const content = await file.text();
       let names = [];
@@ -4144,7 +4151,7 @@
       el.poolImportStatus.textContent = "导入成功";
       el.poolImport.reset();
       await loadPools();
-    } catch (error) { el.poolImportStatus.textContent = error.message; }
+    } catch (error) { el.poolImportStatus.textContent = error.message; el.poolImportStatus.classList.add("is-danger"); }
   });
 
   async function exitArtworkFullscreen() {
@@ -4475,9 +4482,10 @@
     el.settingsUpdateCheck.setAttribute("aria-busy", String(Boolean(checking)));
   }
 
-  function showUpdateCheckFeedback(message) {
+  function showUpdateCheckFeedback(message, failed=false) {
     clearTimeout(updateUI.feedbackTimer);
     el.settingsUpdateFeedback.textContent = message;
+    el.settingsUpdateFeedback.classList.toggle("is-danger", failed);
     if (message) updateUI.feedbackTimer = setTimeout(() => { el.settingsUpdateFeedback.textContent = ""; }, 5000);
   }
 
@@ -4485,7 +4493,7 @@
     const current = updateUI.status || {};
     if (!updateUI.checkPending || updateUI.checkRequestPending || current.checking || current.state === "checking") return;
     updateUI.checkPending = false;
-    if (current.error) showUpdateCheckFeedback(current.error);
+    if (current.error) showUpdateCheckFeedback(current.error,true);
     else if (current.supported && current.latest && ["available", "downloading", "verifying", "ready", "applying", "failed"].includes(current.state)) openUpdateDialog();
     else if (current.supported && current.state === "idle") showUpdateCheckFeedback("已是最新版本");
     renderManualUpdateCheck();
@@ -4507,7 +4515,7 @@
       if (result && updateUI.statusEventRevision === revision) renderUpdateStatus(result);
     } catch (error) {
       updateUI.checkPending = false;
-      if (!state.destroyed) showUpdateCheckFeedback(`检查失败：${error.message}`);
+      if (!state.destroyed) showUpdateCheckFeedback(`检查失败：${error.message}`,true);
     } finally {
       updateUI.checkRequestPending = false;
       finishManualUpdateCheck();

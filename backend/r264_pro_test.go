@@ -42,8 +42,11 @@ func TestR264ProFirstScreenUsesLocalRosterDuringSevenSecondSeventyPercentFailure
 		t.Fatalf("local roster waited for relay: %s", time.Since(started))
 	}
 	var result proPlayersResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil || result.PlayerCount != 33 || result.AccountCount != 53 || len(result.Teams) != 6 || !result.Updating {
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil || result.PlayerCount != 33 || result.AccountCount != 53 || len(result.Teams) != 6 || result.Updating {
 		t.Fatalf("local first screen: err=%v players=%d accounts=%d teams=%d updating=%v", err, result.PlayerCount, result.AccountCount, len(result.Teams), result.Updating)
+	}
+	if requests.Load() != 0 {
+		t.Fatal("first screen started an invisible background refresh", requests.Load())
 	}
 }
 

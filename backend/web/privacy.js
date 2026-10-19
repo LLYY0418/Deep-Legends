@@ -1,7 +1,7 @@
 (function(root,factory){const api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;else root.deepLegendsPrivacy=api;})(typeof window==='undefined'?globalThis:window,root=>{
  'use strict';
  const lists=new Map();
- function masked(){try{return root.localStorage?.getItem('lol-loot-mask-names')==='true'}catch{return false}}
+ function masked(){try{return (root.deepLegendsPreferenceStorage || root.localStorage)?.getItem('lol-loot-mask-names')==='true'}catch{return false}}
  function name(player={},options={}){
   const enabled=options.masked ?? masked();
   if(!enabled){if(player.identityUnresolved)return '身份待公开';if(player.hidden)return '隐藏玩家';return `${player.gameName || player.displayName || '隐藏玩家'}${options.fullName===false?'':player.tagLine?'#'+player.tagLine:''}`;}

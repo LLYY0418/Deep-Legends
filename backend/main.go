@@ -48,6 +48,7 @@ type app struct {
 	collectionSkinEventRunning bool
 	collectionSkinEventPending bool
 
+	githubStars       githubStarsCache
 	announcementsOnce sync.Once
 	announcements     *announcementCache
 
@@ -649,6 +650,7 @@ func main() {
 	mux.HandleFunc("GET /api/client-launch/status", a.authorized(a.handleClientLaunchStatus))
 	mux.HandleFunc("GET /api/status", a.authorized(a.handleStatus))
 	mux.HandleFunc("POST /api/gameplay/history-head", a.authorized(a.handleGameplayHistoryHead))
+	mux.HandleFunc("GET /api/github/stars", a.authorized(a.handleGithubStars))
 	mux.HandleFunc("GET /api/announcements", a.authorized(a.handleAnnouncements))
 	mux.HandleFunc("GET /api/announcements/image", a.authorized(a.handleAnnouncementImage))
 	mux.HandleFunc("GET /api/events", a.authorized(a.handleEvents))

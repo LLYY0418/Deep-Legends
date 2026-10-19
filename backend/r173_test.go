@@ -333,7 +333,7 @@ func TestR173StartupUsesOnlyDiskProfilesThenPageRefreshes(t *testing.T) {
 		t.Fatal("startup downloaded profiles", requests.Load())
 	}
 	cached := a.proProfiles.entries[key]
-	if cached.CheckedAt != account.CheckedAt || !strings.Contains(string(cached.Rank), "MASTER") || !cached.Stale {
+	if cached.CheckedAt != account.CheckedAt || !strings.Contains(string(cached.Rank), "MASTER") || cached.Stale {
 		t.Fatal("startup failed to preserve seven-day cached profile", cached)
 	}
 	if !a.proPlayers.fetchedAt.IsZero() || !a.proPlayers.attemptedAt.IsZero() {
@@ -344,10 +344,15 @@ func TestR173StartupUsesOnlyDiskProfilesThenPageRefreshes(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	a.handleProPlayers(rec, httptest.NewRequest("GET", "/api/pro-players", nil))
+	if requests.Load() != 0 {
+		t.Fatal("GET first screen made a network request")
+	}
+	requestBody, _ := json.Marshal(map[string]any{"team": "all", "accounts": []string{proLadderAccountKey(account.GameName, account.TagLine)}, "manual": true})
+	a.handleProScopedRefresh(httptest.NewRecorder(), httptest.NewRequest("POST", "/api/pro-players/refresh", strings.NewReader(string(requestBody))))
 	select {
 	case <-profiles:
 	case <-time.After(2 * time.Second):
-		t.Fatal("opening pro page did not refresh expired profiles", requests.Load(), rec.Body.String())
+		t.Fatal("explicit visible refresh did not fetch selected profile", requests.Load(), rec.Body.String())
 	}
 	mainSource, err := os.ReadFile("main.go")
 	if err != nil {

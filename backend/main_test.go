@@ -535,8 +535,11 @@ func TestWindowsClientDetectionUsesOrderedProductionBuilder(t *testing.T) {
 		t.Fatal("detectClientInstallationsWithScan production body was not found")
 	}
 	body := source[start:end]
-	if !strings.Contains(body, "buildDetectedClientInstallations(uniquePaths(gameRoots), executables, shortcuts, regularFile)") {
+	if !strings.Contains(body, "buildDetectedClientInstallations(uniquePaths(gameRoots), executables, otherShortcuts, regularFile)") {
 		t.Fatal("Windows production detector does not use the ordered candidate builder")
+	}
+	if !strings.Contains(body, "selectWeGameCandidate(wegameCandidates, inspectWindowsFileVersion)") {
+		t.Fatal("WeGame bypassed version selection")
 	}
 }
 

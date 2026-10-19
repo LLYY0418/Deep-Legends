@@ -8,7 +8,7 @@ test('R190 1–4 roster marks only subject, including Arena and masking',()=>{
  const f=fixture();
  for(const n of [10,16]) {const match={participants:players(n).map((p,i)=>({...p,...(n===16?{subteamId:Math.floor(i/2)+1,placement:8-Math.floor(i/2)}:{})})),subjectParticipantId:4,gameMode:n===16?'CHERRY':''};const d=dom(f.renderMatchPlayers(match));assert.equal(d.querySelectorAll('.match-player-name.is-current-player').length,1);assert.equal(d.querySelector('.is-current-player').textContent,n===16?'召唤师 4':'召唤师 4#测试');}
  for(const subjectParticipantId of [undefined,0]) assert.equal(dom(f.renderMatchPlayers({participants:players(10),subjectParticipantId})).querySelectorAll('.is-current-player').length,0);
- f.state.settings.maskNames=true;const d=dom(f.renderMatchPlayers({participants:players(10),subjectParticipantId:4}));assert.equal(d.querySelector('.is-current-player').textContent,'玩家 04');
+ f.state.settings.maskNames=true;const d=dom(f.renderMatchPlayers({participants:players(10),subjectParticipantId:4}));assert.equal(d.querySelector('.is-current-player').textContent,'召唤师 4');
 });
 test('R190 5–9 effect parser handles zero, labels, time, invalid templates and overrides',()=>{
  const f=fixture();assert.deepEqual(f.perkEffectLines(f.perks[1],[804,300,0]),[{label:'回复生命值',value:804,kind:'heal'},{label:'额外金币',value:300,kind:'gold'}]);assert.equal(f.perkEffectLines(f.perks[2],[19,5,0])[0].value,'19:05');

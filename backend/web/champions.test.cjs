@@ -175,8 +175,8 @@ function cssNumber(source, marker, property) {
 }
 
 function compileFunctions(source, names, dependencies = {}) {
-  if (source.includes("function computeOverviewStreak(")) names = require("./r211-harness-support.cjs").expand(source, names, dependencies);
-  dependencies = { recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies };
+  names = require("./r211-harness-support.cjs").expand(source, names, dependencies);
+  dependencies = require("./r211-harness-support.cjs").environment({ recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies });
   const bodies = names.map((name) => functionSource(source, name));
   const compiledDependencies = { state:{},gradeBadge: sharedGrades.gradeBadge, gradeRank: sharedGrades.gradeRank, isSummonersRiftMatch: data => Number(data?.mapId) === 11, ...dependencies };
   if (source.includes("function loadOverview(")) {
@@ -427,8 +427,8 @@ function assertR15PerformanceAndBuildContracts() {
   assert.match(gameplayScript, /return Boolean\(tab\?\.overlay \|\| tab\?\.key === activeTabKey\)/);
   assert.match(gameplayStyles, /\.build-summary-bar\s*\{[^}]*grid-template-columns:\s*repeat\(3,/s);
   assert.match(mainSource, /BuildFingerprint: buildFingerprint/);
-  assert.match(appScript, /data\.buildFingerprint/);
-  assert.match(appScript, /settingsBuildIdentity\.textContent\s*=/);
+  assert.match(appScript, /settingsBuildIdentity\.innerHTML[^\n]*data\.version/);
+  assert.doesNotMatch(appScript, /settingsBuildIdentity[^\n]*data\.buildFingerprint/);
   assert.match(html, /id="settings-build-identity"/);
   assert.match(html, /href="\/build-item-row\.css"/);
 	  assert.equal((styles.match(/^\s*\.build-item-row\s*\{/gm) || []).length, 0);
@@ -2427,7 +2427,8 @@ test("cross-server ranked data is an explicit unsupported state", () => {
 });
 
 test("privacy UI separates explicit and opt-in automatic writes", () => {
-  assert.match(appScript, /客户端操作需主动点击；自动规则仅在开启后执行。/);
+  assert.match(appScript, /class="settings-fact status-text"/);
+  assert.doesNotMatch(appScript, /客户端操作需主动点击；自动规则仅在开启后执行。/);
   for (const flag of ["localOnly", "requiresPassword", "uploadsData"]) assert.ok(appScript.includes(`data.${flag}`));
   assert.doesNotMatch(appScript, /group\("明确点击后写入客户端"/);
 });
@@ -3198,11 +3199,15 @@ test("floating tooltip content is structured safely and shown only after placeme
   assert.match(appScript, /"国服大区合并对照"[\s\S]*"联盟一区：/);
 });
 
-test("round 9 section navigation restores each page scroll position after panel activation", () => {
+test("round 9 section navigation restores each page scroll position after panel activation", (t) => {
+  const sidebarDOM=new JSDOM('<div class="app-frame"></div><div class="topbar"></div>');t.after(()=>sidebarDOM.window.close());
+  const sidebarWindow=sidebarDOM.window;sidebarWindow.matchMedia=()=>({matches:false});
+  Object.defineProperty(sidebarDOM.window.document.querySelector(".app-frame"),"clientWidth",{value:1500});
   const panels = [{ id: "overview-panel", hidden: false }, { id: "live-panel", hidden: true }];
   const scrollCalls = [];
   const state = { section: "overview", sectionScroll: Object.create(null), favoritesPage: "collection", status: null };
   const el = {
+    sidebarToggle:sidebarDOM.window.document.createElement("button"),settingsSidebarToggle:sidebarDOM.window.document.createElement("button"),
     sectionTabs: [
       { dataset: { section: "overview" }, getAttribute: () => "overview-panel" },
       { dataset: { section: "live" }, getAttribute: () => "live-panel" },
@@ -3223,6 +3228,7 @@ test("round 9 section navigation restores each page scroll position after panel 
   const frames = [];
   let resize;
   class ResizeObserver { constructor(fn) { resize=fn; } observe() {} disconnect() { resize=null; } }
+  sidebarWindow.ResizeObserver=ResizeObserver;
   const { activateSection } = compileFunctions(appScript, ["activateSection", "restoreSectionScroll"], {
     state,
     el,
@@ -3234,12 +3240,12 @@ test("round 9 section navigation restores each page scroll position after panel 
     loadPrivacy: () => {},
     renderNotice: () => {},
     renderLaunchpad: () => {},
-		document: { getElementById: () => null },
+		document: sidebarDOM.window.document,
     ResizeObserver,
     setTimeout: () => 1, clearTimeout: () => {},
     requestAnimationFrame: (callback) => frames.push(callback),
-    window: { ResizeObserver, dispatchEvent: () => {}, matchMedia: () => ({ matches: false }), addEventListener: () => {}, removeEventListener: () => {} },
-    CustomEvent: class CustomEvent { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
+    window: sidebarWindow,
+    CustomEvent: sidebarWindow.CustomEvent,
   });
   activateSection("live");
   assert.equal(state.sectionScroll.overview, 240);

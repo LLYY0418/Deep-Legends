@@ -45,7 +45,18 @@ func selectWeGameCandidate(candidates []clientLaunchCandidate, inspect func(stri
 			v = inspect(c.executable)
 		}
 		observations = append(observations, clientCandidateObservation{Source: c.Source, FileVersion: v.String(), Exists: v.Exists})
-		if v.Exists && v.Known && (chosen < 0 || newerClientVersion(v, version)) {
+		better := chosen < 0
+		if chosen >= 0 {
+			switch {
+			case v.Known != version.Known:
+				better = v.Known
+			case v.Known:
+				better = newerClientVersion(v, version)
+			default:
+				better = v.Modified.After(version.Modified)
+			}
+		}
+		if v.Exists && better {
 			chosen, version = i, v
 		}
 	}

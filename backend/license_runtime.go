@@ -139,9 +139,6 @@ func (a *app) runLicensedBusiness(ctx context.Context) {
 			a.mu.Lock()
 			a.proRefreshContext = business
 			a.mu.Unlock()
-			a.proPlayers.mu.Lock()
-			a.proPlayers.refreshStarted = false
-			a.proPlayers.mu.Unlock()
 			done = make(chan struct{})
 			finished := done
 			a.goSafe("license_business", func() { defer close(finished); a.runConnectionManager(business) })

@@ -86,5 +86,5 @@ test('R195 8 no champion or pending pick retains empty icon slot and aligned nam
  }
 });
 test('R195 9 premade icon rows preserve name masking',()=>{
- const {d,tooltip}=rosterTooltip(members(),true);try{assert.deepEqual([...tooltip.querySelectorAll('.tooltip-roster-name')].map(n=>n.textContent),['玩家 01','玩家 02']);assert.doesNotMatch(tooltip.textContent,/测试玩家|#195/);}finally{d.window.close();}
+ const {d,tooltip}=rosterTooltip(members(),true);try{assert.deepEqual([...tooltip.querySelectorAll('.tooltip-roster-name')].map(n=>n.textContent),['阿狸','卡西奥佩娅']);assert.doesNotMatch(tooltip.textContent,/测试玩家|#195/);}finally{d.window.close();}
 });

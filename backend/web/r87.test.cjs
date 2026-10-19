@@ -16,7 +16,7 @@ function extract(source, name) {
 function compile(file, names, deps = {}, mutation = s => s) {
   const source = mutation(read(file));
   if (file === "gameplay.js") names = require("./r211-harness-support.cjs").expand(source, names, deps);
-  const context = { updateLiveLoadingVisibility() {}, ...deps };
+  const context = require("./r211-harness-support.cjs").environment({updateLiveLoadingVisibility() {}, ...deps});
   vm.runInNewContext(names.map(n => extract(source, n)).join('\n') + `\nObject.assign(globalThis,{${names.join(',')}});`, context);
   return context;
 }

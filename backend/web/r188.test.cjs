@@ -61,7 +61,7 @@ test('R188 zero and negative champion IDs retain an empty icon slot even with in
 test('R188 mask names uses the existing maskedPlayerName policy', () => {
   const f = h(); f.state.settings.maskNames = true;
   const d = dom();
-  try { const t = tooltip(d, f, roster(2)); assert.deepEqual([...t.querySelectorAll('.tooltip-roster-name')].map(e => e.textContent), ['玩家 01', '玩家 02']); assert.doesNotMatch(t.textContent, /测试成员|#188/); }
+  try { const t = tooltip(d, f, roster(2)); assert.deepEqual([...t.querySelectorAll('.tooltip-roster-name')].map(e => e.textContent), ['阿狸', '未知英雄']); assert.doesNotMatch(t.textContent, /测试成员|#188/); }
   finally { d.window.close(); }
 });
 test('R188 matchup is after tabs outside insight and visible on runes/build/insight', () => {

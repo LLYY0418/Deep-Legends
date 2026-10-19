@@ -48,11 +48,11 @@ test('R223 unknown current tab stays ungrouped and resolves to JP once',()=>{
 test('R223 cancelled launch leaves cards visible, suppresses overlay and produces no toast or refresh',async()=>{
  const dom=new JSDOM(html),el=elements(dom.window.document),state={section:'overview',status:{connected:false},installationsLoaded:true,installations:[{id:'tcls',available:true,name:'TCLS'},{id:'riot',available:true,name:'Riot'}]},hidden=[];
  try {
-  const f=compile(app,['renderLaunchpad','launchOfficialLogin','launchDetectedClient'],{state,el,escapeHTML,api:async()=>({cancelled:true}),hideReadingOverlay:reason=>hidden.push(reason),showToast:()=>assert.fail('cancel toast'),refreshStatus:()=>assert.fail('cancel refresh'),setTimeout:()=>assert.fail('cancel timer'),loadClientInstallations:()=>{}});
+  const f=compile(app,['renderLaunchpad','launchOfficialLogin','launchDetectedClient','updateClientLaunchWaiting'],{state,el,escapeHTML,api:async()=>({cancelled:true}),hideReadingOverlay:reason=>hidden.push(reason),showToast:()=>assert.fail('cancel toast'),refreshStatus:()=>assert.fail('cancel refresh'),setTimeout:()=>assert.fail('cancel timer'),loadClientInstallations:()=>{}});
   await f.launchOfficialLogin();assert.equal(state.clientLaunched,null);assert.equal(state.clientLaunchInFlight,'');assert.equal(state.overlaySuppressed,undefined);assert.deepEqual(hidden,[]);assert.equal(el.launcherList.hidden,false);
   assert([...el.launcherList.querySelectorAll('button')].filter(b=>b.dataset.clientId!=='wegame').every(b=>!b.disabled));
   state.overviewGroup='kr';state.clientLaunched={id:'riot',at:Date.now()};f.renderLaunchpad(clientView(state.status));assert.equal(el.launcherList.hidden,false);assert.equal(el.launcherList.querySelector('[data-client-id="riot"]').disabled,true);assert.equal(el.launcherList.querySelector('[data-client-id="tcls"]'),null);
-  state.clientLaunched.at-=61_000;f.renderLaunchpad(clientView({connected:false,clientDiscovery:'process-not-found'}));assert.equal(state.clientLaunched,null);assert([...el.launcherList.querySelectorAll('button')].filter(b=>b.dataset.clientId!=='wegame').every(b=>!b.disabled));assert.equal(dom.window.document.getElementById('client-launch-reselect'),null);
+  state.clientLaunched.at-=20_000;f.updateClientLaunchWaiting({known:true,leagueRunning:false,launchers:{riot:false}});f.renderLaunchpad(clientView({connected:false,clientDiscovery:'process-not-found'}));assert.equal(state.clientLaunched,null);assert([...el.launcherList.querySelectorAll('button')].filter(b=>b.dataset.clientId!=='wegame').every(b=>!b.disabled));assert.equal(dom.window.document.getElementById('client-launch-reselect'),null);
  }finally {dom.window.close();}
 });
 

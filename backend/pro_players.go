@@ -35,9 +35,6 @@ type proPlayersCache struct {
 	flight            chan struct{}
 	updating          bool
 	firstScreenFlight bool
-	refreshStarted    bool
-	refreshWait       func(context.Context, time.Duration) error
-	refreshNow        func() time.Time
 	refreshAttempted  map[string]time.Time
 }
 
@@ -228,7 +225,6 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 	if restored && !force {
 		teams, at := c.teams, c.fetchedAt
 		c.mu.Unlock()
-		a.startProSeedRefresh()
 		return teams, at, nil
 	}
 	c.mu.Unlock()
@@ -379,7 +375,6 @@ func (a *app) loadProPlayers(ctx context.Context, force bool) ([]opggProTeam, ti
 			a.persistProSnapshotLocked()
 			c.mu.Unlock()
 			a.recordDiagnostic(map[string]any{"event": "pro_directory_cost", "stage": "ladder", "duration_ms": time.Since(started).Milliseconds(), "stage_duration_ms": time.Since(ladderStarted).Milliseconds(), "wait_after_supplements_ms": time.Since(waitStarted).Milliseconds()})
-			a.startProSeedRefresh()
 		}()
 		select {
 		case <-done:

@@ -25,7 +25,7 @@
     "mask-names":enumOf("true","false"),"confirm-replay":enumOf("true","false"),"auto-live":enumOf("true","false"),
     "live-tags":{array:enumOf("self","premade","pro","hidden","autofill","squad","positions"),maxLength:7},
   };
-  const schema = {exportDirectory:"string",renderer:rendererSchema,native:{contentProtection:"boolean",closeBehavior:enumOf("exit","tray"),disableHardwareAcceleration:"boolean"},automatic:"boolean",blockAutostart:"boolean",network:{mode:enumOf("auto","direct","manual"),url:"string"},watch:watchSchema};
+  const schema = {exportDirectory:"string",renderer:rendererSchema,native:{contentProtection:"boolean",closeBehavior:enumOf("exit","tray"),disableHardwareAcceleration:"boolean"},automatic:"boolean",autoDownload:"boolean",blockAutostart:"boolean",network:{mode:enumOf("auto","direct","manual"),url:"string"},watch:watchSchema};
   function sanitize(value, shape = schema) {
     if (shape === "boolean" || shape === "string") {
       if (typeof value !== shape || shape === "string" && value.length > 1024) throw new Error("设置格式无效");
@@ -44,11 +44,32 @@
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("设置格式无效");
     const result = {};
     for (const key of Object.keys(shape)) if (Object.hasOwn(value,key)) result[key] = sanitize(value[key],shape[key]);
+    if (shape === schema && result.network?.url) {
+      const proxy = new URL(result.network.url);
+      if (proxy.username || proxy.password) throw new Error("代理地址不能包含用户名或密码");
+    }
     return result;
   }
-  const backup = Object.freeze({sanitize,rendererSchema});
+  function exportProxyURL(value) {
+    if (!value) return "";
+    const proxy = new URL(value);
+    if (!proxy.username && !proxy.password) return value;
+    proxy.username = ""; proxy.password = "";
+    return proxy.href;
+  }
+  const formatStars = count => Number.isSafeInteger(count) && count >= 0 ? count.toLocaleString("en-US") : "";
+  const backup = Object.freeze({sanitize,rendererSchema,formatStars});
   if (typeof module === "object" && module.exports) { module.exports = backup; return; }
   window.deepLegendsSettingsBackup = backup;
+  // Persistence can be blocked (including opaque origins). Keep the current
+  // session usable without changing any existing storage key.
+  const memory = new Map();
+  const preferenceStorage = globalThis.deepLegendsPreferenceStorage || {
+    getItem(key) { try { const value=localStorage.getItem(key); if(value!==null){memory.set(key,value);return value;} } catch(_) {} return memory.get(key) ?? null; },
+    setItem(key,value) { memory.set(key,String(value)); try { localStorage.setItem(key,String(value)); } catch(_) {} },
+    removeItem(key) { memory.delete(key); try { localStorage.removeItem(key); } catch(_) {} },
+  };
+  globalThis.deepLegendsPreferenceStorage = preferenceStorage;
   const get = id=>document.getElementById(id);
   const controls = {
     theme:"setting-theme","ui-scale":"setting-ui-scale","default-page":"setting-default-page","match-count":"setting-match-count","default-match-filter":"setting-default-match-filter",
@@ -77,11 +98,17 @@
     if(initialized)return; initialized=true;
     const measureScrollbar=()=>{const scroll=document.querySelector(".app-scroll");if(scroll)document.documentElement.style.setProperty("--settings-scrollbar",`${scroll.offsetWidth-scroll.clientWidth}px`);};
     measureScrollbar();window.addEventListener("resize",measureScrollbar);
-    const dot=document.querySelector(".settings-new-dot"); if(dot)dot.hidden=localStorage.getItem("lol-loot-settings-app-seen")==="true";
-    get("settings-github").addEventListener("click",()=>{
+    const dot=document.querySelector(".settings-new-dot"); if(dot)dot.hidden=preferenceStorage.getItem("lol-loot-settings-app-seen")==="true";
+    get("settings-github").addEventListener("click",event=>{
+      event.preventDefault();
       if(window.desktopPreferences)void window.desktopPreferences.openGithub();
       else window.open("https://github.com/LLYY0418/Deep-Legends","_blank","noopener,noreferrer");
     });
+    const showStars = count => {
+      const node=get("settings-github-count"),text=formatStars(count);
+      node.textContent=text; node.hidden=!text;
+    };
+    void api("/api/github/stars").then(value=>showStars(value.count)).catch(()=>showStars(null));
     const nativeKeys={"setting-content-protection":"contentProtection","setting-close-behavior":"closeBehavior","setting-disable-hardware":"disableHardwareAcceleration"};
     const syncNative=value=>{
       for(const [id,key] of Object.entries(nativeKeys)){const node=get(id);if(node.type==="checkbox")node.checked=value[key];else node.value=value[key];}
@@ -97,16 +124,25 @@
       });
     }
     void window.desktopPreferences?.get().then(syncNative).catch(()=>{for(const id of Object.keys(nativeKeys))get(id).disabled=true;});
-    get("setting-auto-update").addEventListener("change",async()=>{
-      const node=get("setting-auto-update");node.disabled=true;
-      try{const settings=await api("/api/update/settings");await api("/api/update/settings",{...settings,automatic:node.checked});}
-      catch(error){node.checked=!node.checked;toast(error.message);}finally{node.disabled=false;}
-    });
+    const syncUpdate = value => {
+      get("setting-auto-update").checked = value.automatic !== false;
+      get("setting-auto-download").checked = value.autoDownload !== false;
+      get("setting-auto-download").disabled = value.automatic === false;
+      get("setting-auto-download-row").classList.toggle("is-disabled", value.automatic === false);
+    };
+    for (const [id,key] of [["setting-auto-update","automatic"],["setting-auto-download","autoDownload"]]) {
+      get(id).addEventListener("change",async()=>{
+        const node=get(id);get("setting-auto-update").disabled=true;get("setting-auto-download").disabled=true;
+        try { const settings=await api("/api/update/settings"); syncUpdate(await api("/api/update/settings",{...settings,[key]:node.checked})); }
+        catch(error) { node.checked=!node.checked; toast(error.message); }
+        finally { get("setting-auto-update").disabled=false; get("setting-auto-download").disabled=!get("setting-auto-update").checked; get("setting-auto-download-row").classList.toggle("is-disabled",!get("setting-auto-update").checked); }
+      });
+    }
     get("setting-block-autostart").addEventListener("change",async()=>{
       const node=get("setting-block-autostart");node.disabled=true;
       try{await api("/api/client-autostart",{block:node.checked});}catch(error){node.checked=!node.checked;toast(error.message);}finally{node.disabled=false;}
     });
-    void api("/api/update/settings").then(value=>{get("setting-auto-update").checked=value.automatic!==false;}).catch(()=>{get("setting-auto-update").disabled=true;});
+    void api("/api/update/settings").then(syncUpdate).catch(()=>{get("setting-auto-update").disabled=true;get("setting-auto-download").disabled=true;});
     void api("/api/client-autostart").then(value=>{get("setting-block-autostart").checked=value.block!==false;}).catch(()=>{get("setting-block-autostart").disabled=true;});
     get("setting-release-notes").addEventListener("click",async()=>{
       try{const data=await api("/api/release-notes"),content=document.createElement("pre");content.textContent=data.notes;modal("本版更新内容",content);}catch(error){toast(error.message);}
@@ -115,12 +151,12 @@
     async function createBackup(){
       const renderer={};
       for(const key of Object.keys(rendererSchema)){
-        let value=localStorage.getItem(`lol-loot-${key}`);
+        let value=preferenceStorage.getItem(`lol-loot-${key}`);
         if(value===null && controls[key]){const node=get(controls[key]);value=node.type==="checkbox"?String(node.checked):node.value;}
         if(value!==null)renderer[key]=key==="live-tags"?JSON.parse(value):value;
       }
       const [native,update,autostart,network,watch]=await Promise.all([window.desktopPreferences?.get()||{},api("/api/update/settings"),api("/api/client-autostart"),api("/api/champions/network"),api("/api/watch/rules")]);
-      return sanitize({...(window.desktopShare?.getSaveDirectory ? {exportDirectory:(await window.desktopShare.getSaveDirectory()).directory||""}:{}),renderer,native,automatic:update.automatic!==false,blockAutostart:autostart.block!==false,network:{mode:network.mode,url:network.url||""},watch});
+      return sanitize({...(window.desktopShare?.getSaveDirectory ? {exportDirectory:(await window.desktopShare.getSaveDirectory()).directory||""}:{}),renderer,native,automatic:update.automatic!==false,autoDownload:update.autoDownload!==false,blockAutostart:autostart.block!==false,network:{mode:network.mode,url:exportProxyURL(network.url||"")},watch});
     }
     async function applyBackupValues(data, notify=true){
       let count=0;
@@ -132,14 +168,14 @@
       if(data.exportDirectory!==undefined && window.desktopShare?.setSaveDirectory){await window.desktopShare.setSaveDirectory(data.exportDirectory);count++;}
       if(data.network){await api("/api/champions/network",data.network);count++;}
       if(data.native && Object.keys(data.native).length && window.desktopPreferences){syncNative(await window.desktopPreferences.update(data.native));count+=Object.keys(data.native).length;}
-      if(data.automatic!==undefined){const settings=await api("/api/update/settings");await api("/api/update/settings",{...settings,automatic:data.automatic});get("setting-auto-update").checked=data.automatic;count++;}
+      if(data.automatic!==undefined || data.autoDownload!==undefined){const settings=await api("/api/update/settings");syncUpdate(await api("/api/update/settings",{...settings,...(data.automatic===undefined?{}:{automatic:data.automatic}),...(data.autoDownload===undefined?{}:{autoDownload:data.autoDownload})}));count++;}
       if(data.blockAutostart!==undefined){await api("/api/client-autostart",{block:data.blockAutostart});get("setting-block-autostart").checked=data.blockAutostart;count++;}
       for(const [key,value] of Object.entries(data.renderer||{})){
         if(key==="density"||key==="sidebar"){
           const defaults=key==="density"?"comfortable":"expanded";
-          if((localStorage.getItem(`lol-loot-${key}`)||defaults)!==value)get(key==="density"?"density-toggle":"settings-sidebar-toggle").click();
+          if((preferenceStorage.getItem(`lol-loot-${key}`)||defaults)!==value)get(key==="density"?"density-toggle":"settings-sidebar-toggle").click();
         }else{
-          localStorage.setItem(`lol-loot-${key}`,key==="live-tags"?JSON.stringify(value):value);
+          preferenceStorage.setItem(`lol-loot-${key}`,key==="live-tags"?JSON.stringify(value):value);
           const node=controls[key] ? get(controls[key]) : null;if(node){if(node.type==="checkbox")node.checked=value==="true";else node.value=value;node.dispatchEvent(new Event("change",{bubbles:true}));}
         }
         count++;

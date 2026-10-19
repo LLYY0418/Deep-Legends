@@ -59,9 +59,14 @@ test('R220 practice NONE position displays the OPGG primary lane without fallbac
  assert.equal(f.practicePlayerPosition(self,data),'middle');assert.equal(f.specialistPosition(data),'mid');const markup=f.liveCurrentPositionChip(data);assert.match(markup,/中路/);assert.doesNotMatch(markup,/其他|推断|报告的位置|回退/);
 });
 
-test('R220 external capability diagnostics hide Tencent SGP and ARAMKit entry quietly',()=>{
- const state={controllers:new Map(),status:{clientRegion:'jp1'},lastCapabilities:[{name:'match-details',state:'failed',path:'sgp: /match',detail:'腾讯 SGP失败'},{name:'match-history',state:'available',path:'riot: /match',attempts:[{source:'riot',outcome:'success'},{source:'sgp',outcome:'disabled'}]}]},nodes={gameplaySettingsStatus:{innerHTML:''}};
- const f=compile(gameplay,['renderCapabilitySettings','capabilityAttemptSummary','renderRankMMRPopover'],{state,nodes,escapeHTML,number:String,riotTab:t=>t.region==='jp1'});f.renderCapabilitySettings();assert.match(nodes.gameplaySettingsStatus.innerHTML,/Riot API/);assert.doesNotMatch(nodes.gameplaySettingsStatus.innerHTML,/SGP|腾讯/);assert.equal(f.renderRankMMRPopover({region:'jp1'}),'');
+test('R220 external capability diagnostics hide Tencent SGP and ARAMKit entry quietly',async()=>{
+ const state={controllers:new Map(),status:{clientRegion:'jp1'},lastCapabilities:[{name:'match-details',state:'failed',path:'sgp: /match',detail:'腾讯 SGP失败'},{name:'match-history',state:'available',path:'riot: /match',attempts:[{source:'riot',outcome:'success'},{source:'sgp',outcome:'disabled'}]}]},dom=new JSDOM('<div id="capabilities"></div>'),nodes={gameplaySettingsStatus:dom.window.document.querySelector('#capabilities')};
+ try {
+  let modal;
+  const f=compile(gameplay,['renderCapabilitySettings','capabilityAttemptSummary','renderRankMMRPopover'],{state,nodes,document:dom.window.document,window:{deepLegendsSections:{load:async()=>{}},deepLegendsSettingsModal:(_title,content)=>{modal=content}},escapeHTML,number:String,riotTab:t=>t.region==='jp1'});
+  f.renderCapabilitySettings();assert.match(nodes.gameplaySettingsStatus.textContent,/1 项可用/);nodes.gameplaySettingsStatus.querySelector('button').click();await new Promise(setImmediate);
+  assert(modal);assert.match(modal.textContent,/Riot API/);assert.doesNotMatch(modal.textContent,/SGP|腾讯|ARAMKit/);assert.equal(f.renderRankMMRPopover({region:'jp1'}),'');
+ } finally {dom.window.close();}
 });
 
 test('R220 local Riot overview permits the retry budget and still accepts ordinary JSON replies',async()=>{
