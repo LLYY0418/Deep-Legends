@@ -19,7 +19,7 @@
       link.rel = "stylesheet";
       link.href = `/${name}.css`;
       link.dataset.sectionStyle = name;
-      link.onload = () => { styleReady.add(name); styleFlights.delete(name); link.onload = link.onerror = null; resolve(); };
+      link.onload = () => { styleReady.add(name); if (name === "settings-preferences") document.getElementById("settings-panel")?.removeAttribute("data-settings-style-pending"); styleFlights.delete(name); link.onload = link.onerror = null; resolve(); };
       link.onerror = () => {
         link.remove();
         styleFlights.delete(name);

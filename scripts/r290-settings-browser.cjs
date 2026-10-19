@@ -13,12 +13,19 @@ withBrowser(async({page,results,errors})=>{
   const normal=await read();assert.equal(normal.height,40);assert(normal.text.includes('GitHub'));assert.equal(normal.count,failure?'':'1,234');assert.equal(normal.calls,1);
   await p.call('DOM.enable');await p.call('CSS.enable');const {root}=await p.call('DOM.getDocument');const {nodeId}=await p.call('DOM.querySelector',{nodeId:root.nodeId,selector:'#settings-github'});
   for(const pseudo of ['hover','focus-visible']){
-   await p.call('CSS.forcePseudoState',{nodeId,forcedPseudoClasses:[pseudo]});const hovered=await read();assert(hovered.text.includes('觉得顺手？赏颗星'));assert.equal(hovered.right,normal.right);assert.equal(hovered.height,40);results.push({kind:'github',failure,state:pseudo,...hovered});
+   await p.call('CSS.forcePseudoState',{nodeId,forcedPseudoClasses:[pseudo]});
+   const cursors=await p.evaluate(`(()=>{const b=document.getElementById('settings-github'),r=b.getBoundingClientRect(),points=[];for(const x of [.05,.25,.5,.75,.95])for(const y of [.25,.5,.75]){const n=document.elementFromPoint(r.x+r.width*x,r.y+r.height*y);points.push({inside:b.contains(n),cursor:getComputedStyle(n).cursor})}const divider=b.querySelector('.settings-github-stars').getBoundingClientRect().x;for(const x of [divider-1,divider,divider+1]){const n=document.elementFromPoint(x,r.y+r.height/2);points.push({inside:b.contains(n),cursor:getComputedStyle(n).cursor})}return {elements:[b,...b.querySelectorAll('*')].map(n=>getComputedStyle(n).cursor),points}})()`);
+   assert(cursors.elements.every(x=>x==='pointer'));assert(cursors.points.every(x=>x.inside&&x.cursor==='pointer'),'whole capsule including divider and padding is clickable');results.push({kind:'github-cursor',theme,failure,pseudo,...cursors});
+   const hovered=await read();assert(hovered.text.includes('觉得顺手？赏颗星'));assert.equal(hovered.right,normal.right);assert.equal(hovered.height,40);results.push({kind:'github',failure,state:pseudo,...hovered});
   }
+  const hoverTarget=await p.evaluate("(()=>{const r=document.getElementById('settings-github').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()");
+  await p.call('Input.dispatchMouseEvent',{type:'mouseMoved',...hoverTarget});
+  const icon=await p.evaluate("new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const b=document.getElementById('settings-github'),star=b.querySelector('.github-star').getBoundingClientRect();resolve({width:star.width,height:star.height,tooltips:[...document.querySelectorAll('[role=tooltip]')].filter(n=>n.getClientRects().length>0).length,tooltip:b.hasAttribute('data-tooltip'),title:b.hasAttribute('title')})})))");
+  assert.equal(icon.width,18);assert.equal(icon.height,18);assert.equal(icon.tooltip,false);assert.equal(icon.title,false);assert.equal(icon.tooltips,0,'GitHub hover must not open a tooltip');results.push({kind:'github-hover-icon',theme,...icon});
   await p.shot(failure?'github-offline':'github-hover');
-  await p.call('CSS.forcePseudoState',{nodeId,forcedPseudoClasses:[]});assert((await read()).text.includes('GitHub'));
+  await p.call('CSS.forcePseudoState',{nodeId,forcedPseudoClasses:[]});await p.call('Input.dispatchMouseEvent',{type:'mouseMoved',x:10,y:200});assert((await read()).text.includes('GitHub'));
   await p.call('Emulation.setDeviceMetricsOverride',{width:900,height:900,deviceScaleFactor:1,mobile:false});
-  const narrow=await read();assert.equal(narrow.label,'none');assert.equal(narrow.tooltip,'觉得顺手？赏颗星');assert.equal(narrow.height,40);
+  const narrow=await read();assert.equal(narrow.label,'none');assert.equal(narrow.tooltip,undefined);assert.equal(narrow.height,40);
   results.push({kind:'github',theme,failure,state:'normal',...normal},{kind:'github',theme,failure,state:'narrow',...narrow});
   if(!failure){
    await p.call('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});

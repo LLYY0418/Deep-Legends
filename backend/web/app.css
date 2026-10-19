@@ -814,6 +814,9 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 
 
 
+/* Static settings markup is revealed only after its lazy stylesheet applies. */
+#settings-panel[data-settings-style-pending] > :not([data-section-loading]) { display:none; }
+#settings-panel[data-settings-style-pending] > [data-section-loading] { grid-column:1 / -1; }
 .settings-panel { display: grid; grid-template-columns: 188px minmax(0,1fr); grid-template-areas: "head head" "tabs content"; align-content: start; align-items: start; gap: 22px; padding-top: 16px; }
 .settings-head { grid-area: head; padding-bottom: 4px; }
 .settings-subpanel { grid-area: content; }

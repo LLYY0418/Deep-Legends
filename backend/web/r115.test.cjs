@@ -75,3 +75,14 @@ test('R115 shared blocks keep critical geometry while optional CSS waits for its
  const shared=read('app.css'),loader=read('section-loader.js');
  assert.match(shared,/\.mayhem-ranking-list/);assert.match(shared,/\.suite-panel\s*\{[\s\S]*container-type:\s*inline-size/);assert.match(loader,/await Promise\.all\(\(styles\[name\] \|\| \[\]\)\.map\(loadStyle\)\)/);assert.match(loader,/link\.onload/);
 });
+test('R290 settings markup stays pending across stylesheet failure and reveals only on successful load',async()=>{
+ const h=harness();try{
+  const panel=h.w.document.getElementById('settings-panel');panel.setAttribute('data-settings-style-pending','');
+  assert.match(read('index.html'),/id="settings-panel"[^>]*data-settings-style-pending/);
+  const failed=assert.rejects(h.w.deepLegendsSections.load('settings-preferences'),/样式加载失败/);
+  assert(panel.hasAttribute('data-settings-style-pending'));h.fail('settings-preferences');await failed;
+  assert(panel.hasAttribute('data-settings-style-pending'),'failure must not reveal unstyled controls');
+  const retried=h.w.deepLegendsSections.load('settings-preferences');assert(panel.hasAttribute('data-settings-style-pending'));
+  h.finish('settings-preferences');await retried;assert.equal(panel.hasAttribute('data-settings-style-pending'),false);
+ }finally{h.close()}
+});

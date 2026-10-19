@@ -37,7 +37,10 @@ test('R290 settings stars load once on opening, failures fall back quietly to ju
    assert.equal(calls,1,'no retry or repeated initialization');
    assert.equal(h.get('settings-github-count').textContent,mode==='success'?'1,234':'');
    assert.equal(h.get('settings-github-count').hidden,mode!=='success');
-   assert.equal(h.get('settings-github').querySelector('.github-star').textContent,'★');
+   assert(h.get('settings-github').querySelector('svg.github-star path'),'failure retains the star icon');
+   assert.equal(h.get('settings-github').querySelector('svg.github-star').getAttribute('width'),'18');
+   assert.equal(h.get('settings-github').hasAttribute('data-tooltip'),false);
+   assert.equal(h.get('settings-github').hasAttribute('title'),false);
    assert.equal(h.get('settings-github').getAttribute('href'),'https://github.com/LLYY0418/Deep-Legends');
    assert.equal(h.get('toast').hidden,true,'no failure toast');
   }finally{h.close()}

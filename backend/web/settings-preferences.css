@@ -8,13 +8,14 @@ main.shell:has(> #settings-panel:not([hidden])) { padding: 28px 46px; }
 .settings-head .settings-build-identity { margin: 0; color: var(--primary-strong); font-size: 16px; font-weight: 700; letter-spacing: .2px; white-space: nowrap; }
 .settings-build-identity small { margin-right: 6px; color: var(--muted); font: 600 13px var(--font); }
 .settings-github { display: inline-flex; height: 40px; flex: none; align-items: stretch; margin-top: 4px; padding: 0; color: var(--muted); background: var(--surface-strong); border: 1px solid var(--line); border-radius: 10px; text-decoration: none; overflow: hidden; font-size:13px; }
+.settings-github, .settings-github * { cursor:pointer; }
 .settings-github-main { display:flex; align-items:center; gap:8px; padding-inline:12px; }
 .settings-github-label { display:grid; }
 .settings-github-label > span { grid-area:1/1; }
 .github-hover-copy { display:none; }
 .settings-github-label .github-default-copy { justify-self:start; }
 .settings-github-stars { display:flex; align-items:center; gap:6px; padding-inline:12px; border-left:1px solid var(--line); color:var(--primary-strong); font-family:Consolas,monospace; font-weight:600; }
-.github-star { color:var(--rarity-gold); }
+.settings-github .github-star { width:18px; height:18px; flex:none; color:var(--rarity-gold); }
 .settings-github:is(:hover,:focus-visible) .settings-github-main { background:var(--primary-soft); color:var(--primary-strong); }
 .settings-github:is(:hover,:focus-visible) .github-default-copy { display:none; }
 .settings-github:is(:hover,:focus-visible) .github-hover-copy { display:block; }
