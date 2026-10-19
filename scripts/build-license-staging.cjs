@@ -22,7 +22,7 @@ function build(args = process.argv.slice(2)) {
   };
   const digest = file => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
   try {
-    for (const name of ["go.mod", "go.sum", "backend", "installer", "scripts", "build-desktop.sh", "build-desktop-windows.ps1", "build-windows.ps1", "desktop"]) {
+    for (const name of ["go.mod", "go.sum", "release_notes.go", "CHANGELOG.md", "backend", "installer", "scripts", "build-desktop.sh", "build-desktop-windows.ps1", "build-windows.ps1", "desktop"]) {
       fs.cpSync(path.join(root, name), path.join(snapshot, name), { recursive: true, filter: file => !file.includes(path.sep + "node_modules") && !file.includes(path.sep + "payload" + path.sep + "files") && !file.includes(path.sep + "_shots") && !file.endsWith(path.sep + "loot-service.exe") && !file.endsWith(path.sep + "backend-digest.cjs") && !file.endsWith(path.sep + "uninstall-shell.exe") });
     }
     const desktop = path.join(snapshot, "desktop"), packed = path.join(snapshot, "dist/desktop");

@@ -9,7 +9,7 @@ const cases=[
  ['p9-full-render','gameplay.js','    const list = container.querySelector(".match-list");\n    if (list && additions.length','    const list = container.querySelector(".match-list");\n    if(list && additions.length)list.innerHTML=(tab.data.matches || []).map(match=>renderMatch(match,tab.data.player.playerRef,tab)).join("");\n    if (list && additions.length','sample.sameList && sample.sameFirst'],
 ];
 cases.push(['p7-auto-sidebar','app.js',
- 'forced: scale >= 1.5 || width <= 820', 'forced: false', 'automatic sidebar collapse']);
+ 'forced: scale >= 1.5 || narrow', 'forced: false', 'automatic sidebar collapse']);
 cases.push(['p7-refresh-label','app.css',
  '--refresh-padding:0; --refresh-label-display:none; }',
  '--refresh-padding:0; --refresh-label-display:inline; }', 'refresh label must hide in narrow topbar']);

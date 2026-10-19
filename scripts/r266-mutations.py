@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix="r266-mutations-") as temporary:
     go_root = temp / "go"
     go_root.mkdir()
     shutil.copytree(ROOT / "backend", go_root / "backend")
-    for file in ("go.mod", "go.sum"):
+    for file in ("go.mod", "go.sum", "release_notes.go", "CHANGELOG.md"):
         shutil.copy2(ROOT / file, go_root / file)
     go_cases = [
         ("p7-ignore-puuid", "riot_api.go", "ctx = riotPinnedIdentityContext(ctx)\n\taccount, err := p.accountByRiotIDPinned", "return riotAccount{PUUID: \"opgg-encrypted-subject\",GameName:gameName,TagLine:tagLine},nil\n\tctx = riotPinnedIdentityContext(ctx)\n\taccount, err := p.accountByRiotIDPinned", "TestR266ProRiotIDResolutionAndRetriesJoinFlight"),

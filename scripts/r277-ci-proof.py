@@ -40,7 +40,7 @@ class Proof:
         self.temporary = tempfile.TemporaryDirectory(prefix='r277-go-proof-', dir=self.scratch)
         self.root = Path(self.temporary.name)
         try:
-            for name in ['go.mod', 'go.sum']:
+            for name in ['go.mod', 'go.sum', 'release_notes.go', 'CHANGELOG.md']:
                 shutil.copy2(ROOT / name, self.root / name)
             shutil.copytree(ROOT / 'backend', self.root / 'backend', ignore=shutil.ignore_patterns('node_modules', '__pycache__'))
             # Fail closed on empty filtered selections, including newly added R277 tests.

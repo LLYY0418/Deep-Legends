@@ -42,7 +42,9 @@ async function main(){
  await call('Page.enable');
  // Use the production shell and every production stylesheet. Fixtures have no
  // personal IDs, no network dependency, long account names and missing rows.
- const data={teams:['BLG','IG','T1','HLE','GEN','DK'].map(code=>({code,name:code,league:'LCK',players:[{key:`${code}/fixture`,name:'Fixture',position:'middle',status:'partial',accounts:[{gameName:'A very long Korean account name '.repeat(3),tagLine:'KR1',tier:'CHALLENGER',rankStatus:'ranked',lp:1432,ladderRank:17,ladderRankKnown:true,updatedAt:'2026-09-08T10:00:00Z'},{gameName:'Short',tagLine:'KR2',tier:'MASTER',rankStatus:'ranked',lp:400,updatedAt:'2026-09-08T10:00:00Z'},{gameName:'Historical',tagLine:'KR3',dormant:true}]},{key:`${code}/missing`,name:'Missing',position:'top',status:'missing',accounts:[]}]})),warnings:['测试来源提示'],fetchedAt:'2026-09-08T11:00:00Z',rosterVerifiedAt:'2026-09-08'};
+ // Distinct long names make nowrap removal produce two wrapped heights plus
+ // the unchanged 52px rows; pending accounts no longer collapse into a 46px history row.
+ const data={teams:['BLG','IG','T1','HLE','GEN','DK'].map(code=>({code,name:code,league:'LCK',players:[{key:`${code}/fixture`,name:'Fixture',position:'middle',status:'partial',accounts:[{gameName:'A very long Korean account name '.repeat(3),tagLine:'KR1',tier:'CHALLENGER',rankStatus:'ranked',lp:1432,ladderRank:17,ladderRankKnown:true,updatedAt:'2026-09-08T10:00:00Z'},{gameName:'An even longer secondary Korean account name '.repeat(8),tagLine:'KR2',tier:'MASTER',rankStatus:'ranked',lp:400,updatedAt:'2026-09-08T10:00:00Z'},{gameName:'Historical',tagLine:'KR3',dormant:true}]},{key:`${code}/missing`,name:'Missing',position:'top',status:'missing',accounts:[]}]})),warnings:['测试来源提示'],fetchedAt:'2026-09-08T11:00:00Z',rosterVerifiedAt:'2026-09-08'};
  server=require('node:http').createServer((req,res)=>{
    const pathname=new URL(req.url,'http://localhost').pathname;
    if(pathname==='/api/pro-players'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(data));return;}

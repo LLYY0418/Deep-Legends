@@ -843,7 +843,7 @@
     "file": "backend/pro_players_supplement_test.go",
     "line": 166,
     "target": "calls",
-    "source_sha256": "e62e99000efb742fc704d8bd2d590a451bb3b50ca4a959fc5d0c7a80d17b8d89",
+    "source_sha256": "be80eb9e74b9f063f76c8f4e35ec6b5709772b70e6838e56a9818e78585d9450",
     "comment": "r276-capture-safe: TestProPublicFetchRejectsUnsafeRedirectsAndCookies: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

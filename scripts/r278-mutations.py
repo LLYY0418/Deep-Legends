@@ -39,7 +39,7 @@ with tempfile.TemporaryDirectory(prefix='r278-mutants-') as d:
  mutate('P12-dismiss-marks-read','backend/web/announcements.js','dismiss(){},','dismiss(n){read.push(id(n));},','R278_ANNOUNCEMENTS_MODULE')
  mutate('P12-game-phase-gate-lost','backend/web/announcements.js',"if(phase==='unknown' || active.has(phase))return;","if(phase==='unknown')return;",'R278_ANNOUNCEMENTS_MODULE')
  mutate('P13-long-probe-restored','backend/update_sources.go','updateProbeTimeout = 2 * time.Second','updateProbeTimeout = 6 * time.Second',test='TestR278P13ProbeBudget')
- mutate('P13-auto-predownload-disabled','backend/update.go','predownload := u.autoPredownload && resultState == "available" && !u.status.ManualOnly','predownload := false',test='TestR278P13AutomaticPredownloadAndForegroundTakeover')
+ mutate('P13-auto-predownload-disabled','backend/update.go','predownload := u.autoPredownload && !u.autoDownloadDisabled && resultState == "available" && !u.status.ManualOnly','predownload := false',test='TestR278P13AutomaticPredownloadAndForegroundTakeover')
  mutate('P14-success-poll-not-aggregated','backend/request_diagnostic_summary.go','local := event["event"] == "local_request_client"','local := false',test='TestR278P14LocalSuccessWindow')
  mutate('P14-snapshot-dedup-lost','backend/diagnostic_snapshots.go','if !snapshotDiagnosticEvent(name) {','if name == "overview_art_source" || !snapshotDiagnosticEvent(name) {',test='TestR278P14SnapshotRetainsChanges')
  release_version=json.loads((ROOT/'desktop/package.json').read_text())['version']

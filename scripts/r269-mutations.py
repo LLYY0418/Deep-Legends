@@ -23,7 +23,8 @@ with tempfile.TemporaryDirectory(prefix='r269-mutants-') as temp:
   mutant=source
   for a,b in changes:assert a in mutant,(name,a);mutant=mutant.replace(a,b)
   file=temp/(name+'.cjs');file.write_text(mutant);run(name,['node','--test','backend/web/r269.test.cjs'],extra={'R269_FILTER_SOURCE':str(file)},negative=True)
- go=temp/'go';shutil.copytree(ROOT/'backend',go/'backend');shutil.copy2(ROOT/'go.mod',go/'go.mod');shutil.copy2(ROOT/'go.sum',go/'go.sum')
+ go=temp/'go';shutil.copytree(ROOT/'backend',go/'backend')
+ for name in ('go.mod','go.sum','release_notes.go','CHANGELOG.md'):shutil.copy2(ROOT/name,go/name)
  cases=[
  ('p1-no-recovery','riot_puuid_scope.go','fresh, scope, lookupErr := p.recoverPUUID(ctx, id)','return err\n fresh, scope, lookupErr := p.recoverPUUID(ctx, id)','TestR269CredentialScopesAndPUUIDRecovery'),
  ('p1-no-credential-partition','riot_puuid_scope.go',' + "|credential:" + riotCredentialScope(ctx)', '','TestR269CredentialScopesAndPUUIDRecovery'),
