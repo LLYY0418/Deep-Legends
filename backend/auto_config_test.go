@@ -201,8 +201,11 @@ func TestR298SameSessionRuneReplacementBoundary(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			a := &app{}
 			a.autoConfig.runtime = autoConfigRuntime{PageID: 77, generation: 1, Results: map[string]string{"runes": "applied"}}
+			var mu sync.Mutex
 			var deleted []string
 			client := &LCUClient{baseURL: "https://127.0.0.1", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+				mu.Lock()
+				defer mu.Unlock()
 				var data any
 				switch {
 				case req.Method == "DELETE":
@@ -227,8 +230,11 @@ func TestR298SameSessionRuneReplacementBoundary(t *testing.T) {
 			if err != nil || id != 101 {
 				t.Fatalf("page=%d err=%v", id, err)
 			}
-			if c.canDelete && !reflect.DeepEqual(deleted, []string{"/lol-perks/v1/pages/77"}) || !c.canDelete && len(deleted) != 0 {
-				t.Fatalf("deleted %v", deleted)
+			mu.Lock()
+			gotDeleted := append([]string(nil), deleted...)
+			mu.Unlock()
+			if c.canDelete && !reflect.DeepEqual(gotDeleted, []string{"/lol-perks/v1/pages/77"}) || !c.canDelete && len(gotDeleted) != 0 {
+				t.Fatalf("deleted %v", gotDeleted)
 			}
 			if a.autoConfig.runtime.PageID != 101 || a.autoConfig.runtime.expectedRunes != runes || a.autoConfig.runtime.applyingRunes || a.autoConfigYieldSnapshot()["runes"] {
 				t.Fatalf("own write was not retained or was mistaken for a player edit: %+v", a.autoConfig.runtime)
