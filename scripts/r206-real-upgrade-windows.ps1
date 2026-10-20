@@ -309,6 +309,10 @@ try {
     $published079 = Join-Path $root 'Deep-Legends-Setup-0.12.79-public.exe'
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.79/Deep-Legends-Setup-0.12.79-public.exe' -OutFile $published079
     if ((Get-FileHash $published079 -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'cabacc1b4e8bc8dcf51469e1d1e84f0ef6ff8f82090084bf0c3fd6b0bb794d96') { throw 'Published 0.12.79 setup checksum mismatch' }
+    # Previous candidates in this shared fixture have a new authority file;
+    # this independent published legacy build must exercise first migration.
+    node scripts/r297-upgrade-preferences-fixture.cjs $root '079'
+    if ($LASTEXITCODE -ne 0) { throw 'Independent legacy preference fixture could not be isolated' }
     Run-Setup $published079 -Version '0.12.79'
     Assert-InstalledVersion '0.12.79'
     Wait-R265InstallerLaunch
@@ -396,6 +400,10 @@ try {
     $published080 = Join-Path $root 'Deep-Legends-Setup-0.12.80-public.exe'
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.80/Deep-Legends-Setup-0.12.80-public.exe' -OutFile $published080
     if ((Get-FileHash $published080 -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'e62a12f286cef2a5b8dabaaf99dcd8de50557ba34f5c1b84cde3fa0c86744aaf') { throw 'Published 0.12.80 setup checksum mismatch' }
+    # Previous candidates in this shared fixture have a new authority file;
+    # this independent published legacy build must exercise first migration.
+    node scripts/r297-upgrade-preferences-fixture.cjs $root '080'
+    if ($LASTEXITCODE -ne 0) { throw 'Independent legacy preference fixture could not be isolated' }
     Run-Setup $published080 -Version '0.12.80' -PublishedLegacy
     Assert-InstalledVersion '0.12.80'
     Wait-R265InstallerLaunch
@@ -454,6 +462,10 @@ try {
     $published081 = Join-Path $root 'Deep-Legends-Setup-0.12.81-public.exe'
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.81/Deep-Legends-Setup-0.12.81-public.exe' -OutFile $published081
     if ((Get-FileHash $published081 -Algorithm SHA256).Hash.ToLowerInvariant() -ne '7dd3e6eb22aeb75c9e62deddd090231f8c93fa62e92de90bfc1baa174085862d') { throw 'Published 0.12.81 setup checksum mismatch' }
+    # Previous candidates in this shared fixture have a new authority file;
+    # this independent published legacy build must exercise first migration.
+    node scripts/r297-upgrade-preferences-fixture.cjs $root ('081-' + $legacyScale)
+    if ($LASTEXITCODE -ne 0) { throw 'Independent legacy preference fixture could not be isolated' }
     Run-Setup $published081 -Version '0.12.81' -PublishedLegacy
     Assert-InstalledVersion '0.12.81'
     Wait-R265InstallerLaunch
@@ -519,6 +531,10 @@ try {
     $published082 = Join-Path $root 'Deep-Legends-Setup-0.12.82-public.exe'
     Invoke-WebRequest 'https://github.com/LLYY0418/Deep-Legends/releases/download/v0.12.82/Deep-Legends-Setup-0.12.82-public.exe' -OutFile $published082
     if ((Get-FileHash $published082 -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'c87bbeb6ea99eda83ec191c6026410851049e54ece9623ca4121ec70c06c88d6') { throw 'Published 0.12.82 setup checksum mismatch' }
+    # Previous candidates in this shared fixture have a new authority file;
+    # this independent published legacy build must exercise first migration.
+    node scripts/r297-upgrade-preferences-fixture.cjs $root ('082-' + $legacyScale)
+    if ($LASTEXITCODE -ne 0) { throw 'Independent legacy preference fixture could not be isolated' }
     Run-Setup $published082 -Version '0.12.82'
     Assert-InstalledVersion '0.12.82'
     Wait-R265InstallerLaunch
