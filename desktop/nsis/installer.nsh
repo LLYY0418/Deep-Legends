@@ -112,6 +112,38 @@ Var pid
 ; Keep registry/shortcut targets unchanged. The stock NSIS uninstaller remains
 ; the only implementation of file, registry and shortcut removal.
 !define DL_UNINSTALL_SHELL "${PROJECT_DIR}\uninstall-shell.exe"
+; R297: only this product's fixed registration keys are eligible for repair.
+; No directory is removed or migrated, and unrelated uninstall keys are untouched.
+!macro DLPruneOwnMissingRegistration VIEW
+  SetRegView ${VIEW}
+  ReadRegStr $R1 HKCU "${UNINSTALL_REGISTRY_KEY}" "DisplayName"
+  ReadRegStr $R2 HKCU "${UNINSTALL_REGISTRY_KEY}" "InstallLocation"
+  ${If} $R1 == "Deep Legends"
+  ${AndIf} $R2 != ""
+    ; Leave quoted/noncanonical values alone rather than guess a target.
+    StrCpy $R3 $R2 1
+    ${If} $R3 != '$\"'
+      ${IfNot} ${FileExists} "$R2\."
+        DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY}"
+      ${EndIf}
+    ${EndIf}
+  ${EndIf}
+!macroend
+
+!macro DLRepairInstallRegistration
+  Push $R1
+  Push $R2
+  Push $R3
+  !insertmacro DLPruneOwnMissingRegistration 64
+  !insertmacro DLPruneOwnMissingRegistration 32
+  SetRegView 64
+  WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "InstallLocation" "$INSTDIR"
+  WriteRegStr SHELL_CONTEXT "${INSTALL_REGISTRY_KEY}" "InstallLocation" "$INSTDIR"
+  Pop $R3
+  Pop $R2
+  Pop $R1
+!macroend
+
 !macro customInstall
   ; Internal payload, not a second user-facing uninstaller. The shell copies
   ; this PE to its temporary workspace before launching the stock NSIS logic.
@@ -123,6 +155,7 @@ Var pid
     Abort "Unable to prepare the uninstaller payload"
   File "/oname=$INSTDIR\${UNINSTALL_FILENAME}" "${DL_UNINSTALL_SHELL}"
   Delete "$INSTDIR\Uninstall Deep Legends Core.exe"
+  !insertmacro DLRepairInstallRegistration
 !macroend
 
 !macro customInstallMode

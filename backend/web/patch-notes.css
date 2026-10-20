@@ -1,0 +1,62 @@
+/* 8) 英雄页头部（P10）：副标题整行去掉；标题右侧加「版本更新」按钮；刷新数据按钮改成与「段位」选择框同级的正常样式。
+      原因：全局 .text-button 默认 color: var(--muted)（灰），悬停才变 --ink，所以刷新按钮平时看起来像禁用。
+      头部这两个按钮用 --ink + 边框 + --surface-strong，悬停只加深边框；真正禁用（正在联网）才降到 .55 透明度。 */
+.champion-head-title { display: flex; min-width: 0; align-items: center; gap: 14px; }
+.champion-head-actions .text-button, .champion-head-title .text-button { min-height: 38px; gap: 7px; padding: 0 14px; color: var(--ink); background: var(--surface-strong); border: 1px solid var(--line); font-weight: 650; }
+.champion-head-actions .text-button:hover:not(:disabled), .champion-head-title .text-button:hover:not(:disabled) { border-color: color-mix(in oklab, var(--primary) 55%, var(--line)); }
+.champion-head-actions .text-button:disabled { opacity: .55; cursor: progress; }
+.champion-head-title .text-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.champion-head-title .text-button b { padding: 1px 6px; color: var(--primary-strong); background: color-mix(in oklab, var(--primary) 14%, transparent); border-radius: 5px; font-size: 11.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
+
+/* 9) 版本更新弹窗：只显示当前所在 tab 对应模式的改动。主题色只用在：版本号、模式标签、改后的新值、「新增」标签、分组标题左侧竖条。
+      不用红 / 绿表示增强 / 削弱（官方公告没有可靠的增强 / 削弱标记，按数字大小猜会出错：冷却变短是增强）。 */
+.pn-scrim { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgb(0 0 0 / .46); }
+.pn-dialog { display: grid; width: min(680px, 100%); max-height: min(720px, 100%); grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; color: var(--ink);
+  background: var(--surface-strong); border: 1px solid color-mix(in oklab, var(--primary) 30%, var(--line)); border-radius: 14px; box-shadow: 0 24px 60px rgb(0 0 0 / .5); }
+.pn-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px 14px; border-bottom: 1px solid var(--line); }
+.pn-head h3 { margin: 0; font-size: 17px; }
+.pn-head h3 b { color: var(--primary-strong); font-weight: 800; font-variant-numeric: tabular-nums; }
+.pn-mode { padding: 2px 9px; color: var(--primary-strong); background: color-mix(in oklab, var(--primary) 13%, transparent); border: 1px solid color-mix(in oklab, var(--primary) 38%, transparent); border-radius: 6px; font-size: 12px; font-weight: 700; }
+.pn-date { margin-left: auto; color: var(--muted); font-size: 12px; }
+.pn-close { display: grid; width: 28px; height: 28px; place-items: center; padding: 0; color: var(--muted); background: transparent; border: 0; border-radius: 7px; }
+.pn-close:hover { color: var(--ink); background: color-mix(in oklab, var(--ink) 9%, transparent); }
+.pn-close svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.pn-body { min-height: 0; padding: 4px 20px 6px; overflow: auto; }
+.pn-section { padding: 14px 0 4px; }
+.pn-section > h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13.5px; }
+.pn-section > h4::before { width: 3px; height: 14px; background: var(--primary-strong); border-radius: 2px; content: ""; }
+.pn-section > h4 small { color: var(--muted); font-size: 12px; font-weight: 500; }
+.pn-entry { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--line-soft, var(--line)); }
+.pn-section > h4 + .pn-entry { border-top: 0; padding-top: 2px; }
+.pn-entry .ic { grid-row: 1 / span 2; width: 36px; height: 36px; border-radius: 8px; overflow: hidden; }
+.pn-entry > strong { align-self: center; font-size: 14px; }
+.pn-entry > div { grid-column: 2; display: grid; gap: 6px; }
+.pn-group { display: grid; gap: 3px; }
+.pn-group > span { justify-self: start; padding: 0 6px; color: var(--muted); background: color-mix(in oklab, var(--ink) 7%, transparent); border-radius: 5px; font-size: 11px; font-weight: 650; line-height: 18px; }
+.pn-line { color: var(--ink); font-size: 13px; line-height: 1.6; }
+.pn-line .k { color: var(--muted); }
+.pn-line .from { color: var(--muted); }
+.pn-line .arrow { margin: 0 5px; color: var(--muted); }
+.pn-line .to { color: var(--primary-strong); font-weight: 750; }
+.pn-new { display: inline-block; margin-right: 6px; padding: 0 6px; color: var(--bg); background: var(--primary); border-radius: 5px; font-size: 11px; font-weight: 800; line-height: 17px; vertical-align: 1px; }
+.pn-list { margin: 0; padding: 0; list-style: none; }
+.pn-list li { position: relative; padding: 4px 0 4px 14px; font-size: 13px; line-height: 1.6; }
+.pn-list li::before { position: absolute; top: 12px; left: 2px; width: 4px; height: 4px; background: var(--muted); border-radius: 50%; content: ""; }
+.pn-foot { display: flex; align-items: center; justify-content: space-between; padding: 11px 20px; color: var(--muted); border-top: 1px solid var(--line); font-size: 12px; }
+.pn-foot a { color: var(--primary-strong); font-weight: 650; text-decoration: none; }
+.pn-empty { display: grid; min-height: 180px; place-items: center; color: var(--muted); font-size: 13px; }
+
+.champion-head-title { flex-wrap:wrap; }
+.champion-page-head { min-height:76px; }
+.pn-entry.is-text-only { display:block; }
+.pn-entry.is-text-only > div { margin-top:6px; }
+.pn-intro { margin:0 0 12px; color:var(--ink); font-size:13px; line-height:1.65; white-space:pre-line; }
+.pn-entry .ic img { width:100%; height:100%; object-fit:cover; }
+.pn-entry .ic { background:var(--surface); }
+.pn-line { overflow-wrap:anywhere; white-space:pre-line; }
+.pn-loading { display:grid; gap:12px; padding:24px 0; }
+.pn-loading i { display:block; height:44px; border-radius:8px; background:var(--surface); animation:pn-pulse 1s infinite alternate; }
+.pn-empty { gap:12px; align-content:center; }
+@keyframes pn-pulse { to { opacity:.4; } }
+@media(max-width:1000px){.champion-page-head{flex-wrap:wrap;gap:12px}.champion-head-title{gap:8px}.pn-head{flex-wrap:wrap;gap:8px}.pn-date{margin-left:0}.pn-close{margin-left:auto}.pn-scrim{padding:16px}}
+@media(prefers-reduced-motion:reduce){.pn-loading i{animation:none}}

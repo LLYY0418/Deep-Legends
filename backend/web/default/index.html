@@ -14,10 +14,10 @@
     <link rel="stylesheet" href="/metrics.css">
     <script src="/privacy.js" defer></script>
     <script src="/runtime.js" defer></script>
+    <script src="/ui-preferences.js" defer></script>
     <script src="/license-ui.js" defer></script>
     <script src="/image-queue.js" defer></script>
     <script src="/overview-art.js" defer></script>
-    <script src="/augment-artwork.js" defer></script>
     <script src="/section-loader.js" defer></script>
     <script src="/collection-new-items.js" defer></script>
     <script src="/app.js" defer></script>
@@ -323,6 +323,7 @@
 <section id="settings-panel" class="panel settings-panel" data-settings-style-pending role="tabpanel" tabindex="-1" aria-labelledby="section-settings" hidden><header class="settings-head"><div class="settings-head-copy"><h2>设置</h2><p>偏好保存在本机 · 不上传任何数据 · 修改立即生效</p><div class="settings-version-row"><p id="settings-build-identity" class="settings-build-identity">版本信息读取中…</p><button id="settings-update-check" class="text-button" type="button" aria-describedby="settings-update-feedback" hidden disabled>检查更新</button><span id="settings-update-feedback" class="settings-update-feedback status-text" role="status" aria-live="polite"></span></div></div><a id="settings-github" class="settings-github" href="https://github.com/LLYY0418/Deep-Legends" target="_blank" rel="noopener noreferrer" aria-label="GitHub · 觉得顺手？赏颗星"><span class="settings-github-main"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .8a11.2 11.2 0 0 0-3.54 21.83c.56.1.76-.24.76-.54v-2.1c-3.12.68-3.78-1.33-3.78-1.33-.51-1.3-1.24-1.65-1.24-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.63 1.22 3.27.93.1-.73.39-1.22.71-1.5-2.49-.28-5.1-1.25-5.1-5.54 0-1.23.44-2.23 1.16-3.02-.12-.28-.5-1.43.11-2.98 0 0 .94-.3 3.08 1.15a10.7 10.7 0 0 1 5.6 0c2.14-1.45 3.08-1.15 3.08-1.15.61 1.55.23 2.7.11 2.98.72.79 1.16 1.8 1.16 3.02 0 4.3-2.62 5.26-5.12 5.54.4.35.76 1.03.76 2.08v3.1c0 .3.2.65.77.54A11.2 11.2 0 0 0 12 .8Z"/></svg><span class="settings-github-label"><span class="github-default-copy">GitHub</span><span class="github-hover-copy">觉得顺手？赏颗星</span></span></span><span class="settings-github-stars"><svg class="github-star" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m12 2.2 2.95 5.98 6.6.96-4.77 4.65 1.12 6.57L12 17.26l-5.9 3.1 1.12-6.57L2.45 9.14l6.6-.96Z"/></svg><span id="settings-github-count" hidden></span></span></a></header><div class="settings-tabs" role="tablist" aria-label="设置分类" aria-orientation="vertical">
               <button id="settings-tab-appearance" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="settings-appearance-panel" data-settings-page="appearance">外观与导航</button>
               <button id="settings-tab-gameplay" class="tab" type="button" role="tab" aria-selected="false" aria-controls="settings-gameplay-panel" data-settings-page="gameplay">战绩与对局</button>
+              <button id="settings-tab-player-tags" class="tab" type="button" role="tab" aria-selected="false" aria-controls="settings-player-tags-panel" data-settings-page="player-tags">玩家标签</button>
               <button id="settings-tab-privacy" class="tab" type="button" role="tab" aria-selected="false" aria-controls="settings-privacy-panel" data-settings-page="privacy">隐私与能力</button>
             <button id="settings-tab-app" class="tab" type="button" role="tab" aria-selected="false" aria-controls="settings-app-panel" data-settings-page="app">应用<span class="settings-new-dot" hidden></span></button></div>
             <section id="settings-appearance-panel" class="settings-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="settings-tab-appearance">
@@ -349,6 +350,7 @@
             <section class="setting-card"><div><h3>回放操作确认</h3><p>下载或启动回放前再次确认，避免误触。</p></div><label class="toggle-control"><input id="setting-confirm-replay" type="checkbox" checked><span>操作前确认</span></label></section>
             <section class="setting-card"><div><h3>自动规则</h3><p>管理自动接受、下一把与重连。</p></div><button class="text-button" type="button" data-navigate-suite="watch">打开自动规则</button></section>
               </div></section>
+            <section id="settings-player-tags-panel" class="settings-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="settings-tab-player-tags" hidden><div id="player-tags-settings"></div></section>
             <section id="settings-privacy-panel" class="settings-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="settings-tab-privacy" hidden>
               <div class="settings-grid">
                 <section class="setting-card"><div><h3>隐私遮罩</h3><p>隐藏所有玩家名称，对局里用英雄名代替，适合直播或截图。</p></div><label class="toggle-control"><input id="setting-mask-names" type="checkbox"><span>隐藏名称</span></label></section>

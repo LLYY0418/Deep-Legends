@@ -676,6 +676,9 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
+	"ui_preferences.go":          1, // Root ui-preferences.json: local UI choices/read revisions; no new directory.
+	"player_tags.go":             1, // Root player-tags.json: user-authored local player tags/notes; no upload or new directory.
+	"patch_notes.go":             1, // Root patch-notes.json: public official patch text cache; no player data.
 	"github_stars.go":            1, // github-stars.json: fixed public repository star count and timestamp, six-hour cache; no user data.
 	"client_autostart.go":        1, // client-autostart.json: declared local original startup bytes for reversible changes.
 	"pro_scoped_refresh.go":      1, // pro-account-identities.json: declared permanent public roster Riot ID -> PUUID only; excludes the user/friends.

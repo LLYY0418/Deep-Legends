@@ -54,7 +54,7 @@ test('R189 emote ward and icon show known ownership, unknown stays absent', () =
     });
     card({...item, category, ownedKnown: false, owned: true}, root => assert.equal(root.querySelector('.loot-ownership'), null));
   }
-  const css = fs.readFileSync(path.join(__dirname, 'app.css'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, 'app.css'), 'utf8')+fs.readFileSync(path.join(__dirname, 'collection.css'), 'utf8');
   assert.match(css, /\.loot-ownership\.is-missing\s*\{[^}]*color:\s*var\(--muted\)/);
 });
 test('R189 skin ownership and upgrade wording remain unchanged', () => {

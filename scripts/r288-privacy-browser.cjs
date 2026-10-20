@@ -15,6 +15,9 @@ withBrowser(async({page,results,errors})=>{
  };
  await p.evaluate("document.querySelector('.global-tooltip').textContent=__r288Leaks[0];document.getElementById('setting-mask-names').checked=true;document.getElementById('setting-mask-names').dispatchEvent(new Event('change'))");
  await check('overview-tabs-header-recent-history');
+ assert(await p.evaluate("document.querySelectorAll('.recent-player').length>0"),'recent-player fixture must render');
+ assert(await p.evaluate("[...document.querySelectorAll('.recent-player')].every(n=>!n.querySelector('img')&&n.querySelector('[data-tooltip=\"身份已遮罩\"]'))"),'recent avatars must be replaced immediately');
+ await p.shot('privacy-on');
  const share=await p.evaluate("__r278Game.createOverviewShareMarkup(document.getElementById('overview-content'))");assert(!roster.some(value=>share.includes(value)));results.push({name:'share',leaks:[]});
  // The production detail renderer is lazy, with the same injected privacy function.
  await p.evaluate(`(async()=>{const g=__r278Game;await g.ensureMatchDetailRenderer();const tab=g.activeTab(),match=tab.data.matches?.[0]||tab.data.recentMatches?.[0];window.__r288Match=match;if(!match)throw Error('missing match');tab.openMatches.add(String(match.gameId));g.rerenderMatch(tab,String(match.gameId))})()`);
@@ -35,5 +38,11 @@ withBrowser(async({page,results,errors})=>{
  await check('arena');
  await p.evaluate("__r278App.activateSection('overview');document.getElementById('setting-mask-names').checked=false;document.getElementById('setting-mask-names').dispatchEvent(new Event('change'))");
  assert(await p.evaluate('__r288Leaks.some(value=>document.body.textContent.includes(value))'),'mask off must restore identities');
+ assert(await p.evaluate("[...document.querySelectorAll('.recent-player')].some(n=>n.querySelector('img'))"),'mask off restores recent avatars');
+ await p.shot('privacy-off');
+ await p.evaluate("document.getElementById('setting-mask-names').checked=true;document.getElementById('setting-mask-names').dispatchEvent(new Event('change'))");
+ await check('overview-on-off-on');
+ assert(await p.evaluate("[...document.querySelectorAll('.recent-player')].every(n=>!n.querySelector('img'))"),'second mask replaces cached recent avatars');
+ await p.shot('privacy-on-again');
  assert.deepEqual(errors,[]);
 }).catch(error=>{console.error(error);process.exitCode=1});

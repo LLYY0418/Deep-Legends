@@ -10,7 +10,7 @@ import (
 func updateLongPathName(value string) (string, error) { return value, nil }
 
 func detectUpdateInstallation() (updateInstallDetection, error) {
-	return classifyUpdateInstallation("", false, false, nil), nil
+	return updateInstallDetection{Result: "unsupported_platform"}, nil
 }
 func installedUpdateDirectory() (string, error) { return "", nil }
 func launchUpdateInstaller(string, string) error {

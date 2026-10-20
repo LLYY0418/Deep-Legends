@@ -96,6 +96,7 @@ func TestR238DefaultOnline076To077(t *testing.T) {
 		}
 	}()
 	u.status.Portable = false
+	u.status.InstallTargetBlocked = false
 	u.installDir = filepath.Join(store.root, "installed")
 	if dir := os.Getenv("R238_UPGRADE_INSTALL"); dir != "" {
 		u.installDir = dir

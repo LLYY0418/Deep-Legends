@@ -44,6 +44,8 @@ func updateTestManager(t *testing.T, data []byte) *updateManager {
 	// Each fixture supplies its own complete route inventory; production retains built-ins with custom settings.
 	u.sourceDefaults = []string{}
 	u.status.Portable = false
+	u.status.InstallTargetBlocked = false
+	u.installDetection = updateInstallDetection{Result: "installed", HasUninstaller: true}
 	u.portableDirectory = func() (string, error) { return filepath.Join(root, "Programs", "Deep Legends"), nil }
 	u.migrate = func() error { return nil }
 	u.installDir = filepath.Join(root, "installed")

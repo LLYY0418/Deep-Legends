@@ -5,7 +5,12 @@ const read=name=>fs.readFileSync(name==='index.html'&&process.env.R115_INDEX_SOU
 function harness(){
  const dom=new JSDOM('<head></head><body><main id="champions-panel"></main><main id="pro-players-panel"></main><main id="suite-panel"></main><main id="settings-panel"></main></body>',{url:'http://fixture/',runScripts:'outside-only'});
  const w=dom.window;w.eval(read('section-loader.js'));const scripts=()=>[...w.document.querySelectorAll('script[data-section-module]')];const styles=()=>[...w.document.querySelectorAll('link[data-section-style]')];
- const finish=(name,fn=()=>{})=>{w.deepLegendsSections.register(name,fn);styles().find(n=>n.dataset.sectionStyle===name)?.onload();setImmediate(()=>scripts().find(n=>n.dataset.sectionModule===name)?.onload());};
+ const finish=async(name,fn=()=>{})=>{
+  if(name==='champions' && !scripts().some(n=>n.dataset.sectionModule==='patch-notes'))await finish('patch-notes');
+  w.deepLegendsSections.register(name,fn);styles().find(n=>n.dataset.sectionStyle===name)?.onload();
+  await new Promise(setImmediate);scripts().find(n=>n.dataset.sectionModule===name)?.onload();
+  await new Promise(setImmediate);
+ };
  const fail=(name)=>styles().find(n=>n.dataset.sectionStyle===name)?.onerror();
  return {dom,w,scripts,styles,finish,fail,close:()=>dom.window.close()};
 }
@@ -24,7 +29,7 @@ test('R115 friends load on demand and complete only after successful registratio
  }finally{h.close();}
 });
 test('R115 module requests are singleflight and repeat entry does not add script nodes',async()=>{
- const h=harness();try{const a=h.w.deepLegendsSections.activate('champions'),b=h.w.deepLegendsSections.activate('champions');assert.equal(h.styles().length,1);assert.equal(h.scripts().length,0);let activated=0;h.finish('champions',()=>activated++);await Promise.all([a,b]);assert.equal(activated,1);await h.w.deepLegendsSections.activate('overview');await h.w.deepLegendsSections.activate('champions');assert.equal(h.scripts().length,1);assert.equal(h.w.document.querySelector('[data-section-loading]'),null);}finally{h.close();}
+ const h=harness();try{const a=h.w.deepLegendsSections.activate('champions'),b=h.w.deepLegendsSections.activate('champions');assert.equal(h.styles().length,1);assert.equal(h.scripts().length,0);let activated=0;h.finish('champions',()=>activated++);await Promise.all([a,b]);assert.equal(activated,1);await h.w.deepLegendsSections.activate('overview');await h.w.deepLegendsSections.activate('champions');assert.equal(h.scripts().length,2);assert.deepEqual(h.scripts().map(n=>n.dataset.sectionModule),['patch-notes','champions']);assert.equal(h.w.document.querySelector('[data-section-loading]'),null);}finally{h.close();}
 });
 test('R115 failed loading is visible, retryable and does not leave duplicate nodes',async()=>{
  const h=harness();try{const a=h.w.deepLegendsSections.activate('pro-players');h.fail('pro-players');await a;assert.match(h.w.document.querySelector('[role=alert]').textContent,/加载失败.*重新加载/);h.w.document.querySelector('button').click();assert.equal(h.styles().length,1);h.finish('pro-players');await new Promise(setImmediate);assert.equal(h.w.document.querySelector('[role=alert]'),null);}finally{h.close();}
@@ -39,7 +44,7 @@ test('R115 Suite loads helpers first, retains navigation tab and replays only th
   h.w.dispatchEvent(new h.w.CustomEvent('deep-legends:status',{detail:{connected:true}}));
   h.w.dispatchEvent(new h.w.CustomEvent('deep-legends:navigate',{detail:{section:'suite',tab:'sweep'}}));
   let state;h.w.deepLegendsSections.listen('deep-legends:status',event=>state=event.detail);assert.equal(state.connected,true);assert.equal(oldStatusCalls,2);
-  const a=h.w.deepLegendsSections.activate('suite');assert.equal(h.styles().length,1);assert.equal(h.scripts().length,0);h.finish('champions');await new Promise(setImmediate);let detail;assert.equal(h.styles().length,2);h.finish('suite',e=>detail=e.detail);await a;assert.equal(detail.name,'suite');assert.equal(detail.navigation.tab,'sweep');
+  const a=h.w.deepLegendsSections.activate('suite');assert.equal(h.styles().length,1);assert.equal(h.scripts().length,0);await h.finish('champions');let detail;assert.equal(h.styles().length,3);h.finish('suite',e=>detail=e.detail);await a;assert.equal(detail.name,'suite');assert.equal(detail.navigation.tab,'sweep');
  }finally{h.close();}
 });
 test('R139 broadcast controls hide options for self and show one suite-switch for team',()=>{

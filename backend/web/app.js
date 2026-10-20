@@ -1,5 +1,6 @@
-(() => {
+(async () => {
   "use strict";
+  if (window.deepLegendsPreferenceStorage?.ready) await window.deepLegendsPreferenceStorage.ready;
 
   const escapeHTML = window.deepLegendsRuntime.escapeHTML;
 
@@ -2839,7 +2840,8 @@
     else if (name) activateSection(name);
   }
   window.addEventListener("hashchange", activateSectionLink);
-  document.addEventListener("DOMContentLoaded", activateSectionLink, { once: true });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", activateSectionLink, { once: true });
+  else Promise.resolve().then(activateSectionLink);
 
   // 总览页切换玩家页签时同步启动入口卡的可见性（只对当前召唤师展示）。
   window.addEventListener("deep-legends:overview-tab", (event) => {
@@ -2952,7 +2954,7 @@
     const tab = el.settingsTabs.find((item) => item.dataset.settingsPage === name);
     if (!tab) return;
     if (state.settingsPage === "privacy" && name !== "privacy") resetDiagnosticsExport();
-    if (name === "app") { savePreference("settings-app-seen", "true"); document.querySelector(".settings-new-dot")?.setAttribute("hidden", ""); }
+    if (name === "app") { savePreference("settings-app-seen", "true"); void window.deepLegendsPreferenceStorage?.flush?.(); document.querySelector(".settings-new-dot")?.setAttribute("hidden", ""); }
     state.settingsPage = name;
     activateTab(tab, el.settingsTabs, (selected) => {
       for (const panel of el.settingsPanels) panel.hidden = panel.id !== selected.getAttribute("aria-controls");
@@ -3842,12 +3844,13 @@
     async function pump() {
       if (stopped || loading || !data) return;
       let read = [];
-      try { read = JSON.parse(localStorage.getItem('deep-legends-announcements-read-v1') || '[]'); } catch (_) {}
+      try { read = JSON.parse((globalThis.deepLegendsPreferenceStorage || localStorage).getItem('deep-legends-announcements-read-v1') || '[]'); } catch (_) {}
       if (!Array.isArray(read)) read = [];
+      let dismissed=[];try{dismissed=JSON.parse((globalThis.deepLegendsPreferenceStorage || localStorage).getItem('deep-legends-announcements-dismissed-v1') || '[]')}catch(_){}
       const unread = (data.announcements || []).filter(n => (!n.expiresAt || Date.parse(n.expiresAt)>Date.now()) && !read.includes(n.id+':'+n.revision));
       button.classList.toggle('has-announcement-unread', Boolean(unread.length));
       button.dataset.tooltip = unread.length ? '公告：'+unread[0].summary : '公告';
-      if (!manual && (phase === 'unknown' || active.has(phase) || !unread.some(n => n.popup))) return;
+      if (!manual && (phase === 'unknown' || active.has(phase) || !unread.some(n => n.popup && !dismissed.includes(n.id+':'+n.revision)))) return;
       if (!visible || document.hidden || busy()) return;
       loading = true;
       try {
@@ -4328,9 +4331,11 @@
           if(detail?.type === "network-proxy-state"){void loadChampionNetworkStatus();return;}
           if(detail?.type === "client-cold-window") {window.deepLegendsPerformance?.startColdRequestWindow?.(detail.processAt);return;}
           if (detail?.type === "client-view") { try { acceptClientView(detail); } catch (error) { reportStatusRenderFailed(error, "acceptClientView"); } return; }
+		  if (detail?.type === "champselect-lite") { window.dispatchEvent(new CustomEvent("deep-legends:champselect-lite", { detail })); return; }
 		  if (detail?.type === "live-player-progress") { window.dispatchEvent(new CustomEvent("deep-legends:live-player-progress", { detail })); return; }
           if(detail?.type==='history-service-recovered'){window.dispatchEvent(new CustomEvent('deep-legends:history-service-recovered',{detail}));return;}
           if(detail?.type==='collection-new-skins'){window.deepLegendsCollectionNewItems?.newSkins(detail);window.reportFlowDiagnostic?.('collection_new_marker','skin',{latency_ms:Math.max(0,Date.now()-Number(detail.at || Date.now())),source:'event'});return;}
+          if(detail?.type==='patch-notes-changed'){window.dispatchEvent(new CustomEvent('deep-legends:patch-notes-changed'));return;}
           if(detail?.type==='announcements-changed'){window.dispatchEvent(new CustomEvent('deep-legends:announcements-changed'));return;}
 		  const slices = LIVE_UPDATE_STATE_SLICES[detail?.type] || [];
 		  if (slices.includes("riot-relay-recovered")) window.dispatchEvent(new CustomEvent("deep-legends:riot-relay-recovered", {detail}));
@@ -4446,7 +4451,7 @@
     const visible = current.supported && ["available", "downloading", "verifying", "ready", "applying", "failed"].includes(current.state) && !!current.latest;
     el.updateButton.hidden = !visible;
     if (!visible) { renderUpdateReadyToast(); finishManualUpdateCheck(); return; }
-    const manual = false;
+    const manual = current.installTargetBlocked === true;
     const busy = ["downloading", "verifying"].includes(current.state);
     const ready = current.state === "ready" || current.state === "applying";
     const progress = current.progress || {};
@@ -4538,7 +4543,7 @@
 
   function renderUpdateDialog() {
     const current = updateUI.status || {};
-    const manual = false;
+    const manual = current.installTargetBlocked === true;
     const busy = ["downloading", "verifying"].includes(current.state);
     const ready = current.state === "ready" || current.state === "applying";
     const failed = current.state === "failed";
@@ -4566,7 +4571,7 @@
     const remaining = progress.bytesPerSecond > 0 ? updateETA(progress.etaSeconds) : "正在连接下载线路…";
     el.updateProgressHint.textContent = progress.selectingSource ? "正在选择最快的下载线路…" : current.state === "verifying" ? "下载完成，正在校验 SHA-256…" : `${updateBytes(progress.receivedBytes)} / ${updateBytes(progress.totalBytes || current.sizeBytes)} · ${updateBytes(progress.bytesPerSecond)}/s · ${remaining}`;
     const warning = ["InProgress", "ChampSelect"].includes(updateUI.phase) ? "你正在对局中，建议打完再升级" : "";
-    el.updateAlert.textContent = [current.error, warning].filter(Boolean).join("\n");
+    el.updateAlert.textContent = [current.installTargetBlocked ? "安装位置无法确认，请下载完整安装包" : current.error, warning].filter(Boolean).join("\n");
     el.updateAlert.hidden = !el.updateAlert.textContent;
     el.updateStart.hidden = manual || ready || busy;
     el.updateBackground.hidden = !busy;
@@ -4577,7 +4582,7 @@
     el.updateApply.hidden = !ready || manual;
     el.updateApply.disabled = updateUI.pending || updateUI.checkPending || current.state === "applying";
     el.updateLater.hidden = busy && !manual;
-    el.updateReleaseLink.hidden = !failed;
+    el.updateReleaseLink.hidden = !failed && !manual;
     el.updateReleaseLink.href = "https://github.com/LLYY0418/Deep-Legends/releases";
   }
 

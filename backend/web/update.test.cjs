@@ -72,11 +72,12 @@ function assertSafeNotes(h){
  assert.equal(node.querySelector("code").textContent,"**原样**");
 }
 test("notes allow only escaped whitelist Markdown",()=>{const h=harness();try{assertSafeNotes(h);}finally{h.close();}});
-test("all updater registry ids are killed by the real renderer",()=>{
+test("all updater registry ids are killed by the real renderer",async()=>{
  for(const id of ids){
   const mutated=source.replace(`"${id}",`,"");assert.notEqual(mutated,source,id);
   let h;
   assert.throws(()=>{h=harness(mutated);renderScenarios(h);h.probe.showUpdateCheckFeedback("");},undefined,id);
+  if(h)await h.ready.catch(()=>{});
   h?.close();
  }
 });
@@ -256,4 +257,16 @@ test("manual-check request, shared-dialog, support and busy mutations are all de
     assert.notEqual(script, source, "mutation must change production source");
     await assert.rejects(() => check(script));
   }
+});
+
+test("R297 unknown install target offers full installer and cannot upgrade",()=>{
+ const h=harness();try{
+  for(const state of ['available','ready','failed']){
+   h.probe.renderUpdateStatus({...available,state,installTargetBlocked:true});
+   assert.equal(h.get('update-start').hidden,true);
+   assert.equal(h.get('update-apply').hidden,true);
+   assert.equal(h.get('update-release-link').hidden,false);
+   assert.match(h.get('update-alert').textContent,/安装位置无法确认，请下载完整安装包/);
+  }
+ }finally{h.close()}
 });

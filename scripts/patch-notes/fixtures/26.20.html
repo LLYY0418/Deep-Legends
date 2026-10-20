@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="gbk">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="robots" content="all">
+    <meta name="author" content="Tencent-CP">
+    <meta name="Copyright" content="Tencent">
+    <meta name="keywords" content="英雄联盟,lol,league of legends,lol攻略,lol视频,lol视频攻略,lol英雄资料,lol战争学院,小苍解说视频,101战争学院,英雄"/>
+    <meta name="description" content="英雄联盟101战争学院，推荐攻略，视频攻略，小苍解说视频"/>
+    <title>文章详情-英雄联盟官方网站-腾讯游戏</title>
+    <!-- 页面设计：cp | 页面制作：cp | 创建：2018-07-30 -->
+    <link rel="stylesheet" href="//lol.qq.com/c/=/v3/css/topfoot.css,/space/css/comm.css" charset="utf-8">
+    <link href="/web201310/css/ngonggao.css" rel="stylesheet" />
+    <script>document.domain = "qq.com";</script>
+</head>
+<body>
+
+<!--[if lt IE 9]>
+<style>.comm-head{top:40px}</style>
+<p class="chromeframe">
+  <span>您使用的IE浏览器版本过低，本站不再支持，</span>
+  <a href="//windows.microsoft.com/">升级您的IE浏览器</a>
+  <span>，或使用</span>
+  <a href="//www.google.cn/chrome/">Google Chrome</a><a>、</a><a href="//www.firefox.com.cn/download/">Firefox</a>
+  <span>等高级浏览器，将会得到更好的体验！</span>
+</p>
+<![endif]-->
+<!--官网通用页头 start-->
+<div class="comm-head" exposure-tag="topnav,头部导航">
+  <div class="head-normal">
+    <!--logo-->
+    <a class="logo" href="/" title="英雄联盟官网">
+      <img src="//game.gtimg.cn/images/lol/v3/logo-public.png" width="167" height="60" alt="英雄联盟">
+    </a>
+    <!--官网导航-->
+    <ul class="head-nav" id="J_headNav">
+    </ul>
+    <script type="text/html" id="J_headNavTemplate">
+      {{each list}}
+      <li>
+        <a {{if $value.url.length > 0}}href="{{$value.url}}" target="_blank" onclick="PTTSendClick('topnav','topnav-{{$index}}','{{$value.name}}');" title="{{$value.name}}"{{/if}}>
+          <span class="head-nav-title">{{$value.name}}</span>
+          <span class="head-nav-subtitle">{{$value.enname}}</span>
+        </a>
+      </li>
+      {{/each}}
+    </script>
+    <!--玩家信息-->
+    <div class="head-userinfo-normal">
+      <div class="head-userinfo-avatar">
+        <img src="//game.gtimg.cn/images/lol/v2/personal/avatar/default.png" width="36" height="auto" alt="玩家头像">
+        <span></span>
+        <!--  <a href="//lol.qq.com/space/index.shtml" target="_blank" class="herf-mask" title="个人中心"></a> -->
+      </div>
+      <div class="head-userinfo-brief">
+        <p class="unlogin">亲爱的召唤师，欢迎<a href="javascript:T_Login.login()">登录</a></p>
+        <p class="login-unbindarea" style="display: none">请<a href="javascript:T_Login.changeArea()">绑定大区</a>或<a href="javascript:T_Login.logout()">注销</a></p>
+        <p class="logined" style="display: none"><a class="logined-name"></a><a class="logined-logout" href="javascript:T_Login.logout()">[注销]</a></p>
+      </div>
+    </div>
+    <!--掌盟图标-->
+    <span class="head-app-normal">
+      <a target="_blank" href="//lol.qq.com/app/index.html" onclick="pgvSendClick({hottag:'v3.top.top.zmpc'})" class="comm-icon-phone"></a>
+    </span>
+    <!--搜索按钮-->
+    <a class="head-search-btn" id="J_headSearchBtn" href="javascript:" title="搜索">
+      <i class="comm-icon-search"></i>
+    </a>
+    <!--hover:掌盟二维码-->
+    <div class="head-app-hover">
+      <i class="head-zm-qrcode">
+        <img src="//game.gtimg.cn/images/lol/v3/zm-qrcode-new.jpg" width="119" height="119" alt="掌盟App二维码">
+      </i>
+      <p class="p1">扫码下载掌上英雄联盟</p>
+      <img class="polo" src="//game.gtimg.cn/images/lol/v3/polo.gif" alt="魄罗" width="50" height="50">
+    </div>
+    <!--登录hover-->
+    <div class="head-login-hover">
+      <div class="unlogin">
+        <p class="p1">
+          登录并且绑定大区后才可以查看您的具体信息哦<br>
+          (包括战绩、资产、声望）
+        </p>
+        <p class="p2">
+          官网个人信息显示略有延迟，请以游戏数据为准
+        </p>
+      </div>
+      <div class="logined" style="display: none;">
+        <div class="logined-top">
+          <a class="select-area" href="javascript:T_Login.changeArea()"></a>
+          <a class="user-name"></a>
+        </div>
+        <ul class="logined-ul">
+          <li class="user-rank">
+            <div class="img-wrap">
+              <img src="//game.gtimg.cn/images/lol/space/rank/2019pre/default.png" alt="段位" id="commHeadTierImg">
+            </div>
+            <a class="a1" id="commHeadTier">暂无段位</a><br>
+            <a class="a2" id="commHeadQueue"></a>
+          </li>
+          <li class="user-datalist">
+            <a class="a1" id="commHeadWinRate">--</a><br><a class="a2">胜率</a>
+          </li>
+          <li class="user-datalist">
+            <a class="a1" id="commHeadMatchCount">--</a><br><a class="a2">总场次</a>
+          </li>
+          <!--<li class="user-datalist">-->
+          <!--  <a class="a1" id="commHeadJingCui">--</a><br><a class="a2">蓝色精粹</a>-->
+          <!--</li>-->
+          <!--<li class="user-datalist">-->
+          <!--  <a class="a1" id="commHeadDianQuan">--</a><br><a class="a2">点券</a>-->
+          <!--</li>-->
+        </ul>
+        <p class="p2">
+          官网个人信息显示略有延迟，请以游戏数据为准
+        </p>
+      </div>
+      <!--<a href="//lol.qq.com/space/index.shtml" class="href-gouserhome">进入个人中心<i class="more-arrow"></i></a>-->
+    </div>
+  </div>
+  <!--hover:官网导航子菜单-->
+  <div class="head-nav-sub">
+    <div class="head-nav-sub-inner">
+      <ul id="J_headNavSub">
+      </ul>
+      <script type="text/html" id="J_headNavSubTemplate">
+        {{each list as topItem topIndex}}
+        <li>
+          {{each topItem.urls as subItem subIndex}}
+          {{if subItem.name === '封号查询'}}
+          <a class="head-nav-sub-a" onclick="PTTSendClick('topnav','topnav-{{topIndex+1}}-{{subIndex}}','{{subItem.name}}');" href="javascript:void(0);">
+            {{if subItem.icon.length > 0}}<i class="icon-{{subItem.icon}}"></i>{{/if}}
+            {{subItem.name}}
+            <span class="qr-bar">
+              <img src="//game.gtimg.cn/images/lol/v3/qr-fhcx.png" alt="">
+              <span class="qr-tip">请前往“腾讯游戏安全中心”公众号-自助服务进行处罚查询</span>
+            </span>
+          </a>
+          {{else}}
+          <a class="head-nav-sub-a" onclick="PTTSendClick('topnav','topnav-{{topIndex+1}}-{{subIndex}}','{{subItem.name}}');" href="{{subItem.url}}" target="_blank">
+            {{if subItem.icon.length > 0}}<i class="icon-{{subItem.icon}}"></i>{{/if}}
+            {{subItem.name}}
+          </a>
+          {{/if}}
+          {{/each}}
+        </li>
+        {{/each}}
+      </script>
+    </div>
+  </div>
+  <!--hover:搜索-->
+  <div class="search-hover-wrap">
+    <div class="search-hover-inner">
+      <a href="javascript:" class="btn-search" id="J_hoverSearchBtn" title="点击搜索">
+        <i class="comm-icon-search"></i>
+      </a>
+      <input type="text" id="J_hoverSearchInput" class="input-search" placeholder="搜索 lol.qq.com" autocomplete="off">
+      <a class="btn-close-search" id="J_btnCloseSearch" href="javascript:" title="关闭搜索">
+        <i class="icon-xx-1"></i>
+      </a>
+      <div class="search-hover-bottom">
+        <span class="hover-bottom-s1">搜索记录</span>
+        <ul class="search-direct-href"></ul>
+        <a class="hover-bottom-s2" href="javascript:" id="J_hoverClearRecord">清除记录</a>
+      </div>
+    </div>
+  </div>
+</div>
+<!--官网通用页头 end-->
+<!--头部广告 start-->
+<div class="comm-topact big" exposure-tag="topact,头部广告">
+  <img class="topact-big-img">
+  <img class="topact-small-img">
+  <div class="act-fullscreen-mask"></div>
+  <div class="dark-mask"></div>
+  <div class="comm-topact-inner">
+    <a class="top-act-link" href="javascript:" onclick="PTTSendClick('topact','topact-detail','查看详情')" target="_blank">查看详情</a>
+    <div id="J_topActVersion" class="top-version">当前游戏版本：<em>Ver ***</em> <a class="top-version-link" href="javascript:" onclick="pgvSendClick({hottag:'v3.topact.version.link'})" target="_blank">版本详情</a></div>
+  </div>
+</div>
+<!--头部广告 end-->
+
+
+<div class="g-wrap g-commu_article">
+    <div class="bg-1"></div>
+	<div class="bg-2"></div>
+	<div class="bg-3"></div>
+	<div class="bg-4"></div>
+    <div class="main-container clearfix">
+        <!--页面路径-->
+        <div class="navi">
+            <i class="icon-home"></i>
+            <a href="//lol.qq.com">英雄联盟首页</a>
+            <i class="icon-arrow-nav"></i>
+            <a href="/news/index.shtml">新闻列表</a>
+            <i class="icon-arrow-nav"></i>
+            <span>文章详情</span>
+        </div>
+        <div class="art-con">
+            <div class="art-c-side">
+                <div>
+                    <a href="#commentIframe" class="icon-comm-g"></a>
+                    <!--<p><span class="num-com">--</span>条评论</p>-->
+                </div>
+                <i class="share-line"></i>
+                <div id="tg-sns"></div>
+                <!--<a class="icon-qq" href="javascript:;"></a>-->
+                <!--<a class="icon-wechat" href="javascript:;"></a>-->
+                <!--<a class="icon-webo" href="javascript:;"></a>-->
+            </div>
+            <div class="part">
+                <div class="in-part">
+                    <h1 class="art-tit" data="0">26.20版本更新公告</h1>
+                    <div class="art-palette">
+                        <span class="auth-name"></span>
+                        <span class="art-time" data="2026-10-08">2026-10-08 19:28:39</span>
+                        <span class="fs-title">字体：</span>
+                        <div class="fs-wrap">
+                            <a href="javascript:;" class="btn-font-size" onClick="pgvSendClick({hottag:'v3.personal.article_detail.font_large'});"><span class="radio"></span>大</a>
+                            <a href="javascript:;" class="btn-font-size on" onClick="pgvSendClick({hottag:'v3.personal.article_detail.font_medium'});"><span class="radio"></span>中</a>
+                            <a href="javascript:;" class="btn-font-size" onClick="pgvSendClick({hottag:'v3.personal.article_detail.font_small'});"><span class="radio"></span>小</a>
+                        </div>
+
+                        <div class="g-c-box">
+                            <div class="read-count"><span id="readCount" data="37098539"></span>次阅读</div>
+                            <!--类加on为已点赞和收藏-->
+                            <!--div class="good-box" onClick="ArticleDetail.doLike()"><a href="javascript:" class="icon-good"></a><span id="likeNum">--</span></div-->
+                            <!--<div class="colle-box"><a href="javascript:;" class="icon-collect"></a><span>收藏</span></div>-->
+                        </div>
+                    </div>
+                    <div class="article" id="article">
+                        <p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/9264264955184.jpg" alt="" width="800" /></p><p>LOL将在10月9日凌晨1点开始全区停机维护(请注意：10月9日0点将关闭排位赛入口，不会影响正在进行中的排位赛)发布26.20版本，预计停机时间为1:00-12:00 。对于在停机期间结束的活动，其实际结束时间也将提前至停机维护开始时，敬请留意</p><blockquote><p>&nbsp; 哔啵哔啵&mdash;&mdash;全球总决赛时间到！这个版本将作为召唤师峡谷的全球总决赛版本，见证今年最重要的巅峰对决。做好准备，因为团队将调整安蓓萨、奎桑提等职业赛场常客，同时加强凯南和千珏等可能处在&ldquo;能够登场但摇摇欲坠&rdquo;这种境地的弱势英雄。火箭腰带将再次小幅削弱，降低它为缺乏位移的英雄充当&ldquo;花钱就能买到的闪现&rdquo;的能力。同时，团队会为部分依赖这件装备的英雄提供补偿性加强&mdash;&mdash;毕竟，全球总决赛版本就在这一版，调整机会仅此一次。此外，还有更多精彩内容，包括海克斯大乱斗和经典模式的有趣更新，继续往下看吧！<br />走错版本公告了？点击<a href="https://lol.qq.com/gicp/news/662/37098543.html" target="_blank" rel="noopener">此处</a>前往【云顶之弈】版本公告！</p></blockquote><p>&nbsp;<span style="color: #ff0000;">注：国服的公告基于国服更新的实际版本数值，Riot游戏设计团队如在版本内对平衡性进行调整，国服运营团队将根据更新筹备进度发布版本内更新公告。后续可能基于实际运行效果进行优化，且不同机器配置下效果可能不同。</span></p><h3><strong>版本要闻</strong></h3><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/41552444128701.png" alt="" width="800" /></p><p style="text-align: left;">【至臻 经典 克格莫男爵】、【至臻 心之钢 我行我路 瑟提】、【心之钢 我行我路 伊泽瑞尔】、【心之钢 我行我路 凯隐】、【心之钢 我行我路 厄斐琉斯】、【心之钢 我行我路 永恩】和【心之钢 我行我路 奎桑提】已在16.20版本内。</p><h3><strong>英雄</strong></h3><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/3c92ac53126e8ab6410f6821203fb67f/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/3c92ac53126e8ab6410f6821203fb67f/0" /><em>铁血狼母 安蓓萨</em></h4><blockquote><p>&emsp; 安蓓萨在所有段位中，尤其是职业赛场上，对于高熟练度玩家来说，后期表现一直过于稳定。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/80e45dbdf3e5944a5f74233e7728ccd0/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/80e45dbdf3e5944a5f74233e7728ccd0/0" />被动 - 龙犬诡步<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>伤害：5 - 30 (+25%额外攻击力) &rArr; 5 - 25 (+20%额外攻击力)</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/4594f4e188105f8e9d238405f82aa416/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/4594f4e188105f8e9d238405f82aa416/0" /><em>寒冰射手 艾希</em></h4><blockquote><p>&emsp; 艾希目前是职业赛场上最热门的射手之一。作为游戏中功能性最强的射手，她的伤害输出显得有些过高了。</p></blockquote><p><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>基础属性<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>每级攻击力：3.5 &rArr; 3</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/c025b3da6383c5b4822bcc26f1eceae1/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/c025b3da6383c5b4822bcc26f1eceae1/0" /><em>魔蛇之拥 卡西奥佩娅</em></h4><blockquote><p>&nbsp;&emsp;团队在两个版本前对卡西奥佩娅的调整取得了预期效果：相比职业选手，大多数玩家受到的影响要小得多。不过，她在对线前期依然过于强势。因此团队再次收紧了她前期的资源，现在她需要更加努力才能建立优势。</p></blockquote><p><strong>&nbsp;</strong> &nbsp; &nbsp;&nbsp;基础属性<br />&nbsp; &nbsp; &nbsp;&nbsp;基础生命值：630 &rArr; 610<br />&nbsp; &nbsp; &nbsp;&nbsp;基础法力值：480 &rArr; 450</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/e83414dec7868d1212e92c297d9f16cb/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/e83414dec7868d1212e92c297d9f16cb/0" /><em>皎月女神 黛安娜</em></h4><blockquote><p>&nbsp;&emsp;虽然黛安娜的刺客出装表现出色，但她的半肉出装明显落后。团队希望为半肉打法增添一些强度。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/17eda2292328bca3e2f059a196687f87/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/17eda2292328bca3e2f059a196687f87/0" />W - 苍白之瀑<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>护盾 额外生命值收益率：11% &rArr; 14%</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/d6ac5aab34fbdac2151b2285e3ae43c3/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/d6ac5aab34fbdac2151b2285e3ae43c3/0" /><em>狂暴之心 凯南</em></h4><blockquote><p>&nbsp; &emsp;团队将加强他的招牌技能（也是他在《符文战场》中的招牌法术），为他再添一分胜算，同时补偿【火箭腰带】调整对他的不利影响。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/59b1c28db6f11fe7951a243cf6c9aace/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/59b1c28db6f11fe7951a243cf6c9aace/0" />E - 奥义！雷铠<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>额外攻击速度：40 / 50 / 60 / 70 / 80% &rArr; 50 / 60 / 70 / 80 / 90%</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/7d5aafa4f64f277ea058a780b4e91cb4/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/7d5aafa4f64f277ea058a780b4e91cb4/0" /><em>永猎双子 千珏</em></h4><blockquote><p>&emsp;&nbsp; 千珏目前有些偏弱，因此团队将给予一些加强，同时避免让他们在前期入侵时变得过于强势。期待他们会在强势阵容中占据一席之地，为赛场提供独特选择。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/7b8d5812a4b158b056030432f0a63a60/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/7b8d5812a4b158b056030432f0a63a60/0" />W - 狼灵狂热<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>对野怪伤害修正：150% &rArr; 165%</p><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/5e2390ccc193d9beda27fdd50fbbb142/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/5e2390ccc193d9beda27fdd50fbbb142/0" />E - 横生惧意<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>减速时长：1秒 &rArr; 1.5秒<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>小型野怪目标选取：已启用 &rArr; 已移除</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/b0cde59f27ba184554376d70df0ee7aa/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/b0cde59f27ba184554376d70df0ee7aa/0" /><em>纳祖芒荣耀 奎桑提</em></h4><blockquote><p>&nbsp; &emsp;削弱了这位守护者在高配合度对局中作为盲选的可靠性&mdash;&mdash;提高了前期法力消耗，并降低了W技能的持续伤害减免。这些调整预计将主要影响顶尖水平的对局。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/25255e3b7d709d3a798b9e249c082a72/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/25255e3b7d709d3a798b9e249c082a72/0" />W - 辟路先锋<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>法力消耗：40 / 45 / 50 / 55 / 60 &rArr; 45 / 50 / 55 / 60 / 65<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>W技能 基础/最高伤害减免：30 / 75% &rArr; 25 / 70%</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/3e199a505c55ba9220bd62b4cf67183d/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/3e199a505c55ba9220bd62b4cf67183d/0" /><em>含羞蓓蕾 莉莉娅</em></h4><blockquote><p>&nbsp; &emsp;上个版本，团队稍微加强了这只小鹿，但效果没有达到预期。团队认为，她在各个水平的对局中都还有进一步发挥的空间，因此决定再加强一次，助她大放异彩。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/aa0c36341e0675f28fdc38d816a42023/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/aa0c36341e0675f28fdc38d816a42023/0" />R - 夜阑谣<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>持续时长：2.5秒 &rArr; 2.5 / 2.75 / 3秒</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/409c656c04b47e1131cd062943506cd5/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/409c656c04b47e1131cd062943506cd5/0" /><em>圣枪游侠 卢锡安</em></h4><blockquote><p>&nbsp;&emsp;上个版本，团队希望通过调整来缩小中路与下路的表现差距，结果削弱了其在下路的表现。因此，本次更新将追加加强，弥补失去的强度。</p></blockquote><p><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>基础属性<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>攻击力：60 + 2.5/级 &rArr; 60 + 2.9/级</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/f2e4d4ae240df652a9246bebfb491f3e/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/f2e4d4ae240df652a9246bebfb491f3e/0" /><em>铁铠冥魂 莫德凯撒</em></h4><blockquote><p>&nbsp;&emsp;莫德凯撒在大招的冷却期间，很难跟上许多对手的节奏。随着游戏节奏加快，他的核心技能(Q)也会显得有些乏力，因此团队认为可以提升它在后期的伤害。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/d566c4e555b966c6b1114002ccec12c4/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/d566c4e555b966c6b1114002ccec12c4/0" />Q - 破灭之锤<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>10-20级每级成长：(+5/级) &rArr; (+7/级)</p><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/1cc6ba910c84513815c293a6c2ed27a1/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/1cc6ba910c84513815c293a6c2ed27a1/0" />R - 轮回绝境<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>冷却时间：140 / 120 / 100秒 &rArr; 120 / 110 / 100秒</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/5eebfd2d181637e9a22578d182679751/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/5eebfd2d181637e9a22578d182679751/0" /><em>万花通灵 妮蔻</em></h4><blockquote><p>&nbsp;&emsp;本次【火箭腰带】的调整预计会小幅削弱妮蔻，因此团队将为她提供一些补偿性加强。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/ab1d07e2d5da7b8127f1a79921c0f698/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/ab1d07e2d5da7b8127f1a79921c0f698/0" />E - 缠结倒刺<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>基础伤害：70 / 105 / 140 / 175 / 210 (+65%法术强度) &rArr; 80 / 115 / 150 / 185 / 220 (+65%法术强度)<br />&nbsp; &nbsp; &nbsp;&nbsp;强化禁锢时长：1.8 / 2.1 / 2.4 / 2.7 / 3秒 &rArr; 2 / 2.25 / 2.5 / 2.75 / 3秒</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/3632aecf03ef38f7aa8ee3ac6b1c8b1e/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/3632aecf03ef38f7aa8ee3ac6b1c8b1e/0" /><em>炽炎雏龙 斯莫德</em></h4><blockquote><p>&nbsp;&emsp;过去几个版本中，斯莫德的强度下降了不少。黑切的远程削弱以及下路格局的变化，都对他相当不利。团队将进一步加强暴击出装，让他的半肉出装和纯暴击出装在强度上更加接近。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/d9284d51bd0743c61d7c75638eb60440/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/d9284d51bd0743c61d7c75638eb60440/0" />被动 - 龙之研习<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong><strong>【</strong>Q超级灼热龙息】额外魔法伤害：25-55%【龙之研习】层数 (如有【无尽之刃】+0-9%)，随暴击几率提升 &rArr; 25-60%【龙之研习】层数 (如有【无尽之刃】+0-10.5%)，随暴击几率提升<br />&nbsp; &nbsp; &nbsp;&nbsp;【E扑棱，扑棱，扑棱！】额外魔法伤害：8 - 12.8%【龙之研习】层数 (如有【无尽之刃】+0-1.44%)，随暴击几率提升 &rArr; 8 - 14% 【龙之研习】层数 (如有【无尽之刃】+0-1.8%)，随暴击几率提升</p><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/9e9eb139e5d49c494cb011a1fbfc37f4/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/9e9eb139e5d49c494cb011a1fbfc37f4/0" />R - 妈----！<br /><strong>&nbsp; &nbsp; </strong>&nbsp;&nbsp;自我治疗：100 / 135 / 170 (+50%额外攻击力) (+75%法术强度) &rArr; 100 / 175 / 250 (+75%额外攻击力) (+75%法术强度)</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/0e6455f18b7750e1d1091664892787bb/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/0e6455f18b7750e1d1091664892787bb/0" /><em>诺克萨斯统领 斯维因</em></h4><blockquote><p>&nbsp;&emsp;这个版本将适度加强中单斯维因，同时调整一些内容，应该有助于标准化他在中路与下路的表现。</p></blockquote><p><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>基础属性<br />&nbsp; &nbsp; &nbsp;&nbsp;基础魔抗：31 &rArr; 34<br />&nbsp; &nbsp; &nbsp;&nbsp;基础护甲：25 &rArr; 23</p><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/84a0370ecb6ac77edd7e02514280de98/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/84a0370ecb6ac77edd7e02514280de98/0" />W - 帝国视界<br />&nbsp; &nbsp; &nbsp;&nbsp;伤害：70 / 105 / 140 / 175 / 210 (+60%法术强度) &rArr; 70 / 115 / 160 / 205 / 250 (+60%法术强度)<br />&nbsp; &nbsp; &nbsp;&nbsp;冷却时间：22 / 21 / 20 / 19 / 18秒 &rArr; 20 / 19 / 18 / 17 / 16秒</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/2131e7a12be3899227d678275e641bd1/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/2131e7a12be3899227d678275e641bd1/0" /><em>河流之王 塔姆</em></h4><blockquote><p>&nbsp;&emsp;塔姆是生命回复最低的坦克辅助之一，且多个技能的收益都与生命值挂钩，因此近期辅助装备的调整对他影响较大。因此，团队会为他提供补偿性加强。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/a8b8abfe31229e3b79f9a7247ebd04c1/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/a8b8abfe31229e3b79f9a7247ebd04c1/0" />Q - 巨舌鞭笞<br /><strong>&nbsp; &nbsp;</strong> &nbsp;&nbsp;基础治疗效果：10 / 13.75 / 17.5 / 21.25 / 25 &rArr; 10 / 20 / 30 / 40 / 50</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/fa84241d4121970c425c9559d9d34cc5/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/fa84241d4121970c425c9559d9d34cc5/0" /><em>暗夜猎手 薇恩</em></h4><blockquote><p>&nbsp;&emsp;薇恩目前表现偏弱。虽然她在上路与下路的强度差距仍未完全达到团队的预期，但情况正在逐步改善。团队调整了她的基础属性，以帮助她在下路更好地应对骚扰，同时回退了此前对Q技能法力消耗的调整&mdash;&mdash;那项改动带来的体验实在太差了。</p></blockquote><p><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>基础属性<br />&nbsp; &nbsp; &nbsp;&nbsp;生命回复/5秒：4 + 0.5/级 &rArr; 5.5 + 0.4/级</p><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/da1ad82f1a6be413c86601860ad40590/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/da1ad82f1a6be413c86601860ad40590/0" />Q - 闪避突袭<br /><strong>&nbsp;</strong> &nbsp; &nbsp;&nbsp;法力消耗：46 / 42 / 38 / 34 / 30 &rArr; 30</p><h4 style="text-align: left; border-radius: 25px 0px 0px 25px;"><img src="https://mlol-75288.qpic.cn/common/f87925f389c573a102c413d6e5b1f496/0" alt="" width="60" data-src="https://mlol-75288.qpic.cn/common/f87925f389c573a102c413d6e5b1f496/0" /><em>不破之誓 芸阿娜</em></h4><blockquote><p>&nbsp;&emsp;芸阿娜最容易让对局变成&ldquo;双方和平发育，坐等装备成型&rdquo;的局面。团队希望避免这种玩法成为主流，尤其是在全球总决赛临近之际。</p></blockquote><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/62cf25598b7d43bffe151306a505d848/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/62cf25598b7d43bffe151306a505d848/0" />Q - 灵蕴拳<br /><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>被动附带伤害：5 / 10 / 15 / 20 / 25 (+20%法术强度) &rArr; 3 / 8 / 13 / 18 / 23 (+20%法术强度)<br />&nbsp; &nbsp; &nbsp;&nbsp;主动附带伤害：5 / 10 / 15 / 20 / 25 (+20%法术强度) &rArr; 3 / 8 / 13 / 18 / 23 (+20%法术强度)</p><p style="text-align: left;"><img src="https://mlol-75288.qpic.cn/common/a9fc10a93858e3637dd492fcabf2a2f9/0" alt="" width="30" data-src="https://mlol-75288.qpic.cn/common/a9fc10a93858e3637dd492fcabf2a2f9/0" />W - 善恶轮<br /><strong>&nbsp;</strong> &nbsp; &nbsp;&nbsp;减速效果叠加：可与其他减速效果叠加 &rArr; 不再与其他减速效果叠加</p><h3><strong>装备</strong></h3><h4 style="text-align: left;"><em><img src="https://static.gametalk.qq.com/image/3/1791464637_57c49b8c22333a44395ce31cccbb8cab.jpg" alt="" width="60" height="60" />海克斯注力刚壁</em></h4><blockquote><p>&nbsp;&emsp;这件装备在远程英雄手中的表现一直不太符合团队的预期，尤其是在上路作为首件装备时：它让远程英雄过于容易扛住爆发伤害，又在全力对拼时拥有过高击杀能力。</p></blockquote><p><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>由远程英雄持有时的效能：70%数值(35%攻击速度、14%移动速度) &rArr; 50%数值(25%攻击速度、10%移动速度)</p><h4 style="text-align: left;"><em><img src="https://static.gametalk.qq.com/image/3/1791464668_ebc81de41a96c9a55777fc146905ad76.jpg" alt="" width="60" height="60" />海克斯科技火箭腰带</em></h4><blockquote><p>&emsp; 【火箭腰带】依然更多被用作逃生工具，而不是高风险开团装备，因此团队将削弱它的通用收益，强化其进攻属性，尤其是让依赖它进场对拼的法强半肉英雄更能发挥其价值。</p></blockquote><p><strong>&nbsp; &nbsp; &nbsp;</strong>&nbsp;技能急速：20 &rArr; 10<br />&nbsp; &nbsp; &nbsp;&nbsp;主动伤害：100 (+10%法术强度) &rArr; 135 (+15%法术强度)</p><h4 style="text-align: left;"><em><img src="https://static.gametalk.qq.com/image/3/1791464688_5db8fd5764cc08d88651e5a20380f999.jpg" alt="" width="60" height="60" />卢安娜的飓风</em></h4><blockquote><p>&nbsp;&emsp;这件装备之前加强得有点过头了，所以这次稍微回调一下。</p></blockquote><p><strong>&nbsp; &nbsp; &nbsp;&nbsp;</strong>每支弩箭攻击力：65% &rArr; 60%</p><h4 style="text-align: left; padding-left: 20px; border-left: 4px solid #00a483;"><em>记分板显示优化</em></h4><blockquote><p>&nbsp;&emsp;近期，团队对增益栏进行了系统性的清晰度优化，将许多数值从增益图标转移到了装备图标上。结果这些数字开始在计分板上疯狂刷存在感（说的就是你，死亡之舞）。记分板应展示对战术决策有价值的信息，瞬息万变的战斗状态数值则会造成干扰。因此，团队将隐藏记分板上的大部分装备图标计数。【女神之泪】系列装备、【梅贾的窃魂卷】等与战略相关的装备数值，依然会显示在记分板图标上。</p></blockquote><p>以下装备的图标计数现在不再显示在记分板上：</p><ul style="list-style-type: disc; padding-left: 2em;"><li>死亡之舞</li><li>幽魂面具</li><li>兰德里的折磨</li><li>裂隙制造者</li><li>海妖杀手</li><li>界弓</li><li>鬼索的狂暴之刃</li><li>猎魔人弩箭</li><li>海力亚的回响</li><li>亡者的板甲</li><li>朔极之矛</li><li>霸王血铠</li><li>破舰者</li><li>千变者贾修</li><li>自然之力</li></ul><h3><strong>经典模式</strong></h3><blockquote><p>&nbsp;&emsp;准备好迎接更多焕然一新的老英雄了吗？！团队已经迫不及待了！这次登场的阵容可谓五花八门，怎么看都不像能凑成一支乐队。有请亚托克斯、凯特琳、艾瑞莉娅、卡尔玛和奎因来到正义之地。<br /><br />温馨提示：第2幕战斗通行证将随26.21版本一同上线</p></blockquote><h4 style="text-align: left; padding-left: 20px; border-left: 4px solid #00a483;"><em>英雄</em></h4><p><strong>[新]暗裔剑魔 亚托克斯</strong></p><blockquote><p>&nbsp;&emsp;团队在敲定经典模式的亚托克斯版本时，选择了他还是个刚上线三个版本的&ldquo;小宝宝&rdquo;时的那一版。在2017年的英雄更新和后续的2018年全面更新之前，他只经历过四次平衡性调整。团队很期待再次看到他的表现。他是一名普攻型战士，会通过消耗自身生命值来提升攻击速度，还能在受到致命伤害时复活。</p></blockquote><ul style="list-style-type: disc; padding-left: 2em;"><li>被动 - 鲜血魔井：亚托克斯的基础技能会消耗自身生命值，为鲜血魔井充能，并获得额外攻击速度。受到致命伤害时，他会清空鲜血魔井，在原地复活。</li><li>Q - 黑暗之跃：亚托克斯腾空而起，随后猛砸地面，对范围内的敌人造成伤害并将其击飞。</li><li>W - 血之渴望/血之报偿：在血之渴望和血之报偿之间切换，每第三次普攻会触发对应的额外效果。血之渴望会治疗亚托克斯，低生命值时治疗效果提升。血之报偿会造成额外伤害，同时消耗自身生命值。</li><li>E - 痛苦利刃：亚托克斯发射两道利刃，对触碰到的所有敌人造成伤害并施加减速效果。</li><li>R - 浴血屠戮：亚托克斯对附近所有敌方英雄造成伤害，并获得持续数秒的额外攻击速度和攻击距离。</li></ul><p><strong>[新]皮城女警 凯特琳</strong></p><blockquote><p>&nbsp;&emsp;经典模式采用的是2011年至2015年间的凯特琳。你知道吗？她刚上线时，一些玩家还曾因为她与厄运小姐过于相似而感到不满。</p></blockquote><ul style="list-style-type: disc; padding-left: 2em;"><li>被动 - 爆头每隔数次普攻，凯特琳就会打出一次爆头，造成额外伤害。在草丛中攻击时，爆头的充能速度会更快。</li><li>Q - 和平使者：凯特琳发射一颗贯穿子弹，对后续目标造成的伤害依次递减。</li><li>W - 约德尔诱捕器：凯特琳在地面放置一个陷阱，禁锢并对第一个踩中的敌方英雄造成伤害。她同一时间至多可拥有2层陷阱充能。</li><li>E - 90口径绳网：凯特琳发射一张巨网，并将她向后推送。绳网会对命中的第一个敌人造成伤害并使其减速。</li><li>R - 让子弹飞：凯特琳在引导后向一名敌方英雄发射一枚伤害极高的子弹，但其他敌方英雄能拦截这枚子弹。</li></ul><p><strong>[新]刀锋意志 艾瑞莉娅</strong></p><blockquote><p>&nbsp;&emsp;欢迎2010年至2018年版本的艾瑞莉娅回归！【三相之力】的元祖代言人再次登场，无论局势多么不利，她都能扭转乾坤。她曾在不同时期流行过主Q、主W和主E的加点方式，快来试试哪种最适合你！她是一名身手敏捷但出奇抗打的战士，尤其擅长以弱胜强。</p></blockquote><ul style="list-style-type: disc; padding-left: 2em;"><li><strong>被动 - 艾欧尼亚热诚：艾瑞莉娅会根据附近可见敌方英雄的数量获得额外韧性。</strong></li><li><strong>Q - 利刃冲击：艾瑞莉娅冲刺至一个敌人，造成伤害并附带攻击特效。如果击杀目标，则重置【利刃冲击】的冷却时间，并返还部分法力消耗。</strong></li><li><strong>W - 飞天姿态：被动：艾瑞莉娅每次普攻都会回复一些生命值。主动：普攻造成额外真实伤害，并回复更多生命值。</strong></li><li><strong>E - 均衡打击：艾瑞莉娅对附近一名敌人造成伤害并使其减速。如果目标的生命值百分比高于她，则转而造成晕眩效果。</strong></li><li><strong>R - 至尊锋刃：艾瑞莉娅依次发射四把直线飞行的利刃，每把都会对所有命中的敌人造成伤害，并为她回复一定生命值。这可绝对不只是个清兵技能。</strong></li></ul><p><strong>[新]天启者 卡尔玛</strong></p><blockquote><p>&nbsp;&emsp;卡尔玛在凯特琳上线后的两个版本便登场了，随后于2013年初迎来全面更新，原版仅存在了两年多。卡尔玛可以说是《英雄联盟》最早的战斗法师，擅长深入战局，损失的生命值越多，实力就越强。</p></blockquote><ul style="list-style-type: disc; padding-left: 2em;"><li>被动 - 心灵烈焰：卡尔玛基于她的已损失生命值获得额外法强。</li><li>Q - 天国之刃：卡尔玛射出扇子内的暗器，对向前方扇形区域内命中的所有敌人造成伤害。梵咒强化：还会为所有友军（包括她自己）治疗生命值，受益于目标的已损失生命值。</li><li>W - 灵魂连接：卡尔玛系住另一名目标，被系住的友军（包括她自己）获得移动速度加成，被系住的敌军会被减速，并在二者之间生成一道灵链。穿过灵链的友军将获得与被系住友军相同的移动速度加成，穿过灵链的敌军将受到与被系住敌军相同的减速效果。穿过灵链的敌军会受到伤害。梵咒强化：所有移速效果翻倍。</li><li>E - 灵魂护盾：卡尔玛为目标提供护盾。梵咒强化：还会对目标周围的所有敌人造成伤害。</li><li>R - 梵咒：梵咒在1级时就可以使用，最多可持有两层充能。施放后，强化下一个基础技能。</li></ul><p><strong>[新]德玛西亚之翼 奎因和华洛</strong></p><blockquote><p>&nbsp;&emsp;奎因和华洛携手回归！这一组合版本曾在2013年至2015年间登场，仅存在了两年多。奎因是一名灵活的远程普攻型英雄，而她的终极技能可以让华洛接替她，以疾如闪电的游走型战士形态投入战斗。</p></blockquote><ul style="list-style-type: disc; padding-left: 2em;"><li>被动 - 侵扰：华洛周期性地标记附近的敌人。奎因攻击被标记的目标时，会造成额外伤害。</li><li>Q - 炫目攻势：华洛向前飞出，对范围内的敌人造成伤害并致盲。</li><li>W - 敏锐感知：被动：奎因触发【侵扰】时，获得额外攻击速度和移动速度。主动：短暂显形周围一大片区域。</li><li>E - 旋翔掠杀：奎因冲刺至一个敌人身旁，对目标造成伤害、击退和减速，然后后跳远离。华洛随即给目标打上【侵扰】标记。</li><li>R - 王牌搭档：奎因暂时撤离战场，由华洛接替她作战。华洛获得大量额外移动速度，并在出战期间持续享有强化版的【敏锐感知】攻击速度增益，同时施放改版【炫目攻势】和【旋翔掠杀】。再次施放(R)技能会发动【鹰翼天翔】，对附近所有敌人造成伤害，并让奎因重返战场。</li></ul><p><strong>菲奥娜</strong></p><blockquote><p>&nbsp;&emsp;即使经历了上一轮削弱，菲奥娜依然是游戏中最具统治力的上单，因此团队将再进行一轮调整。团队不打算进一步削弱她爆炸力十足的终极技能，所以这次只进行了一次通用的伤害削弱。</p></blockquote><p>W - 劳伦特心眼刀</p><ul style="list-style-type: disc; padding-left: 2em;"><li>额外攻击力：15 / 20 / 25 / 30 / 35 &rArr; 10 / 15 / 20 / 25 / 30</li></ul><p><strong>格雷福斯</strong></p><blockquote><p>&nbsp;&emsp;格雷福斯一登场就大放异彩，不仅人气爆棚，甚至可以说是游戏中最强的英雄。团队对他的动画进行了优化，特别是暴击动画，让手感更加顺畅。另外，还少不了一些没那么讨喜、但确实急需的削弱。团队希望保留他的霰弹枪爆发输出，以及作为坦系ADC的独特定位，因此团队只需要削弱他的持续输出能力。</p></blockquote><p>基础属性</p><ul style="list-style-type: disc; padding-left: 2em;"><li>普攻与暴击动画：提速</li><li>基础攻击力：54.1 &rArr; 50</li><li>每级攻击力：3.1 &rArr; 2.5</li><li>每级攻击速度：2.9% &rArr; 2.5%</li></ul><p>R - 终极爆弹</p><ul style="list-style-type: disc; padding-left: 2em;"><li>锥形伤害：140 / 250 / 360 + 120%额外攻击力 &rArr; 140 / 230 / 320 + 100%额外攻击力</li><li>飞弹伤害：未改动</li></ul><p><strong>菲兹</strong></p><blockquote><p>&nbsp;&emsp;菲兹仅次于格雷福斯，表现相当强势，不过主要以中路法强刺客的打法大放异彩。团队希望保留他的刺客和战士两种玩法，因此本次削弱将更多地影响其高法强出装。团队将借鉴2013年和2015年的两次削弱，以较轻幅度降低他的保底爆发。毕竟，有【冥火之拥】和法强收益率高达75%的【巫妖之祸】，他已经拥有相当充足的可靠伤害。</p></blockquote><p>Q - 淘气打击</p><ul style="list-style-type: disc; padding-left: 2em;"><li>法术强度收益率：60% &rArr; 40%</li></ul><p>W - 海石三叉戟</p><ul style="list-style-type: disc; padding-left: 2em;"><li>主动法术强度收益率：35% &rArr; 20%</li></ul><p><strong>凯南</strong></p><blockquote><p>&nbsp;&emsp;凯南的表现还未达到其他忍者同伴的水准，团队认为他理应发挥得更好。相比其他出装，物理输出流凯南更需要大幅加强，因此本次调整会更偏向于帮助采用这一打法的玩家。</p></blockquote><p>W - 奥义！电刃</p><ul style="list-style-type: disc; padding-left: 2em;"><li>被动伤害：40 / 50 / 60 / 70 / 80%总攻击力 &rArr; 25 / 40 / 55 / 70 / 85 + 100%额外攻击力</li></ul><p><strong>诺提勒斯</strong></p><blockquote><p>&nbsp;&emsp;与其他水系伙伴不同，诺提勒斯登场后的表现并不亮眼。有时候，那只船锚反而成了他的负担。目前，他在辅助、打野和上单三个主要位置上的表现都偏弱，而团队尤其希望改善后两个位置的表现。因此，团队修复了一个重大BUG，同时借鉴他上线早期的一些加强，并回调了当时的部分削弱，让他更有动力去吸经验然后冲进战斗的风口浪尖。</p></blockquote><p>被动 - 排山倒海</p><ul style="list-style-type: disc; padding-left: 2em;"><li>BUG修复：修复了一个BUG，该BUG曾导致：强化普攻暴击时造成的伤害过高。</li></ul><p>W - 泰坦之怒</p><ul style="list-style-type: disc; padding-left: 2em;"><li>BUG修复：修复了一个BUG，该BUG曾导致：护盾承受伤害时未计入护甲和魔法抗性。</li><li>持续伤害：40 / 55 / 70 / 85 / 100 + 40%法术强度 &rArr; 40 / 65 / 90 / 115 / 140 + 40%法术强度</li><li>护盾 额外生命值收益率：10% &rArr; 15%</li><li>护盾时长：9.75 &rArr; 10</li></ul><h4 style="text-align: left; padding-left: 20px; border-left: 4px solid #00a483;"><em>装备</em></h4><blockquote><p>&nbsp;&emsp;有几件坦克装备表现不佳，原因是它们提供的生命回复过低，所以团队将对此进行提升。团队还修复了【女妖面纱】在商店中的显示问题，现在搜索生命值装备时也能找到它了。</p></blockquote><p><strong>振奋盔甲</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>生命回复/5秒：4 &rArr; 20</li></ul><p><strong>自然之力</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>生命回复/5秒：20 &rArr; 40</li></ul><p><strong>狂徒铠甲</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>生命回复/5秒：10 &rArr; 30</li></ul><p><strong>女妖面纱</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>属性筛选分类：法术强度 &rArr; 生命值</li></ul><h4 style="text-align: left; padding-left: 20px; border-left: 4px solid #00a483;"><em>BUG修复</em></h4><ul style="list-style-type: disc; padding-left: 2em;"><li>修复了一个BUG，该BUG曾导致：菲兹在经典模式对局中(E)技能描述显示错误翻译。</li><li>修复了一个BUG，该BUG曾导致：希瓦娜在【烈火燎原】(W)依然处于生效状态下仍可施放该技能。</li><li>修复了一个BUG，该BUG曾导致：厄运小姐的默认皮肤错误使用经典模式原画。</li><li>修复了一个BUG，该BUG曾导致：希瓦娜的【魔龙降世】(R)无法打断引导技能。</li><li>修复了一个BUG，该BUG曾导致：凯尔的【清算】(Q)会附带攻击特效。</li><li>修复了一个BUG，该BUG曾导致：格雷福斯的经典版原画未在藏品页签、载入界面、荣誉界面、成长进度界面或赛后结算记分板中显示。</li><li>修复了一个BUG，该BUG曾导致：经典模式藏品菜单中英雄总览位置图标与所列英雄位置不符。</li><li>修复了一个BUG，该BUG曾导致：提莫在死亡后无法重新获得【小莫快跑】(W)技能提供的移动速度加成。</li><li>修复了一个BUG，该BUG曾导致：格雷福斯的概览页面在&ldquo;经典模式 改动&rdquo;下未显示文本。</li><li>修复了一个BUG，该BUG曾导致：诺提勒斯的&ldquo;深海泰坦&rdquo;称号下方未显示英雄名称。</li><li>修复了一个BUG，该BUG曾导致：赛恩攻击敌方召唤水晶能够进行生命偷取。</li><li>修复了一个BUG，该BUG曾导致：在经典模式藏品页中，潘森的【圣盾庇护】(被动)描述文本包含一条未本地化的文本。</li><li>修复了一个BUG，该BUG曾导致：受格雷福斯【烟幕弹】(W)的近视减益影响时，使用【水银饰带】、【水银弯刀】或普朗克的【坏血病疗法】(W)会短暂获得局内随机防御塔附近的视野。</li><li>修复了一个BUG，该BUG曾导致：已拥有的符文页可能会超出显示区域，遮挡符文编辑器或属性面板。</li><li>修复了一个BUG，该BUG曾导致：经典模式召唤师技能在施放时播放错误音效。</li></ul><h3><strong>海克斯大乱斗</strong></h3><blockquote><p>&emsp;&nbsp; 各位海斗狂热者，大家好！<br /><br />在本次版本更新中，团队将重点关照一些需要加强的英雄和强化符文。英雄方面，团队将引入英雄专属加强，在强化其核心打法的同时，让他们在海斗中更容易上手，玩起来也更有爽感。强化符文方面，团队将继续着重改善易用性。<br /><br />例如，【咒语裂变】现在会在飞弹到达终点或技能再次施放时触发分裂，而不是在首次命中目标时触发分裂。团队还缩减了【扳机炼狱】的冷却时间，让玩家能够真正体验莎弥拉火力全开的快感。欢迎告诉团队这些调整的体验如何，感谢大家的游玩。<br /><br />桥上见！</p></blockquote><h4 style="text-align: left; padding-left: 20px; border-left: 4px solid #00a483;"><em>英雄</em></h4><p><strong>巴德</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>木灵 法术强度收益率：50% &rArr; 67%</li><li>木灵 充能时间：8秒 &rArr; 5秒</li><li>每3层调和之音对木灵的普攻伤害提升：6 / 3层调和之音 &rArr; 10 / 3层调和之音</li></ul><p><strong>盖伦</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>被动回复：1.5%~10.1% &rArr; 2%~12%</li><li>W冷却时间：22~12 &rArr; 18~12</li><li>W护盾值：18%额外生命值 &rArr; 20%额外生命值</li><li>W被动 双抗：每击杀一个小兵获得0.4双抗 &rArr; 每击杀一个小兵获得0.75双抗</li></ul><p><strong>奎桑提</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>W冷却时间：14~10 &rArr; 10</li><li>W伤害减免：30% &rArr; 45%</li><li>E护盾值：13.5%额外生命值 &rArr; 15%额外生命值</li></ul><p><strong>李青</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>被动 攻击速度：40%额外攻击速度 &rArr; 50%额外攻击速度</li><li>被动 能量回复：20 / 30 / 40 &rArr; 30 / 40 / 50</li><li>W护盾值：60~240 &rArr; 80~320</li><li>Q技能第二段伤害：60~180 &rArr; 80~240</li><li>斯维因</li><li>承受伤害：105% &rArr; 100%</li><li>治疗效果：95% &rArr; 100%</li><li>魂屑回复：固定6% &rArr; 3%~6%，随等级提升</li></ul><p><strong>锤石</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>被动 每个灵魂提供的层数：2 &rArr; 3</li><li>W冷却时间：21 / 20 / 19 / 18 / 17秒 &rArr; 19 / 18 / 17 / 16 / 15秒</li></ul><h4 style="text-align: left; padding-left: 20px; border-left: 4px solid #00a483;"><em>强化符文</em></h4><p><strong>注魔</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>[已移除]普攻法力消耗：已移除</li><li>额外伤害 法力值收益率：4.5% &rArr; 7%</li><li>&nbsp;[新]由远程英雄持有时的效果：5.6%（80%x7%）</li></ul><p><strong>练腿日</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>减速抗性：40% &rArr; 50%</li></ul><p><strong>咒语裂变</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>分裂 触发条件：首次命中单位 &rArr; 到达终点或再次施放时</li></ul><p><strong>鲨鱼暴风</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>减速：30% 持续3秒 &rArr; 40% 持续3秒</li><li>基础范围伤害：50~100 &rArr; 100~200</li><li>附着伤害 持续3秒：75~225 + 0.6额外攻击力 + 0.36法术强度 &rArr; 90~270 + 0.75额外攻击力 + 0.45法术强度</li></ul><p><strong>软弹啪叽抓</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>冷却时间：35秒 &rArr; 30秒</li><li>伤害：30~100 + 10%额外生命值 &rArr; 50~150 + 15%额外生命值</li><li>每拉拽一个目标的护盾：35~150 + 50%额外护甲 + 50%额外魔法抗性 &rArr; 50~200 + 50%额外护甲 + 50%额外魔法抗性</li></ul><p><strong>牙仙子</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>[新]伤害判定：折前而非折后</li></ul><p><strong>扳机炼狱</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>冷却时间：15秒 &rArr; 5秒</li></ul><h4 style="text-align: left; padding-left: 20px; border-left: 4px solid #00a483;"><em>BUG修复</em></h4><ul style="list-style-type: disc; padding-left: 2em;"><li>修复了一个BUG，该BUG曾导致：【炼狱龙魂】和【珠光护手】会将对小兵造成的伤害计入统计。</li><li>修复了一个BUG，该BUG曾导致：【尊我为王】在任务完成后仍占据栏位。</li><li>修复了一个BUG，该BUG曾导致：【尊我为王】质变为【超负荷】后，后者无法生效。</li><li>修复了一个BUG，该BUG曾导致：【鲨鱼诱饵】显示空白增益栏。</li><li>修复了一个BUG，该BUG曾导致：阿萝拉的(Q)技能无法获得来自【老练狙神】的冷却缩减效果。（注：暂未生效，将于后续版本修复）</li><li>修复了一个BUG，该BUG曾导致：慎在使用【闪现】或排序施放其他技能时，【回响施放】复制的【奥义！影缚】(E)无法进行冲刺。</li><li>修复了一个BUG，该BUG曾导致：移动指令可能会改变【回响施放】的复制体朝向。</li><li>修复了一个BUG，该BUG曾导致：拥有【咒语裂变】的卢锡安在(W)技能施放期间使用(E)技能时，(W)技能的飞弹无法正常分裂。</li><li>修复了一个BUG，该BUG曾导致：在技能施放期间施放召唤师技能，会导致【咒语裂变】的飞弹无法正常分裂。</li><li>修复了一个BUG，该BUG曾导致：当施放被【咒语裂变】强化的技能时，英雄无法排序施放其他技能。</li><li>修复了一个BUG，该BUG曾导致：【舞会女王】的冷却图标在死亡后消失。</li><li>修复了一个BUG，该BUG曾导致：厄加特(W)技能的飞弹会摧毁【飞升仪式】的精华。</li><li>修复了一个BUG，该BUG曾导致：【仆从大师】的伤害增幅对萨科(R)技能的爆炸伤害和艾翁(R)技能的击飞伤害不生效。</li><li>修复了一个BUG，该BUG曾导致：【终极九头蛇】的任务图标与卡牌图标不一致。</li></ul><h3><strong>极地大乱斗</strong></h3><h4 style="text-align: left; padding-left: 20px; border-left: 4px solid #00a483;"><em>英雄</em></h4><p><strong>卑尔维斯</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>造成伤害：105% &rArr; 100%</li><li>承受伤害：95% &rArr; 100%</li><li>韧性：20% &rArr; 0%</li></ul><p><strong>洛克</strong></p><ul style="list-style-type: disc; padding-left: 2em;"><li>造成伤害：105% &rArr; 115%</li></ul><h3><strong>5人排位赛</strong></h3><blockquote><p>&nbsp;&emsp;提醒一下：5人组队排位的开放时间已从服务器时间16:00-次日02:00延长至16:00-次日04:00。</p></blockquote><h3><strong>BUG修复及品质级改动</strong></h3><ul style="list-style-type: disc; padding-left: 2em;"><li>修复了一个BUG，该BUG曾导致：奥莉安娜在魔偶抵达魔腾等高速移动的友军之前施放(R)技能时，该技能的视觉特效与实际判定范围会发生错位。</li><li>修复了一个BUG，该BUG曾导致：塞拉斯失去目标视野后，窃取自诺提勒斯的【深海冲击】(R)可能会失效。（注：暂未生效，将于后续版本修复）</li><li>修复了一个BUG，该BUG曾导致：赵信【三重爪击】(Q)的首次攻击被慎的【奥义！影缚】(E)或贾克斯的【反击风暴】(E)等技能闪避后，该技能会直接进入完整冷却时间。</li><li>修复了一个BUG，该BUG曾导致：希瓦娜的【魔龙降世】(R)无法打断敌方传送。</li><li>修复了一个BUG，该BUG曾导致：凯尔的【清算】(Q)会附带【耀光】、【巫妖之祸】、【三相之力】和【冰脉护手】的咒刃效果。</li><li>修复了一个BUG，该BUG曾导致：大体型的近战英雄能够在对大体型的敌方英雄进行普攻时不处于【献祭】作用范围之内。</li><li>修复了一个BUG，该BUG曾导致：拥有超过20个符文页时，符文页的页签会超出显示区域并遮挡编辑器。</li><li>修复了一个BUG，该BUG曾导致：希维尔的【法术护盾】(E)无法格挡蕾欧娜的【天顶之刃】(E)。（注：暂未生效，将于后续版本修复）</li><li>修复了一个BUG，该BUG曾导致：英雄概览窗口中的页签按钮错位、无法使用。</li><li>修复了一个BUG，该BUG曾导致：多个经典模式技能图标未填满其整个方形显示区域。</li><li>修复了一个BUG，该BUG曾导致：墨菲特在使用【势不可挡】(R)后，召唤师技能【闪现】会被禁用。</li><li>修复了一个BUG，该BUG曾导致：购买【皇家守卫 菲奥娜】皮肤不会提供相应的经典模式炫彩。</li><li>修复了一个BUG，该BUG曾导致：在打开一个非经典模式页签时，经典模式主页图片会被载入。</li><li>修复了一个BUG，该BUG曾导致：经典模式下的藏品 - 肖像页签中，两个&ldquo;发布日期&rdquo;排序按钮的排序效果相同。</li><li>修复了一个BUG，该BUG曾导致：经典模式商城 - 符文页的排序选项中缺少了&ldquo;推荐&rdquo;。</li><li>修复了一个BUG，该BUG曾导致：经典模式商城 - 符文页无法按发布日期对符文进行正确排序。</li><li>修复了一个BUG，该BUG曾导致：快速地按【回城】键会提供【鬼索的狂暴之刃】层数。</li><li>修复了一个BUG，该BUG曾导致：在英雄选择期间的炫彩选择界面中，赵信的经典模式炫彩【皇家守卫】未显示名称。</li><li>修复了一个BUG，该BUG曾导致：【卢安娜的飓风】的齐射(被动)会触发小兵呼救机制。</li><li>修复了一个BUG，该BUG曾导致：希维尔的【法术护盾】不会格挡来自厄运小姐Q技能的伤害。</li><li>修复了一个BUG，该BUG曾导致：娑娜的(E)技能描述错误地说它的效果仅施加给英雄。</li><li>修复了一个BUG，该BUG曾导致：多个经典模式装备图标未填满其整个方形显示区域。</li></ul><h3><strong>即将到来的皮肤和炫彩</strong></h3><p>以下皮肤已在26.20版本内：</p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/434351295461722.jpg" alt="" width="800" /><br /><strong>至臻 心之钢 我行我路 瑟提</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/74125474394682.jpg" alt="" width="800" /><br /><strong>心之钢 我行我路 伊泽瑞尔</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/70336159344188.jpg" alt="" width="800" /><br /><strong>心之钢 我行我路 凯隐</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/288251405696935.jpg" alt="" width="800" /><br /><strong>心之钢 我行我路 厄斐琉斯</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/64382493551536.jpg" alt="" width="800" /><br /><strong>心之钢 我行我路 永恩</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/763921075402223.jpg" alt="" width="800" /><br /><strong>心之钢 我行我路 奎桑提</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/6195412975689.jpg" alt="" width="800" /><br /><strong>至臻 经典 克格莫男爵</strong></p><p>以下炫彩已在26.20版本内：</p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/1870850223755.jpg" alt="" width="800" /><br /><strong>SKT T1 贾克斯</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/208351122825900.jpg" alt="" width="800" /><br /><strong>SKT T1 李青</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/774441765300470.jpg" alt="" width="800" /><br /><strong>SKT T1 薇恩</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/824611530888992.jpg" alt="" width="800" /><br /><strong>SKT T1 婕拉</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/72860630667838.jpg" alt="" width="800" /><br /><strong>SKT T1 劫</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/12713774974646.jpg" alt="" width="800" /><br /><strong>至臻 经典 克格莫男爵</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/941841778326691.jpg" alt="" width="800" /><br /><strong>至臻 心之钢 我行我路 瑟提</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/49377258070933.jpg" alt="" width="800" /><br /><strong>心之钢 我行我路 伊泽瑞尔</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/321141399621365.jpg" alt="" width="800" /><br /><strong>心之钢 我行我路 凯隐</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/626561452598740.jpg" alt="" width="800" /><br /><strong>心之钢 我行我路 厄斐琉斯</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/39334138905165.jpg" alt="" width="800" /><br /><strong>心之钢 我行我路 永恩</strong></p><p style="text-align: center;"><img src="//ossweb-img.qq.com/upload/webplat/info/lol/20261008/623901514883459.jpg" alt="" width="800" /><br /><strong>心之钢 我行我路 奎桑提</strong></p>
+                    </div>
+                </div>
+            </div>
+            <!--评论组件-->
+            <div class="art-com">
+            </div>
+        </div>
+        <div class="clearfix verleft" id="verleft">
+            <div id="rightNav" class="rightNav">
+                <div class="topTit c">
+                    <ul id="VerNav" class="ver-nav">
+                        <li class="clearfix">数据加载中……</li>
+                    </ul>
+                </div>
+                <div class="varName" data="">更新总览</div>
+                <div class="verlist"></div>
+                <div class="changeInfo" id="changeInfo"></div>
+            </div>
+        </div>
+        <div class="side-con">
+            <div class="s-author part" style="display: none">
+                <div class="in-part">
+                    <!--作者信息-->
+                    <div class="s-top-bar clearfix" id="authorInfo">
+
+                    </div>
+                    <!--他的文章-->
+                    <h2 class="tit">TA的文章</h2>
+                    <ul class="push-ul" id="authorArticleList">
+                       
+                    </ul>
+                    <a class="art-more-look" href="#" target="_blank">更多TA的内容</a>
+                </div>
+            </div>
+            <div class="s-push part" style="display: none">
+                <div class="in-part">
+                    <h2 class="tit">相关推荐</h2>
+                    <ul class="push-ul" id="pushArticle">
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--官网通用底部,仅供官网使用,其他站请用pureFoot start-->
+<div class="foot-wrap" id="footWrap">
+  <div class="foot_inner" id="gfooter" ams="152/35206/m131" age="16" dark="1" ieg-logo="1">
+    <!-- <div class="foot_top"> any HTML code </div> -->
+    <a onclick="pgvSendClick({hottag:'v3.foot.ieg.link'})" target="_blank" href="//ieg.tencent.com/" title="腾讯互动娱乐" class="foot_ieg_logo">腾讯互动娱乐</a>
+    <span onclick="pgvSendClick({hottag:'v3.foot.riot.link'})" title="RIOT" class="foot_left logo-riot">riot</span>
+    <p class="copyright_txt">COPYRIGHT &copy; 2012 Riot Games,Inc. ALL RIGHTS RESERVED.</p>
+    <p>全国文化市场统一举报电话：12318</p>
+    <!-- <p class="copyright_txt">COPYRIGHT &?Smilegate Entertainment. All rights reserved.</p>-->
+    <!-- <div  class="foot_bottom"> any HTML code </div> -->
+  </div>
+</div>
+<!--底部版权js-->
+<script src="//game.gtimg.cn/images/js/2018foot/foot.js"></script>
+<!--官网通用js start-->
+<script src="//ossweb-img.qq.com/images/js/jquery/jquery-1.9.1.min.js"></script>
+<script src="//ossweb-img.qq.com/images/js/eas/eas.js"></script>
+<script src="/v3/js/lib.js?v=927"></script>
+<script src="//js.aq.qq.com/js/aq_common.js"></script>
+<!--官网通用js end-->
+<!--登录部分js start-->
+<script src="//ossweb-img.qq.com/images/js/milo_bundle/milo.js"></script>
+<script src="//game.gtimg.cn/images/js/milo-next/latest/milo.min.js" charset="utf-8"></script>
+<script src="//game.gtimg.cn/images/js/lol_public_lib/login-new.js"></script>
+<script src="//lol.qq.com/comm-htdocs/js/game_area/lol_server_select.js"></script>
+<script src="/v3/js/LOL_Login.js"></script>
+<script src="/v3/js/v3comm.js"></script>
+<!--登录部分js end-->
+<!--顶部模块js start-->
+<script src="//lol.qq.com/act/AutoCMS/publish/LOLWeb/HeadCfg/headcfg.js"></script>
+<script src="/v3/js/TopModule.js"></script>
+<script src="//ossweb-img.qq.com/images/js/ArtTemplate.js" charset="utf-8"></script>
+<!--顶部模块js end-->
+<!--官网通用底部 end-->
+
+<script src="//ossweb-img.qq.com/images/js/eas/eas.js"></script>
+<script src="//gicp.qq.com/wmp/v5/static/js/gicprp.js"></script>
+<script src="//pingjs.qq.com/tcss.ping.https.js"></script>
+<script src="/web201310/js/ngonggao.js"></script>
+<script>
+var dId=$("#readCount").attr("data");
+    function is_pc(){
+        var os = new Array("Android","iPhone","Windows Phone","iPod","BlackBerry","MeeGo","SymbianOS");  // 其他类型的移动操作系统类型，自行添加
+        var info = navigator.userAgent;
+        var len = os.length;
+        for (var i = 0; i < len; i++) {
+            if (info.indexOf(os[i]) > 0){
+                return false;
+            }
+        }
+        return true;
+    }
+    function loadScript(a, b, z) {
+        var c = document.createElement("script");
+        c.async = false;
+        if (z) {
+            c.charset = "utf-8";
+        }
+        c.type = "text/javascript", c.readyState ? c.onreadystatechange = function() {
+            ("loaded" == c.readyState || "complete" == c.readyState) && (c.onreadystatechange = null,
+            b && b());
+        } :c.onload = function() {
+            b && b();
+        }, c.src = a, document.body.appendChild(c);
+    }
+    if(!is_pc()){
+
+      loadScript("//cdn.jsdelivr.net/eruda/1.0.4/eruda.min.js", function(){eruda.init();})
+
+    }
+    if(typeof(pgvMain) === 'function')pgvMain();
+    if(typeof(Gicprp.send) == 'function'){
+       Gicprp.send({
+           'action_type':'pv',
+           'iuName':'web_pc',
+           'contentId':'37098539',
+           'serviceType':'3',
+           'contentType':'news'
+       });
+    };
+    $(function() {
+        $.ajax({
+            type: "GET",
+            url: "//apps.game.qq.com/cmc/getplay?p0=3&ids=1_"+dId,
+            dataType: "json",
+            success: function(res) {
+                var data = res.data;
+                var no=data[1][dId];
+                if(no>100000){$("#readCount").html(Math.round(no/10000)+"万");}else{$("#readCount").html(no);}
+                
+            }
+        });
+    });
+</script>
+</body>
+</html>

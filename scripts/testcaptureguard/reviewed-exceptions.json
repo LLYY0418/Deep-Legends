@@ -883,9 +883,9 @@
   },
   {
     "file": "backend/quality_test.go",
-    "line": 743,
+    "line": 746,
     "target": "events",
-    "source_sha256": "211a5d3e93c08491e6cd0ba3927ee95a61ac323f3436f68279bbbf578a22a90f",
+    "source_sha256": "f6826e5d77c5038ab5d2c7207bfb3816d7d1f1c91bff7cb9937453e08e44cba6",
     "comment": "r276-capture-safe: TestLootFallbackDiagnosticRuntimePayloadNeverStoresItemDetails: enrichLootItemsWithMetadata directly invokes observe in its synchronous item loop on the caller; this call returns before events is inspected or marshaled"
   },
   {
@@ -1312,42 +1312,42 @@
     "file": "backend/r186_test.go",
     "line": 76,
     "target": "launches",
-    "source_sha256": "189db240b278c2cb92d24ddbf8c2b617391ce903ff756aebb3e5da28703f414b",
+    "source_sha256": "ea5b6f594061ac8e14fe1659b3c1d6bd57a6d53b4c3764f0ccca6de1abc3b224",
     "comment": "r276-capture-safe: TestR186PortableDownloadApplyAndFailures: the audited fixture operations in this test invoke this callback serially and return before launches is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r186_test.go",
     "line": 120,
     "target": "events",
-    "source_sha256": "189db240b278c2cb92d24ddbf8c2b617391ce903ff756aebb3e5da28703f414b",
+    "source_sha256": "ea5b6f594061ac8e14fe1659b3c1d6bd57a6d53b4c3764f0ccca6de1abc3b224",
     "comment": "r276-capture-safe: TestR186DataMigrationNeverOverwritesAndKeepsSourceOnFailure: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r186_test.go",
     "line": 203,
     "target": "f.calls",
-    "source_sha256": "189db240b278c2cb92d24ddbf8c2b617391ce903ff756aebb3e5da28703f414b",
+    "source_sha256": "ea5b6f594061ac8e14fe1659b3c1d6bd57a6d53b4c3764f0ccca6de1abc3b224",
     "comment": "r276-capture-safe: newR186SyncFixture: fixture users call settings operations serially; their RoundTripper executes in that request goroutine and returns before f.calls/f.patches/f.lcu assertions"
   },
   {
     "file": "backend/r186_test.go",
     "line": 211,
     "target": "f.patches",
-    "source_sha256": "189db240b278c2cb92d24ddbf8c2b617391ce903ff756aebb3e5da28703f414b",
+    "source_sha256": "ea5b6f594061ac8e14fe1659b3c1d6bd57a6d53b4c3764f0ccca6de1abc3b224",
     "comment": "r276-capture-safe: newR186SyncFixture: fixture users call settings operations serially; their RoundTripper executes in that request goroutine and returns before f.calls/f.patches/f.lcu assertions"
   },
   {
     "file": "backend/r186_test.go",
     "line": 215,
     "target": "f.lcu[section][name]",
-    "source_sha256": "189db240b278c2cb92d24ddbf8c2b617391ce903ff756aebb3e5da28703f414b",
+    "source_sha256": "ea5b6f594061ac8e14fe1659b3c1d6bd57a6d53b4c3764f0ccca6de1abc3b224",
     "comment": "r276-capture-safe: newR186SyncFixture: fixture users call settings operations serially; their RoundTripper executes in that request goroutine and returns before f.calls/f.patches/f.lcu assertions"
   },
   {
     "file": "backend/r186_test.go",
     "line": 287,
     "target": "launches",
-    "source_sha256": "189db240b278c2cb92d24ddbf8c2b617391ce903ff756aebb3e5da28703f414b",
+    "source_sha256": "ea5b6f594061ac8e14fe1659b3c1d6bd57a6d53b4c3764f0ccca6de1abc3b224",
     "comment": "r276-capture-safe: TestR186MigrationPreflightStopsInstallerAndRejectsNestedTarget: the audited fixture operations in this test invoke this callback serially and return before launches is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
@@ -1382,7 +1382,7 @@
     "file": "backend/r195_test.go",
     "line": 26,
     "target": "conversions",
-    "source_sha256": "13e664d0ee24c48c87f764ae6c27425cce73f59025ee20e2c9029faa67ea060c",
+    "source_sha256": "a892344f2bf8079a6bb66dfd8c02f8d82d0e3a1f4cb703af99b1ee09466bca88",
     "comment": "r276-capture-safe: TestR195InstallationPathNormalization: the audited fixture operations in this test invoke this callback serially and return before conversions is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
@@ -1828,9 +1828,9 @@
   },
   {
     "file": "backend/r238_update_test.go",
-    "line": 144,
+    "line": 145,
     "target": "launches",
-    "source_sha256": "3a33303ffad8f3e225010cfd766aed9b734734145ed19293d60052c649a20a3f",
+    "source_sha256": "c20ad93a668b262d149975de74529d34e0993247b2a6a141fc6476cc35b083eb",
     "comment": "r276-capture-safe: TestR238DefaultOnline076To077: the audited fixture operations in this test invoke this callback serially and return before launches is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
@@ -2591,30 +2591,30 @@
   },
   {
     "file": "backend/update_test.go",
-    "line": 497,
+    "line": 499,
     "target": "requests",
-    "source_sha256": "ea0cc1ce42e37d1da8ab503f5a15ac3b6e5488cc5be2258c93815c148689f334",
+    "source_sha256": "39afbbd88daeed702ee0c4b1e5b891f0606de8c568d5cc9cb51b517e12bb2441",
     "comment": "r276-capture-safe: TestUpdateDownloadHashRetryAndCleanup: request state uses its mutex and controlled gate/done signals join updater completion before assertions"
   },
   {
     "file": "backend/update_test.go",
-    "line": 541,
+    "line": 543,
     "target": "requests",
-    "source_sha256": "ea0cc1ce42e37d1da8ab503f5a15ac3b6e5488cc5be2258c93815c148689f334",
+    "source_sha256": "39afbbd88daeed702ee0c4b1e5b891f0606de8c568d5cc9cb51b517e12bb2441",
     "comment": "r276-capture-safe: TestUpdateResumeReprobesEachMirrorAndHashesPrefix: request state uses its mutex and controlled gate/done signals join updater completion before assertions"
   },
   {
     "file": "backend/update_test.go",
-    "line": 639,
+    "line": 641,
     "target": "launched",
-    "source_sha256": "ea0cc1ce42e37d1da8ab503f5a15ac3b6e5488cc5be2258c93815c148689f334",
+    "source_sha256": "39afbbd88daeed702ee0c4b1e5b891f0606de8c568d5cc9cb51b517e12bb2441",
     "comment": "r276-capture-safe: TestUpdateApplyRehashPortableMinimumAndCommand: request state uses its mutex and controlled gate/done signals join updater completion before assertions"
   },
   {
     "file": "backend/update_test.go",
-    "line": 775,
+    "line": 777,
     "target": "expireHeader",
-    "source_sha256": "ea0cc1ce42e37d1da8ab503f5a15ac3b6e5488cc5be2258c93815c148689f334",
+    "source_sha256": "39afbbd88daeed702ee0c4b1e5b891f0606de8c568d5cc9cb51b517e12bb2441",
     "comment": "r276-capture-safe: TestUpdateProgressAndStalledSourceFallback: request state uses its mutex and controlled gate/done signals join updater completion before assertions"
   },
   {

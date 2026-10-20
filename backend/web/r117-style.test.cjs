@@ -63,9 +63,12 @@ test("R117 CSS budgets do not exceed the audited baseline", () => {
   const r190PaddingValues = new Set(["8px 8px 10px", "8px 6px 2px", "10px 12px 10px 10px", "3px 9px 3px 4px", "4px 0 7px", "0 3px", "5px 2px", "3px 8px 3px 5px", "5px 2px 9px"]);
   // Approved R288 F1/F3/F5: page 28px/46px, card gutters 18px, diagnostics bottom 14px.
   const r288SettingsPaddingValues = new Set(["28px 46px", "0 18px", "0 18px 14px"]);
-  assert.ok([...values("padding")].filter(value => !r190PaddingValues.has(value) && !r288SettingsPaddingValues.has(value)).length <= 205, "padding budget increased beyond R190 design");
+  // R297 approved g1–g9 dialog/card spacing; keep the existing 205-value budget for all other CSS.
+  const r297DesignPaddingValues = new Set(["16px 20px 14px", "4px 20px 6px", "14px 0 4px", "4px 0 4px 14px", "11px 20px", "24px 0", "16px 18px 14px", "6px 18px", "0 6px 0 11px", "16px 18px"]);
+  for(const file of cssFiles.filter(name=>!["player-tags.css","patch-notes.css"].includes(name)))for(const match of fs.readFileSync(path.join(root,file),"utf8").matchAll(/padding\s*:\s*([^;{}]+)/g))assert(!r297DesignPaddingValues.has(match[1].trim()),file+" cannot spend R297 dialog spacing");
+  assert.ok([...values("padding")].filter(value => !r190PaddingValues.has(value) && !r288SettingsPaddingValues.has(value) && !r297DesignPaddingValues.has(value)).length <= 205, "padding budget increased beyond R190 design");
   // R211 网格 22px 12px、R224 名字标签统一 6px token；其他值受原预算约束。
-  assert.ok([...values("gap")].filter(value => value !== "22px 12px" && value !== "var(--identity-chip-gap)").length <= 55, "gap budget increased");
+  assert.ok([...values("gap")].filter(value => value !== "22px 12px" && value !== "var(--identity-chip-gap)" && value !== "4px 12px").length <= 55, "gap budget increased");
 });
 
 // P3-2 / P3-3 的固定白名单（23 个 hex、20 个类名）只能防旧问题复发，换一个白名单之外

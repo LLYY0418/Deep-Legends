@@ -103,6 +103,10 @@ func (u *updateManager) download(background bool) error {
 			return err
 		}
 	}
+	if u.status.InstallTargetBlocked {
+		u.mu.Unlock()
+		return errors.New("安装位置无法确认，请下载完整安装包")
+	}
 	if !u.status.Supported {
 		u.mu.Unlock()
 		return errors.New("请从发布页下载完整安装包")
@@ -481,6 +485,10 @@ func (u *updateManager) apply(async bool, success func()) error {
 		return errors.New("当前构建不支持更新")
 	}
 	u.mu.Lock()
+	if u.status.InstallTargetBlocked {
+		u.mu.Unlock()
+		return errors.New("安装位置无法确认，请下载完整安装包")
+	}
 	if !u.status.Supported {
 		u.mu.Unlock()
 		return errors.New("当前构建不支持更新")

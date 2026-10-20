@@ -74,5 +74,7 @@ func liveGameplayReference(client *LCUClient, raw lcuLivePlayer) gameplayReferen
 	if strings.EqualFold(strings.TrimSpace(raw.NameVisibilityType), "HIDDEN") {
 		ref.GameName, ref.TagLine, ref.DisplayName = "", "", ""
 	}
+	ref.TagVisibilityKnown = true
+	ref.TagBlocked = strings.EqualFold(strings.TrimSpace(raw.NameVisibilityType), "HIDDEN") || (ref.GameName == "" && ref.DisplayName == "")
 	return ref
 }

@@ -99,6 +99,9 @@
     const measureScrollbar=()=>{const scroll=document.querySelector(".app-scroll");if(scroll)document.documentElement.style.setProperty("--settings-scrollbar",`${scroll.offsetWidth-scroll.clientWidth}px`);};
     measureScrollbar();window.addEventListener("resize",measureScrollbar);
     const dot=document.querySelector(".settings-new-dot"); if(dot)dot.hidden=preferenceStorage.getItem("lol-loot-settings-app-seen")==="true";
+    const markAppSeen=()=>{if(!get("settings-panel").hidden && !get("settings-app-panel").hidden){preferenceStorage.setItem("lol-loot-settings-app-seen","true");if(dot)dot.hidden=true;void preferenceStorage.flush?.();}};
+    const appPageObserver=new MutationObserver(markAppSeen);for(const node of [get("settings-panel"),get("settings-app-panel")])appPageObserver.observe(node,{attributes:true,attributeFilter:["hidden"]});
+    markAppSeen();window.addEventListener("deep-legends:dispose",()=>appPageObserver.disconnect(),{once:true});
     get("settings-github").addEventListener("click",event=>{
       event.preventDefault();
       if(window.desktopPreferences)void window.desktopPreferences.openGithub();

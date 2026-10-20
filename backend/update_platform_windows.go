@@ -46,7 +46,10 @@ func detectUpdateInstallation() (updateInstallDetection, error) {
 	if err != nil {
 		return updateInstallDetection{Result: "no_uninstaller"}, err
 	}
-	root := updateRootForExecutable(executable)
+	return detectUpdateInstallationAt(updateRootForExecutable(executable), os.Getenv("PORTABLE_EXECUTABLE_FILE") != "" || os.Getenv("PORTABLE_EXECUTABLE_DIR") != ""), nil
+}
+
+func detectUpdateInstallationAt(root string, portable bool) updateInstallDetection {
 	entries := []updateRegistryInstallation{}
 	for _, view := range []uint32{registry.WOW64_64KEY, registry.WOW64_32KEY} {
 		parent, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Uninstall`, registry.READ|view)
@@ -66,20 +69,28 @@ func detectUpdateInstallation() (updateInstallDetection, error) {
 		}
 		parent.Close()
 	}
-	return classifyUpdateInstallation(root, os.Getenv("PORTABLE_EXECUTABLE_FILE") != "" || os.Getenv("PORTABLE_EXECUTABLE_DIR") != "", regularFile(filepath.Join(root, "Uninstall Deep Legends.exe")), entries), nil
+	return classifyUpdateInstallation(root, portable, regularFile(filepath.Join(root, "Uninstall Deep Legends.exe")), entries)
 }
 func installedUpdateDirectory() (string, error) {
 	d, err := detectUpdateInstallation()
 	return d.directory, err
 }
 func launchUpdateInstaller(setup, destination string) error {
-	installed, err := installedUpdateDirectory()
-	if err == nil && installed == "" {
-		return launchPortableUpdateInstaller(setup, destination)
-	}
+	d, err := detectUpdateInstallation()
 	if err != nil {
 		return err
 	}
+	return launchDetectedUpdateInstaller(setup, destination, d)
+}
+
+func launchDetectedUpdateInstaller(setup, destination string, d updateInstallDetection) error {
+	if d.Result == "portable_env" {
+		return launchPortableUpdateInstaller(setup, destination)
+	}
+	if d.Result != "installed" || d.directory == "" {
+		return errors.New("安装位置无法确认，请下载完整安装包")
+	}
+	installed := d.directory
 	if !updateInstallationMatches(destination, "Deep Legends", installed, regularFile(filepath.Join(destination, "Uninstall Deep Legends.exe"))) {
 		return errors.New("安装位置已变化，请从发布页下载完整安装包")
 	}

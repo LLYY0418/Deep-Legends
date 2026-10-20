@@ -9,6 +9,8 @@ import (
 
 type updateRegistryInstallation struct{ DisplayName, Location string }
 type updateInstallDetection struct {
+	HasUninstaller       bool   `json:"has_uninstaller"`
+	PortableEnvironment  bool   `json:"portable_environment"`
 	Result               string `json:"result"`
 	RegistryDisplayFound bool   `json:"registry_display_found"`
 	LocationMatches      bool   `json:"location_matches"`
@@ -28,7 +30,7 @@ func classifyUpdateInstallation(root string, portable, uninstall bool, entries [
 }
 
 func classifyUpdateInstallationWith(root string, portable, uninstall bool, entries []updateRegistryInstallation, defaultDirectory string, normalize func(string) string) updateInstallDetection {
-	d := updateInstallDetection{Result: "registry_missing"}
+	d := updateInstallDetection{Result: "registry_missing", HasUninstaller: uninstall, PortableEnvironment: portable}
 	d.RootIsDefaultDir = updatePathsMatch(root, defaultDirectory, normalize)
 	for _, entry := range entries {
 		if entry.DisplayName != "Deep Legends" {
@@ -54,11 +56,9 @@ func classifyUpdateInstallationWith(root string, portable, uninstall bool, entri
 		d.Result = "portable_env"
 	case !uninstall:
 		d.Result = "no_uninstaller"
-	case d.MatchAfterNormalize || d.RootIsDefaultDir:
+	case uninstall:
 		d.Result = "installed"
 		d.directory = normalize(root)
-	case d.RegistryDisplayFound:
-		d.Result = "registry_location_mismatch"
 	}
 	return d
 }
@@ -72,6 +72,16 @@ func (d updateInstallDetection) diagnosticEvent() map[string]any {
 		"root_is_default_dir": d.RootIsDefaultDir, "location_is_default_dir": d.LocationIsDefaultDir,
 		"match_after_normalize": d.MatchAfterNormalize}
 }
+func (d updateInstallDetection) targetDiagnosticEvent() map[string]any {
+	branch := "blocked"
+	if d.Result == "installed" {
+		branch = "running-directory"
+	} else if d.Result == "portable_env" {
+		branch = "portable-environment"
+	}
+	return map[string]any{"event": "update_target_decision", "branch": branch, "has_uninstaller": d.HasUninstaller, "portable_environment": d.PortableEnvironment, "target_confirmed": d.Result == "installed" || d.Result == "portable_env"}
+}
+
 func portableUpdateEnvironment(env []string) []string {
 	out := make([]string, 0, len(env))
 	for _, value := range env {

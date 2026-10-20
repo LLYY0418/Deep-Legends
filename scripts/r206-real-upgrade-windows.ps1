@@ -570,6 +570,8 @@ try {
     }
     Remove-Item Env:R272_LEGACY_SCALE
 
+    . (Join-Path $PSScriptRoot 'r297-upgrade-targets.ps1')
+    Test-R297UpgradeTargets -Candidate $Setup -Published @(@{version='0.12.65';file=$old},@{version='0.12.68';file=$legacy},@{version='0.12.76';file=$published076})
     Assert-R279UpgradeStages
 } catch {
     # Capture before final cleanup, including foreign install paths/port owners.

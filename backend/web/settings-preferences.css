@@ -46,7 +46,7 @@ main.shell:has(> #settings-panel:not([hidden])) { padding: 28px 46px; }
 .settings-capability-summary { display: flex; align-items: center; gap: 10px; color: var(--primary-strong); font-weight:600; }
 .settings-capability-degraded { color: var(--warning); }
 .settings-tag-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; }
-.settings-tag-options label { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; font-size: 12px; }
+.settings-tag-options label { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; font-size: 13px; font-weight: 600; }
 .settings-tag-options input { accent-color: var(--primary); }
 .settings-modal { width: min(720px,calc(100vw - 40px)); max-height: 80vh; padding: 24px; overflow: auto; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
 .settings-modal header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
@@ -104,7 +104,7 @@ main.shell:has(> #settings-panel:not([hidden])) { padding-right: calc(46px - var
 .settings-diagnostics .panel-heading p { max-width:none; line-height:14px; }
 .settings-diagnostics .diagnostic-export-note { line-height:15px; }
 .settings-tag-options { padding-top:2px; padding-bottom:14px; }
-.settings-tag-options label { height:30px; padding:0 10px; }
+.settings-tag-options label { height:32px; padding:0 10px; }
 @media(max-width:1000px) { .settings-diagnostics .panel-heading { padding-right:0; } }
 .settings-panel .toggle-control { gap:8px; font-size:13px; }
 .settings-panel .toggle-control input { width:36px; height:20px; }
@@ -119,3 +119,5 @@ main.shell:has(> #settings-panel:not([hidden])) { padding-right: calc(46px - var
 .settings-fact::before { margin-right:4px; font-weight:700; }
 
 .setting-card.is-disabled { opacity: .5; }
+
+.settings-panel :is(.setting-actions .text-button, .app-select-trigger, .toggle-control, input[type="text"], input[type="number"], select, textarea) { font-size:13px; font-weight:600; }

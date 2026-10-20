@@ -30,7 +30,7 @@ function harness() {
     }),
     recordLiveRefresh: noop, updateBeacon: phase => { state.beacon.phase = phase; }, markOverviewAfterGame: noop, scheduleBeaconPoll: noop,
     resetLivePositionOverrides: noop, resetRecommendationTabsOnChampionChange: noop, renderCapabilitySettings: noop,
-    liveRecommendationsFor: () => null, ensureLiveRecommendations: noop, ensureSpecialistRunes: noop, ensureProRunes: noop, ensureLaneMatchupCandidates: noop,
+    liveRecommendationsFor: () => null, ensureFastClientRecommendation: noop, ensureLiveRecommendations: noop, ensureSpecialistRunes: noop, ensureProRunes: noop, ensureLaneMatchupCandidates: noop,
     liveAugmentRecommendationSource: () => "", escapeHTML: String,
     renderSessionSummary: data => { nodes.liveSessionSummary.textContent = data ? `game-${data.gameId}` : ""; },
     renderRecommendationArea: data => `<article>recommendation-${data.gameId || "empty"}</article>`,
@@ -45,7 +45,7 @@ function harness() {
   const names = ["retainArenaBravery", "updateLiveLoadingVisibility", "loadLive", "liveRecommendationMarkup", "renderLive", "preserveLiveImages", "stampLiveRows", "handleGameplayPhase", "queueLiveEventRefresh", "shouldResetLiveGameScopedState", "resetLiveGameScopedState", "clearRuneStarterRetries", "softResetGameplayState", "syncLiveRetryBudget", "liveSnapshotComplete", "liveClientPositionsPending", "liveAutoRefreshStopped", "renderLiveRefreshStatus", "scheduleLiveRefresh", "normalizeLiveInterval", "liveRefreshDelayMs", "liveRenderTriggerLabel"];
   for (const name of ["liveGamePhase", "invalidateLiveForNewGame", "resetDisconnectedLive", "normalizeLiveGameId", "liveGameIdComparison", "recordLiveObservation", "liveSnapshotBehindPhase"]) if (source.includes(`function ${name}(`)) names.push(name);
   Object.assign(context,require("./r211-harness-support.cjs").environment(context));
-  names.push("readSetting");
+  names.push("readSetting", "mergeChampSelectFields");
   vm.runInNewContext(names.map(extract).join("\n") + "\n" + extract("pollGameflowPhase"), context);
   context.beaconPollDelay = () => 12000;
   const render = context.renderLive;

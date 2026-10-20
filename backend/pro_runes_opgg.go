@@ -232,6 +232,20 @@ func (p *proRuneProvider) opggRecommend(ctx context.Context, championID int, pos
 		response.Reason = "cache-write-failed"
 	}
 	response.Pros, response.TotalGames, response.Failed = proOPGGRecommendations(cached.Rows, championID, position, meta.NameZH, now, cached.ReadAt, response.Stale)
+	for i := range response.Pros {
+		if id := response.Pros[i].OpponentChampionID; id > 0 {
+			p.provider.mu.Lock()
+			_, known := p.provider.championMeta[int(id)]
+			p.provider.mu.Unlock()
+			// The champion catalog is already loaded for the selected champion.
+			// Missing fixture/old-cache metadata must not introduce another network read.
+			if known {
+				if opponent, err := p.provider.championMetadataByID(ctx, int(id)); err == nil {
+					response.Pros[i].OpponentChampionName = opponent.NameZH
+				}
+			}
+		}
+	}
 	if response.Failed > 0 {
 		response.Stale = true
 		if response.Reason == "" {
@@ -344,6 +358,7 @@ func proOPGGRecommendations(rows []proOPGGBuild, championID int, position, name 
 		if r.OpponentGamePlayer != nil {
 			o := r.OpponentGamePlayer
 			config.OpponentChampionID, _ = strconv.ParseInt(o.ChampionID, 10, 64)
+			config.OpponentChampionName = bundledChampionNames()[config.OpponentChampionID]
 			config.OpponentPlayerName = strings.TrimSpace(o.Team.Acronym + " " + o.Player.NickName)
 		}
 		order := []string{}

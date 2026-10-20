@@ -24,7 +24,7 @@ function harness() {
   const state = {section:'live', liveLoading:true, liveProgressRequestId:'current', liveExpectedGameId:213,
     liveLoadSource:'interval', liveAwaitingGame:false, beacon:{phase:'ChampSelect'}, recommendationTab:'insight'};
   const diagnostics = [], jobs = new Map(); let id = 0, f;
-  const dependencies = {state, nodes, document, window:{reportFlowDiagnostic:(event, reason, fields)=>diagnostics.push({event,reason,...fields})},
+  const dependencies = {ensureFastClientRecommendation:()=>{},ensureLiveRecommendations:()=>{},ensureProRunes:()=>{},ensureSpecialistRunes:()=>{},state, nodes, document, window:{reportFlowDiagnostic:(event, reason, fields)=>diagnostics.push({event,reason,...fields})},
     connected:()=>true, liveSnapshotBehindPhase:d=>d.phase!==state.beacon.phase,
     setTimeout:(fn, delay)=>{jobs.set(++id,{fn,delay});return id;}, clearTimeout:key=>jobs.delete(key), escapeHTML,
     renderLiveRefreshStatus:()=>'', renderSessionSummary:()=>{}, bindLiveContent:()=>{}, applyRenderedMetricStyles:()=>{}, prepareImages:()=>{},

@@ -23,11 +23,15 @@ function harness(script = source, respond) {
     close(){}
     emit(name,data){this.listeners.get(name)?.({data:JSON.stringify(data)});}
   };
+  let ready;
   try {
     w.eval(fs.readFileSync(path.join(__dirname, "runtime.js"), "utf8"));
-    w.eval(script.replace(/\}\)\(\);\s*$/, 'window.updateProbe = { renderUpdateStatus, renderUpdateNotes, updateUI, renderUpdateDialog, showUpdateCheckFeedback };})();'));
+    ready=Promise.resolve(w.eval(script.replace(/\}\)\(\);\s*$/, 'window.updateProbe = { renderUpdateStatus, renderUpdateNotes, updateUI, renderUpdateDialog, showUpdateCheckFeedback };})();')));
+    // Bootstrap mutations reject asynchronously after the preference-ready change.
+    // Expose the exact rejection for the mutant test, and keep it handled on teardown.
+    ready.catch(()=>{});
   } catch(error) {dom.window.close();throw error;}
-  return { w, dom, requests, streams, probe:w.updateProbe, get:id=>w.document.getElementById(id), close:()=>w.close() };
+  return { w, dom, requests, streams, ready, probe:w.updateProbe, get:id=>w.document.getElementById(id), close:()=>w.close() };
 }
 function renderScenarios(h) {
   for (const state of ["available", "downloading", "verifying", "ready", "failed", "applying"]) h.probe.renderUpdateStatus({ ...available, state, error:state==="failed"?"最后线路超时":"",progress:{receivedBytes:42,totalBytes:100,bytesPerSecond:10,etaSeconds:6} });

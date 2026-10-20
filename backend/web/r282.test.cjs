@@ -70,7 +70,7 @@ test('R282 P16 Arena bravery survives transition until real champions arrive',()
 });
 
 test('R282 P17 collection tracks and skeletons do not depend on card count',()=>{
- const css=fs.readFileSync(process.env.R282_APP_CSS_SOURCE||__dirname+'/app.css','utf8');
+ const css=fs.readFileSync(process.env.R282_APP_CSS_SOURCE||__dirname+'/app.css','utf8')+fs.readFileSync(__dirname+'/collection.css','utf8');
  for(const selector of ['skin-grid','champion-skins','chroma-prestige-grid','loot-card-grid','reward-grid'])assert.match(css,new RegExp('\\.'+selector+' \\{[^}]*repeat\\(auto-fill'));
  const skeleton=compile(app,['renderCollectionSkeleton'],{state:{view:'chromas',qualitySelections:new Set(),sort:'name'}}).renderCollectionSkeleton();
  for(const cls of ['chroma-prestige-grid','chroma-stack-cards','chroma-mini-card'])assert(skeleton.includes(cls));

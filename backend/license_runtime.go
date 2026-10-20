@@ -32,7 +32,7 @@ func licensePublicRoute(r *http.Request) bool {
 		return true
 	}
 	switch r.Method + " " + r.URL.Path {
-	case "GET /api/license/status", "POST /api/license/activate", "GET /api/system-proxy", "POST /api/system-proxy", "GET /api/privacy", "GET /api/diagnostics/log", "POST /api/diagnostics/client", "POST /api/diagnostics/startup", "POST /api/diagnostics/startup-stage", "POST /api/quit":
+	case "GET /api/ui-preferences", "POST /api/ui-preferences", "GET /api/license/status", "POST /api/license/activate", "GET /api/system-proxy", "POST /api/system-proxy", "GET /api/privacy", "GET /api/diagnostics/log", "POST /api/diagnostics/client", "POST /api/diagnostics/startup", "POST /api/diagnostics/startup-stage", "POST /api/quit":
 		return true
 	}
 	return licenseUpdateRoute(r)

@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const appSource = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
-const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
+const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8")+fs.readFileSync(path.join(__dirname, "collection.css"), "utf8");
 
 function extract(name) {
   const start = appSource.indexOf(`function ${name}(`);

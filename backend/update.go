@@ -128,19 +128,20 @@ type updateProgress struct {
 	SelectingSource bool    `json:"selectingSource,omitempty"`
 }
 type updateStatus struct {
-	Supported   bool           `json:"supported"`
-	Checking    bool           `json:"checking"`
-	Current     string         `json:"current"`
-	Latest      string         `json:"latest"`
-	Notes       string         `json:"notes"`
-	SizeBytes   int64          `json:"sizeBytes"`
-	PublishedAt time.Time      `json:"publishedAt"`
-	State       string         `json:"state"`
-	Progress    updateProgress `json:"progress"`
-	Error       string         `json:"error"`
-	Portable    bool           `json:"portable"`
-	ManualOnly  bool           `json:"manualOnly"`
-	ReleaseURL  string         `json:"releaseUrl"`
+	Supported            bool           `json:"supported"`
+	Checking             bool           `json:"checking"`
+	Current              string         `json:"current"`
+	Latest               string         `json:"latest"`
+	Notes                string         `json:"notes"`
+	SizeBytes            int64          `json:"sizeBytes"`
+	PublishedAt          time.Time      `json:"publishedAt"`
+	State                string         `json:"state"`
+	Progress             updateProgress `json:"progress"`
+	Error                string         `json:"error"`
+	Portable             bool           `json:"portable"`
+	InstallTargetBlocked bool           `json:"installTargetBlocked,omitempty"`
+	ManualOnly           bool           `json:"manualOnly"`
+	ReleaseURL           string         `json:"releaseUrl"`
 }
 type updateCache struct {
 	CheckedAt time.Time      `json:"checkedAt"`
@@ -257,7 +258,8 @@ func newUpdateManagerWithTrust(current string, store *localStore, notify func(st
 	u.directory = filepath.Join(store.root, "updates")
 	u.installDetection, _ = detectUpdateInstallation()
 	u.installDir = u.installDetection.directory
-	u.status.Portable = u.installDir == ""
+	u.status.Portable = u.installDetection.Result == "portable_env"
+	u.status.InstallTargetBlocked = u.installDetection.Result == "no_uninstaller"
 	u.migrate = u.preparePortableData
 	u.portableDirectory = defaultPortableInstallDirectory
 	if data, err := readLocalStoreFile(store, "update-settings.json"); err == nil && len(data) < 16384 {
@@ -305,6 +307,7 @@ func (u *updateManager) Start() {
 	if u.diagnostic != nil {
 		d := u.installDetection
 		u.diagnostic(d.diagnosticEvent())
+		u.diagnostic(d.targetDiagnosticEvent())
 	}
 	goSafe("update.Start.1", func() {
 		u.Check(false)
@@ -506,7 +509,7 @@ func (u *updateManager) Check(force bool) bool {
 			_ = writeLocalStoreFile(u.store, "update-manifest.json", data)
 		}
 		resultState := u.status.State
-		predownload := u.autoPredownload && !u.autoDownloadDisabled && resultState == "available" && !u.status.ManualOnly
+		predownload := u.autoPredownload && !u.autoDownloadDisabled && resultState == "available" && !u.status.ManualOnly && !u.status.InstallTargetBlocked
 		u.mu.Unlock()
 		if err == nil && u.ctx.Err() == nil {
 			u.recordUpdateCheck(map[string]any{

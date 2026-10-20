@@ -49,6 +49,8 @@ type app struct {
 	collectionSkinEventPending bool
 
 	githubStars       githubStarsCache
+	patchNotesOnce    sync.Once
+	patchNotes        *patchNotesCache
 	announcementsOnce sync.Once
 	announcements     *announcementCache
 
@@ -56,6 +58,7 @@ type app struct {
 	collectionDataRetry             *time.Timer
 	collectionDataRetryCount        int
 	collectionDataRetryClient       *LCUClient
+	champLite                       champSelectLiteState
 	liveSnapshots                   liveSnapshotCache
 	liveClientAllGameData           func(context.Context) ([]byte, int, error)
 	liveClientAllGameDataMu         sync.Mutex
@@ -651,6 +654,7 @@ func main() {
 	mux.HandleFunc("GET /api/status", a.authorized(a.handleStatus))
 	mux.HandleFunc("POST /api/gameplay/history-head", a.authorized(a.handleGameplayHistoryHead))
 	mux.HandleFunc("GET /api/github/stars", a.authorized(a.handleGithubStars))
+	mux.HandleFunc("GET /api/patch-notes", a.authorized(a.handlePatchNotes))
 	mux.HandleFunc("GET /api/announcements", a.authorized(a.handleAnnouncements))
 	mux.HandleFunc("GET /api/announcements/image", a.authorized(a.handleAnnouncementImage))
 	mux.HandleFunc("GET /api/events", a.authorized(a.handleEvents))
@@ -665,6 +669,12 @@ func main() {
 	mux.HandleFunc("POST /api/client-launch-overview-ready", a.authorized(a.handleClientLaunchOverviewReady))
 	mux.HandleFunc("GET /api/gameplay/masteries", a.authorized(a.handleGameplayMasteries))
 	mux.HandleFunc("GET /api/gameplay/champion-table", a.authorized(a.handleGameplayChampionTable))
+	mux.HandleFunc("GET /api/gameplay/client-recommendation", a.authorized(a.handleClientRecommendation))
+	mux.HandleFunc("POST /api/gameplay/champselect-latency", a.authorized(a.handleChampSelectLatency))
+	mux.HandleFunc("GET /api/player-tags", a.authorized(a.handlePlayerTags))
+	mux.HandleFunc("POST /api/player-tags", a.authorized(a.handlePlayerTags))
+	mux.HandleFunc("GET /api/ui-preferences", a.authorized(a.handleUIPreferences))
+	mux.HandleFunc("POST /api/ui-preferences", a.authorized(a.handleUIPreferences))
 	mux.HandleFunc("GET /api/gameplay/live", a.authorized(a.handleGameplayLive))
 	mux.HandleFunc("GET /api/gameplay/live/match", a.authorized(a.handleGameplayLiveMatch))
 	mux.HandleFunc("GET /api/gameplay/mayhem-rating", a.authorized(a.handleGameplayMayhemRating))
@@ -780,6 +790,9 @@ func main() {
 		closeDiagnosticStore(store)
 		log.Fatal("本地界面只能监听回环地址")
 	}
+	_, requestedPort, _ := net.SplitHostPort(*listenAddress)
+	actualPort := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+	a.recordDiagnostic(map[string]any{"event": "ui_listen_fallback", "fallback": *listenFallback && requestedPort != "0" && requestedPort != actualPort})
 	baseAddress := "http://" + listener.Addr().String()
 	address := baseAddress + "/?bootstrap=" + url.QueryEscape(token)
 	if *desktopMode {
@@ -795,6 +808,7 @@ func main() {
 	a.runtimeMetricsDone = make(chan struct{})
 	a.goSafe("backend_runtime_metrics", func() { defer close(a.runtimeMetricsDone); a.runBackendRuntimeMetrics(runtimeContext, nil, nil) })
 	a.startApplicationBusiness(runtimeContext)
+	a.startPatchNotes(runtimeContext)
 	a.goSafe("client-autostart-startup", a.scanClientAutostart)
 	a.updates.Start()
 	if !*noBrowser && !*desktopMode {
@@ -827,6 +841,13 @@ func (a *app) localUIHandler(listener net.Listener, mux http.Handler) http.Handl
 
 func listenLocalUI(address string, fallback bool) (net.Listener, error) {
 	listener, err := net.Listen("tcp", address)
+	if err != nil && fallback {
+		deadline := time.Now().Add(3 * time.Second)
+		for err != nil && time.Now().Before(deadline) {
+			time.Sleep(200 * time.Millisecond)
+			listener, err = net.Listen("tcp", address)
+		}
+	}
 	if err != nil && fallback {
 		// The desktop shell asks for a fixed port so the page origin, and with
 		// it localStorage and the renderer code cache, survives restarts. A busy

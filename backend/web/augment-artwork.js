@@ -69,4 +69,6 @@
     } catch (_) { /* Keep original artwork if canvas access/decoding is unavailable. */ }
   }
   window.deepLegendsAugmentArtwork = { prepare, isNeutralGlyph, tintPixels };
+  document.querySelectorAll(".augment-icon img,.arena-augment-icon img").forEach(prepare);
+  window.deepLegendsSections?.register("augment-artwork", () => {});
 })();

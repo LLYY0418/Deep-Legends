@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix='r278-mutants-') as d:
  mutate('P10-data-only-render-suppression-restored','backend/web/app.js',"return state.renderedSignature===signature && Boolean(el.grid?.querySelector('[data-collection-id]')) && !el.grid.querySelector('.skeleton,.loading,.empty-state');","return state.items.length>0;",'R278_APP_SOURCE')
  mutate('P11-empty-name-inline-feedback-lost','backend/web/history-filters.js',"if(!name){if(input){input.setAttribute('aria-invalid','true');","if(!name){if(input){input.removeAttribute('aria-invalid');",'R278_FILTER_MODULE')
  mutate('P12-public-entry-missing','backend/web/default/index.html','id="announcements-button"','id="announcement-missing"','R278_DEFAULT_HTML')
- mutate('P12-dismiss-marks-read','backend/web/announcements.js','dismiss(){},','dismiss(n){read.push(id(n));},','R278_ANNOUNCEMENTS_MODULE')
+ mutate('P12-dismiss-marks-read','backend/web/announcements.js','dismiss(n){if(!dismissed.includes(id(n)))dismissed.push(id(n));save(dismissedKey,dismissed);},','dismiss(n){read.push(id(n));save(key,read);},','R278_ANNOUNCEMENTS_MODULE')
  mutate('P12-game-phase-gate-lost','backend/web/announcements.js',"if(phase==='unknown' || active.has(phase))return;","if(phase==='unknown')return;",'R278_ANNOUNCEMENTS_MODULE')
  mutate('P13-long-probe-restored','backend/update_sources.go','updateProbeTimeout = 2 * time.Second','updateProbeTimeout = 6 * time.Second',test='TestR278P13ProbeBudget')
  mutate('P13-auto-predownload-disabled','backend/update.go','predownload := u.autoPredownload && !u.autoDownloadDisabled && resultState == "available" && !u.status.ManualOnly','predownload := false',test='TestR278P13AutomaticPredownloadAndForegroundTakeover')

@@ -306,6 +306,8 @@ type gameplayPlayer struct {
 // keeps enough identity hints to continue loading match data when the client
 // hides a player's visible name or exposes an obfuscated champ-select ID.
 type gameplayReference struct {
+	TagVisibilityKnown  bool // only fresh live identity may clear hidden status
+	TagBlocked          bool // hidden or unresolved live identity: never expose personal tags
 	ClientIdentity      bool // PUUID came from LCU, not the public Riot API
 	OPGGIdentity        bool // resolve by Riot ID before sending to our Riot API project
 	PlayerRef           string
@@ -3034,6 +3036,10 @@ func safeDiagnosticReason(err error) string {
 }
 
 func mergeGameplayReferences(preferred, fallback gameplayReference) gameplayReference {
+	if !preferred.TagVisibilityKnown {
+		preferred.TagBlocked = preferred.TagBlocked || fallback.TagBlocked
+		preferred.TagVisibilityKnown = fallback.TagVisibilityKnown
+	}
 	preferred.ClientIdentity = preferred.ClientIdentity || fallback.ClientIdentity
 	preferred = normalizeGameplayReference(preferred)
 	fallback = normalizeGameplayReference(fallback)
@@ -4617,6 +4623,7 @@ func matchSubject(match gameplayMatch, playerRef string) (gameplayParticipant, b
 }
 
 type gameplayLiveResponse struct {
+	champSelectObservedAt    time.Time
 	HistoryServiceDown       bool                      `json:"historyServiceDown"`
 	Phase                    string                    `json:"phase"`
 	Available                bool                      `json:"available"`
@@ -7482,6 +7489,7 @@ func recommendationStats(pickRate, winRate float64, games int) gameplayRecommend
 }
 
 type gameplayLivePlayer struct {
+	CellID *int64 `json:"cellId,omitempty"`
 	gameplayPlayer
 	IdentityUnresolved   bool   `json:"identityUnresolved,omitempty"`
 	TeamID               int64  `json:"teamId"`
@@ -7936,6 +7944,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			champSelectErr = json.Unmarshal(champSelectRaw, &champSelect)
 		}
 		if champSelectErr == nil {
+			response.champSelectObservedAt = time.Now()
 			a.recordChampSelectAutofillShape(champSelect.GameID, champSelect)
 			localPlayerCellID = champSelect.LocalPlayerCellID
 			beforeMerge := len(rawPlayers)
@@ -8123,7 +8132,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		summoner := summonerFromGameplayReference(ref)
 		hidden, unresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
 		self := gameplayLivePlayerIsCurrent(ref, current.PUUID, raw.player.CellID, localPlayerCellID)
-		progress.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: a.registerGameplayReferenceDetails(ref), DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, Hidden: hidden, IsCurrent: self, Region: ref.Region}, TeamID: raw.team, IsAlly: self || arenaMode && phase == "ChampSelect", IdentityUnresolved: unresolved, ChampionID: raw.player.ChampionID, Bravery: arenaMode && phase == "ChampSelect" && (self || raw.team == 100) && (raw.player.ChampionID == -3 || raw.player.ChampionPickIntent == -3 || raw.player.Bravery), ChampionPickPending: raw.player.ChampionPickPending, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionLocked: raw.player.ChampionLocked, ChampionName: championName(names, raw.player.ChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), HistoryState: "pending"}
+		progress.Players[index] = gameplayLivePlayer{CellID: raw.player.CellID, gameplayPlayer: gameplayPlayer{PlayerRef: a.registerGameplayReferenceDetails(ref), DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, Hidden: hidden, IsCurrent: self, Region: ref.Region}, TeamID: raw.team, IsAlly: self || arenaMode && phase == "ChampSelect", IdentityUnresolved: unresolved, ChampionID: raw.player.ChampionID, Bravery: arenaMode && phase == "ChampSelect" && (self || raw.team == 100) && (raw.player.ChampionID == -3 || raw.player.ChampionPickIntent == -3 || raw.player.Bravery), ChampionPickPending: raw.player.ChampionPickPending, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionLocked: raw.player.ChampionLocked, ChampionName: championName(names, raw.player.ChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), HistoryState: "pending"}
 	}
 	var progressMu sync.Mutex
 	publishLiveProgress(ctx, progress)
@@ -8265,7 +8274,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 				rankedRecord = recentRankedRecord(recentGames)
 			}
 			hidden, identityUnresolved := livePlayerIdentityFlags(visibility, summoner.GameName, summoner.DisplayName)
-			response.Players[index] = gameplayLivePlayer{gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(summoner.Privacy), "PRIVATE"), Autofill: raw.player.IsAutofilled, IsCurrent: isCurrent, reference: reference}, IdentityUnresolved: identityUnresolved, TeamID: raw.team, IsAlly: isAlly, Bravery: arenaMode && phase == "ChampSelect" && (isCurrent || isAlly) && (raw.player.ChampionID == -3 || raw.player.ChampionPickIntent == -3 || raw.player.Bravery), ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
+			response.Players[index] = gameplayLivePlayer{CellID: raw.player.CellID, gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(summoner.Privacy), "PRIVATE"), Autofill: raw.player.IsAutofilled, IsCurrent: isCurrent, reference: reference}, IdentityUnresolved: identityUnresolved, TeamID: raw.team, IsAlly: isAlly, Bravery: arenaMode && phase == "ChampSelect" && (isCurrent || isAlly) && (raw.player.ChampionID == -3 || raw.player.ChampionPickIntent == -3 || raw.player.Bravery), ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
 			response.Players[index].SoloRank, response.Players[index].FlexRank = soloRank, flexRank
 			if arenaMode {
 				response.Players[index].ArenaFame = arenaFame
@@ -8496,6 +8505,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		"event": "live_load_cost", "players": len(response.Players), "concurrency": concurrency,
 		"ranks_ms": ranksMS, "matches_ms": matchesMS, "total_ms": time.Since(liveLoadStarted).Milliseconds(),
 	})
+	a.rememberTaggedLivePlayers(response)
 	return response
 }
 
@@ -9179,6 +9189,10 @@ type lcuRecommendedPage struct {
 }
 
 func loadClientRecommendation(client *LCUClient, championID int64, position string, mapID int64) (*gameplayRecommendation, error) {
+	return loadClientRecommendationContext(context.Background(), client, championID, position, mapID)
+}
+
+func loadClientRecommendationContext(ctx context.Context, client *LCUClient, championID int64, position string, mapID int64) (*gameplayRecommendation, error) {
 	if championID <= 0 {
 		return nil, errors.New("尚未选定英雄")
 	}
@@ -9191,7 +9205,7 @@ func loadClientRecommendation(client *LCUClient, championID int64, position stri
 	}
 	path := fmt.Sprintf("/lol-perks/v1/recommended-pages/champion/%d/position/%s/map/%d", championID, url.PathEscape(position), mapID)
 	var pages []lcuRecommendedPage
-	if err := client.GetJSON(path, &pages); err != nil {
+	if err := client.GetJSONContext(ctx, path, &pages); err != nil {
 		return nil, err
 	}
 	if len(pages) == 0 {

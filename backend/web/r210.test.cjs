@@ -75,7 +75,7 @@ function liveHarness() {
     setTimeout:(fn,delay)=>{jobs.set(++serial,{fn,delay});return serial},clearTimeout:id=>jobs.delete(id),
     recordLiveRefresh:noop,updateBeacon:phase=>state.beacon.phase=phase,markOverviewAfterGame:noop,scheduleBeaconPoll:noop,
     resetRecommendationTabsOnChampionChange:noop,renderCapabilitySettings:noop,clearRuneStarterRetries:noop,
-    liveRecommendationsFor:()=>null,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,ensureLaneMatchupCandidates:noop,
+    liveRecommendationsFor:()=>null,ensureFastClientRecommendation:noop,ensureLiveRecommendations:noop,ensureSpecialistRunes:noop,ensureProRunes:noop,ensureLaneMatchupCandidates:noop,
     liveRecommendationTarget:()=>null,liveAugmentRecommendationSource:()=>'',recommendationCapabilities:()=>({hasRunes:false,hasAugments:false}),
     recommendationTabSpecs:()=>[['insight','详情'],['build','出装']],recommendationActiveTab:()=> 'insight',recommendationPanelBusy:()=>false,
     renderLiveInsights:data=>`<div data-live-body>${(data.players||[]).map((p,i)=>f.renderLivePlayer(p,i)).join('')}</div>`,

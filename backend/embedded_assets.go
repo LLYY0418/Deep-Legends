@@ -18,6 +18,7 @@ import (
 //go:embed web/app.js web/augment-artwork.js web/cache-controls.js web/champions.js web/demo-data.js
 //go:embed web/favorites-facade.js web/friends.js web/gameplay.js web/history-filters.js web/history-recovery.js web/image-queue.js web/live-arena.js web/match-details.js
 //go:embed web/overview-art.js web/overview-casual.js web/pro-players.js web/runtime.js web/section-loader.js web/suite.js
+//go:embed web/player-tags.js web/ui-preferences.js web/patch-notes.js
 //go:embed web/privacy.js web/settings-preferences.js
 //go:embed web/*.css web/*.png web/*.svg
 //go:embed web/arena-team-icons/*.svg web/position-icons/*.svg web/tier-icons/*.svg

@@ -63,7 +63,7 @@ test("品质与数量排序默认从高到低", () => {
 });
 
 test("普通炫彩始终平铺且不再提示悬停展开", () => {
-  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8")+fs.readFileSync(path.join(__dirname, "collection.css"), "utf8");
   assert.doesNotMatch(source, /悬停展开|滚轮横移/);
   assert.doesNotMatch(css, /--chroma-stack-offset|--chroma-depth-y|--chroma-tilt/);
   assert.match(css, /\.chroma-stack-cards[^}]*scroll-snap-type:\s*x proximity/);
@@ -71,7 +71,7 @@ test("普通炫彩始终平铺且不再提示悬停展开", () => {
 
 test("炫彩横栏保留页面纵向滚动，仅在 Shift 滚轮时横移", () => {
   const navigation = functionSource("enableHorizontalNavigation");
-  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8")+fs.readFileSync(path.join(__dirname, "collection.css"), "utf8");
   assert.match(navigation, /!event\.shiftKey/);
   assert.match(navigation, /previousButton\.disabled/);
   assert.match(navigation, /nextButton\.disabled/);
@@ -108,7 +108,7 @@ test("卡片等待图片时显示加载中，失败后才显示暂无预览", ()
 });
 
 test("详情与炫彩导航共用全局图标尺寸令牌", () => {
-  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8")+fs.readFileSync(path.join(__dirname, "collection.css"), "utf8");
   const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   assert.match(css, /--control-icon-size:\s*24px/);
   assert.match(css, /\.control-icon[^}]*width:\s*var\(--control-icon-size\)/);
@@ -124,7 +124,7 @@ test("奖池不再使用三合一优先层级并在切换拥有状态时重置�
 });
 
 test("主滚动区域从顶部栏下方开始且不显示滚动条箭头", () => {
-  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8")+fs.readFileSync(path.join(__dirname, "collection.css"), "utf8");
   const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   assert.match(html, /<header class="topbar">[\s\S]*?<div id="app-scroll" class="app-scroll">[\s\S]*?<main class="shell">/);
   assert.match(css, /\.app-main[^}]*overflow:\s*hidden/);
@@ -152,7 +152,7 @@ test("皮肤详情只在英雄分组时按英雄切换，其余视图按当前�
 });
 
 test("最小窗口使用应用内排序菜单并在工具栏内换行", () => {
-  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8")+fs.readFileSync(path.join(__dirname, "collection.css"), "utf8");
   const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   assert.match(html, /id="sort-menu" class="select-menu-popover"/);
   assert.match(css, /\.select-menu-popover[^}]*right:\s*0/);
@@ -161,7 +161,7 @@ test("最小窗口使用应用内排序菜单并在工具栏内换行", () => {
 
 test("炫彩显隐不再扫描整棵 DOM 或触发布局测量", () => {
   const visibility = functionSource("applyChromaVisibility");
-  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "app.css"), "utf8")+fs.readFileSync(path.join(__dirname, "collection.css"), "utf8");
   assert.doesNotMatch(visibility, /querySelectorAll|dispatchEvent|scrollWidth|clientWidth/);
   assert.match(visibility, /classList\.toggle\("hide-unowned"/);
   assert.match(visibility, /classList\.toggle\("hide-prestige"/);

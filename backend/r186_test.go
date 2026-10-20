@@ -25,8 +25,8 @@ func TestR186InstallDetectionFiveReasons(t *testing.T) {
 		{false, true, []updateRegistryInstallation{{"Deep Legends", root}}, "installed", true, true},
 		{true, true, []updateRegistryInstallation{{"Deep Legends", root}}, "portable_env", true, true},
 		{false, false, nil, "no_uninstaller", false, false},
-		{false, true, []updateRegistryInstallation{{"Other", root}}, "registry_missing", false, false},
-		{false, true, []updateRegistryInstallation{{"Deep Legends", root + "-old"}}, "registry_location_mismatch", true, false},
+		{false, true, []updateRegistryInstallation{{"Other", root}}, "installed", false, false},
+		{false, true, []updateRegistryInstallation{{"Deep Legends", root + "-old"}}, "installed", true, false},
 	} {
 		d := classifyUpdateInstallation(root, tc.portable, tc.uninstall, tc.entries)
 		if d.Result != tc.result || d.RegistryDisplayFound != tc.found || d.LocationMatches != tc.matches {

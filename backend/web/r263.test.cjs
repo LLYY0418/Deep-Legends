@@ -294,7 +294,7 @@ test('R263 P4 failures stay inside the dialog with a retry button', async () => 
 
 test('R263 P4 wiring: lazy module loads with the live section, re-renders once, and chip clicks are delegated', async () => {
   const loader = fs.readFileSync(path.join(__dirname, 'section-loader.js'), 'utf8');
-  assert.match(loader, /const modules = \{[^}]*\blive: \["live-arena"\]/);
+  assert.match(loader, /const modules = \{[^}]*\blive: \[[^\]]*"live-arena"[^\]]*\]/);
   assert.match(loader, /const styles = \{[^}]*"live-arena": \["live-arena"\]/);
   const index = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   assert.doesNotMatch(index, /live-arena/, 'not part of the initial bundle');

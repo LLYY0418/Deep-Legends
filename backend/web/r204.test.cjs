@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
 const {compile:compileSource,extract}=require('./r188-harness.cjs');
 // The shared lightweight extractor does not parse comment apostrophes.
-const compile=(source,names,deps)=>compileSource(source.replace(/^[ \t]*\/\/.*$/gm,''),names,{recordLiveProgressApply:()=>{},...deps});
+const compile=(source,names,deps)=>compileSource(source.replace(/^[ \t]*\/\/.*$/gm,''),names,{recordLiveProgressApply:()=>{},ensureFastClientRecommendation:()=>{},ensureLiveRecommendations:()=>{},ensureProRunes:()=>{},ensureSpecialistRunes:()=>{},...deps});
 const app=fs.readFileSync(path.join(__dirname,'app.js'),'utf8'),gameplay=fs.readFileSync(path.join(__dirname,'gameplay.js'),'utf8'),html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
 test('R204 Key input is masked and save/clear immediately update status without echo',async()=>{
  const dom=new JSDOM(html);const doc=dom.window.document;const el={};for(const [key,id]of Object.entries({settingRiotKeyInput:'setting-riot-key-input',settingRiotKeyState:'setting-riot-key-state',settingRiotKeySave:'setting-riot-key-save',settingRiotKeyClear:'setting-riot-key-clear',settingRiotKeyReveal:'setting-riot-key-reveal'}))el[key]=doc.getElementById(id);

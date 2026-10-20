@@ -18,7 +18,7 @@ const (
 	connectedFallbackInterval   = time.Hour
 	summonerFallbackInterval    = 60 * time.Second
 	eventDebounceInterval       = 900 * time.Millisecond
-	champSelectEventDebounce    = 300 * time.Millisecond
+	champSelectEventDebounce    = 150 * time.Millisecond
 	facadeEventThrottleInterval = 5 * time.Second
 	eventRetryInitialInterval   = 5 * time.Second
 	eventRetryMaxInterval       = time.Minute
@@ -304,7 +304,8 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 	}
 	syncPhaseTimers()
 	eventTriggers := make(chan string, 4)
-	champSelectTriggers := make(chan struct{}, 8)
+	champSelectTriggers := make(chan time.Time, 8)
+	a.goSafe("champselect-lite", func() { a.runChampSelectLitePump(sessionCtx, client, champSelectTriggers) })
 	friendTriggers := make(chan struct{}, 1)
 	eventErrors := make(chan error, 1)
 	eventReady := make(chan struct{}, 1)
@@ -377,7 +378,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 						watch.handleChampSelectTrade(client)
 					}
 					select {
-					case champSelectTriggers <- struct{}{}:
+					case champSelectTriggers <- time.Now():
 					default:
 					}
 					return
@@ -391,7 +392,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 						watch.handleChampSelect(client, current)
 					}
 					select {
-					case champSelectTriggers <- struct{}{}:
+					case champSelectTriggers <- time.Now():
 					default:
 						champCoalesced.Add(1)
 					}
@@ -452,8 +453,6 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 	retryFailures := 0
 	var debounceTimer *time.Timer
 	var debounce <-chan time.Time
-	var champSelectTimer *time.Timer
-	var champSelectDebounce <-chan time.Time
 	var friendsTimer *time.Timer
 	var friendsDebounce <-chan time.Time
 	var retryTimer *time.Timer
@@ -541,22 +540,6 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				debounceTimer.Reset(eventDebounceInterval)
 			}
 			debounce = debounceTimer.C
-		case <-champSelectTriggers:
-			if champSelectTimer == nil {
-				champSelectTimer = time.NewTimer(champSelectEventDebounce)
-			} else {
-				if !champSelectTimer.Stop() {
-					select {
-					case <-champSelectTimer.C:
-					default:
-					}
-				}
-				champSelectTimer.Reset(champSelectEventDebounce)
-			}
-			champSelectDebounce = champSelectTimer.C
-		case <-champSelectDebounce:
-			champSelectDebounce = nil
-			a.broadcastEvent("champselect:changed")
 		case <-friendTriggers:
 			if friendsTimer == nil {
 				friendsTimer = time.NewTimer(friendsEventDebounce)

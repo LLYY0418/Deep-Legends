@@ -1042,15 +1042,9 @@
   }
 
   function renderWorkspace() {
-    const patchNote = state.rankings?.patch ? `版本 ${state.rankings.patch} · ` : "";
-    const dataNote = state.mode === "ranked"
-      ? `${patchNote}${tierLabel(state.tier)}`
-      : state.mode === "arena"
-        ? `${patchNote}海克斯、棱彩装备、核心物品与吃鸡战绩`
-        : `${patchNote}英雄、海克斯与构筑`;
     root.innerHTML = `
       <header class="champion-page-head">
-        <div><h2>英雄梯度与构建</h2><p>${escapeHTML(dataNote)}</p></div>
+        <div class="champion-head-title"><h2>英雄梯度与构建</h2>${window.deepLegendsPatchNotes?.button(state.mode) || '<button type="button" class="text-button" data-patch-notes>版本更新</button>'}</div>
         <div class="champion-head-actions">
           ${state.mode === "ranked" ? `<label class="champion-tier-select select-wrap"><span>段位</span><select data-champion-tier>${renderTierOptions()}</select></label>` : ""}
           <button class="text-button" type="button" data-champion-refresh ${state.loading ? "disabled" : ""}>${state.loading ? "正在联网…" : "刷新数据"}</button>
@@ -2676,7 +2670,7 @@
   function renderEmpty(title, copy) { return `<div class="champion-state"><span aria-hidden="true">◇</span><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-champion-clear>清除筛选</button></div>`; }
   function prepareImages(container = root) {
     for (const image of container.querySelectorAll("[data-champion-image]")) {
-      const loaded = () => { image.hidden = false; image.parentElement?.classList.add("has-loaded-image"); window.deepLegendsAugmentArtwork?.prepare(image); };
+      const loaded = () => { image.hidden = false; image.parentElement?.classList.add("has-loaded-image"); if (image.closest(".augment-icon,.arena-augment-icon")) {if(window.deepLegendsAugmentArtwork)window.deepLegendsAugmentArtwork.prepare(image);else void window.deepLegendsSections?.load("augment-artwork").then(()=>window.deepLegendsAugmentArtwork?.prepare(image)).catch(()=>{});} };
       const failed = () => {
         const holder = image.parentElement;
         const artworkFallback = holder?.dataset.artworkFallback || image.dataset.artworkFallback;

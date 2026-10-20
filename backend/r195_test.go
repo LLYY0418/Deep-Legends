@@ -78,13 +78,13 @@ func TestR195InstallationDefaultFallbackAndDiagnostics(t *testing.T) {
 		{defaultDir, false, true, "installed"},
 		{defaultDir, false, false, "no_uninstaller"},
 		{defaultDir, true, true, "portable_env"},
-		{filepath.Join(base, "custom-install"), false, true, "registry_location_mismatch"},
+		{filepath.Join(base, "custom-install"), false, true, "installed"},
 	} {
 		got := classifyUpdateInstallationWith(tc.root, tc.portable, tc.uninstall, []updateRegistryInstallation{{"Deep Legends", other}}, defaultDir, normalizeUpdateInstallationPath)
 		if got.Result != tc.result || got.MatchAfterNormalize {
 			t.Fatalf("fallback gate: %+v", got)
 		}
-		if got.Result == "installed" && got.directory != normalizeUpdateInstallationPath(defaultDir) {
+		if got.Result == "installed" && got.directory != normalizeUpdateInstallationPath(tc.root) {
 			t.Fatal("wrong installed destination")
 		}
 	}

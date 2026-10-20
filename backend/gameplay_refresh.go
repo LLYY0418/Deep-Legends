@@ -71,6 +71,9 @@ func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase
 	if !changed {
 		return
 	}
+	if phase != "ChampSelect" {
+		a.flushChampSelectLatency()
+	}
 	a.observeArenaGroupingPhase(client, phase)
 	a.liveSnapshots.invalidate()
 	if isEndOfGamePhase(phase) {
@@ -179,6 +182,14 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 		if phase == "ChampSelect" {
 			var session lcuChampSelectSession
 			valid = client.RequestJSON(ctx, http.MethodGet, champSelectAPI+"/session", nil, &session) == nil && session.GameID == response.GameID
+			if valid {
+				lite := champSelectLiteFromSession(session)
+				// A changed cell signature expires the assembled selection fields,
+				// retaining the already loaded per-player ranks and histories.
+				if champSelectResponseSignature(response) != lite.signature() {
+					response = mergeChampSelectLite(response, lite)
+				}
+			}
 		} else {
 			valid = client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/session", nil, &game) == nil && game.GameData.GameID == response.GameID
 		}
@@ -216,7 +227,7 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 			if !valid {
 				return gameplayLiveResponse{Phase: phase}
 			}
-			return flight.response
+			return a.mergeLatestChampSelect(client, flight.response)
 		case <-ctx.Done():
 			return gameplayLiveResponse{Phase: phase}
 		}
@@ -232,7 +243,7 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		if loadCtx.Err() == nil && c.generation == generation && c.flight == flight {
-			flight.publish(progress)
+			flight.publish(a.mergeLatestChampSelect(client, progress))
 		}
 	})
 	defer cancel()
@@ -243,6 +254,7 @@ func (a *app) cachedGameplayLive(ctx context.Context, client *LCUClient, current
 		if value != nil {
 			response = gameplayLiveResponse{Phase: phase}
 		}
+		response = a.mergeLatestChampSelect(client, response)
 		c.mu.Lock()
 		if c.generation == generation && c.flight == flight {
 			c.flight = nil

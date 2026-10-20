@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const modules = { favorites: ["favorites-facade"], champions: ["champions"], "pro-players": ["pro-players"], suite: ["champions", "suite"], settings: ["champions", "cache-controls", "settings-preferences"], live: ["live-arena"] };
-  const styles = { "settings-preferences": ["settings-preferences"], champions: ["champions"], "pro-players": ["pro-players"], suite: ["champions", "suite"], settings: ["champions", "settings-preferences"], "live-arena": ["live-arena"], announcements: ["announcements"] };
+  const modules = { overview: [], favorites: ["favorites-facade"], champions: ["patch-notes", "champions"], "pro-players": ["pro-players"], suite: ["patch-notes", "champions", "suite"], settings: ["patch-notes", "champions", "cache-controls", "settings-preferences", "player-tags"], live: ["player-tags", "live-arena"] };
+  const styles = { "favorites-facade": ["collection"], "patch-notes": ["patch-notes"], "player-tags": ["player-tags"], "settings-preferences": ["settings-preferences"], champions: ["patch-notes", "champions"], "pro-players": ["pro-players"], suite: ["patch-notes", "champions", "suite"], settings: ["patch-notes", "champions", "settings-preferences"], "live-arena": ["live-arena"], announcements: ["announcements"] };
   const flights = new Map(), ready = new Set(), callbacks = new Map(), snapshots = new Map();
   const styleFlights = new Map(), styleReady = new Set();
   let current = "overview", navigation = {}, generation = 0;
@@ -26,7 +26,8 @@
         window.reportFlowDiagnostic?.("local_request_client", "failed", { endpoint: "section-loader", httpStatus: 0, errorKind: "network" });
         reject(new Error("页面样式加载失败，请重试"));
       };
-      document.head.append(link);
+      if(name === "collection") document.head.insertBefore(link, document.querySelector('link[href="/app.css"]'));
+      else document.head.append(link);
     });
     styleFlights.set(name, task);
     return task;
