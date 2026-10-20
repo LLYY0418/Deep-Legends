@@ -171,7 +171,85 @@ func TestR298LateRuneAckAndManualYield(t *testing.T) {
 	if !a.autoConfig.runtime.Yielded["runes"] {
 		t.Fatal("manual page switch did not yield")
 	}
+	a.autoConfig.runtime.Yielded = nil
+	a.autoConfig.runtime.done = false
+	a.autoConfig.processing = true
+	send("/lol-perks/v1/currentpage", `88`)
+	if !a.autoConfig.runtime.Yielded["runes"] {
+		t.Fatal("manual page switch during pending hero change did not yield")
+	}
+	a.autoConfig.runtime.Yielded = nil
+	a.autoConfig.runtime.applyingRunes = true
+	send("/lol-perks/v1/currentpage", `88`)
+	if a.autoConfig.runtime.Yielded["runes"] {
+		t.Fatal("own page transitions during a rune write yielded")
+	}
 }
+
+func TestR298SameSessionRuneReplacementBoundary(t *testing.T) {
+	deletable := false
+	for _, c := range []struct {
+		name      string
+		page      lcuRunePage
+		canDelete bool
+	}{
+		{"own page", lcuRunePage{ID: 77, Name: "[DL] 旧英雄 · 自动配置"}, true},
+		{"foreign page", lcuRunePage{ID: 77, Name: "玩家符文"}, false},
+		{"different ID", lcuRunePage{ID: 88, Name: "[DL] 其他页"}, false},
+		{"not deletable", lcuRunePage{ID: 77, Name: "[DL] 保护页", IsDeletable: &deletable}, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			a := &app{}
+			a.autoConfig.runtime = autoConfigRuntime{PageID: 77, generation: 1, Results: map[string]string{"runes": "applied"}}
+			var deleted []string
+			client := &LCUClient{baseURL: "https://127.0.0.1", token: "fixture", http: &http.Client{Transport: gameplayRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+				var data any
+				switch {
+				case req.Method == "DELETE":
+					deleted = append(deleted, req.URL.Path)
+				case req.URL.Path == "/lol-perks/v1/pages/77":
+					data = c.page
+				case req.URL.Path == "/lol-perks/v1/inventory":
+					data = map[string]any{"canAddCustomPage": true}
+				case req.Method == "POST" && req.URL.Path == "/lol-perks/v1/pages/":
+					data = map[string]any{"id": 101}
+				case req.Method == "PUT" && req.URL.Path == "/lol-perks/v1/pages/101":
+				case req.Method == "PUT" && req.URL.Path == "/lol-perks/v1/currentpage":
+					a.observeAutoConfigEvent(context.Background(), nil, LCUEvent{URI: req.URL.Path, Data: json.RawMessage(`101`)})
+				default:
+					t.Errorf("unexpected %s %s", req.Method, req.URL.Path)
+				}
+				b, _ := json.Marshal(data)
+				return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(string(b)))}, nil
+			})}}
+			runes := &autoConfigRunes{PrimaryStyleID: 8000, SubStyleID: 8100, SelectedPerkIDs: []int64{1, 2, 3}}
+			id, err := a.applyAutoConfigRunes(context.Background(), client, 1, 77, 2, "新英雄", runes)
+			if err != nil || id != 101 {
+				t.Fatalf("page=%d err=%v", id, err)
+			}
+			if c.canDelete && !reflect.DeepEqual(deleted, []string{"/lol-perks/v1/pages/77"}) || !c.canDelete && len(deleted) != 0 {
+				t.Fatalf("deleted %v", deleted)
+			}
+			if a.autoConfig.runtime.PageID != 101 || a.autoConfig.runtime.expectedRunes != runes || a.autoConfig.runtime.applyingRunes || a.autoConfigYieldSnapshot()["runes"] {
+				t.Fatalf("own write was not retained or was mistaken for a player edit: %+v", a.autoConfig.runtime)
+			}
+		})
+	}
+}
+
+func TestR298CancelledRuneWriteCannotSuppressNewSessionEdits(t *testing.T) {
+	a := &app{}
+	a.autoConfig.runtime = autoConfigRuntime{generation: 2}
+	if _, err := a.applyAutoConfigRunes(context.Background(), nil, 1, 0, 1, "旧会话", nil); err == nil || a.autoConfig.runtime.applyingRunes {
+		t.Fatal("stale job changed the new session's rune write state")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := a.applyAutoConfigRunes(ctx, nil, 2, 0, 1, "已取消", nil); err == nil || a.autoConfig.runtime.applyingRunes {
+		t.Fatal("cancelled job suppressed player edits")
+	}
+}
+
 func TestR298GuardAndApplyOnce(t *testing.T) {
 	var mu sync.Mutex
 	cell := int64(7)
@@ -255,6 +333,25 @@ func TestR298GuardAndApplyOnce(t *testing.T) {
 	if a.autoConfigGuard(context.Background(), client, snapshot, a.autoConfig.runtime.generation, 1) == nil {
 		t.Fatal("phase changed passed guard")
 	}
+	mu.Lock()
+	phase = "ChampSelect"
+	s.MyTeam[0].ChampionID = 2
+	s.Actions[0][0].ChampionID = 2
+	raw, _ := json.Marshal(s)
+	mu.Unlock()
+	a.autoConfig.Lock()
+	a.autoConfig.settings.Champions["2"] = map[string]autoConfigEntry{"ranked": {Spells: &autoConfigSpells{14, 4}, Items: &autoConfigItems{}}}
+	a.autoConfig.Unlock()
+	a.observeAutoConfigEvent(context.Background(), client, LCUEvent{URI: "/lol-champ-select/v1/session", Data: raw})
+	wait()
+	mu.Lock()
+	if !reflect.DeepEqual(writes, [][2]int64{{4, 14}, {14, 4}}) {
+		t.Error("new hero spell pair did not apply", writes)
+	}
+	mu.Unlock()
+	if a.autoConfigYieldSnapshot()["spells"] {
+		t.Fatal("our changed spell pair was mistaken for a manual edit by a later guard")
+	}
 }
 
 func TestR298ARAMDebounceLatestChampionAndYield(t *testing.T) {
@@ -276,7 +373,7 @@ func TestR298ARAMDebounceLatestChampionAndYield(t *testing.T) {
 		case "/lol-champ-select/v1/session/my-selection":
 			var pair autoConfigSpells
 			_ = json.NewDecoder(req.Body).Decode(&pair)
-			if session.MyTeam[0].ChampionID != 2 {
+			if session.MyTeam[0].ChampionID != 2 && session.MyTeam[0].ChampionID != 3 {
 				t.Error("wrote stale champion")
 			}
 			session.MyTeam[0].Spell1ID = pair.Spell1ID
@@ -293,6 +390,7 @@ func TestR298ARAMDebounceLatestChampionAndYield(t *testing.T) {
 	settings.Enabled = true
 	settings.Champions["1"] = map[string]autoConfigEntry{"aram": {Spells: &autoConfigSpells{4, 14}}}
 	settings.Champions["2"] = settings.Champions["1"]
+	settings.Champions["3"] = settings.Champions["1"]
 	a.autoConfig.settings = settings
 	a.autoConfig.loaded = true
 	c := r298Catalog()
@@ -338,12 +436,21 @@ func TestR298ARAMDebounceLatestChampionAndYield(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
+	// A new hero starts the debounce; a player edit during that pending job must
+	// still yield after this session has already applied spells once.
+	mu.Lock()
+	session.MyTeam[0].ChampionID = 3
+	raw, _ = json.Marshal(session)
+	mu.Unlock()
+	a.observeAutoConfigEvent(ctx, client, LCUEvent{URI: "/lol-champ-select/v1/session", Data: raw})
+	time.Sleep(50 * time.Millisecond)
 	mu.Lock()
 	session.MyTeam[0].Spell1ID = 14
 	session.MyTeam[0].Spell2ID = 4
+	raw, _ = json.Marshal(session)
 	mu.Unlock()
-	a.triggerAutoConfig(ctx, client)
-	for i := 0; i < 100; i++ {
+	a.observeAutoConfigEvent(ctx, client, LCUEvent{URI: "/lol-champ-select/v1/session", Data: raw})
+	for i := 0; i < 500; i++ {
 		a.autoConfig.Lock()
 		busy := a.autoConfig.processing
 		yielded := a.autoConfig.runtime.Yielded["spells"]
@@ -356,6 +463,11 @@ func TestR298ARAMDebounceLatestChampionAndYield(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
+	mu.Lock()
+	if len(writes) != 1 {
+		t.Errorf("manual edit during pending hero change was overwritten: %d writes", len(writes))
+	}
+	mu.Unlock()
 	a.resetAutoConfig()
 	if len(a.autoConfigYieldSnapshot()) != 0 {
 		t.Fatal("new session did not restore categories")

@@ -21,6 +21,7 @@ type autoConfigRuntime struct {
 	Results       map[string]string `json:"results"`
 	Yielded       map[string]bool   `json:"yielded"`
 	expectedRunes *autoConfigRunes
+	applyingRunes bool
 	client        *LCUClient
 	cancel        context.CancelFunc
 	generation    uint64
@@ -28,6 +29,22 @@ type autoConfigRuntime struct {
 	changedAt     time.Time
 	running       bool
 	done          bool
+}
+
+// Call with autoConfig locked. A pending hero-change job must not hide a
+// player's edit made after an earlier successful write in this session.
+func (r *autoConfigRuntime) observeSpells(s lcuChampSelectSession) {
+	if r.Results["spells"] != "applied" {
+		return
+	}
+	for _, p := range s.MyTeam {
+		if p.CellID != nil && s.LocalPlayerCellID != nil && *p.CellID == *s.LocalPlayerCellID && (p.Spell1ID != r.Spells.Spell1ID || p.Spell2ID != r.Spells.Spell2ID) {
+			if r.Yielded == nil {
+				r.Yielded = map[string]bool{}
+			}
+			r.Yielded["spells"] = true
+		}
+	}
 }
 
 func autoConfigLocked(session lcuChampSelectSession, mode string) bool {
@@ -126,7 +143,7 @@ func (a *app) observeAutoConfigEvent(ctx context.Context, client *LCUClient, eve
 		r := &a.autoConfig.runtime
 		pageID := r.PageID
 		expected := r.expectedRunes
-		ready := r.done && r.Results["runes"] == "applied" && !a.autoConfig.processing
+		ready := r.Results["runes"] == "applied" && !r.applyingRunes
 		a.autoConfig.Unlock()
 		if ready {
 			var page struct {
@@ -225,11 +242,7 @@ func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
 			*r = autoConfigRuntime{Session: key, client: client, generation: generation, running: true, Results: map[string]string{}, Yielded: map[string]bool{}}
 		}
 		// Client edits after a successful write yield only that category for the rest of this session.
-		for _, p := range s.MyTeam {
-			if p.CellID != nil && s.LocalPlayerCellID != nil && *p.CellID == *s.LocalPlayerCellID && r.Results["spells"] == "applied" && (p.Spell1ID != r.Spells.Spell1ID || p.Spell2ID != r.Spells.Spell2ID) {
-				r.Yielded["spells"] = true
-			}
-		}
+		r.observeSpells(s)
 		changed := r.observed != id
 		if changed {
 			r.observed = id
@@ -293,6 +306,9 @@ func (a *app) autoConfigGuard(ctx context.Context, client *LCUClient, original l
 	if autoConfigSessionKey(s) != autoConfigSessionKey(original) || champSelectCurrentChampion(s) != id || !autoConfigLocked(s, autoConfigMode(s.QueueID, "", 0)) {
 		return errors.New("英雄或会话已变化")
 	}
+	a.autoConfig.Lock()
+	a.autoConfig.runtime.observeSpells(s)
+	a.autoConfig.Unlock()
 	return nil
 }
 
@@ -304,6 +320,42 @@ func checkAutoConfigWrite(ctx context.Context) error {
 	}
 	return nil
 }
+
+func (a *app) applyAutoConfigRunes(ctx context.Context, client *LCUClient, generation uint64, oldPage int64, id int64, name string, runes *autoConfigRunes) (pageID int64, err error) {
+	a.autoConfig.Lock()
+	if a.autoConfig.runtime.generation != generation || ctx.Err() != nil {
+		a.autoConfig.Unlock()
+		return 0, errors.New("自动配置已取消")
+	}
+	a.autoConfig.runtime.applyingRunes = true
+	a.autoConfig.Unlock()
+	defer func() {
+		a.autoConfig.Lock()
+		r := &a.autoConfig.runtime
+		if r.generation == generation {
+			r.applyingRunes = false
+			if err == nil && pageID > 0 {
+				r.PageID = pageID
+				r.expectedRunes = runes
+				r.Results["runes"] = "applied"
+			}
+		}
+		a.autoConfig.Unlock()
+	}()
+	if oldPage > 0 {
+		var page lcuRunePage
+		if client.RequestJSON(ctx, "GET", fmt.Sprintf("/lol-perks/v1/pages/%d", oldPage), nil, &page) == nil && page.ID == oldPage && strings.HasPrefix(page.Name, runePagePrefix) && (page.IsDeletable == nil || *page.IsDeletable) {
+			if err = checkAutoConfigWrite(ctx); err != nil {
+				return 0, err
+			}
+			if err = client.RequestJSON(ctx, "DELETE", fmt.Sprintf("/lol-perks/v1/pages/%d", oldPage), nil, nil); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return applyRunePage(ctx, client, gameplayRuneApplyRequest{ChampionID: id, ChampionName: name, Source: "自动配置", PrimaryStyleID: runes.PrimaryStyleID, SubStyleID: runes.SubStyleID, SelectedPerkIDs: runes.SelectedPerkIDs})
+}
+
 func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChampSelectSession, generation uint64, id int64, mode, modeKey string, entry autoConfigEntry, exists bool) {
 	started := time.Now()
 	guard := func() error { return a.autoConfigGuard(ctx, client, s, generation, id) }
@@ -370,19 +422,7 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 				results[kind] = "skipped-incomplete"
 				continue
 			}
-			if oldPage > 0 {
-				var page lcuRunePage
-				if client.RequestJSON(ctx, "GET", fmt.Sprintf("/lol-perks/v1/pages/%d", oldPage), nil, &page) == nil && page.ID == oldPage && strings.HasPrefix(page.Name, runePagePrefix) && (page.IsDeletable == nil || *page.IsDeletable) {
-					if guard() != nil {
-						return
-					}
-					err = client.RequestJSON(ctx, "DELETE", fmt.Sprintf("/lol-perks/v1/pages/%d", oldPage), nil, nil)
-				}
-			}
-			if err == nil {
-				r := entry.Runes
-				pageID, err = applyRunePage(ctx, client, gameplayRuneApplyRequest{ChampionID: id, ChampionName: name, Source: "自动配置", PrimaryStyleID: r.PrimaryStyleID, SubStyleID: r.SubStyleID, SelectedPerkIDs: r.SelectedPerkIDs})
-			}
+			pageID, err = a.applyAutoConfigRunes(ctx, client, generation, oldPage, id, name, entry.Runes)
 		case "spells":
 			if a.validateAutoConfigCatalog(ctx, mode, autoConfigEntry{Spells: entry.Spells}, false) != nil {
 				results[kind] = "skipped-incomplete"
@@ -392,6 +432,16 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 				return
 			}
 			err = applySummonerSpells(ctx, client, entry.Spells.Spell1ID, entry.Spells.Spell2ID)
+			if err == nil {
+				// Later guards compare against the write just acknowledged by LCU,
+				// rather than treating our new hero's different pair as a player edit.
+				a.autoConfig.Lock()
+				if a.autoConfig.runtime.generation == generation {
+					a.autoConfig.runtime.Spells = *entry.Spells
+					a.autoConfig.runtime.Results["spells"] = "applied"
+				}
+				a.autoConfig.Unlock()
+			}
 		case "items":
 			if a.validateAutoConfigCatalog(ctx, mode, autoConfigEntry{Items: entry.Items}, false) != nil {
 				results[kind] = "skipped-incomplete"
