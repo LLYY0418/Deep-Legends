@@ -24,6 +24,7 @@
   const appScroll = document.getElementById("app-scroll");
   const subtitle = document.getElementById("topbar-subtitle");
   const standardMetrics = panel.querySelector("[data-suite-standard-metrics]");
+  const configMetrics = panel.querySelector("[data-suite-config-metrics]");
   const champSelectMetrics = panel.querySelector("[data-suite-champselect-metrics]");
   const champSelectConfiguredMetric = document.getElementById("suite-champselect-configured");
   const champSelectActiveMetric = document.getElementById("suite-champselect-active");
@@ -34,6 +35,7 @@
     facade: "背景、签名与展示",
     sweep: "未领取奖励清扫",
     champselect: "禁用与选用的备选序列",
+ config: "符文、召唤师技能与装备",
   };
   const phaseOrder = ["Lobby", "Matchmaking", "ReadyCheck", "ChampSelect", "InProgress", "EndOfGame"];
   const phaseNames = { Lobby: "房间", Matchmaking: "匹配中", ReadyCheck: "确认对局", ChampSelect: "英雄选择", InProgress: "游戏中", Reconnect: "重连", EndOfGame: "结算" };
@@ -223,7 +225,7 @@
   function setConnected(connected) {
     state.connected = Boolean(connected);
     offline.hidden = state.connected;
-    for (const subpanel of panels) subpanel.hidden = !state.connected || subpanel.dataset.suitePanel !== state.tab;
+    for (const subpanel of panels) subpanel.hidden = (subpanel.dataset.suitePanel !== "config" && !state.connected) || subpanel.dataset.suitePanel !== state.tab;
     if (!state.connected) {
       clearTimeout(state.facadeRefreshTimer);
       clearTimeout(state.facadeChallengeRetryTimer);
@@ -255,12 +257,14 @@
       tab.tabIndex = active ? 0 : -1;
       if (active && focus) tab.focus();
     }
-    for (const subpanel of panels) subpanel.hidden = !state.connected || subpanel.dataset.suitePanel !== name;
-    if (standardMetrics) standardMetrics.hidden = name === "champselect";
+    for (const subpanel of panels) subpanel.hidden = (subpanel.dataset.suitePanel !== "config" && !state.connected) || subpanel.dataset.suitePanel !== name;
+    if (standardMetrics) standardMetrics.hidden = ["champselect", "config"].includes(name);
+ if (configMetrics) configMetrics.hidden = name !== "config";
+ if (offline) offline.hidden = state.connected || name === "config";
     if (champSelectMetrics) champSelectMetrics.hidden = name !== "champselect";
     if (state.active && subtitle) subtitle.textContent = tabCopy[name];
     requestAnimationFrame(() => appScroll?.scrollTo({ top: Number(state.scroll[name] || 0), behavior: "instant" }));
-	if (state.active && state.connected) void loadActiveTab(false);
+	if (state.active && (state.connected || name === "config")) void loadActiveTab(false);
   }
 
   function setupTabs() {
@@ -279,6 +283,7 @@
   }
 
   function loadActiveTab(force = false) {
+ if (state.tab === "config") return window.deepLegendsAutoConfig?.load(force);
     const loader = { watch: loadWatch, rig: loadRig, facade: loadFacade, sweep: loadClaims, champselect: loadChampSelect }[state.tab] || loadWatch;
     return loader(force);
   }
@@ -727,7 +732,7 @@
   }
 
   function renderChampSelectTimeline(runtime) {
-    const records = runtime?.records || [];
+    const records = [...(runtime?.records || []), ...(state.autoConfigRecords || [])];
     const rows = records.length ? records.slice().reverse().map((record) => {
       const at = record.at ? new Date(record.at) : null;
       const time = at && Number.isFinite(at.getTime()) ? at.toLocaleTimeString("zh-CN", { hour12: false }) : "—";
@@ -908,7 +913,7 @@
     const liveLabel = runtime.active ? runtime.unsupported ? "当前模式无对应分组，本局不接管" : `${(state.champSelectGroups.find((group) => group.groupId === runtime.groupId)?.name || runtime.groupId)}${runtime.position && runtime.position !== "default" ? ` · ${champSelectLaneName(runtime.position)}` : ""}` : "等待英雄选择";
     const capabilities = champSelectCapabilitiesHTML(definition, runtime) + `<label class="suite-switch cs-avoid-global" title="同时用于本组禁用、提前预选和选用。开启时避让队友预选；关闭时允许选择队友仅预选的英雄。队友已经选择的英雄始终跳过。"><span>避让队友预选</span><input type="checkbox" data-cs-avoid${checked(config.ban?.avoidTeammateIntent !== false || config.pick?.avoidTeammateIntent !== false)}${settings.enabled ? "" : " disabled"}></label>`;
     roots.champselect.className = settings.enabled ? "" : "cs-master-off";
-    champSelectPanelRoot().innerHTML = `<section class="suite-card cs-master"><div class="cs-master-id"><span class="cs-master-ring" aria-hidden="true">⌖</span><div><h2>征召托管</h2><p>仅在英雄选择阶段生效；总开关同步控制各模式的禁用与选用</p></div><label class="suite-switch"><input type="checkbox" data-cs-master${checked(settings.enabled)}><span>总开关</span></label></div><div class="cs-master-right"><span class="cs-live-pill"><i></i>${escapeHTML(liveLabel)}</span><button class="button button-secondary" type="button" data-cs-pause${runtime.active && settings.enabled ? "" : " disabled"}>${runtime.sessionPaused ? "恢复本局" : "本局暂停"}</button></div></section>
+    champSelectPanelRoot().innerHTML = `<section class="suite-card cs-master"><div class="cs-master-id"><span class="cs-master-ring" aria-hidden="true">⌖</span><div><h2>征召托管</h2><p>仅在英雄选择阶段生效；总开关同步控制各模式的禁用与选用</p></div></div><div class="cs-master-right"><span class="cs-live-pill"><i></i>${escapeHTML(liveLabel)}</span><button class="cs-pause" type="button" data-cs-pause${runtime.active ? "" : " hidden"}${settings.enabled ? "" : " disabled"}>${runtime.sessionPaused ? "恢复本局" : "本局暂停"}</button><span class="cs-sep"></span><label class="suite-switch is-label-left"><input type="checkbox" data-cs-master${checked(settings.enabled)}><span>总开关</span></label></div></section>
       <div class="cs-body"><nav class="cs-mode-list" aria-label="征召模式分组"><span class="cs-mode-title">模式分组</span>${state.champSelectGroups.map((group) => { const value = settings.groups?.[group.groupId] || {}; const banCount = champSelectConfiguredCount(value, "ban"); const pickCount = champSelectConfiguredCount(value, "pick"); return `<button class="cs-mode-item${definition.groupId === group.groupId ? " is-active" : ""}" type="button" data-cs-group="${group.groupId}"><span aria-hidden="true">${({ranked:"◈",normal:"◇",aram:"❄",arena:"⚔",event:"✧",practice:"▤"})[group.groupId] || "◇"}</span><span><strong>${escapeHTML(group.name)}</strong><small><i class="${banCount ? "on" : ""}">${group.hasBan ? `禁 ${banCount}` : "无禁用"}</i><i class="${pickCount ? "on" : ""}">选 ${pickCount}</i></small></span></button>`; }).join("")}</nav><div class="cs-stack"><div class="cs-capabilities"><h3>${escapeHTML(definition.name)}</h3>${capabilities}</div>${champSelectPoolHelpHTML(definition, runtime)}<fieldset class="cs-config-fields" data-cs-config-group="${definition.groupId}"${settings.enabled ? "" : " disabled"} aria-label="征召配置">${renderChampSelectSideCard("ban", definition, config, runtime)}${renderChampSelectSideCard("pick", definition, config, runtime)}${renderChampSelectBenchCard(definition, config, runtime)}</fieldset>${renderChampSelectTimeline(runtime)}</div></div>`;
     bindChampSelectControls();
     syncChampSelectDialog();
@@ -2092,7 +2097,7 @@
   panel.addEventListener("click", (event) => {
     const reload = event.target.closest("[data-suite-reload]");
     if (!reload) return;
-    ({ watch: loadWatch, rig: loadRig, facade: () => loadFacade(true, false, "manual"), sweep: loadClaims, champselect: loadChampSelect }[reload.dataset.suiteReload])?.(true);
+    ({ config: force=>window.deepLegendsAutoConfig?.load(force), watch: loadWatch, rig: loadRig, facade: () => loadFacade(true, false, "manual"), sweep: loadClaims, champselect: loadChampSelect }[reload.dataset.suiteReload])?.(true);
   });
 
 
@@ -2109,7 +2114,11 @@
     subtitle.textContent = tabCopy[state.tab];
     loadAll();
   }
-  window.addEventListener("deep-legends:section", handleLazySection);
+  window.addEventListener("deep-legends:auto-config", event => {
+ const auto = event.detail || {}; state.autoConfigRecords = Object.entries(auto.results || {}).filter(([kind,result])=>result === "applied" && !auto.yielded?.[kind]).map(([kind])=>({kind:"ok",message:"已应用"+({runes:"符文",spells:"召唤师技能",items:"装备"})[kind]}));
+ if(state.tab === "champselect") renderChampSelect();
+ });
+ window.addEventListener("deep-legends:section", handleLazySection);
   window.deepLegendsSections?.register("suite", handleLazySection);
   window.addEventListener("deep-legends:navigate", (event) => { if (event.detail?.section === "suite" && event.detail?.tab) activateTab(event.detail.tab); });
   (window.deepLegendsSections?.listen || window.addEventListener.bind(window))("deep-legends:status", (event) => {

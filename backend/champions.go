@@ -252,6 +252,7 @@ type championAsset struct {
 }
 
 type championAssetDescription struct {
+	Maps        map[string]bool
 	Name        string
 	Description string
 	Source      string
@@ -1613,16 +1614,17 @@ type ddragonAssetList struct {
 }
 
 type ddragonAsset struct {
-	Key         string    `json:"key"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Tooltip     string    `json:"tooltip"`
-	Cooldown    []float64 `json:"cooldown"`
-	Cost        []float64 `json:"cost"`
-	Range       []float64 `json:"range"`
-	Into        []string  `json:"into"`
-	InStore     *bool     `json:"inStore"`
-	HideFromAll *bool     `json:"hideFromAll"`
+	Maps        map[string]bool `json:"maps"`
+	Key         string          `json:"key"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Tooltip     string          `json:"tooltip"`
+	Cooldown    []float64       `json:"cooldown"`
+	Cost        []float64       `json:"cost"`
+	Range       []float64       `json:"range"`
+	Into        []string        `json:"into"`
+	InStore     *bool           `json:"inStore"`
+	HideFromAll *bool           `json:"hideFromAll"`
 	Gold        struct {
 		Total       int64 `json:"total"`
 		Purchasable *bool `json:"purchasable"`
@@ -1848,7 +1850,7 @@ func (p *championProvider) loadStaticDescriptions(ctx context.Context) (map[stri
 			descriptions[endpoint.kind+"/"+strings.ToLower(item.Image.Full)] = championAssetDescription{
 				Name: item.Name, Description: cleanMarkup(firstNonEmpty(item.Description, item.Tooltip)),
 				Source: "ddragon", Path: "/cdn/" + patch + "/img/" + endpoint.kind + "/" + item.Image.Full,
-				BuildsInto: len(item.Into) > 0, Price: item.Gold.Total,
+				BuildsInto: len(item.Into) > 0, Price: item.Gold.Total, Maps: item.Maps,
 				Costs: cloneNumbers(item.Cost), Cooldowns: cloneNumbers(item.Cooldown), Ranges: cloneNumbers(item.Range),
 			}
 			if endpoint.kind == "spell" {

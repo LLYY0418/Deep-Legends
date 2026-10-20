@@ -6451,6 +6451,7 @@
     state.recommendationTabTouched = false;
     state.runeSourceTab = "opgg";
     state.selectedRecommendation = "opgg";
+ state.autoConfigOpen = false; state.autoConfigSelected = false; state.autoConfig = null;
     if (preserveTabs && recommendationTabTouched) {
       state.recommendationTab = recommendationTab;
       state.recommendationTabTouched = true;
@@ -7819,6 +7820,9 @@
   }
 
   function renderRecommendationArea(data) {
+ const auto = state.autoConfig;
+ const customSelf = (data?.players || []).find(p=>p.isCurrent);
+ const custom = auto?.championId === Number(customSelf?.championId) && auto?.results?.runes === "applied" && !auto.yielded?.runes;
     const self = (data.players || []).find((player) => player.isCurrent);
     const target = liveRecommendationTarget(data);
     const availablePayload = liveRecommendationsFor(data);
@@ -7837,8 +7841,6 @@
     const selected = capabilities.hasRunes ? selectedRuneRecommendation(data) : null;
     const selectedComplete = Boolean(selected && selected.selectedComplete !== false && (selected.selectedComplete !== true || selected.selectedPerkIds?.length === 9) && (selected.selectedPerkIds || selected.perkIds || []).length >= 6);
     const tab = (key, label) => `<button type="button" role="tab" id="recommendation-tab-${key}" aria-controls="recommendation-panel-${key}" aria-selected="${activeTab === key}" tabindex="${activeTab === key ? "0" : "-1"}" class="${activeTab === key ? "is-active" : ""}" data-recommendation-tab="${key}">${label}</button>`;
-    // 页签内容还在拉取时，只在 tab 栏「下方」的这块面板上盖一层加载遮罩，
-    // tab 栏本身保持可点击可切换。提示文案按页签内容区分。
     const loadingCopy = {
       runes: ["正在读取符文推荐", "从 OP.GG 拉取当前英雄与位置的符文分布"],
       build: ["正在读取海克斯、出装与技能", "按当前模式整理海克斯、鞋子、核心装备与技能加点"],
@@ -7868,7 +7870,7 @@
         if (capabilities.hasRunes) {
           const runePanel = renderRuneRecommendations(data, true);
           const spellPair = selectedComplete ? recommendedRuneSpellIDs(data, selected) : [];
-          const spellToggle = spellPair.length ? `<label class="rune-spell-toggle"><input type="checkbox" data-apply-rune-spells ${state.applyRuneSpells !== false ? "checked" : ""}>同时应用召唤师技能</label>` : "";
+          const spellToggle = spellPair.length ? `<label class="rune-spell-toggle"><input type="checkbox" data-apply-rune-spells ${state.applyRuneSpells !== false ? "checked" : ""}>同时应用召唤师技能${state.summonerKeys?.flashSlot != null ? `（闪现放在 ${escapeHTML(state.summonerKeys.keys[state.summonerKeys.flashSlot])}）` : ""}</label>` : "";
           content.runes = `${renderChampionRecommendationHeader(payload.hero, self, data)}${runePanel}<footer class="recommendation-action"><div><strong>${selected ? `已选择：${escapeHTML(runeConfigurationTitle(selected))}` : "请选择一套完整符文"}</strong><span>${selectedComplete ? "将新建符文页并设为当前页" : "这套数据尚不完整，暂时不能应用"}</span>${spellToggle}</div><button class="button button-primary apply-runes" type="button" data-apply-runes="selected" ${!selectedComplete || data.phase !== "ChampSelect" ? "disabled" : ""}>${data.phase === "ChampSelect" ? "应用所选符文" : "仅英雄选择阶段可应用"}</button></footer>`;
         }
 		const recommendationHeader = renderChampionRecommendationHeader(payload.hero, self, data);
@@ -7876,7 +7878,11 @@
 		content.build = `${recommendationHeader}${augmentContent}${renderBuildRecommendation(payload.build, self, data.championAbilities || [], data)}`;
       }
     }
-	    const rosterNotice = data.champSelectNotice ? `<p class="live-roster-notice" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5m0-9h.01"></path></svg><span>${escapeHTML(data.champSelectNotice)}</span></p>` : "";
+	    if(custom && content.runes) {
+ const banner = window.deepLegendsAutoConfigLive?.banner(auto,state.summonerKeys,state.autoConfigOpen) || "";
+ content.runes = `${banner}<div class="ac-live-reco" ${state.autoConfigOpen ? "" : "hidden"}>${content.runes}</div>`;
+ }
+ const rosterNotice = data.champSelectNotice ? `<p class="live-roster-notice" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5m0-9h.01"></path></svg><span>${escapeHTML(data.champSelectNotice)}</span></p>` : "";
     // R128 §2.3：方法论/口径类说明不再进 UI（用户 2026-09-22 指示，撤销 R116-B
     // P0-3 的常驻页脚）。后端仍可能下发那个口径字段，前端一律不消费。
 	    return `<section class="recommendation-area"><div data-live-notice="data">${renderRecommendationDataNotices(payload)}</div><div class="recommendation-tab-row"><div class="recommendation-tabs" role="tablist" aria-label="推荐类型">${tabs.map(([key, label]) => tab(key, label)).join("")}</div><div data-lane-matchup-slot>${renderLaneMatchupCard(data, payload.hero)}</div><div data-live-notice="roster">${rosterNotice}</div></div>${tabs.map(([key]) => panel(key, content[key] || "")).join("")}</section>`;
@@ -8774,6 +8780,10 @@
   }
 
   function selectedRuneRecommendation(data) {
+ const auto = state.autoConfig;
+ const self = (data?.players || []).find(p=>p.isCurrent);
+ const custom = auto?.championId === Number(self?.championId) && auto?.results?.runes === "applied" && !auto.yielded?.runes;
+ if(custom && !state.autoConfigSelected) { state.selectedRecommendation = ""; return null; }
     const runes = liveRecommendationsFor(data)?.runes || {};
     const opggItems = Array.isArray(runes.opgg) ? runes.opgg : runes.opgg ? [runes.opgg] : [];
     const opggFallback = opggItems.length
@@ -8923,6 +8933,7 @@
       openPlayerOverlay({ playerRef: button.dataset.playerRef, region: clientRegion(), serverId: clientRegion() ? "" : state.status?.serverId || "", label: playerButtonLabel(button), ...proContextFromButton(button) });
     };
     bindRuneWorkspaceControls(scope);
+ bindLiveNode(scope?.querySelector("[data-auto-config-toggle]"), "click", "auto-config-toggle", () => { state.autoConfigOpen = !state.autoConfigOpen; renderLive("selection"); });
     bindLiveNode(scope?.querySelector("[data-apply-rune-spells]"), "change", "data-apply-rune-spells", (event) => { state.applyRuneSpells = event.currentTarget.checked; });
     for (const button of scope.querySelectorAll("[data-live-position]")) bindLiveNode(button, "click", "live-position", () => selectLivePosition(livePositionValue(button.dataset.livePosition)));
     bindRuneChoiceButtons(scope);
@@ -8953,7 +8964,8 @@
 	      if (choice._runeChoiceBound) continue;
 	      choice._runeChoiceBound = true;
 	      const select = () => {
-	        state.selectedRecommendation = choice.dataset.runeChoice;
+	        state.autoConfigSelected = true;
+ state.selectedRecommendation = choice.dataset.runeChoice;
 	        renderLive("selection");
 	      };
 	      choice.addEventListener("click", select);
@@ -8994,7 +9006,8 @@
       if (spells.length) { payload.spell1Id = spells[0]; payload.spell2Id = spells[1]; }
       const result = await api("/api/gameplay/runes/apply", { method: "POST", body: JSON.stringify(payload) }, "apply-runes", 15000);
       showToast(spells.length ? result?.spellApplied === true ? "符文和召唤师技能已应用" : "符文已应用，召唤师技能未能同步" : "符文已新建并设为当前页");
-      button.textContent = "再次新增";
+      if(state.autoConfig) { state.autoConfig.yielded ||= {}; state.autoConfig.yielded.runes = true; state.autoConfigOpen = true; renderLive("selection"); }
+ button.textContent = "再次新增";
     } catch (error) { showToast(error.message); button.textContent = "应用所选符文"; }
     finally { button.disabled = false; }
   }
@@ -9968,6 +9981,7 @@
   window.addEventListener("deep-legends:post-game-reveal", () => {
     if (state.section === "live" && state.live?.gameId && !liveGamePhase(state.beacon.phase)) queueLiveEventRefresh("event");
   });
+  window.deepLegendsGameAutoConfig = {state,renderLive,iconFigure};
   window.addEventListener("deep-legends:gameflow", (event) => {
     handleGameplayPhase(String(event.detail?.phase || ""), "sse", Boolean(event.detail?.changed), event.detail?.gameId);
   });

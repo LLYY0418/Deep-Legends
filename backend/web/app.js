@@ -4328,6 +4328,7 @@
 	  if (typeof event.data === "string" && event.data.startsWith("{")) {
 		try {
 		  const detail = JSON.parse(event.data);
+ if(detail?.type === "auto-config"){ window.deepLegendsAutoConfigState = detail.state; window.dispatchEvent(new CustomEvent("deep-legends:auto-config",{detail:detail.state})); return; }
           if(detail?.type === "network-proxy-state"){void loadChampionNetworkStatus();return;}
           if(detail?.type === "client-cold-window") {window.deepLegendsPerformance?.startColdRequestWindow?.(detail.processAt);return;}
           if (detail?.type === "client-view") { try { acceptClientView(detail); } catch (error) { reportStatusRenderFailed(error, "acceptClientView"); } return; }

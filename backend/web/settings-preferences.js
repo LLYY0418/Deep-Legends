@@ -25,8 +25,11 @@
     "mask-names":enumOf("true","false"),"confirm-replay":enumOf("true","false"),"auto-live":enumOf("true","false"),
     "live-tags":{array:enumOf("self","premade","pro","hidden","autofill","squad","positions"),maxLength:7},
   };
-  const schema = {exportDirectory:"string",renderer:rendererSchema,native:{contentProtection:"boolean",closeBehavior:enumOf("exit","tray"),disableHardwareAcceleration:"boolean"},automatic:"boolean",autoDownload:"boolean",blockAutostart:"boolean",network:{mode:enumOf("auto","direct","manual"),url:"string"},watch:watchSchema};
+  const autoEntry = {runes:{primaryStyleId:integer(1,100000),subStyleId:integer(1,100000),selectedPerkIds:{array:integer(0,100000),maxLength:9}},spells:{spell1Id:integer(1,100000),spell2Id:integer(1,100000)},items:{core:{array:integer(1,1000000),maxLength:6},situational:{array:integer(1,1000000),maxLength:6}},updatedAt:"string"};
+  const autoConfigSchema = {version:integer(1,Number.MAX_SAFE_INTEGER),enabled:"boolean",runes:"boolean",spells:"boolean",items:"boolean",champions:{map:{map:autoEntry,keyPattern:/^(?:ranked(?:-(?:top|jungle|middle|bottom|utility))?|normal|aram|hextech|urf|event)$/,maxKeys:11},keyPattern:/^[1-9][0-9]{0,3}$/,maxKeys:1000}};
+  const schema = {exportDirectory:"string",renderer:rendererSchema,native:{contentProtection:"boolean",closeBehavior:enumOf("exit","tray"),disableHardwareAcceleration:"boolean"},automatic:"boolean",autoDownload:"boolean",blockAutostart:"boolean",network:{mode:enumOf("auto","direct","manual"),url:"string"},watch:watchSchema,autoConfig:autoConfigSchema,summonerKeys:{flashSlot:{nullable:integer(0,1)}}};
   function sanitize(value, shape = schema) {
+    if (shape.nullable) return value === null ? null : sanitize(value,shape.nullable);
     if (shape === "boolean" || shape === "string") {
       if (typeof value !== shape || shape === "string" && value.length > 1024) throw new Error("设置格式无效");
       return value;
@@ -34,7 +37,7 @@
     if (shape.values) { if (!shape.values.includes(value)) throw new Error("设置格式无效"); return value; }
     if (shape.min !== undefined) { if (!Number.isInteger(value) || value < shape.min || value > shape.max) throw new Error("设置格式无效"); return value; }
     if (shape.map) {
-      if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length > 64) throw new Error("设置格式无效");
+      if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length > (shape.maxKeys || 64)) throw new Error("设置格式无效");
       return Object.fromEntries(Object.entries(value).filter(([key])=>shape.keyPattern.test(key)).map(([key,item])=>[key,sanitize(item,shape.map)]));
     }
     if (shape.array) {
@@ -80,6 +83,7 @@
     if (!response.ok) throw new Error("设置保存失败");
     return response.json();
   }
+  async function putAPI(path,body) {const r=await fetch(path,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!r.ok)throw Error(await r.text());return r.json();}
   function toast(text) {
     const node=get("toast"); node.textContent=text; node.hidden=false;
     clearTimeout(toast.timer); toast.timer=setTimeout(()=>{node.hidden=true;},3200);
@@ -112,6 +116,10 @@
       node.textContent=text; node.hidden=!text;
     };
     void api("/api/github/stars").then(value=>showStars(value.count)).catch(()=>showStars(null));
+    let flashKeys;
+    function renderFlashKeys(value){flashKeys=value;const host=get("setting-flash-keys");if(!host)return;host.replaceChildren();for(let i=0;i<2;i++){const b=document.createElement("button"),kbd=document.createElement("kbd");kbd.className="ac-kbd";kbd.textContent=value.keys[i]||"—";b.append(kbd,document.createTextNode(i?"右侧技能":"左侧技能"));b.type="button";b.disabled=!value.keys[i];b.className=value.flashSlot===i?"is-active":"";b.setAttribute("aria-pressed",String(value.flashSlot===i));b.onclick=async()=>{try{renderFlashKeys(await putAPI("/api/settings/summoner-keys",{flashSlot:flashKeys.flashSlot===i?null:i}));}catch(e){toast(e.message);}};host.append(b);}if(value.keys.every(k=>!k))host.append(document.createTextNode("连接客户端后读取快捷键"));}
+    const refreshFlashKeys=()=>void api("/api/settings/summoner-keys").then(renderFlashKeys).catch(()=>{});
+    refreshFlashKeys();window.addEventListener("deep-legends:section",e=>{if(e.detail?.name==="settings")refreshFlashKeys();});
     const nativeKeys={"setting-content-protection":"contentProtection","setting-close-behavior":"closeBehavior","setting-disable-hardware":"disableHardwareAcceleration"};
     const syncNative=value=>{
       for(const [id,key] of Object.entries(nativeKeys)){const node=get(id);if(node.type==="checkbox")node.checked=value[key];else node.value=value[key];}
@@ -158,11 +166,14 @@
         if(value===null && controls[key]){const node=get(controls[key]);value=node.type==="checkbox"?String(node.checked):node.value;}
         if(value!==null)renderer[key]=key==="live-tags"?JSON.parse(value):value;
       }
-      const [native,update,autostart,network,watch]=await Promise.all([window.desktopPreferences?.get()||{},api("/api/update/settings"),api("/api/client-autostart"),api("/api/champions/network"),api("/api/watch/rules")]);
-      return sanitize({...(window.desktopShare?.getSaveDirectory ? {exportDirectory:(await window.desktopShare.getSaveDirectory()).directory||""}:{}),renderer,native,automatic:update.automatic!==false,autoDownload:update.autoDownload!==false,blockAutostart:autostart.block!==false,network:{mode:network.mode,url:exportProxyURL(network.url||"")},watch});
+      const [native,update,autostart,network,watch,autoConfig,summonerKeys]=await Promise.all([window.desktopPreferences?.get()||{},api("/api/update/settings"),api("/api/client-autostart"),api("/api/champions/network"),api("/api/watch/rules"),api("/api/auto-config/settings"),api("/api/settings/summoner-keys")]);
+      return sanitize({...(window.desktopShare?.getSaveDirectory ? {exportDirectory:(await window.desktopShare.getSaveDirectory()).directory||""}:{}),renderer,native,automatic:update.automatic!==false,autoDownload:update.autoDownload!==false,blockAutostart:autostart.block!==false,network:{mode:network.mode,url:exportProxyURL(network.url||"")},watch,autoConfig,summonerKeys:{flashSlot:summonerKeys.flashSlot}});
     }
     async function applyBackupValues(data, notify=true){
       let count=0;
+      if(data.autoConfig){const current=await api("/api/auto-config/settings");await putAPI("/api/auto-config/settings",{...data.autoConfig,version:current.version});count++;}
+      if(data.summonerKeys){await putAPI("/api/settings/summoner-keys",data.summonerKeys);count++;}
+
       if(data.watch){
         const merge=(current,patch)=>{const result={...current};for(const [key,value] of Object.entries(patch))result[key]=value&&typeof value==="object"&&!Array.isArray(value)?merge(current?.[key]||{},value):value;return result;};
         const current=sanitize({watch:await api("/api/watch/rules")}).watch;
@@ -202,7 +213,7 @@
     });
     get("setting-backup-import").addEventListener("click",()=>get("setting-backup-file").click());
     get("setting-backup-file").addEventListener("change",async event=>{
-      try{const file=event.target.files[0];if(!file)return;if(file.size>128*1024)throw new Error("设置格式无效");await applyBackup(JSON.parse(await file.text()));}catch(error){toast(error.message);}finally{event.target.value="";}
+      try{const file=event.target.files[0];if(!file)return;if(file.size>2*1024*1024)throw new Error("设置格式无效");await applyBackup(JSON.parse(await file.text()));}catch(error){toast(error.message);}finally{event.target.value="";}
     });
     window.deepLegendsSettingsBackup = Object.freeze({...backup,createBackup,applyBackup});
   });

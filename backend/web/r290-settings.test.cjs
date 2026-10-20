@@ -49,10 +49,10 @@ test('R290 settings stars load once on opening, failures fall back quietly to ju
 test('R290 unavailable persistent storage keeps settings initialization and backup usable in the current session',async()=>{
  const app=fs.readFileSync(__dirname+'/app.js','utf8');
  const script=`Object.defineProperty(window,'localStorage',{get(){throw new DOMException('blocked','SecurityError')}});\n`+app;
- const values={'/api/update/settings':{automatic:true,mirrors:['']},'/api/client-autostart':{block:true},'/api/champions/network':{mode:'auto',url:''},'/api/watch/rules':{schemaVersion:1,masterEnabled:false}};
+ const values={'/api/auto-config/settings':{version:1,enabled:false,runes:true,spells:true,items:true,champions:{}},'/api/settings/summoner-keys':{keys:['D','F'],flashSlot:null},'/api/update/settings':{automatic:true,mirrors:['']},'/api/client-autostart':{block:true},'/api/champions/network':{mode:'auto',url:''},'/api/watch/rules':{schemaVersion:1,masterEnabled:false}};
  const h=require('./update-harness.cjs').harness(script,(url,options={})=>{
   if(!Object.hasOwn(values,url))return;
-  if(options.method==='POST')values[url]=JSON.parse(options.body);
+  if(options.method==='POST'||options.method==='PUT')values[url]=JSON.parse(options.body);
   return Promise.resolve({ok:true,json:async()=>values[url]});
  });
  try {

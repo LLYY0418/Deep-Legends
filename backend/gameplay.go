@@ -9329,6 +9329,15 @@ func (a *app) handleGameplayRuneApply(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 	ctx = context.WithValue(ctx, runeApplyTraceContextKey{}, trace)
+	a.yieldAutoConfig("runes")
+	a.autoConfig.Lock()
+	a.loadSummonerKeysLocked()
+	flashSlot := a.autoConfig.keys.FlashSlot
+	a.autoConfig.Unlock()
+	request.Spell1ID, request.Spell2ID = reorderFlashSpells(request.Spell1ID, request.Spell2ID, flashSlot)
+	if request.Spell1ID > 0 {
+		a.yieldAutoConfig("spells")
+	}
 	pageID, err := applyRunePage(ctx, client, request)
 	if err != nil {
 		outcome = "failed"
@@ -9425,6 +9434,9 @@ func applyRunePage(ctx context.Context, client *LCUClient, request gameplayRuneA
 			if index >= runePageRecycleLimit {
 				break
 			}
+			if err := checkAutoConfigWrite(ctx); err != nil {
+				return 0, err
+			}
 			if err := client.RequestJSON(ctx, http.MethodDelete, fmt.Sprintf("/lol-perks/v1/pages/%d", page.ID), nil, nil); err != nil {
 				return 0, err
 			}
@@ -9442,6 +9454,9 @@ func applyRunePage(ctx context.Context, client *LCUClient, request gameplayRuneA
 	}
 	name := runePageName(request.ChampionName, request.Source)
 	var addedRaw json.RawMessage
+	if err := checkAutoConfigWrite(ctx); err != nil {
+		return 0, err
+	}
 	if err := client.RequestJSON(ctx, http.MethodPost, "/lol-perks/v1/pages/", map[string]any{"name": name, "isEditable": true, "primaryStyleId": strconv.FormatInt(request.PrimaryStyleID, 10)}, &addedRaw); err != nil {
 		return 0, err
 	}
@@ -9458,11 +9473,17 @@ func applyRunePage(ctx context.Context, client *LCUClient, request gameplayRuneA
 	}
 	body := map[string]any{"id": pageID, "isRecommendationOverride": false, "isTemporary": false, "name": name, "primaryStyleId": request.PrimaryStyleID, "selectedPerkIds": request.SelectedPerkIDs, "subStyleId": request.SubStyleID, "recommendationChampionId": request.ChampionID}
 	var updatedRaw json.RawMessage
+	if err := checkAutoConfigWrite(ctx); err != nil {
+		return 0, err
+	}
 	if err := client.RequestJSON(ctx, http.MethodPut, fmt.Sprintf("/lol-perks/v1/pages/%d", pageID), body, &updatedRaw); err != nil {
 		return 0, err
 	}
 	recordRuneApplyResponse(trace, "update-page", updatedRaw)
 	var currentRaw json.RawMessage
+	if err := checkAutoConfigWrite(ctx); err != nil {
+		return 0, err
+	}
 	if err := client.RequestJSON(ctx, http.MethodPut, "/lol-perks/v1/currentpage", pageID, &currentRaw); err != nil {
 		return 0, err
 	}
@@ -9751,6 +9772,7 @@ func (a *app) handleGameplayItemSetApply(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "装备方案应用失败："+safeGameplayError(err), http.StatusConflict)
 		return
 	}
+	a.yieldAutoConfig("items")
 	stored = true
 	applyStage = "completed"
 	if normalization.LegacyCleanupFailed {
@@ -10296,6 +10318,7 @@ type gameplayPerkSlot struct {
 	Perks []gameplayPerk `json:"perks"`
 }
 type gameplayPerkStyle struct {
+	Tooltip  string             `json:"tooltip,omitempty"`
 	ID       int64              `json:"id"`
 	Name     string             `json:"name"`
 	IconPath string             `json:"iconPath"`

@@ -667,7 +667,7 @@ test("suite champselect tab after maintenance activates the real panel", () => {
   const champSelectMetrics = { hidden: true };
   const { activateTab } = compile(["activateTab"], {
     tabCopy: { watch: "自动", rig: "维护", facade: "生涯", sweep: "领奖", champselect: "征召" }, state, appScroll: null,
-    writePreference() {}, tabs, panels, standardMetrics, champSelectMetrics, subtitle: null, requestAnimationFrame(callback) { callback(); }, loadFacade() {}, loadChampSelect() {},
+    writePreference() {}, tabs, panels, standardMetrics, champSelectMetrics, configMetrics:null, offline:null, subtitle: null, requestAnimationFrame(callback) { callback(); }, loadFacade() {}, loadChampSelect() {},
   });
   activateTab("champselect");
   assert.equal(state.tab, "champselect");

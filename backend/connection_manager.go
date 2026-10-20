@@ -260,6 +260,13 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 	fameState.mu.Unlock()
 	defer func() { a.finishArenaFameDiscovery(client.arenaDiscoveryState()) }()
 	a.beginConnectionPriority(sessionCtx, client)
+	a.scheduleConnectionWork(sessionCtx, client, "auto-config-catalog", false, func() {
+		if a.autoConfigSnapshot().Enabled {
+			_, _ = a.loadAutoConfigCatalog(sessionCtx)
+		}
+	})
+	a.goSafe("summoner-keys-connect", func() { a.refreshSummonerKeys(sessionCtx, client) })
+	defer a.resetAutoConfig()
 	a.prefetchSelfMayhemRating(client)
 	a.goSafe("connection_manager.platform", func() { a.recordDiagnostic(clientPlatformDiagnostic(client)) })
 	a.scheduleConnectionWork(sessionCtx, client, "connection_manager.settings-watch", false, func() { a.beginGameSettingsWatch(sessionCtx, client) })
@@ -333,6 +340,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				if currentTokenClient {
 					a.sgp.observeTokenEvent(client, event)
 					a.observeClientCatalogVersion(client, event)
+					a.observeAutoConfigEvent(sessionCtx, client, event)
 					client.observeArenaDiscoveryEvent(event)
 				}
 				if currentTokenClient {
@@ -508,6 +516,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 				a.maybeStartupPrefetch(client, time.Now())
 			}
 		case <-champSelectPoll.ticks:
+			a.triggerAutoConfig(sessionCtx, client)
 			if !champSelectPoll.sync(a, client) {
 				continue
 			}

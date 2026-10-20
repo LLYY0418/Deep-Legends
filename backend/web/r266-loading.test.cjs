@@ -15,7 +15,7 @@ test('R266 P4 new session resets previous collection clock; failure reason belon
  assert.equal(f.collectionReadFailed({clientSessionEpoch:2,lastError:'sensitive original error'}),true);assert.equal(events[0][1],'last_error');assert.equal(events[0][2].sessionEpoch,2);assert(!JSON.stringify(events).includes('sensitive'));
 });
 test('R266 P9 suite DOM and keyboard ordering use the same array',()=>{
- const {JSDOM}=require('../../desktop/node_modules/jsdom');for(const file of ['index.html','default/index.html']){const doc=new JSDOM(fs.readFileSync(__dirname+'/'+file,'utf8')).window.document;assert.deepEqual([...doc.querySelectorAll('[data-suite-tab]')].map(n=>n.dataset.suiteTab),['watch','champselect','facade','sweep','rig']);}
+ const {JSDOM}=require('../../desktop/node_modules/jsdom');for(const file of ['index.html','default/index.html']){const doc=new JSDOM(fs.readFileSync(__dirname+'/'+file,'utf8')).window.document;assert.deepEqual([...doc.querySelectorAll('[data-suite-tab]')].map(n=>n.dataset.suiteTab),['watch','champselect','config','facade','sweep','rig']);}
  const doc=new JSDOM(fs.readFileSync(__dirname+'/index.html','utf8')).window.document,tabs=[...doc.querySelectorAll('[data-suite-tab]')],calls=[];const f=compile(fs.readFileSync(__dirname+'/suite.js','utf8'),['setupTabs'],{tabs,state:{tab:'watch'},activateTab:(name)=>calls.push(name)});f.setupTabs();tabs[0].dispatchEvent(new doc.defaultView.KeyboardEvent('keydown',{key:'ArrowRight'}));assert.equal(calls.at(-1),'champselect');tabs[0].dispatchEvent(new doc.defaultView.KeyboardEvent('keydown',{key:'ArrowLeft'}));assert.equal(calls.at(-1),'rig');
 });
 test('R266 P7 repeated foreground retry waits for the original request',async()=>{

@@ -36,6 +36,7 @@ var buildFingerprint = "dev"
 const diagnosticDeduplicationLimit = 512
 
 type app struct {
+	autoConfig                autoConfigStore
 	snapshotDiagnosticMu      sync.Mutex
 	snapshotDiagnosticWindows map[string]*diagnosticSnapshotWindow
 	milestoneCache            milestoneCache
@@ -698,6 +699,15 @@ func main() {
 	mux.HandleFunc("POST /api/gameplay/convenience", a.authorized(a.handleGameplayConvenience))
 	mux.HandleFunc("GET /api/watch/rules", a.authorized(a.handleWatchRules))
 	mux.HandleFunc("POST /api/watch/rules", a.authorized(a.handleWatchRules))
+	mux.HandleFunc("GET /api/auto-config/settings", a.authorized(a.handleAutoConfigSettings))
+	mux.HandleFunc("PUT /api/auto-config/settings", a.authorized(a.handleAutoConfigSettings))
+	mux.HandleFunc("PUT /api/auto-config/champions/{id}/{modeKey}", a.authorized(a.handleAutoConfigChampion))
+	mux.HandleFunc("DELETE /api/auto-config/champions/{id}/{modeKey}", a.authorized(a.handleAutoConfigChampion))
+	mux.HandleFunc("POST /api/auto-config/copy", a.authorized(a.handleAutoConfigCopy))
+	mux.HandleFunc("GET /api/auto-config/catalog", a.authorized(a.handleAutoConfigCatalog))
+	mux.HandleFunc("GET /api/auto-config/state", a.authorized(a.handleAutoConfigState))
+	mux.HandleFunc("GET /api/settings/summoner-keys", a.authorized(a.handleSummonerKeys))
+	mux.HandleFunc("PUT /api/settings/summoner-keys", a.authorized(a.handleSummonerKeys))
 	mux.HandleFunc("GET /api/champselect/groups", a.authorized(a.handleChampSelectGroups))
 	mux.HandleFunc("GET /api/champselect/state", a.authorized(a.handleChampSelectState))
 	mux.HandleFunc("POST /api/champselect/pause", a.authorized(a.handleChampSelectPause))
