@@ -1,0 +1,374 @@
+{
+  "catalog": {
+    "eventGameMode": "ULTBOOK",
+    "styles": [
+      {
+        "id": 8000,
+        "name": "精密",
+        "iconPath": "/fixture-icon/8000",
+        "slots": [
+          {
+            "perks": [
+              {
+                "id": 1,
+                "name": "符文1",
+                "iconPath": "/fixture-icon/1"
+              }
+            ]
+          },
+          {
+            "perks": [
+              {
+                "id": 2,
+                "name": "符文2",
+                "iconPath": "/fixture-icon/2"
+              }
+            ]
+          },
+          {
+            "perks": [
+              {
+                "id": 3,
+                "name": "符文3",
+                "iconPath": "/fixture-icon/3"
+              }
+            ]
+          },
+          {
+            "perks": [
+              {
+                "id": 4,
+                "name": "符文4",
+                "iconPath": "/fixture-icon/4"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 8100,
+        "name": "主宰",
+        "iconPath": "/fixture-icon/8100",
+        "slots": [
+          {
+            "perks": [
+              {
+                "id": 11,
+                "name": "符文11",
+                "iconPath": "/fixture-icon/11"
+              }
+            ]
+          },
+          {
+            "perks": [
+              {
+                "id": 12,
+                "name": "符文12",
+                "iconPath": "/fixture-icon/12"
+              }
+            ]
+          },
+          {
+            "perks": [
+              {
+                "id": 13,
+                "name": "符文13",
+                "iconPath": "/fixture-icon/13"
+              }
+            ]
+          },
+          {
+            "perks": [
+              {
+                "id": 14,
+                "name": "符文14",
+                "iconPath": "/fixture-icon/14"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "statModSlots": [
+      {
+        "perks": [
+          {
+            "id": 5008,
+            "name": "符文5008",
+            "iconPath": "/fixture-icon/5008"
+          }
+        ]
+      },
+      {
+        "perks": [
+          {
+            "id": 5008,
+            "name": "符文5008",
+            "iconPath": "/fixture-icon/5008"
+          }
+        ]
+      },
+      {
+        "perks": [
+          {
+            "id": 5001,
+            "name": "符文5001",
+            "iconPath": "/fixture-icon/5001"
+          }
+        ]
+      }
+    ],
+    "perks": [
+      {
+        "id": 1,
+        "name": "符文1",
+        "iconPath": "/fixture-icon/1"
+      },
+      {
+        "id": 2,
+        "name": "符文2",
+        "iconPath": "/fixture-icon/2"
+      },
+      {
+        "id": 3,
+        "name": "符文3",
+        "iconPath": "/fixture-icon/3"
+      },
+      {
+        "id": 4,
+        "name": "符文4",
+        "iconPath": "/fixture-icon/4"
+      },
+      {
+        "id": 11,
+        "name": "符文11",
+        "iconPath": "/fixture-icon/11"
+      },
+      {
+        "id": 12,
+        "name": "符文12",
+        "iconPath": "/fixture-icon/12"
+      },
+      {
+        "id": 13,
+        "name": "符文13",
+        "iconPath": "/fixture-icon/13"
+      },
+      {
+        "id": 14,
+        "name": "符文14",
+        "iconPath": "/fixture-icon/14"
+      },
+      {
+        "id": 5008,
+        "name": "符文5008",
+        "iconPath": "/fixture-icon/5008"
+      },
+      {
+        "id": 5008,
+        "name": "符文5008",
+        "iconPath": "/fixture-icon/5008"
+      },
+      {
+        "id": 5001,
+        "name": "符文5001",
+        "iconPath": "/fixture-icon/5001"
+      }
+    ],
+    "spells": [
+      {
+        "id": 3,
+        "name": "虚弱",
+        "gameModes": [
+          "CLASSIC",
+          "ARAM",
+          "KIWI",
+          "ARAM_MAYHEM",
+          "URF",
+          "ULTBOOK"
+        ],
+        "iconPath": "/fixture-icon/3",
+        "cooldown": 30
+      },
+      {
+        "id": 4,
+        "name": "闪现",
+        "gameModes": [
+          "CLASSIC",
+          "ARAM",
+          "KIWI",
+          "ARAM_MAYHEM",
+          "URF",
+          "ULTBOOK"
+        ],
+        "iconPath": "/fixture-icon/4",
+        "cooldown": 30
+      },
+      {
+        "id": 6,
+        "name": "峡谷专用",
+        "gameModes": [
+          "CLASSIC"
+        ],
+        "iconPath": "/fixture-icon/6",
+        "cooldown": 30
+      },
+      {
+        "id": 7,
+        "name": "极地专用",
+        "gameModes": [
+          "ARAM"
+        ],
+        "iconPath": "/fixture-icon/7",
+        "cooldown": 30
+      },
+      {
+        "id": 11,
+        "name": "惩戒",
+        "gameModes": [
+          "CLASSIC",
+          "URF"
+        ],
+        "iconPath": "/fixture-icon/11",
+        "cooldown": 30
+      },
+      {
+        "id": 12,
+        "name": "传送",
+        "gameModes": [
+          "CLASSIC",
+          "URF",
+          "ULTBOOK"
+        ],
+        "iconPath": "/fixture-icon/12",
+        "cooldown": 30
+      },
+      {
+        "id": 14,
+        "name": "引燃",
+        "gameModes": [
+          "CLASSIC",
+          "ARAM",
+          "KIWI",
+          "ARAM_MAYHEM",
+          "URF",
+          "ULTBOOK"
+        ],
+        "iconPath": "/fixture-icon/14",
+        "cooldown": 30
+      },
+      {
+        "id": 32,
+        "name": "标记",
+        "gameModes": [
+          "ARAM"
+        ],
+        "iconPath": "/fixture-icon/32",
+        "cooldown": 30
+      },
+      {
+        "id": 60,
+        "name": "无限火力专用",
+        "gameModes": [
+          "URF"
+        ],
+        "iconPath": "/fixture-icon/60",
+        "cooldown": 30
+      },
+      {
+        "id": 61,
+        "name": "活动专用",
+        "gameModes": [
+          "ULTBOOK"
+        ],
+        "iconPath": "/fixture-icon/61",
+        "cooldown": 30
+      },
+      {
+        "id": 2201,
+        "name": "海斗专用",
+        "gameModes": [
+          "KIWI"
+        ],
+        "iconPath": "/fixture-icon/2201",
+        "cooldown": 30
+      },
+      {
+        "id": 2202,
+        "name": "海斗变体专用",
+        "gameModes": [
+          "ARAM_MAYHEM"
+        ],
+        "iconPath": "/fixture-icon/2202",
+        "cooldown": 30
+      }
+    ],
+    "items": [
+      {
+        "id": 3000,
+        "name": "测试成装",
+        "iconPath": "/fixture-icon/3000",
+        "priceTotal": 3000,
+        "categories": [
+          "Damage"
+        ],
+        "from": [
+          1036
+        ],
+        "to": [],
+        "inStore": true,
+        "displayInItemSets": true,
+        "maps": {
+          "11": true,
+          "12": true
+        }
+      }
+    ]
+  },
+  "expectedSpellPools": {
+    "ranked": [
+      3,
+      4,
+      6,
+      11,
+      12,
+      14
+    ],
+    "normal": [
+      3,
+      4,
+      6,
+      11,
+      12,
+      14
+    ],
+    "aram": [
+      3,
+      4,
+      7,
+      14,
+      32
+    ],
+    "hextech": [
+      4,
+      14,
+      2201,
+      2202
+    ],
+    "urf": [
+      3,
+      4,
+      11,
+      12,
+      14,
+      60
+    ],
+    "event": [
+      3,
+      4,
+      12,
+      14,
+      61
+    ]
+  }
+}

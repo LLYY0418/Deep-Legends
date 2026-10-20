@@ -74,6 +74,19 @@ func autoConfigSessionKey(s lcuChampSelectSession) string {
 	}
 	return fmt.Sprintf("%d:%d:%d", s.GameID, s.QueueID, cell)
 }
+
+func autoConfigSessionMode(s lcuChampSelectSession, flow lcuGameflowSession) string {
+	queue := s.QueueID
+	if queue == 0 {
+		queue = flow.GameData.Queue.ID
+	}
+	mapID := flow.GameData.Queue.MapID
+	if mapID == 0 {
+		mapID = flow.Map.ID
+	}
+	return autoConfigMode(queue, firstNonEmpty(flow.GameData.Queue.GameMode, flow.Map.GameMode), mapID)
+}
+
 func (a *app) resetAutoConfig() {
 	a.autoConfig.Lock()
 	r := &a.autoConfig.runtime
@@ -217,16 +230,7 @@ func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
 		}
 		var flow lcuGameflowSession
 		_ = client.RequestJSON(ctx, "GET", "/lol-gameflow/v1/session", nil, &flow)
-		queue := s.QueueID
-		if queue == 0 {
-			queue = flow.GameData.Queue.ID
-		}
-		mapID := flow.GameData.Queue.MapID
-		if mapID == 0 {
-			mapID = flow.Map.ID
-		}
-		gameMode := firstNonEmpty(flow.GameData.Queue.GameMode, flow.Map.GameMode)
-		mode := autoConfigMode(queue, gameMode, mapID)
+		mode := autoConfigSessionMode(s, flow)
 		if mode == "" {
 			return
 		}
@@ -268,7 +272,7 @@ func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
 				return
 			}
 		}
-		if err := a.autoConfigGuard(ctx, client, s, generation, id); err != nil {
+		if err := a.autoConfigGuard(ctx, client, s, generation, id, mode); err != nil {
 			return
 		}
 		position := ""
@@ -281,7 +285,7 @@ func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
 		a.applyAutoConfig(ctx, client, s, generation, id, mode, modeKey, entry, exists)
 	})
 }
-func (a *app) autoConfigGuard(ctx context.Context, client *LCUClient, original lcuChampSelectSession, generation uint64, id int64) error {
+func (a *app) autoConfigGuard(ctx context.Context, client *LCUClient, original lcuChampSelectSession, generation uint64, id int64, expectedMode string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -303,10 +307,20 @@ func (a *app) autoConfigGuard(ctx context.Context, client *LCUClient, original l
 	if err = client.RequestJSON(ctx, "GET", "/lol-champ-select/v1/session", nil, &s); err != nil {
 		return err
 	}
-	if autoConfigSessionKey(s) != autoConfigSessionKey(original) || champSelectCurrentChampion(s) != id || !autoConfigLocked(s, autoConfigMode(s.QueueID, "", 0)) {
+	var flow lcuGameflowSession
+	_ = client.RequestJSON(ctx, "GET", "/lol-gameflow/v1/session", nil, &flow)
+	mode := autoConfigSessionMode(s, flow)
+	if autoConfigSessionKey(s) != autoConfigSessionKey(original) || champSelectCurrentChampion(s) != id || mode == "" || mode != expectedMode || !autoConfigLocked(s, mode) {
 		return errors.New("英雄或会话已变化")
 	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	a.autoConfig.Lock()
+	if a.autoConfig.runtime.generation != generation || a.autoConfig.runtime.client != client {
+		a.autoConfig.Unlock()
+		return errors.New("自动配置已取消")
+	}
 	a.autoConfig.runtime.observeSpells(s)
 	a.autoConfig.Unlock()
 	return nil
@@ -358,7 +372,7 @@ func (a *app) applyAutoConfigRunes(ctx context.Context, client *LCUClient, gener
 
 func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChampSelectSession, generation uint64, id int64, mode, modeKey string, entry autoConfigEntry, exists bool) {
 	started := time.Now()
-	guard := func() error { return a.autoConfigGuard(ctx, client, s, generation, id) }
+	guard := func() error { return a.autoConfigGuard(ctx, client, s, generation, id, mode) }
 	ctx = context.WithValue(ctx, autoConfigWriteGuardKey{}, guard)
 	catalog, catErr := a.loadAutoConfigCatalog(ctx)
 	settings := a.autoConfigSnapshot()

@@ -197,7 +197,7 @@
 .ac-spell:hover svg { transform:translateY(-1px); }
 .ac-spell.is-used { color:var(--primary-strong); }
 .ac-spell.is-used svg { box-shadow:0 0 0 2px var(--primary); }
-.ac-spell.is-used::after { content:attr(data-slot); position:absolute; top:1px; right:6px; min-width:14px; height:14px; padding:0 3px; border-radius:4px; background:var(--primary); color:var(--on-primary); font:700 9.5px/14px var(--font); }
+.ac-spell.is-used::after { content:attr(data-spell-key); position:absolute; top:1px; right:6px; min-width:14px; height:14px; padding:0 3px; border-radius:4px; background:var(--primary); color:var(--on-primary); font:700 9.5px/14px var(--font); }
 .ac-spell-note { grid-column:1 / -1; margin:-6px 0 0; color:var(--faint); font-size:11px; }
 
 .ac-items { display:grid; grid-template-columns:150px minmax(0,1fr) minmax(250px,300px); gap:14px; align-items:start; }

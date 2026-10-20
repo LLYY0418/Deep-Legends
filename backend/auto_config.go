@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -254,6 +255,7 @@ func (a *app) handleAutoConfigChampion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var entry autoConfigEntry
+	var version int64
 	if r.Method != http.MethodDelete {
 		if decodeAutoConfig(w, r, &entry) != nil {
 			http.Error(w, "配置格式无效", 400)
@@ -263,7 +265,19 @@ func (a *app) handleAutoConfigChampion(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		if err = a.validateAutoConfigCatalog(r.Context(), mode, entry, false); err != nil {
+		previous := a.autoConfigSnapshot()
+		version = previous.Version
+		stored := previous.Champions[id][mode]
+		// Preserve obsolete values already stored for an untouched category.
+		// A changed spell pair or equipment list must pass the current catalog.
+		changed := entry
+		if reflect.DeepEqual(entry.Spells, stored.Spells) {
+			changed.Spells = nil
+		}
+		if reflect.DeepEqual(entry.Items, stored.Items) {
+			changed.Items = nil
+		}
+		if err = a.validateAutoConfigCatalog(r.Context(), mode, changed, false); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
@@ -272,6 +286,10 @@ func (a *app) handleAutoConfigChampion(w http.ResponseWriter, r *http.Request) {
 	a.autoConfig.Lock()
 	defer a.autoConfig.Unlock()
 	a.loadAutoConfigLocked()
+	if r.Method != http.MethodDelete && a.autoConfig.settings.Version != version {
+		http.Error(w, "配置已更新，请重新读取后保存", http.StatusConflict)
+		return
+	}
 	next := a.autoConfig.settings
 	// Clone before mutation: a failed disk write must leave the live configuration intact.
 	data, _ := json.Marshal(next)

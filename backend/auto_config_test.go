@@ -329,14 +329,14 @@ func TestR298GuardAndApplyOnce(t *testing.T) {
 	snapshot := s
 	s.Actions[0][0].Completed = false
 	mu.Unlock()
-	if a.autoConfigGuard(context.Background(), client, snapshot, a.autoConfig.runtime.generation, 1) == nil {
+	if a.autoConfigGuard(context.Background(), client, snapshot, a.autoConfig.runtime.generation, 1, "ranked") == nil {
 		t.Fatal("revoked lock passed guard")
 	}
 	mu.Lock()
 	s.Actions[0][0].Completed = true
 	phase = "GameStart"
 	mu.Unlock()
-	if a.autoConfigGuard(context.Background(), client, snapshot, a.autoConfig.runtime.generation, 1) == nil {
+	if a.autoConfigGuard(context.Background(), client, snapshot, a.autoConfig.runtime.generation, 1, "ranked") == nil {
 		t.Fatal("phase changed passed guard")
 	}
 	mu.Lock()
