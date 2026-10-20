@@ -1026,7 +1026,13 @@
   }
 
   /* ---------- fetch 拦截 ---------- */
+  let autoConfigDemo={version:1,enabled:false,runes:true,spells:true,items:true,champions:{}};
+  let summonerKeysDemo={keys:["D","F"],flashSlot:null};
   const fixtures = new Map([
+    ["/api/auto-config/settings",()=>structuredClone(autoConfigDemo)],
+    ["/api/auto-config/catalog",()=>({...perksCatalog,items:[],spells:[]})],
+    ["/api/auto-config/state",()=>({})],
+    ["/api/settings/summoner-keys",()=>structuredClone(summonerKeysDemo)],
     ["/api/status", () => status],
     ["/api/chromas", () => ({ items: chromas, count: chromas.length, ownedCount: 2, capability: { name: "chromas", state: "available", count: chromas.length } })],
     ["/api/account", () => account],
@@ -1104,6 +1110,8 @@
       try { request = JSON.parse(init?.body || "{}"); } catch (_) {}
       return Promise.resolve(new Response(JSON.stringify({ applied: true, verified: true, uid: "deep-legends-demo", title: `DL · ${request.title || "推荐出装"}` }), { status: 200, headers: { "Content-Type": "application/json" } }));
     }
+    if(pathname==="/api/auto-config/settings"&&init?.method==="PUT"){autoConfigDemo={...JSON.parse(init.body),version:autoConfigDemo.version+1};return Promise.resolve(new Response(JSON.stringify(autoConfigDemo)));}
+    if(pathname==="/api/settings/summoner-keys"&&init?.method==="PUT"){summonerKeysDemo={...summonerKeysDemo,...JSON.parse(init.body)};return Promise.resolve(new Response(JSON.stringify(summonerKeysDemo)));}
     if (pathname === "/api/watch/rules" && String(init?.method || "GET").toUpperCase() === "POST") {
       try { suiteWatch = JSON.parse(init?.body || "{}"); } catch (_) {}
       return Promise.resolve(new Response(JSON.stringify(structuredClone(suiteWatch)), { status: 200, headers: { "Content-Type": "application/json" } }));

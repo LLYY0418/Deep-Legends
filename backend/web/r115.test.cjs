@@ -44,7 +44,7 @@ test('R115 Suite loads helpers first, retains navigation tab and replays only th
   h.w.dispatchEvent(new h.w.CustomEvent('deep-legends:status',{detail:{connected:true}}));
   h.w.dispatchEvent(new h.w.CustomEvent('deep-legends:navigate',{detail:{section:'suite',tab:'sweep'}}));
   let state;h.w.deepLegendsSections.listen('deep-legends:status',event=>state=event.detail);assert.equal(state.connected,true);assert.equal(oldStatusCalls,2);
-  const a=h.w.deepLegendsSections.activate('suite');assert.equal(h.styles().length,1);assert.equal(h.scripts().length,0);await h.finish('champions');let detail;assert.equal(h.styles().length,3);h.finish('suite',e=>detail=e.detail);await a;assert.equal(detail.name,'suite');assert.equal(detail.navigation.tab,'sweep');
+  const a=h.w.deepLegendsSections.activate('suite');assert.equal(h.styles().length,1);assert.equal(h.scripts().length,0);await h.finish('champions');let detail;assert.equal(h.styles().length,3);await h.finish('auto-config');assert.equal(h.styles().length,4);h.finish('suite',e=>detail=e.detail);await a;assert.equal(detail.name,'suite');assert.equal(detail.navigation.tab,'sweep');assert.deepEqual(h.scripts().map(n=>n.dataset.sectionModule),['patch-notes','champions','auto-config','suite']);
  }finally{h.close();}
 });
 test('R139 broadcast controls hide options for self and show one suite-switch for team',()=>{

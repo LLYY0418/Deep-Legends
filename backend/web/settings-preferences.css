@@ -121,3 +121,13 @@ main.shell:has(> #settings-panel:not([hidden])) { padding-right: calc(46px - var
 .setting-card.is-disabled { opacity: .5; }
 
 .settings-panel :is(.setting-actions .text-button, .app-select-trigger, .toggle-control, input[type="text"], input[type="number"], select, textarea) { font-size:13px; font-weight:600; }
+
+/* Summoner key choice belongs to settings. */
+.ac-flash-seg { display:flex; padding:2px; border:1px solid var(--line); border-radius:9px; background:var(--bg); }
+.ac-flash-seg button { display:inline-flex; align-items:center; gap:6px; min-width:58px; height:30px; padding:0 12px; border:0; border-radius:7px; background:transparent; color:var(--muted); font:inherit; font-size:12px; cursor:pointer; justify-content:center; }
+.ac-flash-seg button:hover { color:var(--ink); }
+.ac-flash-seg button.is-active { color:var(--on-primary); background:var(--primary); font-weight:700; }
+.ac-flash-seg button.is-active kbd { color:var(--on-primary); border-color:color-mix(in oklab,var(--on-primary) 35%,transparent); background:transparent; }
+.ac-kbd { display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 5px; border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; background:var(--surface-strong); color:var(--ink); font:700 11px/1 var(--font); }
+.ac-setting-flash h3 { color:var(--primary-strong); }
+.ac-setting-flash .ac-flash-seg button { min-width:104px; gap:8px; }

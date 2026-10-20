@@ -15,6 +15,7 @@ import (
 //
 //go:embed web/announcements.js
 //go:embed web/collection-new-items.js
+//go:embed web/auto-config.js web/auto-config-live.js
 //go:embed web/app.js web/augment-artwork.js web/cache-controls.js web/champions.js web/demo-data.js
 //go:embed web/favorites-facade.js web/friends.js web/gameplay.js web/history-filters.js web/history-recovery.js web/image-queue.js web/live-arena.js web/match-details.js
 //go:embed web/overview-art.js web/overview-casual.js web/pro-players.js web/runtime.js web/section-loader.js web/suite.js

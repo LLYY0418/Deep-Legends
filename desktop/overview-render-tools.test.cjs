@@ -17,18 +17,20 @@ const { waitForOverview, waitForRender, waitForWatch } = require("./renderer-wai
 
 installWindowCleanup(test);
 
-test("演示数据下工具五个页签都渲染完成", async () => {
+test("演示数据下工具六个页签都渲染完成", async () => {
   const { window: w, errors } = bootDemoApp();
   await waitForOverview(w, 17);
   w.document.querySelector('[data-section="suite"]').click();
   await waitForWatch(w);
-  for (const name of ["watch", "rig", "facade", "sweep", "champselect"]) {
+  for (const name of ["watch", "rig", "facade", "sweep", "champselect", "config"]) {
     await visitTool(w, name);
     const root = w.document.getElementById(`suite-${name}-root`);
     assert.ok(root, `工具缺少 ${name} 容器`);
     assert.equal(root.classList.contains("suite-loading"), false, `${name} 永久停在加载态`);
     assert.ok(root.textContent.trim().length > 20, `${name} 没有渲染出内容`);
   }
+  assert.ok(w.document.querySelector("#suite-config-root .ac-master"),"配置页没有渲染总开关卡片");
+  assert.equal(w.document.querySelectorAll("#suite-config-root [data-mode]").length,6,"配置页缺少六个模式");
   const watchCards = [...w.document.querySelectorAll("#suite-watch-root [data-watch-card]")];
   assert.deepEqual(watchCards.map((card) => card.dataset.watchCard), ["accept", "promote-leader", "invitations", "auto-matchmaking", "reconnect", "position-broadcast", "play-again", "auto-honor", "skip-celebration"], "自动页九张规则卡未按分类完整渲染");
   assert.equal(w.document.querySelectorAll("#suite-watch-root [data-watch-toggle]").length, 9, "自动规则卡缺少独立开关");
@@ -49,9 +51,9 @@ test("演示数据下工具五个页签都渲染完成", async () => {
   assert.ok(w.document.querySelector("#suite-sweep-root .claim-row"), "领奖清单未渲染");
   assert.equal(w.document.querySelector("#suite-sweep-root > .suite-note.is-info"), null, "领奖页仍显示重新扫描下方的说明条");
   assert.equal(w.document.querySelector("#suite-sweep-root .claim-sub"), null, "领奖标题下仍显示描述文字");
-  assert.deepEqual([...w.document.querySelectorAll(".suite-tab")].map((node) => node.dataset.suiteTab), ["watch", "champselect", "facade", "sweep", "rig"], "维护应移至领奖后面");
+  assert.deepEqual([...w.document.querySelectorAll(".suite-tab")].map((node) => node.dataset.suiteTab), ["watch", "champselect", "config", "facade", "sweep", "rig"], "维护应移至领奖后面");
   const suiteIcons = [...w.document.querySelectorAll(".suite-tab-icon svg")];
-  assert.equal(suiteIcons.length, 5, "五个工具图标应统一使用 SVG");
+  assert.equal(suiteIcons.length, 6, "六个工具图标应统一使用 SVG");
   for (const icon of suiteIcons) {
     assert.equal(icon.getAttribute("viewBox"), "0 0 24 24");
     assert(icon.querySelector("path,circle,rect"));
