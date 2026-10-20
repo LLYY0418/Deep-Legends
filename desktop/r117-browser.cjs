@@ -53,10 +53,10 @@ async function main(){
  await until('document.querySelector(".demo-flag")');
  await new Promise(r=>setTimeout(r,600));
 
- // ---- 阶段 A：首屏（只有 5 张首屏样式表，任何懒页 CSS 都还没注入）----
+ // ---- 阶段 A：首屏（5 张基础样式表及 R297 总览玩家标签样式，其他懒页 CSS 尚未注入）----
  const initialLinks = await evaluate(`JSON.stringify([...document.querySelectorAll('link[rel="stylesheet"]')].map(l=>l.getAttribute("href")))`);
- assert.deepEqual(JSON.parse(initialLinks), ['/app.css','/build-item-row.css','/gameplay.css','/friends.css','/metrics.css'], 'first-screen stylesheet set drifted');
- assert.equal(await evaluate(`Boolean(document.querySelector('link[data-section-style]'))`), false, 'a lazy section sheet was already injected at first paint');
+ assert.deepEqual(JSON.parse(initialLinks), ['/app.css','/build-item-row.css','/gameplay.css','/friends.css','/metrics.css','/player-tags.css'], 'first-screen stylesheet set drifted');
+ assert.equal(await evaluate(`Boolean(document.querySelector('link[data-section-style]:not([data-section-style="player-tags"])'))`), false, 'a lazy section sheet was already injected at first paint');
  // 反证：champions.css 此刻确实未生效，否则下面几条共享片断言证明不了任何事。
  assert.notEqual(await evaluate(`getComputedStyle(document.querySelector('#champions-panel .champions-skeleton')).display`), 'grid', 'champions.css must not be active before the section switch');
  // 共享片必须在首屏生效：对局页装备排行用的 .mayhem-ranking-list 基础几何原本只存在于 champions.css。

@@ -1,6 +1,6 @@
 'use strict';
 const {browser}=require('./r297-browser-harness.cjs'),path=require('node:path'),fs=require('node:fs'),assert=require('node:assert/strict');
-const out=path.resolve(__dirname,'../docs/history/reports/r297/evidence/p3-browser'),backend=process.argv[2];
+const out=path.join(process.env.R297_REPORT_DIR||path.join(require('node:os').tmpdir(),'r297-browser-proof'),'p3-browser'),backend=process.argv[2];
 (async()=>{
  const results=[];
  for(const run of [0,1]){

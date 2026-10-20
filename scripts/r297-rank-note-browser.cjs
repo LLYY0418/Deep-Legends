@@ -1,6 +1,6 @@
 'use strict';
 const {browser}=require('./r297-browser-harness.cjs'),path=require('node:path'),fs=require('node:fs'),assert=require('node:assert/strict');
-const out=path.resolve(__dirname,'../docs/history/reports/r297/evidence/p7-rank-note');
+const out=path.join(process.env.R297_REPORT_DIR||path.join(require('node:os').tmpdir(),'r297-browser-proof'),'p7-rank-note');
 (async()=>{const b=await browser({out});const results=[];try{
  await b.call('Page.navigate',{url:b.origin+'/?demo&section=overview'});await b.until('window.__r297?.activeTab()?.data&&!__r297.activeTab().loading');
  for(const theme of ['dark','light'])for(const capped of [false,true]){

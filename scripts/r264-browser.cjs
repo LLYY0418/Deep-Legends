@@ -76,6 +76,12 @@ async function start(){
   })().catch(async e=>{if(closedSessions.has(m.sessionId))return;if(e.message.includes('Invalid InterceptionId')){await new Promise(resolve=>setTimeout(resolve,50));if(canceledRequests.has(m.sessionId+':'+m.params.networkId)){canceledInterceptions++;return;}}errors.push({message:e.message});});
  });
  for(const theme of ['dark','light'])for(const storage of ['empty','saved','malformed']){
+  // Each storage case models a fresh installation. R297 preferences persist
+  // across origins, so clearing only localStorage no longer isolates cases.
+  const preferenceHeaders={'Content-Type':'application/json','X-Local-Token':ready.token};
+  const existing=await fetch(ready.baseUrl+'/api/ui-preferences',{headers:preferenceHeaders});assert(existing.ok);
+  const keys=Object.keys((await existing.json()).values||{});
+  if(keys.length){const reset=await fetch(ready.baseUrl+'/api/ui-preferences',{method:'POST',headers:preferenceHeaders,body:JSON.stringify({mode:'update',values:Object.fromEntries(keys.map(key=>[key,null]))})});assert(reset.ok,'reset authoritative fixture preferences');}
   const {targetId}=await send('Target.createTarget',{url:'about:blank'}),{sessionId}=await send('Target.attachToTarget',{targetId,flatten:true}),call=(m,p)=>send(m,p,sessionId);
   const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
   const until=async expression=>{if(await waitForPage(evaluate,expression,{idleMs:15000,hardMs:90000}))return;const snapshot=await evaluate("({api:window.__r264API?.slice(-20),statuses:window.__r264Statuses?.slice(-10),ensureCalls:window.__r264EnsureCalls,conflict:window.__r264Conflict,hidden:document.hidden,view:document.querySelector('#favorites-panel')?.textContent.slice(0,1200),grid:document.querySelector('#skin-grid')?.textContent.slice(0,500),launch:document.querySelector('#client-launchpad')?.hidden,filter:!!document.querySelector('[data-af-open]'),requests:window.__r264OverviewRequests,overview:document.querySelector('#overview-content')?._overviewViewTab && {loading:document.querySelector('#overview-content')._overviewViewTab.loading,error:document.querySelector('#overview-content')._overviewViewTab.initialPageError}})");throw Error('timeout '+expression+' '+JSON.stringify(snapshot));};

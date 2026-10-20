@@ -6076,6 +6076,15 @@
     void fetch("/api/gameplay/champselect-latency", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stage, durationMs: Math.max(0, Math.round(performance.now() - started)) }) }).catch(() => {});
   }
 
+  function noteChampSelectReady(stage, currentTargetMatches) {
+    const version = Number(state.champSelectLite?.version || 0);
+    if (!currentTargetMatches || state.live?.phase !== "ChampSelect" || !version || !state.champSelectRecommendationStarted) return;
+    const recorded = state.champSelectReadyVersions ||= new Map();
+    if (recorded.get(stage) === version) return;
+    recorded.set(stage, version);
+    noteChampSelectLatency(stage, state.champSelectRecommendationStarted);
+  }
+
   function mergeChampSelectFields(data, afterVersion = -1) {
     const lite = state.champSelectLite;
     if (!lite || Number(lite.version) <= afterVersion || data?.phase !== "ChampSelect" || Number(data.gameId || 0) !== Number(lite.gameId || 0)) return data;
@@ -6104,9 +6113,9 @@
     const target = liveRecommendationTarget(data);
     if (!target) return;
     const cache = state.clientRuneCache ||= new Map(), flights = state.clientRuneFlights ||= new Map(), failures = state.clientRuneFailures ||= new Map();
-    if (cache.has(target.key)) { if (liveRecommendationTarget(state.live)?.key === target.key) state.live.clientRecommendation = cache.get(target.key); noteChampSelectLatency("client_ready", state.champSelectRecommendationStarted); return; }
+    if (cache.has(target.key)) { if (liveRecommendationTarget(state.live)?.key === target.key) state.live.clientRecommendation = cache.get(target.key); noteChampSelectReady("client_ready", liveRecommendationTarget(state.live)?.key === target.key); return; }
     if (flights.has(target.key) || failures.has(target.key) && Date.now() - failures.get(target.key) < 60000) return;
-    const generation = state.liveGameGeneration, started = state.champSelectRecommendationStarted || performance.now();
+    const generation = state.liveGameGeneration;
     flights.set(target.key, generation);
     try {
       const query = new URLSearchParams({ championId: target.championId, position: target.clientPosition, mapId: target.mapId });
@@ -6117,7 +6126,7 @@
       failures.delete(target.key);
       if (liveRecommendationTarget(state.live)?.key === target.key) {
         state.live.clientRecommendation = result.clientRecommendation;
-        ensurePerks(); renderLive("recommendation"); noteChampSelectLatency("client_ready", started);
+        ensurePerks(); renderLive("recommendation"); noteChampSelectReady("client_ready", true);
       }
     } catch (error) {if(generation === state.liveGameGeneration && error.name !== "RequestCancelled") failures.set(target.key, Date.now());}
     finally {if(flights.get(target.key) === generation) flights.delete(target.key);}
@@ -6130,6 +6139,7 @@
     if (expected && Number(detail.gameId) !== expected) return false;
     const started = performance.now() - Math.max(0, Date.now() - Number(detail.eventAtMs || Date.now())), previous = state.live;
     state.champSelectLite = detail;
+    state.champSelectRecommendationStarted = started;
     if (!previous) return true;
     state.live = mergeChampSelectFields(previous);
     if (state.liveProgressSnapshot) state.liveProgressSnapshot.live = state.live;
@@ -6137,7 +6147,6 @@
     renderLive("sse");
     noteChampSelectLatency("card_render", started);
     noteChampSelectLatency("recommendation_loading", started);
-    state.champSelectRecommendationStarted = started;
     void ensureFastClientRecommendation(state.live);
     void ensureLiveRecommendations(state.live);
     void ensureProRunes(state.live);
@@ -6417,6 +6426,7 @@
         clearedRecommendations: state.liveRecommendations?.size || 0 }),
     }).catch(() => {});
     state.champSelectLite = null;
+    state.champSelectReadyVersions?.clear();
     state.clientRuneCache?.clear();
     state.clientRuneFlights?.clear();
     state.clientRuneFailures?.clear();
@@ -6689,10 +6699,10 @@
     // R116-D：阵容（我方 5 人 + 视阶段而定的敌方 5 人）。拿不到阵容就不传 roster
     const roster = liveRecommendationRoster(data);
     const rosterSignature = String(roster?.signature || "");
-    if (data?.recommendations) { recordLiveRecommendationSkip("has-payload", target, data); return; }
+    if (data?.recommendations) { if (hasUsableLiveRecommendations(data.recommendations)) noteChampSelectReady("build_ready", liveRecommendationTarget(state.live)?.key === targetKey); recordLiveRecommendationSkip("has-payload", target, data); return; }
     // 缓存命中还要再比一次阵容签名：选人阶段英雄是逐个锁定的，阵容变了而
     // key 没变（key 的格式被既有测试钉死、不含阵容），提示就会停在旧阵容上。
-    if (state.liveRecommendations.has(targetKey) && (!rosterSignature || state.liveRecommendationRosters?.get?.(targetKey) === rosterSignature)) { recordLiveRecommendationSkip("cached", target, data); return; }
+    if (state.liveRecommendations.has(targetKey) && (!rosterSignature || state.liveRecommendationRosters?.get?.(targetKey) === rosterSignature)) { noteChampSelectReady("build_ready", liveRecommendationTarget(state.live)?.key === targetKey); recordLiveRecommendationSkip("cached", target, data); return; }
     if (liveRecommendationFlightActive(targetKey)) { recordLiveRecommendationSkip("in-flight", target, data); return; }
     const failedAt = Number(state.liveRecommendationFailures.get(targetKey) || 0);
     if (failedAt > 0 && Date.now() - failedAt < 60_000) { recordLiveRecommendationSkip("backoff", target, data); return; }
@@ -6732,7 +6742,7 @@
       });
       // R116-D: track roster provenance separately from stable recommendation keys.
       if (rosterSignature) state.liveRecommendationRosters?.set?.(targetKey, rosterSignature);
-      noteChampSelectLatency("build_ready", state.champSelectRecommendationStarted);
+      noteChampSelectReady("build_ready", liveRecommendationTarget(state.live)?.key === targetKey);
       state.liveRecommendationFailures.delete(targetKey);
       recordItemSetClientDiagnostic("live_recommendations_client", "received", {
         ...target, traceId: recommendations.traceId, recommendationKey: recommendations.recommendationKey,
@@ -6826,7 +6836,7 @@
     const target = proRequestTarget(data);
     if (!target || state.proRuneFlights.has(target.key)) return;
     const cached = state.proRunes.get(target.key);
-    if (!force && cached && Date.now() - cached.receivedAt < (cached.preparing || cached.outcomesLoading ? 3000 : cached.reason ? 60000 : 300000)) return;
+    if (!force && cached && Date.now() - cached.receivedAt < (cached.preparing || cached.outcomesLoading ? 3000 : cached.reason ? 60000 : 300000)) { if (!cached.preparing && !cached.outcomesLoading && !cached.stale && !cached.reason) noteChampSelectReady("pros_ready", proRequestTarget(state.live)?.key === target.key); return; }
     const generation = Number(state.liveGameGeneration || 0);
     state.proRuneFlights.set(target.key, true);
     try {
@@ -6835,7 +6845,7 @@
       if (generation !== Number(state.liveGameGeneration || 0)) return;
       if (!Array.isArray(response?.pros)) throw new Error("职业符文数据不完整");
       retainRuneStarterItems(response.pros, cached?.pros);
-      if (!response.preparing) noteChampSelectLatency("pros_ready", state.champSelectRecommendationStarted);
+      if (!response.preparing && !response.outcomesLoading && !response.stale && !response.reason) noteChampSelectReady("pros_ready", proRequestTarget(state.live)?.key === target.key);
       state.proRunes.set(target.key, { ...response, receivedAt: Date.now() });
       if (response.pros.length) { ensurePerks(); ensureItems(); }
     } catch (error) {
@@ -6860,8 +6870,9 @@
 	if (!target) { recordSpecialistRuneClientSkip("no-target", null, data); return; }
 	if (!recommendationQueueHasTopPlayers(data)) { recordSpecialistRuneClientSkip("no-top-players", target, data); return; }
     const embedded = liveRecommendationsFor(data)?.runes?.specialists;
-	if (Array.isArray(embedded) && embedded.length) { recordSpecialistRuneClientSkip("embedded", target, data); return; }
+	if (Array.isArray(embedded) && embedded.length) { noteChampSelectReady("specialists_ready", specialistRequestTarget(state.live)?.key === target.key); recordSpecialistRuneClientSkip("embedded", target, data); return; }
 	if (state.specialistRunes.has(target.key)) {
+      if (!state.specialistRuneFailures.has(target.key)) noteChampSelectReady("specialists_ready", specialistRequestTarget(state.live)?.key === target.key);
 	  recordSpecialistRuneClientSkip(state.specialistRunes.get(target.key)?.length ? "cached" : "cached-empty", target, data);
 	  return;
 	}
@@ -6895,7 +6906,7 @@
 	  } else {
 		retainRuneStarterItems(runes, state.specialistRunes.get(target.key));
 		state.specialistRunes.set(target.key, runes);
-        noteChampSelectLatency("specialists_ready", state.champSelectRecommendationStarted);
+        noteChampSelectReady("specialists_ready", specialistRequestTarget(state.live)?.key === target.key);
 		state.specialistRuneFailures.delete(target.key);
 	  }
       if (runes.length) ensurePerks();

@@ -39,3 +39,17 @@ test('R297 empty client results cool down and non-selection snapshots issue no r
  await h.ensureFastClientRecommendation(h.state.live);await h.ensureFastClientRecommendation(h.state.live);
  assert.equal(reads,1);assert(h.state.clientRuneFailures.has('1'));
 });
+test('R297 ready diagnostics count each source once per selection and reject stale targets',async()=>{
+ const h=fixture(async()=>({championId:1,clientRecommendation:{championId:1}}));
+ const samples=[];h.state.champSelectLite={version:1};h.state.champSelectRecommendationStarted=10;
+ const f=compile(source,['ensureFastClientRecommendation','noteChampSelectReady'],{state:h.state,api:async()=>({championId:1,clientRecommendation:{championId:1}}),liveRecommendationTarget:d=>({key:String(d.championId),championId:d.championId,clientPosition:'mid',mapId:11}),ensurePerks(){},renderLive(){},noteChampSelectLatency:(stage,started)=>samples.push({stage,started})});
+ for(let i=0;i<26;i++)await f.ensureFastClientRecommendation(h.state.live);
+ assert.deepEqual(samples,[{stage:'client_ready',started:10}]);
+ h.state.champSelectLite.version=2;h.state.champSelectRecommendationStarted=20;
+ await f.ensureFastClientRecommendation(h.state.live);assert.equal(samples.length,2);assert.equal(samples[1].started,20);
+ h.state.live={phase:'ChampSelect',championId:2};h.state.champSelectLite.version=3;
+ await f.ensureFastClientRecommendation({phase:'ChampSelect',championId:1});
+ f.noteChampSelectReady('build_ready',false);assert.equal(samples.length,2,'old hero responses must not pollute current timings');
+ f.noteChampSelectReady('build_ready',true);f.noteChampSelectReady('build_ready',true);assert.equal(samples.length,3);
+ h.state.live.phase='InProgress';h.state.champSelectLite.version=4;f.noteChampSelectReady('build_ready',true);assert.equal(samples.length,3);
+});

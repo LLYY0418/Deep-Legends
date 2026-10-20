@@ -1,6 +1,6 @@
 "use strict";
 const {browser}=require('./r297-browser-harness.cjs'),path=require('node:path'),fs=require('node:fs'),assert=require('node:assert/strict');
-const out=path.resolve(__dirname,'../docs/history/reports/r297/evidence/p5-settings');
+const out=path.join(process.env.R297_REPORT_DIR||path.join(require('node:os').tmpdir(),'r297-browser-proof'),'p5-settings');
 (async()=>{const b=await browser({out});const results=[];try{
  await b.call('Page.navigate',{url:b.origin+'/?demo'});await b.until('window.__r297');
  await b.evaluate(`window.dispatchEvent(new CustomEvent('deep-legends:navigate',{detail:{section:'settings',page:'gameplay'}}))`);

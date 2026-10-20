@@ -34,6 +34,15 @@ function serveStaticAPI(req,res){
  if(method==='GET'&&pathname==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache'});res.write(': synthetic fixture stream\n\n');return true;}
  if(method==='GET'&&['/api/image','/api/champion-asset'].includes(pathname)){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#587c83"/></svg>');return true;}
  let data;
+ if(['GET','POST'].includes(method)&&pathname==='/api/player-tags'){
+  if(method==='GET')data={version:1,catalog:[],players:[]};
+  else {
+   const chunks=[];req.on('data',c=>chunks.push(c));req.on('end',()=>{
+    try { const body=JSON.parse(Buffer.concat(chunks).toString());if(body.op!=='query'||!Array.isArray(body.playerRefs))throw Error('unexpected player tags operation');res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version:1,catalog:[],records:{}})); }
+    catch {res.statusCode=400;res.end('unsupported player tags fixture request');}
+   });return true;
+  }
+ }
  if(method==='GET'&&pathname==='/api/gameplay/client-recommendation')data=browserAPI(url);
  if(method==='GET'&&pathname==='/api/announcements')data={source:'synthetic',announcements:[]};
  if(method==='GET'&&pathname==='/api/gameplay/summoner-spells')data={source:'synthetic',spells:[{id:4,name:'闪现'},{id:11,name:'惩戒'},{id:14,name:'引燃'}]};

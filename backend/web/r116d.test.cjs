@@ -63,7 +63,7 @@ function functionSource(source, name) {
 
 function compileFunctions(source, names, dependencies = {}) {
   const bodies = names.map((name) => functionSource(source, name));
-  if (bodies.some(body=>body.includes("noteChampSelectLatency("))) bodies.push(functionSource(source,"noteChampSelectLatency"));
+  for (const helper of ["noteChampSelectReady", "noteChampSelectLatency"]) if (bodies.some(body=>body.includes(helper+"("))) bodies.push(functionSource(source,helper));
   if (bodies.some(body=>body.includes("champSelectEnemyPlaceholder("))) bodies.push(functionSource(source,"champSelectEnemyPlaceholder"));
   const dependencyNames = Object.keys(dependencies);
   const factory = Function(...dependencyNames, `"use strict";\n${bodies.join("\n")}\nreturn { ${names.join(", ")} };`);

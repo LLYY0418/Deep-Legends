@@ -637,10 +637,6 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .audit-tables { display: grid; gap: 26px; }
 .diagnostic-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .diagnostic-actions > .muted { font-size: 12px; }
-.diagnostic-actions :is(#copy-diagnostics, #export-diagnostics) { border: 1px solid currentColor; font-weight: 700; text-decoration: none; }
-.diagnostic-actions #copy-diagnostics { color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, var(--surface)); }
-.diagnostic-actions #export-diagnostics { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
-.diagnostic-actions :is(#copy-diagnostics, #export-diagnostics):hover { box-shadow: inset 0 0 0 1px currentColor; filter: brightness(1.08); }
 .diagnostic-actions :is(#copy-diagnostics, #export-diagnostics):focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 .diagnostic-export-note { margin: 0 0 20px; font-size: 12px; }
 .history-actions, .form-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
@@ -1205,21 +1201,21 @@ html[data-ui-preferences="pending"] #app-frame { visibility: hidden; }
 
 /* Main toolbar actions remain legible while idle. */
 :is(#overview-refresh,#live-refresh,#pro-players-refresh,#refresh-history),
-.suite-head .text-button,.suite-toolbar .text-button,
+.suite-head .text-button,
 .settings-panel .setting-card .text-button:not([id$="-clear"]),
 .settings-panel .diagnostic-actions .text-button,
 .ptag-manage-card > header .text-button {
   color:var(--ink); background:var(--surface-strong); border:1px solid var(--line);
 }
 :is(#overview-refresh,#live-refresh,#pro-players-refresh,#refresh-history):hover:not(:disabled),
-.suite-head .text-button:hover:not(:disabled),.suite-toolbar .text-button:hover:not(:disabled),
+.suite-head .text-button:hover:not(:disabled),
 .settings-panel .setting-card .text-button:not([id$="-clear"]):hover:not(:disabled),
 .settings-panel .diagnostic-actions .text-button:hover:not(:disabled),
 .ptag-manage-card > header .text-button:hover:not(:disabled) {
   color:var(--ink); border-color:color-mix(in oklab,var(--primary) 55%,var(--line));
 }
 :is(#overview-refresh,#live-refresh,#pro-players-refresh,#refresh-history):disabled,
-.suite-head .text-button:disabled,.suite-toolbar .text-button:disabled,
+.suite-head .text-button:disabled,
 .settings-panel .setting-card .text-button:not([id$="-clear"]):disabled,
 .settings-panel .diagnostic-actions .text-button:disabled,
 .ptag-manage-card > header .text-button:disabled { opacity:.55; cursor:progress; }

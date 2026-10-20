@@ -1,6 +1,6 @@
 'use strict';
 const {browser}=require('./r297-browser-harness.cjs'),path=require('node:path'),fs=require('node:fs'),assert=require('node:assert/strict');
-const out=path.resolve(__dirname,'../docs/history/reports/r297/evidence/p8-player-tags');
+const out=path.join(process.env.R297_REPORT_DIR||path.join(require('node:os').tmpdir(),'r297-browser-proof'),'p8-player-tags');
 (async()=>{const b=await browser({out,backend:process.argv[2],intercept:`if(pathname==='/api/gameplay/live'&&window.__tagLive)return Promise.resolve(new Response(JSON.stringify(window.__tagLive),{headers:{"Content-Type":"application/json"}}));`});const results=[];try{
  await b.call('Page.navigate',{url:b.origin+'/?demo&section=overview'});await b.until('window.__r297?.activeTab()?.data&&!__r297.activeTab().loading');
  await b.evaluate(`window.dispatchEvent(new CustomEvent('deep-legends:navigate',{detail:{section:'live'}}))`);await b.until('__r297.state.live?.players?.length>=10 && !__r297.state.liveLoading && window.deepLegendsPlayerTags');

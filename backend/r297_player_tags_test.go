@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -39,8 +40,13 @@ func TestR297PlayerTagsPersistenceAPIAndImport(t *testing.T) {
 	if json.Unmarshal(raw, &v) != nil || v.Players[rawID].Note != "这次会沟通" {
 		t.Fatal(string(raw))
 	}
-	if mode, _ := os.Stat(filepath.Join(s.root, "player-tags.json")); mode.Mode().Perm() != 0600 {
-		t.Fatal(mode.Mode())
+	info, err := os.Stat(filepath.Join(s.root, "player-tags.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Windows FileMode does not express POSIX owner-only permission bits.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
+		t.Fatal(info.Mode())
 	}
 	// A new app/token exposes only new opaque references, retaining the same machine records.
 	a = &app{storage: &localStore{root: s.root}, token: "new-token"}
