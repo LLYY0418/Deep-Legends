@@ -1,6 +1,8 @@
 # Dot-sourced by r206-real-upgrade-windows.ps1; these paths belong to its CI fixture.
 function Test-R297UpgradeTargets {
     param([string]$Candidate, [array]$Published)
+    # go test runs from backend/, so export an absolute native installer path.
+    $Candidate = (Resolve-Path -LiteralPath $Candidate).Path
     $savedInstall = $script:install
     $defaultCopy = Join-Path $env:LOCALAPPDATA 'Programs/Deep Legends/Deep Legends.exe'
     $defaultBefore = if (Test-Path -LiteralPath $defaultCopy) { (Get-FileHash -LiteralPath $defaultCopy -Algorithm SHA256).Hash } else { $null }
@@ -18,6 +20,7 @@ function Test-R297UpgradeTargets {
                 $sentinel = Join-Path $script:install 'r297-original-directory.txt'
                 # The installer may replace its own files; this verifies the old directory survives.
                 Set-Content -LiteralPath $sentinel -Value 'r297-original-directory' -Encoding utf8
+                $staleRegistrationWrites = 0
                 if ($stale) {
                     foreach ($view in @([Microsoft.Win32.RegistryView]::Registry64,[Microsoft.Win32.RegistryView]::Registry32)) {
                         $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser,$view)
@@ -30,12 +33,14 @@ function Test-R297UpgradeTargets {
                                     $command = [string]$key.GetValue('UninstallString','')
                                     if ($key.GetValue('DisplayName','') -eq 'Deep Legends' -and $command.Contains($script:install)) {
                                         $key.SetValue('InstallLocation',(Join-Path $root 'r297-nonexistent-directory'))
+                                        $staleRegistrationWrites++
                                     }
                                 } finally { $key.Dispose() }
                             }
                         } finally { if ($parent) { $parent.Dispose() }; $base.Dispose() }
                     }
                 }
+                if ($stale -and $staleRegistrationWrites -eq 0) { throw "R297 stale-registration fixture did not alter an owned key ($label)" }
                 $env:R297_TARGET_INSTALL = $script:install
                 $env:R297_TARGET_SETUP = $Candidate
                 $script:lastSetupDeadline = (Get-Date).AddMinutes(3)
@@ -48,7 +53,7 @@ function Test-R297UpgradeTargets {
                 }
                 $defaultAfter = if (Test-Path -LiteralPath $defaultCopy) { (Get-FileHash -LiteralPath $defaultCopy -Algorithm SHA256).Hash } else { $null }
                 if ($defaultAfter -ne $defaultBefore) { throw "R297 upgrade created or changed default copy ($label)" }
-                $results += @{ old_version=$oldBuild.version; scenario=$label; original_directory_intact=$true; default_copy_unchanged=$true; native_handoff=$true }
+                $results += @{ old_version=$oldBuild.version; scenario=$label; original_directory_intact=$true; default_copy_unchanged=$true; native_handoff=$true; stale_registration_requested=$stale; stale_registration_writes=$staleRegistrationWrites }
                 Stop-InstalledApp
             }
         }
