@@ -10,9 +10,11 @@ function snapshot(data,overrides) {
  return {...data,augments};
 }
 async function main() {
- const data=process.argv[2]?JSON.parse(fs.readFileSync(process.argv[2],'utf8')):await (async()=>{const response=await fetch(url,{signal:AbortSignal.timeout(30000)});if(!response.ok)throw Error('CommunityDragon HTTP '+response.status);return response.json()})();
- const result=snapshot(data,JSON.parse(fs.readFileSync(path.join(root,'backend/data/augment_description_overrides_zh_cn.json'),'utf8')));
- const target=path.join(root,'backend/data/augment_descriptions_20261017.json');fs.writeFileSync(target,JSON.stringify(result)+'\n');
- console.log(JSON.stringify({source:url,rows:result.augments.length,target:path.relative(root,target)}));
+ const check=process.argv[2]==='--check',target=path.join(root,'backend/data/augment_descriptions_20261017.json');
+ const data=check?JSON.parse(fs.readFileSync(target,'utf8')):process.argv[2]?JSON.parse(fs.readFileSync(process.argv[2],'utf8')):await (async()=>{const response=await fetch(url,{signal:AbortSignal.timeout(30000)});if(!response.ok)throw Error('CommunityDragon HTTP '+response.status);return response.json()})();
+ const result=snapshot(data,check?{augments:[]}:JSON.parse(fs.readFileSync(path.join(root,'backend/data/augment_description_overrides_zh_cn.json'),'utf8')));
+ // Refresh explicitly before committing a release candidate, never while building it.
+ if(!check)fs.writeFileSync(target,JSON.stringify(result)+'\n');
+ console.log(JSON.stringify({source:check?path.relative(root,target):url,rows:result.augments.length,target:path.relative(root,target),...(check?{checked:true}:{})}));
 }
 module.exports={snapshot};if(require.main===module)main().catch(error=>{console.error(error.message);process.exitCode=1});

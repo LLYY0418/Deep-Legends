@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -82,7 +83,10 @@ func TestLiveSpellProbeContinuesAfterSuccessAndCancels(t *testing.T) {
 	defer cancel()
 	calls, waits := 0, 0
 	var rows []map[string]any
+	var mu sync.Mutex
 	runLiveSpellProbe(ctx, func(ctx context.Context, endpoint string) ([]byte, int, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		calls++
 		switch endpoint {
 		case "gamestats":
@@ -92,7 +96,13 @@ func TestLiveSpellProbeContinuesAfterSuccessAndCancels(t *testing.T) {
 		default:
 			return []byte(`{"Events":[]}`), 200, nil
 		}
-	}, func(row map[string]any) { rows = append(rows, row) }, func(ctx context.Context, d time.Duration) bool {
+	}, func(row map[string]any) {
+		mu.Lock()
+		defer mu.Unlock()
+		rows = append(rows, row)
+	}, func(ctx context.Context, d time.Duration) bool {
+		mu.Lock()
+		defer mu.Unlock()
 		if d != 2*time.Second {
 			t.Fatalf("interval: %v", d)
 		}
@@ -103,6 +113,8 @@ func TestLiveSpellProbeContinuesAfterSuccessAndCancels(t *testing.T) {
 		}
 		return true
 	})
+	mu.Lock()
+	defer mu.Unlock()
 	if calls != 9 || rows[len(rows)-1]["event"] != "live_spell_stop" {
 		t.Fatalf("lifecycle calls=%d rows=%v", calls, rows)
 	}
@@ -119,14 +131,21 @@ func TestLiveSpellProbeContinuesAfterSuccessAndCancels(t *testing.T) {
 
 func TestLiveSpellProbeFailureIsNotEmptySuccess(t *testing.T) {
 	var rows []map[string]any
+	var mu sync.Mutex
 	runLiveSpellProbe(context.Background(), func(context.Context, string) ([]byte, int, error) {
 		return []byte(`{}`), 404, nil
-	}, func(row map[string]any) { rows = append(rows, row) }, func(_ context.Context, delay time.Duration) bool {
+	}, func(row map[string]any) {
+		mu.Lock()
+		defer mu.Unlock()
+		rows = append(rows, row)
+	}, func(_ context.Context, delay time.Duration) bool {
 		if delay != 10*time.Second {
 			t.Fatalf("failure backoff %v", delay)
 		}
 		return false
 	})
+	mu.Lock()
+	defer mu.Unlock()
 	if len(rows) != 3 || rows[1]["event"] != "live_spell_health" || rows[1]["endpoints"].(map[string]any)["playerlist"] != "http-404" {
 		t.Fatalf("failure evidence %v", rows)
 	}

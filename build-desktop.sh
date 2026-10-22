@@ -69,7 +69,7 @@ if [[ "$DEEP_LEGENDS_KEY_MODE" == "private" ]]; then
 else
   echo "Public build: no embedded Riot API key; KR queries require RIOT_API_KEY at runtime."
 fi
-run_stage augment-snapshot node scripts/update-augment-descriptions.cjs
+run_stage augment-snapshot node scripts/update-augment-descriptions.cjs --check
 source_fingerprint="$(run_stage source-fingerprint node desktop/source-fingerprint.cjs)"
 [[ "$source_fingerprint" =~ ^[0-9a-f]{12}$ ]] || { echo "Invalid source fingerprint" >&2; exit 1; }
 run_stage backend-build env GOCACHE="$GOCACHE" GOTMPDIR="${GOTMPDIR:-/private/tmp}" GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -tags= -buildvcs=false -trimpath \
