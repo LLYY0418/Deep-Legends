@@ -10,12 +10,35 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
+const cssTree = require("css-tree");
 
 const { WEB, SCRIPTS, gameplaySource, suiteSource, appStyles, gameplayStyles, suiteStyles, functionSource, compileFunctions, collapsedBeaconStyles, bootDemoApp, settled, installWindowCleanup, visitTool, bootLiveTab } = require("./overview-render-helpers.cjs");
 
 const { waitForOverview, waitForRender, waitForWatch } = require("./renderer-wait.cjs");
 
 installWindowCleanup(test);
+
+function responsiveDeclaration(source, name, condition, selector, property) {
+  let value;
+  cssTree.parse(source).children.forEach((atRule) => {
+    if (atRule.type !== "Atrule" || atRule.name !== name || !atRule.prelude || cssTree.generate(atRule.prelude) !== condition) return;
+    atRule.block?.children.forEach((rule) => {
+      if (rule.type !== "Rule" || cssTree.generate(rule.prelude) !== selector) return;
+      rule.block.children.forEach((declaration) => {
+        if (declaration.type === "Declaration" && declaration.property === property) value = cssTree.generate(declaration.value);
+      });
+    });
+  });
+  return value;
+}
+
+test("响应式布局契约按断点与选择器读取，不受兄弟规则顺序影响", () => {
+  const read = (source) => responsiveDeclaration(source, "container", "suite-page (max-width:1060px)", ".facade-row", "grid-template-columns");
+  assert.equal(read("@container suite-page (max-width:1060px) { .suite-head { display:flex; } .facade-row { grid-template-columns:1fr; } }"), "1fr");
+  assert.equal(read(".facade-row { grid-template-columns:1fr; } @container suite-page (max-width:1060px) { .suite-head { display:flex; } }"), undefined);
+  assert.equal(read("@container suite-page (max-width:860px) { .facade-row { grid-template-columns:1fr; } }"), undefined);
+  assert.equal(read("@container suite-page (max-width:1060px) { .facade-row { grid-template-columns:1fr 1fr; } }"), "1fr 1fr");
+});
 
 test("演示数据下工具六个页签都渲染完成", async () => {
   const { window: w, errors } = bootDemoApp();
@@ -30,7 +53,7 @@ test("演示数据下工具六个页签都渲染完成", async () => {
     assert.ok(root.textContent.trim().length > 20, `${name} 没有渲染出内容`);
   }
   assert.ok(w.document.querySelector("#suite-config-root .ac-master"),"配置页没有渲染总开关卡片");
-  assert.equal(w.document.querySelectorAll("#suite-config-root [data-mode]").length,6,"配置页缺少六个模式");
+  assert.deepEqual(Array.from(w.document.querySelectorAll("#suite-config-root [data-mode]"), node => node.dataset.mode), ["ranked", "normal", "aram", "urf", "event"], "配置页应完整展示五个模式");
   const watchCards = [...w.document.querySelectorAll("#suite-watch-root [data-watch-card]")];
   assert.deepEqual(watchCards.map((card) => card.dataset.watchCard), ["accept", "promote-leader", "invitations", "auto-matchmaking", "reconnect", "position-broadcast", "play-again", "auto-honor", "skip-celebration"], "自动页九张规则卡未按分类完整渲染");
   assert.equal(w.document.querySelectorAll("#suite-watch-root [data-watch-toggle]").length, 9, "自动规则卡缺少独立开关");
@@ -248,8 +271,8 @@ test("R56 工具页状态、确认、下拉与领奖契约完整", async () => {
   assert.match(fs.readFileSync(path.join(WEB, "app.js"), "utf8"), /pageScrollRoot\.scrollTop\s*=\s*pageScrollTop/, "下拉打开后没有恢复页面主滚动位置");
   assert.match(suiteStyles, /\.facade-film\s*\{[^}]*grid-template-columns\s*:\s*repeat\(auto-fill,[^}]*overflow-x\s*:\s*hidden[^}]*overflow-y\s*:\s*auto/s);
   assert.match(suiteStyles, /\.facade-preview-art\s*\{[^}]*aspect-ratio\s*:\s*1215\s*\/\s*717[^}]*height\s*:\s*auto/s);
-  assert.match(suiteStyles, /@container suite-page \(max-width:\s*1060px\)\s*\{[^}]*\.facade-row\s*\{[^}]*grid-template-columns\s*:\s*1fr[^}]*\}/s, "中等宽度生涯设置行未切换为单列");
-  assert.match(suiteStyles, /@media \(max-width:\s*1250px\)\s*\{[^}]*\.facade-row\s*\{[^}]*grid-template-columns\s*:\s*1fr[^}]*\}/s, "1250px 以下生涯设置行未切换为单列");
+  assert.equal(responsiveDeclaration(suiteStyles, "container", "suite-page (max-width:1060px)", ".facade-row", "grid-template-columns"), "1fr", "中等宽度生涯设置行未切换为单列");
+  assert.equal(responsiveDeclaration(suiteStyles, "media", "(max-width:1250px)", ".facade-row", "grid-template-columns"), "1fr", "1250px 以下生涯设置行未切换为单列");
   assert.doesNotMatch(fs.readFileSync(path.join(WEB, "suite.js"), "utf8"), /\bconfirm\s*\(/);
 	assert.doesNotMatch(suiteSource, /requestedAvailability\s*===\s*["']dnd["']\s*&&/, "在线状态回弹仍只处理游戏中");
   assert.deepEqual(errors, [], `R55 工具页渲染出现异常：\n${errors.join("\n")}`);

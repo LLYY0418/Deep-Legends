@@ -92,6 +92,9 @@ func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase
 	if !valid {
 		return
 	}
+	if a.storage != nil && (phase == "InProgress" || phase == "Reconnect") {
+		a.goSafe("live-spell-diagnostics", func() { a.runLiveSpellDiagnostics(phaseContext) })
+	}
 	a.goSafe("live-prewarm", func() {
 		// Only phase transitions prewarm; one shared flight, bounded by session
 		// lifetime and a hard budget. No periodic upstream polling here.

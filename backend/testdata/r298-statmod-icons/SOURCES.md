@@ -1,0 +1,1 @@
+R298 browser rendering fixtures: unmodified 32x32 Riot stat modifier icons, retrieved from https://raw.communitydragon.org/16.1/game/assets/perks/statmods/ on 2026-10-21. These tiny fixtures verify alpha bounds, image scaling and visual size; they are not production image replacements.

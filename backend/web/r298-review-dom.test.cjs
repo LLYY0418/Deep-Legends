@@ -48,8 +48,8 @@ for(const keys of [['D','F'],['N','M']])test(`R298 real DOM spell picks save and
   assert(h.writes.every(({body})=>Number.isFinite(body.spells.spell1Id)&&Number.isFinite(body.spells.spell2Id)));
  } finally {h.close()}
 });
-test('R298 active ULTBOOK session keeps all six editor spell pools isolated',async t=>{
+test('R298 active ULTBOOK session keeps visible editor spell pools isolated and removes the hextech entry',async t=>{
  for(const [mode,expected] of Object.entries(fixture.expectedSpellPools))await t.test(mode,async()=>{
-  const h=await editor(['N','M'],'ULTBOOK');try{await h.click(`[data-mode="${mode}"]`);await h.click('[data-tab="kit"]');assert.deepEqual([...h.w.document.querySelectorAll('[data-spell]')].map(n=>Number(n.dataset.spell)),expected);}finally{h.close()}
+  const h=await editor(['N','M'],'ULTBOOK');try{if(mode==='hextech'){assert.equal(h.w.document.querySelector('[data-mode="hextech"]'),null);assert.deepEqual(fixture.catalog.spells.filter(s=>require('./auto-config.js').spellAllowed(s,mode,'ULTBOOK')).map(s=>s.id),expected);assert(h.saved.champions['1'].hextech,'legacy saved mode is retained');}else{await h.click(`[data-mode="${mode}"]`);await h.click('[data-tab="kit"]');assert.deepEqual([...h.w.document.querySelectorAll('[data-spell]')].map(n=>Number(n.dataset.spell)),expected);}}finally{h.close()}
  });
 });

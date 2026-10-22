@@ -1,0 +1,127 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {JSDOM}=require(require.resolve('jsdom',{paths:[path.join(__dirname,'../../desktop')]}));
+const fixture=require('../testdata/r298-review-catalog.json');
+const clone=v=>JSON.parse(JSON.stringify(v));
+const tick=()=>new Promise(setImmediate);
+async function editor(options={}) {
+ const dom=new JSDOM('<div id="suite-config-root"></div>',{url:'http://127.0.0.1',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
+ w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};
+ let saved={version:1,champions:{'1':{ranked:{runes:{primaryStyleId:8000,subStyleId:8100,selectedPerkIds:[1,2,3,4,12,13,5008,5008,5001]},items:{core:[],situational:[]}}}}};
+ if(options.runeIDs)saved.champions['1'].ranked.runes.selectedPerkIds=clone(options.runeIDs);
+ if(options.legacyHextech)saved.champions['1'].hextech=clone(options.legacyHextech);
+ const catalog=clone(fixture.catalog);catalog.clientConnected=true;catalog.itemsStatus='ready';catalog.spellsStatus='ready';
+ catalog.styles.reverse();catalog.styles.find(s=>s.id===8000).slots[0].perks[0].longDesc='每10分钟获得属性。<br>10分钟：+8法术强度<br/>20分钟：+24法术强度<p>30分钟：+48法术强度</p><script>bad()</script>';
+ catalog.statModSlots[0].perks[0].longDesc='获得9适应之力（5.4攻击力或9法术强度）。';
+ catalog.items.push({...catalog.items[0],id:3002,name:'第二件装备'});
+ Object.assign(catalog,options.catalog||{});
+ const calls=[],writes=[];
+ w.deepLegendsRuntime={escapeHTML:v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;')};w.deepLegendsSections={register(){}};
+ w.fetch=async(url,opts={})=>{
+  calls.push({url,method:opts.method});let value={};
+  if(url==='/api/auto-config/settings')value=saved;
+  else if(url==='/api/auto-config/catalog')value=catalog;
+  else if(url==='/api/champions/catalog')value={champions:[{id:1,key:'Annie',nameZh:'安妮',imagePath:'/fixture-icon/1'},{id:2,key:'Olaf',nameZh:'奥拉夫'}]};
+  else if(url==='/api/settings/summoner-keys')value={keys:options.keys||['','']};
+  else if(url.startsWith('/api/gameplay/champion-lanes'))value={'1':[{position:'middle',rate:.7},{position:'top',rate:.3}]};
+  else if(url.startsWith('/api/champions/detail')){
+   if(new URL(url,'http://fixture').searchParams.get('position')==='all')return {ok:false,text:async()=>'invalid champion detail filter'};
+   if(options.detail) return options.detail(url,opts);
+   value={runes:[{primaryStyle:{id:8000},subStyle:{id:8100},selected:[1,2,3,4,12,13,5008,5008,5001].map(id=>({id}))}],build:{summonerSpells:[{assets:[{id:4},{id:14}]}],coreItems:[{assets:[{id:3000}]}]}};
+  }
+  else if(url==='/api/auto-config/copy'){const body=JSON.parse(opts.body);for(const target of body.targets){saved.champions['1'][target]=clone(saved.champions['1'][body.from]);if(target==='hextech')delete saved.champions['1'][target].runes;}saved.version++;value=saved;}
+  else if(url.startsWith('/api/auto-config/champions/')){
+   if(options.beforeSave)await options.beforeSave(url,opts);
+   if(options.saveFails)return {ok:false,text:async()=>'保存失败，请重试'};
+   const mode=url.split('/').at(-1);if(opts.method==='DELETE')delete saved.champions['1'][mode];else{const body=JSON.parse(opts.body);writes.push({mode,body});saved.champions['1'][mode]=body;}saved.version++;value=saved;
+  }
+  return {ok:true,json:async()=>clone(value),text:async()=>''};
+ };
+ w.eval(fs.readFileSync(process.env.R298_AUTO_CONFIG_SOURCE||path.join(__dirname,'auto-config.js'),'utf8'));await w.deepLegendsAutoConfig.load();
+ const click=async selector=>{const node=w.document.querySelector(selector);assert(node,selector);node.click();await tick();await tick();};
+ return {w,click,calls,writes,catalog,get saved(){return clone(saved);},close:()=>w.close()};
+}
+test('R298 UI rune clicks preserve list, tree, focus and untouched rune nodes',async()=>{
+ const h=await editor();try{const d=h.w.document,list=d.querySelector('.ac-champ-list'),tree=d.querySelector('.ac-tree'),untouched=d.querySelector('[data-col="primary"][data-row="3"]');list.scrollTop=72;
+ for(const selector of ['[data-col="primary"][data-row="0"]','[data-col="sub"][data-row="3"]','[data-col="shards"][data-row="0"]']){d.querySelector(selector).focus();await h.click(selector);assert.equal(d.querySelector('.ac-tree'),tree);assert.equal(d.querySelector('.ac-champ-list'),list);assert.equal(d.querySelector('[data-col="primary"][data-row="3"]'),untouched);assert.equal(list.scrollTop,72);assert.equal(d.activeElement,d.querySelector(selector));assert(!untouched.classList.contains('is-flash'));}
+ await h.click('[data-act="save"]');assert.equal(h.writes.length,1);assert.equal(h.saved.champions['1'].ranked.runes.selectedPerkIds[5],14);
+ }finally{h.close();}
+});
+test('R298 UI dirty switch uses modal; cancel and save failure retain draft',async()=>{
+ const h=await editor({saveFails:true});try{await h.click('[data-col="primary"]');await h.click('[data-mode="aram"]');assert(h.w.document.querySelector('dialog[open] [data-ac-close]'));assert(!h.w.document.querySelector('.ac-unsaved'));await h.click('dialog [data-act="save-switch"]');assert(h.w.document.querySelector('dialog[open]').textContent.includes('保存失败'));assert.equal(h.w.document.querySelector('.ac-mode.is-active').dataset.mode,'ranked');await h.click('dialog [data-ac-close]');assert(!h.w.document.querySelector('dialog[open]'));await h.click('[data-mode="aram"]');await h.click('dialog [data-act="discard"]');assert.equal(h.w.document.querySelector('.ac-mode.is-active').dataset.mode,'aram');}finally{h.close();}
+});
+test('R298 UI generic recommendation discovers valid position, fills draft and saves',async()=>{
+ const h=await editor();try{await h.click('[data-act="import"]');assert(h.calls.some(c=>c.url.startsWith('/api/gameplay/champion-lanes')));assert(h.calls.some(c=>c.url.includes('/api/champions/detail?')&&c.url.includes('position=mid')));assert(!h.calls.some(c=>c.url.includes('position=all')));assert.equal(h.writes.length,1,'import must persist without an extra save click');assert(h.w.document.querySelector('.ac-tabs .ac-feedback').textContent.includes('已导入并保存'));assert.deepEqual(h.saved.champions['1'].ranked.spells,{spell1Id:4,spell2Id:14});}finally{h.close();}
+});
+test('R298 UI import exposes busy and error; late response cannot overwrite rune edit',async()=>{
+ let finish;const h=await editor({detail:()=>new Promise(r=>finish=r)});try{await h.click('[data-act="import"]');assert(h.w.document.querySelector('[data-act="import"]').disabled);await h.click('[data-col="sub"][data-row="3"]');finish({ok:true,json:async()=>({})});await tick();await tick();await h.click('[data-act="save"]');assert.equal(h.saved.champions['1'].ranked.runes.selectedPerkIds[5],14);}finally{h.close();}
+ const empty=await editor({detail:async()=>({ok:true,json:async()=>({})})});try{await empty.click('[data-act="import"]');assert.match(empty.w.document.querySelector('[role="alert"]').textContent,/没有可导入|暂无.*推荐/);assert.equal(empty.writes.length,0);}finally{empty.close();}
+});
+test('R298 UI unknown keys and empty slots have no key badge or invalid tooltip; hextech entry is absent',async()=>{
+ const h=await editor();try{await h.click('[data-tab="kit"]');assert.equal(h.w.document.querySelectorAll('.ac-slot kbd').length,0);for(const slot of h.w.document.querySelectorAll('.ac-slot')){assert(!slot.hasAttribute('data-ac-tooltip'));assert(!slot.classList.contains('ac-invalid'));}assert(h.w.document.querySelector('[data-sort]').closest('.select-wrap'));assert.equal(h.w.document.querySelectorAll('[data-target]').length,0);assert.equal(h.w.document.querySelector('[data-mode="hextech"]'),null);}finally{h.close();}
+});
+test('R298 UI style order and tooltip preserve line breaks without shard style attribution',async()=>{
+ const h=await editor();try{assert.deepEqual([...h.w.document.querySelectorAll('[data-pick-path="primary"]')].map(n=>Number(n.dataset.style)),[8100]);assert(h.w.document.querySelector('.ac-path-main img').src.endsWith('/rune-styles/precision.svg'));const n=h.w.document.querySelector('[data-col="primary"][data-row="0"]');n.dispatchEvent(new h.w.MouseEvent('mouseover',{bubbles:true}));const tip=h.w.document.querySelector('.ac-tip');assert(tip.querySelectorAll('br').length>=3);assert.equal(tip.querySelector('script'),null);h.w.document.querySelector('[data-col="shards"][data-row="0"]').dispatchEvent(new h.w.MouseEvent('mouseover',{bubbles:true}));const shard=h.w.document.querySelector('.ac-tip');assert.equal(shard.querySelector('small').textContent,'属性碎片');assert(shard.textContent.includes('9适应之力'));}finally{h.close();}
+});
+test('R298 UI disconnected catalog is distinct from filters and refresh preserves unsaved draft',async()=>{
+ const h=await editor({catalog:{spells:[],items:[],clientConnected:false,spellsStatus:'disconnected',itemsStatus:'disconnected'}});try{await h.click('[data-tab="kit"]');assert.match(h.w.document.querySelector('.ac-shop-empty').textContent,/连接客户端/);assert(!h.w.document.querySelector('.ac-shop-empty').textContent.includes('符合'));await h.click('[data-tab="runes"]');await h.click('[data-col="sub"][data-row="3"]');h.catalog.clientConnected=true;h.catalog.itemsStatus='ready';h.catalog.spellsStatus='ready';h.catalog.items=clone(fixture.catalog.items);h.catalog.spells=clone(fixture.catalog.spells);await h.w.deepLegendsAutoConfig.load();await h.click('[data-act="save"]');assert.equal(h.saved.champions['1'].ranked.runes.selectedPerkIds[5],14);assert(h.calls.filter(c=>c.url==='/api/auto-config/catalog').length>=2);}finally{h.close();}
+});
+test('R298 UI equipment drags to either group, reorders, rejects duplicates, saves exact groups',async()=>{
+ const h=await editor();try{await h.click('[data-tab="kit"]');assert.equal(h.w.document.querySelector('[data-target]'),null);const drag=(source,target)=>{const data={setData(){}};for(const [type,selector] of [['dragstart',source],['dragover',target],['drop',target]]){const event=new h.w.Event(type,{bubbles:true,cancelable:true});Object.defineProperty(event,'dataTransfer',{value:data});h.w.document.querySelector(selector).dispatchEvent(event);}};
+ drag('[data-item="3000"]','[data-build="core:0"]');drag('[data-item="3002"]','[data-build="core:1"]');drag('[data-build="core:1"]','[data-build="core:0"]');drag('[data-build="core:1"]','[data-build="situational:0"]');drag('[data-item="3000"]','[data-build="core:1"]');await h.click('[data-act="save"]');assert.deepEqual(h.saved.champions['1'].ranked.items,{core:[3002],situational:[3000]});}finally{h.close();}
+});
+test('R298 UI clear confirmation cancels safely and confirms deletion',async()=>{
+ const h=await editor();try{await h.click('[data-act="clear"]');assert(h.w.document.querySelector('dialog[open]'));await h.click('dialog [data-act="stay"]');assert(h.saved.champions['1'].ranked);assert.equal(h.calls.filter(c=>c.method==='DELETE').length,0);await h.click('[data-act="clear"]');await h.click('dialog [data-act="discard"]');assert.equal(h.saved.champions['1'].ranked,undefined);assert.equal(h.calls.filter(c=>c.method==='DELETE').length,1);}finally{h.close();}
+});
+test('R298 UI generic import follows highest play position and matching ignores ranked position',async()=>{
+ const detail={runes:[{primaryStyle:{id:8000},subStyle:{id:8100},selected:[1,2,3,4,12,13,5008,5008,5001].map(id=>({id}))}],positions:[{position:'top',play:100},{position:'mid',play:10}]};
+ const h=await editor({detail:async()=>({ok:true,json:async()=>clone(detail)})});try{await h.click('[data-act="import"]');assert(h.calls.some(c=>c.url.includes('position=mid')));assert(h.calls.some(c=>c.url.includes('position=top')));await h.click('[data-act="save"]');await h.click('[data-pos="jungle"]');await h.click('[data-mode="normal"]');await h.click('[data-act="import"]');assert(h.calls.filter(c=>c.url.startsWith('/api/champions/detail')).at(-1).url.includes('position=top'));assert(h.saved.champions['1'].normal.runes);assert(!h.calls.some(c=>c.url.includes('position=all')));}finally{h.close();}
+});
+test('R298 settings hides disconnected shortcut hint and preserves actual flash key selection',async()=>{
+ for(const file of ['index.html','default/index.html']){const page=new JSDOM(fs.readFileSync(path.join(__dirname,file),'utf8'));const host=page.window.document.getElementById('setting-flash-keys');assert(!host.textContent.includes('连接客户端后读取快捷键'));assert.equal(host.querySelectorAll('button:disabled').length,2);page.window.close();}
+ let keys={keys:['',''],flashSlot:null};const writes=[];
+ const h=require('./update-harness.cjs').harness(undefined,(url,options={})=>{if(url!=='/api/settings/summoner-keys')return;if(options.method==='PUT'){const patch=JSON.parse(options.body);writes.push(patch);keys={...keys,...patch};}return Promise.resolve({ok:true,json:async()=>clone(keys)});});
+ try{let initialize;h.w.deepLegendsSections={register:(_name,fn)=>initialize=fn};h.w.eval(fs.readFileSync(process.env.R298_SETTINGS_SOURCE||path.join(__dirname,'settings-preferences.js'),'utf8'));initialize();await tick();await tick();const host=h.get('setting-flash-keys');assert(!host.textContent.includes('连接客户端后读取快捷键'));assert.equal(host.querySelectorAll('button:disabled').length,2);keys={keys:['N','M'],flashSlot:null};h.w.dispatchEvent(new h.w.CustomEvent('deep-legends:section',{detail:{name:'settings'}}));await tick();await tick();assert.deepEqual([...host.querySelectorAll('kbd')].map(n=>n.textContent),['N','M']);host.querySelector('button').click();await tick();assert.deepEqual(writes,[{flashSlot:0}]);assert.equal(host.querySelector('button').getAttribute('aria-pressed'),'true');}finally{h.dom.window.close();}
+});
+
+test('R298 polish secondary keeps three candidate rows and exactly two progress nodes',async()=>{
+ const h=await editor();try{const d=h.w.document;assert.equal(d.querySelectorAll('[data-group="sub"] .ac-row').length,3);assert.equal(d.querySelectorAll('[data-group="sub"] .ac-node').length,2);for(const row of [1,2,3])await h.click(`[data-col="sub"][data-row="${row}"]`);assert.equal(d.querySelectorAll('[data-group="sub"] .ac-row.is-picked').length,2);assert.equal(d.querySelectorAll('[data-group="sub"] .ac-node.is-picked').length,2);await h.click('[data-act="save"]');assert.deepEqual(h.saved.champions['1'].ranked.runes.selectedPerkIds.slice(4,6),[13,14]);}finally{h.close();}
+});
+test('R298 polish copy opens a modal and persists selected target with standard buttons',async()=>{
+ const h=await editor();try{await h.click('[data-act="copy"]');const d=h.w.document,modal=d.querySelector('dialog[open]');assert(modal);assert.equal(d.querySelector('.ac-editor [data-copy-target]'),null);assert.equal(modal.querySelector('[data-copy-target="hextech"]'),null);modal.querySelector('[data-copy-target="aram"]').click();assert(modal.querySelector('[data-act="copy-save"]').classList.contains('button-primary'));assert(modal.querySelector('[data-act="copy-cancel"]').classList.contains('button-secondary'));await h.click('dialog [data-act="copy-save"]');assert(!d.querySelector('dialog[open]'));assert(h.saved.champions['1'].aram);assert.deepEqual(h.saved.champions['1'].aram.runes,h.saved.champions['1'].ranked.runes);}finally{h.close();}
+});
+test('R298 polish failed import persistence retains draft and never claims success',async()=>{
+ const h=await editor({saveFails:true});try{await h.click('[data-act="import"]');assert(h.w.document.querySelector('dialog[open]').textContent.includes('保存失败'));assert(!h.w.document.querySelector('.ac-feedback').textContent.includes('已导入并保存'));assert(h.w.document.querySelector('[data-save-state]').textContent.includes('未保存'));assert.equal(h.saved.champions['1'].ranked.spells,undefined);}finally{h.close();}
+});
+
+test('R298 polish delayed import save preserves later edits and queues the later manual save',async()=>{
+ let release,started=0;const h=await editor({beforeSave:()=>++started===1?new Promise(r=>release=r):Promise.resolve()});try{await h.click('[data-act="import"]');assert.equal(started,1);await h.click('[data-col="sub"][data-row="3"]');await h.click('[data-act="save"]');assert.equal(started,1,'later save must wait for the import write');assert(h.w.document.querySelector('[data-save-state]').textContent.includes('未保存'));release();for(let i=0;i<8;i++)await tick();assert.equal(started,2);assert.equal(h.writes.length,2);assert.equal(h.saved.champions['1'].ranked.runes.selectedPerkIds[5],14);assert(!h.w.document.querySelector('[data-save-state]').textContent.includes('未保存'));assert(!h.w.document.querySelector('.ac-feedback').textContent.includes('已导入并保存'));}finally{h.close();}
+});
+
+test('R298 navigation champion search clear restores results and focus without changing rune draft',async()=>{
+ const h=await editor();try{await h.click('[data-col="sub"][data-row="3"]');const input=h.w.document.querySelector('[data-champ-search]');input.value='安妮';input.dispatchEvent(new h.w.Event('input',{bubbles:true}));assert.equal(h.w.document.querySelectorAll('[data-champ]').length,1);await h.click('[data-act="clear-champ-search"]');assert.equal(h.w.document.querySelector('[data-champ-search]').value,'');assert.equal(h.w.document.querySelectorAll('[data-champ]').length,2);assert.equal(h.w.document.activeElement,h.w.document.querySelector('[data-champ-search]'));assert(h.w.document.querySelector('[data-act="clear-champ-search"]').hidden);await h.click('[data-act="save"]');assert.equal(h.saved.champions['1'].ranked.runes.selectedPerkIds[5],14);}finally{h.close();}
+});
+test('R298 navigation removes the entire hextech editor entry and preserves existing saved hextech data',async()=>{
+ const legacy={spells:{spell1Id:4,spell2Id:32},items:{core:[3000],situational:[]}};const h=await editor({legacyHextech:legacy});try{assert.equal(h.w.document.querySelector('[data-mode="hextech"]'),null);assert.equal(h.w.document.querySelectorAll('.ac-mode').length,5);assert.equal(h.w.document.querySelectorAll('.ac-champ .ac-dots i').length,10);await h.click('[data-act="copy"]');assert.equal(h.w.document.querySelector('[data-copy-target="hextech"]'),null);await h.click('dialog [data-act="copy-cancel"]');await h.click('[data-col="primary"]');await h.click('[data-act="save"]');await h.w.deepLegendsAutoConfig.load(true);assert.deepEqual(h.saved.champions['1'].hextech,legacy);assert.equal(h.w.document.querySelector('[data-mode="hextech"]'),null);await h.click('[data-act="clear"]');await h.click('dialog [data-act="discard"]');await h.click('[data-configured="1"]');assert.equal(h.w.document.querySelectorAll('[data-champ]').length,0);assert(h.w.document.querySelector('[data-configured="1"]').textContent.includes('0'));assert.deepEqual(h.saved.champions['1'].hextech,legacy);}finally{h.close();}
+});
+
+test('R298 final tuning path choices exclude the current rail emblem and return the previous choice',async()=>{
+ const catalog=clone(fixture.catalog);catalog.styles.push({...clone(catalog.styles[1]),id:8200,name:'巫术'});const h=await editor({catalog});try{const d=h.w.document,choices=col=>[...d.querySelectorAll(`[data-pick-path="${col}"]`)].map(n=>+n.dataset.style);assert.deepEqual(choices('primary'),[8100,8200]);assert.deepEqual(choices('sub'),[8200]);await h.click('[data-pick-path="primary"][data-style="8200"]');assert.deepEqual(choices('primary'),[8000,8100]);assert.deepEqual(choices('sub'),[8000]);assert(d.querySelector('.ac-path-main img').src.endsWith('/rune-styles/sorcery.svg'));await h.click('[data-pick-path="primary"][data-style="8000"]');assert.deepEqual(choices('primary'),[8100,8200]);}finally{h.close();}
+});
+test('R298 final tuning incomplete runes cannot save; last shard enables saving the nine chosen IDs',async()=>{
+ const h=await editor();try{await h.click('[data-mode="aram"]');await h.click('[data-act="start"]');const d=h.w.document;assert(d.querySelector('[data-act="save"]').disabled);d.querySelector('[data-act="save"]').dispatchEvent(new h.w.MouseEvent('click',{bubbles:true}));await tick();await tick();assert.equal(h.writes.length,0,'forced event cannot write an incomplete page');assert(d.querySelector('dialog[open]'));await h.click('dialog [data-ac-close]');for(const row of [0,1,2,3])await h.click(`[data-col="primary"][data-row="${row}"]`);for(const row of [1,2])await h.click(`[data-col="sub"][data-row="${row}"]`);for(const row of [0,1])await h.click(`[data-col="shards"][data-row="${row}"]`);assert(d.querySelector('[data-act="save"]').disabled);await h.click('[data-col="shards"][data-row="2"]');assert(!d.querySelector('[data-act="save"]').disabled);await h.click('[data-act="save"]');assert.equal(h.writes.length,1);assert(h.saved.champions['1'].aram.runes.selectedPerkIds.every(id=>id>0));assert.equal(h.saved.champions['1'].aram.runes.selectedPerkIds.length,9);}finally{h.close();}
+});
+test('R298 final tuning compact confirmations use X as stay and put primary action last',async()=>{
+ const h=await editor();try{await h.click('[data-col="primary"]');await h.click('[data-mode="aram"]');const d=h.w.document;let dialog=d.querySelector('dialog[open]');assert(dialog.querySelector('[data-ac-close] svg'));assert.equal(dialog.querySelector('[data-act="stay"]'),null);assert.deepEqual([...dialog.querySelectorAll('.ac-confirm-actions button')].map(n=>n.dataset.act),['discard','save-switch']);await h.click('dialog [data-ac-close]');assert.equal(d.querySelector('.ac-mode.is-active').dataset.mode,'ranked');assert(d.querySelector('[data-save-state]').textContent.includes('未保存'));await h.click('[data-act="clear"]');dialog=d.querySelector('dialog[open]');assert.deepEqual([...dialog.querySelectorAll('.ac-confirm-actions button')].map(n=>n.dataset.act),['stay','discard']);assert(dialog.querySelector('[data-act="discard"]').classList.contains('button-primary'));await h.click('dialog [data-ac-close]');assert(h.saved.champions['1'].ranked);}finally{h.close();}
+});
+test('R298 final tuning keeps unchanged legacy invalid runes while saving another category',async()=>{
+ const ids=[999999,2,3,4,12,13,5008,5008,5001],h=await editor({runeIDs:ids});try{assert(h.w.document.querySelector('[data-act="save"]').disabled);await h.click('[data-tab="kit"]');assert(!h.w.document.querySelector('[data-act="save"]').disabled);await h.click('[data-spell="4"]');await h.click('[data-spell="14"]');await h.click('[data-act="save"]');assert.deepEqual(h.saved.champions['1'].ranked.runes.selectedPerkIds,ids);assert.deepEqual(h.saved.champions['1'].ranked.spells,{spell1Id:4,spell2Id:14});}finally{h.close();}
+});
+
+test('R298 copy hierarchy keeps ranked first, nests positions and excludes the current target from writes',async()=>{
+ const h=await editor();try{await h.click('[data-act="copy"]');const d=h.w.document,groups=[...d.querySelectorAll('.ac-copy > [data-copy-mode]')];assert.deepEqual(groups.map(n=>n.dataset.copyMode),['ranked','normal','aram','urf','event']);const ranked=groups[0];assert(ranked.querySelector('[data-copy-target="ranked"]').disabled);assert.deepEqual([...ranked.querySelectorAll('.ac-copy-positions [data-copy-target]')].map(n=>n.dataset.copyTarget),['ranked-top','ranked-jungle','ranked-middle','ranked-bottom','ranked-utility']);ranked.querySelector('[data-copy-target="ranked-top"]').click();d.querySelector('[data-copy-target="normal"]').click();await h.click('dialog [data-act="copy-save"]');assert.deepEqual(h.saved.champions['1']['ranked-top'].runes,h.saved.champions['1'].ranked.runes);assert.deepEqual(h.saved.champions['1'].normal.runes,h.saved.champions['1'].ranked.runes);await h.click('[data-mode="normal"]');await h.click('[data-act="copy"]');assert(!d.querySelector('[data-copy-target="ranked"]').disabled);assert(d.querySelector('[data-copy-target="normal"]').disabled);d.querySelector('[data-copy-target="ranked"]').click();await h.click('dialog [data-act="copy-save"]');assert.deepEqual(h.saved.champions['1'].ranked.runes,h.saved.champions['1'].normal.runes);}finally{h.close();}
+});
+test('R298 rune completion hint belongs to the build title and hides when all nine are picked',async()=>{
+ const h=await editor();try{await h.click('[data-mode="aram"]');await h.click('[data-act="start"]');const d=h.w.document,hint=d.querySelector('.ac-stage-warn');assert.equal(hint.parentElement,d.querySelector('.ac-buildname'));assert(!hint.hidden);for(const row of [0,1,2,3])await h.click(`[data-col="primary"][data-row="${row}"]`);for(const row of [1,2])await h.click(`[data-col="sub"][data-row="${row}"]`);for(const row of [0,1,2])await h.click(`[data-col="shards"][data-row="${row}"]`);assert(hint.hidden);assert(!d.querySelector('[data-act="save"]').disabled);}finally{h.close();}
+});

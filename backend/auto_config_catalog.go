@@ -32,12 +32,15 @@ type autoConfigSpell struct {
 	Cooldown    float64  `json:"cooldown"`
 }
 type autoConfigCatalog struct {
-	EventGameMode string              `json:"eventGameMode,omitempty"`
-	Styles        []gameplayPerkStyle `json:"styles"`
-	StatModSlots  []gameplayPerkSlot  `json:"statModSlots"`
-	Perks         []gameplayPerk      `json:"perks"`
-	Items         []autoConfigItem    `json:"items"`
-	Spells        []autoConfigSpell   `json:"spells"`
+	ClientConnected bool                `json:"clientConnected"`
+	ItemsStatus     string              `json:"itemsStatus"`
+	SpellsStatus    string              `json:"spellsStatus"`
+	EventGameMode   string              `json:"eventGameMode,omitempty"`
+	Styles          []gameplayPerkStyle `json:"styles"`
+	StatModSlots    []gameplayPerkSlot  `json:"statModSlots"`
+	Perks           []gameplayPerk      `json:"perks"`
+	Items           []autoConfigItem    `json:"items"`
+	Spells          []autoConfigSpell   `json:"spells"`
 }
 
 func (a *app) loadAutoConfigCatalog(ctx context.Context) (autoConfigCatalog, error) {
@@ -54,14 +57,36 @@ func (a *app) loadAutoConfigCatalog(ctx context.Context) (autoConfigCatalog, err
 		key = "ddragon"
 	}
 	perks, err := a.cachedGameplayPerkCatalog(ctx, key, func() (gameplayPerkCatalogResponse, error) { return a.loadGameplayPerkCatalog(ctx, client) })
-	out := autoConfigCatalog{Styles: perks.Styles, StatModSlots: perks.StatModSlots, Perks: perks.Perks, Items: []autoConfigItem{}, Spells: []autoConfigSpell{}}
+	out := autoConfigCatalog{Styles: perks.Styles, StatModSlots: perks.StatModSlots, Perks: perks.Perks, Items: []autoConfigItem{}, Spells: []autoConfigSpell{}, ClientConnected: client != nil, ItemsStatus: "disconnected", SpellsStatus: "disconnected"}
 	if err != nil {
 		return out, err
 	}
+	// The disk rune catalog can predate shard descriptions. Enrich a copy so
+	// readers of the shared cache never observe an in-place mutation.
+	out.StatModSlots = append([]gameplayPerkSlot(nil), perks.StatModSlots...)
+	for index := range out.StatModSlots {
+		slot := &out.StatModSlots[index]
+		slot.Perks = append([]gameplayPerk(nil), slot.Perks...)
+		for perkIndex := range slot.Perks {
+			perk := &slot.Perks[perkIndex]
+			if perk.LongDescription == "" && perk.ShortDescription == "" {
+				perk.LongDescription = runeShardDescription(int(perk.ID))
+			}
+		}
+	}
 	// Only the current client's pool authorizes automatic writes. Missing metadata fails closed.
 	if client != nil {
-		_ = a.clientCatalogJSON(ctx, client, "/lol-game-data/assets/v1/items.json", &out.Items)
-		_ = a.clientCatalogJSON(ctx, client, "/lol-game-data/assets/v1/summoner-spells.json", &out.Spells)
+		out.ItemsStatus, out.SpellsStatus = "failed", "failed"
+		if err := a.clientCatalogJSON(ctx, client, "/lol-game-data/assets/v1/items.json", &out.Items); err == nil && len(out.Items) > 0 {
+			out.ItemsStatus = "ready"
+		} else {
+			out.Items = []autoConfigItem{}
+		}
+		if err := a.clientCatalogJSON(ctx, client, "/lol-game-data/assets/v1/summoner-spells.json", &out.Spells); err == nil && len(out.Spells) > 0 {
+			out.SpellsStatus = "ready"
+		} else {
+			out.Spells = []autoConfigSpell{}
+		}
 	}
 	if a.champions != nil {
 		descriptions, _ := a.champions.loadStaticDescriptions(ctx)

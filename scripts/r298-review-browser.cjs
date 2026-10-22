@@ -24,9 +24,7 @@ const setup=`window.deepLegendsRuntime={escapeHTML:v=>String(v??'').replaceAll('
    results.keyBindings.push(result);await b.shot('spells-'+name);
   }
   for(const [mode,expected] of Object.entries(fixture.expectedSpellPools)){
-   await click(`[data-mode="${mode}"]`);await click('[data-tab="kit"]');
-   const actual=await b.evaluate(`[...document.querySelectorAll('[data-spell]')].map(n=>Number(n.dataset.spell))`);assert.deepEqual(actual,expected,mode);results.spellPools[mode]=actual;
-   if(mode==='hextech'){assert(await b.evaluate(`document.querySelector('[data-tab="runes"]').disabled`));await b.shot('hextech');}
+   if(mode==='hextech'){assert.equal(await b.evaluate(`document.querySelector('[data-mode="hextech"]')`),null);assert.deepEqual(fixture.catalog.spells.filter(s=>require('../backend/web/auto-config.js').spellAllowed(s,mode,'ULTBOOK')).map(s=>s.id),expected);results.removedEditorModes=['hextech'];}else{await click(`[data-mode="${mode}"]`);await click('[data-tab="kit"]');const actual=await b.evaluate(`[...document.querySelectorAll('[data-spell]')].map(n=>Number(n.dataset.spell))`);assert.deepEqual(actual,expected,mode);results.spellPools[mode]=actual;}
   }
   await b.call('Emulation.setDeviceMetricsOverride',{width:960,height:1100,deviceScaleFactor:1,mobile:false});assert(!await b.evaluate(`document.documentElement.scrollWidth>innerWidth`));await b.shot('narrow');
   assert.deepEqual(b.errors,[]);fs.writeFileSync(path.join(out,'result.json'),JSON.stringify(results,null,2));console.log(JSON.stringify(results));

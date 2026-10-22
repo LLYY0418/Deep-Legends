@@ -16,22 +16,20 @@
 }
 
 .suite-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   flex: 1;
-  flex-wrap: nowrap;
-  overflow-x: auto;
   min-width: 0;
   gap: 6px;
 }
 
 .suite-tab {
   display: flex;
-  flex-shrink: 0;
   min-width: 0;
   min-height: 52px;
   align-items: center;
   gap: 10px;
-  padding: 0 15px;
+  padding: 0 10px;
   color: var(--ink);
   text-align: left;
   background: var(--surface);
@@ -52,7 +50,9 @@
 
 .suite-metrics {
   display: flex;
-  flex-shrink: 0;
+  flex: 0 0 218px;
+  width:218px;
+  justify-content:flex-end;
   gap: 22px;
   margin: 0;
 }
@@ -344,6 +344,9 @@ button.suite-tile { cursor: pointer; }
 
 /* 中等桌面宽度下，段位控件的固有宽度不能挤压说明文字。 */
 @container suite-page (max-width: 1060px) {
+  .suite-head { flex-wrap:wrap; }
+  .suite-tabs { flex-basis:100%; }
+  .suite-metrics { margin-left:auto; }
   .facade-row { grid-template-columns: 1fr; align-items: start; }
   .facade-row-control { justify-content: flex-start; }
 }
@@ -354,12 +357,9 @@ button.suite-tile { cursor: pointer; }
 }
 
 @container suite-page (max-width: 720px) {
-  .suite-panel { padding-top: 8px; }
-  .suite-head { display: contents; position: static; }
-  .suite-tabs { position: sticky; top: 0; z-index: 14; background: var(--bg); width: 100%; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 12px; }
-  .suite-tab { min-width: 112px; padding: 9px; }
+  .suite-tab { padding: 9px; }
   .suite-tab small { display: none; }
-  .suite-metrics { width: 100%; justify-content: flex-end; margin-bottom: 16px; }
+  .suite-metrics { width: 100%; justify-content: flex-end; }
   .suite-offline { grid-template-columns: 1fr; padding: 24px; text-align: center; }
   .suite-offline-mark { margin-inline: auto; }
   .watch-hero, .rig-lock, .facade-row, .facade-action, .sweep-sticky { grid-template-columns: 1fr; }
@@ -378,6 +378,7 @@ button.suite-tile { cursor: pointer; }
 }
 
 @container suite-page (max-width: 480px) {
+  .suite-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .suite-tab { min-width: 0; gap: 5px; padding-inline: 5px; }
   .suite-metrics { justify-content: space-between; gap: 10px; }
   .suite-metrics div { min-width: 0; }

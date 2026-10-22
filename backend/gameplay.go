@@ -10681,7 +10681,7 @@ func splitGameplayStatModSlots(styles []gameplayPerkStyle) ([]gameplayPerkStyle,
 
 func defaultGameplayStatModSlots() []gameplayPerkSlot {
 	perk := func(id int64, name, icon string) gameplayPerk {
-		return gameplayPerk{ID: id, Name: name, IconPath: "ddragon:/cdn/img/perk-images/StatMods/" + icon}
+		return gameplayPerk{ID: id, Name: name, IconPath: "ddragon:/cdn/img/perk-images/StatMods/" + icon, LongDescription: runeShardDescription(int(id))}
 	}
 	adaptive := perk(5008, "适应之力", "StatModsAdaptiveForceIcon.png")
 	healthScaling := perk(5001, "成长生命值", "StatModsHealthPlusIcon.png")

@@ -30,12 +30,12 @@
   const champSelectActiveMetric = document.getElementById("suite-champselect-active");
 
   const tabCopy = {
-    watch: "自动接受、重连与点赞",
-    rig: "安装目录与客户端进程",
-    facade: "背景、签名与展示",
-    sweep: "未领取奖励清扫",
-    champselect: "禁用与选用的备选序列",
- config: "符文、召唤师技能与装备",
+    watch: "接受对局重连与点赞",
+    rig: "安装目录与进程维护",
+    facade: "生涯背景签名与展示",
+    sweep: "任务活动与奖励领取",
+    champselect: "禁用选用与备选英雄",
+ config: "符文技能与装备配置",
   };
   const phaseOrder = ["Lobby", "Matchmaking", "ReadyCheck", "ChampSelect", "InProgress", "EndOfGame"];
   const phaseNames = { Lobby: "房间", Matchmaking: "匹配中", ReadyCheck: "确认对局", ChampSelect: "英雄选择", InProgress: "游戏中", Reconnect: "重连", EndOfGame: "结算" };
@@ -246,6 +246,7 @@
     if (!tabCopy[name]) name = "watch";
     if (state.tab !== name) {
       state.scroll[state.tab] = Number(appScroll?.scrollTop || 0);
+      state.scroll[name] = 0;
       writePreference("suite-scroll", JSON.stringify(state.scroll));
     }
     state.tab = name;

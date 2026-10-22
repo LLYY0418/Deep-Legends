@@ -1219,3 +1219,7 @@ html[data-ui-preferences="pending"] #app-frame { visibility: hidden; }
 .settings-panel .setting-card .text-button:not([id$="-clear"]):disabled,
 .settings-panel .diagnostic-actions .text-button:disabled,
 .ptag-manage-card > header .text-button:disabled { opacity:.55; cursor:progress; }
+
+.settings-modal{ padding:24px;overflow:auto;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:12px;}
+.settings-modal::backdrop{ background:var(--overlay);}
+.settings-modal header{ display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px;}

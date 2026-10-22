@@ -48,10 +48,6 @@ main.shell:has(> #settings-panel:not([hidden])) { padding: 28px 46px; }
 .settings-tag-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; }
 .settings-tag-options label { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; font-size: 13px; font-weight: 600; }
 .settings-tag-options input { accent-color: var(--primary); }
-.settings-modal { width: min(720px,calc(100vw - 40px)); max-height: 80vh; padding: 24px; overflow: auto; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
-.settings-modal header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
-.settings-modal h2 { margin: 0; font-size: 20px; }
-.settings-modal pre { white-space: pre-wrap; font: 14px/1.7 var(--font); }
 @media (max-width: 1000px) {
  .settings-panel { grid-template-columns: minmax(0,1fr); grid-template-areas: "head" "tabs" "content"; gap: 12px; }
  .settings-tabs { position: static; flex-direction: row; gap: 4px; overflow-x: auto; }
@@ -131,3 +127,7 @@ main.shell:has(> #settings-panel:not([hidden])) { padding-right: calc(46px - var
 .ac-kbd { display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 5px; border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; background:var(--surface-strong); color:var(--ink); font:700 11px/1 var(--font); }
 .ac-setting-flash h3 { color:var(--primary-strong); }
 .ac-setting-flash .ac-flash-seg button { min-width:104px; gap:8px; }
+
+.settings-modal pre { white-space: pre-wrap; font: 14px/1.7 var(--font); }
+
+.settings-modal { width:min(720px,calc(100vw - 40px)); max-height:80vh; }

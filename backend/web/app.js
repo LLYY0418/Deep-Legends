@@ -4321,7 +4321,10 @@
         state.liveEventsReady = true;
         return;
       }
-      if (event.data === "connection-state" || event.data === "summoner-updated") return;
+      if (event.data === "connection-state" || event.data === "summoner-updated") {
+        window.dispatchEvent(new CustomEvent("deep-legends:client-state-changed"));
+        return;
+      }
       if (event.data === "riot-key-updated") { window.dispatchEvent(new CustomEvent("deep-legends:riot-key-updated")); void loadRiotKeySettings(); return; }
       if (event.data === "pro-runes") { window.dispatchEvent(new CustomEvent("deep-legends:pro-runes")); return; }
       if (event.data === "resync-required") { resyncLiveState(); return; }
