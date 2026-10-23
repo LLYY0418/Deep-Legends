@@ -71,7 +71,7 @@ func TestR298Bindings(t *testing.T) {
 		}
 	}
 	keys := summonerKeysFromJSON([]byte(`{"GameEvents":{"evtCastAvatarSpell1":"[d]","evtSmartCastAvatarSpell1":"[n],[1]","evtCastAvatarSpell2":"[m]"}}`))
-	if keys != [2]string{"N", "M"} {
+	if keys != [2]string{"D", "M"} {
 		t.Fatal(keys)
 	}
 	keys = summonerKeysFromValues(allSettingsFromINI([]byte("[GameEvents]\nevtCastAvatarSpell1=[Shift][d]\nevtCastAvatarSpell2=[f]"), false))

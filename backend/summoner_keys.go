@@ -80,15 +80,21 @@ func summonerKeysFromJSON(data []byte) [2]string {
 func summonerKeysFromValues(values map[string]string) [2]string {
 	out := [2]string{}
 	for i, suffix := range []string{"1", "2"} {
-		for _, event := range []string{"evtSmartCastAvatarSpell", "evtCastAvatarSpell"} {
+		for _, event := range []string{"evtCastAvatarSpell", "evtSmartCastAvatarSpell", "evtSmartPlusSelfCastAvatarSpell", "evtNormalCastAvatarSpell"} {
 			for key, value := range values {
 				if strings.Contains(strings.ToLower(key), "gameevents") && strings.HasSuffix(strings.ToLower(key), strings.ToLower(event+suffix)) {
 					if v := formatSummonerBinding(value); v != "" {
-						out[i] = v
+						if out[i] == "" {
+							out[i] = v
+						}
+						if !strings.Contains(v, "+") {
+							out[i] = v
+							break
+						}
 					}
 				}
 			}
-			if out[i] != "" {
+			if out[i] != "" && !strings.Contains(out[i], "+") {
 				break
 			}
 		}
