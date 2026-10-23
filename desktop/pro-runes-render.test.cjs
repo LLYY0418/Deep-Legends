@@ -33,6 +33,13 @@ test(`R75/R76 actual page: pro rows, degradation ${coverage ? coverage.failedGam
     require("./license-render-fixture.cjs").installLicenseRenderFixture(w);
     for (const file of ["privacy.js", "runtime.js", "demo-data.js", "license-ui.js", "app.js", "gameplay.js", "champions.js", "friends.js", "suite.js"]) {
       w.eval(fs.readFileSync(path.join(WEB, file), "utf8"));
+      if(file==="gameplay.js"){
+        // This legacy fixture loads page scripts directly; include the live module
+        // that production's section loader loads before enabling the live section.
+        const sections=w.deepLegendsSections;w.deepLegendsSections={register(){}};
+        w.eval(fs.readFileSync(path.join(WEB,"auto-config-live.js"),"utf8"));
+        if(sections)w.deepLegendsSections=sections;else delete w.deepLegendsSections;
+      }
       if (file !== "demo-data.js") continue;
       const demoFetch = w.fetch;
       w.fetch = async (input, init) => {

@@ -34,7 +34,7 @@ test("R293 pro and specialist rows share two adaptive spell locations, omitting 
     assert.equal(row.querySelector(".sg-skills"),skills);
     assert.equal(row.querySelector(".sg-spells"),spells);
     assert.equal(row.querySelector(".rune-corner-spells"),corner);
-    assert.equal(row.querySelectorAll(".sg-items .route-divider").length,1);
+    assert.deepEqual([...row.querySelectorAll(".sg-items .sg-label")].map(n=>n.textContent),["出门装","最终装备"]);
     state.perks = null;
     root.innerHTML = renderSpecialistPlayers([config],"pro");
     assert.equal(root.querySelectorAll(".rune-corner-spells,.sg-spells").length,2,"loading the rune catalog must not remove a spell location");

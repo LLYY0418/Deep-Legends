@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -320,9 +321,9 @@ func TestR300OPGGActualOpeningPurchasesAndCache(t *testing.T) {
 	row.Game.Set = 1
 	row.Game.BeginAt = game.BeginAt
 	cp := proTestProvider()
-	requests := 0
+	var requests atomic.Int64
 	cp.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		requests++
+		requests.Add(1)
 		if r.Method != "POST" || r.URL.String() != "https://esports.op.gg/matches/graphql" {
 			t.Error(r.Method, r.URL)
 		}
@@ -347,8 +348,8 @@ func TestR300OPGGActualOpeningPurchasesAndCache(t *testing.T) {
 			t.Fatal(got)
 		}
 	}
-	if requests != 1 {
-		t.Fatal("cache missed", requests)
+	if requests.Load() != 1 {
+		t.Fatal("cache missed", requests.Load())
 	}
 	// The same game must never supply another player's opening inventory.
 	row.ID = "another"

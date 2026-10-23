@@ -429,7 +429,7 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 		}
 	}
 	writes := strings.Join(privacy.ExplicitWrites, "\n")
-	for _, expected := range []string{"头像", "旗帜", "不动表情", "符文", "装备方案", "英雄选择", "[DL] ", "页数已满", "最旧符文页", "最多回收 5 页", "绝不删除其它符文页", "回放", "生涯背景", "个性签名", "头像框", "逐项领取", "客户端界面", "只读属性", "符号链接"} {
+	for _, expected := range []string{"头像", "旗帜", "不动表情", "符文", "装备方案", "英雄选择", "[DL] ", "页数已满", "复用或创建一页", "清理多余自建页", "不可编辑或不可删除页", "EndOfGame", "绝不删除其它符文页", "回放", "生涯背景", "个性签名", "头像框", "逐项领取", "客户端界面", "只读属性", "符号链接"} {
 		if !strings.Contains(writes, expected) {
 			t.Fatalf("privacy statement is missing %q: %s", expected, writes)
 		}
@@ -676,6 +676,7 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
+	"patch_release_schedule.go":  1, // Root patch-release-schedule.json: declared public release dates and local refresh status; no account data.
 	"ui_preferences.go":          1, // Root ui-preferences.json: local UI choices/read revisions; no new directory.
 	"player_tags.go":             1, // Root player-tags.json: user-authored local player tags/notes; no upload or new directory.
 	"patch_notes.go":             1, // Root patch-notes.json: public official patch text cache; no player data.

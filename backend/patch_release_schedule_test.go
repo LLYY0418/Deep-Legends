@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -59,10 +60,10 @@ func TestPatchReleaseScheduleOnceAfterMissedTimeAndRestart(t *testing.T) {
 	a := &app{storage: trackTestStore(t, &localStore{root: t.TempDir()})}
 	state := a.loadPatchReleaseState()
 	state.LastAttemptVersion = "26.20"
-	calendarCalls, refreshes := 0, 0
-	calendar := func() ([]patchRelease, error) { calendarCalls++; return nil, errors.New("offline") }
+	var calendarCalls, refreshes atomic.Int64
+	calendar := func() ([]patchRelease, error) { calendarCalls.Add(1); return nil, errors.New("offline") }
 	refresh := func(at time.Time) {
-		refreshes++
+		refreshes.Add(1)
 		// The claim must already be durable even when network work fails.
 		stored := a.loadPatchReleaseState()
 		if stored.LastAttemptVersion != "26.21" || !stored.AttemptedAt.Equal(at) {
@@ -71,15 +72,15 @@ func TestPatchReleaseScheduleOnceAfterMissedTimeAndRestart(t *testing.T) {
 	}
 	now := releaseTestTime("2026-10-23 14:00:00")
 	next := state.step(now, calendar, func() error { return a.savePatchReleaseState(state) }, refresh)
-	if refreshes != 1 || calendarCalls != 1 || !next.Equal(releaseTestTime("2026-11-05 00:00:00")) {
-		t.Fatal(refreshes, calendarCalls, next)
+	if refreshes.Load() != 1 || calendarCalls.Load() != 1 || !next.Equal(releaseTestTime("2026-11-05 00:00:00")) {
+		t.Fatal(refreshes.Load(), calendarCalls.Load(), next)
 	}
 	state = (&app{storage: a.storage}).loadPatchReleaseState()
 	for _, offset := range []time.Duration{5 * time.Minute, time.Hour, 24 * time.Hour} {
 		state.step(now.Add(offset), calendar, func() error { return a.savePatchReleaseState(state) }, refresh)
 	}
-	if refreshes != 1 || calendarCalls != 1 {
-		t.Fatal("background retry/restart repeated networking", refreshes, calendarCalls)
+	if refreshes.Load() != 1 || calendarCalls.Load() != 1 {
+		t.Fatal("background retry/restart repeated networking", refreshes.Load(), calendarCalls.Load())
 	}
 	state.LastAttemptVersion = ""
 	due, _ := state.pending(releaseTestTime("2026-12-25 12:00:00"))
@@ -97,29 +98,29 @@ func TestPatchReleaseScheduleRespectsPostponementAndNextYear(t *testing.T) {
 			updated[i].Date = "2026-11-06"
 		}
 	}
-	calls := 0
-	refreshes := 0
-	calendar := func() ([]patchRelease, error) { calls++; return updated, nil }
-	next := state.step(releaseTestTime("2026-11-05 00:00:00"), calendar, func() error { return nil }, func(time.Time) { refreshes++ })
-	if refreshes != 0 || calls != 1 || !next.Equal(releaseTestTime("2026-11-07 00:00:00")) {
-		t.Fatal(refreshes, calls, next)
+	var calls atomic.Int64
+	var refreshes atomic.Int64
+	calendar := func() ([]patchRelease, error) { calls.Add(1); return updated, nil }
+	next := state.step(releaseTestTime("2026-11-05 00:00:00"), calendar, func() error { return nil }, func(time.Time) { refreshes.Add(1) })
+	if refreshes.Load() != 0 || calls.Load() != 1 || !next.Equal(releaseTestTime("2026-11-07 00:00:00")) {
+		t.Fatal(refreshes.Load(), calls.Load(), next)
 	}
-	state.step(releaseTestTime("2026-11-07 00:00:00"), calendar, func() error { return nil }, func(time.Time) { refreshes++ })
-	if refreshes != 1 {
-		t.Fatal(refreshes)
+	state.step(releaseTestTime("2026-11-07 00:00:00"), calendar, func() error { return nil }, func(time.Time) { refreshes.Add(1) })
+	if refreshes.Load() != 1 {
+		t.Fatal(refreshes.Load())
 	}
 	state.LastAttemptVersion = "26.24"
 	calendar = func() ([]patchRelease, error) {
-		calls++
+		calls.Add(1)
 		return []patchRelease{{Version: "27.01", Date: "2027-01-07"}}, nil
 	}
-	next = state.step(releaseTestTime("2027-01-01 00:00:00"), calendar, func() error { return nil }, func(time.Time) { refreshes++ })
-	if !next.Equal(releaseTestTime("2027-01-08 00:00:00")) || refreshes != 1 {
-		t.Fatal(next, refreshes)
+	next = state.step(releaseTestTime("2027-01-01 00:00:00"), calendar, func() error { return nil }, func(time.Time) { refreshes.Add(1) })
+	if !next.Equal(releaseTestTime("2027-01-08 00:00:00")) || refreshes.Load() != 1 {
+		t.Fatal(next, refreshes.Load())
 	}
-	state.step(releaseTestTime("2027-01-08 00:00:00"), calendar, func() error { return nil }, func(time.Time) { refreshes++ })
-	if refreshes != 2 || state.LastAttemptVersion != "27.01" {
-		t.Fatal(state, refreshes)
+	state.step(releaseTestTime("2027-01-08 00:00:00"), calendar, func() error { return nil }, func(time.Time) { refreshes.Add(1) })
+	if refreshes.Load() != 2 || state.LastAttemptVersion != "27.01" {
+		t.Fatal(state, refreshes.Load())
 	}
 }
 
@@ -159,18 +160,18 @@ func TestMayhemReleaseBoundaryRefreshesMemoryAndDiskPreservingFallback(t *testin
 			}
 			now = releaseTestTime("2026-11-05 00:00:00")
 			cache.setMayhemReleaseBoundary(now)
-			calls := 0
-			data, err := cache.load(context.Background(), key, 6*time.Hour, 24*time.Hour, true, func(context.Context) ([]byte, error) { calls++; return nil, errors.New("offline") })
-			if err != nil || string(data) != "old-success" || calls != 1 {
-				t.Fatal(string(data), err, calls)
+			var calls atomic.Int64
+			data, err := cache.load(context.Background(), key, 6*time.Hour, 24*time.Hour, true, func(context.Context) ([]byte, error) { calls.Add(1); return nil, errors.New("offline") })
+			if err != nil || string(data) != "old-success" || calls.Load() != 1 {
+				t.Fatal(string(data), err, calls.Load())
 			}
 			_, err = cache.load(context.Background(), other, 6*time.Hour, 24*time.Hour, true, func(context.Context) ([]byte, error) { t.Fatal("unrelated Arena cache expired"); return nil, nil })
 			if err != nil {
 				t.Fatal(err)
 			}
-			data, err = cache.load(context.Background(), key, 6*time.Hour, 24*time.Hour, true, func(context.Context) ([]byte, error) { calls++; return []byte("new-success"), nil })
-			if err != nil || string(data) != "new-success" || calls != 2 {
-				t.Fatal(string(data), err, calls)
+			data, err = cache.load(context.Background(), key, 6*time.Hour, 24*time.Hour, true, func(context.Context) ([]byte, error) { calls.Add(1); return []byte("new-success"), nil })
+			if err != nil || string(data) != "new-success" || calls.Load() != 2 {
+				t.Fatal(string(data), err, calls.Load())
 			}
 			_, err = cache.load(context.Background(), key, 6*time.Hour, 24*time.Hour, true, func(context.Context) ([]byte, error) { t.Fatal("new version fetched again"); return nil, nil })
 			if err != nil {
