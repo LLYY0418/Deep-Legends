@@ -8859,6 +8859,7 @@
     window.reportFlowDiagnostic?.("live_ui_switch", "rune-workspace", { source: state.runeSourceTab, partial: true });
     bindRuneWorkspaceControls(panel);
     bindRuneChoiceButtons(panel);
+    updateLiveRuneSelection(panel);
     applyRenderedMetricStyles(panel);
     prepareImages(nextStack);
     rememberLiveRecommendationMarkup();
