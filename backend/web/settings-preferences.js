@@ -25,7 +25,7 @@
     "mask-names":enumOf("true","false"),"confirm-replay":enumOf("true","false"),"auto-live":enumOf("true","false"),
     "live-tags":{array:enumOf("self","premade","pro","hidden","autofill","squad","positions"),maxLength:7},
   };
-  const autoEntry = {runes:{primaryStyleId:integer(1,100000),subStyleId:integer(1,100000),selectedPerkIds:{array:integer(0,100000),maxLength:9}},spells:{spell1Id:integer(1,100000),spell2Id:integer(1,100000)},items:{core:{array:integer(1,1000000),maxLength:6},situational:{array:integer(1,1000000),maxLength:6}},updatedAt:"string"};
+  const autoEntry = {runes:{primaryStyleId:integer(1,100000),subStyleId:integer(1,100000),selectedPerkIds:{array:integer(0,100000),maxLength:9}},spells:{spell1Id:integer(1,100000),spell2Id:integer(1,100000)},items:{starter:{array:{id:integer(1,1000000),count:integer(1,99)},maxLength:6},core:{array:integer(1,1000000),maxLength:6},situational:{array:integer(1,1000000),maxLength:6}},updatedAt:"string"};
   const autoConfigSchema = {version:integer(1,Number.MAX_SAFE_INTEGER),enabled:"boolean",runes:"boolean",spells:"boolean",items:"boolean",champions:{map:{map:autoEntry,keyPattern:/^(?:ranked(?:-(?:top|jungle|middle|bottom|utility))?|normal|aram|hextech|urf|event)$/,maxKeys:11},keyPattern:/^[1-9][0-9]{0,3}$/,maxKeys:1000}};
   const schema = {exportDirectory:"string",renderer:rendererSchema,native:{contentProtection:"boolean",closeBehavior:enumOf("exit","tray"),disableHardwareAcceleration:"boolean"},automatic:"boolean",autoDownload:"boolean",blockAutostart:"boolean",network:{mode:enumOf("auto","direct","manual"),url:"string"},watch:watchSchema,autoConfig:autoConfigSchema,summonerKeys:{flashSlot:{nullable:integer(0,1)}}};
   function sanitize(value, shape = schema) {

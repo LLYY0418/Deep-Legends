@@ -4,7 +4,7 @@ const clone=value=>JSON.parse(JSON.stringify(value));
 const tick=()=>new Promise(setImmediate);
 function largeBackup() {
  const champions={};
- for(let id=1;id<=180;id++)champions[id]=Object.fromEntries(['ranked','normal','aram','urf','event','ranked-top'].map(mode=>[mode,{runes:{primaryStyleId:8000,subStyleId:8100,selectedPerkIds:[1,2,3,4,12,13,5008,5008,5001]},spells:{spell1Id:4,spell2Id:14},items:{core:[3000],situational:[]},updatedAt:'2026-10-20'}]));
+ for(let id=1;id<=180;id++)champions[id]=Object.fromEntries(['ranked','normal','aram','urf','event','ranked-top'].map(mode=>[mode,{runes:{primaryStyleId:8000,subStyleId:8100,selectedPerkIds:[1,2,3,4,12,13,5008,5008,5001]},spells:{spell1Id:4,spell2Id:14},items:{starter:[{id:2003,count:10}],core:[3000],situational:[]},updatedAt:'2026-10-20'}]));
  return {autoConfig:{version:1,enabled:true,runes:true,spells:true,items:true,champions},summonerKeys:{flashSlot:1},watch:{schemaVersion:1,masterEnabled:true,rules:{autoAccept:{enabled:true,delayMs:250}}},network:{mode:'manual',url:'http://127.0.0.1:7890'},native:{contentProtection:true,closeBehavior:'exit',disableHardwareAcceleration:true},automatic:false,autoDownload:false,blockAutostart:false,exportDirectory:'/tmp/r298-imported',renderer:{theme:'dark','mask-names':'true'}};
 }
 async function backupHarness({failOnce=false}={}) {
@@ -54,6 +54,7 @@ test('R298 actual file import accepts a complete backup larger than old 128KiB',
   assert.equal(h.values['/api/watch/rules'].masterEnabled,true);
   assert.equal(h.values['/api/client-autostart'].block,false);
   assert.equal(h.w.deepLegendsSettingsBackup.sanitize(await h.w.deepLegendsSettingsBackup.createBackup()).renderer.theme,'dark');
+  assert.deepEqual(clone(h.w.deepLegendsSettingsBackup.sanitize(await h.w.deepLegendsSettingsBackup.createBackup()).autoConfig.champions),backup.autoConfig.champions,'export after actual import preserves starter quantities for all champions/modes');
   assert.equal(h.get('setting-backup-file').value,'');
  }finally{h.close()}
 });

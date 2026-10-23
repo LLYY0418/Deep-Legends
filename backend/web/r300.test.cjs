@@ -76,3 +76,10 @@ test('R300 recommendation import rejects excessive quantities and preserves unsu
  const h=await editor({catalog:{items:[{...starterPool()[0],priceTotal:0}]},detail:async()=>({ok:true,json:async()=>({build:{starterItems:[{assets:[{id:2003,count:90},{id:2003,count:20},{id:2003,count:-2},{id:2003,count:1.5}]}]}})})});
  try{await h.click('[data-act="import"]');assert.deepEqual(h.saved.champions['1'].ranked.items.starter,[{id:2003,count:90}]);for(const mode of ['aram','urf','event']){await h.click(`[data-mode="${mode}"]`);assert(h.w.document.querySelector('[data-act="import"]').disabled);assert.equal(h.saved.champions['1'][mode],undefined);}}finally{h.close();}
 });
+
+test('R300 settings backup preserves starter quantities and rejects invalid starter arrays',()=>{
+ const {sanitize}=require('./settings-preferences.js');const backup=starter=>({autoConfig:{version:1,champions:{1:{normal:{items:{starter,core:[3000],situational:[3001]}}}}}});
+ const source=backup([{id:2003,count:10}]);assert.deepEqual(sanitize(JSON.parse(JSON.stringify(sanitize(source)))),source);
+ for(const starter of [[{id:2003,count:0}],[{id:2003,count:100}],[{id:2003,count:1.5}],[{id:0,count:1}],Array.from({length:7},(_,i)=>({id:1000+i,count:1}))])assert.throws(()=>sanitize(backup(starter)));
+ const old={autoConfig:{champions:{1:{ranked:{items:{core:[3000],situational:[]}}}}}};assert.deepEqual(sanitize(old),old);
+});
