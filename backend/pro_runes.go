@@ -138,6 +138,8 @@ type proRuneProvider struct {
 	diskMu           sync.Mutex
 	cacheWriteFailed bool
 	opggBuilds       map[int]proOPGGCache
+	starterLinks     map[string]proStarterLink
+	opggOpenings     map[string]proOPGGOpeningCache
 }
 
 func newProRuneProvider(provider *championProvider, store *localStore, notify func()) *proRuneProvider {

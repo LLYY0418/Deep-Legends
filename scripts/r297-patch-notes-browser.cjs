@@ -1,8 +1,11 @@
 'use strict';
 const {browser}=require('./r297-browser-harness.cjs'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const out=path.join(process.env.R297_REPORT_DIR||path.join(require('node:os').tmpdir(),'r297-browser-proof'),'p10-patch-notes');const feed=JSON.parse(fs.readFileSync(path.resolve(__dirname,'../backend/patchnotes/patch-notes.json')));
-(async()=>{const b=await browser({out,inject:`window.__patchFeed=${JSON.stringify(feed)};window.__patchData=__patchFeed.versions[0];`,intercept:`if(pathname==='/api/patch-notes')return Promise.resolve(new Response(JSON.stringify(window.__patchData),{headers:{'Content-Type':'application/json'}}));`,transform:(name,data)=>name==='champions.js'?Buffer.from(data.toString().replace(/\}\)\(\);\s*$/,'window.__patchChampions={state,render};\n})();')):data});const results=[];try{
+(async()=>{const b=await browser({out,inject:`window.__patchFeed=${JSON.stringify(feed)};window.__patchData=__patchFeed.versions.find(v=>v.version==='26.20');`,intercept:`if(pathname==='/api/patch-notes')return Promise.resolve(new Response(JSON.stringify(window.__patchData),{headers:{'Content-Type':'application/json'}}));`,transform:(name,data)=>name==='champions.js'?Buffer.from(data.toString().replace(/\}\)\(\);\s*$/,'window.__patchChampions={state,render};\n})();')):data});const results=[];try{
  await b.call('Page.navigate',{url:b.origin+'/?demo&section=champions'});await b.until("window.__patchChampions && document.querySelector('[data-patch-notes] b')?.textContent==='26.20'");
+ await b.evaluate("window.__patchData=__patchFeed.versions.find(v=>v.version==='26.21');window.dispatchEvent(new CustomEvent('deep-legends:patch-notes-changed'))");await b.until("document.querySelector('[data-patch-notes] b')?.textContent==='26.21'");
+ for(const mode of ['ranked','aram-mayhem','arena']){await b.evaluate(`__patchChampions.state.mode='${mode}';__patchChampions.state.selected=null;__patchChampions.render();document.querySelector('[data-patch-notes]').click()`);await b.until("document.querySelector('.pn-dialog')");assert(await b.evaluate("document.querySelector('.pn-head h3').textContent.includes('26.21')"));assert(await b.evaluate("document.querySelectorAll('.pn-entry').length>0"));await b.shot('26.21-'+mode);await b.evaluate("document.querySelector('.pn-dialog').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");}
+ await b.evaluate("window.__patchData=__patchFeed.versions.find(v=>v.version==='26.20');window.dispatchEvent(new CustomEvent('deep-legends:patch-notes-changed'))");await b.until("document.querySelector('[data-patch-notes] b')?.textContent==='26.20'");
  for(const width of [1440,960])for(const theme of ['dark','light']){
   await b.call('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});await b.evaluate(`document.documentElement.dataset.theme='${theme}'`);const heights=[];
   for(const mode of ['ranked','aram-mayhem','arena']){
@@ -15,7 +18,7 @@ const out=path.join(process.env.R297_REPORT_DIR||path.join(require('node:os').tm
    assert.equal(dialog.width,680);assert(dialog.right<=width);assert(dialog.center<1);assert(dialog.entries>0);assert(dialog.scroll);assert(dialog.focus);results.push({theme,width,mode,header,dialog});
    await b.shot(`${mode==='ranked'?'g7':mode==='aram-mayhem'?'g8':'g9'}-${mode}-${theme}-${width}`);
    await b.evaluate("document.querySelector('.pn-dialog').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");assert(!await b.evaluate("!!document.querySelector('.pn-dialog')"));assert(await b.evaluate("document.activeElement.matches('[data-patch-notes]')"));
-   if(mode==='arena'){await b.evaluate("window.__patchData=__patchFeed.versions[0];window.dispatchEvent(new CustomEvent('deep-legends:patch-notes-changed'))");await b.until("document.querySelector('[data-patch-notes] b').textContent==='26.20'")}
+   if(mode==='arena'){await b.evaluate("window.__patchData=__patchFeed.versions.find(v=>v.version==='26.20');window.dispatchEvent(new CustomEvent('deep-legends:patch-notes-changed'))");await b.until("document.querySelector('[data-patch-notes] b').textContent==='26.20'")}
   }
   if(width===1440)assert(Math.max(...heights)-Math.min(...heights)<1,JSON.stringify(heights));
  }

@@ -83,6 +83,8 @@ type championDataCache struct {
 	lastPrune         time.Time
 	writtenSincePrune int64
 	migrationErr      error
+
+	mayhemReleaseAfter time.Time // guarded by mu
 }
 
 func newChampionDataCache(store *localStore) *championDataCache {
@@ -128,7 +130,7 @@ func (c *championDataCache) loadCacheFlight(ctx context.Context, key string, ttl
 	now := c.cacheNow()
 	c.mu.Lock()
 	if entry, ok := c.entries[key]; ok {
-		if now.Before(entry.ExpiresAt) {
+		if now.Before(entry.ExpiresAt) && c.freshForMayhemRelease(entry) {
 			c.touchLocked(key)
 			data := append([]byte(nil), entry.Data...)
 			c.mu.Unlock()
@@ -158,7 +160,7 @@ func (c *championDataCache) loadCacheFlight(ctx context.Context, key string, ttl
 		diskEntry, _ = c.readDisk(key)
 	}
 	c.mu.Lock()
-	if entry, ok := c.entries[key]; ok && c.cacheNow().Before(entry.ExpiresAt) {
+	if entry, ok := c.entries[key]; ok && c.cacheNow().Before(entry.ExpiresAt) && c.freshForMayhemRelease(entry) {
 		c.touchLocked(key)
 		data := append([]byte(nil), entry.Data...)
 		c.mu.Unlock()
@@ -182,7 +184,7 @@ func (c *championDataCache) loadCacheFlight(ctx context.Context, key string, ttl
 	}
 	if len(diskEntry.Data) > 0 {
 		c.storeMemoryLocked(key, diskEntry)
-		if now.Before(diskEntry.ExpiresAt) {
+		if now.Before(diskEntry.ExpiresAt) && c.freshForMayhemRelease(diskEntry) {
 			data := append([]byte(nil), diskEntry.Data...)
 			c.mu.Unlock()
 			return championCacheLoadResult{data: data, fetchedAt: diskEntry.FetchedAt, state: championCacheStateDisk}, nil

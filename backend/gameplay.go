@@ -9242,7 +9242,10 @@ type gameplayRuneApplyRequest struct {
 }
 
 type runeApplyTrace struct {
-	Responses map[string]string
+	Responses     map[string]string
+	DLPagesBefore int
+	DLPagesAfter  int
+	Action        string
 }
 
 type runeApplyTraceContextKey struct{}
@@ -9265,6 +9268,14 @@ func recordRuneApplyResponse(trace *runeApplyTrace, name string, raw json.RawMes
 		trace.Responses = make(map[string]string)
 	}
 	data := bytes.TrimSpace(raw)
+	// Page names can contain player-supplied identity; diagnostics need protocol results only.
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(data, &fields) == nil && fields != nil {
+		if _, ok := fields["name"]; ok {
+			delete(fields, "name")
+			data, _ = json.Marshal(fields)
+		}
+	}
 	if len(data) > runeApplyResponseLimit {
 		data = data[:runeApplyResponseLimit]
 	}
@@ -9273,8 +9284,7 @@ func recordRuneApplyResponse(trace *runeApplyTrace, name string, raw json.RawMes
 
 const (
 	runePagePrefix       = "[DL] "
-	runePageRecycleLimit = 5
-	runePageLimitMessage = "客户端符文页已达上限，无法新增推荐符文页；请删除一个自定义符文页后重试"
+	runePageLimitMessage = "符文页已满，请在客户端腾出一个自定义符文页后重试"
 )
 
 var errRunePageLimit = errors.New(runePageLimitMessage)
@@ -9287,7 +9297,7 @@ func (a *app) handleGameplayRuneApply(w http.ResponseWriter, r *http.Request) {
 	var request gameplayRuneApplyRequest
 	trace := &runeApplyTrace{}
 	defer func() {
-		event := map[string]any{"event": "perk_apply_attempt", "phase": phase, "outcome": outcome, "reason": truncateClientDiagnosticText(reason), "spell_requested": request.Spell1ID > 0 && request.Spell2ID > 0, "spell_applied": spellApplied}
+		event := map[string]any{"event": "perk_apply_attempt", "phase": phase, "outcome": outcome, "reason": truncateClientDiagnosticText(reason), "spell_requested": request.Spell1ID > 0 && request.Spell2ID > 0, "spell_applied": spellApplied, "dl_pages_before": trace.DLPagesBefore, "dl_pages_after": trace.DLPagesAfter, "action": trace.Action}
 		if len(request.SelectedPerkIDs) > 0 {
 			event["perk_ids"] = append([]int64(nil), request.SelectedPerkIDs...)
 		}
@@ -9329,15 +9339,16 @@ func (a *app) handleGameplayRuneApply(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 	ctx = context.WithValue(ctx, runeApplyTraceContextKey{}, trace)
-	a.yieldAutoConfig("runes")
+	kinds := []string{}
+	if request.Spell1ID > 0 {
+		kinds = append(kinds, "spells")
+	}
+	a.yieldAutoConfigForChampion(ctx, client, request.ChampionID, "runes", kinds...)
 	a.autoConfig.Lock()
 	a.loadSummonerKeysLocked()
 	flashSlot := a.autoConfig.keys.FlashSlot
 	a.autoConfig.Unlock()
 	request.Spell1ID, request.Spell2ID = reorderFlashSpells(request.Spell1ID, request.Spell2ID, flashSlot)
-	if request.Spell1ID > 0 {
-		a.yieldAutoConfig("spells")
-	}
 	pageID, err := applyRunePage(ctx, client, request)
 	if err != nil {
 		outcome = "failed"
@@ -9398,103 +9409,11 @@ func applySummonerSpells(ctx context.Context, client *LCUClient, spell1ID, spell
 	return client.RequestJSON(ctx, http.MethodPatch, "/lol-champ-select/v1/session/my-selection", map[string]any{"spell1Id": spell1ID, "spell2Id": spell2ID}, nil)
 }
 
-func applyRunePage(ctx context.Context, client *LCUClient, request gameplayRuneApplyRequest) (int64, error) {
-	trace := runeApplyTraceFromContext(ctx)
-	canAdd, err := canAddRunePage(ctx, client)
-	if err != nil {
-		return 0, err
-	}
-	if !canAdd {
-		var pages []lcuRunePage
-		if err := client.RequestJSON(ctx, http.MethodGet, "/lol-perks/v1/pages", nil, &pages); err != nil {
-			return 0, err
-		}
-		candidates := make([]lcuRunePage, 0, len(pages))
-		for _, page := range pages {
-			if page.ID <= 0 || !strings.HasPrefix(page.Name, runePagePrefix) || (page.IsDeletable != nil && !*page.IsDeletable) {
-				continue
-			}
-			candidates = append(candidates, page)
-		}
-		sort.SliceStable(candidates, func(i, j int) bool {
-			left, right := candidates[i], candidates[j]
-			leftMissing, rightMissing := left.LastModified <= 0, right.LastModified <= 0
-			if leftMissing || rightMissing {
-				if leftMissing != rightMissing {
-					return leftMissing
-				}
-				return left.ID < right.ID
-			}
-			if left.LastModified != right.LastModified {
-				return left.LastModified < right.LastModified
-			}
-			return left.ID < right.ID
-		})
-		for index, page := range candidates {
-			if index >= runePageRecycleLimit {
-				break
-			}
-			if err := checkAutoConfigWrite(ctx); err != nil {
-				return 0, err
-			}
-			if err := client.RequestJSON(ctx, http.MethodDelete, fmt.Sprintf("/lol-perks/v1/pages/%d", page.ID), nil, nil); err != nil {
-				return 0, err
-			}
-			canAdd, err = canAddRunePage(ctx, client)
-			if err != nil {
-				return 0, err
-			}
-			if canAdd {
-				break
-			}
-		}
-		if !canAdd {
-			return 0, errRunePageLimit
-		}
-	}
-	name := runePageName(request.ChampionName, request.Source)
-	var addedRaw json.RawMessage
-	if err := checkAutoConfigWrite(ctx); err != nil {
-		return 0, err
-	}
-	if err := client.RequestJSON(ctx, http.MethodPost, "/lol-perks/v1/pages/", map[string]any{"name": name, "isEditable": true, "primaryStyleId": strconv.FormatInt(request.PrimaryStyleID, 10)}, &addedRaw); err != nil {
-		return 0, err
-	}
-	recordRuneApplyResponse(trace, "create-page", addedRaw)
-	var added struct {
-		ID int64 `json:"id"`
-	}
-	if err := json.Unmarshal(addedRaw, &added); err != nil {
-		return 0, fmt.Errorf("decode rune page response: %w", err)
-	}
-	pageID := added.ID
-	if pageID <= 0 {
-		return 0, errors.New("客户端没有返回符文页编号")
-	}
-	body := map[string]any{"id": pageID, "isRecommendationOverride": false, "isTemporary": false, "name": name, "primaryStyleId": request.PrimaryStyleID, "selectedPerkIds": request.SelectedPerkIDs, "subStyleId": request.SubStyleID, "recommendationChampionId": request.ChampionID}
-	var updatedRaw json.RawMessage
-	if err := checkAutoConfigWrite(ctx); err != nil {
-		return 0, err
-	}
-	if err := client.RequestJSON(ctx, http.MethodPut, fmt.Sprintf("/lol-perks/v1/pages/%d", pageID), body, &updatedRaw); err != nil {
-		return 0, err
-	}
-	recordRuneApplyResponse(trace, "update-page", updatedRaw)
-	var currentRaw json.RawMessage
-	if err := checkAutoConfigWrite(ctx); err != nil {
-		return 0, err
-	}
-	if err := client.RequestJSON(ctx, http.MethodPut, "/lol-perks/v1/currentpage", pageID, &currentRaw); err != nil {
-		return 0, err
-	}
-	recordRuneApplyResponse(trace, "set-current-page", currentRaw)
-	return pageID, nil
-}
-
 type lcuRunePage struct {
 	ID           int64  `json:"id"`
 	Name         string `json:"name"`
 	IsDeletable  *bool  `json:"isDeletable"`
+	IsEditable   *bool  `json:"isEditable"`
 	LastModified int64  `json:"lastModified"`
 }
 
@@ -9822,7 +9741,7 @@ func validateGameplayItemSetRequest(request gameplayItemSetApplyRequest) error {
 		}
 		seen := make(map[int64]bool, len(block.Items))
 		for _, item := range block.Items {
-			if item.ID <= 0 || item.ID > 1000000 || item.Count <= 0 || item.Count > 6 || seen[item.ID] {
+			if item.ID <= 0 || item.ID > 1000000 || item.Count <= 0 || item.Count > 99 || item.Count > 6 && blockType != "出门装" || seen[item.ID] {
 				return errors.New("装备方案包含无效或重复的装备")
 			}
 			seen[item.ID] = true
@@ -10412,6 +10331,7 @@ func (a *app) handleGameplayPerks(w http.ResponseWriter, r *http.Request) {
 		payload = a.enrichPerkAugments(cacheKey, client, payload)
 		// Hexdata hero visits extend the observed ID index after the base perk
 		// catalog may already have been cached. Merge it on every response.
+		payload.Augments = mergeGameplayAugmentMetadata(payload.Augments, currentMayhemMetadataRows())
 		payload.Augments = mergeGameplayAugmentMetadata(payload.Augments, a.championDataProvider().observedHexdataAugments())
 		payload.Augments = preferBundledAugmentIcons(mergeGameplayAugmentMetadata(payload.Augments, bundledAugmentCatalog()))
 	}

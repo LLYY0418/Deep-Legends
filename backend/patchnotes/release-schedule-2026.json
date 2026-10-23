@@ -1,0 +1,31 @@
+{
+  "sourceUrl": "https://support.riotgames.com/en-us/league-of-legends/gameplay/patch-schedule-league-of-legends/",
+  "sourceTimezone": "America/Los_Angeles",
+  "verifiedAt": "2026-10-23",
+  "releases": [
+    {"version":"26.01","date":"2026-01-08"},
+    {"version":"26.02","date":"2026-01-22"},
+    {"version":"26.03","date":"2026-02-04"},
+    {"version":"26.04","date":"2026-02-19"},
+    {"version":"26.05","date":"2026-03-04"},
+    {"version":"26.06","date":"2026-03-18"},
+    {"version":"26.07","date":"2026-04-01"},
+    {"version":"26.08","date":"2026-04-15"},
+    {"version":"26.09","date":"2026-04-29"},
+    {"version":"26.10","date":"2026-05-13"},
+    {"version":"26.11","date":"2026-05-28"},
+    {"version":"26.12","date":"2026-06-10"},
+    {"version":"26.13","date":"2026-06-24"},
+    {"version":"26.14","date":"2026-07-15"},
+    {"version":"26.15","date":"2026-07-29"},
+    {"version":"26.16","date":"2026-08-12"},
+    {"version":"26.17","date":"2026-08-26"},
+    {"version":"26.18","date":"2026-09-10"},
+    {"version":"26.19","date":"2026-09-23"},
+    {"version":"26.20","date":"2026-10-07"},
+    {"version":"26.21","date":"2026-10-21"},
+    {"version":"26.22","date":"2026-11-04"},
+    {"version":"26.23","date":"2026-11-18"},
+    {"version":"26.24","date":"2026-12-09"}
+  ]
+}

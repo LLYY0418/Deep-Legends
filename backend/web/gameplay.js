@@ -6451,7 +6451,7 @@
     state.recommendationTabTouched = false;
     state.runeSourceTab = "opgg";
     state.selectedRecommendation = "opgg";
- state.autoConfigOpen = false; state.autoConfigSelected = false; state.autoConfig = null;
+ state.autoConfigViewKey = ""; state.autoConfig = null;
     if (preserveTabs && recommendationTabTouched) {
       state.recommendationTab = recommendationTab;
       state.recommendationTabTouched = true;
@@ -7006,12 +7006,13 @@
     for (const row of nodes.liveContent.querySelectorAll(".specialist-game-row[data-rune-choice]")) {
       const config = byKey.get(row.dataset.runeChoice);
       if (!config?.starterItemIds?.length) continue;
-      const current = row.querySelector(".sg-items");
-      if (!current) continue;
       const next = document.createElement("div");
       next.innerHTML = renderRuneEquipment(config);
-      const equipment = next.querySelector(".sg-items");
-      if (equipment) { current.replaceWith(equipment); prepareImages(equipment); }
+      const starter=next.querySelector(".sg-starters");if(!starter)continue;
+      const current=row.querySelector(".sg-starters");
+      if(current)current.replaceWith(starter);
+      else {const footer=row.querySelector(".specialist-game-footer"),final=row.querySelector(".sg-items");if(final)final.before(starter);else if(footer)footer.prepend(starter);else{const host=row.querySelector(".specialist-game-runes");if(!host)continue;const footer=document.createElement("div");footer.className="specialist-game-footer";footer.append(starter);host.append(footer);}}
+      prepareImages(starter);
     }
     rememberLiveRecommendationMarkup();
   }
@@ -7820,9 +7821,7 @@
   }
 
   function renderRecommendationArea(data) {
- const auto = state.autoConfig;
- const customSelf = (data?.players || []).find(p=>p.isCurrent);
- const custom = auto?.championId === Number(customSelf?.championId) && auto?.results?.runes === "applied" && !auto.yielded?.runes;
+    const customConfig = window.deepLegendsAutoConfigLive?.prepare(data);
     const self = (data.players || []).find((player) => player.isCurrent);
     const target = liveRecommendationTarget(data);
     const availablePayload = liveRecommendationsFor(data);
@@ -7834,12 +7833,13 @@
     const noChampion = !waiting && !target;
     const augmentSource = liveAugmentRecommendationSource(data);
     const capabilities = recommendationCapabilities(data, payload);
+    if(customConfig)capabilities.hasRunes=true;
     const tabs = recommendationTabSpecs(capabilities);
     const tabKeys = tabs.map(([key]) => key);
     const activeTab = recommendationActiveTab(tabKeys, capabilities);
     if (activeTab !== state.recommendationTab) state.recommendationTab = activeTab;
     const selected = capabilities.hasRunes ? selectedRuneRecommendation(data) : null;
-    const selectedComplete = Boolean(selected && selected.selectedComplete !== false && (selected.selectedComplete !== true || selected.selectedPerkIds?.length === 9) && (selected.selectedPerkIds || selected.perkIds || []).length >= 6);
+    const selectedComplete = Boolean(selected?.sourceLabel === "自配置" || selected && selected.selectedComplete !== false && (selected.selectedComplete !== true || selected.selectedPerkIds?.length === 9) && (selected.selectedPerkIds || selected.perkIds || []).length >= 6);
     const tab = (key, label) => `<button type="button" role="tab" id="recommendation-tab-${key}" aria-controls="recommendation-panel-${key}" aria-selected="${activeTab === key}" tabindex="${activeTab === key ? "0" : "-1"}" class="${activeTab === key ? "is-active" : ""}" data-recommendation-tab="${key}">${label}</button>`;
     const loadingCopy = {
       runes: ["正在读取符文推荐", "从 OP.GG 拉取当前英雄与位置的符文分布"],
@@ -7847,7 +7847,7 @@
       insight: ["正在读取双方玩家战绩", "逐个查询十名玩家的段位与最近对局"],
     };
     const panelLoading = (key) => {
-      if (!recommendationPanelBusy(key, target, payload)) return "";
+      if (key === "runes" && state.runeSourceTab === "custom" || !recommendationPanelBusy(key, target, payload)) return "";
       const [title, detail] = loadingCopy[key] || ["正在读取数据", "稍候片刻"];
       return `<div class="panel-loading" role="status" aria-live="polite"><div class="panel-loading-content"><span class="panel-spinner" aria-hidden="true"></span><strong>${escapeHTML(title)}</strong></div></div>`;
     };
@@ -7858,8 +7858,6 @@
       content.insight = recommendationEmptyPanel("等待进入对局", "进入英雄选择或游戏后，这里会展示双方玩家与最新战绩。");
       content.build = recommendationEmptyPanel("等待进入对局", "进入英雄选择或游戏后，这里会展示召唤师技能、技能加点与装备分布。");
     } else {
-      // R116-D：把推荐 payload 一起传进去，详情 tab 才能渲染克制/协同小条与
-      // 队伍画像标签。payload 为空时函数内部整块不渲染（拿不到就隐藏）。
       content.insight = renderLiveInsights(data, payload);
       if (noChampion) {
         const pendingTitle = randomPending ? "随机待定" : "请先选定英雄";
@@ -7870,21 +7868,15 @@
         if (capabilities.hasRunes) {
           const runePanel = renderRuneRecommendations(data, true);
           const spellPair = selectedComplete ? recommendedRuneSpellIDs(data, selected) : [];
-          const spellToggle = spellPair.length ? `<label class="rune-spell-toggle"><input type="checkbox" data-apply-rune-spells ${state.applyRuneSpells !== false ? "checked" : ""}>同时应用召唤师技能${state.summonerKeys?.flashSlot != null ? `（闪现放在 ${escapeHTML(state.summonerKeys.keys[state.summonerKeys.flashSlot])}）` : ""}</label>` : "";
-          content.runes = `${renderChampionRecommendationHeader(payload.hero, self, data)}${runePanel}<footer class="recommendation-action"><div><strong>${selected ? `已选择：${escapeHTML(runeConfigurationTitle(selected))}` : "请选择一套完整符文"}</strong><span>${selectedComplete ? "将新建符文页并设为当前页" : "这套数据尚不完整，暂时不能应用"}</span>${spellToggle}</div><button class="button button-primary apply-runes" type="button" data-apply-runes="selected" ${!selectedComplete || data.phase !== "ChampSelect" ? "disabled" : ""}>${data.phase === "ChampSelect" ? "应用所选符文" : "仅英雄选择阶段可应用"}</button></footer>`;
+          const spellToggle = selected?.sourceLabel !== "自配置" && spellPair.length ? `<label class="rune-spell-toggle"><input type="checkbox" data-apply-rune-spells ${state.applyRuneSpells !== false ? "checked" : ""}>同时应用召唤师技能${state.summonerKeys?.flashSlot != null ? `（闪现放在 ${escapeHTML(state.summonerKeys.keys[state.summonerKeys.flashSlot])}）` : ""}</label>` : "";
+          content.runes = `${renderChampionRecommendationHeader(payload.hero, self, data)}${runePanel}<footer class="recommendation-action"><div><strong>${selected ? `已选择：${escapeHTML(runeConfigurationTitle(selected))}` : "请选择一套完整符文"}</strong><span>${selectedComplete ? "将更新 [DL] 符文页并设为当前页" : "这套数据尚不完整，暂时不能应用"}</span>${spellToggle}</div><button class="button button-primary apply-runes" type="button" data-apply-runes="selected" ${!selectedComplete || data.phase !== "ChampSelect" ? "disabled" : ""}>${data.phase === "ChampSelect" ? "应用所选符文" : "仅英雄选择阶段可应用"}</button></footer>`;
         }
 		const recommendationHeader = renderChampionRecommendationHeader(payload.hero, self, data);
 		const augmentContent = capabilities.hasAugments && augmentSource ? renderLiveAugmentRecommendations(data, augmentSource) : "";
 		content.build = `${recommendationHeader}${augmentContent}${renderBuildRecommendation(payload.build, self, data.championAbilities || [], data)}`;
       }
     }
-	    if(custom && content.runes) {
- const banner = window.deepLegendsAutoConfigLive?.banner(auto,state.summonerKeys,state.autoConfigOpen) || "";
- content.runes = `${banner}<div class="ac-live-reco" ${state.autoConfigOpen ? "" : "hidden"}>${content.runes}</div>`;
- }
  const rosterNotice = data.champSelectNotice ? `<p class="live-roster-notice" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5m0-9h.01"></path></svg><span>${escapeHTML(data.champSelectNotice)}</span></p>` : "";
-    // R128 §2.3：方法论/口径类说明不再进 UI（用户 2026-09-22 指示，撤销 R116-B
-    // P0-3 的常驻页脚）。后端仍可能下发那个口径字段，前端一律不消费。
 	    return `<section class="recommendation-area"><div data-live-notice="data">${renderRecommendationDataNotices(payload)}</div><div class="recommendation-tab-row"><div class="recommendation-tabs" role="tablist" aria-label="推荐类型">${tabs.map(([key, label]) => tab(key, label)).join("")}</div><div data-lane-matchup-slot>${renderLaneMatchupCard(data, payload.hero)}</div><div data-live-notice="roster">${rosterNotice}</div></div>${tabs.map(([key]) => panel(key, content[key] || "")).join("")}</section>`;
   }
 
@@ -8113,8 +8105,6 @@
         liveConfidenceText(notice)));
     }
     if (!bars.length) return "";
-    // R128 §2.3-B：覆盖率/免责说明不再进 UI。覆盖率低（克制单局命中率 34.6%、
-    // 协同 18.8%）因此也仍然不做「阵容协同 +X%」这类总分（Anti-scope 第 2 条）。
     return `<div class="roster-notice-strip" role="note" aria-label="阵容克制与协同提示">${bars.join("")}</div>`;
   }
 
@@ -8122,7 +8112,6 @@
     const labels = (payload?.teamPortrait?.labels || []).filter((label) => String(label?.label || "").trim() !== "");
     if (!labels.length) return "";
     const resolved = Number(payload?.teamPortrait?.resolvedHeroes) || 0;
-    // R128 §2.3：队伍画像的口径说明不进 tooltip，只留可核对的入队人数。
     const tooltip = resolved > 0 ? `本队 ${resolved} 位英雄进入统计` : "";
     // 缺口类型放在 data-portrait-gap 属性上而不是 is-<key> 类名上：
     return `<span class="team-portrait-tags"${tooltip ? ` data-tooltip="${escapeHTML(tooltip)}" tabindex="0"` : ""}>${labels.map((label) => `<b class="team-portrait-tag" data-portrait-gap="${escapeHTML(String(label.key || ""))}">${escapeHTML(String(label.label))}</b>`).join("")}</span>`;
@@ -8161,11 +8150,8 @@
       for (const teamID of [100, 200]) alignment.teams.set(teamID, clusterPremadePlayers(alignment.teams.get(teamID)));
     }
     const headerNotice = !relativeTeamsKnown ? "无法确定你所在阵营，按蓝方/红方展示" : alignment.reason;
-    // R116-D P1-2/P1-3（克制与协同的行内小条）与 P1-5（队伍画像缺口标签）：
-    // 七个渲染 helper 已经提到模块作用域（就在本函数上面那一段），这里只负责调用。
     const bars = renderLiveRosterNoticeBars(payload, players);
     const portraitTags = renderLiveTeamPortraitTags(payload);
-    // R128 §2.3：队伍画像的口径披露不再进 UI；缺口标签本身保留。
     const supplement = bars ? `<div class="live-roster-supplement">${bars}</div>` : "";
     const liveGameMode = String(data.gameMode || "").toUpperCase();
     const identityKind = arenaMode ? "arena" : isARAMRelatedMatch(data) ? "aram" : isSummonersRiftMatch(data) && ["", "CLASSIC", "PRACTICETOOL"].includes(liveGameMode) ? "rift" : "none";
@@ -8260,7 +8246,8 @@
     const opggItems = Array.isArray(runes.opgg) ? runes.opgg : runes.opgg ? [runes.opgg] : [];
     const positions = Array.isArray(payload.positions) ? payload.positions : [];
     const opggFallback = opggItems.length ? opggItems : !positions.length && data.clientRecommendation ? [{ ...data.clientRecommendation, key: "opgg", title: "客户端内置（备用）" }] : [];
-    const sections = [{ key: "opgg", title: "OPGG", items: opggFallback }];
+    const custom = window.deepLegendsAutoConfigLive?.selection(data);
+    const sections = [custom ? {key:"custom",title:"自配置",items:[custom]} : { key: "opgg", title: "OPGG", items: opggFallback }];
 	const hasTopPlayers = recommendationQueueHasTopPlayers(data);
 	if (proRequestTarget(data)) sections.push({ key: "pro", title: "职业选手", items: proRunesFor(data), proStatus: state.proRunes?.get(proRequestTarget(data).key), loading: state.proRuneFlights?.has(proRequestTarget(data).key) });
 	sections.push({ key: "specialist", title: "绝活哥", items: hasTopPlayers ? specialistRunesFor(data) : [], loading: Boolean(hasTopPlayers && specialistTarget && specialistRuneFlightActive(specialistTarget.key)), failed: specialistFailed, unsupported: !hasTopPlayers });
@@ -8296,6 +8283,7 @@
   }
 
   function renderRuneSourceSection(section, championSelected) {
+    if(section.key==="custom")return renderCustomConfiguration(section.items[0]);
     if (section.key === "pro") {
       const status = section.proStatus || {};
       const unavailableReason = { pro: status.reason === "upstream-timeout" ? "职业赛事上游超时，请稍后重试。" : status.reason === "network-unavailable" ? "无法连接职业赛事数据源，请检查网络或代理后重试。" : status.reason === "no-sample" ? "近 30 天暂无该英雄在当前所选位置的职业选手符文。" : status.reason === "cache-write-failed" ? "职业数据缓存写入失败，请检查本地存储。" : "职业赛事数据暂不可用，请重试。" };
@@ -8427,9 +8415,9 @@
     const icons = renderRuneSpellIcons(config);
     const spells = icons ? `<div class="sg-spells">${icons}</div>` : "";
     const starterIDs = (config.starterItemIds || []).map(Number).filter((id) => Number.isInteger(id) && id > 0).slice(0, 6);
-    const starter = starterIDs.length ? `${starterIDs.map(id => renderItemIcon(id)).join("")}<span class="route-divider" aria-hidden="true"></span>` : "";
-    const items = itemIDs.length ? `<div class="sg-items"><span class="sg-label">${starterIDs.length ? "装备" : "最终装备"}</span><div class="sg-icons">${starter}${itemIDs.map((id) => renderItemIcon(id)).join("")}</div></div>` : "";
-    return items || spells || skills ? `<div class="specialist-game-footer">${items}${spells}${skills}</div>` : "";
+    const starter = starterIDs.length ? `<div class="sg-items sg-starters"><span class="sg-label">出门装</span><div class="sg-icons">${starterIDs.map(id => renderItemIcon(id)).join("")}</div></div>` : "";
+    const items = itemIDs.length ? `<div class="sg-items"><span class="sg-label">最终装备</span><div class="sg-icons">${itemIDs.map((id) => renderItemIcon(id)).join("")}</div></div>` : "";
+    return starter || items || spells || skills ? `<div class="specialist-game-footer">${starter}${items}${spells}${skills}</div>` : "";
   }
 
   function proRuneRecordLabel(config) {
@@ -8454,6 +8442,10 @@
     const secondaryName = rightSide || (fallback.includes("·") ? fallback.split("·").at(-1).trim() : "");
     return keystoneName && secondaryName ? `${keystoneName} + ${secondaryName}` : fallback;
   }
+
+  function renderCustomConfiguration(...args){return window.deepLegendsAutoConfigLive?.renderCustomConfiguration(...args);}
+  function updateLiveRuneSelection(...args){return window.deepLegendsAutoConfigLive?.updateLiveRuneSelection(...args);}
+  function applyCustomConfiguration(...args){return window.deepLegendsAutoConfigLive?.applyCustomConfiguration(...args);}
 
   function renderRuneChoice(config) {
     const key = String(config.key || "");
@@ -8721,8 +8713,6 @@
       return kind === "route" && ids.length > 1 ? `<span class="route-step">${index ? '<span class="route-arrow" aria-hidden="true">›</span>' : ""}${item}</span>` : item;
     }).join("");
     const stats = option.stats ? { ...option.stats, gamesUnavailable: option.gamesUnavailable ?? option.stats.gamesUnavailable } : option;
-    // 不再给低样本行加任何视觉标记：R30 的做法是整块压暗到 opacity .55、
-    // 只有 hover 才恢复，用户看到的就是「装备图标全是灰的」。
     const visualKind = kind === "route" && ids.length <= 1 ? "item" : kind;
     return `<div class="config-option is-${visualKind}"><div class="config-icons" data-icon-count="${ids.length}">${icons}</div>${statsRenderer ? statsRenderer(stats) : renderOptionStats(stats)}</div>`;
   }
@@ -8780,16 +8770,13 @@
   }
 
   function selectedRuneRecommendation(data) {
- const auto = state.autoConfig;
- const self = (data?.players || []).find(p=>p.isCurrent);
- const custom = auto?.championId === Number(self?.championId) && auto?.results?.runes === "applied" && !auto.yielded?.runes;
- if(custom && !state.autoConfigSelected) { state.selectedRecommendation = ""; return null; }
+    const custom = window.deepLegendsAutoConfigLive?.prepare(data);
     const runes = liveRecommendationsFor(data)?.runes || {};
     const opggItems = Array.isArray(runes.opgg) ? runes.opgg : runes.opgg ? [runes.opgg] : [];
     const opggFallback = opggItems.length
       ? opggItems.map((item) => ({ ...item, sourceLabel: "OPGG" }))
       : data?.clientRecommendation ? [{ ...data.clientRecommendation, title: "客户端内置（备用）", sourceLabel: "客户端内置" }] : [];
-    const normalized = opggFallback.map((item, index) => ({ ...item, key: item.key || (index === 0 ? "opgg" : `opgg-${index}`) }));
+    const normalized = (custom ? [] : opggFallback).map((item, index) => ({ ...item, key: item.key || (index === 0 ? "opgg" : `opgg-${index}`) }));
     if (recommendationQueueHasTopPlayers(data)) {
       normalized.push(
         ...specialistRunesFor(data).map((item, index) => ({ ...item, sourceLabel: "绝活哥", key: item.key || `specialist-${index}` })),
@@ -8797,7 +8784,11 @@
       );
     }
     normalized.push(...proRunesFor(data).map((item, index) => ({ ...item, sourceLabel: "职业选手", key: item.key || `pro-${index}` })));
-    const selected = normalized.find((item) => String(item.key) === String(state.selectedRecommendation)) || normalized[0] || null;
+    if(custom)normalized.unshift(custom);
+    const label={custom:"自配置",opgg:"OPGG",pro:"职业选手",specialist:"绝活哥"}[state.runeSourceTab];
+    const visible=normalized.filter(item=>item.sourceLabel===label || state.runeSourceTab==="opgg"&&item.sourceLabel==="客户端内置");
+    const choices=label?visible:normalized;
+    const selected = choices.find((item) => String(item.key) === String(state.selectedRecommendation)) || choices[0] || null;
     if (selected && String(selected.key) !== String(state.selectedRecommendation)) state.selectedRecommendation = String(selected.key);
     return selected;
   }
@@ -8886,7 +8877,7 @@
   function bindRuneWorkspaceControls(root) {
     for (const button of root?.querySelectorAll("[data-rune-source]") || []) bindLiveNode(button, "click", "rune-source", () => {
       const source = button.dataset.runeSource;
-      if (!["opgg", "specialist", "pro"].includes(source)) return;
+      if (!["custom", "opgg", "specialist", "pro"].includes(source)) return;
       clearRuneStarterRetries();
       state.runeSourceTab = source;
       refreshLiveRuneWorkspace(`[data-rune-source="${CSS.escape(source)}"]`);
@@ -8933,7 +8924,6 @@
       openPlayerOverlay({ playerRef: button.dataset.playerRef, region: clientRegion(), serverId: clientRegion() ? "" : state.status?.serverId || "", label: playerButtonLabel(button), ...proContextFromButton(button) });
     };
     bindRuneWorkspaceControls(scope);
- bindLiveNode(scope?.querySelector("[data-auto-config-toggle]"), "click", "auto-config-toggle", () => { state.autoConfigOpen = !state.autoConfigOpen; renderLive("selection"); });
     bindLiveNode(scope?.querySelector("[data-apply-rune-spells]"), "change", "data-apply-rune-spells", (event) => { state.applyRuneSpells = event.currentTarget.checked; });
     for (const button of scope.querySelectorAll("[data-live-position]")) bindLiveNode(button, "click", "live-position", () => selectLivePosition(livePositionValue(button.dataset.livePosition)));
     bindRuneChoiceButtons(scope);
@@ -8964,9 +8954,8 @@
 	      if (choice._runeChoiceBound) continue;
 	      choice._runeChoiceBound = true;
 	      const select = () => {
-	        state.autoConfigSelected = true;
- state.selectedRecommendation = choice.dataset.runeChoice;
-	        renderLive("selection");
+	        state.selectedRecommendation = choice.dataset.runeChoice;
+	        updateLiveRuneSelection(root);
 	      };
 	      choice.addEventListener("click", select);
 	      choice.addEventListener("keydown", (event) => {
@@ -8991,6 +8980,7 @@
     const button = event.currentTarget;
     const recommendation = selectedRuneRecommendation(state.live);
     if (!recommendation) return;
+    if(recommendation.sourceLabel==="自配置"){await applyCustomConfiguration(button,recommendation);return;}
     if (recommendation.selectedComplete === false || (recommendation.selectedComplete === true && recommendation.selectedPerkIds?.length !== 9)) { showToast("这套数据尚不完整，暂时不能应用"); return; }
     const self = (state.live?.players || []).find((player) => player.isCurrent);
     const championId = liveRecommendationChampionId(self);
@@ -9005,9 +8995,9 @@
       const payload = { championName: self.championName, source: recommendation.sourceLabel, championId: recommendation.championId || championId, primaryStyleId: recommendation.primaryStyleId, subStyleId: recommendation.subStyleId, selectedPerkIds: recommendation.selectedPerkIds || recommendation.perkIds || [] };
       if (spells.length) { payload.spell1Id = spells[0]; payload.spell2Id = spells[1]; }
       const result = await api("/api/gameplay/runes/apply", { method: "POST", body: JSON.stringify(payload) }, "apply-runes", 15000);
-      showToast(spells.length ? result?.spellApplied === true ? "符文和召唤师技能已应用" : "符文已应用，召唤师技能未能同步" : "符文已新建并设为当前页");
-      if(state.autoConfig) { state.autoConfig.yielded ||= {}; state.autoConfig.yielded.runes = true; state.autoConfigOpen = true; renderLive("selection"); }
- button.textContent = "再次新增";
+      showToast(spells.length ? result?.spellApplied === true ? "符文和召唤师技能已应用" : "符文已应用，召唤师技能未能同步" : "符文已应用并设为当前页");
+      if(state.autoConfig?.championId===championId) {state.autoConfig.yielded ||= {};state.autoConfig.yielded.runes=true;}
+      button.textContent = "再次应用";
     } catch (error) { showToast(error.message); button.textContent = "应用所选符文"; }
     finally { button.disabled = false; }
   }
@@ -9981,7 +9971,7 @@
   window.addEventListener("deep-legends:post-game-reveal", () => {
     if (state.section === "live" && state.live?.gameId && !liveGamePhase(state.beacon.phase)) queueLiveEventRefresh("event");
   });
-  window.deepLegendsGameAutoConfig = {state,renderLive,iconFigure};
+  window.deepLegendsGameAutoConfig = {state,renderLive,iconFigure,escapeHTML,renderItemIcon,renderRuneSpellIcons,renderUnifiedRuneBoard,runeConfigurationTitle,nodes,selectedRuneRecommendation,recommendedRuneSpellIDs,bindLiveNode,renderRecommendationArea,rememberLiveRecommendationMarkup,api,showToast};
   window.addEventListener("deep-legends:gameflow", (event) => {
     handleGameplayPhase(String(event.detail?.phase || ""), "sse", Boolean(event.detail?.changed), event.detail?.gameId);
   });

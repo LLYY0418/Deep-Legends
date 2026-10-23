@@ -61,7 +61,7 @@ const (
 	hexdataAggregateHeroMin    = 150
 	hexdataAggregateHeroMax    = 200
 	hexdataAggregateAugmentMin = 190
-	hexdataAggregateAugmentMax = 230
+	hexdataAggregateAugmentMax = 600
 )
 
 func hexdataMeasurementTechnique(answer hexdataAnswerCards) string {
@@ -1044,6 +1044,11 @@ func (h *hexdataClient) load(ctx context.Context, kind, id, requestPath, accept 
 		}
 		if fetchErr != nil {
 			h.recordLoadFailure(kind, fetchErr)
+		} else {
+			h.mu.Lock()
+			h.state.BuildChecked = h.now()
+			h.saveStateLocked()
+			h.mu.Unlock()
 		}
 		return data, fetchErr
 	}
@@ -1647,7 +1652,7 @@ func (h *hexdataClient) adoptAnswer(answer hexdataAnswerCards) {
 	h.state.BuildID = answer.BuildID
 	h.state.ReportPatch = answer.ReportPatch
 	h.state.ReportDate = answer.ReportDate
-	h.state.BuildChecked = h.now()
+	// Reading an already cached answer is not a successful upstream version check.
 	h.saveStateLocked()
 	h.mu.Unlock()
 }
@@ -1664,7 +1669,9 @@ func (h *hexdataClient) adoptCitation(citation championSourceCitation) bool {
 	h.state.BuildID = citation.BuildID
 	h.state.ReportPatch = citation.Patch
 	h.state.ReportDate = citation.ReportDate
-	h.state.BuildChecked = h.now()
+	if changed {
+		h.state.BuildChecked = h.now()
+	}
 	h.saveStateLocked()
 	h.mu.Unlock()
 	if changed {
@@ -1688,7 +1695,9 @@ func (h *hexdataClient) adoptMeta(snapshot hexdataMetaSnapshot) bool {
 	h.state.BuildID = snapshot.BuildID
 	h.state.ReportPatch = snapshot.ReportPatch
 	h.state.ReportDate = snapshot.ReportDate
-	h.state.BuildChecked = h.now()
+	if changed {
+		h.state.BuildChecked = h.now()
+	}
 	h.saveStateLocked()
 	h.mu.Unlock()
 	if changed {
@@ -1744,7 +1753,7 @@ func (p *championProvider) loadHexdataAnswer(ctx context.Context) (hexdataAnswer
 		return hexdataAnswerCards{}, page, errors.New("hexdata answer cards changed")
 	}
 	p.hexdata.adoptAnswer(answer)
-	if page.Cache != championCacheStateStale {
+	if page.Cache == championCacheStateMiss {
 		p.hexdata.recordSuccess("answer", hexdataAnswerPath)
 	}
 	p.hexdata.promote("answer", "site", answer.BuildID, page.Data, page.FetchedAt)
@@ -2414,7 +2423,7 @@ func (p *championProvider) loadHexdataMeta(ctx context.Context) (hexdataMetaSnap
 	// P0-5：成功路径必须 promote，否则 refreshBuild 那条 persistDisk=false 的
 	// 通道永远不落盘，每 12 小时第一次访问都回源。
 	p.hexdata.promote("meta", "site", snapshot.BuildID, page.Data, page.FetchedAt)
-	if page.Cache != championCacheStateStale {
+	if page.Cache == championCacheStateMiss {
 		p.hexdata.recordSuccess("meta", hexdataMetaPath)
 	}
 	p.reportHexdataShape("meta", snapshot.HeroCount, snapshot.AugmentCount, snapshot.BuildID)
@@ -3650,6 +3659,23 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 	metaStarted := time.Now()
 	snapshot, snapshotErr := p.loadHexdataMeta(ctx)
 	metaMS = time.Since(metaStarted).Milliseconds()
+	// Prefer a confirmed newer public build before starting obsolete JSON reads.
+	if snapshotErr == nil && comparePatchVersions(mayhemComparablePatch(snapshot.ReportPatch), mayhemComparablePatch(readCurrentMayhem().Patch)) < 0 {
+		// Local metadata remains independent of the RSC network request.
+		loadAugmentMetadata()
+		loaded := <-rscReady
+		if loaded.err == nil && comparePatchVersions(mayhemComparablePatch(loaded.detail.Citation.Patch), mayhemComparablePatch(snapshot.ReportPatch)) > 0 {
+			rsc := loaded.detail
+			response := championDetailResponse{Mode: "hextech-aram", Region: "CN", Source: "OP.GG RSC", Patch: rsc.Citation.Patch, FetchedAt: rsc.FetchedAt, Citation: &rsc.Citation, BuildCitation: &rsc.Citation, Build: rsc.Build, RecommendedAugments: rsc.Augments, EntertainmentSample: true}
+			p.enrichCurrentMayhemDetail(ctx, &response)
+			applyLocalAugmentGrades(response.RecommendedAugments)
+			p.decorateDetailAssets(ctx, metadata.Slug, &response)
+			return response, nil
+		}
+		rscReady = make(chan rscResult, 1)
+		rscReady <- loaded
+		close(rscReady)
+	}
 	type tierResult struct {
 		tiers map[int]int
 		ms    int64
@@ -3821,6 +3847,7 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 	if len(response.RecommendedAugments) == 0 {
 		return championDetailResponse{}, errors.New("mayhem recommendations are incomplete")
 	}
+	p.enrichCurrentMayhemDetail(ctx, &response)
 	return response, nil
 }
 

@@ -51,6 +51,7 @@
     mayhemAugmentError: "",
     mayhemAtlasLoading: false,
     mayhemAtlasError: "",
+    mayhemReleasePending: false,
     mayhemRarityData: null,
     mayhemRarityLoading: false,
     mayhemRarityError: "",
@@ -244,6 +245,14 @@
     return `<span class="champion-asset ${className}"${fallbackData}${withTooltip ? ` tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}"` : ""}><img data-queued-src="${image}" alt="${escapeHTML(name)}" loading="lazy" decoding="async" data-champion-image><span aria-hidden="true">${escapeHTML(name.slice(0, 1))}</span></span>`;
   }
 
+  function refreshChampionWorkspace() {
+    if (state.mode === "aram-mayhem" && state.mayhemView === "atlas") return loadMayhemAtlas(true);
+    if (state.mode === "arena") { state.selected = null; state.detail = null; state.arenaDetailKey = 0; resetArenaControls(); }
+    if (state.mode === "aram-mayhem") state.mayhemDetailKey = 0;
+    if (state.mode === "aram-mayhem") state.mayhemForceRefresh = true;
+    return loadWorkspace(true);
+  }
+
   async function api(path, key = path) {
     state.requests.get(key)?.abort();
     const controller = new AbortController();
@@ -406,6 +415,7 @@
 
   async function loadWorkspace(force = false) {
     if (!force && rankingsFresh()) { renderLoadedWorkspace(); return; }
+    if (state.mode === "aram-mayhem") state.mayhemReleasePending = false;
     if (typeof window !== "undefined") window.reportFlowDiagnostic?.("automatic_read_client", "request", { endpoint: "champions", source: "workspace" });
     const token = state.workspaceRequestToken + 1;
     state.workspaceRequestToken = token;
@@ -637,7 +647,9 @@
     state.mayhemRequestToken = token;
     const championID = Number(selected.championId);
     const current = () => token === state.mayhemRequestToken && state.mode === "aram-mayhem" && state.mayhemView === "champions" && Number(state.selected?.championId) === championID;
-    void api(`/api/champions/detail?mode=aram-mayhem&champion=${encodeURIComponent(selected.champion)}`, "mayhem-detail").then((detail) => {
+    const refresh = state.mayhemForceRefresh ? "&refresh=1" : "";
+    state.mayhemForceRefresh = false;
+    void api(`/api/champions/detail?mode=aram-mayhem&champion=${encodeURIComponent(selected.champion)}${refresh}`, "mayhem-detail").then((detail) => {
       if (detail?.recommendedAugments?.some((row) => row.assets?.some((asset) => asset.source === "hexdata" && asset.path))) {
         window.dispatchEvent(new Event("deep-legends:augment-index-updated"));
       }
@@ -661,10 +673,11 @@
     state.mayhemAtlasError = "";
     render();
     try {
-      const augments = await api("/api/champions/augments", "mayhem-atlas");
+      const augments = await api(`/api/champions/augments${force ? "?refresh=1" : ""}`, "mayhem-atlas");
       if(state.mode!=="aram-mayhem" || state.mayhemAtlasRequestToken!==token)return;
       if (!augments || !Array.isArray(augments.rows) || !augments.rows.length) throw new Error("海克斯图鉴数据暂时为空，已保留上次结果");
       state.augments = augments;
+	  if (force) { state.mayhemAugmentDetailCache.clear(); state.mayhemAugmentDetail = null; }
       const first = filteredAugments()[0];
       // 保留首次加载时的自动选中语义；刷新后若旧选项已经消失，下面的
       // fallback 分支仍会把当前列表第一项选中。
@@ -675,14 +688,10 @@
       if (!selected && first) {
         state.mayhemAugmentID = Number(first.id);
         state.mayhemAugmentDetail = state.mayhemAugmentDetailCache.get(Number(first.id)) || null;
-        if (usesHexdata(state.augments?.source)) {
-          loadMayhemAugmentDetail(first);
-        } else {
-          state.mayhemAugmentDetail = { source: state.augments?.source || "OP.GG", champions: [] };
-        }
+        loadMayhemAugmentDetail(first);
       } else if (selected && !state.mayhemAugmentDetail) {
         state.mayhemAugmentDetail = state.mayhemAugmentDetailCache.get(Number(selected.id)) || null;
-        if (usesHexdata(state.augments?.source)) loadMayhemAugmentDetail(selected);
+        loadMayhemAugmentDetail(selected);
       }
     } catch (error) {
       if(state.mode!=="aram-mayhem" || state.mayhemAtlasRequestToken!==token)return;
@@ -704,12 +713,6 @@
     state.mayhemAugmentDetail = state.mayhemAugmentDetailCache.get(augmentID) || null;
     state.mayhemAugmentLoading = true;
     state.mayhemAugmentError = "";
-    if (!usesHexdata(state.augments?.source)) {
-      state.mayhemAugmentDetail = { source: state.augments?.source || "OP.GG", champions: [] };
-      state.mayhemAugmentLoading = false;
-      render();
-      return;
-    }
     render();
     const current = () => token === state.mayhemAugmentRequestToken && state.mode === "aram-mayhem" && state.mayhemView === "atlas" && state.mayhemAugmentID === augmentID;
     void api(`/api/champions/augment-detail?id=${augmentID}&slug=${encodeURIComponent(item.key || "")}`, "mayhem-augment-detail").then((detail) => {
@@ -1210,7 +1213,9 @@
 
   // 概览：海克斯推荐 → 开局配置 → 该英雄专属品质概率。
   function mayhemOverviewTabMarkup(detail) {
-    return `<div data-mayhem-augments>${renderRecommendedAugments(detail.recommendedAugments || [], detail.citation)}</div>${renderMayhemOpeningConfiguration(detail.build || {}, detail.buildCitation)}${renderMayhemHeroRarityPanel(detail.heroStageRarity)}`;
+    const version = detail.citation?.patch || detail.patch || "版本未知";
+    const date = detail.citation?.reportDate || "";
+    return `<p class="mayhem-data-status">${escapeHTML(detail.source || "来源未知")} · 数据版本 ${escapeHTML(version)}${date ? ` · ${escapeHTML(date)}` : ""}${detail.dataNotice ? ` · ${escapeHTML(detail.dataNotice)}` : ""}</p><div data-mayhem-augments>${renderRecommendedAugments(detail.recommendedAugments || [], detail.citation)}</div>${renderMayhemOpeningConfiguration(detail.build || {}, detail.buildCitation)}${renderMayhemHeroRarityPanel(detail.heroStageRarity)}`;
   }
 
   // 构筑：装备排行（P0-1/P0-2）+ 装备路线 + 技能加点。成装三件套
@@ -1395,7 +1400,10 @@
       const active = state.augmentRarity === value;
       return `<button type="button" role="tab" aria-selected="${active}" class="${active ? "is-active" : ""}" data-augment-rarity="${value}"><i class="is-${value}" aria-hidden="true"></i>${label}</button>`;
     }).join("");
-    return `<div class="mayhem-atlas">
+    const citation = state.augments?.citation;
+    const dataStatus = `${state.augments?.source || "来源未知"} · 数据版本 ${citation?.patch || "版本未知"}${citation?.reportDate ? ` · ${citation.reportDate}` : ""}${state.augments?.dataNotice ? ` · ${state.augments.dataNotice}` : ""}`;
+    const pending = objectRows(state.augments?.pendingAugments);
+    return `<p class="mayhem-data-status">${escapeHTML(dataStatus)}</p>${pending.length ? `<section class="mayhem-official-additions"><h3>官方新增 · 上游尚未收录</h3>${pending.map(row => `<p><strong>${escapeHTML(row.name)}</strong>：${escapeHTML(row.description)}</p>`).join("")}</section>` : ""}<div class="mayhem-atlas">
       <section class="augment-directory mayhem-atlas-browser">
         <div class="mayhem-panel-head">
           <div><h3>海克斯图鉴</h3><p>${objectRows(state.augments?.rows).length} 个海克斯，按梯度与品质排列</p></div>
@@ -1467,6 +1475,9 @@
 
   function renderMayhemRarityPanel() {
     const stages = objectRows(state.mayhemRarityData?.stages);
+    const patch = state.augments?.citation?.patch || state.detail?.citation?.patch;
+    const rarityPatch = state.mayhemRarityData?.citation?.patch;
+    if (patch && rarityPatch && patch.split(".").slice(0, 2).join(".") !== rarityPatch.split(".").slice(0, 2).join(".")) return "";
     // 用户要求：拿不到就别展示。读取失败时整块隐藏，不留一个报错的空壳。
     if (state.mayhemRarityError && !stages.length) return "";
     let body = '<p class="mayhem-inline-empty">正在读取品质分布…</p>';
@@ -2852,12 +2863,7 @@
       return;
     }
     if (event.target.closest("[data-champion-back]")) { closeDetail(); return; }
-    if (event.target.closest("[data-champion-refresh]")) {
-      if (state.mode === "arena") { state.selected = null; state.detail = null; state.arenaDetailKey = 0; resetArenaControls(); }
-      if (state.mode === "aram-mayhem") state.mayhemDetailKey = 0;
-      loadWorkspace(true);
-      return;
-    }
+    if (event.target.closest("[data-champion-refresh]")) { void refreshChampionWorkspace(); return; }
     const blockRetry = event.target.closest("[data-arena-block-retry]");
     if (blockRetry) { void retryArenaBlock(blockRetry.dataset.arenaBlockRetry); return; }
     if (event.target.closest("[data-champion-retry]")) {
@@ -3026,6 +3032,30 @@
     }
   }
   window.addEventListener("deep-legends:section", handleLazySection);
+  function handleMayhemReleaseChanged() {
+    state.augments = null;
+    state.mayhemAugmentDetailCache.clear();
+    state.mayhemAugmentDetail = null;
+    state.mayhemAugmentLoading = false;
+    state.mayhemAugmentError = "";
+    state.mayhemAugmentRequestToken += 1;
+    state.mayhemAtlasRequestToken = Number(state.mayhemAtlasRequestToken || 0) + 1;
+    state.mayhemAtlasLoading = false;
+    state.mayhemAtlasError = "";
+    state.mayhemDetailKey = 0;
+    state.mayhemRequestToken += 1;
+    if (state.mode !== "aram-mayhem") return;
+    state.rankingsAt = 0;
+    state.mayhemReleasePending = true;
+    refreshPendingMayhemRelease();
+  }
+  function refreshPendingMayhemRelease() {
+    if (!state.mayhemReleasePending || state.mode !== "aram-mayhem" || state.section !== "champions" || document.hidden) return;
+    state.mayhemReleasePending = false;
+    void loadWorkspace(true);
+  }
+  window.addEventListener("deep-legends:mayhem-data-changed", handleMayhemReleaseChanged);
+  document.addEventListener("visibilitychange", refreshPendingMayhemRelease);
   window.deepLegendsSections?.register("champions", handleLazySection);
   window.addEventListener("deep-legends:riot-relay-recovered", () => {
     if(state.section!=="champions" || document.hidden || state.loading)return;

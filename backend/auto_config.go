@@ -25,9 +25,14 @@ type autoConfigSpells struct {
 	Spell1ID int64 `json:"spell1Id"`
 	Spell2ID int64 `json:"spell2Id"`
 }
+type autoConfigStarterItem struct {
+	ID    int64 `json:"id"`
+	Count int64 `json:"count"`
+}
 type autoConfigItems struct {
-	Core        []int64 `json:"core"`
-	Situational []int64 `json:"situational"`
+	Starter     []autoConfigStarterItem `json:"starter,omitempty"`
+	Core        []int64                 `json:"core"`
+	Situational []int64                 `json:"situational"`
 }
 type autoConfigEntry struct {
 	Runes     *autoConfigRunes  `json:"runes,omitempty"`
@@ -133,8 +138,15 @@ func validateAutoConfigEntry(mode string, e autoConfigEntry) error {
 		}
 	}
 	if e.Items != nil {
-		if len(e.Items.Core) > 6 || len(e.Items.Situational) > 6 {
+		if len(e.Items.Core) > 6 || len(e.Items.Situational) > 6 || len(e.Items.Starter) > 6 {
 			return errors.New("每组最多6件装备")
+		}
+		starterSeen := map[int64]bool{}
+		for _, item := range e.Items.Starter {
+			if item.ID <= 0 || item.ID > 1000000 || item.Count < 1 || item.Count > 99 || starterSeen[item.ID] {
+				return errors.New("出门装备编号或数量无效")
+			}
+			starterSeen[item.ID] = true
 		}
 		seen := map[int64]bool{}
 		for _, ids := range [][]int64{e.Items.Core, e.Items.Situational} {

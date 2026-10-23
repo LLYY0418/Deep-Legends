@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"math"
 	"net/http"
 	"slices"
 	"sort"
@@ -74,6 +75,9 @@ type rendererPerfGroup struct {
 	MaxMS   float64 `json:"maxMs"`
 }
 type clientDiagnosticRequest struct {
+	LayoutShiftTotal  float64         `json:"layoutShiftTotal,omitempty"`
+	LayoutShiftMax    float64         `json:"layoutShiftMax,omitempty"`
+	LayoutShiftCount  int             `json:"layoutShiftCount,omitempty"`
 	RankRecordQueue   string          `json:"queue,omitempty"`
 	OverviewPage      string          `json:"page,omitempty"`
 	OverviewFrom      string          `json:"from,omitempty"`
@@ -338,6 +342,7 @@ var clientDiagnosticEvents = map[string]map[string]bool{
 	"summoner_copy":                  {"success": true, "failed": true},
 	"overview_card_ready":            {"ready": true},
 	"renderer_perf":                  {"aggregated": true},
+	"live_layout_shift":              {"aggregated": true},
 	"live_render_rebuild":            {"aggregated": true},
 	"live_roster_duplicate_dropped":  {"deduplicated": true},
 	"stale_team_two_dropped":         {"dropped": true},
@@ -767,6 +772,15 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 				a.observeFirstMatchesCard(request.Source, at)
 			}
 		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if request.Event == "live_layout_shift" {
+		if math.IsNaN(request.LayoutShiftTotal) || math.IsInf(request.LayoutShiftTotal, 0) || request.LayoutShiftTotal < 0 || request.LayoutShiftTotal > 1e6 || request.LayoutShiftMax < 0 || request.LayoutShiftMax > request.LayoutShiftTotal || request.LayoutShiftCount < 0 || request.LayoutShiftCount > 1e6 {
+			http.Error(w, "invalid layout shift", 400)
+			return
+		}
+		a.recordDiagnostic(map[string]any{"event": request.Event, "reason": request.Reason, "cumulative": request.LayoutShiftTotal, "maximum": request.LayoutShiftMax, "count": request.LayoutShiftCount})
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}

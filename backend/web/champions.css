@@ -964,3 +964,7 @@
 [data-theme="light"] .champion-detail-metrics .metric-pick strong{color:var(--accent)}
 [data-theme="light"] .champion-detail-metrics .metric-ban strong{color:var(--danger)}
 [data-theme="light"] .arena-overview-secondary{background:var(--surface)}
+.mayhem-data-status { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.mayhem-official-additions { margin-bottom: 16px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; line-height: 1.65; }
+.mayhem-official-additions h3 { margin: 0 0 6px; font-size: 14px; }
+.mayhem-official-additions p { margin: 0; }

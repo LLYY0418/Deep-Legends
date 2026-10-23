@@ -1103,7 +1103,7 @@ func TestDecorateHexdataAugmentsKeepsOfflineDescriptionWhenAugmentsAreUnavailabl
 	provider.client = &http.Client{Transport: championRoundTripFunc(func(*http.Request) (*http.Response, error) {
 		return nil, errors.New("augment catalogs unavailable")
 	})}
-	rows := []championMetricRow{{Assets: []championAsset{{ID: 1323, Kind: "augment", Name: "海克斯1323"}}}}
+	rows := []championMetricRow{{Assets: []championAsset{{ID: 9999, Kind: "augment", Name: "未知海克斯"}}}}
 	provider.decorateHexdataAugmentsWithCatalog(rows, gameplayAugmentIndexAll(provider.loadAugmentMetadataCatalog(context.Background())))
 	if got := rows[0].Assets[0].Description; got != augmentOfflineDescription {
 		t.Fatalf("degraded live description = %q, want %q", got, augmentOfflineDescription)

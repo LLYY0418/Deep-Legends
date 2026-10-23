@@ -562,6 +562,7 @@ type championPositionOption struct {
 }
 
 type championDetailResponse struct {
+	DataNotice          string                   `json:"dataNotice,omitempty"`
 	FailedBlocks        []string                 `json:"failedBlocks,omitempty"`
 	Mode                string                   `json:"mode"`
 	Region              string                   `json:"region"`
@@ -642,6 +643,8 @@ type championPerformancePanel struct {
 }
 
 type championAugmentResponse struct {
+	DataNotice          string                  `json:"dataNotice,omitempty"`
+	PendingAugments     []championAugment       `json:"pendingAugments,omitempty"`
 	Source              string                  `json:"source"`
 	Mode                string                  `json:"mode"`
 	FetchedAt           time.Time               `json:"fetchedAt"`
@@ -978,24 +981,21 @@ func (a *app) handleChampionRankings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) handleChampionAugments(w http.ResponseWriter, r *http.Request) {
-	response, err := a.championDataProvider().loadAugments(r.Context())
+	provider := a.championDataProvider()
+	if r.URL.Query().Get("refresh") == "1" && provider.cache != nil {
+		provider.cache.invalidate(championCacheKey(opggPageHost, "/zh-cn/lol/modes/aram-mayhem", "", "text/html,application/xhtml+xml"))
+	}
+	response, err := provider.loadAugments(r.Context())
 	writeChampionResponse(w, response, err)
 }
 
 func (a *app) handleChampionAugmentDetail(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("id")))
-	slug := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("slug")))
-	if err != nil || id <= 0 || id > 10000 {
+	if err != nil || id <= 0 || id > 100000 {
 		http.Error(w, "invalid augment", http.StatusBadRequest)
 		return
 	}
-	if !regexp.MustCompile(`^[a-z0-9-]+$`).MatchString(slug) {
-		// OP.GG keys use a different namespace (for example ARAM_MagicMissile).
-		// Let the provider resolve the entry by ID instead of sending a
-		// non-canonical slug to Hexdata.
-		slug = ""
-	}
-	response, err := a.championDataProvider().loadHexdataAugmentDetail(r.Context(), id, slug)
+	response, err := a.championDataProvider().loadCurrentAugmentDetail(r.Context(), id)
 	writeChampionResponse(w, response, err)
 }
 
@@ -1037,6 +1037,9 @@ func (a *app) handleChampionDetail(w http.ResponseWriter, r *http.Request) {
 		tier = ""
 	}
 	provider := a.championDataProvider()
+	if mode == "hextech-aram" && r.URL.Query().Get("refresh") == "1" && provider.cache != nil {
+		provider.cache.invalidate(strings.Join([]string{"v2", "opgg-rsc", "aram-mayhem", champion}, "|"))
+	}
 	if mode == "arena" && r.URL.Query().Get("block") != "" {
 		response, err := provider.loadArenaDetailBlock(r.Context(), champion, r.URL.Query().Get("block"))
 		writeChampionResponse(w, response, err)
@@ -2333,8 +2336,16 @@ func (p *championProvider) loadARAMPage(ctx context.Context) ([]byte, string, er
 }
 
 func (p *championProvider) loadARAMRankings(ctx context.Context) (championRankingResponse, error) {
-	if response, err := p.loadHexdataRankings(ctx); err == nil {
-		return response, nil
+	useHexdata := true
+	if p.hexdata != nil {
+		if snapshot, err := p.loadHexdataMeta(ctx); err == nil && comparePatchVersions(mayhemComparablePatch(snapshot.ReportPatch), mayhemComparablePatch(readCurrentMayhem().Patch)) < 0 {
+			useHexdata = false
+		}
+	}
+	if useHexdata {
+		if response, err := p.loadHexdataRankings(ctx); err == nil {
+			return response, nil
+		}
 	}
 	data, err := p.fetch(ctx, opggChampionHost, "/api/contents/tiers", url.Values{"type": {"aram_mayhem"}}, championJSONMax, "application/json")
 	if err != nil {
@@ -2479,7 +2490,7 @@ type augmentChampionRaw struct {
 	ImageURL string `json:"image_url"`
 }
 
-func (p *championProvider) loadAugments(ctx context.Context) (championAugmentResponse, error) {
+func (p *championProvider) loadLegacyAugments(ctx context.Context) (championAugmentResponse, error) {
 	if p.hexdata != nil {
 		if page, pageErr := p.hexdata.load(ctx, "augments", "all", "/augments", "text/html,application/xhtml+xml", false); pageErr == nil {
 			if rows, citation, parseErr := parseHexdataAugments(page.Data); parseErr == nil && hexdataCitationComplete(citation) && (page.Cache == championCacheStateStale || p.hexdata.adoptCitation(citation)) {
@@ -2597,6 +2608,7 @@ func (p *championProvider) loadAugments(ctx context.Context) (championAugmentRes
 }
 
 func cloneChampionAugmentResponse(value championAugmentResponse) championAugmentResponse {
+	value.PendingAugments = append([]championAugment(nil), value.PendingAugments...)
 	value.Rows = append([]championAugment(nil), value.Rows...)
 	for index := range value.Rows {
 		value.Rows[index].Champions = append([]championAugmentChampion(nil), value.Rows[index].Champions...)
@@ -2647,6 +2659,7 @@ func (p *championProvider) loadAugmentMetadataCatalogFast(ctx context.Context) [
 			catalog = append(catalog, local...)
 		}
 	}
+	catalog = mergeGameplayAugmentMetadata(catalog, currentMayhemMetadataRows())
 	catalog = mergeGameplayAugmentMetadata(catalog, bundledAugmentCatalog())
 	catalog = mergeGameplayAugmentMetadata(catalog, p.observedHexdataAugments())
 	p.remoteAugmentMu.RLock()

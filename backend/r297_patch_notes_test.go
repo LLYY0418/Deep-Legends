@@ -14,15 +14,53 @@ import (
 	"time"
 )
 
+func TestPatchNoteAugmentIconsMatchExactNames(t *testing.T) {
+	docs, err := decodePatchNotes(bundledPatchNotes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	icons := patchNoteAugmentIcons(docs[0])
+	count := 0
+	for _, section := range docs[0].Modes.Mayhem.Sections {
+		if section.ID != "new-augments" {
+			continue
+		}
+		for _, entry := range section.Entries {
+			icon, ok := icons[entry.Name]
+			if entry.Name == "没法力，没问题" {
+				if ok {
+					t.Fatal("unknown artwork should stay absent")
+				}
+				continue
+			}
+			if !ok || icon.Source != "opgg" || !strings.HasPrefix(icon.Path, "/meta/images/") {
+				t.Fatalf("missing or invalid artwork for %s: %+v", entry.Name, icon)
+			}
+			count++
+		}
+	}
+	if count != 34 {
+		t.Fatalf("matched %d new augment icons, want 34", count)
+	}
+	if err := validatePatchDocument(docs[0]); err != nil {
+		t.Fatal("artwork lookup mutated the saved document:", err)
+	}
+}
+
 func TestR297PatchNotesBundleStrictDecodeAndLimits(t *testing.T) {
 	docs, err := decodePatchNotes(bundledPatchNotes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(docs) != 3 || docs[0].Version != "26.20" || len(docs[0].Modes.Arena.Sections) != 0 {
-		t.Fatal(docs)
+	if len(docs) != 3 || docs[0].Version != "26.21" || len(docs[0].Modes.Arena.Sections) == 0 {
+		t.Fatal("latest bundle or mode coverage is missing")
 	}
-	clone := func() patchNoteFeed { var v patchNoteFeed; json.Unmarshal(bundledPatchNotes, &v); return v }
+	clone := func() patchNoteFeed {
+		var v patchNoteFeed
+		json.Unmarshal(bundledPatchNotes, &v)
+		v.Versions[0], v.Versions[1] = v.Versions[1], v.Versions[0]
+		return v
+	}
 	encode := func(v patchNoteFeed) []byte { raw, _ := json.Marshal(v); return raw }
 	cases := []struct {
 		name string
@@ -63,7 +101,7 @@ func TestR297PatchNotesCacheMergeLatestAndAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	alias := docs[0]
-	alias.Version = "26.20.0"
+	alias.Version = docs[0].Version + ".0"
 	if len(mergePatchNotes([]patchNoteDocument{docs[0]}, []patchNoteDocument{alias})) != 1 {
 		t.Fatal("equivalent version duplicated")
 	}
@@ -71,7 +109,7 @@ func TestR297PatchNotesCacheMergeLatestAndAPI(t *testing.T) {
 		t.Fatal("lexical compare")
 	}
 	newer := docs[0]
-	newer.Version = "26.21"
+	newer.Version = "26.22"
 	newer.Modes.Ranked.Sections = []patchNoteSection{}
 	raw, _ := json.Marshal(patchNoteFeed{Schema: 1, Versions: []patchNoteDocument{newer}})
 	store := &localStore{root: t.TempDir()}
@@ -83,7 +121,7 @@ func TestR297PatchNotesCacheMergeLatestAndAPI(t *testing.T) {
 	r := httptest.NewRequest("GET", "/api/patch-notes", nil)
 	r.Header.Set("X-Local-Token", a.token)
 	a.authorized(a.handlePatchNotes)(w, r)
-	if w.Code != 200 || !bytes.Contains(w.Body.Bytes(), []byte(`"version":"26.21"`)) {
+	if w.Code != 200 || !bytes.Contains(w.Body.Bytes(), []byte(`"version":"26.22"`)) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	if len(a.patchNotesState().documents) != 3 {
@@ -94,7 +132,7 @@ func TestR297PatchNotesCacheMergeLatestAndAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	a = &app{storage: store}
-	if a.patchNotesState().documents[0].Version != "26.20" {
+	if a.patchNotesState().documents[0].Version != "26.21" {
 		t.Fatal("offline bundle unavailable")
 	}
 	_ = os.Remove(store.root + "/patch-notes.json")

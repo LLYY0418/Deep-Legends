@@ -89,13 +89,6 @@
 .ac-tab.is-active::after { content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; border-radius:2px; background:var(--primary); }
 .ac-tab[aria-disabled="true"] { color:var(--faint); cursor:not-allowed; }
 
-.ac-foot { display:flex; align-items:center; gap:8px; padding:12px 16px; border-top:1px solid var(--line); background:color-mix(in oklab,var(--surface-strong) 40%,transparent); }
-.ac-foot .ac-dirty { display:inline-flex; align-items:center; gap:7px; color:var(--warning); font-size:11.5px; }
-.ac-foot .ac-dirty i { width:7px; height:7px; border-radius:50%; background:var(--warning); }
-.ac-foot .ac-saved { color:var(--muted); font-size:11.5px; }
-.ac-foot .ac-spacer { flex:1; }
-.ac-foot .button { min-height:32px; padding:0 14px; font-size:12.5px; }
-
 /* ---------- 符文编辑台 ---------- */
 .ac-stage { position:relative; display:flex; flex-direction:column; gap:14px; padding:16px 20px; overflow:hidden; isolation:isolate; }
 .ac-tree { display:grid; grid-template-columns:minmax(236px,272px) minmax(212px,240px);  justify-content:center; }
@@ -130,15 +123,15 @@
 .ac-track-fill { position:absolute; left:0; top:0; width:100%; height:var(--fill,0px); border-radius:2px; background:linear-gradient(180deg, var(--path), color-mix(in oklab,var(--path) 70%,white)); box-shadow:0 0 10px color-mix(in oklab,var(--path) 70%,transparent); transition:height 380ms cubic-bezier(.3,.7,.2,1), background 300ms; }
 .ac-row { position:relative; display:flex; align-items:center; gap:14px; padding-left:46px; }
 .ac-row + .ac-row::before { content:""; position:absolute; left:46px; right:4px; top:0; height:1px; background:linear-gradient(90deg, color-mix(in oklab,var(--path) 30%,var(--line)), transparent); opacity:.6; }
-.ac-row.is-key { height:144px; gap:10px; }
+.ac-row.is-key { height:120px; gap:10px; }
 .ac-row.is-key.has-4 { gap:6px; }
-.ac-row.is-minor { height:120px; }
-.ac-row.is-sub { height:98px; gap:16px; }
+.ac-row.is-minor { height:100px; }
+.ac-row.is-sub { height:81.6666667px; gap:16px; }
 .ac-row.is-sub .ac-rune { width:40px; height:40px; }
 .ac-row.is-shard + .ac-row.is-shard::before { display:none; }
 .ac-group[data-group="shards"] { --path:var(--ac-shard); }
 .ac-group[data-group="shards"] .ac-row:first-child::before { content:""; position:absolute; left:46px; right:4px; top:0; height:1px; background:linear-gradient(90deg, color-mix(in oklab,var(--ac-shard) 40%,var(--line)), transparent); opacity:.7; }
-.ac-row.is-shard { height:60px; gap:16px; }
+.ac-row.is-shard { height:50px; gap:16px; }
 .ac-node { position:absolute; left:16px; top:50%; width:14px; height:14px; margin-top:-7px; border-radius:50%; border:2px solid color-mix(in oklab,var(--muted) 40%,transparent); background:var(--surface); transition:border-color 260ms, background 260ms, box-shadow 260ms, transform 260ms; z-index:1; }
 .ac-row.is-picked .ac-node, .ac-node.is-picked { border-color:var(--path); background:radial-gradient(circle, color-mix(in oklab,var(--path) 85%,white) 0 3px, var(--surface) 3.5px); box-shadow:0 0 0 3px color-mix(in oklab,var(--path) 20%,transparent), 0 0 12px color-mix(in oklab,var(--path) 70%,transparent); }
 .ac-row.is-shard .ac-node { width:10px; height:10px; margin-top:-5px; left:18px; }
@@ -279,22 +272,6 @@
 :root[data-theme="light"] .ac-root, :root[data-theme="light"].ac-root { --ic-bg:#f3f4f6; }
 :root[data-theme="light"] .ac-rune .ring { box-shadow:0 0 10px color-mix(in oklab,var(--path) 45%,transparent); }
 
-/* ---------- 对局页：已用自定义配置时折叠符文推荐 ---------- */
-.ac-applied { display:flex; width:100%; align-items:center; gap:12px; margin:0 0 10px; padding:11px 14px; border:1px solid color-mix(in oklab,var(--primary) 55%,var(--line)); border-radius:var(--radius-md); background:color-mix(in oklab,var(--primary-soft) 78%,var(--surface)); color:var(--primary-strong); font:inherit; text-align:left; cursor:pointer; transition:background 160ms ease-out, border-color 160ms ease-out; }
-.ac-applied:hover { background:color-mix(in oklab,var(--primary-soft) 100%,var(--surface)); border-color:var(--primary); }
-.ac-applied .txt { display:grid; gap:2px; min-width:0; flex:1; }
-.ac-applied .txt strong { font-size:13px; font-weight:700; }
-.ac-applied .txt small { color:color-mix(in oklab,var(--primary-strong) 62%,var(--muted)); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.ac-applied .mini { display:flex; align-items:center; gap:5px; }
-.ac-applied .mini span { position:relative; width:26px; height:26px; }
-.ac-applied .mini svg { width:26px; height:26px; border-radius:6px; }
-.ac-applied .mini kbd { position:absolute; right:-4px; bottom:-5px; min-width:14px; height:14px; padding:0 3px; border-radius:4px; background:var(--primary); color:var(--on-primary); font:700 9px/14px var(--font); text-align:center; }
-.ac-applied .more { display:inline-flex; align-items:center; gap:5px; flex:none; padding-left:12px; border-left:1px solid color-mix(in oklab,var(--primary) 35%,transparent); font-size:12px; font-weight:650; }
-.ac-applied .more svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2; transition:transform 200ms; }
-.ac-applied[aria-expanded="true"] .more svg { transform:rotate(180deg); }
-.ac-live-reco[hidden] { display:none; }
-.ac-live-reco { animation:ac-rune-in 220ms ease-out both; }
-
 /* ---------- 构成标题：基石名 + 副系名 ---------- */
 .ac-buildname { display:flex; align-items:center; flex-wrap:wrap; gap:10px; min-height:30px; font-size:15px; font-weight:700; letter-spacing:.02em; }
 .ac-buildname img { width:16px; height:20px; }
@@ -331,8 +308,8 @@
 .ac-row.is-shard .ac-rune { margin:0; }
 .ac-row + .ac-row::before, .ac-group[data-group="shards"] .ac-row:first-child::before { content:""; position:absolute; left:58px; right:12px; top:0; height:9px; margin-top:-4px; opacity:1;
   background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 9'%3E%3Cpath d='M4.5 1 8 4.5 4.5 8 1 4.5z' fill='none' stroke='%23c8aa6e' stroke-opacity='.75'/%3E%3C/svg%3E") left center / 9px 9px no-repeat,
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 9'%3E%3Cpath d='M4.5 1 8 4.5 4.5 8 1 4.5z' fill='none' stroke='%23c8aa6e' stroke-opacity='.75'/%3E%3C/svg%3E") right center / 9px 9px no-repeat,
+    url("/rune-divider.svg") left center / 9px 9px no-repeat,
+    url("/rune-divider.svg") right center / 9px 9px no-repeat,
     linear-gradient(90deg, transparent 8px, color-mix(in oklab,var(--ac-rail) 42%,transparent) 8px, color-mix(in oklab,var(--ac-rail) 42%,transparent) calc(100% - 8px), transparent calc(100% - 8px)) center / 100% 1px no-repeat; }
 
 .ac-node { width:16px; height:16px; margin-top:-8px; left:calc(var(--ac-track-x) - 8px); border-color:color-mix(in oklab,var(--muted) 45%,transparent); background:var(--surface); }
@@ -356,7 +333,6 @@
 .ac-item.is-used img { opacity:.42; filter:grayscale(.6); }
 .ac-bslot img { width:100%; height:100%; border-radius:9px; }
 .ac-bslot:focus .x { display:block; }
-.ac-applied .mini img { width:26px; height:26px; border-radius:6px; }
 .ac-invalid { color:var(--danger); outline:1px solid var(--danger); }
 .ac-notice { padding:12px 16px; color:var(--warning); }
 /* Confirmation uses the shared settings modal, outside the scrolling editor. */
@@ -364,7 +340,7 @@
 .ac-confirm p { margin:0; line-height:1.65; }
 .ac-confirm-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; }
 .ac-confirm-error { color:var(--danger); }
-.ac-foot .button-primary:disabled, .ac-confirm-actions .button-primary:disabled { background:var(--surface-strong); color:var(--muted); border-color:var(--line); box-shadow:none; }
+.ac-editor-actions .button-primary:disabled, .ac-confirm-actions .button-primary:disabled { background:var(--surface-strong); color:var(--muted); border-color:var(--line); box-shadow:none; }
 .ac-feedback { margin-left:auto; padding:0; color:var(--primary-strong); font-size:12px; }
 .ac-feedback[role="alert"] { color:var(--warning); }
 .ac-sort { flex:0 0 120px; min-width:0; }
@@ -383,8 +359,8 @@
 .settings-modal.ac-dialog { position:fixed; margin:0; left:var(--ac-dialog-x,50%); top:var(--ac-dialog-y,50%); transform:translate(-50%,-50%); zoom:var(--ui-zoom,1); width:min(460px,var(--ac-dialog-width,90vw)); max-width:var(--ac-dialog-width,90vw); max-height:var(--ac-dialog-height,90vh); }
 .ac-positions { flex-wrap:wrap; }
 .ac-tree { grid-template-columns:minmax(0,380px) minmax(0,380px); gap:26px; }
-.ac-col.is-secondary > .ac-group[data-group="sub"] .ac-row { height:98px; }
-.ac-col.is-secondary > .ac-group[data-group="shards"] { margin-bottom:30px; }
+.ac-col.is-secondary > .ac-group[data-group="sub"] .ac-row { height:81.6666667px; }
+.ac-col.is-secondary > .ac-group[data-group="shards"] { margin-bottom:25px; }
 .cs-master-right { margin-left:auto; }
 .cs-master .cs-pause { min-height:30px; padding:0 10px; color:var(--muted); border:0; background:transparent; font:inherit; font-size:12px; cursor:pointer; }
 .cs-master .cs-sep { width:1px; height:22px; background:var(--line); }
@@ -421,6 +397,46 @@
   .ac-build-blocks { grid-template-columns:1fr; }
 }
 
-@media(prefers-reduced-motion:reduce) { .ac-root *, .ac-live-reco { animation:none!important; transition:none!important; } .ac-burst,.ac-ripple { display:none!important; } }
+@media(prefers-reduced-motion:reduce) { .ac-root * { animation:none!important; transition:none!important; } .ac-burst,.ac-ripple { display:none!important; } }
 button.ac-flow-step { border:0; background:transparent; font:inherit; cursor:pointer; }
 button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primary-soft); }
+
+/* R300 compact editor controls and selectable equipment groups. */
+.ac-ed-head { padding:10px 16px; }
+.ac-ed-head .ac-portrait { width:36px; height:36px; border-radius:8px; }
+.ac-section-head { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:0; }
+.ac-section-head h4 { margin:0; }
+.ac-editor-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-left:auto; font-weight:400; letter-spacing:normal; }
+.ac-editor-actions .button { min-height:30px; padding:0 10px; font-size:12px; }
+.ac-editor-actions .text-button { margin-right:4px; font-size:12px; }
+.ac-buildname .ac-stage-warn { margin-left:auto; }
+.ac-buildname .ac-editor-actions { margin-left:0; }
+.ac-save-state { display:inline-flex; padding:3px 8px; border-radius:6px; font-size:11px; white-space:nowrap; color:var(--muted); background:var(--surface-strong); }
+.ac-tabs > .ac-save-state { margin-left:auto; }
+.ac-save-state.ac-dirty { color:var(--primary-strong); background:var(--primary-soft); }
+.ac-tabs .ac-feedback { flex-basis:100%; margin-bottom:6px; }
+.ac-items { --ac-shop-height:398px; align-items:start; }
+.ac-filter { height:var(--ac-shop-height); max-height:var(--ac-shop-height); overflow-y:auto; box-sizing:border-box; }
+.ac-shop { height:var(--ac-shop-height); }
+.ac-item-grid { flex:1; min-height:0; max-height:none; align-content:start; }
+.ac-build { border:0; background:transparent; padding:0; }
+.ac-build-block { border:1px solid var(--line); border-radius:10px; padding:10px; cursor:pointer; min-width:0; }
+.ac-build-block.is-active { border-color:var(--primary); background:var(--primary-soft); }
+.ac-build-block.is-active header strong::before { content:""; display:inline-block; width:6px; height:6px; margin-right:6px; border-radius:50%; background:var(--primary); vertical-align:middle; }
+.ac-build-slots { grid-template-columns:repeat(6,minmax(0,1fr)); gap:5px; }
+.ac-bslot { width:100%; height:auto; aspect-ratio:1; }
+.ac-item[aria-disabled="true"] { opacity:.4; cursor:not-allowed; }
+.ac-budget-error { color:var(--warning); font-size:11px; }
+.ac-build-block.is-budget-error header { animation:ac-budget-shake 180ms ease-out; }
+@keyframes ac-budget-shake { 25%,75% { transform:translateX(-2px); } 50% { transform:translateX(2px); } }
+@container ac-editor (max-width:800px) { .ac-build-blocks { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; } }
+@container ac-editor (max-width:560px) { .ac-build-blocks { grid-template-columns:minmax(0,1fr); } .ac-filter { height:auto; max-height:140px; overflow-y:auto; } .ac-ed-title h3 { flex-wrap:wrap; gap:3px 8px; } .ac-editor-actions { gap:6px; } }
+
+.custom-config-card { display:block; }
+.custom-config-header { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:12px; }
+.custom-config-header small { margin-left:auto; color:var(--muted); font-size:12px; }
+.custom-config-item { position:relative; display:inline-flex; }
+.custom-config-item b { position:absolute; right:0; bottom:0; background:var(--surface); font-size:10px; }
+.recommendation-area .game-icon { flex-shrink:0; }
+.recommendation-area .game-icon img { display:block; width:100%; height:100%; object-fit:contain; }
+

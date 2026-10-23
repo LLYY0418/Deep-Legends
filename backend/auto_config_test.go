@@ -210,8 +210,9 @@ func TestR298SameSessionRuneReplacementBoundary(t *testing.T) {
 				switch {
 				case req.Method == "DELETE":
 					deleted = append(deleted, req.URL.Path)
-				case req.URL.Path == "/lol-perks/v1/pages/77":
-					data = c.page
+				case req.Method == "GET" && req.URL.Path == "/lol-perks/v1/pages":
+					data = []lcuRunePage{c.page}
+				case req.Method == "PUT" && (req.URL.Path == "/lol-perks/v1/pages/77" || req.URL.Path == "/lol-perks/v1/pages/88"):
 				case req.URL.Path == "/lol-perks/v1/inventory":
 					data = map[string]any{"canAddCustomPage": true}
 				case req.Method == "POST" && req.URL.Path == "/lol-perks/v1/pages/":
@@ -226,17 +227,27 @@ func TestR298SameSessionRuneReplacementBoundary(t *testing.T) {
 				return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(string(b)))}, nil
 			})}}
 			runes := &autoConfigRunes{PrimaryStyleID: 8000, SubStyleID: 8100, SelectedPerkIDs: []int64{1, 2, 3}}
+			wantID := int64(101)
+			if editableDLPage(c.page) {
+				wantID = c.page.ID
+			}
 			id, err := a.applyAutoConfigRunes(context.Background(), client, 1, 77, 2, "新英雄", runes)
-			if err != nil || id != 101 {
+			if strings.HasPrefix(c.page.Name, runePagePrefix) && !editableDLPage(c.page) {
+				if err == nil || len(deleted) != 0 {
+					t.Fatal("protected page must stop without writes", id, err, deleted)
+				}
+				return
+			}
+			if err != nil || id != wantID {
 				t.Fatalf("page=%d err=%v", id, err)
 			}
 			mu.Lock()
 			gotDeleted := append([]string(nil), deleted...)
 			mu.Unlock()
-			if c.canDelete && !reflect.DeepEqual(gotDeleted, []string{"/lol-perks/v1/pages/77"}) || !c.canDelete && len(gotDeleted) != 0 {
-				t.Fatalf("deleted %v", gotDeleted)
+			if len(gotDeleted) != 0 {
+				t.Fatalf("reused/foreign pages were deleted: %v", gotDeleted)
 			}
-			if a.autoConfig.runtime.PageID != 101 || a.autoConfig.runtime.expectedRunes != runes || a.autoConfig.runtime.applyingRunes || a.autoConfigYieldSnapshot()["runes"] {
+			if a.autoConfig.runtime.PageID != wantID || a.autoConfig.runtime.expectedRunes != runes || a.autoConfig.runtime.applyingRunes || a.autoConfigYieldSnapshot()["runes"] {
 				t.Fatalf("own write was not retained or was mistaken for a player edit: %+v", a.autoConfig.runtime)
 			}
 		})

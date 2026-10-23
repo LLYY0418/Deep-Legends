@@ -12,38 +12,48 @@ import (
 )
 
 type autoConfigRuntime struct {
-	Session       string            `json:"session"`
-	ChampionID    int64             `json:"championId"`
-	ModeKey       string            `json:"modeKey"`
-	PageName      string            `json:"pageName,omitempty"`
-	PageID        int64             `json:"pageId,omitempty"`
-	Spells        autoConfigSpells  `json:"spellPair"`
-	Results       map[string]string `json:"results"`
-	Yielded       map[string]bool   `json:"yielded"`
-	expectedRunes *autoConfigRunes
-	applyingRunes bool
-	client        *LCUClient
-	cancel        context.CancelFunc
-	generation    uint64
-	observed      int64
-	changedAt     time.Time
-	running       bool
-	done          bool
+	Session           string            `json:"session"`
+	ChampionID        int64             `json:"championId"`
+	ModeKey           string            `json:"modeKey"`
+	PageName          string            `json:"pageName,omitempty"`
+	PageID            int64             `json:"pageId,omitempty"`
+	Spells            autoConfigSpells  `json:"spellPair"`
+	Results           map[string]string `json:"results"`
+	Yielded           map[string]bool   `json:"yielded"`
+	yieldedByChampion map[int64]map[string]bool
+	observedSpells    autoConfigSpells
+	spellsObserved    bool
+	expectedRunes     *autoConfigRunes
+	applyingRunes     bool
+	client            *LCUClient
+	cancel            context.CancelFunc
+	generation        uint64
+	observed          int64
+	changedAt         time.Time
+	running           bool
+	done              bool
 }
 
 // Call with autoConfig locked. A pending hero-change job must not hide a
 // player's edit made after an earlier successful write in this session.
 func (r *autoConfigRuntime) observeSpells(s lcuChampSelectSession) {
-	if r.Results["spells"] != "applied" {
+	if champSelectCurrentChampion(s) != r.ChampionID {
 		return
 	}
 	for _, p := range s.MyTeam {
-		if p.CellID != nil && s.LocalPlayerCellID != nil && *p.CellID == *s.LocalPlayerCellID && (p.Spell1ID != r.Spells.Spell1ID || p.Spell2ID != r.Spells.Spell2ID) {
+		if p.CellID == nil || s.LocalPlayerCellID == nil || *p.CellID != *s.LocalPlayerCellID {
+			continue
+		}
+		pair := autoConfigSpells{p.Spell1ID, p.Spell2ID}
+		changed := r.Results["spells"] == "applied" && pair != r.Spells || r.spellsObserved && !r.done && pair != r.observedSpells
+		if changed {
 			if r.Yielded == nil {
 				r.Yielded = map[string]bool{}
 			}
 			r.Yielded["spells"] = true
 		}
+		r.observedSpells = pair
+		r.spellsObserved = true
 	}
 }
 
@@ -111,13 +121,59 @@ func (a *app) emitAutoConfig() {
 	a.autoConfig.Unlock()
 	a.broadcastEvent(string(data))
 }
+func (r *autoConfigRuntime) selectChampion(id int64) {
+	if r.yieldedByChampion == nil {
+		r.yieldedByChampion = map[int64]map[string]bool{}
+		if r.ChampionID > 0 {
+			r.yieldedByChampion[r.ChampionID] = r.Yielded
+		}
+	}
+	if r.ChampionID != id {
+		r.Results = map[string]string{}
+		r.PageID = 0
+		r.expectedRunes = nil
+		r.spellsObserved = false
+		r.done = false
+	}
+	r.ChampionID = id
+	if r.yieldedByChampion[id] == nil {
+		r.yieldedByChampion[id] = map[string]bool{}
+	}
+	r.Yielded = r.yieldedByChampion[id]
+}
 func (a *app) yieldAutoConfig(kind string) {
 	a.autoConfig.Lock()
 	r := &a.autoConfig.runtime
-	if r.Yielded == nil {
-		r.Yielded = map[string]bool{}
-	}
+	r.selectChampion(r.ChampionID)
 	r.Yielded[kind] = true
+	a.autoConfig.Unlock()
+	a.emitAutoConfig()
+}
+func (a *app) yieldAutoConfigForChampion(ctx context.Context, client *LCUClient, id int64, kind string, extraKinds ...string) {
+	var s lcuChampSelectSession
+	if client.RequestJSON(ctx, "GET", "/lol-champ-select/v1/session", nil, &s) != nil {
+		return
+	}
+	current := champSelectCurrentChampion(s)
+	if id <= 0 {
+		id = current
+	}
+	if id <= 0 || current > 0 && id != current {
+		return
+	}
+	a.autoConfig.Lock()
+	r := &a.autoConfig.runtime
+	if r.Session != autoConfigSessionKey(s) || r.client != client {
+		if r.cancel != nil {
+			r.cancel()
+		}
+		*r = autoConfigRuntime{Session: autoConfigSessionKey(s), client: client, generation: r.generation + 1}
+	}
+	r.selectChampion(id)
+	r.Yielded[kind] = true
+	for _, extra := range extraKinds {
+		r.Yielded[extra] = true
+	}
 	a.autoConfig.Unlock()
 	a.emitAutoConfig()
 }
@@ -146,6 +202,13 @@ func (a *app) observeAutoConfigEvent(ctx context.Context, client *LCUClient, eve
 				r.generation++
 				a.autoConfig.Unlock()
 			} else {
+				if phase == "EndOfGame" && previous != "EndOfGame" {
+					a.goSafe("dl-rune-cleanup", func() {
+						cleanupCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+						defer cancel()
+						a.cleanupDLRunePages(cleanupCtx, client)
+					})
+				}
 				a.resetAutoConfig()
 			}
 		}
@@ -247,6 +310,8 @@ func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
 		}
 		// Client edits after a successful write yield only that category for the rest of this session.
 		r.observeSpells(s)
+		r.selectChampion(id)
+		r.observeSpells(s)
 		changed := r.observed != id
 		if changed {
 			r.observed = id
@@ -258,6 +323,7 @@ func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
 		}
 		if r.done || !autoConfigLocked(s, mode) {
 			a.autoConfig.Unlock()
+			a.emitAutoConfig()
 			return
 		}
 		delay := time.Duration(0)
@@ -356,23 +422,27 @@ func (a *app) applyAutoConfigRunes(ctx context.Context, client *LCUClient, gener
 		}
 		a.autoConfig.Unlock()
 	}()
-	if oldPage > 0 {
-		var page lcuRunePage
-		if client.RequestJSON(ctx, "GET", fmt.Sprintf("/lol-perks/v1/pages/%d", oldPage), nil, &page) == nil && page.ID == oldPage && strings.HasPrefix(page.Name, runePagePrefix) && (page.IsDeletable == nil || *page.IsDeletable) {
-			if err = checkAutoConfigWrite(ctx); err != nil {
-				return 0, err
-			}
-			if err = client.RequestJSON(ctx, "DELETE", fmt.Sprintf("/lol-perks/v1/pages/%d", oldPage), nil, nil); err != nil {
-				return 0, err
-			}
+	trace := &runeApplyTrace{}
+	ctx = context.WithValue(ctx, runeApplyTraceContextKey{}, trace)
+	defer func() {
+		outcome := "success"
+		if err != nil {
+			outcome = "failed"
 		}
-	}
+		a.recordDiagnostic(map[string]any{"event": "perk_apply_attempt", "source": "auto-config", "outcome": outcome, "dl_pages_before": trace.DLPagesBefore, "dl_pages_after": trace.DLPagesAfter, "action": trace.Action})
+	}()
 	return applyRunePage(ctx, client, gameplayRuneApplyRequest{ChampionID: id, ChampionName: name, Source: "自动配置", PrimaryStyleID: runes.PrimaryStyleID, SubStyleID: runes.SubStyleID, SelectedPerkIDs: runes.SelectedPerkIDs})
 }
 
-func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChampSelectSession, generation uint64, id int64, mode, modeKey string, entry autoConfigEntry, exists bool) {
+func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChampSelectSession, generation uint64, id int64, mode, modeKey string, entry autoConfigEntry, exists bool, manualApply ...bool) {
 	started := time.Now()
-	guard := func() error { return a.autoConfigGuard(ctx, client, s, generation, id, mode) }
+	manual := len(manualApply) > 0 && manualApply[0]
+	guard := func() error {
+		if manual {
+			return a.autoConfigManualGuard(ctx, client, s, id, mode)
+		}
+		return a.autoConfigGuard(ctx, client, s, generation, id, mode)
+	}
 	ctx = context.WithValue(ctx, autoConfigWriteGuardKey{}, guard)
 	catalog, catErr := a.loadAutoConfigCatalog(ctx)
 	settings := a.autoConfigSnapshot()
@@ -394,13 +464,16 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 	}
 	pageName := runePageName(name, "自动配置")
 	for _, kind := range []string{"runes", "spells", "items"} {
-		enabled := map[string]bool{"runes": settings.Runes, "spells": settings.Spells, "items": settings.Items}[kind]
+		enabled := manual || map[string]bool{"runes": settings.Runes, "spells": settings.Spells, "items": settings.Items}[kind]
 		a.autoConfig.Lock()
-		yielded := a.autoConfig.runtime.Yielded[kind]
+		yielded := !manual && a.autoConfig.runtime.Yielded[kind]
 		oldPage := a.autoConfig.runtime.PageID
 		a.autoConfig.Unlock()
 		if !enabled || yielded || mode == "hextech" && kind == "runes" {
 			results[kind] = "skipped-disabled"
+			if yielded {
+				results[kind] = "skipped-manual"
+			}
 			continue
 		}
 		if !exists || (kind == "runes" && entry.Runes == nil) || (kind == "spells" && entry.Spells == nil) || (kind == "items" && entry.Items == nil) {
@@ -420,9 +493,9 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 				return err
 			}
 			current := a.autoConfigSnapshot()
-			enabled := map[string]bool{"runes": current.Runes, "spells": current.Spells, "items": current.Items}[kind]
+			enabled := manual || map[string]bool{"runes": current.Runes, "spells": current.Spells, "items": current.Items}[kind]
 			a.autoConfig.Lock()
-			yielded := a.autoConfig.runtime.Yielded[kind]
+			yielded := !manual && a.autoConfig.runtime.Yielded[kind]
 			a.autoConfig.Unlock()
 			if !enabled || yielded {
 				return errors.New("玩家已切换或已关闭此项")
@@ -452,6 +525,8 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 				a.autoConfig.Lock()
 				if a.autoConfig.runtime.generation == generation {
 					a.autoConfig.runtime.Spells = *entry.Spells
+					a.autoConfig.runtime.observedSpells = *entry.Spells
+					a.autoConfig.runtime.spellsObserved = true
 					a.autoConfig.runtime.Results["spells"] = "applied"
 				}
 				a.autoConfig.Unlock()
@@ -470,6 +545,13 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 				mapID = 12
 			}
 			req := gameplayItemSetApplyRequest{Storage: "recommended", Title: "[DL] " + name, ChampionID: id, MapID: mapID, Position: "other"}
+			if len(entry.Items.Starter) > 0 {
+				block := gameplayItemSetBlockRequest{Type: "出门装"}
+				for _, item := range entry.Items.Starter {
+					block.Items = append(block.Items, gameplayItemSetItemRequest{ID: item.ID, Count: int(item.Count)})
+				}
+				req.Blocks = append(req.Blocks, block)
+			}
 			for i, ids := range [][]int64{entry.Items.Core, entry.Items.Situational} {
 				if len(ids) == 0 {
 					continue
@@ -525,4 +607,100 @@ func (a *app) autoConfigYieldSnapshot() map[string]bool {
 		out[k] = v
 	}
 	return out
+}
+
+func autoConfigDisplayedChampion(s lcuChampSelectSession) int64 {
+	for _, p := range s.MyTeam {
+		if p.CellID != nil && s.LocalPlayerCellID != nil && *p.CellID == *s.LocalPlayerCellID {
+			if p.ChampionID > 0 {
+				return p.ChampionID
+			}
+			return positiveChampionPickIntent(p.ChampionPickIntent)
+		}
+	}
+	return 0
+}
+func (a *app) autoConfigManualGuard(ctx context.Context, client *LCUClient, original lcuChampSelectSession, id int64, mode string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	current, _, err := a.gameplayClient()
+	if err != nil || current != client {
+		return errors.New("客户端已变化")
+	}
+	var phase string
+	if client.RequestJSON(ctx, "GET", "/lol-gameflow/v1/gameflow-phase", nil, &phase) != nil || phase != "ChampSelect" {
+		return errors.New("只能在英雄选择阶段应用配置")
+	}
+	var session lcuChampSelectSession
+	if err := client.RequestJSON(ctx, "GET", "/lol-champ-select/v1/session", nil, &session); err != nil {
+		return err
+	}
+	var flow lcuGameflowSession
+	if err := client.RequestJSON(ctx, "GET", "/lol-gameflow/v1/session", nil, &flow); err != nil {
+		return err
+	}
+	if autoConfigSessionKey(session) != autoConfigSessionKey(original) || autoConfigDisplayedChampion(session) != id || autoConfigSessionMode(session, flow) != mode {
+		return errors.New("英雄或模式已变化")
+	}
+	return nil
+}
+func (a *app) handleAutoConfigApply(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		ChampionID int64 `json:"championId"`
+	}
+	if decodeAutoConfig(w, r, &request) != nil || request.ChampionID <= 0 {
+		http.Error(w, "英雄无效", 400)
+		return
+	}
+	client, _, err := a.gameplayClient()
+	if err != nil {
+		http.Error(w, "请连接客户端", 409)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+	defer cancel()
+	var session lcuChampSelectSession
+	var flow lcuGameflowSession
+	if client.RequestJSON(ctx, "GET", "/lol-champ-select/v1/session", nil, &session) != nil || client.RequestJSON(ctx, "GET", "/lol-gameflow/v1/session", nil, &flow) != nil {
+		http.Error(w, "读取英雄选择失败", 409)
+		return
+	}
+	mode := autoConfigSessionMode(session, flow)
+	if err := a.autoConfigManualGuard(ctx, client, session, request.ChampionID, mode); err != nil {
+		http.Error(w, err.Error(), 409)
+		return
+	}
+	position := ""
+	for _, p := range session.MyTeam {
+		if p.CellID != nil && session.LocalPlayerCellID != nil && *p.CellID == *session.LocalPlayerCellID {
+			position = p.AssignedPosition
+		}
+	}
+	entry, key, exists := autoConfigEntryFor(a.autoConfigSnapshot(), request.ChampionID, mode, position)
+	if !exists {
+		http.Error(w, "当前英雄没有已保存配置", 404)
+		return
+	}
+	a.autoConfig.Lock()
+	runtime := &a.autoConfig.runtime
+	if runtime.cancel != nil {
+		runtime.cancel()
+	}
+	if runtime.Session != autoConfigSessionKey(session) || runtime.client != client {
+		*runtime = autoConfigRuntime{Session: autoConfigSessionKey(session), client: client, generation: runtime.generation + 1}
+	} else {
+		runtime.generation++
+	}
+	runtime.selectChampion(request.ChampionID)
+	generation := runtime.generation
+	a.autoConfig.Unlock()
+	a.applyAutoConfig(ctx, client, session, generation, request.ChampionID, mode, key, entry, true, true)
+	a.autoConfig.Lock()
+	results := map[string]string{}
+	for k, v := range a.autoConfig.runtime.Results {
+		results[k] = v
+	}
+	a.autoConfig.Unlock()
+	respondJSON(w, map[string]any{"results": results})
 }

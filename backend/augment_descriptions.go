@@ -127,6 +127,17 @@ func (p *championProvider) refreshAugmentDescription(id int64) {
 	})
 }
 func (p *championProvider) resolveAugmentDescription(ctx context.Context, id int64, local func(context.Context) []gameplayAugment) gameplayAugmentDescription {
+	// Current Mayhem effects must supersede pre-patch, unversioned description caches.
+	if catalog, ok := p.rememberedAugmentCatalog(); ok {
+		for _, row := range catalog.Rows {
+			if int64(row.ID) == id && augmentEffectDescription(row.Description) != "" {
+				return gameplayAugmentDescription{ID: id, Description: row.Description, Status: "ok", Source: catalog.Source}
+			}
+		}
+	}
+	if item := augmentDescriptionFromRows(id, currentMayhemMetadataRows(), "bundled-mayhem"); item.Status == "ok" {
+		return item
+	}
 	if item, ok := p.cachedAugmentDescription(id); ok {
 		if item.Source == "stale_cache" {
 			p.refreshAugmentDescription(id)

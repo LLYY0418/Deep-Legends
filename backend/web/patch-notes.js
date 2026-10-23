@@ -13,7 +13,10 @@
     flight = null,
     dialog = null,
     opener = null,
-    mode = "ranked";
+    mode = "ranked",
+    reloadQueued = false,
+    pollTimer = null,
+    refreshPolls = 0;
   function validSource(value) {
     try {
       const u = new URL(value);
@@ -66,14 +69,16 @@
       }
     }
   }
-  async function load() {
+  async function load(refresh = false) {
     if (flight) return flight;
+    clearTimeout(pollTimer);
+    if (refresh) refreshPolls = 0;
     error = false;
     flight = (async () => {
       const controller = new AbortController(),
         timeout = setTimeout(() => controller.abort(), 5000);
       try {
-        const response = await fetch("/api/patch-notes", {
+        const response = await fetch(`/api/patch-notes${refresh ? "?refresh=1" : ""}`, {
           signal: controller.signal,
         });
         if (!response.ok) throw Error("公告暂不可用");
@@ -85,6 +90,8 @@
         flight = null;
         updateBadges();
         renderDialog();
+        if (reloadQueued) { reloadQueued = false; void load(); }
+        else if (data?.updateStatus === "checking" && refreshPolls++ < 20) pollTimer = setTimeout(() => void load(), 1500);
       }
     })();
     renderDialog();
@@ -104,6 +111,11 @@
         encodeURIComponent(
           `/lol-game-data/assets/v1/items/${Number(entry.itemId)}.png`,
         );
+    else if (mode === "aram-mayhem" && !entry.augmentId &&
+      data?.augmentIcons?.[entry.name]?.source === "opgg" &&
+      data.augmentIcons[entry.name].path?.startsWith("/meta/images/"))
+      url = "/api/champion-asset?source=opgg&path=" +
+        encodeURIComponent(data.augmentIcons[entry.name].path);
     else if (entry.augmentId > 0)
       url =
         "/api/champion-asset?source=builtin&path=" +
@@ -111,6 +123,12 @@
     return url
       ? `<span class="ic"><img data-queued-src="${escape(url)}" alt="" loading="lazy" decoding="async"></span>`
       : "";
+  }
+  function listItem(item) {
+    const parts = /^([^：:]{1,80}[：:])([\s\S]*)$/.exec(item);
+    return parts
+      ? `<li><span class="pn-list-name">${escape(parts[1])}</span><span class="pn-list-description">${escape(parts[2])}</span></li>`
+      : `<li>${escape(item)}</li>`;
   }
   function renderSections(sections) {
     return sections
@@ -131,11 +149,12 @@
         return `<section class="pn-section"><h4>${escape(section.title)}${count ? ` <small>${caption}</small>` : ""}</h4>${section.intro ? `<p class="pn-intro">${escape(section.intro)}</p>` : ""}${entries
           .map((entry) => {
             const image = icon(entry);
-            return `<article class="pn-entry${image ? "" : " is-text-only"}">${image}<strong>${entry.isNew ? '<span class="pn-new">新增</span>' : ""}${escape(entry.name)}</strong><div>${(entry.groups || []).map((group) => `<div class="pn-group">${group.label ? `<span>${escape(group.label)}</span>` : ""}${(group.lines || []).map((line) => (line.text ? `<div class="pn-line">${escape(line.text)}</div>` : `<div class="pn-line"><span class="k">${escape(line.k)}：</span><span class="from">${escape(line.from)}</span><span class="arrow">⇒</span><strong class="to">${escape(line.to)}</strong></div>`)).join("")}</div>`).join("")}</div></article>`;
+            const augment = entry.augmentId > 0 || /(?:^|-)augments$/.test(section.id);
+            return `<article class="pn-entry${image ? "" : " is-text-only"}${augment ? " is-augment" : ""}">${augment ? "" : image}<strong>${entry.isNew ? '<span class="pn-new">新增</span>' : ""}${augment ? image : ""}<span class="pn-entry-name">${escape(entry.name)}</span></strong><div>${(entry.groups || []).map((group, index) => `<div class="pn-group">${group.label ? `<span>${escape(group.label)}</span>` : ""}${(group.lines || []).map((line) => (line.text ? `<div class="pn-line${section.id === "champions" && index === 0 && !group.label ? " is-explanation" : ""}">${escape(line.text)}</div>` : `<div class="pn-line"><span class="k">${escape(line.k)}：</span><span class="from">${escape(line.from)}</span><span class="arrow">⇒</span><strong class="to">${escape(line.to)}</strong></div>`)).join("")}</div>`).join("")}</div></article>`;
           })
           .join(
             "",
-          )}${items.length ? `<ul class="pn-list">${items.map((item) => `<li>${escape(item)}</li>`).join("")}</ul>` : ""}</section>`;
+          )}${items.length ? `<ul class="pn-list">${items.map(listItem).join("")}</ul>` : ""}</section>`;
       })
       .join("");
   }
@@ -148,7 +167,11 @@
       focusedRetry = document.activeElement?.matches("[data-pn-retry]"),
       focusedInside = dialog.contains(document.activeElement),
       focusedSource = document.activeElement?.matches(".pn-foot a");
-    dialog.innerHTML = `<header class="pn-head"><h3><b>${escape(data?.version || "")}</b> 版本更新</h3><span class="pn-mode">${label}</span><span class="pn-date">${data ? escape(data.publishedAt) + " 发布" : ""}</span><button type="button" class="pn-close" data-pn-close aria-label="关闭版本更新">×</button></header><div class="pn-body">${!data && flight ? '<div class="pn-loading" aria-label="正在读取版本公告"><i></i><i></i><i></i></div>' : !data && error ? '<div class="pn-empty"><span>暂时无法获取版本公告</span><button type="button" class="text-button" data-pn-retry>重试</button></div>' : !sections?.length ? '<div class="pn-empty">本版本没有该模式的改动</div>' : renderSections(sections)}</div><footer class="pn-foot"><span></span>${data ? `<a href="${escape(data.sourceUrl)}" target="_blank" rel="noopener noreferrer">查看官方公告原文</a>` : ""}</footer>`;
+    const status = error || data?.updateStatus === "failed" ? "检查更新失败，已保留保存的公告" : data?.updateStatus === "checking" ? "正在检查官方更新…" : data?.updateStatus === "checked" ? "已检查官方公告" : "当前为已保存公告";
+    dialog.innerHTML = `<header class="pn-head"><h3><b>${escape(data?.version || "")}</b> 版本更新</h3><span class="pn-mode">${label}</span><span class="pn-date">${data ? escape(data.publishedAt) + " 发布" : ""}</span><button type="button" class="pn-close" data-pn-close aria-label="关闭版本更新">×</button></header><div class="pn-body">${!data && flight ? '<div class="pn-loading" aria-label="正在读取版本公告"><i></i><i></i><i></i></div>' : !data && error ? '<div class="pn-empty"><span>暂时无法获取版本公告</span><button type="button" class="text-button" data-pn-retry>重试</button></div>' : !sections?.length ? '<div class="pn-empty">本版本没有该模式的改动</div>' : renderSections(sections)}</div><footer class="pn-foot"><span>${data ? `${escape(status)} <button type="button" class="text-button" data-pn-retry${flight ? " disabled" : ""}>检查更新</button>` : ""}</span>${data ? `<a href="${escape(data.sourceUrl)}" target="_blank" rel="noopener noreferrer">查看官方公告原文</a>` : ""}</footer>`;
+    dialog.querySelectorAll(".is-augment .ic img").forEach((img) => {
+      img.addEventListener("error", () => img.parentElement?.remove(), { once: true });
+    });
     dialog.querySelector(".pn-body").scrollTop = scroll;
     if (focusedInside)
       dialog
@@ -213,11 +236,11 @@
       return;
     }
     if (event.target.closest("[data-pn-close]")) close();
-    if (event.target.closest("[data-pn-retry]")) void load();
+    if (event.target.closest("[data-pn-retry]")) void load(true);
   });
   window.addEventListener(
     "deep-legends:patch-notes-changed",
-    () => void load(),
+    () => { if (flight) reloadQueued = true; else void load(); },
   );
   window.deepLegendsPatchNotes = Object.freeze({
     button,

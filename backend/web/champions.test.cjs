@@ -774,7 +774,7 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
   assert.match(script, /renderChampionTable\(rows, "mayhem"\)/);
   assert.match(script, /function selectMayhemChampion\(row\)/);
 	assert.match(script, /sameChampion && \(state\.mayhemDetailLoading \|\| state\.mayhemDetailKey === Number\(selected\.championId\) && state\.detail\)/);
-  assert.match(script, /const token = state\.mayhemRequestToken \+ 1;[\s\S]{0,500}const current = \(\) => token === state\.mayhemRequestToken[\s\S]{0,500}if \(!current\(\)\) return;/);
+  assert.match(script, /const token = state\.mayhemRequestToken \+ 1;[\s\S]{0,500}const current = \(\) => token === state\.mayhemRequestToken[\s\S]{0,800}if \(!current\(\)\) return;/);
   assert.match(script, /class="mayhem-detail-pane"/);
   assert.doesNotMatch(script, /data-champion-back[^\n]+海克斯大乱斗/);
   assert.match(script, /function renderMayhemAtlas\(items\)/);
@@ -793,8 +793,7 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
   // 评分），标签必须写明口径，不能让英雄级数字冒充阶段数值。
   assert.match(script, /\[stage \? "综合评分（英雄级）" : "综合评分", number\(item\.score, 1\), "is-score"\]/);
   assert.match(script, /按综合评分、胜率与样本展示各品质前三项/);
-  assert.match(script, /if \(!usesHexdata\(state\.augments\?\.source\)\)/);
-  assert.match(script, /state\.mayhemAugmentDetail = \{ source: state\.augments\?\.source \|\| "OP\.GG", champions: \[\] \};/);
+  assert.doesNotMatch(functionSource(script, "loadMayhemAugmentDetail"), /if \(!usesHexdata/);
   assert.match(script, /if \(!state\.mayhemAugmentID && first\)/);
   // R128 §2.3：口径说明的转发函数与那段 citation 注释一并删除，界面上不再出现。
   assert.doesNotMatch(script, /citation\.patch|renderMeasurementTechnique|mayhem-measurement|mayhemDetailFooter/);
@@ -811,6 +810,35 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
 	  assert.match(gameplayScript, /\["games", "场次", row\.games, number\]/);
   assert.match(script, /class="mayhem-fit-metrics"/);
   assert.doesNotMatch(styles, /\.mayhem-fit-row > span/);
+});
+
+test("Mayhem atlas refresh replaces the pool and reloads selected effect without refreshing rankings", async () => {
+  const calls = [];
+  const state = {mode:"aram-mayhem",mayhemView:"atlas",mayhemAugmentID:3048,augments:{rows:[{id:2095,name:"旧条目"}]},mayhemAugmentDetail:{description:"旧说明"},mayhemAugmentDetailCache:new Map([[3048,{description:"旧说明"}]]),mayhemAtlasRequestToken:0};
+  const functions = compileFunctions(script,["loadMayhemAtlas","refreshChampionWorkspace"],{
+    state,render:()=>{},filteredAugments:()=>state.augments.rows,api:async path=>{calls.push(path);return {source:"OP.GG",rows:[{id:3048,name:"弹跳蜜蜂",description:"新版说明"}]};},loadMayhemAugmentDetail:row=>calls.push(`detail:${row.id}`),loadWorkspace:()=>{throw Error("atlas refresh must not refresh hero rankings");}
+  });
+  await functions.refreshChampionWorkspace();
+  assert.deepEqual(calls,["/api/champions/augments?refresh=1","detail:3048"]);
+  assert.equal(state.augments.rows[0].id,3048);
+  assert.equal(state.mayhemAugmentDetailCache.size,0);
+});
+
+test("scheduled Mayhem updates discard old view caches and refresh only the visible Mayhem workspace", () => {
+  const state={mode:"aram-mayhem",section:"champions",augments:{rows:[{id:1}]},mayhemAugmentDetailCache:new Map([[1,{}]]),mayhemAugmentRequestToken:2,mayhemRequestToken:2,mayhemDetailKey:222,rankingsAt:100};
+  const calls=[];
+  const doc={hidden:false};
+  const {handleMayhemReleaseChanged,refreshPendingMayhemRelease}=compileFunctions(script,["handleMayhemReleaseChanged","refreshPendingMayhemRelease"],{state,document:doc,loadWorkspace:force=>calls.push(force)});
+  handleMayhemReleaseChanged();
+  assert.equal(state.augments,null);assert.equal(state.mayhemAugmentDetailCache.size,0);
+  assert.equal(state.mayhemDetailKey,0);assert.equal(state.mayhemRequestToken,3);
+  assert.equal(state.rankingsAt,0);assert.deepEqual(calls,[true]);
+  state.mode="ranked";state.rankingsAt=123;handleMayhemReleaseChanged();
+  assert.equal(state.rankingsAt,123);assert.deepEqual(calls,[true]);
+  state.mode="aram-mayhem";doc.hidden=true;handleMayhemReleaseChanged();
+  assert.equal(state.mayhemReleasePending,true);assert.deepEqual(calls,[true]);
+  doc.hidden=false;refreshPendingMayhemRelease();
+  assert.equal(state.mayhemReleasePending,false);assert.deepEqual(calls,[true,true]);
 });
 
 test("Mayhem recommendation and item ranking never request a guessed image URL", () => {
@@ -2928,12 +2956,12 @@ test("rune application creates or recycles only Deep Legends pages", () => {
   assert.match(gameplayScript, /sourceLabel: "OPGG"/);
   assert.match(gameplayScript, /sourceLabel: "绝活哥"/);
   assert.match(gameplayScript, /championName: self\.championName, source: recommendation\.sourceLabel/);
-	assert.match(gameplayScript, /符文已新建并设为当前页/);
-	assert.match(gameplayScript, /将新建符文页并设为当前页/);
-	assert.match(gameplayBackend, /客户端符文页已达上限/);
+	assert.match(gameplayScript, /符文已应用并设为当前页/);
+	assert.match(gameplayScript, /将更新 \[DL\] 符文页并设为当前页/);
+	assert.match(gameplayBackend, /符文页已满/);
 	assert.match(gameplayBackend, /\[DL\]/);
-	assert.match(gameplayBackend, /runePageRecycleLimit\s*=\s*5/);
-  assert.match(gameplayScript, /button\.textContent = "再次新增"/);
+	assert.match(fs.readFileSync(path.join(__dirname,"../rune_pages.go"),"utf8"), /editableDLPage/);
+  assert.match(gameplayScript, /button\.textContent = "再次应用"/);
   assert.match(gameplayScript, /正在读取韩服绝活哥符文/);
   assert.match(gameplayScript, /韩服绝活哥符文读取失败/);
   assert.match(gameplayScript, /暂无可核验的韩服绝活哥符文/);
@@ -4950,10 +4978,11 @@ test("specialist second game selection redraws and applies that game's exact run
 	const opgg = { key: "opgg", title: "OPGG 默认", selectedPerkIds: [1, 2, 3], primaryStyleId: 8000, subStyleId: 8400 };
 	const live = { players: [{ isCurrent: true, championId: 164, championName: "卡蜜尔" }], recommendations: { runes: { opgg: [opgg], specialists: specialistItems } } };
 	const state = { live, selectedRecommendation: "opgg", specialistPlayerTabs: new Map() };
-	let redraws = 0;
+	let redraws = 0, patches=0;
 	let applied;
 	const dependencies = {
 		state,
+ updateLiveRuneSelection:()=>{patches++;},
 		liveRecommendationTarget: () => ({ key: "target" }),
 		liveRecommendationsFor: (data) => data?.recommendations || {},
 		recommendationQueueHasTopPlayers: () => true,
@@ -4990,7 +5019,7 @@ test("specialist second game selection redraws and applies that game's exact run
 	bindRuneChoiceButtons({ querySelectorAll: (selector) => selector === "[data-rune-choice]" ? buttons : [] });
 	listeners[1]();
 	assert.equal(state.selectedRecommendation, "specialist-1");
-	assert.equal(redraws, 1);
+	assert.equal(redraws, 0);assert.equal(patches,1);
 	const selected = selectedRuneRecommendation(live);
 	assert.deepEqual(selected.selectedPerkIds, [21, 22, 23]);
 	assert.equal(selected.sourceLabel, "绝活哥");

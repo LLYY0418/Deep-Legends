@@ -11,13 +11,13 @@ const setup=`window.deepLegendsRuntime={escapeHTML:v=>String(v??'').replaceAll('
  try {
   for(const name of ['df','nm']){
    await b.call('Page.navigate',{url:b.origin+'/?keys='+name});await b.until(`document.querySelector('[data-tab="kit"]')`);await click('[data-tab="kit"]');
-   await click('[data-spell="4"]');assert.equal(await b.evaluate(`document.querySelector('.ac-slot.is-active').dataset.slot`),'1');
-   await click('[data-spell="14"]');assert.equal(await b.evaluate(`document.querySelector('.ac-slot.is-active').dataset.slot`),'0');
+   await click('[data-spell="4"]');assert.equal(await b.evaluate(`document.querySelector('.ac-slot.is-active').dataset.slot`),'0');
+   await click('[data-slot="1"]');await click('[data-spell="14"]');assert.equal(await b.evaluate(`document.querySelector('.ac-slot.is-active').dataset.slot`),'1');
    await click('[data-act="save"]');await b.until('window.writes.length===1');
    assert.deepEqual(await b.evaluate(`window.saved.champions['1'].ranked.spells`),{spell1Id:4,spell2Id:14});
    await click('.ac-slot[data-slot="1"]');await click('[data-spell="6"]');await click('[data-act="swap"]');await click('[data-act="save"]');await b.until('window.writes.length===2');
    assert.deepEqual(await b.evaluate(`window.saved.champions['1'].ranked.spells`),{spell1Id:6,spell2Id:4});
-   await click('.ac-slot[data-slot="0"]');await click('[data-spell="4"]');await click('[data-spell="14"]');await click('[data-act="save"]');await b.until('window.writes.length===3');
+   await click('.ac-slot[data-slot="0"]');await click('[data-spell="4"]');await click('[data-slot="1"]');await click('[data-spell="14"]');await click('[data-act="save"]');await b.until('window.writes.length===3');
    await b.evaluate('deepLegendsAutoConfig.load(true)');
    const result=await b.evaluate(`({keys:[...document.querySelectorAll('.ac-slot kbd')].map(n=>n.textContent),pair:window.saved.champions['1'].ranked.spells,active:document.querySelector('.ac-slot.is-active')?.dataset.slot,badges:[...document.querySelectorAll('.ac-spell.is-used')].map(n=>n.dataset.spellKey),invalidIndex:document.querySelector('#suite-config-root').textContent.includes('NaN'),writes:window.writes})`);
    assert.deepEqual(result.keys,name==='df'?['D','F']:['N','M']);assert.deepEqual(result.pair,{spell1Id:4,spell2Id:14});assert(['0','1'].includes(result.active));assert(!result.invalidIndex);assert.deepEqual(result.badges,result.keys);

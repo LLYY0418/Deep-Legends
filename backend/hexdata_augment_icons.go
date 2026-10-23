@@ -25,6 +25,13 @@ func hexdataAugmentIconPath(value string) string {
 }
 
 func augmentMetadataImage(iconPath string) (string, string) {
+	if strings.HasPrefix(iconPath, "opgg:") {
+		path := strings.TrimPrefix(iconPath, "opgg:")
+		if _, ok := validateChampionAssetPath("opgg", path); ok {
+			return "opgg", path
+		}
+		return "", ""
+	}
 	if strings.HasPrefix(iconPath, "builtin:") {
 		path := strings.TrimPrefix(iconPath, "builtin:")
 		if _, ok := bundledAugmentID(path); ok {

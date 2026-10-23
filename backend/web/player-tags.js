@@ -193,7 +193,7 @@
             .querySelectorAll("[data-ptag-decoration]")
             .forEach((n) => n.remove());
         else
-          target.parentElement
+          (target.closest(".participant-identity") || target.parentElement)
             ?.querySelectorAll(":scope > [data-ptag-decoration]")
             .forEach((n) => n.remove());
         continue;
@@ -206,10 +206,10 @@
       ]);
       if (
         (target._ptagSignature === signature &&
-          target.querySelector("[data-ptag-open]")) ||
+          (target.querySelector("[data-ptag-open]") || target.closest(".match-team-list,.arena-team-roster"))) ||
         (target._ptagSignature === signature &&
-          target.parentElement?.querySelector(
-            ":scope > [data-ptag-decoration]",
+          target.closest(".participant-identity")?.querySelector(
+            "[data-ptag-decoration]",
           ))
       )
         continue;
@@ -228,7 +228,7 @@
             wrap.append(icon);
           }
           wrap.insertAdjacentHTML("beforeend", button(ref, true));
-        } else target.insertAdjacentHTML("beforeend", button(ref, true));
+        }
         continue;
       }
       const live = target.closest(".live-player"),
@@ -248,14 +248,18 @@
             `<span data-ptag-decoration>${chips(ref)}</span>`,
           );
       } else if (detail) {
-        const parent = target.parentElement;
-        parent
-          .querySelectorAll(":scope > [data-ptag-decoration]")
-          .forEach((n) => n.remove());
-        target.insertAdjacentHTML(
-          "afterend",
-          `<span class="ptag-detail" data-ptag-decoration>${chips(ref)}${button(ref)}</span>`,
-        );
+        let cell=target.closest(".participant-identity");
+        if(!cell){
+          cell=document.createElement("div");cell.className="participant-identity";
+          target.replaceWith(cell);cell.append(target);
+          const line=document.createElement("div");line.className="ptag-name-line";target.replaceWith(line);line.append(target);
+        }
+        if(!cell.querySelector(".ptag-name-line")){const line=document.createElement("div");line.className="ptag-name-line";target.replaceWith(line);line.append(target);}
+        cell.querySelectorAll("[data-ptag-decoration]").forEach(n=>n.remove());
+        cell.querySelector(".ptag-name-line").insertAdjacentHTML("beforeend",`<span class="ptag-detail is-${tone(records.get(ref))}" data-ptag-decoration>${button(ref)}</span>`);
+        const equipment=cell.querySelector(".participant-subline")||target.closest(".arena-detail-player")?.querySelector(".participant-subline");
+        equipment?.querySelectorAll("[data-ptag-decoration]").forEach(n=>n.remove());
+        (equipment||cell).insertAdjacentHTML("beforeend",`<span class="ptag-detail-tags" data-ptag-decoration>${chips(ref)}</span>`);
       }
     }
     for (const strip of document.querySelectorAll(".summoner-strip")) {
@@ -394,7 +398,7 @@
   }
   function renderModal() {
     const record = records.get(current) || empty();
-    modal.innerHTML = `<header><span class="avatar"></span><div class="who"><strong></strong><small></small></div><div class="tools">${sequence.length > 1 ? `<button type="button" data-ptag-prev aria-label="上一位">‹</button><i>${sequence.indexOf(current) + 1} / ${sequence.length}</i><button type="button" data-ptag-next aria-label="下一位">›</button>` : ""}<button type="button" data-ptag-close aria-label="关闭">×</button></div></header>${[
+    modal.innerHTML = `<header><span class="avatar"></span><div class="who"><strong></strong><small></small></div><div class="tools">${sequence.length > 1 ? `<button type="button" data-ptag-prev aria-label="上一位">‹</button><i>${sequence.indexOf(current) + 1} / ${sequence.length}</i><button type="button" data-ptag-next aria-label="下一位">›</button>` : ""}<button type="button" class="dialog-close-button control-icon-button" data-ptag-close aria-label="关闭"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></header>${[
       ["neg", "负面（来自客户端举报项）"],
       ["pos", "正面"],
       ["mine", "我的标签"],
@@ -856,6 +860,7 @@
         keepalive: true,
       }).catch(() => {});
   });
+  window.addEventListener("deep-legends:dispose",()=>{observer?.disconnect();clearTimeout(timer);},{once:true});
   window.deepLegendsPlayerTags = Object.freeze({
     signature: (match) =>
       (match.participants || [])

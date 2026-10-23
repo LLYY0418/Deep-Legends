@@ -1,5 +1,5 @@
 'use strict';
-// Offline publication only. The installed application never parses official HTML.
+// Release snapshot extraction; runtime official discovery has a separate bounded parser.
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -13,20 +13,20 @@ const clean = text => String(text || '').replace(/\s+/gu, ' ').trim();
 const compact = text => String(text).replace(/\s/gu, '');
 const canonical = {
  '英雄':'champions','Champions':'champions','裝備':'items','装备':'items','Items':'items',
- '符文':'runes','Runes':'runes','系统':'systems','系統':'systems','Systems':'systems',
+ '符文':'runes','Runes':'runes','系统':'systems','系統':'systems','Systems':'systems','账号系统后台升级':'account',
  '海克斯大乱斗':'aramMayhem','海克斯大亂鬥':'aramMayhem','ARAM: Mayhem':'aramMayhem',
  '斗魂竞技场':'arena','鬥魂競技場':'arena','Arena':'arena','5人排位赛':'flex',
  'BUG修复及品质级改动':'bugfixes','版本要闻':'discard','经典模式':'discard',
  '极地大乱斗':'discard','即将到来的皮肤和炫彩':'discard','私人重播':'discard','队伍语音':'discard',
 };
 const allowedSubheads = {
- aramMayhem: new Set(['英雄','强化符文','BUG修复']),
+ aramMayhem: new Set(['英雄','强化符文','BUG修复','赛季之星','新增的强化符文','已移除的强化符文']),
  arena: new Set(['英雄','装备','强化符文','BUG修复']),
  bugfixes: new Set(['品质级改动','BUG修复']),
  systems: new Set(['射手（ADC）魔法抗性','打野 灵兽同伴','辅助 分路任务']),
 };
 const discardedSubheads = new Set(['英雄','装备','符文','符文与进度','系统','美术','BUG修复','BUG修复及品质级改动','经典模式 皮肤和个性化内容']);
-const sectionIDs = {'英雄':'champions','装备':'items','强化符文':'augments','BUG修复':'bugfixes','品质级改动':'quality'};
+const sectionIDs = {'英雄':'champions','装备':'items','强化符文':'augments','新增的强化符文':'new-augments','已移除的强化符文':'removed-augments','赛季之星':'headliners','BUG修复':'bugfixes','品质级改动':'quality'};
 function officialURL(value) {
  const url = new URL(value);
  if(url.protocol !== 'https:' || url.hostname !== 'lol.qq.com' || url.username || url.password || url.port || !/^\/gicp\/news\/410\/\d+\.html$/.test(url.pathname) || url.search || url.hash) throw Error('只允许国服官方公告 HTTPS URL');
@@ -107,7 +107,7 @@ function extract(raw,sourceURL) {
     const name=clean(el.textContent);majorTitle=name;major=canonical[name];minor='';section=null;entry=null;group=null;intro=[];
     if(!major)report.unmappedHeadings.push('h3: '+name);
     else if(major==='discard')report.discarded.push({heading:name});
-    else if(['champions','items','runes','systems','flex'].includes(major))newSection('ranked',major,name);
+    else if(['champions','items','runes','systems','flex','account'].includes(major))newSection('ranked',major,name);
     continue;
    }
    if(el.tagName==='H4') {
@@ -128,6 +128,11 @@ function extract(raw,sourceURL) {
      if(major==='bugfixes'){routeBug(text);continue}
      if(['aramMayhem','arena'].includes(major)&&minor==='BUG修复'){delete section.entries;(section.items ||= []).push(text);continue}
      const kind=sectionIDs[minor];
+     if(['headliners','removed-augments'].includes(kind)) {delete section.entries;(section.items ||= []).push(text);continue}
+     if(kind==='new-augments') {
+      if(['白银阶','黄金阶','棱彩阶'].includes(text))continue;
+      if(block.tagName==='P') {startEntry(text);entry.isNew=true;continue}
+     }
      if(['aramMayhem','arena'].includes(major)&&section&&kind) {
       const strong=clean(block.querySelector('strong,b')?.textContent),known=Object.keys(resolveID(text,kind)).length>0;
       if(known || index===0&&strong===text&&text.length<100) {startEntry(text);continue}

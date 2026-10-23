@@ -77,6 +77,9 @@ type patchNotesCache struct {
 	mu        sync.Mutex
 	documents []patchNoteDocument
 	started   bool
+	fetching  bool
+	checkedAt time.Time
+	failed    bool
 }
 
 func validPatchSource(value string) bool {
@@ -239,16 +242,20 @@ func (a *app) patchNotesState() *patchNotesCache {
 }
 func fetchPatchNotesDocument(ctx context.Context, client *http.Client) ([]byte, []patchNoteDocument, error) {
 	for _, prefix := range updateMirrors {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, prefix+announcementBranchURL+"patch-notes.json", nil)
+		attemptCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+		req, err := http.NewRequestWithContext(attemptCtx, http.MethodGet, prefix+announcementBranchURL+"patch-notes.json", nil)
 		if err != nil {
+			cancel()
 			continue
 		}
 		resp, err := client.Do(req)
 		if err != nil {
+			cancel()
 			continue
 		}
 		raw, err := readLimited(resp.Body, patchNotesLimit)
 		resp.Body.Close()
+		cancel()
 		if err != nil || resp.StatusCode != 200 {
 			continue
 		}
@@ -267,25 +274,107 @@ func (a *app) startPatchNotes(ctx context.Context) {
 	}
 	cache.started = true
 	cache.mu.Unlock()
-	a.goSafe("patch-notes-startup", func() {
-		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-		raw, remote, err := fetchPatchNotesDocument(ctx, a.externalHTTPClient(&http.Client{Timeout: 2 * time.Second}))
-		if err != nil {
-			return
+	a.goSafe("patch-release-schedule", func() { a.runPatchReleaseSchedule(ctx) })
+}
+
+func (a *app) beginPatchNotesRefresh(force bool) bool {
+	c := a.patchNotesState()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.fetching || force && !c.checkedAt.IsZero() && time.Since(c.checkedAt) < 5*time.Second {
+		return false
+	}
+	c.fetching = true
+	return true
+}
+
+func (a *app) refreshPatchNotes(ctx context.Context, force bool) {
+	if !a.beginPatchNotesRefresh(force) {
+		return
+	}
+	a.goSafe("patch-notes-refresh", func() { a.finishPatchNotesRefresh(ctx) })
+}
+
+func (a *app) finishPatchNotesRefresh(ctx context.Context) {
+	requestCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	err := a.refreshPatchNotesWithClient(requestCtx, a.externalHTTPClient(&http.Client{Timeout: 4 * time.Second}))
+	c := a.patchNotesState()
+	c.mu.Lock()
+	c.fetching = false
+	c.failed = err != nil
+	c.checkedAt = time.Now()
+	c.mu.Unlock()
+	a.recordDiagnostic(map[string]any{"event": "patch_notes_refresh", "success": err == nil})
+	a.broadcastEvent(`{"type":"patch-notes-changed"}`)
+}
+
+func (a *app) refreshPatchNotesWithClient(ctx context.Context, client *http.Client) error {
+	c := a.patchNotesState()
+	c.mu.Lock()
+	version := ""
+	if len(c.documents) > 0 {
+		version = c.documents[0].Version
+	}
+	c.mu.Unlock()
+	remote, err := fetchLatestOfficialPatchNotes(ctx, client, version)
+	officialErr := err
+	if err != nil {
+		_, remote, err = fetchPatchNotesDocument(ctx, client)
+	}
+	if err != nil {
+		return err
+	}
+	if len(remote) == 0 {
+		return officialErr
+	}
+	c.mu.Lock()
+	c.documents = mergePatchNotes(c.documents, remote)
+	raw, encodeErr := json.Marshal(patchNoteFeed{Schema: 1, Versions: c.documents})
+	c.mu.Unlock()
+	if encodeErr != nil {
+		return encodeErr
+	}
+	if a.storage != nil {
+		if err := writeLocalStoreFile(a.storage, "patch-notes.json", raw); err != nil {
+			return err
 		}
-		cache.mu.Lock()
-		cache.documents = mergePatchNotes(cache.documents, remote)
-		cache.mu.Unlock()
-		if a.storage != nil {
-			if err := writeLocalStoreFile(a.storage, "patch-notes.json", raw); err != nil {
-				a.recordDiagnostic(map[string]any{"event": "patch_notes_cache", "saved": false})
+	}
+	return officialErr
+}
+
+type patchNoteAugmentIcon struct {
+	Source string `json:"source"`
+	Path   string `json:"path"`
+}
+
+// Resolve only exact Mayhem names; unknown artwork stays absent rather than
+// borrowing an icon from a similarly named augment or another game mode.
+func patchNoteAugmentIcons(doc patchNoteDocument) map[string]patchNoteAugmentIcon {
+	byName := map[string]patchNoteAugmentIcon{}
+	for _, row := range readCurrentMayhem().Augments {
+		if asset, ok := remoteAsset(row.LargeIcon, row.Name); ok {
+			byName[row.Name] = patchNoteAugmentIcon{Source: asset.Source, Path: asset.Path}
+		}
+	}
+	icons := map[string]patchNoteAugmentIcon{}
+	for _, section := range doc.Modes.Mayhem.Sections {
+		if section.ID != "augments" && !strings.HasSuffix(section.ID, "-augments") {
+			continue
+		}
+		for _, entry := range section.Entries {
+			if icon, ok := byName[entry.Name]; ok && entry.AugmentID == 0 {
+				icons[entry.Name] = icon
 			}
 		}
-		a.broadcastEvent(`{"type":"patch-notes-changed"}`)
-	})
+	}
+	return icons
 }
+
 func (a *app) handlePatchNotes(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("refresh") == "1" {
+		a.refreshPatchNotes(a.licenseBusinessContext(), true)
+	}
 	c := a.patchNotesState()
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -294,5 +383,18 @@ func (a *app) handlePatchNotes(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "暂时无法获取版本公告", 503)
 		return
 	}
-	respondJSON(w, c.documents[0])
+	status := "bundled"
+	if c.fetching {
+		status = "checking"
+	} else if c.failed {
+		status = "failed"
+	} else if !c.checkedAt.IsZero() {
+		status = "checked"
+	}
+	respondJSON(w, struct {
+		patchNoteDocument
+		UpdateStatus string                          `json:"updateStatus"`
+		CheckedAt    time.Time                       `json:"checkedAt,omitempty"`
+		AugmentIcons map[string]patchNoteAugmentIcon `json:"augmentIcons,omitempty"`
+	}{c.documents[0], status, c.checkedAt, patchNoteAugmentIcons(c.documents[0])})
 }

@@ -577,7 +577,7 @@ test("R171 apply optionally writes the selected source's spells and reports part
   state.applyRuneSpells = false;
   await applyRunes({ currentTarget: button });
   assert.equal(posts.at(-1).spell1Id, undefined);
-  assert.equal(toasts.at(-1), "符文已新建并设为当前页");
+  assert.equal(toasts.at(-1), "符文已应用并设为当前页");
   state.applyRuneSpells = true;
   recommendation.sourceLabel = "职业选手";
   recommendation.spell1Id = 0;
@@ -990,10 +990,10 @@ test("R173 rune equipment places opening items, divider and seven final slots in
   });
   const html = renderRuneEquipment({ starterItemIds: [1055, 2003, 2003, 1086, 1001, 1056, 9999], itemIds: [3006, 3072, 3031, 3085, 3036, 3139, 3364, 8888] });
   const dom = new JSDOM(html), equipment = dom.window.document.querySelector(".sg-items");
-  assert.equal(equipment.children[0].textContent, "装备");
-  assert.deepEqual([...equipment.children[1].children].map(node => node.classList.contains("route-divider") ? "|" : Number(node.dataset.item)),
-    [1055, 2003, 2003, 1086, 1001, 1056, "|", 3006, 3072, 3031, 3085, 3036, 3139, 3364]);
-  assert.equal(equipment.querySelector(".route-divider").getAttribute("aria-hidden"), "true");
+  assert.equal(equipment.children[0].textContent, "出门装");
+  assert.deepEqual([...dom.window.document.querySelectorAll(".sg-icons > [data-item]")].map(node => Number(node.dataset.item)),
+    [1055, 2003, 2003, 1086, 1001, 1056, 3006, 3072, 3031, 3085, 3036, 3139, 3364]);
+  assert.deepEqual([...dom.window.document.querySelectorAll(".sg-label")].map(n=>n.textContent),["出门装","最终装备"]);
   assert.equal(equipment.querySelectorAll("[data-tooltip],[title]").length, 0);
 });
 
@@ -1003,12 +1003,12 @@ test("R293 absent opening items keeps exact final-only footer markup", () => {
   const itemIDs = [1055, 2003, 3006], old = '<div class="specialist-game-footer"><div class="sg-items"><span class="sg-label">最终装备</span><div class="sg-icons">' + itemIDs.map(renderItemIcon).join("") + '</div></div></div>';
   assert.equal(renderRuneEquipment({ itemIds: itemIDs }), old);
   assert.equal(renderRuneEquipment({ itemIds: itemIDs, starterItemIds: [] }), old);
-  assert.equal(renderRuneEquipment({ itemIds: [], starterItemIds: [1055] }), "");
+  assert.equal(renderRuneEquipment({ itemIds: [], starterItemIds: [1055] }), '<div class="specialist-game-footer"><div class="sg-items sg-starters"><span class="sg-label">出门装</span><div class="sg-icons"><i data-item="1055"></i></div></div></div>');
 });
 
 test("R173 delayed equipment patch preserves row identity, order and selected state", () => {
   const { JSDOM } = require("../../desktop/node_modules/jsdom");
-  const dom = new JSDOM('<section><div data-rune-choice="new" class="specialist-game-row is-selected" aria-checked="true"><div class="sg-items"><span>最终装备</span><div></div></div></div><div data-rune-choice="old" class="specialist-game-row" aria-checked="false"><div class="sg-items"><span>最终装备</span><div></div></div></div></section>');
+  const dom = new JSDOM('<section><div data-rune-choice="new" class="specialist-game-row is-selected" aria-checked="true"><div class="sg-items"><span>最终装备</span><div><i data-item="3006"></i></div></div></div><div data-rune-choice="old" class="specialist-game-row" aria-checked="false"><div class="sg-items"><span>最终装备</span><div><i data-item="3031"></i></div></div></div></section>');
   const document = dom.window.document, root = document.querySelector("section"), before = [...root.children];
   let remembered = 0;
   const { patchRuneStarterEquipment } = compile(["patchRuneStarterEquipment"], {
@@ -1122,16 +1122,16 @@ test("R174 opening inventory and divider precede final inventory and rightmost s
   const { JSDOM } = require("../../desktop/node_modules/jsdom");
   const html = r174EquipmentRenderer()({ starterItemIds: [1055, 2003, 2003], itemIds: [3006, 3031, 3364], spell1Id: 4, spell2Id: 11 });
   const row = new JSDOM(html).window.document.querySelector(".specialist-game-footer");
-  assert.equal(row.querySelector(".sg-label").textContent, "装备");
-  assert.deepEqual([...row.children].map(node => node.className), ["sg-items", "sg-spells"]);
-  assert.deepEqual([...row.querySelector(".sg-icons").children].map(node => node.classList.contains("route-divider") ? "|" : Number(node.dataset.item)), [1055, 2003, 2003, "|", 3006, 3031, 3364]);
+  assert.equal(row.querySelector(".sg-label").textContent, "出门装");
+  assert.deepEqual([...row.children].map(node => node.className), ["sg-items sg-starters", "sg-items", "sg-spells"]);
+  assert.deepEqual([...row.querySelectorAll(".sg-icons > [data-item]")].map(node => Number(node.dataset.item)), [1055, 2003, 2003, 3006, 3031, 3364]);
   assert.deepEqual([...row.lastElementChild.children].map(node => Number(node.dataset.spell)), [4, 11]);
 });
 
 test("R293 invalid or absent spell pair retains exact equipment-only footer markup", () => {
   const render = r174EquipmentRenderer();
   const oldFinal = '<div class="specialist-game-footer"><div class="sg-items"><span class="sg-label">最终装备</span><div class="sg-icons"><i data-item="3006"></i></div></div></div>';
-  const oldOpening = '<div class="specialist-game-footer"><div class="sg-items"><span class="sg-label">装备</span><div class="sg-icons"><i data-item="1055"></i><span class="route-divider" aria-hidden="true"></span><i data-item="3006"></i></div></div></div>';
+  const oldOpening = '<div class="specialist-game-footer"><div class="sg-items sg-starters"><span class="sg-label">出门装</span><div class="sg-icons"><i data-item="1055"></i></div></div><div class="sg-items"><span class="sg-label">最终装备</span><div class="sg-icons"><i data-item="3006"></i></div></div></div>';
   for (const [spell1Id, spell2Id] of [[undefined, undefined], [undefined, 11], [4, 0], [0, 11], [4, 4], [-1, 4], [4.5, 11], [4, Infinity], [4, 100001]]) {
     assert.equal(render({ itemIds: [3006], spell1Id, spell2Id }), oldFinal);
     assert.equal(render({ itemIds: [3006], starterItemIds: [1055], spell1Id, spell2Id }), oldOpening);
@@ -1145,11 +1145,11 @@ test("R174 spells without final inventory render one right-aligned container wit
   const html = r174EquipmentRenderer()({ starterItemIds: [1055], itemIds: [], spell1Id: 4, spell2Id: 11 });
   const row = new JSDOM(html).window.document.querySelector(".specialist-game-footer");
   assert.ok(row, "spells cannot disappear when final equipment is absent");
-  assert.equal(row.children.length, 1);
-  assert.equal(row.children[0].className, "sg-spells");
+  assert.equal(row.children.length, 2);
+  assert.equal(row.lastElementChild.className, "sg-spells");
   assert.equal(row.querySelector(":scope > span"), null);
-  assert.equal(row.querySelectorAll("[data-item]").length, 0);
-  assert.deepEqual([...row.children[0].children].map(node => Number(node.dataset.spell)), [4, 11]);
+  assert.equal(row.querySelectorAll("[data-item]").length, 1);
+  assert.deepEqual([...row.lastElementChild.children].map(node => Number(node.dataset.spell)), [4, 11]);
 });
 
 test("R174 full specialist and pro templates have no standalone spell row", () => {
@@ -1315,7 +1315,7 @@ test("R177 starter retry success patches opening items and retains rightmost R17
     assert.deepEqual(h.runes[0].starterItemIds, [1055, 2003]);
     const row = h.dom.window.document.querySelector(".specialist-game-footer");
     assert.deepEqual([...row.querySelectorAll("[data-item]")].map(icon => Number(icon.dataset.item)), [1055, 2003, 3006, 3031]);
-    assert.ok(row.querySelector(".route-divider"));
+    assert.deepEqual([...row.querySelectorAll(".sg-label")].map(n=>n.textContent),["出门装","最终装备"]);
     assert.equal(row.lastElementChild.className, "sg-spells");
     assert.deepEqual([...row.lastElementChild.children].map(icon => Number(icon.dataset.spell)), [4, 11]);
     assert.equal(h.clock.timers.size, 0, "completed row does not retry even with a stale hint");

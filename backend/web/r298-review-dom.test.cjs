@@ -27,9 +27,9 @@ for(const keys of [['D','F'],['N','M']])test(`R298 real DOM spell picks save and
  try {
   await h.click('[data-tab="kit"]');
   await h.click('[data-spell="4"]');
-  assert.equal(h.w.document.querySelector('.ac-slot.is-active').dataset.slot,'1','first pick advances to the right slot');
-  await h.click('[data-spell="14"]');
-  assert.equal(h.w.document.querySelector('.ac-slot.is-active').dataset.slot,'0','second pick advances to the left slot');
+  assert.equal(h.w.document.querySelector('.ac-slot.is-active').dataset.slot,'0','first pick keeps the selected left slot');
+  await h.click('[data-slot="1"]');await h.click('[data-spell="14"]');
+  assert.equal(h.w.document.querySelector('.ac-slot.is-active').dataset.slot,'1','second pick keeps the selected right slot');
   await h.click('[data-act="save"]');
   assert.deepEqual(h.saved.champions['1'].ranked.spells,{spell1Id:4,spell2Id:14},'flash preference must not reorder editor configuration');
   await h.click('.ac-slot[data-slot="1"]');await h.click('[data-spell="6"]');
@@ -37,7 +37,7 @@ for(const keys of [['D','F'],['N','M']])test(`R298 real DOM spell picks save and
   assert.deepEqual(h.saved.champions['1'].ranked.spells,{spell1Id:6,spell2Id:4});
   // Pick an already-used candidate, then replace the selected slot again.
   await h.click('.ac-slot[data-slot="0"]');await h.click('[data-spell="4"]');
-  await h.click('[data-spell="14"]');await h.click('[data-act="save"]');
+  await h.click('[data-slot="1"]');await h.click('[data-spell="14"]');await h.click('[data-act="save"]');
   assert.deepEqual(h.saved.champions['1'].ranked.spells,{spell1Id:4,spell2Id:14});
   await h.w.deepLegendsAutoConfig.load(true);
   assert.deepEqual([...h.w.document.querySelectorAll('.ac-slot kbd')].map(n=>n.textContent),keys);

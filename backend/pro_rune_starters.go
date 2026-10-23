@@ -119,6 +119,11 @@ func (p *proRuneProvider) openingDetails(ctx context.Context, game proRuneIndexG
 func (p *proRuneProvider) starterRows(ctx context.Context, championID int, position string, wanted map[string]int64) []runeStarterRow {
 	meta, err := p.provider.championMetadataByID(ctx, championID)
 	if err != nil {
+		if p.provider.diag != nil {
+			for range wanted {
+				p.provider.diag(map[string]any{"event": "rune_starter_items", "source": "pro", "outcome": "failed", "reason": "champion-catalog-unavailable", "item_count": 0})
+			}
+		}
 		return []runeStarterRow{}
 	}
 	p.mu.Lock()
@@ -140,17 +145,20 @@ func (p *proRuneProvider) starterRows(ctx context.Context, championID int, posit
 		recordRuneStarterBatchError(ctx, err)
 		if err == nil {
 			items, _ := proStarterItems(details, row.Participant.ParticipantID, row.Game.Start)
+			if len(items) == 0 {
+				err = errors.New("opening-items-empty")
+			}
 			result[index] = runeStarterRow{proRuneRowKey(row), row.Game.Start.UnixMilli(), items}
 		}
 		if p.provider.diag != nil {
 			outcome, reason := "success", ""
 			if err != nil {
-				outcome, reason = "failed", proRuneErrorReason(err)
+				outcome, reason = "failed", proStarterFailureReason(err)
 			}
 			p.provider.diag(map[string]any{"event": "rune_starter_items", "source": "pro", "outcome": outcome, "reason": reason, "item_count": len(result[index].StarterItemIDs)})
 		}
 	})
-	return nonemptyStarterRows(result)
+	return append(nonemptyStarterRows(result), p.opggStarterRows(ctx, championID, meta.Key, wanted)...)
 }
 
 // The raw JSON is inspected only here. Unknown keys could contain identity

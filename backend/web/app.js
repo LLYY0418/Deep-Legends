@@ -4340,6 +4340,7 @@
           if(detail?.type==='history-service-recovered'){window.dispatchEvent(new CustomEvent('deep-legends:history-service-recovered',{detail}));return;}
           if(detail?.type==='collection-new-skins'){window.deepLegendsCollectionNewItems?.newSkins(detail);window.reportFlowDiagnostic?.('collection_new_marker','skin',{latency_ms:Math.max(0,Date.now()-Number(detail.at || Date.now())),source:'event'});return;}
           if(detail?.type==='patch-notes-changed'){window.dispatchEvent(new CustomEvent('deep-legends:patch-notes-changed'));return;}
+          if(detail?.type==='mayhem-data-changed'){window.dispatchEvent(new CustomEvent('deep-legends:mayhem-data-changed'));return;}
           if(detail?.type==='announcements-changed'){window.dispatchEvent(new CustomEvent('deep-legends:announcements-changed'));return;}
 		  const slices = LIVE_UPDATE_STATE_SLICES[detail?.type] || [];
 		  if (slices.includes("riot-relay-recovered")) window.dispatchEvent(new CustomEvent("deep-legends:riot-relay-recovered", {detail}));
@@ -4467,7 +4468,7 @@
       updateUI.announced = current.latest;
     }
     el.updateButton.querySelector(".dot").hidden = !(current.state === "ready" || current.state === "available" && updateUI.seen !== current.latest);
-    el.updateButton.querySelector(".hex-progress").setAttribute("stroke-dashoffset", String(59 * (1 - percent / 100)));
+    el.updateButton.querySelector(".update-border-progress").setAttribute("stroke-dashoffset", String(100 * (1 - percent / 100)));
     const tooltip = manual ? `有新版本 ${current.latest}` : busy ? `正在下载新版本 ${percent}%` : ready ? "新版本已下载，点击升级" : `有新版本 ${current.latest}`;
     el.updateButton.dataset.tooltip = tooltip;
     el.updateButton.setAttribute("aria-label", tooltip);

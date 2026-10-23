@@ -288,17 +288,17 @@ func TestR191_11DirectoryFallbackHTTP(t *testing.T) {
 			a.handleChampionAugmentDetail(r, httptest.NewRequest("GET", "/api/champions/augment-detail?id=1225&slug=ARAM_MagicMissile", nil))
 			var got championAugmentDetailResponse
 			_ = json.Unmarshal(r.Body.Bytes(), &got)
-			if r.Code != 200 || got.Source != "CommunityDragon fallback" {
+			if r.Code != 200 || !strings.Contains(got.Source, "OP.GG") || got.Citation == nil || got.Citation.Patch != "16.21.1" || got.Description == "" || strings.Contains(got.Description, "禁止补入") {
 				t.Fatalf("%d %s", r.Code, r.Body)
 			}
 		})
 	}
 }
-func TestR191_12FallbackBuildUnavailable(t *testing.T) {
+func TestR191_12FallbackBuildUsesCurrentSnapshot(t *testing.T) {
 	a := &app{champions: r191AugmentProvider(t, "error")}
 	r := httptest.NewRecorder()
 	a.handleGameplayAugmentDescriptions(r, httptest.NewRequest("GET", "/api/gameplay/augment-descriptions?ids=1225", nil))
-	if r.Code != 200 || !strings.Contains(r.Body.String(), `"status":"unavailable"`) || strings.Contains(r.Body.String(), "禁止补入") {
+	if r.Code != 200 || !strings.Contains(r.Body.String(), `"status":"ok"`) || !strings.Contains(r.Body.String(), "在攻击时") || strings.Contains(r.Body.String(), "禁止补入") {
 		t.Fatalf("%d %s", r.Code, r.Body)
 	}
 }

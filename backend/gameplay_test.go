@@ -3672,6 +3672,8 @@ func TestApplyRunePageCreatesNewPageAndMakesItCurrent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests = append(requests, r.Method+" "+r.URL.Path)
 		switch r.Method + " " + r.URL.Path {
+		case "GET /lol-perks/v1/pages":
+			_, _ = w.Write([]byte(`[]`))
 		case "GET /lol-perks/v1/inventory":
 			_, _ = w.Write([]byte(`{"canAddCustomPage":true}`))
 		case "POST /lol-perks/v1/pages/":
@@ -3711,7 +3713,7 @@ func TestApplyRunePageCreatesNewPageAndMakesItCurrent(t *testing.T) {
 	if err != nil || pageID != 7 {
 		t.Fatalf("applyRunePage = %d, %v", pageID, err)
 	}
-	want := []string{"GET /lol-perks/v1/inventory", "POST /lol-perks/v1/pages/", "PUT /lol-perks/v1/pages/7", "PUT /lol-perks/v1/currentpage"}
+	want := []string{"GET /lol-perks/v1/pages", "GET /lol-perks/v1/inventory", "POST /lol-perks/v1/pages/", "PUT /lol-perks/v1/pages/7", "PUT /lol-perks/v1/currentpage"}
 	if strings.Join(requests, "|") != strings.Join(want, "|") {
 		t.Fatalf("request order = %#v, want %#v", requests, want)
 	}
@@ -3755,7 +3757,7 @@ func TestApplyRunePageFullDeletesOnlyOldestOwnedPageThenCreates(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 		case "POST /lol-perks/v1/pages/":
 			_, _ = w.Write([]byte(`{"id":7}`))
-		case "PUT /lol-perks/v1/pages/7", "PUT /lol-perks/v1/currentpage":
+		case "PUT /lol-perks/v1/pages/22", "PUT /lol-perks/v1/currentpage":
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			t.Fatalf("unexpected rune page request: %s", requestKey)
@@ -3765,10 +3767,10 @@ func TestApplyRunePageFullDeletesOnlyOldestOwnedPageThenCreates(t *testing.T) {
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	request := gameplayRuneApplyRequest{ChampionName: "李青", Source: "OPGG", ChampionID: 64, PrimaryStyleID: 8000, SubStyleID: 8100, SelectedPerkIDs: []int64{8001, 8002, 8003, 8004, 8101, 8102, 5001, 5002, 5003}}
 	pageID, err := applyRunePage(context.Background(), client, request)
-	if err != nil || pageID != 7 {
+	if err != nil || pageID != 22 {
 		t.Fatalf("applyRunePage = %d, %v", pageID, err)
 	}
-	want := []string{"GET /lol-perks/v1/inventory", "GET /lol-perks/v1/pages", "DELETE /lol-perks/v1/pages/33", "GET /lol-perks/v1/inventory", "POST /lol-perks/v1/pages/", "PUT /lol-perks/v1/pages/7", "PUT /lol-perks/v1/currentpage"}
+	want := []string{"GET /lol-perks/v1/pages", "DELETE /lol-perks/v1/pages/33", "PUT /lol-perks/v1/pages/22", "PUT /lol-perks/v1/currentpage"}
 	if strings.Join(requests, "|") != strings.Join(want, "|") {
 		t.Fatalf("request order = %#v, want %#v", requests, want)
 	}
@@ -3789,7 +3791,7 @@ func TestApplyRunePageSortsMissingLastModifiedByID(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 		case "POST /lol-perks/v1/pages/":
 			_, _ = w.Write([]byte(`{"id":7}`))
-		case "PUT /lol-perks/v1/pages/7", "PUT /lol-perks/v1/currentpage":
+		case "PUT /lol-perks/v1/pages/9", "PUT /lol-perks/v1/currentpage":
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			t.Fatalf("unexpected rune page request: %s %s", r.Method, r.URL.Path)
@@ -3798,7 +3800,7 @@ func TestApplyRunePageSortsMissingLastModifiedByID(t *testing.T) {
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	request := gameplayRuneApplyRequest{ChampionName: "李青", Source: "OPGG", ChampionID: 64, PrimaryStyleID: 8000, SubStyleID: 8100, SelectedPerkIDs: []int64{1, 2, 3, 4, 5, 6}}
-	if pageID, err := applyRunePage(context.Background(), client, request); err != nil || pageID != 7 || deleted != "/lol-perks/v1/pages/4" {
+	if pageID, err := applyRunePage(context.Background(), client, request); err != nil || pageID != 9 || deleted != "/lol-perks/v1/pages/4" {
 		t.Fatalf("applyRunePage=%d,%v deleted=%q", pageID, err, deleted)
 	}
 }
@@ -3836,14 +3838,14 @@ func TestApplyRunePageSkipsExplicitlyNonDeletableOwnedPage(t *testing.T) {
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	_, err := applyRunePage(context.Background(), client, gameplayRuneApplyRequest{ChampionName: "李青", Source: "OPGG", ChampionID: 64, PrimaryStyleID: 8000, SubStyleID: 8100, SelectedPerkIDs: []int64{1, 2, 3, 4, 5, 6}})
-	if !errors.Is(err, errRunePageLimit) {
+	if err == nil || !strings.Contains(err.Error(), "不可编辑") {
 		t.Fatalf("applyRunePage error = %v, want errRunePageLimit", err)
 	}
 }
 
 func TestApplyRunePageRecycleLoopStopsAfterFiveDeletes(t *testing.T) {
 	inventoryReads := 0
-	deleted := make([]string, 0, runePageRecycleLimit)
+	deleted := make([]string, 0, 5)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/lol-perks/v1/inventory":
@@ -3854,6 +3856,8 @@ func TestApplyRunePageRecycleLoopStopsAfterFiveDeletes(t *testing.T) {
 		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/lol-perks/v1/pages/"):
 			deleted = append(deleted, r.URL.Path)
 			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPut && (r.URL.Path == "/lol-perks/v1/pages/1" || r.URL.Path == "/lol-perks/v1/currentpage"):
+			w.WriteHeader(http.StatusNoContent)
 		default:
 			t.Fatalf("unexpected request after recycle limit: %s %s", r.Method, r.URL.Path)
 		}
@@ -3861,10 +3865,10 @@ func TestApplyRunePageRecycleLoopStopsAfterFiveDeletes(t *testing.T) {
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	_, err := applyRunePage(context.Background(), client, gameplayRuneApplyRequest{ChampionName: "李青", Source: "OPGG", ChampionID: 64, PrimaryStyleID: 8000, SubStyleID: 8100, SelectedPerkIDs: []int64{1, 2, 3, 4, 5, 6}})
-	if !errors.Is(err, errRunePageLimit) || len(deleted) != runePageRecycleLimit || inventoryReads != runePageRecycleLimit+1 {
+	if err != nil || len(deleted) != 5 || inventoryReads != 0 {
 		t.Fatalf("applyRunePage error=%v deleted=%#v inventoryReads=%d", err, deleted, inventoryReads)
 	}
-	if got := strings.Join(deleted, "|"); got != "/lol-perks/v1/pages/1|/lol-perks/v1/pages/2|/lol-perks/v1/pages/3|/lol-perks/v1/pages/4|/lol-perks/v1/pages/5" {
+	if got := strings.Join(deleted, "|"); got != "/lol-perks/v1/pages/2|/lol-perks/v1/pages/3|/lol-perks/v1/pages/4|/lol-perks/v1/pages/5|/lol-perks/v1/pages/6" {
 		t.Fatalf("deleted pages = %s", got)
 	}
 }
@@ -3921,6 +3925,8 @@ func TestRuneApplyHandlerExplainsClientPageLimit(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests = append(requests, r.Method+" "+r.URL.Path)
 		switch r.URL.Path {
+		case "/lol-champ-select/v1/session":
+			_, _ = w.Write([]byte(`{"gameId":42,"queueId":420,"localPlayerCellId":7,"myTeam":[{"cellId":7,"championId":64}]}`))
 		case "/lol-gameflow/v1/gameflow-phase":
 			_, _ = w.Write([]byte(`"ChampSelect"`))
 		case "/lol-perks/v1/inventory":
@@ -3940,7 +3946,7 @@ func TestRuneApplyHandlerExplainsClientPageLimit(t *testing.T) {
 	if recorder.Code != http.StatusConflict || !strings.Contains(recorder.Body.String(), runePageLimitMessage) {
 		t.Fatalf("status/body = %d/%q", recorder.Code, recorder.Body.String())
 	}
-	want := []string{"GET /lol-gameflow/v1/gameflow-phase", "GET /lol-perks/v1/inventory", "GET /lol-perks/v1/pages"}
+	want := []string{"GET /lol-gameflow/v1/gameflow-phase", "GET /lol-champ-select/v1/session", "GET /lol-perks/v1/pages", "GET /lol-perks/v1/inventory"}
 	if strings.Join(requests, "|") != strings.Join(want, "|") {
 		t.Fatalf("request order = %#v, want %#v", requests, want)
 	}
@@ -3953,6 +3959,10 @@ func TestRuneApplyHandlerReturnsAndRecordsAppliedPerks(t *testing.T) {
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
+		case "GET /lol-champ-select/v1/session":
+			_, _ = w.Write([]byte(`{"gameId":42,"queueId":420,"localPlayerCellId":7,"myTeam":[{"cellId":7,"championId":64}]}`))
+		case "GET /lol-perks/v1/pages":
+			_, _ = w.Write([]byte(`[]`))
 		case "GET /lol-gameflow/v1/gameflow-phase":
 			_, _ = w.Write([]byte(`"ChampSelect"`))
 		case "GET /lol-perks/v1/inventory":
@@ -4014,6 +4024,10 @@ func TestRuneApplySummonerSpellPatchAndPartialSuccess(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				paths = append(paths, r.Method+" "+r.URL.Path)
 				switch r.Method + " " + r.URL.Path {
+				case "GET /lol-champ-select/v1/session":
+					_, _ = w.Write([]byte(`{"gameId":42,"queueId":420,"localPlayerCellId":7,"myTeam":[{"cellId":7,"championId":64}]}`))
+				case "GET /lol-perks/v1/pages":
+					_, _ = w.Write([]byte(`[]`))
 				case "GET /lol-gameflow/v1/gameflow-phase":
 					_, _ = w.Write([]byte(`"ChampSelect"`))
 				case "GET /lol-perks/v1/inventory":

@@ -2457,3 +2457,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 [data-theme="light"] :is(.service-outage-compact,.live-refresh-status.is-service-outage) {--primary:var(--primary-strong);}
 
 .rank-career-section > header > h3 { display:flex; align-items:center; gap:4px; }
+
+/* The existing sixth arena cell forms the equipment subline below the name. */
+.arena-detail-columns, .arena-detail-player { grid-template-columns:minmax(140px,1fr) 104px 96px 100px 116px; }
+.arena-detail-columns .arena-column-items, .arena-detail-player > .arena-detail-items { grid-column:1 / -1; justify-self:stretch; justify-content:flex-start; }
+.arena-detail-player > .arena-detail-items { margin-top:5px; flex-wrap:wrap; }
+.arena-detail-columns .arena-column-items { text-align:left; }

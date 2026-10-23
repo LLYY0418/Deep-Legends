@@ -162,3 +162,22 @@
 .ptag-item .who small { display:block; margin-top:4px; }
 .live-player-identity > [data-ptag-decoration] { display:flex; min-width:0; max-width:100%; overflow:hidden; }
 .ptag-row .ptag.is-more { min-width:0; flex:0 1 auto; }
+
+/* R300: decoration remains inside the existing player column. */
+.participant-identity { min-width:0; width:100%; text-align:left; justify-self:stretch; }
+.ptag-name-line { display:flex; min-width:0; align-items:center; gap:5px; }
+.ptag-name-line .participant-link { min-width:0; flex:0 1 auto; width:auto; }
+.ptag-name-line .participant-name { min-width:0; }
+.ptag-detail { flex:none; }
+.ptag-detail .ptag-btn { width:22px; height:22px; padding:0; border:0; background:transparent; }
+.ptag-detail.is-neg .ptag-btn.is-tagged { color:var(--danger); }
+.ptag-detail.is-pos .ptag-btn.is-tagged { color:var(--success); }
+.ptag-detail.is-mine .ptag-btn.is-tagged { color:var(--primary-strong); }
+.ptag-detail-tags { display:block; min-width:0; margin-top:4px; }
+.participant-subline { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
+.participant-subline .ptag-detail-tags { display:inline-flex; margin-top:0; }
+.ptag-modal > footer > div { display:flex; align-items:center; gap:10px; }
+.ptag-modal .tools .dialog-close-button { width:32px; height:32px; border-radius:9px; }
+.ptag-modal .tools .dialog-close-button .control-icon { width:var(--control-icon-size); height:var(--control-icon-size); }
+#player-tags-settings .ptag-manage-card { padding:18px 20px; }
+.arena-team-roster .match-player-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

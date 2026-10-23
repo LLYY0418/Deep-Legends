@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -152,6 +153,31 @@ func autoConfigSpellAllowed(s autoConfigSpell, mode string, currentMode ...strin
 	}
 	return false
 }
+
+// No current official mode-specific starting-gold rule was verifiable on 2026-10-24.
+// R300 fallback: Summoner's Rift 500, Howling Abyss 1400, including URF/event.
+// Official mode references checked: https://www.leagueoflegends.com/en-us/news/game-updates/patch-26-21-notes/
+func autoConfigStarterBudget(mode string) int64 {
+	if mode == "aram" || mode == "hextech" {
+		return 1400
+	}
+	return 500
+}
+func autoConfigStarterAllowed(i autoConfigItem, mode string) bool {
+	mapID := "11"
+	if mode == "aram" || mode == "hextech" {
+		mapID = "12"
+	}
+	return i.ID > 0 && i.InStore && i.DisplayInItemSets && i.RequiredChampion == "" && i.RequiredAlly == "" && i.Maps[mapID] && i.Price >= 0 && i.Price <= autoConfigStarterBudget(mode)
+}
+func autoConfigConsumable(i autoConfigItem) bool {
+	for _, c := range i.Categories {
+		if c == "Consumable" {
+			return true
+		}
+	}
+	return false
+}
 func autoConfigItemAllowed(i autoConfigItem, mode string) bool {
 	if !i.InStore || !i.DisplayInItemSets || i.RequiredChampion != "" || i.RequiredAlly != "" {
 		return false
@@ -261,6 +287,21 @@ func (a *app) validateAutoConfigCatalog(ctx context.Context, mode string, e auto
 		}
 	}
 	if e.Items != nil {
+		starterCatalog := map[int64]autoConfigItem{}
+		for _, item := range c.Items {
+			starterCatalog[item.ID] = item
+		}
+		total := int64(0)
+		for _, item := range e.Items.Starter {
+			meta, ok := starterCatalog[item.ID]
+			if !ok || !autoConfigStarterAllowed(meta, mode) || item.Count < 1 || item.Count > 99 || item.Count > 1 && !autoConfigConsumable(meta) {
+				return autoConfigError("出门装")
+			}
+			total += meta.Price * item.Count
+		}
+		if total > autoConfigStarterBudget(mode) {
+			return errors.New("超出出门预算")
+		}
 		valid := map[int64]bool{}
 		for _, i := range c.Items {
 			if autoConfigItemAllowed(i, mode) {

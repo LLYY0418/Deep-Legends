@@ -705,6 +705,7 @@ func main() {
 	mux.HandleFunc("DELETE /api/auto-config/champions/{id}/{modeKey}", a.authorized(a.handleAutoConfigChampion))
 	mux.HandleFunc("POST /api/auto-config/copy", a.authorized(a.handleAutoConfigCopy))
 	mux.HandleFunc("GET /api/auto-config/catalog", a.authorized(a.handleAutoConfigCatalog))
+	mux.HandleFunc("POST /api/auto-config/apply", a.authorized(a.handleAutoConfigApply))
 	mux.HandleFunc("GET /api/auto-config/state", a.authorized(a.handleAutoConfigState))
 	mux.HandleFunc("GET /api/settings/summoner-keys", a.authorized(a.handleSummonerKeys))
 	mux.HandleFunc("PUT /api/settings/summoner-keys", a.authorized(a.handleSummonerKeys))

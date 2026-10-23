@@ -139,7 +139,12 @@ func mergeAnnouncements(bundled, remote []announcement) []announcement {
 	}
 	return out
 }
+
+type announcementFetchError struct{ Status int }
+
+func (e *announcementFetchError) Error() string { return "notice fetch failed" }
 func fetchAnnouncementDocument(ctx context.Context, client *http.Client) ([]byte, []announcement, error) {
+	status := 0
 	for _, name := range []string{"announcements.v2.json", "announcements.json"} {
 		attempt, cancel := context.WithTimeout(ctx, 2*time.Second)
 		for _, prefix := range updateMirrors {
@@ -148,6 +153,7 @@ func fetchAnnouncementDocument(ctx context.Context, client *http.Client) ([]byte
 			if err != nil {
 				continue
 			}
+			status = resp.StatusCode
 			raw, err := readLimited(resp.Body, 256<<10)
 			resp.Body.Close()
 			if err != nil || resp.StatusCode != 200 {
@@ -162,7 +168,7 @@ func fetchAnnouncementDocument(ctx context.Context, client *http.Client) ([]byte
 		}
 		cancel()
 	}
-	return nil, nil, errors.New("notice fetch failed")
+	return nil, nil, &announcementFetchError{Status: status}
 }
 
 func (a *app) fetchAnnouncements() {
@@ -199,7 +205,12 @@ func (a *app) fetchAnnouncements() {
 		c.mu.Lock()
 		c.fetchFailed = true
 		c.mu.Unlock()
-		a.recordDiagnostic(map[string]any{"event": "announcement_state", "id": "fetch", "revision": "", "source": "bundled", "action": "fetch-failed"})
+		status := 0
+		var fetchErr *announcementFetchError
+		if errors.As(err, &fetchErr) {
+			status = fetchErr.Status
+		}
+		a.recordDiagnostic(map[string]any{"event": "announcement_state", "id": "fetch", "revision": "", "source": "bundled", "action": "fetch-failed", "http_status": status})
 	})
 }
 func (a *app) handleAnnouncements(w http.ResponseWriter, r *http.Request) {

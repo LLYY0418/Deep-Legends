@@ -8,7 +8,7 @@
 .champion-head-title .text-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .champion-head-title .text-button b { padding: 1px 6px; color: var(--primary-strong); background: color-mix(in oklab, var(--primary) 14%, transparent); border-radius: 5px; font-size: 11.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
 
-/* 9) 版本更新弹窗：只显示当前所在 tab 对应模式的改动。主题色只用在：版本号、模式标签、改后的新值、「新增」标签、分组标题左侧竖条。
+/* 9) 版本更新弹窗：说明文字弱化；名称和新值使用主题主色，分组与新增标签使用主题辅助色。
       不用红 / 绿表示增强 / 削弱（官方公告没有可靠的增强 / 削弱标记，按数字大小猜会出错：冷却变短是增强）。 */
 .pn-scrim { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgb(0 0 0 / .46); }
 .pn-dialog { display: grid; width: min(680px, 100%); max-height: min(720px, 100%); grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; color: var(--ink);
@@ -32,13 +32,15 @@
 .pn-entry > strong { align-self: center; font-size: 14px; }
 .pn-entry > div { grid-column: 2; display: grid; gap: 6px; }
 .pn-group { display: grid; gap: 3px; }
-.pn-group > span { justify-self: start; padding: 0 6px; color: var(--muted); background: color-mix(in oklab, var(--ink) 7%, transparent); border-radius: 5px; font-size: 11px; font-weight: 650; line-height: 18px; }
+.pn-group > span { justify-self: start; padding: 0 6px; color: var(--accent); background: color-mix(in oklab, var(--accent) 14%, transparent); border-radius: 5px; font-size: 11px; font-weight: 650; line-height: 18px; }
 .pn-line { color: var(--ink); font-size: 13px; line-height: 1.6; }
-.pn-line .k { color: var(--muted); }
-.pn-line .from { color: var(--muted); }
+.pn-line.is-explanation { color: var(--muted); }
+.pn-line .k, .pn-line .from { color: var(--ink); }
 .pn-line .arrow { margin: 0 5px; color: var(--muted); }
 .pn-line .to { color: var(--primary-strong); font-weight: 750; }
-.pn-new { display: inline-block; margin-right: 6px; padding: 0 6px; color: var(--bg); background: var(--primary); border-radius: 5px; font-size: 11px; font-weight: 800; line-height: 17px; vertical-align: 1px; }
+.pn-new { display: inline-block; padding: 0 6px; color: var(--accent); background: color-mix(in oklab, var(--accent) 14%, transparent); border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent); border-radius: 5px; font-size: 11px; font-weight: 800; line-height: 17px; vertical-align: 1px; }
+.pn-list-name { color: var(--primary-strong); }
+.pn-list-description { color: var(--ink); }
 .pn-list { margin: 0; padding: 0; list-style: none; }
 .pn-list li { position: relative; padding: 4px 0 4px 14px; font-size: 13px; line-height: 1.6; }
 .pn-list li::before { position: absolute; top: 12px; left: 2px; width: 4px; height: 4px; background: var(--muted); border-radius: 50%; content: ""; }
@@ -50,9 +52,13 @@
 .champion-page-head { min-height:76px; }
 .pn-entry.is-text-only { display:block; }
 .pn-entry.is-text-only > div { margin-top:6px; }
-.pn-intro { margin:0 0 12px; color:var(--ink); font-size:13px; line-height:1.65; white-space:pre-line; }
+.pn-intro { margin:0 0 12px; color:var(--muted); font-size:13px; line-height:1.65; white-space:pre-line; }
 .pn-entry .ic img { width:100%; height:100%; object-fit:cover; }
 .pn-entry .ic { background:var(--surface); }
+.pn-entry.is-augment { display:block; }
+.pn-entry.is-augment > strong { display:flex; align-items:center; flex-wrap:wrap; gap:7px; color:var(--primary-strong); }
+.pn-entry.is-augment > div { margin-top:6px; }
+.pn-entry.is-augment .ic { display:inline-flex; flex:0 0 22px; width:22px; height:22px; border-radius:4px; }
 .pn-line { overflow-wrap:anywhere; white-space:pre-line; }
 .pn-loading { display:grid; gap:12px; padding:24px 0; }
 .pn-loading i { display:block; height:44px; border-radius:8px; background:var(--surface); animation:pn-pulse 1s infinite alternate; }
