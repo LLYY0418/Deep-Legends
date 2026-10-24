@@ -1809,21 +1809,21 @@
     "file": "backend/r235_test.go",
     "line": 87,
     "target": "pushed",
-    "source_sha256": "f292b57193c906711544097bf825275b1092a61d55b23ecb08691d822ac02626",
+    "source_sha256": "bfae4491ff2bdd3013f0cd749309a7fd411efbe007364b9b2a1c081e1a028a5e",
     "comment": "r276-capture-safe: TestR235HeadStreamsConcurrentAndFirstPagePush: seasonScanHeadConcurrent workers send pages to the owner channel; only its calling consumer invokes scan.onPage, and seasonScanPagesWithHistoryCache returns before pushed is inspected"
   },
   {
     "file": "backend/r235_test.go",
     "line": 174,
     "target": "event",
-    "source_sha256": "f292b57193c906711544097bf825275b1092a61d55b23ecb08691d822ac02626",
+    "source_sha256": "bfae4491ff2bdd3013f0cd749309a7fd411efbe007364b9b2a1c081e1a028a5e",
     "comment": "r276-capture-safe: TestR235RatingHeaderAndBodyBudgetsAndFailureRetry: client.lookup consumes the pipe body then calls recordContext/observe inline before returning; the first failed cache entry is expired so this second lookup cannot start stale-success background refresh; the pipe writer never touches event"
   },
   {
     "file": "backend/r235_test.go",
     "line": 297,
     "target": "summary",
-    "source_sha256": "f292b57193c906711544097bf825275b1092a61d55b23ecb08691d822ac02626",
+    "source_sha256": "bfae4491ff2bdd3013f0cd749309a7fd411efbe007364b9b2a1c081e1a028a5e",
     "comment": "r276-capture-safe: TestR235RelayTTFBWindowAndPathCategories: the test directly calls state.flushSummary; it constructs entries under its state lock then invokes the supplied observer in a synchronous loop before returning to the summary assertion"
   },
   {

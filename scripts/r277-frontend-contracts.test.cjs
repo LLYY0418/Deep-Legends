@@ -112,5 +112,5 @@ test('P9 score breakdown is lazy, single-flight and cached after hover/focus',as
 });
 test('P4 pending champion statistics never flash zero or overall summary',()=>{
  const api=compile(game,['renderChampionStats'],{escapeHTML,number:String,percent:n=>n+'%',kda:n=>Number(n).toFixed(2),overviewDetailArrow:()=>'',iconFigure:()=>''});
- const html=api.renderChampionStats([],{games:0,kda:0},{collecting:true,complete:false,scanned:0},true);assert(html.includes('career-pending gameplay-skeleton'));assert(!/已统计 0 场|0\.00:1|全部英雄/.test(require('../backend/web/r188-harness.cjs').visibleCareerText(html)));
+ const html=api.renderChampionStats([],{games:0,kda:0},{collecting:true,complete:false,scanned:0},true);assert(html.includes('champion-pending-rows'));assert.equal((html.match(/class="champion-stat-row champion-skeleton-row"/g)||[]).length,5);assert(!/已统计 0 场|0\.00:1|全部英雄/.test(require('../backend/web/r188-harness.cjs').visibleCareerText(html)));
 });

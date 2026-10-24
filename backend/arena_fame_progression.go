@@ -66,6 +66,17 @@ func (a *app) startArenaProgressionDiscovery(client *LCUClient, phase string, ga
 	s := client.arenaDiscoveryState()
 	s.mu.Lock()
 	if s.progression != nil {
+		p := s.progression
+		if p.gameID == 0 && len(gameIDs) > 0 && gameIDs[0] > 0 {
+			p.gameID = gameIDs[0]
+			// The first read persists this ID if it is still running. Once
+			// published, update the existing snapshot without another GET.
+			select {
+			case <-p.done:
+				a.persistArenaProgression(p)
+			default:
+			}
+		}
 		s.mu.Unlock()
 		return
 	}

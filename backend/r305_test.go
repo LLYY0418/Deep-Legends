@@ -104,13 +104,28 @@ func TestR305ProgressionRestartExpiryAndConditionalDelete(t *testing.T) {
 	if restored == nil || restored.before.Values["fame"] != 10 {
 		t.Fatal("restart lost before")
 	}
+	restored.gameID = 0
+	c.arenaDiscoveryState().progression = restored
+	restarted.startArenaProgressionDiscovery(c, "GameStart", 305)
+	if disk := restarted.restoreArenaProgression(c); disk == nil || disk.gameID != 305 {
+		t.Fatal("game start did not persist resolved game ID")
+	}
 	s := c.arenaDiscoveryState()
+	var scheduleMu sync.Mutex
 	var delay time.Duration
 	called := false
-	s.schedule = func(d time.Duration, fn func()) func() { delay = d; called = true; return func() {} }
+	s.schedule = func(d time.Duration, fn func()) func() {
+		scheduleMu.Lock()
+		defer scheduleMu.Unlock()
+		delay, called = d, true
+		return func() {}
+	}
 	restarted.observeArenaProgressionPhase(c, "Lobby")
-	if !called || delay != 0 {
-		t.Fatal("overdue lobby not immediate", delay)
+	scheduleMu.Lock()
+	firstCalled, firstDelay := called, delay
+	scheduleMu.Unlock()
+	if !firstCalled || firstDelay != 0 {
+		t.Fatal("overdue lobby not immediate", firstDelay)
 	}
 	newer := *p
 	newer.gameID = 306
@@ -129,9 +144,13 @@ func TestR305ProgressionRestartExpiryAndConditionalDelete(t *testing.T) {
 		t.Fatal("expired file remains")
 	}
 	none := &LCUClient{}
+	scheduleMu.Lock()
 	called = false
+	scheduleMu.Unlock()
 	none.arenaDiscoveryState().schedule = s.schedule
 	a.observeArenaProgressionPhase(none, "Lobby")
+	scheduleMu.Lock()
+	defer scheduleMu.Unlock()
 	if called {
 		t.Fatal("no snapshot scheduled")
 	}
