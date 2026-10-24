@@ -170,9 +170,6 @@
 .ptag-name-line .participant-name { min-width:0; }
 .ptag-detail { flex:none; }
 .ptag-detail .ptag-btn { width:22px; height:22px; padding:0; border:0; background:transparent; }
-.ptag-detail.is-neg .ptag-btn.is-tagged { color:var(--danger); }
-.ptag-detail.is-pos .ptag-btn.is-tagged { color:var(--success); }
-.ptag-detail.is-mine .ptag-btn.is-tagged { color:var(--primary-strong); }
 .ptag-detail-tags { display:block; min-width:0; margin-top:4px; }
 .participant-subline { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
 .participant-subline .ptag-detail-tags { display:inline-flex; margin-top:0; }

@@ -1149,8 +1149,8 @@
     const heroTier = mayhemHeroTier(row, detail);
     const localNote = heroTier?.locallyCalculated ? '<small class="mayhem-tier-local">本地估算</small>' : "";
     const sample=Number(detail?.stats?.games)||Number(row.play)||0;
-    const rate=Number(detail?.stats?.winRate)||Number(row.winRate)||0;
-    const metricCards=[...(rate>0||sample>0?[metric("胜率",percent(rate))]:[]),...(sample>0?[metric("样本",compactNumber(sample))]:[]),...(heroTier&&(rate>0||sample>0)?[metric("梯度",gradeBadge(heroTier.grade,"is-metric"))]:[])];
+    const rate=detail?.stats?.winRate??row.winRate,hasRate=rate!==undefined&&rate!==null&&Number.isFinite(Number(rate));
+    const metricCards=[...(hasRate?[metric("胜率",percent(rate))]:[]),...(sample>0?[metric("样本",compactNumber(sample))]:[]),...(heroTier&&(hasRate||sample>0)?[metric("梯度",gradeBadge(heroTier.grade,"is-metric"))]:[])];
     const overview = `<section class="mayhem-overview-strip">
       <img class="mayhem-overview-art" data-queued-src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
       <span class="mayhem-overview-shade" aria-hidden="true"></span>
