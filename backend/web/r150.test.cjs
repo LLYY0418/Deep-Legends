@@ -110,7 +110,7 @@ function checkCard(source = script) {
 test("R150 local augment score stays hidden; official item score and hexagon remain", () => {
   checkCard();
   assert.match(script, /按档位与样本展示前九项/);
-  assert.doesNotMatch(functionSource(script, "mayhemAugmentConfidenceMetrics"), /官方档位/);
+  assert.doesNotMatch(functionSource(script, "renderMayhemRecommendedAugment"), /官方档位/);
   assert.match(championCSS, /\.arena-augment-section \.arena-option-card\[data-metric-count="4"\] dl \{ grid-template-columns: repeat\(2,minmax\(0,1fr\)\)/);
   const scoreMutation = script.replace("...(Number(row.score) > 0 ?", "...(true ?");
   assert.notEqual(scoreMutation, script);

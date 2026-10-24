@@ -443,7 +443,7 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 			t.Fatalf("specialist external-read statement is missing %q: %s", expected, externalReads)
 		}
 	}
-	for _, expected := range []string{"ARAMKit", "国服玩家总览", "昵称与 Tag", "第三方估算分", "6 小时", "未收录缓存 1 小时", "韩服不发送"} {
+	for _, expected := range []string{"ARAMKit", "国服玩家总览", "昵称与 Tag", "第三方估算分", "24 小时", "失败缓存 2 分钟", "韩服不发送"} {
 		if !strings.Contains(externalReads, expected) {
 			t.Fatalf("ARAMKit external-read statement is missing %q: %s", expected, externalReads)
 		}
@@ -474,7 +474,7 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 // 必须出现的关键词。声明写的是存了什么内容而不是目录名，所以这里用内容关键词对齐，
 // 一个目录的全部关键词都命中才算被声明覆盖。
 var privacyStoreDirectoryCoverage = map[string][]string{
-	"mayhem-ratings": {"mayhem-ratings", "6 小时", "1 小时", "4 MiB"},
+	"mayhem-ratings": {"mayhem-ratings", "24 小时", "2 分钟", "4 MiB"},
 	"client-catalog": {"client-catalog", "装备", "符文", "召唤师技能", "不含账号标识"},
 	// storage.go openLocalStore 启动期创建
 	"updates":          {"自动更新", "安装包"},
@@ -664,6 +664,7 @@ func TestPrivacyStoresDeclareEveryLocalDirectory(t *testing.T) {
 // 任何新写法都会先在这里红，逼作者归类：要么进覆盖表并补 stores 声明，要么写豁免
 // 理由，不允许悄悄多出一个没人审过的落盘点。
 var privacyMkdirCallPins = map[string]int{
+	"aramkit.go":                     1, // 不可变公开文件仅在既有champion-data缓存子目录内落盘，不含身份。
 	"license_device.go":              1, // 当前用户 DPAPI 设备凭据、计数器和签名租约；stores 明确声明。
 	"update_data_migration.go":       2, // 既有本地数据的升级暂存与目标复制；stores 明确声明，不新增采集。
 	"champion_images.go":             1, // newPublicBinaryCache：所有公开二进制/数据缓存目录的唯一创建点

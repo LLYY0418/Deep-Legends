@@ -61,11 +61,11 @@ test("2024 real mode buttons isolate champion and search memories across all mod
   } finally { w.close(); }
 });
 
-test("2024 legacy memory migrates only to its saved mode, once", () => {
+test("2024 legacy detail keys clear once without restoring a hero", () => {
   const dom = workspace({"lol-loot-champion-mode":"aram-mayhem", "lol-loot-champion-detail-id":"81", "lol-loot-champion-query":"伊泽"});
   try {
     const w = dom.window;
-    assert.equal(w.testWorkspace.state.detailChampionID,81);
+    assert.equal(w.testWorkspace.state.detailChampionID,0);
     assert.equal(w.localStorage.getItem("lol-loot-champion-detail-id-ranked"),null);
     assert.equal(w.localStorage.getItem("lol-loot-champion-detail-id-arena"),null);
     assert.equal(w.localStorage.getItem("lol-loot-champion-mode-preferences-v2"),"1");
@@ -127,8 +127,8 @@ test("2024 rarity UI says selection distribution, retains all stages, hides fail
     assert.doesNotMatch(render(),/不代表抽取、刷新或保底概率/);
     state.mayhemRarityData = {stages:[1,2,3,4].map(stage=>({stage,silver:10,gold:60,prismatic:30,games:1000}))};
     const html = render();
-    assert.equal((html.match(/次选择/g)||[]).length,4);
-    assert.doesNotMatch(html,/海克斯品质概率|查看四阶段/);
+    assert.equal((html.match(/第 [1-4] 阶段/g)||[]).length,4);
+    assert.match(html,/<details/);assert.doesNotMatch(html,/查看四阶段/);
     state.mayhemRarityData=null; state.mayhemRarityError="invalid source";
     assert.equal(render(),"");
   } finally { dom.window.close(); }

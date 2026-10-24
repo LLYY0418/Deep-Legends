@@ -855,9 +855,9 @@
   },
   {
     "file": "backend/quality_test.go",
-    "line": 748,
+    "line": 749,
     "target": "events",
-    "source_sha256": "e5d3de71d1fa0564676a0732ed93252aa84b8c676d2d75c249723a756fa77e23",
+    "source_sha256": "e6c847431f10e7ee137d42087e19d22cd9f7f42b07150f50e4eccddd8715a6d3",
     "comment": "r276-capture-safe: TestLootFallbackDiagnosticRuntimePayloadNeverStoresItemDetails: enrichLootItemsWithMetadata directly invokes observe in its synchronous item loop on the caller; this call returns before events is inspected or marshaled"
   },
   {
@@ -2047,14 +2047,14 @@
     "file": "backend/r269_test.go",
     "line": 188,
     "target": "waits",
-    "source_sha256": "c1cde433bc955a072e0161f5c76db5039d0594bc0c7f00742e536ffa05c06ffb",
+    "source_sha256": "323658664e08cf951a53b44dc25a86c65168d3bf37739ac5bcbd9a591fa01e96",
     "comment": "r276-capture-safe: TestR269SGPBackoffAndEarlyProbe: the audited fixture operations in this test invoke this callback serially and return before waits is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r269_test.go",
     "line": 192,
     "target": "calls",
-    "source_sha256": "c1cde433bc955a072e0161f5c76db5039d0594bc0c7f00742e536ffa05c06ffb",
+    "source_sha256": "323658664e08cf951a53b44dc25a86c65168d3bf37739ac5bcbd9a591fa01e96",
     "comment": "r276-capture-safe: TestR269SGPBackoffAndEarlyProbe: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

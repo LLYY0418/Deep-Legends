@@ -6511,7 +6511,6 @@
     state.runeSourceTab = "opgg";
   }
 
-  // R116-D P1-2/P1-3/P1-5：把客户端已经给出的阵容英雄 ID 交给后端做交集。
   const R116D_MATCHUP_PHASES = ["inprogress", "reconnect"];
   const R116D_ROSTER_SIDE_LIMIT = 5;
 
@@ -6523,8 +6522,6 @@
     const phase = String(data?.phase || "").trim();
     const self = players.find((player) => player.isCurrent);
     const selfTeam = Number(self?.teamId) > 0 ? Number(self.teamId) : 100;
-    // 未锁定时用 pick intent：ChampSelect 阶段大部分时间 championId 还是 0，
-    // 只认锁定值会让协同提示在选人阶段几乎永远不出现。
     const idsOf = (rows) => [...new Set(rows.map((player) => liveRecommendationChampionId(player)).filter((id) => Number(id) > 0))].sort((left, right) => left - right);
     const allyIds = idsOf(players.filter((player) => Number(player.teamId) === selfTeam));
     const matchupAllowed = R116D_MATCHUP_PHASES.includes(phase.toLowerCase());
@@ -6566,8 +6563,6 @@
       state.liveRecommendationScopeGameId = gameId;
     }
     let spellKey = [Number(self?.spell1Id) || 0, Number(self?.spell2Id) || 0].filter((value) => value > 0).sort((left, right) => left - right).join("-") || "none";
-    // R207: special modes retain the last champion-select spell pair for this
-    // game. Live-client names and gameflow omissions must not replace that pair.
     if (augmentSource || gameMode === "ARAM" || mapId === 12) {
       const spells = state.liveRecommendationSpells ||= new Map();
       const scopeKey = baseKey;
@@ -6603,8 +6598,6 @@
     if (!target) return null;
     const exact = state.liveRecommendations.get(target.key);
     if (exact) return exact;
-    // Metadata belongs to a successful response, not the render-time snapshot.
-    // Never borrow from another game, champion, mode, map, or tier.
     let latest = null;
     let latestAt = -1;
     for (const [key, scope] of state.liveRecommendationScopes || []) {
@@ -6681,12 +6674,9 @@
     const target = liveRecommendationTarget(data);
     if (!target) { recordLiveRecommendationSkip("no-target", null, data); return; }
     const targetKey = target.key;
-    // R116-D：阵容（我方 5 人 + 视阶段而定的敌方 5 人）。拿不到阵容就不传 roster
     const roster = liveRecommendationRoster(data);
     const rosterSignature = String(roster?.signature || "");
     if (data?.recommendations) { if (hasUsableLiveRecommendations(data.recommendations)) noteChampSelectReady("build_ready", liveRecommendationTarget(state.live)?.key === targetKey); recordLiveRecommendationSkip("has-payload", target, data); return; }
-    // 缓存命中还要再比一次阵容签名：选人阶段英雄是逐个锁定的，阵容变了而
-    // key 没变（key 的格式被既有测试钉死、不含阵容），提示就会停在旧阵容上。
     if (state.liveRecommendations.has(targetKey) && (!rosterSignature || state.liveRecommendationRosters?.get?.(targetKey) === rosterSignature)) { noteChampSelectReady("build_ready", liveRecommendationTarget(state.live)?.key === targetKey); recordLiveRecommendationSkip("cached", target, data); return; }
     if (liveRecommendationFlightActive(targetKey)) { recordLiveRecommendationSkip("in-flight", target, data); return; }
     const failedAt = Number(state.liveRecommendationFailures.get(targetKey) || 0);
@@ -6695,7 +6685,6 @@
     const traceId = newLiveRecommendationTraceId();
     state.liveRecommendationTraces.set(targetKey, traceId);
     state.liveRecommendationFlights.set(targetKey, Date.now());
-    // 立刻重绘一次，好让各个页签在等待期间显示加载遮罩，而不是先闪一屏空状态。
     if (liveRecommendationTarget(state.live)?.key === targetKey) renderLive("recommendation");
 		const query = new URLSearchParams({
 		  championId: String(target.championId), position: target.position,
@@ -6703,13 +6692,11 @@
       traceId, recommendationKey: targetKey,
 		});
 		if (target.gameId > 0) query.set("gameId", String(target.gameId));
-    // R207: only champion select refines special-mode builds with spell IDs.
     if (!(target.augmentSource || target.gameMode === "ARAM" || target.mapId === 12) || data?.phase === "ChampSelect") {
       if (Number(target.self?.spell1Id) > 0) query.set("spell1Id", String(target.self.spell1Id));
       if (Number(target.self?.spell2Id) > 0) query.set("spell2Id", String(target.self.spell2Id));
     }
 	if (target.augmentSource === "hextech") query.set("source", "mayhem");
-	// R116-D P1-2/P1-3/P1-5：只把阵容的英雄 ID 交给后端做交集。
 	if (roster?.phase) query.set("phase", roster.phase);
 	if (roster?.allyIds?.length) query.set("allyChampionIds", roster.allyIds.join(","));
 	if (roster?.enemyIds?.length) query.set("enemyChampionIds", roster.enemyIds.join(","));
@@ -6725,7 +6712,6 @@
         gameId: target.scopeGameId || target.gameId, championId: target.championId,
         gameMode: target.gameMode, mapId: target.mapId, tier: target.tier, at: Date.now(),
       });
-      // R116-D: track roster provenance separately from stable recommendation keys.
       if (rosterSignature) state.liveRecommendationRosters?.set?.(targetKey, rosterSignature);
       noteChampSelectReady("build_ready", liveRecommendationTarget(state.live)?.key === targetKey);
       state.liveRecommendationFailures.delete(targetKey);
@@ -6737,7 +6723,6 @@
       ensurePerks();
       ensureItems();
       ensureSummonerSpells();
-	  // The first specialist check races this async recommendation request. Once
 	  ensureSpecialistRunes(state.live);
       if (liveRecommendationTarget(state.live)?.key === targetKey) {
         renderLive("recommendation");
@@ -6843,7 +6828,6 @@
           renderLive("rune");
           clearTimeout(state.proRuneTimer);
           const entry = state.proRunes.get(target.key);
-          // SSE is primary; bounded polling recovers a missed/reconnected event.
           state.proRuneTimer = setTimeout(() => { if (state.section === "live") void ensureProRunes(state.live); }, entry?.preparing || entry?.outcomesLoading ? 3200 : 300000);
         }
       }
@@ -6937,7 +6921,6 @@
     if (!target) return;
     const runes = source === "pro" ? proRunesFor(data) : specialistRunesFor(data);
     if (!Array.isArray(runes)) return;
-    // Only records rendered for the active player need the second-stage request.
     const visible = new Set([...nodes.liveContent.querySelectorAll(".specialist-game-row[data-rune-choice]")].map(row => row.dataset.runeChoice));
     const rows = runes.filter(row => visible.has(String(row.key)) && row.starterItemIds === undefined)
       .slice(0, source === "pro" ? 5 : 3).map(row => ({ key: String(row.key), playedAt: Number(row.playedAt) }));
@@ -6968,7 +6951,6 @@
         retryAfter = Math.min(45, Math.max(5, Number(response.retryAfterSeconds)));
       }
     } catch (_) {
-      // Opening items are optional; network failures keep the existing cooldown.
     } finally {
       if (state.runeStarterRequests.get(requestKey) === entry) {
         entry.pending = false;
@@ -7101,8 +7083,6 @@
     return `<div data-live-notice="squad">${data?.arenaMySquadNotice ? `<p class="arena-my-squad-notice">${escapeHTML(data.arenaMySquadNotice)}</p>` : ""}</div>${renderRecommendationArea(data)}`;
   }
 
-  // R129 P1：参与 markup 比较与增量替换的 HTML 只能由快照数据和用户选择决定，
-  // 不能包含 state.liveLoading；瞬时加载状态只更新工具栏的 data-live-status。
   function renderLive(source = "direct") {
     if (state.destroyed || (state.section && state.section !== "live")) return;
     state.liveRenderSource = state.liveRenderTrigger || liveRenderTriggerLabel(source);
@@ -7110,7 +7090,6 @@
     const toolbar = nodes.liveRefresh?.closest(".live-toolbar");
     const status = toolbar?.querySelector?.("[data-live-status]");
     if (!connected()) {
-      // 未连接时收起工具栏（刷新按钮无意义），只保留居中的提示卡。
       if (toolbar) toolbar.hidden = true;
       if (status) status.innerHTML = "";
       renderSessionSummary(null);
@@ -7157,18 +7136,15 @@
       return;
     }
     const markup = liveRecommendationMarkup(data);
-    // Refresh feedback changes independently of the roster and recommendation DOM.
     if (nodes.liveContent._recommendationMarkup === markup && nodes.liveContent.querySelector("[data-live-body]")) {
       return;
     }
-    // R129 P2: patch panels first; preserve visible icons unless the shell changes.
     if (updateLivePanels(markup)) {
       nodes.liveContent._recommendationMarkup = markup;
       return;
     }
     const fullHolder = document.createElement("div");
     fullHolder.innerHTML = markup;
-    // Keep row signatures independent of attributes added by the image queue.
     stampLiveRows(fullHolder);
     const previousBody = nodes.liveContent.querySelector("[data-live-body]");
     const fullReasons = [];
@@ -7179,7 +7155,6 @@
     const laneShell = root => [...(root?.querySelectorAll("[data-lane-matchup-slot]") || [])].map(node => { const shell = node.cloneNode(false); return shell.outerHTML; }).join("");
     if (laneShell(previousBody) !== laneShell(fullHolder)) fullReasons.push("lane-slot");
     if (!fullReasons.length) fullReasons.push("other");
-    // Compare structural labels only. Never export text, player names or DOM attributes.
     const shellLabels = root => {
       if (!root) return [];
       const shell = root.cloneNode(true);
@@ -7204,8 +7179,6 @@
     prepareImages(nodes.liveContent);
   }
 
-  // R129 P2 的增量替换：chrome＝把每个面板内容清空后剩下的外壳（提示条、页签行、
-  // 面板自身的属性与顺序）。chrome 一致才允许只换面板内容，否则交回整块重建。
   function liveBodyChrome(body) {
     const clone = body.cloneNode(true);
     for (const panel of clone.querySelectorAll(".recommendation-panel")) panel.remove();
@@ -7260,7 +7233,6 @@
       seen.add(key);
       const old = oldRows.get(key);
       if (old && (old._liveMarkup || old.outerHTML) === row.outerHTML) {
-        // Existing keys move to their new position; stable order preserves nodes too.
         row.replaceWith(old);
       } else {
         row._liveMarkup = row.outerHTML;
@@ -7303,7 +7275,6 @@
       if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
       recordLiveRenderRebuild(["tabs"]); replaced = true; tabsChanged = true;
     }
-    // Loading/selection attributes and panel membership change without remounting siblings.
     const area = body.querySelector(".recommendation-area");
     for (const panel of [...body.querySelectorAll(".recommendation-panel")]) if (!holder.querySelector(`#${panel.id}`)) panel.remove();
     for (const panel of holder.querySelectorAll(".recommendation-panel")) {
@@ -7328,7 +7299,6 @@
       current._livePanelMarkup = next.innerHTML;
       let stats = { imagesRecreated: 0, rowsReplaced: 0 };
       if (key === "insight" && patchLiveRosterPanel(current, next, stats)) {
-        // The roster rows were patched or moved intact.
       } else {
         stampLiveRows(next);
         const oldRows = new Map([...current.querySelectorAll(".specialist-game-row[data-rune-choice]")].map(row => [row.dataset.runeChoice, row]));
@@ -7439,8 +7409,9 @@
     if(!hextechMode || Number(championId)<=0 || player.championPickPending || Number(player.championPickIntent)<0 || phase==="ChampSelect" && player.championLocked!==true)return "";
     const row=mayhemHeroRankings?.get(Number(championId));if(!row || !/^[SABCD]$/.test(row.grade) || Number(row.play)<=0)return "";
     const win=Number(row.winRate).toFixed(1)+"%",pick=Number(row.pickRate).toFixed(1)+"%";
+    const tone=({S:"is-s",A:"is-a",B:"is-b",C:"is-c",D:"is-d"})[row.grade];
     const tip=`海克斯大乱斗胜率 ${win} · 选取率 ${pick} · 场次 ${number(row.play)}`;
-    return `<span class="live-mayhem-badge is-${row.grade.toLowerCase()}" data-tooltip="${escapeHTML(tip)}" aria-label="${escapeHTML(tip)}"><b>${row.grade}</b><span>${win}</span></span>`;
+    return `<span class="live-mayhem-badge ${tone}" data-tooltip="${escapeHTML(tip)}" aria-label="${escapeHTML(tip)}"><b>${row.grade}</b><span>${win}</span></span>`;
   }
 
   function renderLivePlayer(player, index, arenaMode = false, currentChampionId = 0, premadePlayers = [], recentPositions = "", aramMode = false, hextechMode = false, phase = "", displayPosition = "", identityKind = "") {
@@ -7493,7 +7464,6 @@
     });
   }
 
-  // 统一的居中空状态卡（符文 / 详情 / 出装三个页签共用同一样式与位置）。
   function recommendationEmptyPanel(title, copy) {
     return `<div class="recommendation-empty is-panel"><span aria-hidden="true">⬡</span><strong>${escapeHTML(title)}</strong><p>${escapeHTML(copy)}</p></div>`;
   }
@@ -7541,8 +7511,6 @@
     return notices.length ? `<div class="recommendation-data-notices">${notices.map((copy) => `<p role="note">${escapeHTML(copy)}</p>`).join("")}</div>` : "";
   }
 
-  // 某个推荐页签是否处于「数据还在路上」的状态。没有选定英雄或数据已到齐时
-  // 一律返回 false——遮罩只用于真正的等待期，不能盖住空状态和已有内容。
   function recommendationPanelBusy(key, target, payload) {
     if (!target) return false;
     const pending = liveRecommendationFlightActive(target.key);
@@ -7553,7 +7521,6 @@
   }
 
   function laneMatchupEnemies(data, self) {
-    // teamId distinguishes other allies even when isAlly only marks self.
     return (data?.players || []).filter(player => !player.isAlly && !player.isCurrent
       && Number(self?.teamId) > 0 && Number(player.teamId) > 0 && Number(player.teamId) !== Number(self.teamId)
       && player.championLocked === true && Number(player.championId) > 0);
@@ -7567,7 +7534,6 @@
     const candidates = [];
     for (const enemy of unknown) {
       const lanes = state.laneMatchupLanes?.get(`${Number(enemy.championId)}:${tier}`);
-      // Missing competitor shares cannot be treated as zero evidence.
       if (lanes?.status === "failed" || lanes?.status === "succeeded" && !lanes.rows?.length) return { reason: "lanes-failed" };
       if (lanes?.status !== "succeeded") return { reason: "lanes-pending" };
       const rate = Number(lanes.rows.find(row => livePositionValue(row.position) === position)?.rate || 0);
@@ -7735,7 +7701,6 @@
     try {
       const detail = await api(`/api/champions/detail?${query}`, {}, `lane-matchup:${key}`, 20000);
       if (generation !== Number(state.liveGameGeneration || 0) || state.live?.phase !== "ChampSelect" || state.laneMatchupCandidates.get(key) !== entry) return;
-      // These losing matchups use the enemy perspective; candidate win rate is inverted.
       entry.rows = (detail?.counters?.weakAgainst || []).filter(row => Number(row.championId) > 0
         && Number.isFinite(Number(row.winRate)) && Number(row.winRate) > 0 && Number(row.winRate) < 50).slice(0, 5);
       entry.status = "succeeded";
@@ -7973,7 +7938,6 @@
     return `<section class="live-aramkit-combos"><h4>推荐组合</h4>${rows.map(row=>`<div>${row.assets.map((asset,index)=>`${index?'<b>＋</b>':""}${renderLiveAugmentIcon({assets:[asset]},source)}<strong>${escapeHTML(asset.name)}</strong>`).join("")}<span class="win-rate-value">${percent(row.winRate)}</span><small>${number(row.games)} 场</small></div>`).join("")}</section>`;
   }
 
-  // “详情”页签：双方队伍与每名玩家的最近战绩（英雄、KDA、评分），从新到旧。
   function insightScore(game) {
     const value = (Number(game.kills) + Number(game.assists)) / Math.max(1, Number(game.deaths));
     const tone = value >= 4 ? "is-gold" : value >= 3 ? "is-good" : value < 1.5 ? "is-poor" : "";
@@ -7982,7 +7946,6 @@
 
   function renderInsightMatches(player) {
 	if (player.hidden === true) return '<div class="insight-match-row is-hidden-player" aria-hidden="true"></div>';
-	// R129 P1：与 renderLivePlayer 共用同一个判据，两处词表不会再各写一份。
 	if (!liveHistorySettled(player)) return '<div class="insight-match-row is-history-pending" aria-label="战绩读取中"><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span><span class="live-history-skeleton"></span></div>';
     const games = (player.recentGames || []).slice(0, 10);
 	if (!games.length) {
@@ -8035,14 +7998,12 @@
     const positions = { top: 1, jungle: 2, middle: 3, bottom: 4, utility: 5, other: 6 };
     for (const teamID of [100, 200]) {
       const rows = teams.get(teamID) || [];
-      // 同队可能出现重复或未知位置；只按已知位置排序，同位置保留原顺序。
       teams.set(teamID, [...rows].sort((left, right) =>
         (positions[String(left.position || "").toLowerCase()] || 6) - (positions[String(right.position || "").toLowerCase()] || 6)));
     }
     return { teams, aligned: true, reason: "" };
   }
 
-  // ---------------------------------------------------------------------
   function liveRosterChampionName(players, championID) {
     const wanted = Number(championID) || 0;
     if (wanted <= 0) return "";
@@ -8050,7 +8011,6 @@
     return String(match?.championName || "").trim();
   }
 
-  // Convert upstream deltas to percentage points; direction determines the sign.
   function liveDeltaPoints(value) {
     return (Math.abs(Number(value) || 0) * 100).toFixed(1);
   }
@@ -8064,13 +8024,11 @@
 
   function liveEvidenceSuffix(notice) {
     const evidence = String(notice?.evidence || "").trim();
-    // Keep evidence and confidence bounds so non-significant deltas can degrade.
     if (!evidence) return "上游未标注证据等级";
     if (evidence !== "supported") return `上游证据等级：${evidence}（未达显著性）`;
     return "";
   }
 
-  // modifier 传的是完整类名字面量（"is-weak" / "is-strong" / "is-synergy" /
   function liveNoticeBar(modifier, text, tooltip) {
     return `<span class="roster-notice ${modifier}"${tooltip ? ` data-tooltip="${escapeHTML(tooltip)}" tabindex="0"` : ""}>${text}</span>`;
   }
@@ -8114,11 +8072,9 @@
     if (!labels.length) return "";
     const resolved = Number(payload?.teamPortrait?.resolvedHeroes) || 0;
     const tooltip = resolved > 0 ? `本队 ${resolved} 位英雄进入统计` : "";
-    // 缺口类型放在 data-portrait-gap 属性上而不是 is-<key> 类名上：
     return `<span class="team-portrait-tags"${tooltip ? ` data-tooltip="${escapeHTML(tooltip)}" tabindex="0"` : ""}>${labels.map((label) => `<b class="team-portrait-tag" data-portrait-gap="${escapeHTML(String(label.key || ""))}">${escapeHTML(String(label.label))}</b>`).join("")}</span>`;
   }
 
-  // R116-D: payload is optional for legacy focused render callers.
   function renderLiveInsights(data, payload) {
     if(liveAugmentRecommendationSource(data)==="hextech")ensureMayhemHeroRankings(data);
     const seenPlayerKeys = new Set();
@@ -8193,8 +8149,6 @@
 	  return { ...item, displayRoleRate: explicitRate || (totalPositionPlay > 0 ? play / totalPositionPlay * 100 : 0) };
 	}).sort((left, right) => right.displayRoleRate - left.displayRoleRate || (Number(right.play) || 0) - (Number(left.play) || 0));
     const resolvedPosition = livePositionValue(target?.positionOverride || payload.resolvedPosition || target?.position || self?.position);
-    // 对抗数据来自 OP.GG 的对线样本。冷门英雄/冷门位置（例如下路雷克顿）上游本来就
-    // 没有样本，此时给出明确说明，而不是一个让人以为是 bug 的“—”。
     const positionCopy = positionLabel(livePositionDisplay(resolvedPosition));
     const emptyMatchups = `<span class="muted matchups-empty" data-tooltip="${escapeHTML(`OP.GG 没有「${self?.championName || "该英雄"} · ${positionCopy}」的对线样本，通常是这个位置太冷门。换到常用位置就会有数据。`)}" data-tooltip-size="compact">该位置暂无对线样本</span>`;
     const matchups = (items, tone) => {
@@ -8215,8 +8169,6 @@
       ? `OP.GG 暂无常用位置，已使用${positionLabel(livePositionDisplay(resolvedPosition))}`
       : "";
 	const positionSwitch = orderedPositions.length >= 1 ? `<div class="live-position-switch" role="group" aria-label="当前英雄推荐分路">${orderedPositions.map((item) => { const value = livePositionValue(item.position); const active = value === resolvedPosition; const display = livePositionDisplay(value); return `<button type="button" class="live-position-chip${active ? " is-active" : ""}" aria-pressed="${active}" data-live-position="${escapeHTML(value)}"${automatic && active ? ` data-tooltip="${escapeHTML(sourceCopy)}" data-tooltip-size="compact"` : ""}>${positionIcon(display)}<span>${escapeHTML(positionLabel(display))}</span>${item.displayRoleRate > 0 ? `<b class="live-position-rate">${rate(item.displayRoleRate)}</b>` : ""}</button>`; }).join("")}</div>` : "";
-	// Requested lanes remain authoritative. Below 10%, disclose the niche sample
-	// instead of silently making this view look equivalent to a primary lane.
 	const resolvedPositionRate = orderedPositions.find((item) => livePositionValue(item.position) === resolvedPosition)?.displayRoleRate || 0;
 	const positionContext = payload.positionSource === "requested" && resolvedPositionRate > 0 && resolvedPositionRate < 10
 	  ? `<p class="live-position-context" role="note">当前展示的是${escapeHTML(positionCopy)}数据（该英雄此分路占比 ${rate(resolvedPositionRate)}）</p>`
@@ -8293,7 +8245,6 @@
       const totalGames = Math.max(0, Number(status.totalGames) || 0);
       const failedGames = Math.min(totalGames, Math.max(0, Number(status.failedGames) || 0));
       const failureRate = totalGames ? failedGames / totalGames : 0;
-      // More than 10% is degraded coverage, not proof the entire source is offline.
       const degraded = failureRate > 0.1;
       const stale = status.stale || (status.readAt && Date.now() - Date.parse(status.readAt) > 300000);
       const note = section.items.length && !stale && status.outcomesLoading ? "正在核对近 30 天战绩，未确认胜负不计入统计。" : "";
@@ -8488,8 +8439,6 @@
     };
     const fragments = state.perks.statModSlots || [];
     const fragmentSelections = (config.statModIds || config.stat_mod_ids || (config.selectedComplete === false ? [] : selectedIDs.length >= 9 ? selectedIDs.slice(-3) : [])).map(Number);
-    // Only show unresolved shard types below the board; source-constrained
-    // known slots are already highlighted in their actual rows.
     const knownShards = config.selectedComplete === false ? [...new Map(fragments.flatMap(slot => slot.perks || []).filter(perk => selected.has(Number(perk.id)) && !fragmentSelections.includes(Number(perk.id))).map(perk => [Number(perk.id), perk])).values()] : [];
     const incomplete = knownShards.length ? `<div class="pro-known-shards" aria-label="已取得的属性碎片，槽位未确认"><span>已取得的碎片（槽位未确认）</span>${knownShards.map(perk => renderRuneOption(perk, true)).join("")}</div>` : "";
     return `<div class="unified-rune-board">${renderStyle(config.primaryStyleId, false)}${renderStyle(config.subStyleId, true)}<section class="unified-rune-column rune-shards" aria-label="属性碎片">${corner}<header aria-hidden="true"></header><div class="unified-rune-row is-spacer" aria-hidden="true"></div>${fragments.map((slot, rowIndex) => `<div class="unified-rune-row">${(slot.perks || []).map((perk) => renderRuneOption(perk, fragmentSelections[rowIndex] === Number(perk.id))).join("")}</div>`).join("")}</section></div>${incomplete}`;

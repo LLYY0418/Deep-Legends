@@ -601,7 +601,14 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 		return c.fetchEndpoint(ctx, c.baseURL, gameName, tagLine)
 	}
 	results := make(chan aramkitRatingOutcome, 2)
-	launch := func(endpoint string) { go func() { results <- c.fetchEndpoint(ctx, endpoint, gameName, tagLine) }() }
+	launch := func(endpoint string) {
+		go func() {
+			outcome := aramkitRatingOutcome{reason: "network_error", result: "unavailable", response: unavailableMayhemRating("暂不可用", dataSourceFailed)}
+			defer func() { results <- outcome }()
+			defer recoverPanic("aramkit.rating.endpoint")
+			outcome = c.fetchEndpoint(ctx, endpoint, gameName, tagLine)
+		}()
+	}
 	launch(c.baseURL)
 	delay := c.hedgeDelay
 	if delay <= 0 {

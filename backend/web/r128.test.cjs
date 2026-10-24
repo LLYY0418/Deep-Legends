@@ -112,7 +112,7 @@ test("R128 §2.3-B 方法论与免责说明逐条消失", () => {
   assert.doesNotMatch(championsStyles, /\.mayhem-performance-group dd small/);
   // 该英雄专属品质概率副标题缩成一句事实描述；全服分布面板副标题删除。
   assert.doesNotMatch(championsScript, /全服整体分布见「海克斯图鉴/);
-  assert.match(championsScript, /<p>各阶段白银 \/ 黄金 \/ 棱彩选取概率<\/p>/);
+  assert.doesNotMatch(championsScript, /function renderMayhemHeroRarityPanel/);
   assert.doesNotMatch(championsScript, /玩家实际选择的样本分布，不代表抽取、刷新或保底概率/);
   // 我的海斗出装计数上的口径 tooltip 删除，只留「本人 N 场」。
   assert.doesNotMatch(championsScript, /本机保存的本赛季海克斯大乱斗对局|不是全服数据，也不含其他账号/);
@@ -126,17 +126,7 @@ test("R128 §2.3-B 方法论与免责说明逐条消失", () => {
   assert.match(gameplayScript, /const positionRow = isMayhem\s*\?\s*""/);
 });
 
-test("R128 §2.2 表现 tab 底部只保留用户指定的那一句累计说明", () => {
-  const panel = sliceBetween(championsScript, "function renderMayhemPerformancePanel(", "function mayhemPerformanceGroups(");
-  const copy = "双杀/三杀/四杀/五杀为累计次数，受出场场次影响，不可跨英雄直接比较。";
-  assert.ok(panel.includes(`'<p class="mayhem-performance-note">${copy}</p>'`), "底部说明文案必须逐字一致");
-  // 只在确实有累计项时出现。
-  assert.match(panel, /metrics\.some\(\(metric\) => metric\?\.cumulative === true\)/);
-  // 只在表现 tab：说明拼在 .mayhem-performance 这个 section 内部末尾。
-  assert.ok(panel.includes('</div>${cumulativeNote}</section>`'), "说明必须落在表现面板 section 之内");
-  assert.equal((championsScript.match(/mayhem-performance-note/g) || []).length, 1, "说明只出现一处");
-  assert.match(championsStyles, /\.mayhem-performance-note \{/);
-});
+
 
 test("R128 §2.3-C 状态/错误/数据回退提示保留不动", () => {
   assert.match(readWeb("pro-players.js"), /刷新失败，当前显示上次读取的数据/);
@@ -154,7 +144,7 @@ test("R128 §2.3-C 状态/错误/数据回退提示保留不动", () => {
 // 4. §2.1 / §2.2 / §2.4 结构与文案
 // ---------------------------------------------------------------------------
 
-test("R128 §2.1 概览/构筑/表现 tab 改成等分的一级切换", () => {
+test("R128 §2.1 概览/构筑 tab 改成等分的一级切换", () => {
   const toolbar = sliceBetween(championsScript, "function mayhemDetailToolbar(", "function mayhemDetailPanelMarkup(");
   // tab 组带上真实页签数，CSS 据此等分；图鉴入口仍是独立按钮。
   assert.ok(toolbar.includes('data-mayhem-detail-tabs data-tab-count="${specs.length}"'));
@@ -163,7 +153,7 @@ test("R128 §2.1 概览/构筑/表现 tab 改成等分的一级切换", () => {
   assert.doesNotMatch(toolbar, /data-tooltip|<small|<p>/, "tab 区不得新增说明文字或提示气泡");
 
   assert.match(championsStyles, /\.mayhem-detail-tabs \{[^}]*flex: 1 1 auto;[^}]*grid-template-columns: repeat\(var\(--tab-count\),minmax\(0,1fr\)\)/);
-  assert.match(championsStyles, /\.mayhem-detail-tabs \{[^}]*--tab-count: 3;/, "变量要有声明来源（R117 的变量解析钉子）");
+  assert.match(championsStyles, /\.mayhem-detail-tabs \{[^}]*--tab-count: 2;/, "变量要有声明来源（R117 的变量解析钉子）");
   assert.match(championsStyles, /\.mayhem-detail-tabs button \{[^}]*min-height: 42px;[^}]*font-size: 13px;[^}]*font-weight: 750/);
   assert.doesNotMatch(championsStyles, /\.mayhem-detail-tabs button \{[^}]*color: var\(--muted\)/, "未选中态不得再用 --muted");
   assert.match(championsStyles, /\.mayhem-detail-tabs button\.is-active \{[^}]*color: var\(--primary\);[^}]*box-shadow: inset 0 -2px 0 var\(--primary\);/);
@@ -172,35 +162,15 @@ test("R128 §2.1 概览/构筑/表现 tab 改成等分的一级切换", () => {
   const narrow = championsStyles.slice(championsStyles.lastIndexOf("@media (max-width: 700px)"));
   assert.match(narrow, /\.mayhem-detail-tabs \{ flex: 1 0 100%; \}/);
   assert.match(narrow, /\.mayhem-detail-tabs button \{ min-height: 44px; \}/);
-  assert.match(championsStyles, /@container mayhem-pane \(max-width: 760px\) \{\s*\.mayhem-performance-groups \{ grid-template-columns: 1fr; \}/);
-  assert.match(championsStyles, /@container mayhem-pane \(max-width: 520px\) \{\s*\.mayhem-multikill-values \{ grid-template-columns: repeat\(2,minmax\(0,1fr\)\); \}/);
 });
 
-test("R128 §2.2 表现指标改成逐行列表，多杀四项合并成一行", () => {
-  const group = sliceBetween(championsScript, "function mayhemPerformanceGroup(", "function mayhemPerformanceValue(");
-  // 每行一个指标：数值与「较平均」是两个独立元素，中间由 CSS 给间距。
-  assert.ok(group.includes('<dd><b>${mayhemPerformanceValue(metric)}</b>${delta ? `<span class="mayhem-delta'), "数值与「较平均」必须分成两个元素");
-  // 累计项合并成一行「多杀累计」，四个数字横排，不带 ± 标签。
-  assert.ok(group.includes('<dt>多杀累计</dt>'));
-  assert.ok(group.includes('class="mayhem-multikill-values"'));
-  assert.match(group, /rows\.filter\(\(metric\) => metric\?\.cumulative !== true\)/);
-  assert.match(group, /rows\.filter\(\(metric\) => metric\?\.cumulative === true\)/);
-  // 累计行只有弱化的数字，不带「较平均」标签（现有逻辑本来就不给累计项算 delta）。
-  const cumulativeCell = group.slice(group.indexOf('<div class="is-cumulative">'));
-  assert.ok(cumulativeCell.length > 0, "找不到累计行的 markup");
-  assert.doesNotMatch(cumulativeCell, /mayhem-delta|较平均/);
-  // 分组宽屏两列、组内逐行；累计值弱化。
-  assert.match(championsStyles, /\.mayhem-performance-groups \{[^}]*grid-template-columns: repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(championsStyles, /\.mayhem-performance-group dl > div \{[^}]*grid-template-columns: minmax\(0,1fr\) auto;[^}]*gap: 8px/);
-  assert.doesNotMatch(championsStyles, /\.mayhem-performance-group dl \{[^}]*auto-fit/);
-  assert.match(championsStyles, /\.mayhem-multikill-values b \{[^}]*color: var\(--muted\)/);
-});
+
 
 test("R128 §2.4 概览顺序与推荐卡标题行", () => {
   const overview = sliceBetween(championsScript, "function mayhemOverviewTabMarkup(", "function mayhemBuildTabMarkup(");
-  const order = ["renderRecommendedAugments", "renderMayhemOpeningConfiguration", "renderMayhemHeroRarityPanel"].map((name) => overview.indexOf(name));
+  const order = ["renderRecommendedAugments", "renderARAMKitCombos", "renderMayhemOpeningConfiguration"].map((name) => overview.indexOf(name));
   assert.ok(order.every((index) => index > 0), `概览三段缺一不可：${order}`);
-  assert.ok(order[0] < order[1] && order[1] < order[2], "顺序必须是 海克斯推荐 → 开局配置 → 该英雄专属品质概率");
+  assert.ok(order[0] < order[1] && order[1] < order[2], "顺序必须是 海克斯推荐 → 海克斯组合 → 开局配置");
 
   const augments = sliceBetween(championsScript, "function renderRecommendedAugments(", "function mayhemActiveStage(");
   // 标题行删掉「N 个」，chips 成为 header 最后一个子元素（靠 space-between 贴右）。
@@ -208,7 +178,7 @@ test("R128 §2.4 概览顺序与推荐卡标题行", () => {
   assert.doesNotMatch(augments, /section-count/, "标题行不再有计数");
   assert.doesNotMatch(augments, /entries\.length\} 个/);
   // R150 将官方档位收敛为共享六角徽章，其余收益率/置信度/阶段筛选保留。
-  assert.match(championsScript, /mayhemAugmentConfidenceMetrics/);
+  assert.match(championsScript, /function renderARAMKitCombos/);
   assert.doesNotMatch(championsScript, /\["官方档位", escapeHTML\(label\), "is-hex-label"\]/);
   assert.match(championsScript, /function renderMayhemStageChips\(items\)/);
   assert.match(championsStyles, /\.recommendation-section > header \{[^}]*justify-content: space-between/);

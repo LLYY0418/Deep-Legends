@@ -11,22 +11,6 @@ const gameplayCSS = fs.readFileSync(path.join(__dirname, "gameplay.css"), "utf8"
 const championCSS = fs.readFileSync(path.join(__dirname, "champions.css"), "utf8");
 const liveHTML = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
 
-function mayhemFontSizes(css) {
-  const selectors = [
-    ".mayhem-performance-group h4", ".mayhem-performance-group dt", ".mayhem-performance-group dd",
-    ".mayhem-performance-group dd > .mayhem-delta", ".mayhem-multikill-values small",
-    ".mayhem-multikill-values b", ".mayhem-performance-note",
-  ];
-  return selectors.map((selector) => {
-    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const declaration = css.match(new RegExp(`${escaped} \\{([^}]+)\\}`));
-    assert.ok(declaration, selector);
-    const font = declaration[1].match(/font-size:\s*(\d+)px/);
-    assert.ok(font, `${selector} font-size`);
-    return [selector, Number(font[1])];
-  });
-}
-
 test("R136 live status belongs to toolbar and leaves content without a fixed placeholder", () => {
   assert.match(liveHTML, /class="live-toolbar"[^>]*>.*data-live-status.*id="live-refresh"/);
   assert.doesNotMatch(liveHTML.match(/<div id="live-content"[^>]*>/)?.[0] || "", /data-live-status/);
@@ -36,18 +20,7 @@ test("R136 live status belongs to toolbar and leaves content without a fixed pla
   assert.doesNotMatch(functionSource(gameplaySource, "renderLiveRefreshStatus"), /data-live-refresh/);
 });
 
-test("R136 Mayhem performance font sizes and mutation guard", () => {
-  const expected = [13, 13, 14, 12, 12, 13, 12];
-  assert.deepEqual(mayhemFontSizes(championCSS).map((row) => row[1]), expected);
-  const allowed = new Set([12, 13, 14, 16, 20, 28]);
-  for (const [selector, size] of mayhemFontSizes(championCSS)) assert.ok(allowed.has(size), selector);
-  for (const [selector] of mayhemFontSizes(championCSS)) {
-    const start = championCSS.indexOf(`${selector} {`);
-    const end = championCSS.indexOf("}", start);
-    const mutated = championCSS.slice(0, start) + championCSS.slice(start, end).replace(/font-size:\s*\d+px/, "font-size: 9px") + championCSS.slice(end);
-    assert.ok(mayhemFontSizes(mutated).some((row) => !allowed.has(row[1])), `${selector} mutation must fail`);
-  }
-});
+
 
 function functionSource(source, name) {
   const start = source.indexOf(`function ${name}(`);

@@ -588,7 +588,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") installSta
       const dns=Math.max(0,entry.domainLookupEnd-entry.domainLookupStart),connect=Math.max(0,entry.connectEnd-entry.connectStart);
       const row={at:performance.timeOrigin+entry.fetchStart,wait:Math.max(0,entry.requestStart-entry.fetchStart-dns-connect)};
       records.push(row);if(records.length>4096)droppedAt=records.shift().at;
-      if(windowStart && row.at>=windowStart && row.at<windowStart+3000){windowCounts.resources++;if(row.wait>100)windowCounts.queued++;changed=true;}
+      if(windowStart && row.at>=windowStart && row.at<=windowStart+3000){windowCounts.resources++;if(row.wait>100)windowCounts.queued++;changed=true;}
     }
     if(changed)scheduleReport();
   };
@@ -611,7 +611,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") installSta
 (() => {
   let drag=0,count=0,max=0,frame=0,last=null;
   const consume=entries=>{if(drag)for(const e of entries){count++;max=Math.max(max,e.duration);}};
-  let observer;try{observer=new PerformanceObserver(list=>consume(list.getEntries()));observer.observe({type:"longtask",buffered:false});}catch(_){}
+  let observer;try{if(typeof PerformanceObserver==="function" && PerformanceObserver.supportedEntryTypes?.includes("longtask")){observer=new PerformanceObserver(list=>consume(list.getEntries()));observer.observe({type:"longtask",buffered:false});}}catch(_){}
   const receive=value=>{
     if(drag!==value.drag){drag=value.drag;count=max=0;}
     if(value.reason==="summary"&&observer)consume(observer.takeRecords());
@@ -620,5 +620,5 @@ if (typeof window !== "undefined" && typeof document !== "undefined") installSta
     frame=requestAnimationFrame(()=>{frame=0;const v=last;window.reportFlowDiagnostic?.("window_resize_trace",v.reason,{...v,nextFrameMs:performance.now()-at});if(v.reason==="summary")drag=0;});
   };
   const off=window.desktopWindow?.onResizeTrace?.(receive);
-  window.addEventListener("deep-legends:dispose",()=>{off?.();observer?.disconnect();cancelAnimationFrame(frame);},{once:true});
+  window.addEventListener?.("deep-legends:dispose",()=>{off?.();observer?.disconnect();cancelAnimationFrame(frame);},{once:true});
 })();

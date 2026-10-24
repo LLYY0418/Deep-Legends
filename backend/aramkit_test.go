@@ -38,6 +38,7 @@ func r307Resources(t *testing.T) aramkitResources {
 		var id int
 		fmt.Sscan(key, &id)
 		m.ID = id
+		m.Slug = strings.ToLower(m.Key)
 		r.Metadata[id] = m
 	}
 	r307Fixture(t, "champion-identities", &r.Champions)
@@ -77,6 +78,15 @@ func TestR307ARAMKitRealDetails(t *testing.T) {
 		}
 		if detail.ARAMKit.Scopes["filtered"].Slots["1"] == nil || detail.ARAMKit.Scopes["unfiltered"].Slots["6"] == nil {
 			t.Fatal("scopes/slots lost")
+		}
+		filled := 0
+		for _, row := range detail.RecommendedAugments {
+			if len(row.Assets) > 0 && strings.TrimSpace(row.Assets[0].Description) != "" {
+				filled++
+			}
+		}
+		if float64(filled)/float64(len(detail.RecommendedAugments)) < 0.95 {
+			t.Fatal("description coverage below existing 95% requirement", filled, len(detail.RecommendedAugments))
 		}
 		if id == 157 {
 			if detail.Stats.WinRate != 58.48 || detail.AugmentCombinations[0].Games != 12105 || detail.AugmentCombinations[0].WinRate != 74.88 {

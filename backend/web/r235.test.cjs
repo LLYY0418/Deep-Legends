@@ -42,7 +42,7 @@ test('R235 filter restore uses the identical DOM, expanded state, scroll and fou
 test('R235 retry transitions from error to loading to ready without throttling',async()=>{
  const tab={key:'one',playerRef:'ref',mayhemRatingManual:true,mayhemRating:{status:'error',playerRef:'ref',at:Date.now()}},calls=[];
  let complete;const f=functions(['loadMayhemRating','mayhemRatingStatus','renderRankMMRPopover'],{state:{},escapeHTML,number:String,riotTab:()=>false,tabServerID:()=> 'HN1',updateMayhemRatingPopover:()=>{},rerenderTab:()=>{},api:(_url,_options,_key,timeout)=>{calls.push(timeout);return new Promise(r=>complete=r)}});
- assert.match(f.renderRankMMRPopover(tab),/data-mayhem-rating-retry/);const request=f.loadMayhemRating(tab);assert.equal(tab.mayhemRating.status,'loading');assert.match(f.renderRankMMRPopover(tab),/查询中/);complete({available:true,rating:2350});await request;assert.equal(tab.mayhemRating.status,'ready');assert.deepEqual(calls,[45000]);
+ assert.match(f.renderRankMMRPopover(tab),/data-mayhem-rating-retry/);const request=f.loadMayhemRating(tab);assert.equal(tab.mayhemRating.status,'loading');assert.match(f.renderRankMMRPopover(tab),/查询中/);complete({available:true,rating:2350});await request;assert.equal(tab.mayhemRating.status,'ready');assert.deepEqual(calls,[27000]);
 });
 
 test('R235 history head keeps pagination tail and rejects older generations',()=>{

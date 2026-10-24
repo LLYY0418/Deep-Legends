@@ -57,6 +57,7 @@
       "backend-evidence.cjs",
       "process-metrics.cjs",
       "proxy-resolution.cjs",
+      "window-resize-trace.cjs",
       "window-bounds.cjs",
       "window-bounds-store.cjs",
       "ui-scale.cjs",

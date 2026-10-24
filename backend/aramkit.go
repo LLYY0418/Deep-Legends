@@ -53,7 +53,7 @@ func (p *championProvider) aramkitClient() *aramkitClient {
 	if p.aramkit == nil {
 		dir := ""
 		if p.cache != nil {
-			dir = filepath.Join(filepath.Dir(p.cache.dir), "aramkit")
+			dir = filepath.Join(p.cache.dir, "aramkit")
 		}
 		p.aramkit = &aramkitClient{provider: p, slots: make(chan struct{}, 2), flights: map[string]chan struct{}{}, memory: map[string][]byte{}, retry: map[string]time.Time{}, dir: dir, readFile: os.ReadFile}
 		if dir != "" {
@@ -186,7 +186,7 @@ func (c *aramkitClient) immutable(ctx context.Context, p string) ([]byte, error)
 		if c.dir != "" {
 			b, e = reader(filepath.Join(c.dir, filepath.FromSlash(p)))
 		}
-		if len(b) == 0 {
+		if e != nil || len(b) == 0 || strings.HasSuffix(p, ".json") && !json.Valid(b) {
 			if backoff {
 				e = errors.New("ARAMKit retry backoff")
 			} else {
@@ -203,7 +203,7 @@ func (c *aramkitClient) immutable(ctx context.Context, p string) ([]byte, error)
 		c.mu.Lock()
 		if e == nil {
 			c.memory[p] = b
-		} else {
+		} else if !backoff && !isCancellation(e) && c.provider.featureGates.enabled(featureGateAramkit) {
 			c.retry[p] = time.Now().Add(2 * time.Minute)
 		}
 		delete(c.flights, p)
@@ -259,7 +259,7 @@ func (c *aramkitClient) current(ctx context.Context) (aramkitVersion, error) {
 		if e == nil {
 			c.versions = next
 			c.checked = time.Now()
-		} else {
+		} else if !isCancellation(e) && c.provider.featureGates.enabled(featureGateAramkit) {
 			c.retry["versions"] = time.Now().Add(2 * time.Minute)
 		}
 		v := c.versions.Payload

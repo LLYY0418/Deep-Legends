@@ -150,7 +150,7 @@ func TestR269MayhemDiskTTLAndNoRecordCache(t *testing.T) {
 		r274Flush(t, c.disk)
 		t.Cleanup(func() { r274Flush(t, c.disk) })
 		entry, err := c.disk.readDisk(riotIdentityKey("mayhem:fixture|cn"))
-		expectedTTL := 10 * time.Minute
+		expectedTTL := 2 * time.Minute
 		if first.Available {
 			expectedTTL = 24 * time.Hour
 		}
@@ -163,7 +163,7 @@ func TestR269MayhemDiskTTLAndNoRecordCache(t *testing.T) {
 		if first.Available {
 			now = now.Add(23 * time.Hour)
 		} else {
-			now = now.Add(9 * time.Minute)
+			now = now.Add(90 * time.Second)
 		}
 		result := restarted.lookup(context.Background(), "Fixture", "CN")
 		if calls.Load() != 1 || result.Available != first.Available {

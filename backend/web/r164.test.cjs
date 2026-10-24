@@ -33,10 +33,7 @@ function extract(name) {
 test('R164 non-Rift teammates stay adjacent by verified premade group while Rift keeps lane order', () => {
   const state = { settings: { liveOrder: 'team' } };
   const names = ['livePremadeRoster', 'clusterPremadePlayers', 'orderLivePlayers', 'insightTeamLayout', 'isSummonersRiftMatch', 'renderLiveInsights','champSelectEnemyPlaceholder'];
-  const render = Function('state', 'SUMMONERS_RIFT_QUEUE_IDS', 'liveAugmentRecommendationSource', 'recordLiveRosterRendered', 'renderLiveRosterNoticeBars', 'renderLiveTeamPortraitTags', 'renderLivePlayer', 'renderInsightMatches', 'renderLiveRecentPositions', 'isARAMRelatedMatch', 'arenaLivePlayerGroups', 'escapeHTML', `${names.map(extract).join('\n')}; return renderLiveInsights;`)(
-    state, [420, 440], () => 'hextech', () => {}, () => '', () => '',
-    (player) => `<player id="${player.id}"${player.isCurrent ? ' current' : ''}></player>`, () => '', () => '', () => true, () => [], String,
-  );
+  const render=require('./r188-harness.cjs').compile(source,names,{state,SUMMONERS_RIFT_QUEUE_IDS:[420,440],liveAugmentRecommendationSource:()=> 'hextech',recordLiveRosterRendered:()=>{},renderLiveRosterNoticeBars:()=>'',renderLiveTeamPortraitTags:()=>'',renderLivePlayer:player=>`<player id="${player.id}"${player.isCurrent?' current':''}></player>`,renderInsightMatches:()=>'',renderLiveRecentPositions:()=>'',isARAMRelatedMatch:()=>true,arenaLivePlayerGroups:()=>[],escapeHTML:String}).renderLiveInsights;
   const players = [
     { id: 'self', teamId: 100, isCurrent: true, position: 'bottom', premadeGroup: '1', premadeSize: 2 },
     { id: 'solo', teamId: 100, position: 'jungle' },
