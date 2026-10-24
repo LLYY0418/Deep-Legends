@@ -92,7 +92,7 @@ func TestR86TenPageSeasonBackfillDoesNotPopulateHistoryCache(t *testing.T) {
 	a, calls := r86PagingProvider(t, 500)
 	a.storage = trackTestStore(t, &localStore{root: t.TempDir()})
 	season, start := currentRankedSeason(time.Now())
-	cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: season, AccountHash: "r86-fixture", Streams: map[string]seasonStatsStream{"ranked": {ResumeIndex: 50}, "mayhem": {Complete: true}}}
+	cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: season, AccountHash: "r86-fixture", Streams: map[string]seasonStatsStream{"ranked": {ResumeIndex: 50}, "flex": {Complete: true}, "mayhem": {Complete: true}}}
 	if _, err := a.storage.saveSeasonStatsReported(cache); err != nil {
 		t.Fatal(err)
 	}

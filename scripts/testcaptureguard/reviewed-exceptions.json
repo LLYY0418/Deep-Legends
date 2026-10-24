@@ -883,9 +883,9 @@
   },
   {
     "file": "backend/quality_test.go",
-    "line": 747,
+    "line": 748,
     "target": "events",
-    "source_sha256": "5fdc6e6432da9b289fce4157a315e6d0d006361611235204abde92cef3a68ea7",
+    "source_sha256": "e5d3de71d1fa0564676a0732ed93252aa84b8c676d2d75c249723a756fa77e23",
     "comment": "r276-capture-safe: TestLootFallbackDiagnosticRuntimePayloadNeverStoresItemDetails: enrichLootItemsWithMetadata directly invokes observe in its synchronous item loop on the caller; this call returns before events is inspected or marshaled"
   },
   {
@@ -1620,21 +1620,21 @@
     "file": "backend/r211_test.go",
     "line": 161,
     "target": "calls",
-    "source_sha256": "fc292a4e568ee4f6e79ff9ab17145338b8d42d66a35ddfb8381c393e12a95c5f",
+    "source_sha256": "f330ba1bb5eda77064571a626f4de91c96af67cfa15847be42e992ca3e64101b",
     "comment": "r276-capture-safe: TestR211MasteryRealRiotFieldsAndFullCache: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r211_test.go",
     "line": 231,
     "target": "calls",
-    "source_sha256": "fc292a4e568ee4f6e79ff9ab17145338b8d42d66a35ddfb8381c393e12a95c5f",
+    "source_sha256": "f330ba1bb5eda77064571a626f4de91c96af67cfa15847be42e992ca3e64101b",
     "comment": "r276-capture-safe: TestR211ExpectedGameUsesAllIDsAndRiotFreshBypassesIdentityCache: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r211_test.go",
     "line": 282,
     "target": "calls",
-    "source_sha256": "fc292a4e568ee4f6e79ff9ab17145338b8d42d66a35ddfb8381c393e12a95c5f",
+    "source_sha256": "f330ba1bb5eda77064571a626f4de91c96af67cfa15847be42e992ca3e64101b",
     "comment": "r276-capture-safe: TestR211TimelineWholeGameSingleFetchAndLegacyExtraction: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

@@ -68,6 +68,9 @@ func r288RankFixture(t *testing.T, rankedGames int, rankedDelay, mayhemDelay tim
 		}
 	}
 	a.sgp.http = &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Query().Get("tag") == "q_440" {
+			return updateResponse(200, []byte(`{"games":[]}`)), nil
+		}
 		ranked := strings.Contains(r.URL.RawQuery, "q_420")
 		delay := rankedDelay
 		if !ranked {

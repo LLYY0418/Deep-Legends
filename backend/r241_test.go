@@ -76,7 +76,7 @@ func TestR241HeadFreshnessSmallRequestNewGamesAndRecentGate(t *testing.T) {
 		t.Fatal(p, skipped, added)
 	}
 	mu.Lock()
-	if strings.Join(requests, ";") != ":0:1;q_420,q_440:0:1;q_420,q_440:1:1;q_2300,q_2400,q_3270:0:1" {
+	if strings.Join(requests, ";") != ":0:1;q_420:0:1;q_420:1:1;q_440:0:1;q_2300,q_2400,q_3270:0:1" {
 		t.Fatal(requests)
 	}
 	requests = nil

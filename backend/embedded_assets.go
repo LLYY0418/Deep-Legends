@@ -14,6 +14,7 @@ import (
 // notice accompanies the font in every build, as required by the R14 boundary.
 //
 //go:embed web/announcements.js
+//go:embed web/appearance-boot.js
 //go:embed web/collection-new-items.js
 //go:embed web/auto-config.js web/auto-config-live.js
 //go:embed web/app.js web/augment-artwork.js web/cache-controls.js web/champions.js web/demo-data.js

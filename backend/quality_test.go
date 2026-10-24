@@ -676,6 +676,7 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
+	"arena_fame_progression.go":  1, // arena-progression-before.json: declared filtered numeric snapshot, salted account/platform/game binding and 30m expiry.
 	"patch_release_schedule.go":  1, // Root patch-release-schedule.json: declared public release dates and local refresh status; no account data.
 	"ui_preferences.go":          1, // Root ui-preferences.json: local UI choices/read revisions; no new directory.
 	"player_tags.go":             1, // Root player-tags.json: user-authored local player tags/notes; no upload or new directory.
