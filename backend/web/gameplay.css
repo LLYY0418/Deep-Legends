@@ -2477,9 +2477,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .specialist-game-row[data-spell-layout="board"] .rune-corner-spells { display:flex; }
 
 .champion-performance { align-self:start; }
-.champion-performance h3,.champion-table-section h3,.champion-table-head h3 { display:flex; align-items:center; }
+.champion-performance h3 { display:flex; align-items:center; }
 .champion-skeleton-row .game-icon { width:32px; height:32px; border-radius:50%; }
-.champion-skeleton-row .skeleton-line { display:block; width:70%; height:10px; margin:0; }
+.champion-skeleton-row .skeleton-line { display:block; width:70%; max-width:80px; height:10px; margin:0; }
 .champion-skeleton-row > div:last-child .skeleton-line { width:36px; justify-self:end; }
 .champion-pending-rows { align-self:start; }
 
