@@ -516,6 +516,16 @@ func main() {
 		_ = championProvider.setNetworkSettings(defaultChampionNetworkSettings())
 	}
 
+	go func() {
+		defer recoverPanic("aramkit.versions")
+		for {
+			ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+			_, _ = championProvider.aramkitClient().current(ctx)
+			cancel()
+			time.Sleep(3 * time.Hour)
+		}
+	}()
+
 	a := &app{
 		token:                 token,
 		startedAt:             time.Now(),

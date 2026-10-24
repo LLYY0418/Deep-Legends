@@ -130,30 +130,19 @@ func parseCurrentMayhemCatalog(page []byte, at time.Time) (championAugmentRespon
 }
 
 func (p *championProvider) loadAugments(ctx context.Context) (championAugmentResponse, error) {
-	page, at, err := p.fetchWithMetadata(ctx, opggPageHost, "/zh-cn/lol/modes/aram-mayhem", nil, championHTMLMax, "text/html,application/xhtml+xml")
-	if err == nil {
-		var result championAugmentResponse
-		result, err = parseCurrentMayhemCatalog(page, at)
-		if err == nil && comparePatchVersions(mayhemComparablePatch(result.Citation.Patch), mayhemComparablePatch(readCurrentMayhem().Patch)) >= 0 {
-			if time.Since(at) > 30*time.Minute {
-				result.DataNotice = "上游暂不可用，显示上次读取的缓存"
-			}
-			p.rememberAugmentCatalog(result)
-			return result, nil
-		}
-	}
-	if p.hexdata != nil && comparePatchVersions(mayhemComparablePatch(p.hexdata.snapshot().ReportPatch), mayhemComparablePatch(readCurrentMayhem().Patch)) > 0 {
-		if latest, legacyErr := p.loadLegacyAugments(ctx); legacyErr == nil && latest.Citation != nil && comparePatchVersions(mayhemComparablePatch(latest.Citation.Patch), mayhemComparablePatch(readCurrentMayhem().Patch)) > 0 {
-			return latest, nil
-		}
-	}
-	// A successful old response must not replace a newer known catalog.
-	if previous, ok := p.rememberedAugmentCatalog(); ok && previous.Citation != nil && comparePatchVersions(mayhemComparablePatch(previous.Citation.Patch), mayhemComparablePatch(readCurrentMayhem().Patch)) >= 0 {
-		previous.DataNotice = "本次刷新未取得新版数据，保留上次成功结果"
-		return previous, nil
+	if result, err := p.loadARAMKitAugments(ctx); err == nil {
+		p.rememberAugmentCatalog(result)
+		return result, nil
 	}
 	result := bundledCurrentMayhemCatalog()
-	p.rememberAugmentCatalog(result)
+	for i := range result.Rows {
+		result.Rows[i].Grade = ""
+		result.Rows[i].WinRate = 0
+		result.Rows[i].Popularity = 0
+		result.Rows[i].Performance = 0
+		result.Rows[i].PerformanceUnavailable = true
+		result.Rows[i].Champions = nil
+	}
 	return result, nil
 }
 
@@ -214,6 +203,9 @@ func (p *championProvider) enrichCurrentMayhemDetail(ctx context.Context, detail
 }
 
 func (p *championProvider) loadCurrentAugmentDetail(ctx context.Context, id int) (championAugmentDetailResponse, error) {
+	if result, err := p.loadARAMKitAugmentDetail(ctx, id); err == nil {
+		return result, nil
+	}
 	catalog, err := p.loadAugments(ctx)
 	if err != nil {
 		return championAugmentDetailResponse{}, err

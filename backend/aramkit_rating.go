@@ -6,12 +6,14 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -22,16 +24,17 @@ import (
 
 const (
 	aramkitRatingHost          = "api.aramkit.com"
+	aramkitRatingCNHost        = "api.aramkit.cn"
 	aramkitRatingPath          = "/rating"
 	aramkitRatingResponseMax   = 2 << 20
 	aramkitRatingCacheLimit    = 128
 	aramkitRatingSuccessTTL    = 24 * time.Hour
-	aramkitRatingFailureTTL    = 10 * time.Minute
+	aramkitRatingFailureTTL    = 2 * time.Minute
 	aramkitRatingRequestDelay  = 300 * time.Millisecond
 	aramkitRatingRequestJitter = 100 * time.Millisecond
-	aramkitRatingTimeout       = 12 * time.Second
+	aramkitRatingTimeout       = 25 * time.Second
 	aramkitRatingBodyTimeout   = 8 * time.Second
-	aramkitRatingTotalTimeout  = 45 * time.Second
+	aramkitRatingTotalTimeout  = 25 * time.Second
 	aramkitDiagnosticDomain    = "aramkit-rating-player-v1"
 )
 
@@ -111,13 +114,15 @@ type mayhemRatingResponse struct {
 }
 
 type aramkitRatingOutcome struct {
-	ttfb       time.Duration
-	bytes      int
-	response   mayhemRatingResponse
-	code       int
-	httpStatus int
-	result     string
-	reason     string
+	host              string
+	dns, connect, tls time.Duration
+	ttfb              time.Duration
+	bytes             int
+	response          mayhemRatingResponse
+	code              int
+	httpStatus        int
+	result            string
+	reason            string
 }
 
 type aramkitRatingCacheEntry struct {
@@ -148,6 +153,8 @@ type aramkitRatingClient struct {
 	sleep         func(context.Context, time.Duration) error
 	jitter        func(time.Duration) time.Duration
 	baseURL       string
+	fallbackURL   string
+	hedgeDelay    time.Duration
 	bodyTimeout   time.Duration
 	totalTimeout  time.Duration
 	timeout       time.Duration
@@ -167,7 +174,9 @@ func newAramkitRatingClient(provider *championProvider, observe func(map[string]
 		now:           time.Now,
 		sleep:         sleepWithContext,
 		jitter:        aramkitRandomJitter,
-		baseURL:       "https://" + aramkitRatingHost,
+		baseURL:       "https://" + aramkitRatingCNHost,
+		fallbackURL:   "https://" + aramkitRatingHost,
+		hedgeDelay:    3 * time.Second,
 		timeout:       aramkitRatingTimeout,
 		totalTimeout:  aramkitRatingTotalTimeout,
 		bodyTimeout:   aramkitRatingBodyTimeout,
@@ -349,7 +358,14 @@ func (c *aramkitRatingClient) waitForPace(ctx context.Context) error {
 	return nil
 }
 
-func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine string) aramkitRatingOutcome {
+func (c *aramkitRatingClient) fetchEndpoint(ctx context.Context, baseURL, gameName, tagLine string) (outcome aramkitRatingOutcome) {
+	trace := newARAMKitRatingTrace()
+	defer func() {
+		outcome.dns, outcome.connect, outcome.tls, outcome.ttfb = trace.snapshot(outcome.ttfb)
+		if u, e := url.Parse(baseURL); e == nil {
+			outcome.host = u.Hostname()
+		}
+	}()
 	var ttfb time.Duration
 	var received bytes.Buffer
 	started := time.Now()
@@ -358,9 +374,7 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 		response.FetchedAt = c.now().UTC()
 		return aramkitRatingOutcome{response: response, code: code, httpStatus: status, result: "unavailable", reason: reason, ttfb: ttfb, bytes: received.Len()}
 	}
-	if err := c.waitForPace(ctx); err != nil {
-		return failed("cancelled", "查询已取消", 0, 0)
-	}
+
 	total := c.totalTimeout
 	if total <= 0 {
 		total = aramkitRatingTotalTimeout
@@ -369,7 +383,7 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 	defer cancel()
 	timer := time.AfterFunc(c.timeout, cancel)
 	defer timer.Stop()
-	endpoint, err := url.Parse(c.baseURL)
+	endpoint, err := url.Parse(baseURL)
 	if err != nil {
 		return failed("invalid-endpoint", "暂不可用", 0, 0)
 	}
@@ -378,7 +392,7 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 	query.Set("gameName", gameName)
 	query.Set("tagLine", tagLine)
 	endpoint.RawQuery = query.Encode()
-	request, err := http.NewRequestWithContext(requestContext, http.MethodGet, endpoint.String(), nil)
+	request, err := http.NewRequestWithContext(httptrace.WithClientTrace(requestContext, trace.hooks()), http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return failed("request-build", "暂不可用", 0, 0)
 	}
@@ -495,6 +509,7 @@ func (c *aramkitRatingClient) recordContext(ctx context.Context, key string, cac
 	c.observe(map[string]any{
 		"event": "mayhem_rating_lookup", "source": dataSourceARAMKit, "player_hash": identity,
 		"cache_hit": cacheHit, "cache_source": ctx.Value(aramkitRatingCacheSourceKey{}), "prefetch": ctx.Value(aramkitRatingPrefetchKey{}) == true, "coalesced": coalesced, "duration_ms": duration.Milliseconds(),
+		"host": outcome.host, "dns_ms": outcome.dns.Milliseconds(), "connect_ms": outcome.connect.Milliseconds(), "tls_ms": outcome.tls.Milliseconds(),
 		"ttfb_ms": outcome.ttfb.Milliseconds(), "bytes": outcome.bytes,
 		"code": outcome.code, "http_status": outcome.httpStatus, "result": outcome.result, "reason": outcome.reason,
 	})
@@ -562,4 +577,118 @@ func (a *app) handleGameplayMayhemRating(w http.ResponseWriter, r *http.Request)
 		ctx = context.WithValue(ctx, aramkitRatingRefreshKey{}, true)
 	}
 	respondJSON(w, a.mayhemRatings.lookup(ctx, gameName, tagLine))
+}
+
+// Only the primary starts immediately. The alternate begins after three seconds,
+// or immediately after a failed primary. Both share one bounded lookup context.
+func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine string) aramkitRatingOutcome {
+	if e := c.waitForPace(ctx); e != nil {
+		return aramkitRatingOutcome{reason: "cancelled", result: "unavailable", response: unavailableMayhemRating("查询已取消", dataSourceFailed)}
+	}
+	parent := ctx
+	total := c.totalTimeout
+	if total <= 0 || total > 25*time.Second {
+		total = 25 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, total)
+	defer cancel()
+	fallback := c.fallbackURL
+	// Existing injected endpoints remain self contained; tests can supply two local endpoints.
+	if c.baseURL != "https://"+aramkitRatingCNHost && fallback == "https://"+aramkitRatingHost {
+		fallback = ""
+	}
+	if fallback == "" || fallback == c.baseURL {
+		return c.fetchEndpoint(ctx, c.baseURL, gameName, tagLine)
+	}
+	results := make(chan aramkitRatingOutcome, 2)
+	launch := func(endpoint string) { go func() { results <- c.fetchEndpoint(ctx, endpoint, gameName, tagLine) }() }
+	launch(c.baseURL)
+	delay := c.hedgeDelay
+	if delay <= 0 {
+		delay = 3 * time.Second
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	alternate := false
+	completed := 0
+	var failure aramkitRatingOutcome
+	for {
+		select {
+		case result := <-results:
+			completed++
+			if result.response.Available {
+				cancel()
+				return result
+			}
+			failure = result
+			if !alternate {
+				alternate = true
+				timer.Stop()
+				launch(fallback)
+			}
+			if completed == 2 {
+				return failure
+			}
+		case <-timer.C:
+			if !alternate {
+				alternate = true
+				launch(fallback)
+			}
+		case <-ctx.Done():
+			if parent.Err() != nil {
+				return aramkitRatingOutcome{reason: "cancelled", result: "unavailable", response: unavailableMayhemRating("查询已取消", dataSourceFailed)}
+			}
+			if failure.reason != "" {
+				return failure
+			}
+			return aramkitRatingOutcome{reason: "timeout", result: "unavailable", response: unavailableMayhemRating("暂不可用", dataSourceFailed)}
+		}
+	}
+}
+
+type aramkitRatingTrace struct {
+	mu                          sync.Mutex
+	started, dnsStart, tlsStart time.Time
+	connectStarts               map[string]time.Time
+	dns, connect, tls, ttfb     time.Duration
+}
+
+func newARAMKitRatingTrace() *aramkitRatingTrace {
+	return &aramkitRatingTrace{started: time.Now(), connectStarts: map[string]time.Time{}}
+}
+func (t *aramkitRatingTrace) hooks() *httptrace.ClientTrace {
+	return &httptrace.ClientTrace{
+		DNSStart: func(httptrace.DNSStartInfo) { t.mu.Lock(); t.dnsStart = time.Now(); t.mu.Unlock() }, DNSDone: func(httptrace.DNSDoneInfo) {
+			t.mu.Lock()
+			if !t.dnsStart.IsZero() {
+				t.dns += time.Since(t.dnsStart)
+			}
+			t.mu.Unlock()
+		},
+		ConnectStart: func(network, addr string) { t.mu.Lock(); t.connectStarts[network+addr] = time.Now(); t.mu.Unlock() }, ConnectDone: func(network, addr string, _ error) {
+			t.mu.Lock()
+			if start, ok := t.connectStarts[network+addr]; ok {
+				t.connect += time.Since(start)
+				delete(t.connectStarts, network+addr)
+			}
+			t.mu.Unlock()
+		},
+		TLSHandshakeStart: func() { t.mu.Lock(); t.tlsStart = time.Now(); t.mu.Unlock() }, TLSHandshakeDone: func(tls.ConnectionState, error) {
+			t.mu.Lock()
+			if !t.tlsStart.IsZero() {
+				t.tls += time.Since(t.tlsStart)
+			}
+			t.mu.Unlock()
+		},
+		GotFirstResponseByte: func() { t.mu.Lock(); t.ttfb = time.Since(t.started); t.mu.Unlock() },
+	}
+}
+func (t *aramkitRatingTrace) snapshot(fallback time.Duration) (time.Duration, time.Duration, time.Duration, time.Duration) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	ttfb := t.ttfb
+	if ttfb == 0 {
+		ttfb = fallback
+	}
+	return t.dns, t.connect, t.tls, ttfb
 }

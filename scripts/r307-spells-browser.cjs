@@ -1,0 +1,31 @@
+'use strict';
+const {browser}=require('./r297-browser-harness.cjs'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const out=process.env.R307_REPORT_DIR||'/private/tmp/r307-spells-browser',report={screenshots:[],geometry:[],errors:[]};
+const shot=async(b,name)=>{await b.shot(name);report.screenshots.push(name+'.png');};
+(async()=>{
+ fs.mkdirSync(out,{recursive:true});
+ const b=await browser({out,intercept:`if(pathname==='/api/gameplay/pro-runes'&&window.__r300Pros)return Promise.resolve(new Response(JSON.stringify({pros:__r300Pros})));`,transform:(name,data)=>name==='gameplay.js'?Buffer.from(data.toString().replace('  bindSettings();','  window.__r300={proRequestTarget,renderRecommendationArea};window.__r305={renderSpecialistPlayers,renderSummonerStrip,renderChampionStats,renderCareerPendingMarkup};\n  bindSettings();')):data});
+ const frame=()=>b.evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+ try{
+  await b.call('Page.navigate',{url:b.origin+'/?demo&section=live'});await b.until('window.__r297?.state.live?.players?.length && window.deepLegendsAutoConfigLive && __r297.state.perks');
+  const source=fs.readFileSync(path.join(__dirname,'r300-browser.cjs'),'utf8'),start=source.indexOf('  await b.evaluate(`document.querySelector'),end=source.indexOf('  await b.until(`document.querySelector',start),setup=source.slice(start,end).match(/await b.evaluate\(`([\s\S]*)`\);/)[1];
+  await b.evaluate(setup);await b.until('document.querySelector("[data-custom-config]")');
+  for(const theme of ['dark','light'])for(const width of [1920,1440,1100,1000,860,780])for(const src of ['custom','pro','specialist']){
+   await b.call('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
+   await b.evaluate(`__r297.state.destroyed=false;${setup};__r297.state.settings.liveRefresh=false;__r297.state.settings.maskNames=true;__r300Pros.forEach(c=>{c.title='测试职业选手';c.eventLabel='测试赛事';});document.documentElement.dataset.theme='${theme}';__r297.state.runeSourceTab='custom';__r297.renderLive();__r297.state.destroyed=true;(()=>{const host=document.querySelector('#recommendation-panel-runes');if('${src}'!=='custom')host.innerHTML=__r305.renderSpecialistPlayers(__r300Pros,'${src}');})()`);
+   await frame();await b.evaluate('document.querySelector(".specialist-game-row").scrollIntoView({block:"start"})');await frame();
+   const g=await b.evaluate(`(()=>{const row=document.querySelector('.specialist-game-row'),pair=row.querySelector('[data-card-spells]'),r=pair.getBoundingClientRect(),footer=row.querySelector('.specialist-game-footer'),s=footer?.querySelector('.skill-order');return {layout:row.dataset.spellLayout,pairs:row.querySelectorAll('[data-card-spells]').length,left:r.left,right:r.right,overflow:document.documentElement.scrollWidth>innerWidth,footer:footer&&{w:footer.clientWidth,scroll:footer.scrollWidth},skills:s&&{w:s.clientWidth,count:s.children.length,cells:[...s.children].map(n=>n.getBoundingClientRect().width)},pairParent:pair.parentElement.className,second:(()=>{const n=row.querySelector('.specialist-opponent,[role=status]'),s=n?.getBoundingClientRect();return s?{top:s.top,bottom:s.bottom}:null})(),top:r.top,bottom:r.bottom}})()`);
+   if(g.layout==='opponent'){assert(g.second);assert(Math.abs((g.top+g.bottom)/2-(g.second.top+g.second.bottom)/2)<=1.5,JSON.stringify(g));}assert.equal(g.pairs,1);assert(!g.overflow);assert(g.right<=width+1);assert(['head','opponent','board','footer'].includes(g.layout));if(width===1920){assert.equal(g.layout,'footer',JSON.stringify({src,...g}));if(g.skills)assert(g.skills.cells.every(w=>w>=29.9));}report.geometry.push({p:13,theme,width,src,...g});await shot(b,`p13-${src}-${theme}-${width}`);
+   if(width===780){
+    await b.evaluate(`(()=>{const row=document.querySelector('.specialist-game-row');window.__r307OriginalCard=row.outerHTML;row.style.width='340px';row.style.maxWidth='100%';row.querySelector('.specialist-game-footer')?.style.setProperty('display','none');row.querySelector('.custom-config-header strong,.specialist-game-title strong').textContent='较长的符文标题'.repeat(12);row.querySelector('.specialist-opponent,[role=status]').textContent='对手';})()`);await frame();await frame();
+    const second=await b.evaluate(`(()=>{const row=document.querySelector('.specialist-game-row'),pair=row.querySelector('[data-card-spells]'),p=pair.getBoundingClientRect(),o=row.querySelector('.specialist-opponent,[role=status]').getBoundingClientRect();return {layout:row.dataset.spellLayout,pairs:row.querySelectorAll('[data-card-spells]').length,delta:Math.abs((p.top+p.bottom-o.top-o.bottom)/2)}})()`);assert.equal(second.layout,'opponent');assert.equal(second.pairs,1);assert(second.delta<=1.5);report.geometry.push({theme,width,src,forced:true,...second});await shot(b,`p9-opponent-${src}-${theme}-${width}`);
+    await b.evaluate(`document.querySelector('.specialist-game-row .specialist-opponent,.specialist-game-row [role=status]').textContent='较长的对手或状态'.repeat(30)`);await frame();await frame();
+    const fallback=await b.evaluate(`(()=>{const row=document.querySelector('.specialist-game-row'),pair=row.querySelector('[data-card-spells]');return {layout:row.dataset.spellLayout,pairs:row.querySelectorAll('[data-card-spells]').length,parent:pair.parentElement.className,secondWidth:row.querySelector('.specialist-opponent,[role=status]').scrollWidth,headWidth:row.querySelector('.specialist-game-head,.custom-config-header').clientWidth}})()`);assert.equal(fallback.layout,'board',JSON.stringify(fallback));assert.equal(fallback.pairs,1);report.geometry.push({theme,width,src,forced:true,...fallback});await shot(b,`p9-board-${src}-${theme}-${width}`);await b.evaluate(`document.querySelector(".specialist-game-row").outerHTML=__r307OriginalCard`);await frame();
+   }
+
+  }
+  assert(report.geometry.some(g=>g.layout==='opponent'),'matrix must reach the opponent tier');
+  assert.deepEqual(b.errors,[]);
+ }finally{report.errors=b.errors;await b.stop();fs.writeFileSync(path.join(out,'result.json'),JSON.stringify(report,null,2));}
+ console.log(JSON.stringify({frames:report.geometry.length,layouts:[...new Set(report.geometry.map(g=>g.layout))],errors:report.errors}));
+})().catch(e=>{console.error(e);process.exitCode=1});

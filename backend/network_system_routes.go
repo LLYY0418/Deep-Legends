@@ -21,7 +21,7 @@ func systemProxyTargets() map[string]string {
 			targets[strings.ToLower(u.Hostname())] = u.Scheme + "://" + u.Host + "/"
 		}
 	}
-	for _, host := range []string{opggChampionHost, opggWebAPIHost, opggPageHost, esportsOPGGHost, qq101Host, communityDragonHost, yourGGArenaHost, opggAssetHost, dataDragonHost, aramkitRatingHost, hexdataHost, hexdataAssetHost, prestigeArtworkHost, "github.com", "api.github.com", "raw.githubusercontent.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"} {
+	for _, host := range []string{opggChampionHost, opggWebAPIHost, opggPageHost, esportsOPGGHost, qq101Host, communityDragonHost, yourGGArenaHost, opggAssetHost, dataDragonHost, aramkitRatingHost, aramkitRatingCNHost, aramkitDataCN, aramkitDataCOM, hexdataHost, hexdataAssetHost, prestigeArtworkHost, "github.com", "api.github.com", "raw.githubusercontent.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"} {
 		add("https://" + host)
 	}
 	for _, region := range strings.Fields("br1 eun1 euw1 jp1 kr la1 la2 me1 na1 oc1 ru tr1 ph2 sg2 th2 tw2 vn2 americas asia europe sea") {

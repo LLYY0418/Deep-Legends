@@ -61,6 +61,9 @@ func recordAssetCacheState(ctx context.Context, state string) {
 }
 
 func (a *app) loadChampionRemoteAsset(ctx context.Context, p *championProvider, source, host, path string) ([]byte, error) {
+	if source == "aramkit" {
+		return p.aramkitClient().immutable(ctx, strings.TrimPrefix(path, "/"))
+	}
 	started := time.Now()
 	observation := &assetCacheObservation{state: "memory"}
 	ctx = context.WithValue(ctx, assetCacheObservationKey{}, observation)

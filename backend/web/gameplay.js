@@ -3190,7 +3190,7 @@
 
   async function loadMayhemRating(tab, quietStart = false) {
     const current = mayhemRatingStatus(tab);
-    const permanent = current.status === "ready" && (current.data?.available && Date.now()-Number(current.at || 0)<24*3600_000 || current.data?.unavailableReason === "未收录" && Date.now()-Number(current.at || 0)<600_000);
+    const permanent = current.status === "ready" && (current.data?.available && Date.now()-Number(current.at || 0)<24*3600_000 || current.data?.unavailableReason === "未收录" && Date.now()-Number(current.at || 0)<120_000);
     if (!current.playerRef || current.status === "loading" || current.refreshing || permanent || riotTab(tab) || !tabServerID(tab)) return;
     if(current.status==='error')tab.mayhemRatingManual=true;
     const requestToken = Number(tab.mayhemRatingRequestToken || 0) + 1;
@@ -3200,7 +3200,7 @@
     try {
       const params = new URLSearchParams({ playerRef: current.playerRef, ...(quietStart?{prefetch:"1"}:tab.mayhemRatingManual?{retry:"1"}:{}) });
       tab.mayhemRatingManual=false;
-      const data = await api(`/api/gameplay/mayhem-rating?${params}`, {}, `mayhem-rating:${tab.key}`, 45000);
+      const data = await api(`/api/gameplay/mayhem-rating?${params}`, {}, `mayhem-rating:${tab.key}`, 27000);
       if (tab.closed || tab.mayhemRatingRequestToken !== requestToken || mayhemRatingStatus(tab).playerRef !== current.playerRef) return;
       tab.mayhemRating = { status: data.available || data.unavailableReason === "未收录" ? "ready" : "error", playerRef: current.playerRef, data, error: "", at: Date.now() };
     } catch (error) {
@@ -3209,6 +3209,7 @@
       tab.mayhemRating = { status: "error", playerRef: current.playerRef, data: null, error: "查询暂不可用", at: Date.now() };
     }
     updateMayhemRatingPopover(tab);
+    if (!tab.closed && tab.mayhemRating.status === "error") { clearTimeout(tab.mayhemRatingRetryTimer); tab.mayhemRatingRetryTimer=setTimeout(()=>{if(!tab.closed)void loadMayhemRating(tab,true);},120000); }
   }
 
   function bindMayhemRatingControls(container,tab) {
@@ -7429,6 +7430,19 @@
     } catch (_) { return true; }
   }
 
+  let mayhemHeroRankings = null, mayhemHeroRankingsFlight = null, mayhemHeroRankingsRetryAt = 0;
+  function ensureMayhemHeroRankings(data) {
+    if(liveAugmentRecommendationSource(data)!=="hextech" || mayhemHeroRankings || mayhemHeroRankingsFlight || Date.now()<mayhemHeroRankingsRetryAt)return;
+    mayhemHeroRankingsFlight=api("/api/champions/rankings?mode=aram-mayhem",{},"mayhem-live-rankings").then(result=>{mayhemHeroRankings=new Map((result.rows||[]).map(row=>[Number(row.championId),row]));if(state.live&&liveAugmentRecommendationSource(state.live)==="hextech")renderLive("mayhem-rankings");}).catch(()=>{mayhemHeroRankingsRetryAt=Date.now()+120000;}).finally(()=>{mayhemHeroRankingsFlight=null;});
+  }
+  function renderMayhemHeroBadge(player,championId,hextechMode,phase) {
+    if(!hextechMode || Number(championId)<=0 || player.championPickPending || Number(player.championPickIntent)<0 || phase==="ChampSelect" && player.championLocked!==true)return "";
+    const row=mayhemHeroRankings?.get(Number(championId));if(!row || !/^[SABCD]$/.test(row.grade) || Number(row.play)<=0)return "";
+    const win=Number(row.winRate).toFixed(1)+"%",pick=Number(row.pickRate).toFixed(1)+"%";
+    const tip=`海克斯大乱斗胜率 ${win} · 选取率 ${pick} · 场次 ${number(row.play)}`;
+    return `<span class="live-mayhem-badge is-${row.grade.toLowerCase()}" data-tooltip="${escapeHTML(tip)}" aria-label="${escapeHTML(tip)}"><b>${row.grade}</b><span>${win}</span></span>`;
+  }
+
   function renderLivePlayer(player, index, arenaMode = false, currentChampionId = 0, premadePlayers = [], recentPositions = "", aramMode = false, hextechMode = false, phase = "", displayPosition = "", identityKind = "") {
     if (champSelectEnemyPlaceholder(player, phase, premadePlayers)) {
       return `<article class="live-player">${iconFigure("champion", liveDisplayedChampionId(player, currentChampionId), player.championName, "live")}<div class="live-player-copy live-player-placeholder">暂无玩家信息，进入游戏后显示</div></article>`;
@@ -7455,7 +7469,7 @@
 	const historySummary = historyPending
 	  ? '<dl class="is-history-pending" aria-label="战绩读取中"><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div><div><span class="live-history-skeleton"></span></div></dl>'
 	  : liveArena?.arenaSummary(player, identityKind, emptySummary) || `<dl><div><dt>${recordGames ? `近 ${number(recordGames)} 局` : "当前模式"}</dt><dd class="live-record-value">${displayStats.games ? `${number(displayStats.wins)}胜 ${number(displayStats.losses)}负` : emptySummary}</dd></div>${player.hidden === true && !displayStats.games ? "" : `<div><dt>胜率</dt><dd class="win-rate-value">${displayStats.games ? percent(displayStats.winRate) : "—"}</dd></div><div><dt>KDA</dt><dd class="live-kda-value">${displayStats.games ? `${kda(displayStats.kda)}:1` : "—"}</dd></div>`}</dl>`;
-	return `<article class="live-player${rowTone}">${portrait}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}" ${proBadgeAttributes(player)}` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${liveTagVisible("self") && player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${hiddenChip}${liveAutofillChip}${premadeTag}${liveTagVisible("squad") && player.mySquad && !(identityKind === "arena" && liveArena) ? '<span class="my-squad-chip">我的小队</span>' : ""}${liveTagVisible("pro") ? renderProIdentityBadge(player) : ""}</div>${liveArena ? liveArena.identityLine(player, identityKind, contextCopy) : contextCopy ? `<span>${phase!=='ChampSelect' || player.hidden || arenaMode || aramMode?escapeHTML(contextCopy):`${escapeHTML(positionLabel(displayPosition || player.position))} · <b class="live-rank-title">${escapeHTML(rankCopy)}</b>`}</span>` : ""}${liveTagVisible("positions") ? recentPositions : ""}</div>${historySummary}</article>`;
+	return `<article class="live-player${rowTone}">${portrait}<div class="live-player-copy"><div class="live-player-identity"><button class="live-player-name" type="button" ${player.playerRef ? `data-player-ref="${escapeHTML(player.playerRef)}" ${proBadgeAttributes(player)}` : "disabled"} data-tooltip="${escapeHTML(displayName)}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(displayName)}</button>${liveTagVisible("self") && player.isCurrent ? '<span class="self-chip">自己</span>' : ""}${hiddenChip}${hextechMode?renderMayhemHeroBadge(player,championId,true,phase):""}${liveAutofillChip}${premadeTag}${liveTagVisible("squad") && player.mySquad && !(identityKind === "arena" && liveArena) ? '<span class="my-squad-chip">我的小队</span>' : ""}${liveTagVisible("pro") ? renderProIdentityBadge(player) : ""}</div>${liveArena ? liveArena.identityLine(player, identityKind, contextCopy) : contextCopy ? `<span>${phase!=='ChampSelect' || player.hidden || arenaMode || aramMode?escapeHTML(contextCopy):`${escapeHTML(positionLabel(displayPosition || player.position))} · <b class="live-rank-title">${escapeHTML(rankCopy)}</b>`}</span>` : ""}${liveTagVisible("positions") ? recentPositions : ""}</div>${historySummary}</article>`;
   }
 
 	  function orderLivePlayers(players, groupByTeam = true) {
@@ -7949,7 +7963,14 @@
       if (!matches.length) return "";
       return `<section class="live-augment-column is-${key}"><header><span aria-hidden="true"></span><strong>${label}</strong><small>${matches.length} 个</small></header><div>${matches.map(renderRow).join("")}</div></section>`;
     }).filter(Boolean).join("");
-			return `<section class="live-augment-recommendations${source === "hextech" ? " is-hextech" : ""}"><header><h3>海克斯推荐</h3></header><div class="live-augment-columns">${columns}</div></section>`;
+			return `<section class="live-augment-recommendations${source === "hextech" ? " is-hextech" : ""}"><header><h3>海克斯推荐</h3></header><div class="live-augment-columns">${columns}</div>${renderLiveARAMKitCombos(data,source)}</section>`;
+  }
+
+  function renderLiveARAMKitCombos(data,source) {
+    if(source!=="hextech")return "";
+    const rows=(liveRecommendationsFor(data)?.augmentCombinations||[]).filter(row=>row.assets?.length===2&&Number(row.games)>=200).slice(0,3);
+    if(!rows.length)return "";
+    return `<section class="live-aramkit-combos"><h4>推荐组合</h4>${rows.map(row=>`<div>${row.assets.map((asset,index)=>`${index?'<b>＋</b>':""}${renderLiveAugmentIcon({assets:[asset]},source)}<strong>${escapeHTML(asset.name)}</strong>`).join("")}<span class="win-rate-value">${percent(row.winRate)}</span><small>${number(row.games)} 场</small></div>`).join("")}</section>`;
   }
 
   // “详情”页签：双方队伍与每名玩家的最近战绩（英雄、KDA、评分），从新到旧。
@@ -8099,6 +8120,7 @@
 
   // R116-D: payload is optional for legacy focused render callers.
   function renderLiveInsights(data, payload) {
+    if(liveAugmentRecommendationSource(data)==="hextech")ensureMayhemHeroRankings(data);
     const seenPlayerKeys = new Set();
     let duplicatesDropped = 0;
     const players = (data.players || []).filter((player, index) => {

@@ -415,20 +415,30 @@ func loadGameplayAugmentDescriptions(ctx context.Context, ids []int64, loader fu
 }
 
 func (p *championProvider) gameplayAugmentDescription(ctx context.Context, id int64) (string, error) {
-	if id < 1000 {
-		catalog, err := p.loadCommunityDragonAugments(ctx)
-		if err != nil {
-			return "", err
-		}
-		for _, entry := range catalog {
-			if entry.ID == id {
-				return entry.Description, nil
+	if id >= 1000 {
+		c := p.aramkitClient()
+		if v, err := c.current(ctx); err == nil {
+			if b, err := c.immutable(ctx, v.ResourcePath+"/zh-CN/resources/augments.json"); err == nil {
+				var rows map[string]aramkitResource
+				if json.Unmarshal(b, &rows) == nil {
+					if entry, ok := rows[strconv.FormatInt(id, 10)]; ok {
+						return entry.Tooltip.text(), nil
+					}
+				}
 			}
 		}
-		return "", nil
 	}
-	detail, err := p.loadHexdataAugmentDetail(ctx, int(id), "")
-	return detail.effectDescription, err
+	catalog, err := p.loadCommunityDragonAugments(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, entry := range catalog {
+		if entry.ID == id {
+			return entry.Description, nil
+		}
+	}
+	return "", nil
+
 }
 
 func (a *app) handleGameplayAugmentDescriptions(w http.ResponseWriter, r *http.Request) {

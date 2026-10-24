@@ -71,10 +71,21 @@
    const config=layoutRows.get(row);if(!row.isConnected||!config)return;
    const {head,pair,fallback,footer}=config;
    const style=getComputedStyle(head),gap=parseFloat(style.columnGap)||0,padding=(parseFloat(style.paddingLeft)||0)+(parseFloat(style.paddingRight)||0);
-   const children=[...head.children].filter(n=>n!==pair),previous=head.style.gridTemplateColumns;
+   const children=[...head.children].filter(n=>n!==pair),previous=head.style.gridTemplateColumns,previousLayout=row.dataset.spellLayout;
+   delete row.dataset.spellLayout;
    if(head.classList.contains("specialist-game-head"))head.style.gridTemplateColumns="max-content max-content max-content";
    const needed=children.reduce((w,n)=>w+n.scrollWidth,0)+pair.scrollWidth+gap*children.length+padding;head.style.gridTemplateColumns=previous;
+   if(previousLayout)row.dataset.spellLayout=previousLayout;
    const wide=needed<=head.clientWidth;
+   const opponent=head.querySelector('.specialist-opponent,[role="status"]');
+   let second=false;
+   if(opponent){
+     const previousWidth=opponent.style.width,previousWrap=opponent.style.flexWrap,previousFlex=opponent.style.flex,previousMax=opponent.style.maxWidth,previousWhite=opponent.style.whiteSpace;
+     opponent.style.width="max-content";opponent.style.flexWrap="nowrap";opponent.style.flex="none";opponent.style.maxWidth="none";opponent.style.whiteSpace="nowrap";
+     const opponentNeeded=opponent.scrollWidth+pair.scrollWidth+gap+padding;
+     opponent.style.width=previousWidth;opponent.style.flexWrap=previousWrap;opponent.style.flex=previousFlex;opponent.style.maxWidth=previousMax;opponent.style.whiteSpace=previousWhite;
+     second=opponentNeeded<=head.clientWidth;
+   }
    let bottom=false;
    if(footer){
      const order=footer.querySelector(".skill-order");if(order)order.style.setProperty("--card-skill-count",String(order.children.length));
@@ -84,8 +95,8 @@
      bottom=children.length>0&&footerNeeded<=footer.clientWidth;
    }
    if(bottom){if(pair.parentElement!==footer)footer.append(pair);}
-   else if(wide){const status=head.querySelector('[role="status"]');if(pair.parentElement!==head)head.insertBefore(pair,status||null);}else if(pair.parentElement!==fallback)fallback.append(pair);
-   row.dataset.spellLayout=bottom?"footer":wide?"head":"board";
+   else if(wide||second){const status=head.querySelector('[role="status"]');if(pair.parentElement!==head)head.insertBefore(pair,status||null);}else if(pair.parentElement!==fallback)fallback.append(pair);
+   row.dataset.spellLayout=bottom?"footer":wide?"head":second?"opponent":"board";
    config.widthSignature=spellWidthSignature(config);
  }
  const spellStructure=".specialist-game-row,.specialist-game-head,.custom-config-header,.rune-corner-spells,.sg-spells,.specialist-game-footer,[data-card-spells]";

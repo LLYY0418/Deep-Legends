@@ -4680,28 +4680,29 @@ type gameplayRecommendationsResponse struct {
 }
 
 type gameplayRecommendationBundle struct {
-	TraceID           string                  `json:"traceId,omitempty"`
-	RecommendationKey string                  `json:"recommendationKey,omitempty"`
-	RequestedPosition string                  `json:"requestedPosition,omitempty"`
-	QueueID           int64                   `json:"queueId,omitempty"`
-	MapID             int64                   `json:"mapId,omitempty"`
-	GameID            int64                   `json:"gameId,omitempty"`
-	GameMode          string                  `json:"gameMode,omitempty"`
-	Tier              string                  `json:"tier,omitempty"`
-	Source            string                  `json:"source"`
-	ResolvedMode      string                  `json:"resolvedMode"`
-	ResolvedRegion    string                  `json:"resolvedRegion"`
-	DataVersion       string                  `json:"dataVersion,omitempty"`
-	CurrentVersion    string                  `json:"currentVersion,omitempty"`
-	IsFallback        bool                    `json:"isFallback"`
-	IsStale           bool                    `json:"isStale"`
-	HasRunes          bool                    `json:"hasRunes"`
-	HasAugments       bool                    `json:"hasAugments"`
-	HasCounters       bool                    `json:"hasCounters"`
-	HasBanRate        bool                    `json:"hasBanRate"`
-	HasTopPlayers     bool                    `json:"hasTopPlayers"`
-	HasItemDepths     bool                    `json:"hasItemDepths"`
-	Citation          *championSourceCitation `json:"citation,omitempty"`
+	AugmentCombinations []championMetricRow     `json:"augmentCombinations,omitempty"`
+	TraceID             string                  `json:"traceId,omitempty"`
+	RecommendationKey   string                  `json:"recommendationKey,omitempty"`
+	RequestedPosition   string                  `json:"requestedPosition,omitempty"`
+	QueueID             int64                   `json:"queueId,omitempty"`
+	MapID               int64                   `json:"mapId,omitempty"`
+	GameID              int64                   `json:"gameId,omitempty"`
+	GameMode            string                  `json:"gameMode,omitempty"`
+	Tier                string                  `json:"tier,omitempty"`
+	Source              string                  `json:"source"`
+	ResolvedMode        string                  `json:"resolvedMode"`
+	ResolvedRegion      string                  `json:"resolvedRegion"`
+	DataVersion         string                  `json:"dataVersion,omitempty"`
+	CurrentVersion      string                  `json:"currentVersion,omitempty"`
+	IsFallback          bool                    `json:"isFallback"`
+	IsStale             bool                    `json:"isStale"`
+	HasRunes            bool                    `json:"hasRunes"`
+	HasAugments         bool                    `json:"hasAugments"`
+	HasCounters         bool                    `json:"hasCounters"`
+	HasBanRate          bool                    `json:"hasBanRate"`
+	HasTopPlayers       bool                    `json:"hasTopPlayers"`
+	HasItemDepths       bool                    `json:"hasItemDepths"`
+	Citation            *championSourceCitation `json:"citation,omitempty"`
 	// R128 §2.3：口径说明不再进 UI，前端一律不消费；字段保留供诊断与既有后端测试使用。
 	MeasurementTechnique string                      `json:"measurementTechnique,omitempty"`
 	Positions            []championPositionOption    `json:"positions,omitempty"`
@@ -5623,7 +5624,7 @@ func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Reque
 	// 上游请求数恒为 0（Anti-scope 第 1 条）；只在海斗模式产出，取不到就一个提示
 	// 都不生成，绝不为「有内容」去按英雄扇出请求。
 	diagnosticStage = "roster-insights"
-	a.gameplayApplyRosterInsights(ctx, &bundle, query, provider, championID, resolution.InternalMode)
+	// ARAMKit has no matchup or teammate tables; these panels stay hidden.
 	coreIn := len(detail.Build.CoreItems)
 	bundle.Build.CoreOptions = capGameplayCoreOptions(bundle.Build.CoreOptions)
 	a.recordDiagnostic(map[string]any{"event": "live_build_shape", "diagnostic_schema": 2, "trace_id": traceID, "recommendation_key": recommendationKey, "core_in": coreIn, "core_out": len(bundle.Build.CoreOptions)})
@@ -7409,6 +7410,7 @@ func gameplayRecommendationsFromResolvedDetail(championID int64, position string
 		// 评审整改 B5：局内不渲染阶段维度，别让它背上 stages 的体积。
 		result.Augments = gameplayAugmentRowsWithoutStages(detail.RecommendedAugments)
 	}
+	result.AugmentCombinations = append([]championMetricRow(nil), detail.AugmentCombinations...)
 	result.ItemRanking = append([]championMetricRow(nil), detail.ItemRanking...)
 	if detail.Mode == "arena" {
 		result.Augments = append([]championMetricRow(nil), detail.ArenaAugments...)

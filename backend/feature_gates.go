@@ -105,7 +105,7 @@ func featureGateForChampionHost(host string) string {
 		return featureGateOPGG
 	case hexdataHost, hexdataAssetHost:
 		return featureGateHexdata
-	case aramkitRatingHost:
+	case aramkitRatingHost, aramkitRatingCNHost:
 		return featureGateAramkit
 	case qq101Host:
 		return featureGateQQ101

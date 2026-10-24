@@ -737,6 +737,10 @@ type hexdataRarityStage struct {
 }
 
 type championAugmentDetailResponse struct {
+	ChampionStages map[string][]championAugmentChampion `json:"championStages,omitempty"`
+	Stages         []aramkitAtlasStage                  `json:"stages,omitempty"`
+	Combinations   []championMetricRow                  `json:"combinations,omitempty"`
+	Items          []championMetricRow                  `json:"items,omitempty"`
 	// Raw, checked guide text before metadata fallback; used by match build cards.
 	effectDescription string
 	ID                int                     `json:"id"`
@@ -3597,7 +3601,7 @@ func normalizeAugmentRarity(value any) string {
 	return "unknown"
 }
 
-func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string) (championDetailResponse, error) {
+func (p *championProvider) loadLegacyMayhemDetail(ctx context.Context, champion string) (championDetailResponse, error) {
 	started := time.Now()
 	statsSource, itemsSource := "none", "none"
 	var metaMS, heroMS, insightsMS, postmatchMS, rscMS, decorateMS int64

@@ -921,29 +921,6 @@
 .arena-option-card[data-metric-count="8"] dl { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .mayhem-stage-chips { flex: 0 1 auto; min-width: 0; overflow-x: auto; }
 
-.mayhem-performance-groups { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
-.mayhem-performance-group { min-width: 0; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
-.mayhem-performance-group h4 { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
-.mayhem-performance-group dl { display: grid; margin: 0; }
-.mayhem-performance-group dl > div { display: grid; min-width: 0; min-height: 40px; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
-.mayhem-performance-group dl > div:first-child { border-top: 0; }
-.mayhem-performance-group dt { color: var(--muted); font-size: 13px; }
-.mayhem-performance-group dd { display: inline-flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; margin: 0; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.mayhem-performance-group dd > b { color: var(--ink); }
-.mayhem-performance-group dd > .mayhem-delta { flex: 0 0 auto; font-size: 12px; font-weight: 700; white-space: nowrap; }
-.mayhem-performance-group dl > .is-cumulative { grid-template-columns: 92px minmax(0,1fr); }
-.mayhem-multikill-values { display: grid !important; width: 100%; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
-.mayhem-multikill-values > span { display: grid; min-width: 0; gap: 2px; justify-items: end; }
-.mayhem-multikill-values small { color: var(--muted); font-size: 12px; font-weight: 650; }
-.mayhem-multikill-values b { overflow: hidden; color: var(--muted); font-size: 13px; font-weight: 700; text-overflow: ellipsis; }
-.mayhem-performance-note { margin: 0; padding: 10px 14px; color: var(--muted); border-top: 1px solid var(--line); font-size: 12px; line-height: 1.45; }
-@container mayhem-pane (max-width: 760px) {
-  .mayhem-performance-groups { grid-template-columns: 1fr; }
-}
-@container mayhem-pane (max-width: 520px) {
-  .mayhem-multikill-values { grid-template-columns: repeat(2,minmax(0,1fr)); }
-}
-
 /* P0-5-2：官方档位不可用、榜单退回本地分档时才出现的「本地估算」小字。 */
 .mayhem-tier-local { display: inline-block; margin-left: 4px; color: var(--warning); font-size: 9px; font-weight: 700; }
 
@@ -968,3 +945,6 @@
 
 .mayhem-overview-metrics[data-metric-count="1"] { --metric-columns:1; }
 .mayhem-overview-metrics[data-metric-count="2"] { --metric-columns:2; }
+
+.aramkit-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}.aramkit-controls label{display:flex;gap:6px;align-items:center}.aramkit-controls select,.mayhem-fit-head select,.mayhem-fit-head input{max-width:100%;background:var(--panel);color:inherit;border:1px solid var(--line);border-radius:6px;padding:6px}.aramkit-combos>div,.aramkit-combos details>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.aramkit-combo{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;padding:12px;border:1px solid var(--line);border-radius:8px}.aramkit-combo>span:last-child{flex-basis:100%;text-align:center}.aramkit-combo .augment-icon{width:38px;height:38px}.aramkit-combo button{border:0;background:transparent;padding:0;cursor:pointer}.aramkit-modifiers{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.aramkit-modifiers>span{padding:5px 8px;border:1px solid currentColor;border-radius:6px}.aramkit-balance article{padding:8px 0}.aramkit-balance article p{margin:5px 0;white-space:pre-wrap}.aramkit-balance kbd{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--line);border-radius:4px}.mayhem-fit-metrics{white-space:normal}.is-delta-up{color:var(--success,#38a578)}.is-delta-down{color:var(--danger,#dd6574)}
+.aramkit-combo .is-silver .augment-icon{border:1px solid var(--rarity-silver)}.aramkit-combo .is-gold .augment-icon{border:1px solid var(--rarity-gold)}.aramkit-combo .is-prismatic .augment-icon{border:1px solid var(--rarity-prismatic-a)}

@@ -113,6 +113,7 @@ type championProvider struct {
 	arenaItemsAt          time.Time
 	arenaItems            []gameplayItem
 	hexdata               *hexdataClient
+	aramkit               *aramkitClient
 	featureGates          *featureGates
 	qq101ProbeMu          sync.Mutex
 	qq101ProbeRunning     map[string]bool
@@ -237,6 +238,7 @@ type arenaTeamComposition struct {
 }
 
 type championAsset struct {
+	Rarity       string    `json:"rarity,omitempty"`
 	ID           int       `json:"id,omitempty"`
 	Kind         string    `json:"kind"`
 	Name         string    `json:"name"`
@@ -542,6 +544,7 @@ type championCounterSections struct {
 }
 
 type championDetailStats struct {
+	Games    int     `json:"games,omitempty"`
 	Tier     *int    `json:"tier,omitempty"`
 	Grade    string  `json:"grade,omitempty"`
 	WinRate  float64 `json:"winRate,omitempty"`
@@ -562,6 +565,8 @@ type championPositionOption struct {
 }
 
 type championDetailResponse struct {
+	ARAMKit             *aramkitChampionView     `json:"aramkit,omitempty"`
+	AugmentCombinations []championMetricRow      `json:"augmentCombinations,omitempty"`
 	DataNotice          string                   `json:"dataNotice,omitempty"`
 	FailedBlocks        []string                 `json:"failedBlocks,omitempty"`
 	Mode                string                   `json:"mode"`
@@ -655,6 +660,10 @@ type championAugmentResponse struct {
 }
 
 type championAugment struct {
+	Rank                   int                       `json:"rank,omitempty"`
+	Games                  int                       `json:"games,omitempty"`
+	AvailableStages        []int                     `json:"availableStages,omitempty"`
+	Stages                 []aramkitAtlasStage       `json:"stages,omitempty"`
 	ID                     int                       `json:"id"`
 	Key                    string                    `json:"key"`
 	Name                   string                    `json:"name"`
@@ -674,16 +683,20 @@ type championAugment struct {
 }
 
 type championAugmentChampion struct {
-	ID          int     `json:"id"`
-	Name        string  `json:"name,omitempty"`
-	Key         string  `json:"key,omitempty"`
-	ImageSource string  `json:"imageSource,omitempty"`
-	ImagePath   string  `json:"imagePath,omitempty"`
-	Performance float64 `json:"performance,omitempty"`
-	Popularity  float64 `json:"popularity,omitempty"`
-	Score       float64 `json:"score,omitempty"`
-	WinRate     float64 `json:"winRate,omitempty"`
-	Games       int     `json:"games,omitempty"`
+	Rank            int     `json:"rank,omitempty"`
+	Grade           string  `json:"grade,omitempty"`
+	ChampionWinRate float64 `json:"championWinRate,omitempty"`
+	DeltaWinRate    float64 `json:"deltaWinRate,omitempty"`
+	ID              int     `json:"id"`
+	Name            string  `json:"name,omitempty"`
+	Key             string  `json:"key,omitempty"`
+	ImageSource     string  `json:"imageSource,omitempty"`
+	ImagePath       string  `json:"imagePath,omitempty"`
+	Performance     float64 `json:"performance,omitempty"`
+	Popularity      float64 `json:"popularity,omitempty"`
+	Score           float64 `json:"score,omitempty"`
+	WinRate         float64 `json:"winRate,omitempty"`
+	Games           int     `json:"games,omitempty"`
 }
 
 func newChampionProvider() *championProvider {
@@ -920,7 +933,7 @@ func (p *championProvider) fetchDirect(ctx context.Context, host, requestPath st
 }
 
 func allowedChampionHost(host string) bool {
-	return host == opggChampionHost || host == opggWebAPIHost || host == opggPageHost || host == esportsOPGGHost || host == opggAssetHost || host == dataDragonHost || host == prestigeArtworkHost || host == communityDragonHost || host == yourGGArenaHost || host == hexdataHost || host == hexdataAssetHost || host == qq101Host
+	return host == aramkitDataCN || host == aramkitDataCOM || host == opggChampionHost || host == opggWebAPIHost || host == opggPageHost || host == esportsOPGGHost || host == opggAssetHost || host == dataDragonHost || host == prestigeArtworkHost || host == communityDragonHost || host == yourGGArenaHost || host == hexdataHost || host == hexdataAssetHost || host == qq101Host
 }
 
 func (a *app) handleChampionCatalog(w http.ResponseWriter, r *http.Request) {
@@ -1009,7 +1022,7 @@ func sanitizeAugmentSlug(value string) string {
 }
 
 func (a *app) handleChampionAugmentRarity(w http.ResponseWriter, r *http.Request) {
-	response, err := a.championDataProvider().loadHexdataRarity(r.Context())
+	response, err := a.championDataProvider().loadARAMKitRarity(r.Context())
 	writeChampionResponse(w, response, err)
 }
 
@@ -1390,6 +1403,8 @@ func validateChampionAssetPath(source, requestPath string) (string, bool) {
 		return communityDragonHost, strings.HasPrefix(requestPath, "/latest/game/") || strings.HasPrefix(requestPath, "/latest/plugins/rcp-be-lol-game-data/global/default/") || strings.HasPrefix(requestPath, masteryCrestPrefix)
 	case "gtimg":
 		return prestigeArtworkHost, strings.HasPrefix(requestPath, gtimgChampionIconPrefix) || strings.HasPrefix(requestPath, gtimgSkinArtworkPrefix)
+	case "aramkit":
+		return aramkitDataCN, strings.HasPrefix(requestPath, "/assets/")
 	case "hexdata":
 		return hexdataAssetHost, hexdataAugmentIconPath(requestPath) == requestPath
 	case "builtin":
@@ -2335,16 +2350,8 @@ func (p *championProvider) loadARAMPage(ctx context.Context) ([]byte, string, er
 }
 
 func (p *championProvider) loadARAMRankings(ctx context.Context) (championRankingResponse, error) {
-	useHexdata := true
-	if p.hexdata != nil {
-		if snapshot, err := p.loadHexdataMeta(ctx); err == nil && comparePatchVersions(mayhemComparablePatch(snapshot.ReportPatch), mayhemComparablePatch(readCurrentMayhem().Patch)) < 0 {
-			useHexdata = false
-		}
-	}
-	if useHexdata {
-		if response, err := p.loadHexdataRankings(ctx); err == nil {
-			return response, nil
-		}
+	if result, err := p.loadARAMKitRankings(ctx); err == nil {
+		return result, nil
 	}
 	data, err := p.fetch(ctx, opggChampionHost, "/api/contents/tiers", url.Values{"type": {"aram_mayhem"}}, championJSONMax, "application/json")
 	if err != nil {
@@ -2374,7 +2381,7 @@ func (p *championProvider) loadARAMRankings(ctx context.Context) (championRankin
 		return championRankingResponse{}, errors.New("OP.GG ARAM champion response changed")
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Rank < rows[j].Rank })
-	return championRankingResponse{Mode: "hextech-aram", Region: "KR", Patch: payload.Meta.Version, Source: "OP.GG JSON · Hexdata fallback", FetchedAt: time.Now(), EntertainmentSample: true, Rows: rows}, nil
+	return championRankingResponse{Mode: "hextech-aram", Region: "KR", Patch: payload.Meta.Version, Source: "OP.GG JSON", FetchedAt: time.Now(), EntertainmentSample: true, Rows: rows}, nil
 }
 
 func (p *championProvider) loadStructuredModeRankings(ctx context.Context, mode string) (championRankingResponse, error) {
