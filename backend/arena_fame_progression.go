@@ -32,6 +32,8 @@ type arenaProgressionProbe struct {
 	emitted      bool
 }
 type arenaProgressionSnapshot struct {
+	GroupIDs      []string
+	GroupPaths    []string
 	Values        map[string]float64
 	Status        map[string]string
 	Operations    []lcuHelpOperation
@@ -41,6 +43,7 @@ type arenaProgressionSnapshot struct {
 type arenaProgressionDelta struct {
 	Before float64 `json:"before"`
 	After  float64 `json:"after"`
+	Delta  float64 `json:"delta"`
 }
 type arenaProgressionGroup struct{ id, name string }
 
@@ -116,7 +119,7 @@ func (a *app) startArenaProgressionDiscovery(client *LCUClient, phase string, ga
 		s.mu.Lock()
 		a.persistArenaProgression(p)
 		s.mu.Unlock()
-		event := map[string]any{"event": "arena_fame_progression_before", "resolved_paths": p.before.ResolvedPaths, "before_status": p.before.Status, "before_http_status": p.before.HTTPStatus, "numeric_keys": len(p.before.Values)}
+		event := map[string]any{"event": "arena_fame_progression_before", "resolved_paths": p.before.ResolvedPaths, "before_status": p.before.Status, "before_http_status": p.before.HTTPStatus, "numeric_keys": len(p.before.Values), "group_ids": p.before.GroupIDs}
 		for _, part := range arenaFameDiscoveryParts(event) {
 			a.recordDiagnostic(part)
 		}
@@ -235,7 +238,7 @@ func arenaProgressionPath(op lcuHelpOperation, self Summoner, group string) stri
 	}
 	path := op.Path
 	for _, part := range strings.Split(path, "/") {
-		if strings.EqualFold(part, "{groupId}") {
+		if strings.EqualFold(part, "{groupId}") || strings.EqualFold(part, "{id}") {
 			if group == "" {
 				return ""
 			}
@@ -244,7 +247,7 @@ func arenaProgressionPath(op lcuHelpOperation, self Summoner, group string) stri
 	}
 	return arenaDiscoveryGETPath(path, self)
 }
-func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, ops []lcuHelpOperation, self Summoner) arenaProgressionSnapshot {
+func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, ops []lcuHelpOperation, self Summoner, baseline ...arenaProgressionSnapshot) arenaProgressionSnapshot {
 	snap := arenaProgressionSnapshot{Values: map[string]float64{}, Status: map[string]string{}, Operations: append([]lcuHelpOperation(nil), ops...), ResolvedPaths: map[string]string{}, HTTPStatus: map[string]int{}}
 	selected := map[string]lcuHelpOperation{}
 	for _, op := range ops {
@@ -294,6 +297,9 @@ func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, op
 		defer stop()
 		var raw json.RawMessage
 		kind := arenaProgressionKind(op)
+		if kind == "" {
+			kind = "group_path/" + path
+		}
 		if err := c.RequestJSON(probe, http.MethodGet, path, nil, &raw); err != nil {
 			var httpErr *LCUHTTPError
 			if errors.As(err, &httpErr) {
@@ -312,6 +318,34 @@ func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, op
 	raw, status := read(selected["configuration"], "")
 	snap.Status["configuration"] = status
 	groups := arenaProgressionGroups(raw)
+	if len(baseline) > 0 {
+		groups = nil
+		for _, id := range baseline[0].GroupIDs {
+			groups = append(groups, arenaProgressionGroup{id: id})
+		}
+	}
+	state := c.arenaDiscoveryState()
+	state.mu.Lock()
+	if state.progressionGroupIDs == nil {
+		state.progressionGroupIDs = map[string]bool{}
+	}
+	for _, g := range groups {
+		snap.GroupIDs = append(snap.GroupIDs, g.id)
+		state.progressionGroupIDs[g.id] = true
+	}
+	for path := range state.progressionGroupPaths {
+		snap.GroupPaths = append(snap.GroupPaths, path)
+	}
+	state.mu.Unlock()
+	if len(baseline) > 0 {
+		snap.GroupPaths = append([]string(nil), baseline[0].GroupPaths...)
+	} else {
+		base := strings.TrimSuffix(arenaProgressionPath(selected["configuration"], self, ""), "configuration")
+		for _, g := range groups {
+			snap.GroupPaths = append(snap.GroupPaths, base+url.PathEscape(g.id))
+		}
+	}
+	sort.Strings(snap.GroupPaths)
 	if status == "ok" && len(groups) == 0 {
 		snap.Status["configuration"] = "empty"
 	}
@@ -322,20 +356,29 @@ func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, op
 		snap.Status["instance-data"] = "configuration_unavailable"
 	} else {
 		snap.Status["instance-data"] = "ok"
-		for groupIndex, g := range groups {
+		for _, g := range groups {
 			raw, result := read(instance, g.id)
 			if result != "ok" {
 				snap.Status["instance-data"] = result
 				continue
 			}
-			label := g.name
-			if label == "" {
-				label = "group"
-			}
-			// Group IDs come only from configuration and keep keys stable across reorderings.
-			label = fmt.Sprintf("%s[%d]", label, groupIndex)
+			label := "group/" + g.id
 			for k, v := range arenaProgressionNumbers(raw) {
-				snap.Values[label+"/"+k] = v
+				if arenaProgressionMetric(k) {
+					snap.Values[label+"/"+k] = v
+				}
+			}
+		}
+	}
+	for _, path := range snap.GroupPaths {
+		op := lcuHelpOperation{Method: http.MethodGet, Path: path, Name: "progression group"}
+		raw, result := read(op, "")
+		snap.Status["group_path/"+path] = result
+		if result == "ok" {
+			for k, v := range arenaProgressionNumbers(raw) {
+				if arenaProgressionMetric(k) {
+					snap.Values["path/"+path+"/"+k] = v
+				}
 			}
 		}
 	}
@@ -352,7 +395,7 @@ func arenaProgressionDiff(before, after arenaProgressionSnapshot) map[string]are
 	changes := map[string]arenaProgressionDelta{}
 	for name, value := range after.Values {
 		if prior, ok := before.Values[name]; ok && prior != value {
-			changes[name] = arenaProgressionDelta{Before: prior, After: value}
+			changes[name] = arenaProgressionDelta{Before: prior, After: value, Delta: value - prior}
 		}
 	}
 	return changes
@@ -432,7 +475,7 @@ func (a *app) probeArenaProgressionAfter(c *LCUClient, s *arenaFameDiscoveryStat
 	a.mu.RLock()
 	self := a.summoner
 	a.mu.RUnlock()
-	after := a.readArenaProgressionSnapshot(ctx, c, p.before.Operations, self)
+	after := a.readArenaProgressionSnapshot(ctx, c, p.before.Operations, self, p.before)
 	changes := arenaProgressionDiff(p.before, after)
 	s.mu.Lock()
 	if p.emitted {
@@ -444,7 +487,7 @@ func (a *app) probeArenaProgressionAfter(c *LCUClient, s *arenaFameDiscoveryStat
 	afterEvents := arenaProgressionEventSnapshot(s)
 	s.mu.Unlock()
 	eventChanges := arenaProgressionDiff(arenaProgressionSnapshot{Values: p.beforeEvents}, arenaProgressionSnapshot{Values: afterEvents})
-	event := map[string]any{"event": "arena_fame_progression_diff", "changes": changes, "before_status": p.before.Status, "after_status": after.Status, "resolved_paths": after.ResolvedPaths, "before_http_status": p.before.HTTPStatus, "after_http_status": after.HTTPStatus, "event_before": p.beforeEvents, "event_after": afterEvents, "event_changes": eventChanges}
+	event := map[string]any{"event": "arena_fame_progression_diff_v3", "groups": arenaProgressionGroupDiff(p.before, after), "group_ids": p.before.GroupIDs, "changes": changes, "before_status": p.before.Status, "after_status": after.Status, "resolved_paths": after.ResolvedPaths, "before_http_status": p.before.HTTPStatus, "after_http_status": after.HTTPStatus, "event_before": p.beforeEvents, "event_after": afterEvents, "event_changes": eventChanges}
 	for _, part := range arenaFameDiscoveryParts(event) {
 		a.recordDiagnostic(part)
 	}
@@ -471,11 +514,11 @@ func (c *LCUClient) observeArenaProgressionEvent(event LCUEvent) {
 	values := arenaProgressionNumbers(event.Data)
 	s := c.arenaDiscoveryState()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.progressionEvents == nil {
 		s.progressionEvents = map[string]map[string]float64{}
 	}
 	if _, ok := s.progressionEvents[path]; !ok && len(s.progressionEvents) >= 32 {
+		s.mu.Unlock()
 		return
 	}
 	bounded := map[string]float64{}
@@ -490,7 +533,33 @@ func (c *LCUClient) observeArenaProgressionEvent(event LCUEvent) {
 		}
 		bounded[key] = values[key]
 	}
+	group := ""
+	parts := strings.Split(event.URI, "/")
+	safeParts := strings.Split(path, "/")
+	for i, p := range parts {
+		if s.progressionGroupIDs[p] {
+			group = p
+			safeParts[i] = p
+		}
+	}
+	path = strings.Join(safeParts, "/")
 	s.progressionEvents[path] = bounded
+	if group != "" && strings.Contains(event.URI, "/groups/") && !strings.Contains(path, "{id}") {
+		if s.progressionGroupPaths == nil {
+			s.progressionGroupPaths = map[string]bool{}
+		}
+		if len(s.progressionGroupPaths) < 32 {
+			s.progressionGroupPaths[path] = true
+		}
+	}
+	diagnostic := map[string]any{"event": "arena_fame_progression_event_v3", "path": path, "group_id": group, "keys": arenaProgressionKeys(event.Data), "numeric": bounded}
+	s.mu.Unlock()
+	c.diagnosticMu.Lock()
+	observe := c.diagnosticObserve
+	c.diagnosticMu.Unlock()
+	if observe != nil {
+		observe(diagnostic)
+	}
 }
 
 // Only filtered numeric leaves and approved GET templates survive restart. The
@@ -549,4 +618,60 @@ func (a *app) restoreArenaProgression(c *LCUClient) *arenaProgressionProbe {
 	p := &arenaProgressionProbe{account: disk.Account, platform: disk.Platform, before: disk.Before, gameID: disk.GameID, at: disk.At, lobbyAt: disk.LobbyAt, sawGame: true, done: make(chan struct{})}
 	close(p.done)
 	return p
+}
+
+func arenaProgressionMetric(key string) bool {
+	key = strings.ToLower(key)
+	return strings.Contains(key, "counter") || strings.Contains(key, "milestone") || strings.Contains(key, "triggervalue")
+}
+func arenaProgressionKeys(raw json.RawMessage) []string {
+	var root map[string]json.RawMessage
+	keys := []string{}
+	if json.Unmarshal(raw, &root) != nil {
+		return keys
+	}
+	for key := range root {
+		if arenaDiscoveryIdentifier.MatchString(key) && !arenaProgressionPrivate.MatchString(key) && len(key) < 36 {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	if len(keys) > 128 {
+		keys = keys[:128]
+	}
+	return keys
+}
+func arenaProgressionGroupDiff(before, after arenaProgressionSnapshot) []map[string]any {
+	groups := []map[string]any{}
+	for _, id := range before.GroupIDs {
+		prefix := "group/" + id + "/"
+		old, next, milestones := map[string]float64{}, map[string]float64{}, map[string]float64{}
+		for key, value := range before.Values {
+			if strings.HasPrefix(key, prefix) {
+				old[strings.TrimPrefix(key, prefix)] = value
+			}
+		}
+		for key, value := range after.Values {
+			if strings.HasPrefix(key, prefix) {
+				k := strings.TrimPrefix(key, prefix)
+				next[k] = value
+				if strings.Contains(strings.ToLower(k), "milestone") {
+					milestones[k] = value
+				}
+			}
+		}
+		changes := arenaProgressionDiff(arenaProgressionSnapshot{Values: old}, arenaProgressionSnapshot{Values: next})
+		if len(changes) > 0 {
+			groups = append(groups, map[string]any{"group_id": id, "before": arenaProgressionChangedValues(old, changes), "after": arenaProgressionChangedValues(next, changes), "changes": changes, "milestones": milestones})
+		}
+	}
+	return groups
+}
+
+func arenaProgressionChangedValues(values map[string]float64, changes map[string]arenaProgressionDelta) map[string]float64 {
+	out := map[string]float64{}
+	for key := range changes {
+		out[key] = values[key]
+	}
+	return out
 }

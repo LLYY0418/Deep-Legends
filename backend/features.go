@@ -81,6 +81,8 @@ type clientDiagnosticRequest struct {
 	RankRecordQueue   string          `json:"queue,omitempty"`
 	OverviewPage      string          `json:"page,omitempty"`
 	OverviewFrom      string          `json:"from,omitempty"`
+	ChampionRestore   json.RawMessage `json:"championRestore,omitempty"`
+	ResizeTrace       json.RawMessage `json:"resizeTrace,omitempty"`
 	R278              json.RawMessage `json:"r278,omitempty"`
 	Lost              int             `json:"lost,omitempty"`
 	LPImagesRecreated int             `json:"images_recreated,omitempty"`
@@ -300,6 +302,8 @@ var specialistRuneClientReasons = map[string]bool{
 }
 
 var clientDiagnosticEvents = map[string]map[string]bool{
+	"champion_detail_restore":        {"open": true},
+	"window_resize_trace":            {"will-resize": true, "resize": true, "summary": true},
 	"rank_record_state":              {"known": true, "collecting": true, "paused": true, "unavailable": true},
 	"build_spells_client":            {"render": true},
 	"augment_description_client":     {"ok": true, "retry": true, "unavailable": true},
@@ -422,6 +426,14 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 	if !reasons[request.Reason] {
 		a.recordClientDiagnosticRejected("unknown-reason", request.Event)
 		http.Error(w, "invalid client diagnostic", http.StatusBadRequest)
+		return
+	}
+	if request.Event == "champion_detail_restore" {
+		a.recordChampionDetailRestore(w, request)
+		return
+	}
+	if request.Event == "window_resize_trace" {
+		a.recordWindowResizeTrace(w, request)
 		return
 	}
 	if isR278Diagnostic(request.Event) {

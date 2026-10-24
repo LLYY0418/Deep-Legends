@@ -239,6 +239,16 @@
     await sendFlowDiagnostic(body, JSON.stringify(body), 1, 1500);
   };
   window.reportFlowDiagnostic = (event, reason, fields = {}) => {
+    if(event==="champion_detail_restore"){
+      if(reason!=="open"||!["session","open-champion","user"].includes(fields.source)||!["ranked","aram-mayhem","arena"].includes(fields.mode))return;
+      const body={event,reason,championRestore:{source:fields.source,mode:fields.mode,championId:Number(fields.championId)||0}},encoded=JSON.stringify(body);
+      if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
+    }
+    if(event==="window_resize_trace"){
+      if(!["will-resize","resize","summary"].includes(reason))return;
+      const body={event,reason,resizeTrace:fields},encoded=JSON.stringify(body);
+      if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
+    }
     if(event==="rank_record_state") {
       if(!["solo","flex"].includes(fields.queue) || !["known","collecting","paused","unavailable"].includes(fields.state) || reason!==fields.state)return;
       const body={event,reason,queue:fields.queue,state:fields.state},encoded=JSON.stringify(body);
@@ -595,4 +605,20 @@ if (typeof window !== "undefined" && typeof document !== "undefined") installSta
   };
   if(window.deepLegendsPerformance)window.deepLegendsPerformance.startColdRequestWindow=startColdRequestWindow;
   window.addEventListener?.('deep-legends:dispose',()=>{clearTimeout(timer);clearTimeout(publishTimer);},{once:true});
+})();
+
+// R307: next-frame timing and long tasks share the native drag identifier.
+(() => {
+  let drag=0,count=0,max=0,frame=0,last=null;
+  const consume=entries=>{if(drag)for(const e of entries){count++;max=Math.max(max,e.duration);}};
+  let observer;try{observer=new PerformanceObserver(list=>consume(list.getEntries()));observer.observe({type:"longtask",buffered:false});}catch(_){}
+  const receive=value=>{
+    if(drag!==value.drag){drag=value.drag;count=max=0;}
+    if(value.reason==="summary"&&observer)consume(observer.takeRecords());
+    const at=performance.now();last={...value,innerWidth,innerHeight,longtaskCount:count,longtaskMaxMs:max};
+    if(frame)cancelAnimationFrame(frame);
+    frame=requestAnimationFrame(()=>{frame=0;const v=last;window.reportFlowDiagnostic?.("window_resize_trace",v.reason,{...v,nextFrameMs:performance.now()-at});if(v.reason==="summary")drag=0;});
+  };
+  const off=window.desktopWindow?.onResizeTrace?.(receive);
+  window.addEventListener("deep-legends:dispose",()=>{off?.();observer?.disconnect();cancelAnimationFrame(frame);},{once:true});
 })();

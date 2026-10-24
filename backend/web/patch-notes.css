@@ -68,6 +68,7 @@
 
 .pn-line .to.is-buff, .pn-direction.is-buff { color:var(--success); }
 .pn-line .to.is-nerf, .pn-direction.is-nerf { color:var(--danger); }
-.pn-direction { margin-left:6px; }
+.pn-direction { display:inline-flex; align-items:center; justify-content:center; flex:none; width:18px; height:18px; margin-left:6px; border-radius:5px; background:color-mix(in srgb,currentColor 15%,transparent); vertical-align:middle; }
+.pn-direction svg { display:block; width:12px; height:12px; }
 
 .pn-direction.is-adjust { color:var(--muted); }

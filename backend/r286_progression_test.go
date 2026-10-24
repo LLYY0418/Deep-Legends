@@ -113,7 +113,7 @@ func TestR286ProgressionBeforeAfterReadOnlyResolvedFromFullHelp(t *testing.T) {
 					timer.fn()
 				}
 			}
-			events := readDiagnosticEvents(t, a.storage, "arena_fame_progression_diff")
+			events := readDiagnosticEvents(t, a.storage, "arena_fame_progression_diff_v3")
 			if len(events) != 1 {
 				t.Fatal(events)
 			}
@@ -126,7 +126,7 @@ func TestR286ProgressionBeforeAfterReadOnlyResolvedFromFullHelp(t *testing.T) {
 				if len(changes) != 3 {
 					t.Fatal(changes)
 				}
-				v := changes["ArenaSeason[0]/counters.fame"].(map[string]any)
+				v := changes["group/cherry-season/counters.fame"].(map[string]any)
 				if v["before"] != float64(10) || v["after"] != float64(25) {
 					t.Fatal(v)
 				}
@@ -153,7 +153,7 @@ func TestR286ProgressionBeforeAfterReadOnlyResolvedFromFullHelp(t *testing.T) {
 				}
 			}
 			a.probeArenaProgressionAfter(c, s)
-			if len(readDiagnosticEvents(t, a.storage, "arena_fame_progression_diff")) != 1 {
+			if len(readDiagnosticEvents(t, a.storage, "arena_fame_progression_diff_v3")) != 1 {
 				t.Fatal("duplicate diff")
 			}
 		})
@@ -169,7 +169,7 @@ func TestR286ProgressionPartsReconstructWithin4KB(t *testing.T) {
 		after.Values[key] = float64(i + 20)
 	}
 	changes := arenaProgressionDiff(before, after)
-	event := map[string]any{"event": "arena_fame_progression_diff", "changes": changes}
+	event := map[string]any{"event": "arena_fame_progression_diff_v3", "changes": changes}
 	parts := arenaFameDiscoveryParts(event)
 	if len(parts) < 2 {
 		t.Fatal("oversized diff was not split")
@@ -177,7 +177,7 @@ func TestR286ProgressionPartsReconstructWithin4KB(t *testing.T) {
 	for _, part := range parts {
 		a.recordDiagnostic(part)
 	}
-	events := readDiagnosticEvents(t, a.storage, "arena_fame_progression_diff")
+	events := readDiagnosticEvents(t, a.storage, "arena_fame_progression_diff_v3")
 	rebuilt := ""
 	for i, e := range events {
 		raw, _ := json.Marshal(e)

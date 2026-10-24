@@ -101,7 +101,8 @@ function harness({source=mainSource, stored, width=1920, height=1080}={}) {
     getBounds(){return {...this.bounds,width:this.bounds.width+30,height:this.bounds.height+60};}
     getNormalBounds(){return {x:0,y:0,...this.getBounds()};}
     isMaximized(){return false;}
-    setMinimumSize(...size){minimum.push(size);}
+    setMinimumSize(...size){this.minimumSize=size;minimum.push(size);}
+    getMinimumSize(){return this.minimumSize||[this.options.minWidth,this.options.minHeight];}
     setResizable(){}
     setOpacity(){}
     setMaximizable(){}

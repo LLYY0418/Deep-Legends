@@ -107,7 +107,7 @@
   function chips(ref) {
     if (!shown() || !marked(ref)) return "";
     const ts = tags(records.get(ref));
-    return `<span class="ptag-row" data-ptag-chips="${esc(ref)}" data-tooltip="${esc(tooltip(ref))}">${ts
+    return `<span class="ptag-row" data-ptag-chips="${esc(ref)}" data-ptag-open="${esc(ref)}" role="button" tabindex="0" data-tooltip="${esc(tooltip(ref))}">${ts
       .slice(0, 2)
       .map(
         (t, i) =>
@@ -204,10 +204,10 @@
       ]);
       if (
         (target._ptagSignature === signature &&
-          (target.querySelector("[data-ptag-open]") || target.closest(".match-team-list,.arena-team-roster"))) ||
+          (target.querySelector("[data-ptag-open]") || target.closest(".live-player")?.querySelector("[data-ptag-open]"))) ||
         (target._ptagSignature === signature &&
           target.closest(".participant-identity")?.querySelector(
-            "[data-ptag-decoration]",
+            "[data-ptag-open]",
           ))
       )
         continue;
@@ -350,11 +350,11 @@
         try{
           await api({op:"update",playerRef:ref,...value});
           records.set(ref,{...records.get(ref),...value});
-          if(!pending.has(ref))edits.delete(ref);
+          if(!pending.has(ref)&&edits.get(ref)?.note===value.note&&JSON.stringify(edits.get(ref)?.tags)===JSON.stringify(value.tags))edits.delete(ref);
           saveError="";changed(ref);
         }catch(e){
           if(!cancelled.has(ref)&&![400,404].includes(e.status)){if(!pending.has(ref))pending.set(ref,value);}
-          else {pending.delete(ref);edits.delete(ref);}
+          else {cancelled.add(ref);pending.delete(ref);edits.delete(ref);schedule();}
           saveError=e.message;failure=e;
           if(modal&&current===ref){renderModal();status(saveError);}
         }
@@ -365,8 +365,7 @@
   }
   function close() {
     clearTimeout(timer);
-    for(const ref of edits.keys()){cancelled.add(ref);pending.delete(ref);}
-    edits.clear();schedule();
+    void flush().catch(()=>{});schedule();
     modal?.parentElement.remove();modal=null;
     if(openerLive&&!opener?.getClientRects().length)ctx().revealLive();
     opener?.isConnected&&opener.getClientRects().length?opener.focus():focusRef(openerRef);

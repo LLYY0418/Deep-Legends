@@ -245,6 +245,7 @@
   function activateTab(name, focus = false) {
     if (!tabCopy[name]) name = "watch";
     if (state.tab !== name) {
+      if(state.tab === "config")window.deepLegendsAutoConfig?.flushDraft();
       state.scroll[state.tab] = Number(appScroll?.scrollTop || 0);
       state.scroll[name] = 0;
       writePreference("suite-scroll", JSON.stringify(state.scroll));

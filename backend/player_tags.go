@@ -245,6 +245,9 @@ func (a *app) handlePlayerTags(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	a.gameplayFlow.mu.Lock()
+	phase := a.gameplayFlow.phase
+	a.gameplayFlow.mu.Unlock()
 	s := a.storage
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -408,7 +411,7 @@ func (a *app) handlePlayerTags(w http.ResponseWriter, r *http.Request) {
 		fail(err)
 		return
 	}
-	diagnostic = map[string]any{"event": "player_tags_saved", "players": len(v.Players), "tags": len(v.Catalog)}
+	diagnostic = map[string]any{"event": "player_tags_saved", "players": len(v.Players), "tags": len(v.Catalog), "phase": phase}
 	respondJSON(w, map[string]any{"version": v.Version, "saved": true})
 }
 

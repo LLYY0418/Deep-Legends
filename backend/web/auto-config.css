@@ -74,7 +74,6 @@
 .ac-mode .ac-mode-dot { width:6px; height:6px; border-radius:50%; background:transparent; border:1px solid color-mix(in oklab,var(--muted) 55%,transparent); }
 .ac-mode .ac-mode-dot.on { background:var(--primary); border-color:var(--primary); }
 .ac-positions { display:flex; align-items:center; gap:8px; padding:11px 16px 0; }
-.ac-pos-label { display:inline-flex; align-items:center; height:28px; margin-right:8px; color:var(--muted); font-size:12px; line-height:1; flex:none; }
 .ac-pos { display:inline-flex; align-items:center; gap:5px; height:28px; line-height:1; padding:0 10px; border:1px solid transparent; border-radius:999px; background:transparent; color:var(--muted); font:inherit; font-size:11.5px; cursor:pointer; }
 .ac-pos:hover { color:var(--ink); background:var(--surface-strong); }
 .ac-pos.is-active { color:var(--ink); border-color:var(--hex-line); background:var(--surface-strong); font-weight:650; }
@@ -453,3 +452,7 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 .ac-editor-actions { flex:none; margin-left:auto; }
 .ac-validation-pulse { animation:ac-validation-pulse 650ms ease-out; }
 @keyframes ac-validation-pulse { 30% { outline:2px solid var(--warning); background:color-mix(in oklab,var(--warning) 14%,transparent); } }
+
+.ac-draft-dot { display:inline-block; flex:none; width:6px; height:6px; margin-left:5px; border:1.5px solid var(--primary); border-radius:50%; vertical-align:middle; }
+.ac-save-attempt { display:inline-flex; }
+.ac-save-attempt > button:disabled { pointer-events:none; }

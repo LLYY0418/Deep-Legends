@@ -17,22 +17,24 @@ import (
 
 // The client owns this state; reconnecting creates a new observation scope.
 type arenaFameDiscoveryState struct {
-	mu                sync.Mutex
-	started           bool
-	done              chan struct{}
-	queues            map[string][]string
-	uris              []string
-	event             map[string]any
-	flushRequested    bool
-	emitted           bool
-	lastPhase         string
-	postScheduled     bool
-	schedule          func(time.Duration, func()) func()
-	stops             []func()
-	operations        []lcuHelpOperation
-	baseline          map[string]map[string]float64
-	progression       *arenaProgressionProbe
-	progressionEvents map[string]map[string]float64
+	mu                    sync.Mutex
+	started               bool
+	done                  chan struct{}
+	queues                map[string][]string
+	uris                  []string
+	event                 map[string]any
+	flushRequested        bool
+	emitted               bool
+	lastPhase             string
+	postScheduled         bool
+	schedule              func(time.Duration, func()) func()
+	stops                 []func()
+	operations            []lcuHelpOperation
+	baseline              map[string]map[string]float64
+	progression           *arenaProgressionProbe
+	progressionEvents     map[string]map[string]float64
+	progressionGroupIDs   map[string]bool
+	progressionGroupPaths map[string]bool
 }
 
 var arenaDiscoveryName = regexp.MustCompile(`(?i)cherry|arena|fame|gladiator|progression|eog|end-of-game|pre-end-of-game`)

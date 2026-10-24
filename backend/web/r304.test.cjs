@@ -13,7 +13,7 @@ test('R304 seven real bundled changes use the correct color and preserve officia
    w.document.querySelector('main').innerHTML=w.deepLegendsPatchNotes.renderSections(sections);
    const article=[...w.document.querySelectorAll('.pn-entry')].find(n=>n.querySelector('.pn-entry-name').textContent===name),node=[...article.querySelectorAll('.pn-line')].find(n=>n.querySelector('.k')?.textContent===key+'：');
    assert(node.querySelector('.to').classList.contains('is-'+want),`${version}/${name}/${key}`);assert.equal(node.querySelector('.from').textContent,line.from);assert.equal(node.querySelector('.to').textContent,line.to);
-   if(name==='月华咒刃'){assert.equal(article.querySelector('.pn-direction').textContent,'↓');assert(![...article.querySelectorAll('.pn-line')].find(n=>n.querySelector('.k')?.textContent==='强化攻击次数：').querySelector('.to').classList.contains('is-buff'));}
+   if(name==='月华咒刃'){assert.equal(article.querySelector('.pn-direction').getAttribute('aria-label'),'削弱');assert.equal(article.querySelector('.pn-direction path').getAttribute('d'),'M6 2v8M3 7l3 3 3-3');assert.equal(article.querySelector('.pn-direction path').getAttribute('stroke-width'),'2.4');assert(![...article.querySelectorAll('.pn-line')].find(n=>n.querySelector('.k')?.textContent==='强化攻击次数：').querySelector('.to').classList.contains('is-buff'));}
   }
  }finally{w.close();}
 });

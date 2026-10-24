@@ -3441,7 +3441,7 @@ test("champion mode, searches, and tabs persist while transient detail state res
 	assert.match(reset, /state\.detail = null/);
 	assert.match(reset, /state\.selected = null/);
 	assert.match(reset, /state\.workspaceRequestToken \+= 1/);
-	assert.ok(script.includes("detailChampionID: initialMode === \"arena\" ? 0 : normalizeChampionDetailID(readSetting(`champion-detail-id-${initialMode}`, \"\"))"));
+	assert.ok(script.includes("detailChampionID: 0"));
 	assert.doesNotMatch(script, /readSetting\("champion-(?:loading|error|request-token)/);
 });
 
@@ -5604,7 +5604,7 @@ test("player header retains region and uses friend presence without CN spectator
  assert.doesNotMatch(functionSource(gameplayScript, "updateFriendPresenceChips"), /loadOverview|loadOverviewCurrentGame|renderOverview|\bapi\(/);
 });
 
-test("R46 restores only a persisted champion ID and clears unavailable selections", () => {
+test("R46 restores only a session champion ID and clears unavailable selections", () => {
 	const state = {
 		selected: null,
 		detailChampionID: 266,
@@ -5637,17 +5637,17 @@ test("R46 restores only a persisted champion ID and clears unavailable selection
 	assert.deepEqual(opened, [266]);
 	assert.equal(renders, 1);
 	assert.equal(state.detailChampionID, 0);
-	assert.deepEqual(writes, [["champion-detail-id-ranked", ""]]);
+	assert.deepEqual(writes, []);assert.equal(state.detailByMode.ranked,0);
 
-	assert.match(functionSource(script, "openDetail"), /state\.detailChampionID = championID;[\s\S]*writeSetting\(`champion-detail-id-\$\{state\.mode\}`, championID\)/);
-	assert.match(functionSource(script, "closeDetail"), /state\.detailChampionID = 0;[\s\S]*writeSetting\(`champion-detail-id-\$\{state\.mode\}`, ""\)/);
+	assert.match(functionSource(script, "openDetail"), /state\.detailChampionID = championID;[\s\S]*state\.detailByMode/);assert.doesNotMatch(functionSource(script,"openDetail"),/writeSetting\(`champion-detail-id/);
+	assert.match(functionSource(script, "closeDetail"), /state\.detailChampionID = 0;[\s\S]*state\.detailByMode/);assert.doesNotMatch(functionSource(script,"closeDetail"),/writeSetting\(`champion-detail-id/);
 	assert.doesNotMatch(functionSource(script, "resetTransientChampionState"), /detailChampionID\s*=/);
 	for (const key of ["champion-loading", "champion-detail", "champion-error", "champion-request-token"]) {
 		assert.doesNotMatch(script, new RegExp(`readSetting\\("${key}"`));
 	}
 });
 
-test("R61 champion re-entry renders persisted detail on the first frame", async () => {
+test("R61 champion re-entry renders session detail on the first frame", async () => {
 	const dom = new JSDOM('<main id="champion-root"></main>');
 	const rootNode = dom.window.document.getElementById("champion-root");
 	const snapshots = [];
@@ -5869,7 +5869,7 @@ test("R47 ranked detail recovers to the list when champion metadata is unavailab
   assert.equal(state.loading, false);
   assert.equal(state.error, "");
   assert.equal(renders, 1);
-  assert.deepEqual(writes, [["champion-detail-id-ranked", 266], ["champion-detail-id-ranked", ""]]);
+  assert.deepEqual(writes, []);assert.equal(state.detailByMode.ranked,0);
 });
 
 test("champion detail core routes hide pick rate and retain win rate with games", () => {

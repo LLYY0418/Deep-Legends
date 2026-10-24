@@ -30,7 +30,7 @@
 
   const initialMode = normalizeMode(readSetting("champion-mode", "ranked"));
   migrateChampionModePreferences(initialMode);
-  try { localStorage.removeItem("lol-loot-champion-detail-id-arena"); } catch (_) {}
+  try { for(const mode of ["ranked","aram-mayhem","arena"])localStorage.removeItem(`lol-loot-champion-detail-id-${mode}`);localStorage.removeItem("lol-loot-champion-detail-id"); } catch (_) {}
 
   const state = {
     section: "overview",
@@ -102,7 +102,8 @@
     workspaceRequestToken: 0,
     detailRequestToken: 0,
 	    runePage: normalizeRunePage(readSetting("champion-rune-page", "0")),
-	    detailChampionID: initialMode === "arena" ? 0 : normalizeChampionDetailID(readSetting(`champion-detail-id-${initialMode}`, "")),
+	    detailChampionID: 0,
+    detailByMode: {},
     playerDetour: false,
   };
 
@@ -127,7 +128,7 @@
   // The legacy selection belongs only to the mode saved alongside it, never all three.
   function migrateChampionModePreferences(mode) {
     if (readSetting("champion-mode-preferences-v2", "") === "1") return;
-    for (const key of ["champion-detail-id", "champion-query"]) {
+    for (const key of ["champion-query"]) {
       const scoped = `${key}-${mode}`;
       if (readSetting(scoped, null) === null) writeSetting(scoped, readSetting(key, ""));
     }
@@ -141,7 +142,7 @@
     resetTransientChampionState({ restorePosition: true });
     state.mode = mode;
     writeSetting("champion-mode", mode);
-    state.detailChampionID = mode === "arena" ? 0 : normalizeChampionDetailID(readSetting(`champion-detail-id-${mode}`, ""));
+    state.detailChampionID = mode === "arena" ? 0 : (state.detailByMode?.[mode] || 0);
     state.query = normalizeStoredSearch(readSetting(`champion-query-${mode}`, ""));
     state.rankings = null;
     state.augments = null;
@@ -356,7 +357,7 @@
   function renderLoadedWorkspace() {
     const restored = restorePersistedChampionSelection();
     if (restored && state.mode === "ranked") {
-      void openDetail(restored);
+      void openDetail(restored, "session");
       return;
     }
     if (restored) state.selected = restored;
@@ -484,11 +485,12 @@
     }
   }
 
-  async function openDetail(row) {
+  async function openDetail(row, source = "user") {
     const championID = normalizeChampionDetailID(row?.championId);
     if (!championID) return;
     state.detailChampionID = championID;
-    if(state.mode!=="arena")writeSetting(`champion-detail-id-${state.mode}`, championID);
+    if(state.mode!=="arena")(state.detailByMode||={})[state.mode]=championID;
+    if(typeof window!=="undefined")window.reportFlowDiagnostic?.("champion_detail_restore","open",{source,championId:championID,mode:state.mode});
     if (state.mode === "arena") {
       selectArenaChampion(row);
       return;
@@ -505,7 +507,7 @@
 	      state.detailChampionID = 0;
 	      state.loading = false;
 	      state.error = "";
-	      writeSetting(`champion-detail-id-${state.mode}`, "");
+	      (state.detailByMode||={})[state.mode]=0;
 	      render();
 	      return;
 	    }
@@ -914,7 +916,7 @@
     state.detailPosition = null;
     state.selected = null;
     state.detailChampionID = 0;
-    writeSetting(`champion-detail-id-${state.mode}`, "");
+    (state.detailByMode||={})[state.mode]=0;
     state.error = "";
     render();
     requestAnimationFrame(() => appScroll?.scrollTo({ top: state.listScroll, behavior: "instant" }));
@@ -927,7 +929,7 @@
     const row = rankingRows().find((item) => Number(item.championId) === Number(state.detailChampionID));
     if (row) return row;
     state.detailChampionID = 0;
-    writeSetting(`champion-detail-id-${state.mode}`, "");
+    (state.detailByMode||={})[state.mode]=0;
     return null;
   }
 
@@ -3079,7 +3081,7 @@
     if (!championId || !/^[a-z0-9-]+$/.test(String(detail.key || ""))) return;
     state.mode = "ranked";
     state.playerDetour = false;
-    void openDetail({ championId, key: detail.key, position: normalizePosition(detail.position) });
+    void openDetail({ championId, key: detail.key, position: normalizePosition(detail.position) }, "open-champion");
   });
 
   window.addEventListener("pagehide", flushChampionSearch);

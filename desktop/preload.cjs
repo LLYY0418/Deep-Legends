@@ -3,7 +3,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 let mainWindowVisible=false;const visibleListeners=new Set();ipcRenderer.on('desktop-window-visible',()=>{mainWindowVisible=true;for(const callback of visibleListeners)callback();});
-contextBridge.exposeInMainWorld("desktopWindow", {onVisible(callback){if(typeof callback!=="function")return;visibleListeners.add(callback);if(mainWindowVisible)queueMicrotask(callback);return ()=>visibleListeners.delete(callback);}});
+contextBridge.exposeInMainWorld("desktopWindow", {onResizeTrace(callback){if(typeof callback!=="function")return;const listener=(_event,value)=>callback(value);ipcRenderer.on("desktop-window-resize-trace",listener);return ()=>ipcRenderer.removeListener("desktop-window-resize-trace",listener);},onVisible(callback){if(typeof callback!=="function")return;visibleListeners.add(callback);if(mainWindowVisible)queueMicrotask(callback);return ()=>visibleListeners.delete(callback);}});
 
 contextBridge.exposeInMainWorld("desktopClipboard", {
   copyText(text) { return ipcRenderer.invoke("desktop-copy-text", typeof text === "string" ? text.slice(0, 256) : ""); },

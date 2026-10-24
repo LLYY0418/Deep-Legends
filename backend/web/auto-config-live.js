@@ -3,17 +3,18 @@
  const {state,renderLive,escapeHTML,renderItemIcon,renderRuneSpellIcons,renderUnifiedRuneBoard,runeConfigurationTitle,nodes,selectedRuneRecommendation,recommendedRuneSpellIDs,bindLiveNode,renderRecommendationArea,rememberLiveRecommendationMarkup,api,showToast}=window.deepLegendsGameAutoConfig;
  const labels={ranked:"排位",normal:"匹配",aram:"极地大乱斗",hextech:"海克斯大乱斗",urf:"无限火力",event:"活动模式"};
  const positions={top:"上路",jungle:"打野",middle:"中路",bottom:"下路",utility:"辅助"};
- function mode(data){const q=Number(data?.queueId),m=String(data?.gameMode||"").toUpperCase();if([1700,1710,1750].includes(q)||m==="CHERRY")return "";if([2300,2400,3270].includes(q)||["KIWI","ARAM_MAYHEM"].includes(m))return "hextech";if([420,440].includes(q))return "ranked";if([450,930,3220,720].includes(q)||m==="ARAM")return "aram";if([900,1900].includes(q)||m==="URF")return "urf";if([1300,1400].includes(q)||["ULTBOOK","NEXUSBLITZ"].includes(m))return "event";if([400,430,480,490,700,820,830,840,850,860,870,880,890,950,960,3100].includes(q)||["CLASSIC","PRACTICETOOL"].includes(m)&&[0,11].includes(Number(data?.mapId)||0)||!q&&!m&&Number(data?.mapId)===11)return "normal";return "";}
+ function mode(data) {const q=Number(data?.queueId),m=String(data?.gameMode||"").toUpperCase();if([1700,1710,1750].includes(q)||m==="CHERRY")return "";if([2300,2400,3270].includes(q)||["KIWI","ARAM_MAYHEM"].includes(m))return "hextech";if([420,440].includes(q))return "ranked";if([450,930,3220,720].includes(q)||m==="ARAM")return "aram";if([900,1900].includes(q)||m==="URF")return "urf";if([1300,1400].includes(q)||["ULTBOOK","NEXUSBLITZ"].includes(m))return "event";if([400,430,480,490,700,820,830,840,850,860,870,880,890,950,960,3100].includes(q)||["CLASSIC","PRACTICETOOL"].includes(m)&&[0,11].includes(Number(data?.mapId)||0)||!q&&!m&&Number(data?.mapId)===11)return "normal";return "";}
  function resolveModeKey(all,m,position) {const keys=m==="ranked"?["ranked-"+position,"ranked"]:m==="normal"?["normal","ranked-"+position,"ranked"]:[m];return keys.find(k=>all?.[k])||m;}
- function selection(data){
+ function selection(data) {
   const self=data?.players?.find(p=>p.isCurrent),id=Number(self?.championId)||Number(self?.championPickIntent)||Number(data?.currentChampionId),m=mode(data),all=state.autoConfigSettings?.champions?.[id];
   const position=({mid:"middle",adc:"bottom",support:"utility"})[self?.position]||self?.position;
-  if(!m)return null;
-  const key=resolveModeKey(all,m,position),entry=all?.[key];
+  if(!m||!state.autoConfigSettings?.enabled)return null;
+  const key=resolveModeKey(all,m,position),saved=all?.[key],settings=state.autoConfigSettings;
+  const entry=saved?{...saved,runes:settings.runes?saved.runes:null,spells:settings.spells?saved.spells:null,items:settings.items?saved.items:null}:null;
   if(!entry||!entry.runes&&!entry.spells&&!entry.items?.starter?.length&&!entry.items?.core?.length&&!entry.items?.situational?.length)return null;
   return {key:"custom",sourceLabel:"自配置",championId:id,modeKey:key,modeLabel:(labels[key.startsWith("ranked")?"ranked":key]||"")+(key.startsWith("ranked")?" · "+(positions[key.slice(7)]||"通用"):""),entry,...entry.runes,...entry.spells,selectedComplete:entry.runes?.selectedPerkIds?.length===9};
  }
- function prepare(data){const c=selection(data),self=data?.players?.find(p=>p.isCurrent),key=`${data?.gameId}:${Number(self?.championId)||Number(self?.championPickIntent)||0}:${mode(data)}:${c?.modeKey||""}:${!!c}`;if(key!==state.autoConfigViewKey){state.autoConfigViewKey=key;state.runeSourceTab=c?"custom":"opgg";state.selectedRecommendation=c?"custom":"opgg";}return c;}
+ function prepare(data) {const c=selection(data),self=data?.players?.find(p=>p.isCurrent),key=`${data?.gameId}:${Number(self?.championId)||Number(self?.championPickIntent)||0}:${mode(data)}:${c?.modeKey||""}:${!!c}`;if(key!==state.autoConfigViewKey){state.autoConfigViewKey=key;state.runeSourceTab=c?"custom":"opgg";state.selectedRecommendation=c?"custom":"opgg";}return c;}
  function update(next){state.autoConfig=next;if(state.section==="live")renderLive("sse");}
  let flight=null;
  async function refresh(){if(flight)return flight;flight=(async()=>{await Promise.all([fetch("/api/auto-config/state").then(async r=>{if(r.ok)state.autoConfig=await r.json();}),fetch("/api/auto-config/settings").then(async r=>{if(r.ok)state.autoConfigSettings=await r.json();}),fetch("/api/settings/summoner-keys").then(async r=>{if(r.ok)state.summonerKeys=await r.json();})].map(p=>p.catch(()=>{})));if(state.section==="live")renderLive("settings");})().finally(()=>flight=null);return flight;}
@@ -27,9 +28,10 @@
  window.addEventListener("pagehide",flushShifts);
  window.addEventListener("deep-legends:dispose",()=>{shiftObserver?.disconnect();clearTimeout(shiftTimer);flushShifts();},{once:true});
   function renderCustomConfiguration(config) {
-    const entry=config.entry,auto=state.autoConfig?.championId===config.championId?state.autoConfig:null;
-    const settings=state.autoConfigSettings;
-    const status=!settings?.enabled||!["runes","spells","items"].some(k=>settings[k])?"自动配置已关闭":auto?.yielded?.runes||auto?.yielded?.spells?"已手动应用其他推荐，本局不自动应用":Object.values(auto?.results||{}).includes("applied")?"已应用到客户端":"锁定后自动应用";
+    const settings=state.autoConfigSettings;if(!settings?.enabled)return "";
+    const entry={...config.entry,runes:settings.runes?config.entry.runes:null,spells:settings.spells?config.entry.spells:null,items:settings.items?config.entry.items:null},auto=state.autoConfig?.championId===config.championId?state.autoConfig:null;
+    if(!entry.runes&&!entry.spells&&!["starter","core","situational"].some(k=>entry.items?.[k]?.length))return "";
+    const status=auto?.yielded?.runes||auto?.yielded?.spells?"已手动应用其他推荐，本局不自动应用":Object.values(auto?.results||{}).includes("applied")?"已应用到客户端":"锁定后自动应用";
     const groups=[["出门装",entry.items?.starter||[]],["最终装备",(entry.items?.core||[]).map(id=>({id,count:1}))]].filter(([,items])=>items.length);
     const items=groups.map(([label,ids])=>`<div class="sg-items"><span class="sg-label">${label}</span><div class="sg-icons">${ids.map(item=>`<span class="custom-config-item">${renderItemIcon(item.id)}${item.count>1?`<b>×${item.count}</b>`:""}</span>`).join("")}</div></div>`).join("");
     const spells=entry.spells?renderRuneSpellIcons(entry.spells):"";
@@ -94,7 +96,7 @@
  syncSpellRows();
  window.deepLegendsAutoConfigLive={selection,prepare,renderCustomConfiguration,updateLiveRuneSelection,applyCustomConfiguration};
  window.addEventListener("deep-legends:auto-config",e=>update(e.detail||{}));
- window.addEventListener("deep-legends:auto-config-settings",e=>{state.autoConfigSettings=e.detail;state.autoConfigViewKey="";if(state.section==="live")renderLive("settings");});
+ window.addEventListener("deep-legends:auto-config-settings",e=>{state.autoConfigSettings=e.detail;state.autoConfigViewKey="";prepare(state.live);if(state.section==="live")renderLive("settings");});
  for(const name of ["deep-legends:resync","deep-legends:settings-imported"])window.addEventListener(name,()=>void refresh());
  window.addEventListener("deep-legends:section",e=>{if(e.detail?.name==="live")void refresh();});
  if(window.deepLegendsAutoConfigState)state.autoConfig=window.deepLegendsAutoConfigState;
