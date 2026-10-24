@@ -102,6 +102,7 @@
     return ranked.length >= 2 ? ranked : [];
   }
   window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options), escapeHTML, gradeRank, gradeBadge, scoreChampionSearchOption, skillPriority });
+  let manualRefreshSerial=0;
   const flowSamples = new Map();
   const flowPending = new Set();
   const sampledPending = new Set();
@@ -287,7 +288,7 @@
       body.source=['complete','overview-matches','patch','lp-recorded'].includes(fields.source)?fields.source:'complete';
     }
     if(event==='overview_subpage_open'){body.page=fields.page;body.from=fields.from;body.ok=fields.ok===true;}
-    if(event==='manual_refresh_client')for(const key of ['overview_requests','canceled_requests','busy_ms','label_changes'])body[key]=Math.max(0,Math.min(3600000,Math.floor(Number(fields[key])||0)));
+    if(event==='manual_refresh_client'){for(const key of ['overview_requests','canceled_requests','busy_ms','label_changes'])body[key]=Math.max(0,Math.min(3600000,Math.floor(Number(fields[key])||0)));if(['hard-refresh-wait','status-poll','api'].includes(fields.stage))body.stage=fields.stage;}
     if(event==='match_filter_view'){
       body.filter=fields.filter;body.source=fields.source;
       for(const key of ['count','latest_game_id','latest_ended_at','all_list_count','missing_count'])body[key]=Math.max(0,Math.min(Number.MAX_SAFE_INTEGER,Math.floor(Number(fields[key])||0)));
@@ -411,7 +412,7 @@
       body.errorType = ["Error", "TypeError", "ReferenceError", "RangeError", "SyntaxError", "URIError", "EvalError", "AggregateError"].includes(fields.errorType) ? fields.errorType : "Error";
       body.functionName = ["refreshStatus", "renderStatus", "renderLaunchpad", "acceptClientView", "renderClientConnection", "updateReadingOverlay", "renderNotice", "updateWorkspaceAvailability", "renderUpdateStatus", "loadClientInstallations", "loadSkins", "loadAccount", "loadPools"].includes(fields.functionName) ? fields.functionName : "other";
     }
-    const encoded = JSON.stringify(body);
+    const encoded = JSON.stringify(body)+(event==="manual_refresh_client"?"|"+(++manualRefreshSerial):"");
     if (flowPending.has(encoded) || flowSamples.has(encoded) && now - flowSamples.get(encoded) < 30000) { increment("transportSuppressed"); return; }
     if (flowPending.size >= 32) { increment("transportDropped"); return; }
     flowPending.add(encoded);

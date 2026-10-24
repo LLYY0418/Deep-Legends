@@ -140,37 +140,51 @@ func mergeAnnouncements(bundled, remote []announcement) []announcement {
 	return out
 }
 
-type announcementFetchError struct{ Status int }
+type announcementFetchError struct {
+	Status      int
+	MirrorIndex int
+	Outcomes    []patchFetchAttempt
+}
 
 func (e *announcementFetchError) Error() string { return "notice fetch failed" }
 func fetchAnnouncementDocument(ctx context.Context, client *http.Client) ([]byte, []announcement, error) {
-	status := 0
-	for _, name := range []string{"announcements.v2.json", "announcements.json"} {
-		attempt, cancel := context.WithTimeout(ctx, 2*time.Second)
-		for _, prefix := range updateMirrors {
-			req, _ := http.NewRequestWithContext(attempt, "GET", prefix+announcementBranchURL+name, nil)
-			resp, err := client.Do(req)
-			if err != nil {
-				continue
+	ctx, cancelAll := context.WithTimeout(ctx, 20*time.Second)
+	defer cancelAll()
+	failure := &announcementFetchError{}
+	for index, prefix := range updateMirrors {
+		for _, name := range []string{"announcements.v2.json", "announcements.json"} {
+			attempt, cancel := context.WithTimeout(ctx, 4*time.Second)
+			req, err := http.NewRequestWithContext(attempt, http.MethodGet, prefix+announcementBranchURL+name, nil)
+			status := 0
+			var raw []byte
+			var notices []announcement
+			if err == nil {
+				var resp *http.Response
+				resp, err = client.Do(req)
+				if err == nil {
+					status = resp.StatusCode
+					raw, err = readLimited(resp.Body, 256<<10)
+					resp.Body.Close()
+					if err == nil && status == http.StatusOK {
+						notices, err = decodeAnnouncements(raw)
+					}
+				}
 			}
-			status = resp.StatusCode
-			raw, err := readLimited(resp.Body, 256<<10)
-			resp.Body.Close()
-			if err != nil || resp.StatusCode != 200 {
-				continue
-			}
-			notices, err := decodeAnnouncements(raw)
-			if err != nil {
-				continue
-			}
+			outcome := fetchOutcome(attempt, status, err)
+			failure.Status = status
+			failure.MirrorIndex = index
+			failure.Outcomes = append(failure.Outcomes, patchFetchAttempt{index, outcome})
 			cancel()
-			return raw, notices, nil
+			if outcome == "ok" {
+				return raw, notices, nil
+			}
+			if ctx.Err() != nil {
+				return nil, nil, failure
+			}
 		}
-		cancel()
 	}
-	return nil, nil, &announcementFetchError{Status: status}
+	return nil, nil, failure
 }
-
 func (a *app) fetchAnnouncements() {
 	c := a.announcementState()
 	c.mu.Lock()
@@ -183,9 +197,9 @@ func (a *app) fetchAnnouncements() {
 	c.mu.Unlock()
 	a.goSafe("announcements-fetch", func() {
 		defer func() { c.mu.Lock(); c.fetching = false; c.mu.Unlock() }()
-		ctx, cancel := context.WithTimeout(a.licenseBusinessContext(), 4*time.Second)
+		ctx, cancel := context.WithTimeout(a.licenseBusinessContext(), 20*time.Second)
 		defer cancel()
-		client := a.externalHTTPClient(&http.Client{Timeout: 2 * time.Second})
+		client := a.externalHTTPClient(&http.Client{Timeout: 4 * time.Second})
 		raw, notices, err := fetchAnnouncementDocument(ctx, client)
 		if err == nil {
 			bundle, _ := decodeAnnouncements(bundledAnnouncements)
@@ -210,7 +224,12 @@ func (a *app) fetchAnnouncements() {
 		if errors.As(err, &fetchErr) {
 			status = fetchErr.Status
 		}
-		a.recordDiagnostic(map[string]any{"event": "announcement_state", "id": "fetch", "revision": "", "source": "bundled", "action": "fetch-failed", "http_status": status})
+		event := map[string]any{"event": "announcement_state", "id": "fetch", "revision": "", "source": "bundled", "action": "fetch-failed", "http_status": status}
+		if fetchErr != nil {
+			event["mirror_index"] = fetchErr.MirrorIndex
+			event["mirror_outcomes"] = fetchErr.Outcomes
+		}
+		a.recordDiagnostic(event)
 	})
 }
 func (a *app) handleAnnouncements(w http.ResponseWriter, r *http.Request) {
@@ -256,7 +275,7 @@ func (a *app) handleAnnouncementImage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 		defer cancel()
-		client := a.externalHTTPClient(&http.Client{Timeout: 2 * time.Second})
+		client := a.externalHTTPClient(&http.Client{Timeout: 4 * time.Second})
 		for _, prefix := range updateMirrors {
 			req, _ := http.NewRequestWithContext(ctx, "GET", prefix+announcementBranchURL+name, nil)
 			resp, err := client.Do(req)

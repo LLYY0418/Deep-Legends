@@ -212,8 +212,8 @@ func (s *patchReleaseState) step(now time.Time, calendar func() ([]patchRelease,
 	}
 	if due.Version != "" {
 		s.LastAttemptVersion, s.AttemptedAt = due.Version, now
-		// Persist the attempt BEFORE networking: no five-minute retry and no
-		// repeated checks after a restart, including after upstream failures.
+		// Catalog invalidation remains once per release. Notes have a separate
+		// startup/retry loop and do not use this durable attempt as a success.
 		if save() != nil {
 			return now.Add(24 * time.Hour)
 		}
@@ -257,9 +257,6 @@ func (a *app) refreshPatchReleaseData(ctx context.Context, at time.Time) {
 	defer cancel()
 	provider := a.championDataProvider()
 	provider.cache.setMayhemReleaseBoundary(at)
-	if a.beginPatchNotesRefresh(false) {
-		a.finishPatchNotesRefresh(requestCtx)
-	}
 	catalog, catalogErr := provider.loadAugments(requestCtx)
 	_, rankingsErr := provider.loadARAMRankings(requestCtx)
 	a.recordDiagnostic(map[string]any{"event": "patch_release_refresh", "catalog_success": catalogErr == nil && catalog.DataNotice == "", "rankings_success": rankingsErr == nil})

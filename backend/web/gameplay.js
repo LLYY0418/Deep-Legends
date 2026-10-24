@@ -6498,9 +6498,14 @@
     if (connected()) tasks.push(loadLive(true));
     else renderLive("manual");
     scheduleBeaconPoll(0);
-    await Promise.allSettled(tasks);
-    // A same-round replacement may own the controller after its predecessor ends.
-    while(!state.destroyed && [...state.controllers.keys()].some(key=>key==='live' || key.startsWith('overview:')))await new Promise(resolve=>setTimeout(resolve,20));
+    const started=performance.now(),deadline=started+8000;
+    let settled=false;void Promise.allSettled(tasks).then(()=>settled=true);
+    const pending=()=>[...state.controllers.keys()].some(key=>key==='live'||key.startsWith('overview:'));
+    while(!state.destroyed&&connected()&&(!settled||pending())&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20));
+    if(!state.destroyed&&connected()&&(!settled||pending())){
+      window.reportFlowDiagnostic?.("manual_refresh_client","timeout",{stage:"hard-refresh-wait",busy_ms:Math.round(performance.now()-started)});
+      for(const [key,controller] of state.controllers)if(key==='live'||key.startsWith('overview:'))controller.abort();
+    }
   }
 
   function setOverviewRefreshLoading(group, loading) {

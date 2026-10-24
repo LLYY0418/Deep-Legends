@@ -87,6 +87,7 @@ type clientDiagnosticRequest struct {
 	OverviewRequests  int             `json:"overview_requests,omitempty"`
 	CanceledRequests  int             `json:"canceled_requests,omitempty"`
 	BusyMS            int             `json:"busy_ms,omitempty"`
+	RefreshStage      string          `json:"stage,omitempty"`
 	LabelChanges      int             `json:"label_changes,omitempty"`
 	LatestGameID      int64           `json:"latest_game_id,omitempty"`
 	LatestEndedAt     int64           `json:"latest_ended_at,omitempty"`
@@ -306,7 +307,7 @@ var clientDiagnosticEvents = map[string]map[string]bool{
 	"client_view_client":             {"received": true, "applied": true, "rejected": true, "frame": true, "new-generation": true, "generation-rollback": true, "duplicate-generation": true, "invalid-frame": true},
 	"ui_zoom_state":                  {"applied": true},
 	"lp_chip_render":                 {"render": true},
-	"manual_refresh_client":          {"complete": true},
+	"manual_refresh_client":          {"complete": true, "timeout": true, "released-no-client": true, "released-deadline": true},
 	"match_filter_view":              {"render": true},
 	"overview_subpage_open":          {"open": true},
 	"overview_scroll_reset":          {"restored": true},
@@ -516,6 +517,13 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if request.Event == "manual_refresh_client" {
+		if request.RefreshStage != "" {
+			if !slices.Contains([]string{"hard-refresh-wait", "status-poll", "api"}, request.RefreshStage) {
+				http.Error(w, "invalid refresh stage", 400)
+				return
+			}
+			event["stage"] = request.RefreshStage
+		}
 		event["overview_requests"], event["canceled_requests"] = min(1000, max(0, request.OverviewRequests)), min(1000, max(0, request.CanceledRequests))
 		event["busy_ms"], event["label_changes"] = min(3600000, max(0, request.BusyMS)), min(1000, max(0, request.LabelChanges))
 		a.recordDiagnostic(event)

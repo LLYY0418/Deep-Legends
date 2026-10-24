@@ -202,11 +202,11 @@ func (a *app) observeAutoConfigEvent(ctx context.Context, client *LCUClient, eve
 				r.generation++
 				a.autoConfig.Unlock()
 			} else {
-				if phase == "EndOfGame" && previous != "EndOfGame" {
+				if phase == "EndOfGame" && previous != "EndOfGame" || previous == "ChampSelect" && canceledChampSelectPhase(phase) {
 					a.goSafe("dl-rune-cleanup", func() {
 						cleanupCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
 						defer cancel()
-						a.cleanupDLRunePages(cleanupCtx, client)
+						a.cleanupDLRunePages(cleanupCtx, client, previous == "ChampSelect" && canceledChampSelectPhase(phase))
 					})
 				}
 				a.resetAutoConfig()

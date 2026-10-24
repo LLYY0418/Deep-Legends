@@ -757,6 +757,10 @@
       data.connected = data.identityReady = data.sgpReady = false;
       Object.assign(data, {snapshotReady:false, snapshotFallback:false, calculationOK:false, ownedCount:null, chromaOwnedCount:null, remainingCount:null, collectionDirty:false, syncing:false});
     }
+    if(state.manualRefreshing){
+      if(state.clientView?.state!=="ready" && (state.clientView || !data.connected))state.manualRefreshRelease?.("released-no-client");
+      else if(Date.now()>=state.manualRefreshDeadline)state.manualRefreshRelease?.("released-deadline");
+    }
     document.body.classList.remove("is-fatal");
     if (!data.syncing || !data.connected) state.manualRefreshTimedOut = false;
     const refreshBusy = state.manualRefreshing || (data.syncing && !state.manualRefreshTimedOut);
@@ -1565,8 +1569,6 @@
     const locked = !chroma.owned;
     card.classList.toggle("is-locked", locked);
     const status = card.querySelector(".skin-state");
-    // R130 P3：炫彩卡片去掉右上角的状态标签。未获取靠置灰 + 锁图标表示，已获取
-    // 正常显示；拥有状态在详情弹窗里仍然保留一行。
     status.textContent = "";
     status.hidden = true;
     card.querySelector("strong").textContent = chroma.name;
@@ -1880,8 +1882,7 @@
       activeCardImages: state.activeCardImages,
       queued: state.cardImageQueue.length,
       sourceIndex,
-      // 分类不出来就不带这个字段（runtime.js 与 features.go 都会丢掉非枚举值）。
-      // 这里绝不能兜底成 "lcu"：那是拿推断值代替证据，会把慢源归错类。
+      // Unknown sources remain absent instead of guessing LCU.
       imageSource: window.deepLegendsImageSourceLabel?.(url),
     });
   }
@@ -1952,7 +1953,7 @@
         if (job?.observer && job.observer !== observer) continue;
         if (entry.isIntersecting) {
           if (job && !job.cancelled) enqueueCardImageJob(job);
-          // R130：拿到名额后才停止观察；排队中的任务仍可在滚出预取范围时撤回。
+          // Observe queued images until admission.
           const current = state.cardImageJobs.get(entry.target);
           if (!current || current.active || current.done || current.cancelled) observer.unobserve(entry.target);
           continue;
@@ -2132,8 +2133,7 @@
       state.activeCardImages += 1;
       if (job.remote) state.activePrestigeCardImages += 1;
       job.image.dataset.cardImage = "loading";
-      // R130 P1-B：可见区域只在第一层判一次。拿到名额就转 eager，第二层不再用
-      // 懒加载重复拦截——否则名额已经发出、请求却被压在第二层不放行。
+      // Admitted images load eagerly.
       job.image.loading = "eager";
       loadImageSources(job.image, job.fallback, job.sources, () => finishCardImageJob(job));
     }
@@ -2751,9 +2751,7 @@
       state.renderGeneration += 1;
       state.poolRenderGeneration += 1;
       cancelDeferredImages(el.grid);
-      // R130 P1-D：奖池面板隐藏后里面的图片永远不可见，第二层不会放行，已经拿到
-      // 名额的任务会一直占着全局 8 个名额，直到下次打开奖池页。离开收藏页时和
-      // 皮肤列表一起取消。
+      // Cancel hidden pool images with collection requests.
       cancelDeferredImages(el.poolSkinGrid);
       stopHoverVideo();
     }
@@ -2887,7 +2885,7 @@
       state.renderGeneration += 1;
       state.poolRenderGeneration += 1;
       cancelDeferredImages(el.grid);
-      // R130 P1-D：切换收藏子页时奖池网格同样要取消，理由同 activateSection。
+      // Cancel pool requests on collection subpage changes.
       cancelDeferredImages(el.poolSkinGrid);
       stopHoverVideo();
     }
@@ -3561,9 +3559,7 @@
   function formatNumber(value) { const number = Number(value); return Number.isFinite(number) ? integerFormatter.format(number) : "—"; }
   function formatFileSize(value) { const bytes = Math.max(0, Number(value) || 0); if (bytes < 1024) return `${formatNumber(bytes)} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KiB`; return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`; }
   function formatDateTime(value) { const date = new Date(value); return Number.isNaN(date.valueOf()) ? "时间未知" : new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(date); }
-  // 导出诊断日志的文件名带上日期时间（MMDD-HHmm），避免同名文件在反复导出/
-  // 上传时被按文件名去重，导致明明是新导出的日志被误判成旧文件（真实事故：
-  // 用户删了旧日志重新导出，上传后内容仍是旧的，根因是文件名一直不变）。
+  // Timestamped diagnostic names prevent file collisions.
   function diagnosticExportFilename() {
     const date = new Date();
     const pad = (value) => String(value).padStart(2, "0");
@@ -3588,46 +3584,42 @@
 
   async function runManualRefresh() {
     if (state.manualRefreshing) return;
-    state.manualRefreshTimedOut = false;
-    state.manualRefreshMetrics={started:Date.now(),overview_requests:0,canceled_requests:0,label_changes:0};
-    state.manualRefreshing = true;
-    el.refresh.disabled = true;
-    setRefreshBusy(true);
-    showToast("正在重新读取对局与总览");
-    softResetShellState();
-    try {
-	  let refreshError = null;
-	  try {
-		await api("/api/refresh?source=user_refresh", { method: "POST" }, "refresh-background");
-        if(state.status)state.status.syncing=true;
-	  } catch (error) {
-		if (error.name !== "RequestCancelled") refreshError = error;
-	  }
-      const waitFor = [];
-      window.dispatchEvent(new CustomEvent("deep-legends:hard-refresh", { detail: { waitFor, reason: "manual" } }));
-      await Promise.allSettled(waitFor);
-      if(!refreshError) {
-        const syncDeadline=performance.now()+60000;
-        await refreshStatus(false);
-        while(state.status?.connected && state.status.syncing && !state.destroyed && !state.backendExited && performance.now()<syncDeadline) {
-          await new Promise(resolve=>setTimeout(resolve,200));
-          await refreshStatus(false);
-        }
-        state.manualRefreshTimedOut=Boolean(state.status?.connected && state.status.syncing && performance.now()>=syncDeadline);
+    const token=state.manualRefreshToken=(state.manualRefreshToken||0)+1,started=performance.now(),stop=Symbol("released");
+    const metrics={started:Date.now(),overview_requests:0,canceled_requests:0,label_changes:0};
+    let wake,stage="api";
+    const released=new Promise(resolve=>wake=()=>resolve(stop));
+    const current=()=>state.manualRefreshToken===token;
+    const release=(reason,at=stage)=>{
+      if(!current())return;
+      state.manualRefreshToken++;state.manualRefreshing=false;state.manualRefreshRelease=null;
+      state.manualRefreshTimedOut=reason!=="complete";
+      wake();
+      el.refresh.disabled=false;setRefreshBusy(false);if(state.status)renderStatus();
+      window.reportFlowDiagnostic?.("manual_refresh_client",reason,{overview_requests:metrics.overview_requests,canceled_requests:metrics.canceled_requests,busy_ms:Math.max(1,Math.round(performance.now()-started)),label_changes:metrics.label_changes,...(at?{stage:at}:{})});
+      if(state.manualRefreshMetrics===metrics)state.manualRefreshMetrics=null;
+    };
+    const bounded=async(work,limit,at)=>{
+      stage=at;let timer;
+      try{const value=await Promise.race([work,released,new Promise(resolve=>timer=setTimeout(()=>resolve(stop),Math.max(0,Math.min(limit,90000-(performance.now()-started)))))]);if(value===stop&&current())release("timeout",at);return value;}
+      finally{clearTimeout(timer);}
+    };
+    state.manualRefreshMetrics=metrics;state.manualRefreshTimedOut=false;state.manualRefreshing=true;
+    state.manualRefreshDeadline=Date.now()+90000;state.manualRefreshRelease=release;
+    el.refresh.disabled=true;
+    try{
+      setRefreshBusy(true);showToast("正在重新读取对局与总览");softResetShellState();if(!current())return;
+      let refreshError=null;
+      try{if(await bounded(api("/api/refresh?source=user_refresh",{method:"POST"},"refresh-background"),20000,"api")===stop||!current())return;if(state.status)state.status.syncing=true;}
+      catch(error){if(error.name!=="RequestCancelled")refreshError=error;}
+      if(!current())return;
+      const waitFor=[];window.dispatchEvent(new CustomEvent("deep-legends:hard-refresh",{detail:{waitFor,reason:"manual"}}));
+      if(await bounded(Promise.allSettled(waitFor),20000,"hard-refresh-wait")===stop||!current())return;
+      if(!refreshError){
+        const poll=async()=>{await refreshStatus(false);while(current()&&state.status?.connected&&state.status.syncing&&!state.destroyed&&!state.backendExited){await new Promise(resolve=>setTimeout(resolve,200));if(current())await refreshStatus(false);}};
+        if(await bounded(poll(),60000,"status-poll")===stop||!current())return;
       }
-	  if (refreshError) showToast(`收藏后台补刷未启动：${refreshError.message}`);
-	  else if(!state.manualRefreshTimedOut) showToast("对局与总览已重新读取");
-    } finally {
-      state.manualRefreshing = false;
-      if (state.status) renderStatus();
-      else {
-        el.refresh.disabled = false;
-        setRefreshBusy(false);
-      }
-      const metrics=state.manualRefreshMetrics;
-      if(metrics)window.reportFlowDiagnostic?.('manual_refresh_client','complete',{overview_requests:metrics.overview_requests,canceled_requests:metrics.canceled_requests,busy_ms:Date.now()-metrics.started,label_changes:metrics.label_changes});
-      state.manualRefreshMetrics=null;
-    }
+      if(refreshError)showToast(`收藏后台补刷未启动：${refreshError.message}`);else showToast("对局与总览已重新读取");
+    }finally{if(current())release("complete","");}
   }
   el.refresh.addEventListener("click",runManualRefresh);
   window.addEventListener('deep-legends:manual-refresh-metric',event=>{
@@ -4171,7 +4163,7 @@
   async function closeSkinDialog() {
     ++state.detailGeneration;
     clearTimeout(state.detailMediaTimer);
-    // R130 P1-A：关闭弹窗后不会再有新的 loadImageSources 来顶掉看门狗，必须显式清理。
+    // Closing dialogs must clear their image watchdogs.
     clearCardImageWatchdog(el.skinDialogImage);
     // Hidden dialogs remain connected; release exhausted image tasks explicitly.
     el.skinDialogImage.onload = null;
@@ -4917,8 +4909,7 @@
     update();
   }
 
-  // 暗夜金库改版的一次性迁移：老用户档案里存的浅色/自动主题
-  // 首次升级后统一切到与新设计一致的深色，之后的手动选择照常生效。
+  // One-time theme migration preserves subsequent user choices.
   if (!preference("theme-migrated-dark-vault", "")) {
     savePreference("theme", "dark");
     savePreference("theme-migrated-dark-vault", "1");

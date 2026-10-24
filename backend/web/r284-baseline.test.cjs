@@ -34,13 +34,13 @@ test('R284 P0 delayed friends replay disconnect and recover on the next connecti
 test('R284 P0 manual refresh releases its button after 60 seconds and later syncing polls cannot relock it',async()=>{
  const app=read('app.js','R284_APP_SOURCE'),dom=new JSDOM('<button><i class="refresh-icon"></i><span>重新读取</span></button>'),w=dom.window;
  const state={status:{connected:true,syncing:false}},button=w.document.querySelector('button'),toasts=[];let now=0,reads=0;
- const el={refresh:button};for(const key of ['ownedCount','chromaCount','poolCount','remainingCount','poolSource'])el[key]=w.document.createElement('span');
- const deps={state,el,window:w,document:w.document,CustomEvent:w.CustomEvent,performance:{now:()=>now},showToast:t=>toasts.push(t),softResetShellState(){},api:async()=>{},
-  refreshStatus:async()=>{assert(++reads<400,'manual refresh never stops while backend remains syncing');},setTimeout:fn=>{now+=200;queueMicrotask(fn);},
+ const clock=require('./r301-harness.cjs').clock();const el={refresh:button};for(const key of ['ownedCount','chromaCount','poolCount','remainingCount','poolSource'])el[key]=w.document.createElement('span');
+ const deps={state,el,window:w,document:w.document,CustomEvent:w.CustomEvent,performance:{now:clock.now},showToast:t=>toasts.push(t),softResetShellState(){},api:async()=>{},
+  refreshStatus:async()=>{assert(++reads<400,'manual refresh never stops while backend remains syncing');},setTimeout:clock.setTimeout,clearTimeout:clock.clearTimeout,
   acceptClientView(){},renderClientConnection(){},formatNumber:String,safeHTTPURL:()=>false,renderNotice(){},renderLaunchpad(){},updateWorkspaceAvailability(){},renderUpdateStatus(){}};
  const f=compile(app,['runManualRefresh','setRefreshBusy','renderStatus'],deps);
  try{
-  await f.runManualRefresh();assert.equal(now,60000);assert.equal(state.manualRefreshTimedOut,true);assert.equal(state.manualRefreshing,false);assert.equal(button.disabled,false);assert.equal(button.lastElementChild.textContent,'重新读取');
+  const task=f.runManualRefresh();await clock.advance(60000);await task;now=clock.now();assert.equal(now,60000);assert.equal(state.manualRefreshTimedOut,true);assert.equal(state.manualRefreshing,false);assert.equal(button.disabled,false);assert.equal(button.lastElementChild.textContent,'重新读取');
   assert(!toasts.includes('对局与总览已重新读取'),'timeout cannot claim success');
   for(let i=0;i<3;i++){f.renderStatus();assert.equal(button.disabled,false);}
   state.status.syncing=false;f.renderStatus();assert.equal(state.manualRefreshTimedOut,false);

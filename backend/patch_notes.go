@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -74,12 +75,14 @@ type patchNoteFeed struct {
 	Versions []patchNoteDocument `json:"versions"`
 }
 type patchNotesCache struct {
-	mu        sync.Mutex
-	documents []patchNoteDocument
-	started   bool
-	fetching  bool
-	checkedAt time.Time
-	failed    bool
+	mu           sync.Mutex
+	documents    []patchNoteDocument
+	started      bool
+	fetching     bool
+	checkedAt    time.Time
+	failed       bool
+	attemptedAt  time.Time
+	successfulAt time.Time
 }
 
 func validPatchSource(value string) bool {
@@ -240,27 +243,58 @@ func (a *app) patchNotesState() *patchNotesCache {
 	})
 	return a.patchNotes
 }
-func fetchPatchNotesDocument(ctx context.Context, client *http.Client) ([]byte, []patchNoteDocument, error) {
-	for _, prefix := range updateMirrors {
+
+type patchFetchAttempt struct {
+	MirrorIndex int    `json:"mirror_index"`
+	Outcome     string `json:"outcome"`
+}
+
+func fetchOutcome(ctx context.Context, status int, err error) string {
+	if status != 0 && status != http.StatusOK {
+		return "http-" + strconv.Itoa(status)
+	}
+	if err != nil {
+		if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) {
+			return "timeout"
+		}
+		return "decode"
+	}
+	return "ok"
+}
+func fetchPatchNotesDocument(ctx context.Context, client *http.Client, report ...func(int, string, string, time.Duration)) ([]byte, []patchNoteDocument, error) {
+	for index, prefix := range updateMirrors {
+		started := time.Now()
 		attemptCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 		req, err := http.NewRequestWithContext(attemptCtx, http.MethodGet, prefix+announcementBranchURL+"patch-notes.json", nil)
-		if err != nil {
-			cancel()
-			continue
+		status := 0
+		var raw []byte
+		var documents []patchNoteDocument
+		if err == nil {
+			var resp *http.Response
+			resp, err = client.Do(req)
+			if err == nil {
+				status = resp.StatusCode
+				raw, err = readLimited(resp.Body, patchNotesLimit)
+				resp.Body.Close()
+				if err == nil && status == http.StatusOK {
+					documents, err = decodePatchNotes(raw)
+				}
+			}
 		}
-		resp, err := client.Do(req)
-		if err != nil {
-			cancel()
-			continue
+		outcome := fetchOutcome(attemptCtx, status, err)
+		if len(report) > 0 {
+			version := ""
+			if len(documents) > 0 {
+				version = documents[0].Version
+			}
+			report[0](index, outcome, version, time.Since(started))
 		}
-		raw, err := readLimited(resp.Body, patchNotesLimit)
-		resp.Body.Close()
 		cancel()
-		if err != nil || resp.StatusCode != 200 {
-			continue
-		}
-		if documents, err := decodePatchNotes(raw); err == nil {
+		if outcome == "ok" && len(documents) > 0 {
 			return raw, documents, nil
+		}
+		if ctx.Err() != nil {
+			break
 		}
 	}
 	return nil, nil, errors.New("patch notes fetch failed")
@@ -275,16 +309,18 @@ func (a *app) startPatchNotes(ctx context.Context) {
 	cache.started = true
 	cache.mu.Unlock()
 	a.goSafe("patch-release-schedule", func() { a.runPatchReleaseSchedule(ctx) })
+	a.goSafe("patch-notes-retry", func() { a.runPatchNotesRetry(ctx) })
 }
 
-func (a *app) beginPatchNotesRefresh(force bool) bool {
+func (a *app) beginPatchNotesRefresh(_ bool) bool {
 	c := a.patchNotesState()
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.fetching || force && !c.checkedAt.IsZero() && time.Since(c.checkedAt) < 5*time.Second {
+	if c.fetching || !c.attemptedAt.IsZero() && time.Since(c.attemptedAt) < time.Minute {
 		return false
 	}
 	c.fetching = true
+	c.attemptedAt = time.Now()
 	return true
 }
 
@@ -295,21 +331,35 @@ func (a *app) refreshPatchNotes(ctx context.Context, force bool) {
 	a.goSafe("patch-notes-refresh", func() { a.finishPatchNotesRefresh(ctx) })
 }
 
-func (a *app) finishPatchNotesRefresh(ctx context.Context) {
+func (a *app) finishPatchNotesRefresh(ctx context.Context, triggers ...string) {
+	trigger := "dialog"
+	if len(triggers) > 0 {
+		trigger = triggers[0]
+	}
 	requestCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	err := a.refreshPatchNotesWithClient(requestCtx, a.externalHTTPClient(&http.Client{Timeout: 4 * time.Second}))
+	a.finishPatchNotesRefreshUsing(requestCtx, a.externalHTTPClient(&http.Client{Timeout: 4 * time.Second}), trigger)
+}
+
+func (a *app) finishPatchNotesRefreshUsing(ctx context.Context, client *http.Client, trigger string) {
+	err := a.refreshPatchNotesWithClient(ctx, client, trigger)
 	c := a.patchNotesState()
 	c.mu.Lock()
 	c.fetching = false
 	c.failed = err != nil
 	c.checkedAt = time.Now()
+	if err == nil {
+		c.successfulAt = c.checkedAt
+	}
 	c.mu.Unlock()
-	a.recordDiagnostic(map[string]any{"event": "patch_notes_refresh", "success": err == nil})
 	a.broadcastEvent(`{"type":"patch-notes-changed"}`)
 }
 
-func (a *app) refreshPatchNotesWithClient(ctx context.Context, client *http.Client) error {
+func (a *app) refreshPatchNotesWithClient(ctx context.Context, client *http.Client, triggers ...string) error {
+	trigger := "dialog"
+	if len(triggers) > 0 {
+		trigger = triggers[0]
+	}
 	c := a.patchNotesState()
 	c.mu.Lock()
 	version := ""
@@ -317,16 +367,37 @@ func (a *app) refreshPatchNotesWithClient(ctx context.Context, client *http.Clie
 		version = c.documents[0].Version
 	}
 	c.mu.Unlock()
-	remote, err := fetchLatestOfficialPatchNotes(ctx, client, version)
-	officialErr := err
-	if err != nil {
-		_, remote, err = fetchPatchNotesDocument(ctx, client)
+	report := func(source string, index int, outcome, latest string, duration time.Duration) {
+		a.recordDiagnostic(map[string]any{"event": "patch_notes_refresh", "trigger": trigger, "source": source, "mirror_index": index, "outcome": outcome, "latest_version": latest, "duration_ms": duration.Milliseconds()})
 	}
-	if err != nil {
-		return err
+	started := time.Now()
+	var status atomic.Int64
+	officialClient := *client
+	transport := client.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	officialClient.Transport = patchNotesTransport{base: transport, status: &status}
+	remote, err := fetchLatestOfficialPatchNotes(ctx, &officialClient, version)
+	officialErr := err
+	latest := version
+	if len(remote) > 0 {
+		latest = remote[0].Version
+	}
+	report("official", 0, fetchOutcome(ctx, int(status.Load()), err), latest, time.Since(started))
+	if err != nil || len(remote) == 0 {
+		_, remote, err = fetchPatchNotesDocument(ctx, client, func(index int, outcome, latest string, duration time.Duration) {
+			report("notices", index, outcome, latest, duration)
+		})
+		if err != nil {
+			if officialErr == nil {
+				return nil
+			}
+			return err
+		}
 	}
 	if len(remote) == 0 {
-		return officialErr
+		return nil
 	}
 	c.mu.Lock()
 	c.documents = mergePatchNotes(c.documents, remote)
@@ -340,7 +411,20 @@ func (a *app) refreshPatchNotesWithClient(ctx context.Context, client *http.Clie
 			return err
 		}
 	}
-	return officialErr
+	return nil
+}
+
+type patchNotesTransport struct {
+	base   http.RoundTripper
+	status *atomic.Int64
+}
+
+func (t patchNotesTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := t.base.RoundTrip(r)
+	if resp != nil {
+		t.status.Store(int64(resp.StatusCode))
+	}
+	return resp, err
 }
 
 type patchNoteAugmentIcon struct {
@@ -395,6 +479,7 @@ func (a *app) handlePatchNotes(w http.ResponseWriter, r *http.Request) {
 		patchNoteDocument
 		UpdateStatus string                          `json:"updateStatus"`
 		CheckedAt    time.Time                       `json:"checkedAt,omitempty"`
+		SuccessfulAt time.Time                       `json:"successfulAt,omitempty"`
 		AugmentIcons map[string]patchNoteAugmentIcon `json:"augmentIcons,omitempty"`
-	}{c.documents[0], status, c.checkedAt, patchNoteAugmentIcons(c.documents[0])})
+	}{c.documents[0], status, c.checkedAt, c.successfulAt, patchNoteAugmentIcons(c.documents[0])})
 }

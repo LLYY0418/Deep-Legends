@@ -117,7 +117,11 @@ func applyRunePage(ctx context.Context, client *LCUClient, request gameplayRuneA
 	return pageID, nil
 }
 
-func (a *app) cleanupDLRunePages(ctx context.Context, client *LCUClient) {
+func canceledChampSelectPhase(phase string) bool {
+	return phase == "Lobby" || phase == "Matchmaking" || phase == "None"
+}
+
+func (a *app) cleanupDLRunePages(ctx context.Context, client *LCUClient, canceled ...bool) {
 	dlRunePagesMu.Lock()
 	defer dlRunePagesMu.Unlock()
 	result := "success"
@@ -135,7 +139,7 @@ func (a *app) cleanupDLRunePages(ctx context.Context, client *LCUClient) {
 			continue
 		}
 		var phase string
-		if err := client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase); err != nil || phase != "EndOfGame" {
+		if err := client.RequestJSON(ctx, http.MethodGet, "/lol-gameflow/v1/gameflow-phase", nil, &phase); err != nil || (phase != "EndOfGame" && !(len(canceled) > 0 && canceled[0] && canceledChampSelectPhase(phase))) {
 			result = "phase-changed"
 			return
 		}

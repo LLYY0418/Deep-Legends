@@ -733,6 +733,7 @@ function createMainWindow() {
       ...(licenseEnabled ? { backgroundThrottling: false, additionalArguments: ["--deep-legends-license"] } : {}),
     },
   });
+  mainWindow.webContents.on("will-prevent-unload", event => event.preventDefault());
   mainWindow.setContentProtection(desktopPreferences.contentProtection);
   syncApplicationTray();
   reportStartupStage("main_window_created");
@@ -1057,7 +1058,10 @@ app.on("before-quit", (event) => {
   if (quitting) return;
   event.preventDefault();
   quitting = true;
-  void shutdownBackend().finally(() => app.quit());
+  const flush = mainWindow && !mainWindow.isDestroyed()
+    ? mainWindow.webContents.executeJavaScript("window.deepLegendsAutoConfig?.flushDraft(); window.deepLegendsPreferenceStorage?.flush()").catch(() => {})
+    : Promise.resolve();
+  void Promise.race([flush, new Promise(resolve => setTimeout(resolve, 1000))]).finally(() => shutdownBackend().finally(() => app.quit()));
 });
 
 app.on("window-all-closed", () => app.quit());

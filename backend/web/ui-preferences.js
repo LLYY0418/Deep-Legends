@@ -24,6 +24,10 @@
       } catch (_) {}
     },
   };
+  const journalKey="deep-legends-ui-pending-v1",unconfirmed=new Map();
+  const saveJournal=()=>local.set(journalKey,unconfirmed.size?JSON.stringify(Object.fromEntries(unconfirmed)):null);
+  try{const raw=local.get(journalKey)||"{}";if(raw.length<=128*1024){const rows=Object.entries(JSON.parse(raw));if(rows.length<=256)for(const [key,value]of rows)if(valid(key)&&(value===null||typeof value==="string"&&value.length<=8192)){unconfirmed.set(key,value);pending.set(key,value);}}}catch(_){}
+  const acknowledge=batch=>{for(const [key,value]of Object.entries(batch))if(unconfirmed.has(key)&&unconfirmed.get(key)===value)unconfirmed.delete(key);saveJournal();};
   async function request(body, keepalive = false) {
     const response = await fetch("/api/ui-preferences", {
       credentials: "same-origin",
@@ -39,18 +43,18 @@
   async function flush(keepalive = false) {
     clearTimeout(timer);
     timer = 0;
-    if (saving && !keepalive) {
+    if (saving) {
       await saving;
-      if (pending.size) return flush();
+      if (pending.size) return flush(keepalive);
       return;
     }
     if (!pending.size) return;
     const batch = Object.fromEntries(pending);
     pending.clear();
-    const task = request({ mode: "update", values: batch }, keepalive).catch(
+    const task = request({ mode: "update", values: batch }, keepalive).then(()=>acknowledge(batch)).catch(
       () => {
         for (const [k, v] of Object.entries(batch))
-          if (!pending.has(k)) pending.set(k, v);
+          if (!pending.has(k)&&unconfirmed.get(k)===v) pending.set(k, v);
       },
     );
     saving = task;
@@ -66,7 +70,7 @@
       values.set(key, value);
       local.set(key, value);
       if (valid(key)) {
-        pending.set(key, value);
+        pending.set(key, value);unconfirmed.set(key,value);saveJournal();
         clearTimeout(timer);
         timer = setTimeout(() => void flush(), 300);
       }
@@ -75,7 +79,7 @@
       values.set(key, null);
       local.set(key, null);
       if (valid(key)) {
-        pending.set(key, null);
+        pending.set(key, null);unconfirmed.set(key,null);saveJournal();
         clearTimeout(timer);
         timer = setTimeout(() => void flush(), 300);
       }
@@ -95,9 +99,10 @@
             migrated[key] = local.get(key);
         }
       } catch (_) {}
-      const result = Object.keys(migrated).length
+      let result = Object.keys(migrated).length
         ? await request({ mode: "migrate", values: migrated })
         : saved;
+      if(unconfirmed.size){const batch=Object.fromEntries(unconfirmed);result=await request({mode:"update",values:batch});acknowledge(batch);for(const key of Object.keys(batch))if(pending.get(key)===batch[key])pending.delete(key);}
       for (const [key, value] of Object.entries(result.values || {})) {
         if (valid(key)) {
           values.set(key, value);

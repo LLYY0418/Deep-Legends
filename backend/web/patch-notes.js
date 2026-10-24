@@ -15,6 +15,7 @@
     opener = null,
     mode = "ranked",
     reloadQueued = false,
+    refreshQueued = false,
     pollTimer = null,
     refreshPolls = 0;
   function validSource(value) {
@@ -70,7 +71,7 @@
     }
   }
   async function load(refresh = false) {
-    if (flight) return flight;
+    if (flight) {if(refresh)refreshQueued=true;return flight;}
     clearTimeout(pollTimer);
     if (refresh) refreshPolls = 0;
     error = false;
@@ -90,7 +91,8 @@
         flight = null;
         updateBadges();
         renderDialog();
-        if (reloadQueued) { reloadQueued = false; void load(); }
+        if(refreshQueued){refreshQueued=false;reloadQueued=false;void load(true);}
+        else if (reloadQueued) { reloadQueued = false; void load(); }
         else if (data?.updateStatus === "checking" && refreshPolls++ < 20) pollTimer = setTimeout(() => void load(), 1500);
       }
     })();
@@ -228,6 +230,8 @@
     });
     renderDialog();
     dialog.querySelector(".pn-close").focus();
+    const checked=Date.parse(data?.successfulAt||data?.checkedAt||"");
+    if(!Number.isFinite(checked)||Date.now()-checked>600000)void load(true);
   }
   document.addEventListener("click", (event) => {
     const trigger = event.target.closest("[data-patch-notes]");

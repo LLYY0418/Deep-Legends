@@ -15,7 +15,7 @@ test('latest Mayhem notes retain 35 additions, 13 removals and Headliners',async
 
 test('opening saved notes does not check upstream; explicit check still refreshes',async()=>{
   const calls=[];
-  const f=await fixture(undefined,async url=>{calls.push(url);return {ok:true,json:async()=>structuredClone(feed.versions[0])};});
+  const f=await fixture(undefined,async url=>{calls.push(url);return {ok:true,json:async()=>({...structuredClone(feed.versions[0]),successfulAt:new Date().toISOString()})};});
   try{
     f.open('ranked');await tick();
     f.w.document.querySelector('[data-pn-close]').click();f.open('aram-mayhem');await tick();
