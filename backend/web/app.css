@@ -894,6 +894,7 @@ body.is-demo .toast { bottom: 52px; }
 
 
 .update-icon-button.ready { color: var(--primary); }
+[data-theme="light"] .update-icon-button.ready { color:var(--primary-strong); }
 
 
 

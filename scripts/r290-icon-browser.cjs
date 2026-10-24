@@ -65,8 +65,8 @@ withBrowser(async({page,results,errors,out})=>{
     const clip=await p.evaluate(`(()=>{const a=document.querySelector('#announcements-button').getBoundingClientRect(),b=document.querySelector('#update-button').getBoundingClientRect(),previous=document.querySelector('#refresh').getBoundingClientRect(),gap=a.left-previous.right;return {x:a.left-Math.min(4,gap/2),y:Math.max(0,a.y-6),width:b.right-a.left+Math.min(4,gap/2)+4,height:Math.max(a.height,b.height)+12,scale:1}})()`);
     const shot=await p.call('Page.captureScreenshot',{format:'png',clip});fs.writeFileSync(path.join(out,`${theme}-${width}-${zoom}-${state}.png`),Buffer.from(shot.data,'base64'));
    }
-   const primary=await p.evaluate("getComputedStyle(document.querySelector('.update-border-progress')).stroke");
-   assert.equal(states.ready.update.color,primary,'ready glyph has the theme primary color after transition');
+   const primary=theme==='light'?states.available.update.color:await p.evaluate("getComputedStyle(document.querySelector('.update-border-progress')).stroke");
+   assert.equal(states.ready.update.color,primary,'ready glyph has the intended theme color after transition');
    results.at(-1).states=states;results.at(-1).edges=edges;
   }
  }
