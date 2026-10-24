@@ -138,7 +138,7 @@ async function start(){
     }
     results.push({kind:'skeleton',theme,phase,cards:evidence});
    }
-   await evaluate('__r267Complete()');await until("document.querySelector('.match-list .match-entry') && !document.querySelector('.match-skeleton,.career-pending') && !document.querySelector('#overview-content')._overviewViewTab.loading");
+   await evaluate('__r267Complete()');await until("document.querySelector('.match-list .match-entry') && !document.querySelector('.match-skeleton,.career-pending,.champion-pending-rows') && !document.querySelector('#overview-content')._overviewViewTab.loading");
   }
   closedSessions.add(sessionId);await send('Target.closeTarget',{targetId});
  }

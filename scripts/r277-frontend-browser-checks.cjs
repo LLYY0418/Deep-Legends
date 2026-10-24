@@ -22,7 +22,7 @@ module.exports=async({evaluate,until,click,call,shot,ready,results})=>{
  const settle=async()=>{sampledTopbar=await settleTopbar({evaluate});};
  await evaluate("window.__r277Tab=document.querySelector('#overview-content')._overviewViewTab;window.__r277Data=structuredClone(__r277Tab.data);window.__r277Historical=structuredClone(__r277Data.historicalRanks||[]);__r277Data.historicalRanks=[];delete __r277Data.rankMilestones;for(const key of ['championStats','seasonChampionStats'])if(__r277Data[key]?.length)__r277Data[key]=Array.from({length:8},(_,i)=>({...__r277Data[key][0],championId:103+i,championName:'默认英雄 '+i}));true");
  // P4 exact rectangles: initial page shell vs final fixture for three player contexts.
- const rects="(()=>{const c=document.querySelector('#overview-content'),r=n=>{if(!n)return null;const b=n.getBoundingClientRect();return {top:b.top,height:b.height,width:b.width}};return {strip:r(c.querySelector('.summoner-strip')),filter:r(c.querySelector('.match-filterbar')),match:r(c.querySelector('.match-entry,.match-skeleton')),cards:[...c.querySelectorAll('.career-column > section')].map(n=>({key:n.dataset.careerKey,...r(n),gap:n.getBoundingClientRect().bottom-n.lastElementChild.getBoundingClientRect().bottom,padding:parseFloat(getComputedStyle(n).paddingBottom)+parseFloat(getComputedStyle(n).borderBottomWidth)})),text:c.innerText}})()";
+ const rects="(()=>{const c=document.querySelector('#overview-content'),r=n=>{if(!n)return null;const b=n.getBoundingClientRect();return {top:b.top,height:b.height,width:b.width}};return {strip:r(c.querySelector('.summoner-strip')),filter:r(c.querySelector('.match-filterbar')),match:r(c.querySelector('.match-entry,.match-skeleton')),cards:[...c.querySelectorAll('.career-column > section')].map(n=>({key:n.dataset.careerKey,...r(n),skeletonRows:n.querySelectorAll('.champion-pending-rows>.champion-skeleton-row').length,gap:n.getBoundingClientRect().bottom-n.lastElementChild.getBoundingClientRect().bottom,padding:parseFloat(getComputedStyle(n).paddingBottom)+parseFloat(getComputedStyle(n).borderBottomWidth)})),text:c.innerText}})()";
  for(const player of ['cn','kr','pro'])for(const theme of ['dark','light'])for(const width of [900,1280,1920]){
   await collectCase({name:'skeleton',player,theme,width},async()=>{
   await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});await evaluate(`document.documentElement.dataset.theme='${theme}';document.documentElement.style.setProperty('--ui-zoom','1');true`);
@@ -37,7 +37,11 @@ module.exports=async({evaluate,until,click,call,shot,ready,results})=>{
    // The initial unknown-data shell above still protects the strip and match geometry.
    await evaluate("__r277Tab.data=structuredClone(__r277FinalData);__r266Game.renderOverviewBody(document.querySelector('#overview-content'),__r277Tab);true");await settle();
    const structuredPending=await evaluate(rects);results.at(-1).structuredPending=structuredPending;
-   for(const card of structuredPending.cards){const f=final.cards.find(c=>c.key===card.key);assert(f,card.key);if(card.key==='ranks'){for(const sample of [card,f])assert(Math.abs(sample.gap-sample.padding)<=1,JSON.stringify({player,width,sample}));}else assert(Math.abs(f.height-card.height)<=4,JSON.stringify({player,width,key:card.key,pending:card.height,final:f.height}));}
+   for(const card of structuredPending.cards){const f=final.cards.find(c=>c.key===card.key);assert(f,card.key);if(card.key==='ranks'){for(const sample of [card,f])assert(Math.abs(sample.gap-sample.padding)<=1,JSON.stringify({player,width,sample}));}else if(card.key==='champions'){
+    assert.equal(card.skeletonRows,5,JSON.stringify({player,width,card}));
+    assert.equal(f.skeletonRows,0,JSON.stringify({player,width,f}));
+    for(const sample of [card,f])assert(Math.abs(sample.gap-sample.padding)<=1,JSON.stringify({player,width,sample}));
+   }else assert(Math.abs(f.height-card.height)<=4,JSON.stringify({player,width,key:card.key,pending:card.height,final:f.height}));}
   }
   await evaluate("__r277Tab.data=__r277FinalData;__r277Tab.loading=false;__r277Tab.initialPagePending=false;__r277Tab.matchesReceived=true;__r277Tab.recentStatsReceived=true;__r266Game.renderOverviewBody(document.querySelector('#overview-content'),__r277Tab);true");await settle();
    });

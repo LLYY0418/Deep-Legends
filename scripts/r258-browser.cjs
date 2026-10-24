@@ -111,7 +111,7 @@ async function main(){
   await p.until("!document.querySelector('[data-player-tab-wrap=\"current\"]')");await unblocked();await p.shot('closed-synthetic');
   await p.evaluate("window.__r258SetStatus({connected:true,identityReady:true,sgpReady:true,clientDiscovery:'connected'})");
   await p.until("document.querySelector('[data-player-tab-wrap=\"current\"]')");
-  await p.until("document.querySelector('.match-list .match-entry') && window.__r258OverviewReads>window.__r258Reads");assert(await p.evaluate("window.__r258List!==document.querySelector('.match-list') && !document.querySelector('.career-column .career-pending')"));await unblocked();
+  await p.until("document.querySelector('.match-list .match-entry') && window.__r258OverviewReads>window.__r258Reads");assert(await p.evaluate("window.__r258List!==document.querySelector('.match-list') && !document.querySelector('.career-column .career-pending,.career-column .champion-pending-rows')"));await unblocked();
   await p.evaluate("window.__r258SetStatus({connected:false,clientDiscovery:'exiting'})");await p.until("!document.querySelector('[data-player-tab-wrap=\"current\"]')");
   for(const clientDiscovery of ['credentials-unreadable','process-not-found']) {await p.evaluate(`window.__r258SetStatus({connected:false,clientDiscovery:${JSON.stringify(clientDiscovery)}})`);await new Promise(resolve=>setTimeout(resolve,100));await unblocked();}
   results.push({theme,startupUnblocked:true,headerBeforeNetwork:true,exitUnblocked:true,freshOverviewAfterClientReopen:true});

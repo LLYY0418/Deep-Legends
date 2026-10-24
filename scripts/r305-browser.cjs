@@ -33,6 +33,13 @@ const shot=async(b,name)=>{await b.shot(name);report.screenshots.push(name+'.png
   }
   const heights=report.geometry.filter(x=>x.p===12).map(x=>x.height);assert(Math.max(...heights)-Math.min(...heights)<1);
   for(const phase of ['pending','empty','data']){await b.evaluate(`(()=>{const p={complete:true,season:'S26'},items='${phase}'==='data'?[{championId:103,championName:'阿狸',games:12,kills:4,deaths:2,assists:5,winRate:50}]:[],html=__r305.renderChampionStats(items,{games:items.length?12:0},p);document.querySelector('#r305-overview').innerHTML='<aside class="career-column">'+('${phase}'==='pending'?__r305.renderCareerPendingMarkup(html):html)+'</aside>';document.querySelector('.career-column').style.width='370px';})()`);await frame();if(phase==='pending')assert.equal(await b.evaluate('document.querySelectorAll(".champion-skeleton-row").length'),5);await shot(b,`p14-${phase}`);}
+  for(const width of [1920,1440,1100]){
+   await b.call('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
+   await b.evaluate(`(()=>{const items=Array.from({length:5},(_,i)=>({championId:103+i,championName:'测试英雄 '+i,games:12,kills:4,deaths:2,assists:5,winRate:50}));window.__r306HeroMarkup=__r305.renderChampionStats(items,{games:60},{complete:true,season:'S26'});document.querySelector('#r305-overview').innerHTML='<aside class="career-column" style="width:370px">'+__r305.renderCareerPendingMarkup(__r306HeroMarkup)+'</aside>';})()`);await frame();
+   const pendingRows=await b.evaluate('[...document.querySelectorAll(".champion-skeleton-row")].map(n=>n.getBoundingClientRect().height)');assert.equal(pendingRows.length,5);
+   await b.evaluate('document.querySelector(".career-column").innerHTML=__r306HeroMarkup');await frame();
+   const realRows=await b.evaluate('[...document.querySelectorAll(".champion-stat-row:not(.champion-skeleton-row):not(.is-overall)")].map(n=>n.getBoundingClientRect().height)');assert(realRows.length>=5);assert(pendingRows.every(h=>h>0&&realRows.every(r=>Math.abs(h-r)<=1)),JSON.stringify({width,pendingRows,realRows}));report.geometry.push({p:14,width,pendingRows,realRows});await shot(b,`p14-row-height-${width}`);
+  }
   report.errors.push(...b.errors);
  }catch(e){await shot(b,'failure-live');throw e;}finally{await b.stop();}
  const fixture=require('../backend/testdata/r298-review-catalog.json'),catalog=structuredClone(fixture.catalog);catalog.clientConnected=true;catalog.spellsStatus=catalog.itemsStatus='ready';
