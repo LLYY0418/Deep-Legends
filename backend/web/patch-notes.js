@@ -137,10 +137,17 @@
     const numbers=s=>(String(s).match(/[-+]?\d+(?:\.\d+)?/g)||[]).map(Number);
     const from=numbers(line.from),to=numbers(line.to);if(!from.length||from.length!==to.length)return "";
     const up=to.some((n,i)=>n>from[i]),down=to.some((n,i)=>n<from[i]);if(up===down)return "";
-    const lower=/冷却|法力消耗|能量消耗|生命值消耗|消耗|花费|价格|总价|施法时间|前摇|充能时间|重新装填时间/.test(line.k||"");
+    const key=line.k||"",refund=/冷却(?:时间)?(?:返还|缩减)/.test(key);
+    const lower=!refund&&/冷却|法力消耗|能量消耗|生命值消耗|消耗|花费|费用|价格|总价|施法时间|前摇|充能时间|重新装填时间|承受伤害|受到的?伤害|战斗状态计时器|脱离战斗计时器|脱战|^种子充能$/.test(key);
+    if(!lower&&!refund&&/强化攻击次数|^攻击速度收益$|减速(?!抗性)|击飞|嘲讽|禁锢|晕眩/.test(key))return "";
     return up!==lower?"buff":"nerf";
   }
-  function entryDirection(entry) {if(entry.isNew)return "";const kinds=new Set((entry.groups||[]).flatMap(g=>(g.lines||[]).map(lineDirection)).filter(Boolean));return kinds.size===1?[...kinds][0]:"";}
+  function entryDirection(entry) {
+    if(entry.isNew)return "";
+    // The unlabeled champion introduction is editorial context, not a change.
+    const lines=(entry.groups||[]).flatMap((g,i)=>i===0&&entry.championId>0&&!g.label&&(g.lines||[]).every(l=>l.text)?[]:g.lines||[]),directions=lines.map(lineDirection);
+    return directions.length&&directions.every(Boolean)&&new Set(directions).size===1?directions[0]:"";
+  }
   const directionClasses={buff:"is-buff",nerf:"is-nerf"};
   function renderSections(sections) {
     return sections

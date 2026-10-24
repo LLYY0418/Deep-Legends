@@ -45,13 +45,28 @@
   async function applyCustomConfiguration(button,config){button.disabled=true;button.textContent="正在应用…";try{const result=await api("/api/auto-config/apply",{method:"POST",body:JSON.stringify({championId:config.championId})},"apply-runes",15000);showToast(Object.values(result.results||{}).includes("failed")?"部分配置未能应用，请重试":Object.values(result.results||{}).includes("applied")?"自配置已应用到客户端":"配置尚不完整或已取消，未写入客户端");renderLive("selection");}catch(error){showToast(error.message);}finally{button.disabled=false;button.textContent="应用所选配置";}}
 
  // Move the same pair once, using the title row's actual intrinsic widths.
- const layoutRows=new Set(),layoutObserver=typeof ResizeObserver==="function"?new ResizeObserver(()=>layoutCardSpells()):null;
- function layoutCardSpells(){
-  for(const row of layoutRows)if(!row.isConnected){layoutObserver?.unobserve(row);layoutRows.delete(row);}
+ const layoutRows=new Map(),dirtyRows=new Set(),widthChecks=new Set(),targetRows=new WeakMap(),targetWidths=new WeakMap();let spellFrame=0,spellDisposed=false;
+ const spellWidthSignature=({head,pair})=>[head.clientWidth,pair.scrollWidth,...[...head.querySelectorAll("*")].filter(n=>n!==pair&&!pair.contains(n)).map(n=>n.scrollWidth)].join(":");
+ function scheduleCardSpells(row,widthOnly=false){if(spellDisposed)return;(widthOnly?widthChecks:dirtyRows).add(row);if(!spellFrame)spellFrame=requestAnimationFrame(()=>{spellFrame=0;const rows=new Set([...dirtyRows,...widthChecks]);for(const row of rows){const config=layoutRows.get(row);if(config&&(dirtyRows.has(row)||config.widthSignature!==spellWidthSignature(config)))layoutCardSpells(row);}dirtyRows.clear();widthChecks.clear();});}
+ const layoutObserver=typeof ResizeObserver==="function"?new ResizeObserver(entries=>{for(const entry of entries){const row=targetRows.get(entry.target),width=entry.target.clientWidth,previous=targetWidths.get(entry.target);targetWidths.set(entry.target,width);if(row&&width!==previous)scheduleCardSpells(row);}}):null;
+ function forgetSpellRow(row){const old=layoutRows.get(row);for(const target of old?.targets||[]){layoutObserver?.unobserve(target);targetRows.delete(target);targetWidths.delete(target);}layoutRows.delete(row);dirtyRows.delete(row);widthChecks.delete(row);}
+ function syncSpellRows(){
+  for(const row of layoutRows.keys())if(!row.isConnected)forgetSpellRow(row);
   for(const row of document.querySelectorAll(".specialist-game-row")){
-   const head=row.querySelector(".specialist-game-head,.custom-config-header"),pair=row.querySelector("[data-card-spells]");if(!head||!pair)continue;
-   if(!layoutRows.has(row)){layoutRows.add(row);layoutObserver?.observe(row);}
-   const fallback=row.querySelector(".rune-corner-spells,.sg-spells");if(!fallback)continue;
+   const head=row.querySelector(".specialist-game-head,.custom-config-header"),pair=row.querySelector("[data-card-spells]"),fallback=row.querySelector(".rune-corner-spells,.sg-spells"),old=layoutRows.get(row);
+   if(!head||!pair||!fallback){if(old)forgetSpellRow(row);continue;}
+   const targets=[row,...head.children].filter(n=>n!==pair);
+   if(old?.head===head&&old.pair===pair&&old.fallback===fallback&&old.targets.length===targets.length&&targets.every((n,i)=>old.targets[i]===n))continue;
+   if(old)forgetSpellRow(row);layoutRows.set(row,{head,pair,fallback,targets});
+   // Header children also expose intrinsic title/status width changes without
+   // watching unrelated live-page text updates or rereading every card's style.
+   for(const target of targets){targetRows.set(target,row);targetWidths.set(target,target.clientWidth);layoutObserver?.observe(target);}
+   scheduleCardSpells(row);
+  }
+ }
+ function layoutCardSpells(row){
+   const config=layoutRows.get(row);if(!row.isConnected||!config)return;
+   const {head,pair,fallback}=config;
    const style=getComputedStyle(head),gap=parseFloat(style.columnGap)||0,padding=(parseFloat(style.paddingLeft)||0)+(parseFloat(style.paddingRight)||0);
    const children=[...head.children].filter(n=>n!==pair),previous=head.style.gridTemplateColumns;
    if(head.classList.contains("specialist-game-head"))head.style.gridTemplateColumns="max-content max-content max-content";
@@ -59,12 +74,14 @@
    const wide=needed<=head.clientWidth;
    if(wide){const status=head.querySelector('[role="status"]');if(pair.parentElement!==head)head.insertBefore(pair,status||null);}else if(pair.parentElement!==fallback)fallback.append(pair);
    row.dataset.spellLayout=wide?"head":"board";
-  }
+   config.widthSignature=spellWidthSignature(config);
  }
- const spellMutation=new MutationObserver(()=>layoutCardSpells());spellMutation.observe(nodes?.liveContent||document.body,{childList:true,subtree:true});
- window.addEventListener("resize",layoutCardSpells);
- window.addEventListener("deep-legends:dispose",()=>{layoutObserver?.disconnect();spellMutation.disconnect();},{once:true});
- layoutCardSpells();
+ const spellStructure=".specialist-game-row,.specialist-game-head,.custom-config-header,.rune-corner-spells,.sg-spells,[data-card-spells]";
+ const spellMutation=new MutationObserver(records=>{let structure=false;for(const record of records){const pair=record.target.closest?.("[data-card-spells]"),head=record.target.closest?.(".specialist-game-head,.custom-config-header"),row=(pair||head)?.closest(".specialist-game-row");if(layoutRows.has(row))scheduleCardSpells(row,!pair);if([...record.addedNodes,...record.removedNodes].some(n=>n.nodeType===1&&(n.matches(spellStructure)||n.querySelector(spellStructure))))structure=true;}if(structure)syncSpellRows();});spellMutation.observe(nodes?.liveContent||document.body,{childList:true,subtree:true});
+ const checkSpellWidths=()=>{if(layoutObserver)return;for(const config of layoutRows.values())for(const target of config.targets){const width=target.clientWidth;if(width!==targetWidths.get(target)){targetWidths.set(target,width);scheduleCardSpells(targetRows.get(target));}}};
+ window.addEventListener("resize",checkSpellWidths);
+ window.addEventListener("deep-legends:dispose",()=>{spellDisposed=true;cancelAnimationFrame(spellFrame);dirtyRows.clear();widthChecks.clear();layoutRows.clear();layoutObserver?.disconnect();spellMutation.disconnect();window.removeEventListener("resize",checkSpellWidths);},{once:true});
+ syncSpellRows();
  window.deepLegendsAutoConfigLive={selection,prepare,renderCustomConfiguration,updateLiveRuneSelection,applyCustomConfiguration};
  window.addEventListener("deep-legends:auto-config",e=>update(e.detail||{}));
  window.addEventListener("deep-legends:auto-config-settings",e=>{state.autoConfigSettings=e.detail;state.autoConfigViewKey="";if(state.section==="live")renderLive("settings");});

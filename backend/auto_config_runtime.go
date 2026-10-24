@@ -247,7 +247,24 @@ func (a *app) observeAutoConfigEvent(ctx context.Context, client *LCUClient, eve
 		var session lcuChampSelectSession
 		if json.Unmarshal(event.Data, &session) == nil {
 			a.autoConfig.Lock()
+			a.loadAutoConfigLocked()
 			r := &a.autoConfig.runtime
+			if !a.autoConfig.settings.Enabled {
+				if event.EventType == "Delete" || string(event.Data) == "null" {
+					a.autoConfig.Unlock()
+					return
+				}
+				key := autoConfigSessionKey(session)
+				if r.client != client || r.Session != key {
+					if r.cancel != nil {
+						r.cancel()
+					}
+					*r = autoConfigRuntime{Session: key, client: client, generation: r.generation + 1}
+				}
+				a.autoConfig.Unlock()
+				a.recordAutoConfigSkip("disabled", "")
+				return
+			}
 			id := champSelectCurrentChampion(session)
 			if r.client == client && r.Session == autoConfigSessionKey(session) && id != r.observed {
 				r.observed = id
@@ -280,6 +297,13 @@ func (a *app) recordAutoConfigSkip(reason, modeKey string) {
 	a.recordDiagnostic(map[string]any{"event": "auto_config_skip", "reason": reason, "modeKey": modeKey, "phase": phase})
 }
 func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
+	a.autoConfig.Lock()
+	a.loadAutoConfigLocked()
+	enabled := a.autoConfig.settings.Enabled
+	a.autoConfig.Unlock()
+	if !enabled {
+		return
+	}
 	settings := a.autoConfigSnapshot()
 	a.autoConfig.Lock()
 	if a.autoConfig.processing {
@@ -464,6 +488,38 @@ func (a *app) applyAutoConfigRunes(ctx context.Context, client *LCUClient, gener
 	return applyRunePage(ctx, client, gameplayRuneApplyRequest{ChampionID: id, ChampionName: name, Source: "自动配置", PrimaryStyleID: runes.PrimaryStyleID, SubStyleID: runes.SubStyleID, SelectedPerkIDs: runes.SelectedPerkIDs})
 }
 
+// Match the editor's starter-trinket normalization on an application-only copy.
+// The client's level-one shop permits 3340/3364; keep the first with count one.
+func normalizeAutoConfigStarterTrinkets(items *autoConfigItems, catalog autoConfigCatalog) (*autoConfigItems, bool) {
+	trinkets := map[int64]bool{}
+	for _, item := range catalog.Items {
+		for _, category := range item.Categories {
+			if category == "Trinket" {
+				trinkets[item.ID] = true
+			}
+		}
+	}
+	out := *items
+	out.Starter = make([]autoConfigStarterItem, 0, len(items.Starter))
+	seen, changed := false, false
+	for _, item := range items.Starter {
+		if trinkets[item.ID] {
+			if seen || item.ID != 3340 && item.ID != 3364 {
+				changed = true
+				continue
+			}
+			seen = true
+			changed = changed || item.Count != 1
+			item.Count = 1
+		}
+		out.Starter = append(out.Starter, item)
+	}
+	if !changed {
+		return items, false
+	}
+	return &out, true
+}
+
 func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChampSelectSession, generation uint64, id int64, mode, modeKey string, entry autoConfigEntry, exists bool, manualApply ...bool) {
 	started := time.Now()
 	skip := func(reason string) { a.recordAutoConfigSkip(reason, modeKey) }
@@ -475,13 +531,14 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 		return a.autoConfigGuard(ctx, client, s, generation, id, mode)
 	}
 	ctx = context.WithValue(ctx, autoConfigWriteGuardKey{}, guard)
-	catalog, catErr := a.loadAutoConfigCatalog(ctx)
 	settings := a.autoConfigSnapshot()
 	if !manual && !settings.Enabled {
 		skip("disabled")
 		return
 	}
+	catalog, catErr := a.loadAutoConfigCatalog(ctx)
 	results := map[string]string{}
+	itemsNormalized := false
 	pageID := int64(0)
 	name := bundledChampionNames()[id]
 	if currentName := a.championNames()[id]; currentName != "" {
@@ -587,6 +644,7 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 				a.autoConfig.Unlock()
 			}
 		case "items":
+			entry.Items, itemsNormalized = normalizeAutoConfigStarterTrinkets(entry.Items, catalog)
 			if a.validateAutoConfigCatalog(ctx, mode, autoConfigEntry{Items: entry.Items}, false) != nil {
 				results[kind] = "skipped-incomplete"
 				skip("no_config")
@@ -655,7 +713,14 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 	r.done = true
 	a.autoConfig.Unlock()
 	a.emitAutoConfig()
-	a.recordDiagnostic(map[string]any{"event": "auto_config_apply", "modeKey": modeKey, "results": results, "duration_ms": time.Since(started).Milliseconds(), "yielded": a.autoConfigYieldSnapshot()})
+	diagnosticResults := map[string]any{}
+	for kind, result := range results {
+		diagnosticResults[kind] = result
+	}
+	if itemsNormalized {
+		diagnosticResults["items"] = map[string]any{"status": results["items"], "normalized": true}
+	}
+	a.recordDiagnostic(map[string]any{"event": "auto_config_apply", "modeKey": modeKey, "results": diagnosticResults, "duration_ms": time.Since(started).Milliseconds(), "yielded": a.autoConfigYieldSnapshot()})
 }
 
 func (a *app) autoConfigYieldSnapshot() map[string]bool {

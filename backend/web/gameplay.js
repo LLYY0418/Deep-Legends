@@ -4320,11 +4320,11 @@
     const doc=collection.ownerDocument,win=doc.defaultView;
     if(!doc._matchTagsPopover) {
       const panel=doc.createElement("div");panel.className="match-tags-popover";panel.id="match-tags-popover";
-      panel.setAttribute("role","tooltip");panel.hidden=true;panel.style.margin="0";panel.style.inset="auto";if(typeof panel.showPopover==="function")panel.setAttribute("popover","manual");doc.body.append(panel);
+      panel.setAttribute("role","tooltip");panel.hidden=true;doc.body.append(panel);
       let anchor=null,leaveTimer=0,touchUntil=0;
       const observer=new win.MutationObserver(()=>{if(anchor && !anchor.isConnected)close();});
       const cancelLeave=()=>{win.clearTimeout(leaveTimer);leaveTimer=0;};
-      const close=()=>{observer.disconnect();cancelLeave();if(anchor){anchor.setAttribute("aria-expanded","false");anchor.removeAttribute("aria-describedby");}anchor=null;if(typeof panel.hidePopover==="function"&&panel.matches(":popover-open"))panel.hidePopover();panel.hidden=true;panel.replaceChildren();panel.style.zoom="";if(panel.parentElement!==doc.body)doc.body.append(panel);};
+      const close=()=>{observer.disconnect();cancelLeave();if(anchor){anchor.setAttribute("aria-expanded","false");anchor.removeAttribute("aria-describedby");}anchor=null;panel.hidden=true;panel.replaceChildren();};
       const show=button=>{
         const hidden=[...button.parentElement.querySelectorAll("[data-match-tag]")].filter(item=>item.hidden);
         if(!hidden.length)return close();
@@ -4333,8 +4333,7 @@
           for(const node of clone.querySelectorAll("[id]")) {const old=node.id,next=`${panel.id}-${old}`;node.id=next;for(const target of clone.querySelectorAll("*"))for(const attr of [...target.attributes])if(attr.value.includes(`url(#${old})`))target.setAttribute(attr.name,attr.value.replaceAll(`url(#${old})`,`url(#${next})`));}
           if(clone.matches("[data-tooltip]"))clone.tabIndex=0;clone.querySelectorAll("[data-tooltip]").forEach(tag=>tag.tabIndex=0);return clone;}));
         panel.hidden=false;button.setAttribute("aria-expanded","true");button.setAttribute("aria-describedby",panel.id);
-        if(typeof panel.showPopover==="function")panel.showPopover();
-      let scale=1;for(let n=panel;n;n=n.parentElement)scale*=Number(win.getComputedStyle(n).zoom)||1;
+        const scale=Number(win.getComputedStyle(panel).zoom)||1;
         const rect=button.getBoundingClientRect(),padding=12,gap=8,width=panel.offsetWidth*scale,height=panel.offsetHeight*scale;
         const above=rect.top>=height+gap+padding;
         const left=Math.max(padding,Math.min(win.innerWidth-width-padding,rect.left+rect.width/2-width/2));
@@ -4351,7 +4350,7 @@
       doc.addEventListener("focusout",event=>{if(anchor && (anchor.contains(event.target)||panel.contains(event.target)) && !panel.contains(event.relatedTarget))close();});
       doc.addEventListener("click",event=>{const button=buttonOf(event.target);if(button){event.stopPropagation();anchor===button ? close() : show(button);}else if(anchor && !panel.contains(event.target))close();});
       doc.addEventListener("keydown",event=>{if(event.key==="Escape")close();});
-      doc.addEventListener("close",close,true);doc.addEventListener("scroll",close,true);win.addEventListener("resize",close);win.addEventListener("blur",close);
+      doc.addEventListener("scroll",close,true);win.addEventListener("resize",close);win.addEventListener("blur",close);
       doc._matchTagsPopover={close,get anchor(){return anchor;}};
     }
     return doc._matchTagsPopover;
