@@ -314,10 +314,11 @@ test("manual reread awaits the backend identity refresh before hard-refresh disp
   const end = appSource.indexOf("el.startupLoadingRetry", start);
   assert.ok(start >= 0 && end > start, "manual refresh handler source not found");
   const handler = appSource.slice(start, end);
-  const backendRefresh = handler.indexOf('await api("/api/refresh?source=user_refresh"');
+  const backendRefresh = handler.indexOf('api("/api/refresh?source=user_refresh"');
   const hardRefresh = handler.indexOf('window.dispatchEvent(new CustomEvent("deep-legends:hard-refresh"');
   assert.ok(backendRefresh >= 0 && hardRefresh > backendRefresh, "hard-refresh ran before the awaited backend identity refresh");
-  assert.match(handler, /catch \(error\)[\s\S]*window\.dispatchEvent/);
+  assert.match(handler, /await\s+(?:bounded\(\s*)?api\("\/api\/refresh\?source=user_refresh"/);
+  assert.match(handler, /catch\s*\(error\)[\s\S]*window\.dispatchEvent/);
 });
 
  test("identity status with unresolved backdrop preserves the first overview art", () => {

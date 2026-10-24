@@ -88,6 +88,17 @@ func minTime(a, b time.Time) time.Time {
 	}
 	return b
 }
+
+func (c *patchNotesCache) availableVersion() (string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.documents) == 0 {
+		return "", false
+	}
+	version := c.documents[0].Version
+	return version, !c.successfulAt.IsZero()
+}
+
 func (a *app) runPatchNotesRetry(ctx context.Context) {
 	plan := patchNotesRetryPlan{Next: time.Now().Add(15 * time.Second)}
 	for ctx.Err() == nil {
@@ -103,13 +114,7 @@ func (a *app) runPatchNotesRetry(ctx context.Context) {
 			if a.beginPatchNotesRefresh(false) {
 				a.finishPatchNotesRefresh(ctx, trigger)
 			}
-			cache.mu.Lock()
-			defer cache.mu.Unlock()
-			version := ""
-			if len(cache.documents) > 0 {
-				version = cache.documents[0].Version
-			}
-			return version, !cache.failed && !cache.successfulAt.IsZero()
+			return cache.availableVersion()
 		})
 		timer := time.NewTimer(max(time.Until(next), time.Second))
 		select {

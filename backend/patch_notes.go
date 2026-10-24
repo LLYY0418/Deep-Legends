@@ -27,6 +27,8 @@ var bundledPatchNotes []byte
 
 const patchNotesLimit = 512 << 10
 
+var errPatchNotesOfficialUnchecked = errors.New("official patch notes not checked")
+
 var patchVersion = regexp.MustCompile(`^\d{1,3}(?:\.\d{1,3}){1,3}$`)
 var patchSectionID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,80}$`)
 
@@ -75,14 +77,16 @@ type patchNoteFeed struct {
 	Versions []patchNoteDocument `json:"versions"`
 }
 type patchNotesCache struct {
-	mu           sync.Mutex
-	documents    []patchNoteDocument
-	started      bool
-	fetching     bool
-	checkedAt    time.Time
-	failed       bool
-	attemptedAt  time.Time
-	successfulAt time.Time
+	mu                sync.Mutex
+	documents         []patchNoteDocument
+	started           bool
+	fetching          bool
+	checkedAt         time.Time
+	failed            bool
+	attemptedAt       time.Time
+	successfulAt      time.Time
+	officialCheckedAt time.Time
+	fallback          bool
 }
 
 func validPatchSource(value string) bool {
@@ -346,10 +350,14 @@ func (a *app) finishPatchNotesRefreshUsing(ctx context.Context, client *http.Cli
 	c := a.patchNotesState()
 	c.mu.Lock()
 	c.fetching = false
-	c.failed = err != nil
+	c.fallback = errors.Is(err, errPatchNotesOfficialUnchecked)
+	c.failed = err != nil && !c.fallback
 	c.checkedAt = time.Now()
-	if err == nil {
+	if err == nil || c.fallback {
 		c.successfulAt = c.checkedAt
+	}
+	if err == nil {
+		c.officialCheckedAt = c.checkedAt
 	}
 	c.mu.Unlock()
 	a.broadcastEvent(`{"type":"patch-notes-changed"}`)
@@ -410,6 +418,9 @@ func (a *app) refreshPatchNotesWithClient(ctx context.Context, client *http.Clie
 		if err := writeLocalStoreFile(a.storage, "patch-notes.json", raw); err != nil {
 			return err
 		}
+	}
+	if officialErr != nil {
+		return errors.Join(errPatchNotesOfficialUnchecked, officialErr)
 	}
 	return nil
 }
@@ -472,14 +483,17 @@ func (a *app) handlePatchNotes(w http.ResponseWriter, r *http.Request) {
 		status = "checking"
 	} else if c.failed {
 		status = "failed"
-	} else if !c.checkedAt.IsZero() {
+	} else if c.fallback {
+		status = "fallback"
+	} else if !c.officialCheckedAt.IsZero() {
 		status = "checked"
 	}
 	respondJSON(w, struct {
 		patchNoteDocument
-		UpdateStatus string                          `json:"updateStatus"`
-		CheckedAt    time.Time                       `json:"checkedAt,omitempty"`
-		SuccessfulAt time.Time                       `json:"successfulAt,omitempty"`
-		AugmentIcons map[string]patchNoteAugmentIcon `json:"augmentIcons,omitempty"`
-	}{c.documents[0], status, c.checkedAt, c.successfulAt, patchNoteAugmentIcons(c.documents[0])})
+		UpdateStatus      string                          `json:"updateStatus"`
+		CheckedAt         time.Time                       `json:"checkedAt,omitempty"`
+		SuccessfulAt      time.Time                       `json:"successfulAt,omitempty"`
+		OfficialCheckedAt time.Time                       `json:"officialCheckedAt,omitempty"`
+		AugmentIcons      map[string]patchNoteAugmentIcon `json:"augmentIcons,omitempty"`
+	}{c.documents[0], status, c.checkedAt, c.successfulAt, c.officialCheckedAt, patchNoteAugmentIcons(c.documents[0])})
 }

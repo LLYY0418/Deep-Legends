@@ -169,7 +169,7 @@
       focusedRetry = document.activeElement?.matches("[data-pn-retry]"),
       focusedInside = dialog.contains(document.activeElement),
       focusedSource = document.activeElement?.matches(".pn-foot a");
-    const status = error || data?.updateStatus === "failed" ? "检查更新失败，已保留保存的公告" : data?.updateStatus === "checking" ? "正在检查官方更新…" : data?.updateStatus === "checked" ? "已检查官方公告" : "当前为已保存公告";
+    const status = error || data?.updateStatus === "failed" ? "检查更新失败，已保留保存的公告" : data?.updateStatus === "checking" ? "正在检查官方更新…" : data?.updateStatus === "fallback" ? "已更新公告" : data?.updateStatus === "checked" ? "已检查官方公告" : "当前为已保存公告";
     dialog.innerHTML = `<header class="pn-head"><h3><b>${escape(data?.version || "")}</b> 版本更新</h3><span class="pn-mode">${label}</span><span class="pn-date">${data ? escape(data.publishedAt) + " 发布" : ""}</span><button type="button" class="pn-close" data-pn-close aria-label="关闭版本更新">×</button></header><div class="pn-body">${!data && flight ? '<div class="pn-loading" aria-label="正在读取版本公告"><i></i><i></i><i></i></div>' : !data && error ? '<div class="pn-empty"><span>暂时无法获取版本公告</span><button type="button" class="text-button" data-pn-retry>重试</button></div>' : !sections?.length ? '<div class="pn-empty">本版本没有该模式的改动</div>' : renderSections(sections)}</div><footer class="pn-foot"><span>${data ? `${escape(status)} <button type="button" class="text-button" data-pn-retry${flight ? " disabled" : ""}>检查更新</button>` : ""}</span>${data ? `<a href="${escape(data.sourceUrl)}" target="_blank" rel="noopener noreferrer">查看官方公告原文</a>` : ""}</footer>`;
     dialog.querySelectorAll(".is-augment .ic img").forEach((img) => {
       img.addEventListener("error", () => img.parentElement?.remove(), { once: true });

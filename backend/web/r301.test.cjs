@@ -13,6 +13,10 @@ function refreshFixture({api=async()=>{},wait=false,syncing=false}={}){
 test('R301 manual refresh bounds API and unresolved hard refresh and records stage',async()=>{
  for(const [options,stage]of [[{api:()=>new Promise(()=>{})},'api'],[{wait:true},'hard-refresh-wait']]){const h=refreshFixture(options);try{const task=h.runManualRefresh();await h.c.advance(20000);await task;assert.equal(h.state.manualRefreshing,false);assert.equal(h.button.disabled,false);assert.equal(h.button.textContent,'重新读取');assert(h.reports.some(r=>r[1]==='timeout'&&r[2].stage===stage&&r[2].busy_ms===20000));}finally{h.close();}}
 });
+test('R302 manual refresh dispatches only after delayed identity API settles and also dispatches on ordinary error',async()=>{
+ for(const fail of [false,true]){let returned=false;const seen=[];const h=refreshFixture({api:async()=>{await new Promise(resolve=>h.c.setTimeout(resolve,75));returned=true;if(fail)throw Error('ordinary API failure');}});
+ try{h.w.addEventListener('deep-legends:hard-refresh',()=>seen.push(returned));const task=h.runManualRefresh();await h.c.advance(74);assert.equal(returned,false);assert.deepEqual(seen,[]);await h.c.advance(1);await task;assert.equal(returned,true);assert.deepEqual(seen,[true]);assert.equal(h.button.disabled,false);}finally{h.close();}}
+});
 test('R301 no-client and deadline release immediately; old finally cannot release a new token',async()=>{
  const h=refreshFixture({wait:true});try{const old=h.runManualRefresh();await h.c.flush();h.state.clientView.state='no-client';h.renderStatus();assert.equal(h.button.disabled,false);assert(h.reports.some(r=>r[1]==='released-no-client'));
  h.state.clientView.state='ready';h.state.status.connected=true;const next=h.runManualRefresh();await h.c.flush();await old;assert.equal(h.state.manualRefreshing,true);assert.equal(h.button.disabled,true);
@@ -70,6 +74,11 @@ test('R301 dialog refreshes only after ten-minute successful check and changed u
  const feed=JSON.parse(fs.readFileSync(path.join(__dirname,'../patchnotes/patch-notes.json'))),tick=()=>new Promise(setImmediate);
  for(const old of [false,true]){const dom=new JSDOM('<main id="root"></main>',{url:'http://fixture',runScripts:'outside-only'}),w=dom.window,calls=[];let latest='26.20';w.deepLegendsRuntime={escapeHTML:String};w.deepLegendsSections={register(){}};w.fetch=async url=>{calls.push(url);return {ok:true,json:async()=>({...structuredClone(feed.versions.find(v=>v.version===latest)),successfulAt:new Date(Date.now()-(old?660000:60000)).toISOString()})}};
  try{w.eval(read('patch-notes.js'));await tick();w.document.querySelector('main').innerHTML=w.deepLegendsPatchNotes.button('ranked');w.document.querySelector('button').click();await tick();assert.equal(calls.filter(u=>u.includes('refresh=1')).length,old?1:0);w.document.querySelector('[data-pn-close]').click();latest='26.21';w.dispatchEvent(new w.Event('deep-legends:patch-notes-changed'));await tick();assert.equal(w.document.querySelector('[data-patch-notes] b').textContent,'26.21');assert.equal(w.document.querySelector('.pn-dialog'),null);}finally{w.close();}}
+});
+test('R302 fallback notes say updated without claiming an official check',async()=>{
+ const feed=JSON.parse(fs.readFileSync(path.join(__dirname,'../patchnotes/patch-notes.json'))),dom=new JSDOM('<main></main>',{url:'http://fixture',runScripts:'outside-only'}),w=dom.window;
+ w.deepLegendsRuntime={escapeHTML:String};w.deepLegendsSections={register(){}};w.fetch=async()=>({ok:true,json:async()=>({...structuredClone(feed.versions[0]),updateStatus:'fallback',successfulAt:new Date().toISOString()})});
+ try{w.eval(read('patch-notes.js'));await new Promise(setImmediate);w.document.querySelector('main').innerHTML=w.deepLegendsPatchNotes.button('ranked');w.document.querySelector('button').click();await new Promise(setImmediate);const text=w.document.querySelector('.pn-foot').textContent;assert(text.includes('已更新公告'));assert(!text.includes('已检查官方公告'));}finally{w.close();}
 });
 test('R301 repeated refresh diagnostics retain identical timeout durations without dedup loss',async()=>{
  const dom=new JSDOM('',{url:'http://fixture',runScripts:'outside-only'}),w=dom.window,calls=[];w.fetch=async(url,init)=>{calls.push(JSON.parse(init.body));return {status:204}};
