@@ -96,8 +96,6 @@ func TestR160ArenaAggregateHasBoundedDetailBudget(t *testing.T) {
 	}
 }
 
-
-
 func TestR160OverviewChampionNamesColdStart(t *testing.T) {
 	provider := newChampionProvider()
 	a := &app{riot: newRiotProvider(provider)}

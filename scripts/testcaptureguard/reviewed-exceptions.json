@@ -1193,14 +1193,14 @@
     "file": "backend/r160_test.go",
     "line": 81,
     "target": "called",
-    "source_sha256": "60919170a43d0cc2002617d9e5dc5c51bc613fd16f9d62c5a70d172e20674998",
+    "source_sha256": "447a53bb133114af386a2920e14ab541239798a99063bd58652fab6e38e97556",
     "comment": "r276-capture-safe: TestR160ArenaAggregateHasBoundedDetailBudget: the audited fixture operations in this test invoke this callback serially and return before called is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r160_test.go",
     "line": 84,
     "target": "attempt",
-    "source_sha256": "60919170a43d0cc2002617d9e5dc5c51bc613fd16f9d62c5a70d172e20674998",
+    "source_sha256": "447a53bb133114af386a2920e14ab541239798a99063bd58652fab6e38e97556",
     "comment": "r276-capture-safe: TestR160ArenaAggregateHasBoundedDetailBudget: the audited fixture operations in this test invoke this callback serially and return before attempt is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {

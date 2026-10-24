@@ -159,7 +159,9 @@ func TestR277CNScoreRejectsWrongScopeAndParticipant(t *testing.T) {
 				a.sgp.historyGamesLocked().putSGP("HN1", info)
 				body = r277CNBody(a, a.summoner.PUUID, "HN1", game.GameID)
 			}
-			client.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) { return publicDataResponse(r, []byte(`{"gameId":1}`)), nil })}
+			client.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+				return publicDataResponse(r, []byte(`{"gameId":1}`)), nil
+			})}
 			w := r277ScoreRequest(a, body)
 			if w.Code == 200 {
 				t.Fatalf("%s exposed another scope/participant's cached score", kind)
