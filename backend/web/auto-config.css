@@ -406,11 +406,11 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 .ac-ed-head .ac-portrait { width:36px; height:36px; border-radius:8px; }
 .ac-section-head { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:0; }
 .ac-section-head h4 { margin:0; }
-.ac-editor-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-left:0; font-weight:400; letter-spacing:normal; }
+.ac-editor-actions { display:flex; align-items:center; flex-wrap:nowrap; gap:8px; margin-left:0; font-weight:400; letter-spacing:normal; }
 .ac-editor-actions .button { min-height:30px; padding:0 10px; font-size:12px; }
 .ac-editor-actions .text-button { margin-right:4px; font-size:12px; }
 .ac-buildname .ac-stage-warn { margin-left:0; }
-.ac-buildname .ac-editor-actions { margin-left:0; }
+.ac-buildname .ac-action-row { margin-left:auto; }
 .ac-save-state { display:inline-flex; padding:3px 8px; border-radius:6px; font-size:11px; white-space:nowrap; color:var(--muted); background:var(--surface-strong); }
 .ac-tabs > .ac-save-state { margin-left:auto; }
 .ac-save-state.ac-saved { color:var(--primary-strong); background:var(--primary-soft); }
@@ -445,3 +445,11 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 .ac-slot { position:relative; }
 .ac-spell-remove { display:none; position:absolute; right:-4px; top:-5px; width:18px; height:18px; border-radius:50%; background:var(--surface); color:var(--danger); line-height:18px; }
 .ac-slot:hover .ac-spell-remove, .ac-slot:focus-within .ac-spell-remove { display:block; }
+
+.ac-action-row { display:flex; align-items:center; justify-content:flex-end; flex:1 1 360px; min-width:0; gap:12px; margin-left:auto; }
+.ac-action-row .ac-feedback { min-width:0; display:flex; align-items:center; gap:8px; overflow:hidden; }
+.ac-feedback > span { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.ac-feedback .text-button { flex:none; }
+.ac-editor-actions { flex:none; margin-left:auto; }
+.ac-validation-pulse { animation:ac-validation-pulse 650ms ease-out; }
+@keyframes ac-validation-pulse { 30% { outline:2px solid var(--warning); background:color-mix(in oklab,var(--warning) 14%,transparent); } }

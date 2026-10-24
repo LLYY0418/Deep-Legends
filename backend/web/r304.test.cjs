@@ -13,7 +13,7 @@ test('R304 seven real bundled changes use the correct color and preserve officia
    w.document.querySelector('main').innerHTML=w.deepLegendsPatchNotes.renderSections(sections);
    const article=[...w.document.querySelectorAll('.pn-entry')].find(n=>n.querySelector('.pn-entry-name').textContent===name),node=[...article.querySelectorAll('.pn-line')].find(n=>n.querySelector('.k')?.textContent===key+'：');
    assert(node.querySelector('.to').classList.contains('is-'+want),`${version}/${name}/${key}`);assert.equal(node.querySelector('.from').textContent,line.from);assert.equal(node.querySelector('.to').textContent,line.to);
-   if(name==='月华咒刃'){assert.equal(article.querySelector('.pn-direction'),null);assert(![...article.querySelectorAll('.pn-line')].find(n=>n.querySelector('.k')?.textContent==='强化攻击次数：').querySelector('.to').classList.contains('is-buff'));}
+   if(name==='月华咒刃'){assert.equal(article.querySelector('.pn-direction').textContent,'↓');assert(![...article.querySelectorAll('.pn-line')].find(n=>n.querySelector('.k')?.textContent==='强化攻击次数：').querySelector('.to').classList.contains('is-buff'));}
   }
  }finally{w.close();}
 });
@@ -24,12 +24,12 @@ test('R304 cooldown return and reduction are higher-better; cooldown time and re
  for(const key of ['强化攻击次数','减速','减速阈值','攻击速度收益'])assert.equal(f.lineDirection({k:key,from:'10',to:'20'}),'',key);
  assert.equal(f.lineDirection({k:'减速抗性',from:'10',to:'20'}),'buff');
 });
-test('R304 any indeterminate change blocks the aggregate arrow while official introduction is not a change',()=>{
+test('R304 indeterminate changes allow known directions while mixed numerical sequences adjust',()=>{
  const f=compile(source,['lineDirection','entryDirection'],{}),entry=lines=>({groups:[{lines}]});
- assert.equal(f.entryDirection(entry([{k:'伤害',from:'1',to:'2'},{k:'强化攻击次数',from:'2',to:'3'}])), '');
- assert.equal(f.entryDirection(entry([{k:'伤害',from:'1',to:'2'},{k:'生命值',from:'1/2',to:'2/1'}])), '');
- assert.equal(f.entryDirection(entry([{k:'伤害',from:'1',to:'2'},{text:'新增效果'}])), '');
- assert.equal(f.entryDirection(entry([{k:'伤害',from:'1',to:'2'},{k:'护甲',from:'10',to:'10'}])), '');
+ assert.equal(f.entryDirection(entry([{k:'伤害',from:'1',to:'2'},{k:'强化攻击次数',from:'2',to:'3'}])), 'buff');
+ assert.equal(f.entryDirection(entry([{k:'伤害',from:'1',to:'2'},{k:'生命值',from:'1/2',to:'2/1'}])), 'adjust');
+ assert.equal(f.entryDirection(entry([{k:'伤害',from:'1',to:'2'},{text:'新增效果'}])), 'buff');
+ assert.equal(f.entryDirection(entry([{k:'伤害',from:'1',to:'2'},{k:'护甲',from:'10',to:'10'}])), 'buff');
  const azir=feed.versions[0].modes.ranked.sections.flatMap(s=>s.entries||[]).find(e=>e.championId===268);assert.equal(f.entryDirection(azir),'buff');
 });
 test('R304 spell layout coalesces a frame and ignores unrelated live mutations and unchanged widths',()=>{

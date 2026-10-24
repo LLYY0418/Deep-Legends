@@ -1648,6 +1648,7 @@
   function championStatsPending(items,overall,progress,tab) {
     if(progress?.foreign)return false;
     if(Number(overall?.games)>0 || (items || []).some(item=>Number(item.games)>0))return false;
+    if(progress?.complete)return false;
     if(historyServiceState(tab))return true;
     if(progress && !progress.unavailable)return Boolean(progress.collecting && !progress.complete && !Number(progress.scanned));
     return Boolean(tab?.loading && !tab.recentStatsReceived && !(Number(tab.data?.historyRequested)>0));
@@ -2543,6 +2544,7 @@
   }
 
   function renderCareerPendingMarkup(markup) {
+    if(markup.includes('class="career-section champion-performance'))return markup.replace('class="career-section','class="is-career-pending career-section').replace(/(<section[^>]*>\s*<header>[\s\S]*?<\/header>)[\s\S]*(<\/section>)$/, '$1<div class="champion-pending-rows" aria-label="正在读取英雄数据">'+Array.from({length:5},()=>'<div class="champion-stat-row champion-skeleton-row" aria-hidden="true"><i class="game-icon gameplay-skeleton"></i><div><i class="skeleton-line gameplay-skeleton"></i></div><div><i class="skeleton-line gameplay-skeleton"></i></div><div><i class="skeleton-line gameplay-skeleton"></i></div></div>').join('')+'<\/div>$2');
     return markup.replace('class="career-section','class="is-career-pending career-section').replace(/(<section[^>]*>(?:\s*<header>[\s\S]*?<\/header>)?)([\s\S]*)(<\/section>)$/, '$1<div class="career-pending gameplay-skeleton" aria-hidden="true">$2</div>$3');
   }
 
@@ -3257,17 +3259,17 @@
 
   function renderSeasonDataNote(progress, queue, games, ranks = []) {
     const copy = {title:"数据说明", limit:"受官方接口限制，仅能查询到 {date} 之后的对局。", counted:"已统计 {games} 场", official:" · 官方总场次 {games} 场", future:"此后的新对局会自动累计。"};
-    const oldest=Number(queue==="mayhem" ? progress?.mayhemOldestAt : progress?.rankedOldestAt);
-    const capped=progress?.upstreamCapped&&!progress.foreign&&Number.isFinite(oldest)&&oldest>0;
+    const mode=queue==="mayhem"?"mayhem":queue==="440"?"flex":"solo";
+    const oldest=Number(progress?.[mode+"OldestAt"] ?? (mode==="solo"?progress?.rankedOldestAt:0));
     const date=new Date(oldest);
-
     const dateLabel=`${date.getFullYear()===new Date().getFullYear() ? "" : `${date.getFullYear()}年`}${date.getMonth()+1}月${date.getDate()}日`;
-    const type=queue==="440" ? "RANKED_FLEX_SR" : "RANKED_SOLO_5X5";
-    const row=(ranks || []).find(rank=>String(rank.queueType).toUpperCase()===type);
-    const official=Number.isInteger(row?.wins) && row.wins>=0 && Number.isInteger(row?.losses) && row.losses>=0 ? row.wins+row.losses : null;
+    const type=queue==="440"?"RANKED_FLEX_SR":"RANKED_SOLO_5X5";
+    const row=(ranks||[]).find(rank=>String(rank.queueType).toUpperCase()===type);
+    const official=Number.isInteger(row?.wins)&&row.wins>=0&&Number.isInteger(row?.losses)&&row.losses>=0?row.wins+row.losses:null;
+    const capped=!progress?.foreign&&(progress?.[mode+"Capped"]===true||(mode!=="mayhem"&&official!==null&&games<official));
     const counted=copy.counted.replace("{games}",String(games));
-    const countLine=queue!=="mayhem" && official!==null && official>=games ? counted+copy.official.replace("{games}",String(official)) : counted;
-    const lines=["统计范围：当前整个赛季这一模式的对局。",...(capped&&Number.isFinite(date.getTime())?[copy.limit.replace("{date}",dateLabel),countLine]:[])].filter(Boolean);
+    const countLine=mode!=="mayhem"&&official!==null?counted+copy.official.replace("{games}",String(official)):counted;
+    const lines=["统计范围：当前整个赛季这一模式的对局。",...(capped?[oldest>0&&Number.isFinite(date.getTime())?copy.limit.replace("{date}",dateLabel):"受官方接口限制，只能查询到最近的部分对局。",countLine]:[])];
     return `<button type="button" class="season-data-note" data-season-data-note="${escapeHTML(JSON.stringify(lines))}" aria-label="${copy.title}" aria-expanded="false"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7v4M8 4.5v.5"/></svg></button>`;
   }
 
@@ -3314,7 +3316,7 @@
     const overallRow = `<div class="champion-stat-row is-overall"><span class="overall-champion-mark" aria-hidden="true">全</span><div><strong>全部英雄</strong><small>CS ${number(overall.cs)} (${number(overall.csPerMinute)})</small></div><div><b>${kda(overall.kda)}:1 KDA</b><small>${number(overall.kills)} / ${number(overall.deaths)} / ${number(overall.assists)}</small></div><div><b class="win-rate-value">${percent(overall.winRate)}</b><small>${number(overall.games)} 场</small></div></div>`;
     const rows = items.slice(0, 8).map((item) => `<div class="champion-stat-row">${iconFigure("champion", item.championId, item.championName)}<div><strong>${escapeHTML(item.championName)}</strong><small>CS ${number(item.cs)} (${number(item.csPerMinute)})</small></div><div><b>${kda(item.kda)}:1 KDA</b><small>${number(item.kills)} / ${number(item.deaths)} / ${number(item.assists)}</small></div><div><b class="win-rate-value">${percent(item.winRate)}</b><small>${number(item.games)} 场</small></div></div>`).join("");
     const label = progress?.message ? `${progress.season ? `${escapeHTML(progress.season)} · ` : ""}${escapeHTML(progress.message)}` : (progress?.complete ? `本赛季 · ${number(rankedGames)} 场对局` : `已统计 ${number(rankedGames)} 场`);
-    return `<section class="career-section champion-performance"><header><h3>英雄胜率${renderSeasonDataNote(progress,progress?.queue||"420",Number(overall?.games)||0,ranks)}</h3><span>${label}${progress?.tableSupported && (tableGames>=20 || progress.foreign) ? overviewDetailArrow("champion-table", "查看英雄数据表") : ""}</span></header><div>${overallRow}${rows || '<p class="section-empty">暂无英雄统计</p>'}</div></section>`;
+    return `<section class="career-section champion-performance"><header><h3>英雄胜率${renderSeasonDataNote(progress,progress?.queue||"420",Number(overall?.games)||0,ranks)}</h3><span>${label}${progress?.tableSupported && (tableGames>=20 || progress.foreign) ? overviewDetailArrow("champion-table", "查看英雄数据表") : ""}</span></header><div>${rows?overallRow+rows:'<p class="section-empty">暂无英雄数据</p>'}</div></section>`;
   }
 
   function renderPositionStats(items, queueId = 0, queueSwitcher = "", sourceLabel = "", queueGames = 0, partialHistory = false) {

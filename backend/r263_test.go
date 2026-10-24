@@ -26,8 +26,8 @@ func r263RealInProgressInputs() []arenaPremadeInput {
 
 func TestR263ArenaPremadeGroupsUseRealDistribution(t *testing.T) {
 	groups, dropped := arenaPremadeGroups(r263RealInProgressInputs(), 3, 5)
-	if len(groups) != 2 {
-		t.Fatalf("groups = %#v, want the two 2-player lobbies", groups)
+	if len(groups) != 3 {
+		t.Fatalf("groups = %#v, want the two 2-player lobbies plus own premade", groups)
 	}
 	for _, group := range groups {
 		if len(group.Members) != 2 || group.Source != "session" {

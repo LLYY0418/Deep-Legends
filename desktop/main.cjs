@@ -76,7 +76,9 @@ let readyTimer = null;
 let stdoutBuffer = "";
 let quitting = false;
 let shutdownStarted = false;
-let rendererTheme = null;
+const appearanceCachePath=path.join(app.getPath("userData"),"appearance-theme.json");
+let rendererTheme = "dark";
+try { const cached=JSON.parse(fs.readFileSync(appearanceCachePath,"utf8"));if(["light","dark"].includes(cached.theme))rendererTheme=cached.theme; } catch (_) {}
 let modalOpen = false;
 let shareExportController = null;
 let backendStarted = false;
@@ -719,7 +721,7 @@ function createMainWindow() {
     backgroundColor: titleBarOverlay(rendererTheme).color,
     icon: iconPath(),
     titleBarStyle: "hidden",
-    titleBarOverlay: process.platform === "win32" ? titleBarOverlay() : undefined,
+    titleBarOverlay: process.platform === "win32" ? titleBarOverlay(rendererTheme) : undefined,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -907,7 +909,8 @@ function createMainWindow() {
   ipcMain.handle("desktop-share-capture-and-save", (event, payload) => windowShareExportController.captureAndSave(event, payload));
   ipcMain.removeAllListeners("desktop-theme");
   ipcMain.on("desktop-theme", (_event, theme) => {
-    if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed() && (theme === "dark" || theme === "light")) {
+    if (mainWindow && !mainWindow.isDestroyed() && (theme === "dark" || theme === "light")) {
+      if(rendererTheme!==theme){try {fs.writeFileSync(appearanceCachePath+".tmp",JSON.stringify({theme}),{mode:0o600});fs.renameSync(appearanceCachePath+".tmp",appearanceCachePath);} catch (_) {}}
       rendererTheme = theme;
       syncTitleBar();
       mainWindow.setBackgroundColor(titleBarOverlay(rendererTheme).color);

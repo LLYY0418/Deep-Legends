@@ -191,7 +191,7 @@
 .summoner-strip-copy span, .summoner-strip-copy p { color: var(--muted); }
 .summoner-strip-copy .pro-identity-chip { color: var(--primary-strong); }
 .summoner-strip-copy p { margin: 4px 0 0; font-size: 13px; }
-.summoner-level-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--identity-chip-gap); }
+.summoner-level-row { display: flex; align-items: center; flex-wrap: nowrap; gap: var(--identity-chip-gap); }
 .summoner-level-row .player-tab-hidden { margin-top: 0; color: var(--warning); }
 .summoner-strip-copy .player-live-chip { color: var(--accent); overflow-wrap: anywhere; }
 .player-live-chip time { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -2384,7 +2384,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .career-column>.rank-career-section>header,.career-column>.rank-career-section>.rank-list{flex:none}
 
 
-.summoner-strip { --strip-avatar-size:72px; --strip-name-height:32px; --strip-meta-height:24px; --strip-level-height:20px; grid-template-columns:var(--strip-avatar-size) minmax(0,1fr) 217px; }
+.summoner-strip { --strip-avatar-size:72px; --strip-name-height:32px; --strip-meta-height:24px; --strip-level-height:24px; grid-template-columns:var(--strip-avatar-size) minmax(0,1fr) 217px; }
 .summoner-strip .game-icon.is-summoner-avatar { width:var(--strip-avatar-size);height:var(--strip-avatar-size); }
 .summoner-strip-copy>div { display:flex; flex-direction:row; flex-wrap:nowrap; height:var(--strip-name-height); gap:var(--identity-chip-gap); align-items:center; }
 .summoner-strip-copy h2 { height:var(--strip-name-height);line-height:var(--strip-name-height);margin:0; }
@@ -2392,7 +2392,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .summoner-name-meta { display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:var(--identity-chip-gap);height:var(--strip-name-height);overflow:hidden; }
 .summoner-name-meta>.summoner-tag { flex:0 0 auto; width:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .is-identity-placeholder { visibility:hidden; }
-.summoner-level-row { height:var(--strip-level-height);line-height:var(--strip-level-height);margin-top:4px;overflow:hidden; }
+.summoner-level-row { min-height:var(--strip-level-height);line-height:var(--strip-level-height);margin-top:4px;overflow:visible; }
 .summoner-strip-highlights { width:217px;grid-auto-columns:92px;grid-template-rows:77px 14px 12px;gap:4px 16px; }
 .summoner-highlight>figcaption {grid-row:2 / span 2;}
 .summoner-highlight { min-height:104px; }
@@ -2475,3 +2475,20 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 [data-card-spells] :is(.item-option-button,.game-icon) { width:34px; height:34px; flex:0 0 34px; padding:0; border-radius:8px; }
 .specialist-game-row[data-spell-layout="board"] .rune-corner-spells { display:flex; }
+
+.champion-performance { align-self:start; }
+.champion-performance h3,.champion-table-section h3,.champion-table-head h3 { display:flex; align-items:center; }
+.champion-skeleton-row .game-icon { width:32px; height:32px; border-radius:50%; }
+.champion-skeleton-row .skeleton-line { display:block; width:70%; height:10px; margin:0; }
+.champion-skeleton-row > div:last-child .skeleton-line { width:36px; justify-self:end; }
+.champion-pending-rows { align-self:start; }
+
+.specialist-game-row[data-spell-layout="footer"] .specialist-game-footer { flex-wrap:nowrap; }
+.specialist-game-row[data-spell-layout="footer"] .sg-skills { flex:0 1 auto; padding-top:0; border-top:0; }
+.specialist-game-row[data-spell-layout="footer"] .sg-skills .skill-order { flex:1 1 auto; }
+.specialist-game-footer > [data-card-spells] { margin-left:auto; align-self:center; }
+.specialist-game-row[data-spell-layout="footer"] .rune-corner-spells { display:none; }
+
+.specialist-game-row[data-spell-layout="footer"] .sg-skills { flex:none; flex-wrap:nowrap; }
+.specialist-game-row[data-spell-layout="footer"] .sg-skills .skill-order { flex:none; width:calc(var(--card-skill-count) * 33px - 3px); }
+.specialist-game-row[data-spell-layout="footer"] .sg-skills .skill-order span { flex:0 0 30px; }

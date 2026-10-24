@@ -3115,6 +3115,7 @@
     const now = new Date();
     const effectiveTheme = resolvedTheme(theme, now);
     document.documentElement.dataset.theme = effectiveTheme;
+    try { localStorage.setItem("deep-legends-appearance-v1", JSON.stringify({theme:effectiveTheme,density})); } catch (_) {}
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_BACKGROUNDS[effectiveTheme] || "#0B0E14");
     // 桌面外壳只区分明暗两种标题栏。
     window.desktopTheme?.setTheme?.(effectiveTheme === "light" ? "light" : "dark");

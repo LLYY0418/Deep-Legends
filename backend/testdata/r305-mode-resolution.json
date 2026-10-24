@@ -1,0 +1,9 @@
+[
+ {"name":"practice-ranked-general","mode":"normal","position":"middle","entries":["ranked"],"want":"ranked","exists":true},
+ {"name":"practice-ranked-position","mode":"normal","position":"mid","entries":["ranked","ranked-middle"],"want":"ranked-middle","exists":true},
+ {"name":"normal-own","mode":"normal","position":"top","entries":["normal","ranked-top","ranked"],"want":"normal","exists":true},
+ {"name":"ranked-position","mode":"ranked","position":"adc","entries":["ranked-bottom","ranked"],"want":"ranked-bottom","exists":true},
+ {"name":"ranked-no-normal-fallback","mode":"ranked","position":"top","entries":["normal"],"want":"ranked","exists":false},
+ {"name":"aram-no-fallback","mode":"aram","position":"","entries":["ranked"],"want":"aram","exists":false},
+ {"name":"urf-no-fallback","mode":"urf","position":"","entries":["ranked"],"want":"urf","exists":false}
+]

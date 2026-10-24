@@ -81,7 +81,7 @@ func autoConfigMode(queue int64, mode string, mapID int64) string {
 		return "aram"
 	case 900, 1900:
 		return "urf"
-	case 400, 430, 480, 490, 700, 820, 830, 840, 850, 860, 870, 880, 890, 950, 960:
+	case 400, 430, 480, 490, 700, 820, 830, 840, 850, 860, 870, 880, 890, 950, 960, 3100:
 		return "normal"
 	case 1300, 1400:
 		return "event"
@@ -96,7 +96,7 @@ func autoConfigMode(queue int64, mode string, mapID int64) string {
 		return "urf"
 	case "ULTBOOK", "NEXUSBLITZ":
 		return "event"
-	case "CLASSIC":
+	case "CLASSIC", "PRACTICETOOL":
 		if mapID == 0 || mapID == 11 {
 			return "normal"
 		}
@@ -372,14 +372,35 @@ func (a *app) handleAutoConfigCopy(w http.ResponseWriter, r *http.Request) {
 }
 func autoConfigEntryFor(s autoConfigSettings, id int64, mode, position string) (autoConfigEntry, string, bool) {
 	m := s.Champions[strconv.FormatInt(id, 10)]
+	position = strings.ToLower(position)
+	position = mapPosition(position)
+	keys := []string{mode}
 	if mode == "ranked" && position != "" {
-		key := "ranked-" + strings.ToLower(position)
+		keys = []string{"ranked-" + position, "ranked"}
+	}
+	if mode == "normal" {
+		if position != "" {
+			keys = append(keys, "ranked-"+position)
+		}
+		keys = append(keys, "ranked")
+	}
+	for _, key := range keys {
 		if e, ok := m[key]; ok {
 			return e, key, true
 		}
 	}
-	e, ok := m[mode]
-	return e, mode, ok
+	return autoConfigEntry{}, mode, false
+}
+func mapPosition(position string) string {
+	switch position {
+	case "mid":
+		return "middle"
+	case "adc":
+		return "bottom"
+	case "support":
+		return "utility"
+	}
+	return position
 }
 func autoConfigError(kind string) error {
 	return fmt.Errorf("%s已失效或不适用于当前模式", kind)

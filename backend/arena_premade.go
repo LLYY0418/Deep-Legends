@@ -102,9 +102,6 @@ func arenaPremadeGroups(inputs []arenaPremadeInput, squadSize, threshold int) ([
 			dropped = append(dropped, arenaPremadeDrop{Size: len(members), Reason: "crosses_my_squad"})
 			continue
 		}
-		if mine > 0 {
-			continue // my own lobby is already part of 我的小队
-		}
 		for _, member := range members[1:] {
 			union(members[0], member)
 		}
@@ -132,9 +129,6 @@ func arenaPremadeGroups(inputs []arenaPremadeInput, squadSize, threshold int) ([
 	components := map[int][]int{}
 	roots := []int{}
 	for index := range inputs {
-		if inputs[index].Mine {
-			continue
-		}
 		root := find(index)
 		if _, seen := components[root]; !seen {
 			roots = append(roots, root)
@@ -167,6 +161,9 @@ func arenaPremadeGroups(inputs []arenaPremadeInput, squadSize, threshold int) ([
 		groups = append(groups, arenaPremadeGroup{Members: members, Source: source})
 	}
 	sort.SliceStable(groups, func(i, j int) bool {
+		if inputs[groups[i].Members[0]].Mine != inputs[groups[j].Members[0]].Mine {
+			return !inputs[groups[i].Members[0]].Mine
+		}
 		if len(groups[i].Members) != len(groups[j].Members) {
 			return len(groups[i].Members) > len(groups[j].Members)
 		}
@@ -308,6 +305,7 @@ func (a *app) applyArenaPremadeSquads(response *gameplayLiveResponse, inputsByRe
 	for index := range response.Players {
 		player := &response.Players[index]
 		player.ArenaSquadKey, player.ArenaSquadSource = "", ""
+		player.PremadeGroup, player.PremadeSize, player.PremadeSource = "", 0, ""
 		ref := player.reference.PlayerRef
 		input := inputsByRef[ref]
 		input.Ref = ref
@@ -372,7 +370,12 @@ func (a *app) applyArenaPremadeSquads(response *gameplayLiveResponse, inputsByRe
 	}
 	for groupIndex, group := range groups {
 		for _, member := range group.Members {
-			response.Players[member].ArenaSquadKey = "premade:" + keys[groupIndex]
+			if !inputs[member].Mine {
+				response.Players[member].ArenaSquadKey = "premade:" + keys[groupIndex]
+			}
+			response.Players[member].PremadeGroup = strconv.Itoa(groupIndex + 1)
+			response.Players[member].PremadeSize = len(group.Members)
+			response.Players[member].PremadeSource = group.Source
 			response.Players[member].ArenaSquadSource = group.Source
 		}
 	}

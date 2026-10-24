@@ -228,6 +228,19 @@ func (a *app) handlePlayerTags(w http.ResponseWriter, r *http.Request) {
 		var ok bool
 		ref, ok = a.visibleTagReference(req.PlayerRef)
 		if !ok {
+			raw, found := a.resolveGameplayReferenceDetails(req.PlayerRef)
+			reason := "not_found"
+			if found {
+				if raw.TagBlocked {
+					reason = "tag_blocked"
+				} else {
+					reason = "no_name"
+				}
+			}
+			a.gameplayFlow.mu.Lock()
+			phase := a.gameplayFlow.phase
+			a.gameplayFlow.mu.Unlock()
+			diagnostic = map[string]any{"event": "player_tags_update_rejected", "reason": reason, "source": raw.TagSource, "phase": phase}
 			http.Error(w, "该玩家身份尚未公开或引用已过期", 404)
 			return
 		}

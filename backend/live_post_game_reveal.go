@@ -394,7 +394,8 @@ func (a *app) revealPostGamePlayers(ctx context.Context, client *LCUClient, snap
 			player.RecentRankedRecord = recentRankedRecord(player.RecentGames)
 		}
 		player.ProPlayer = a.matchProIdentity(a.proIdentitySnapshot(), "live", reference, snapshot.GameID)
-		player.PlayerRef = a.registerGameplayReferenceDetails(reference)
+		player.PlayerRef = a.registerGameplayReferenceDetails(reference, "reveal")
+		_, player.Taggable = a.visibleTagReference(player.PlayerRef)
 		if ctx.Err() != nil || !valid() {
 			return snapshot, 0, "stopped"
 		}

@@ -272,6 +272,7 @@ type gameplayRankedQueueStats struct {
 }
 
 type gameplayPlayer struct {
+	Taggable             bool              `json:"taggable"`
 	ProPlayer            *proIdentityBadge `json:"proPlayer,omitempty"`
 	PlayerRef            string            `json:"playerRef,omitempty"`
 	DisplayName          string            `json:"displayName"`
@@ -306,6 +307,7 @@ type gameplayPlayer struct {
 // keeps enough identity hints to continue loading match data when the client
 // hides a player's visible name or exposes an obfuscated champ-select ID.
 type gameplayReference struct {
+	TagSource           string
 	TagVisibilityKnown  bool // only fresh live identity may clear hidden status
 	TagBlocked          bool // hidden or unresolved live identity: never expose personal tags
 	ClientIdentity      bool // PUUID came from LCU, not the public Riot API
@@ -455,6 +457,7 @@ type gameplayMastery struct {
 }
 
 type gameplayRecentPlayer struct {
+	Taggable      bool   `json:"taggable"`
 	PlayerRef     string `json:"playerRef,omitempty"`
 	DisplayName   string `json:"displayName"`
 	ProfileIconID int64  `json:"profileIconId,omitempty"`
@@ -500,6 +503,7 @@ type gameplayPerkStat struct {
 }
 
 type gameplayParticipant struct {
+	Taggable       bool               `json:"taggable"`
 	IsCurrent      bool               `json:"isCurrent,omitempty"`
 	ProPlayer      *proIdentityBadge  `json:"proPlayer,omitempty"`
 	ParticipantID  int64              `json:"participantId"`
@@ -3037,6 +3041,9 @@ func safeDiagnosticReason(err error) string {
 }
 
 func mergeGameplayReferences(preferred, fallback gameplayReference) gameplayReference {
+	if preferred.TagSource == "" {
+		preferred.TagSource = fallback.TagSource
+	}
 	if !preferred.TagVisibilityKnown {
 		preferred.TagBlocked = preferred.TagBlocked || fallback.TagBlocked
 		preferred.TagVisibilityKnown = fallback.TagVisibilityKnown
@@ -3214,7 +3221,10 @@ type gameplayReferenceCacheItem struct {
 	publicRef string
 }
 
-func (a *app) registerGameplayReferenceDetails(reference gameplayReference) string {
+func (a *app) registerGameplayReferenceDetails(reference gameplayReference, sources ...string) string {
+	if len(sources) > 0 {
+		reference.TagSource = sources[0]
+	}
 	reference = normalizeGameplayReference(reference)
 	playerRef := reference.PlayerRef
 	if playerRef == "" {
@@ -3312,13 +3322,15 @@ func (a *app) publicizeOverviewReferences(response *gameplayOverview) {
 	playerReference := mergeGameplayReferences(response.Player.reference, gameplayReference{PlayerRef: response.Player.PlayerRef, DisplayName: response.Player.DisplayName, GameName: response.Player.GameName, TagLine: response.Player.TagLine, ProfileIconID: response.Player.ProfileIconID, SummonerLevel: response.Player.SummonerLevel, Region: response.Player.Region, ServerID: response.Player.ServerID})
 	index := a.proIdentitySnapshot()
 	response.Player.ProPlayer = a.matchProIdentity(index, "overview", playerReference)
-	response.Player.PlayerRef = a.registerGameplayReferenceDetails(playerReference)
+	response.Player.PlayerRef = a.registerGameplayReferenceDetails(playerReference, "overview")
+	_, response.Player.Taggable = a.visibleTagReference(response.Player.PlayerRef)
 	for matchIndex := range response.Matches {
 		a.publicizeMatchReferencesWithProIndex(&response.Matches[matchIndex], index)
 	}
 	for index := range response.RecentPlayers {
 		player := &response.RecentPlayers[index]
-		player.PlayerRef = a.registerGameplayReferenceDetails(mergeGameplayReferences(player.reference, gameplayReference{PlayerRef: player.PlayerRef, DisplayName: player.DisplayName, ProfileIconID: player.ProfileIconID}))
+		player.PlayerRef = a.registerGameplayReferenceDetails(mergeGameplayReferences(player.reference, gameplayReference{PlayerRef: player.PlayerRef, DisplayName: player.DisplayName, ProfileIconID: player.ProfileIconID}), "recent")
+		_, player.Taggable = a.visibleTagReference(player.PlayerRef)
 	}
 }
 
@@ -3342,7 +3354,8 @@ func (a *app) publicizeMatchReferencesWithProIndex(match *gameplayMatch, index p
 		a.mu.RUnlock()
 		participant.IsCurrent = gameplayLivePlayerIsCurrent(reference, currentPUUID, nil, nil)
 		participant.ProPlayer = a.matchProIdentity(index, "match", reference, match.GameID)
-		participant.PlayerRef = a.registerGameplayReferenceDetails(reference)
+		participant.PlayerRef = a.registerGameplayReferenceDetails(reference, "history")
+		_, participant.Taggable = a.visibleTagReference(participant.PlayerRef)
 	}
 }
 
@@ -8032,8 +8045,12 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	response.Available = true
 	rawPlayers = a.supplementLiveGSMRoster(ctx, client, current, &response, rawPlayers)
 	arenaMode := isArenaQueue(response.QueueID, response.GameMode)
+	tagSource := "live"
+	if arenaMode {
+		tagSource = "arena"
+	}
 	if arenaMode && (phase == "ChampSelect" || phase == "GameStart") {
-		a.startArenaProgressionDiscovery(client, phase)
+		a.startArenaProgressionDiscovery(client, phase, response.GameID)
 	}
 	aramMode := isARAMFamilyGameMode(response.GameMode)
 	switch queueModeGroupFor(response.QueueID, response.GameMode, response.MapID) {
@@ -8137,7 +8154,7 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		summoner := summonerFromGameplayReference(ref)
 		hidden, unresolved := livePlayerIdentityFlags(raw.player.NameVisibilityType, summoner.GameName, summoner.DisplayName)
 		self := gameplayLivePlayerIsCurrent(ref, current.PUUID, raw.player.CellID, localPlayerCellID)
-		progress.Players[index] = gameplayLivePlayer{CellID: raw.player.CellID, gameplayPlayer: gameplayPlayer{PlayerRef: a.registerGameplayReferenceDetails(ref), DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, Hidden: hidden, IsCurrent: self, Region: ref.Region}, TeamID: raw.team, IsAlly: self || arenaMode && phase == "ChampSelect", IdentityUnresolved: unresolved, ChampionID: raw.player.ChampionID, Bravery: arenaMode && phase == "ChampSelect" && (self || raw.team == 100) && (raw.player.ChampionID == -3 || raw.player.ChampionPickIntent == -3 || raw.player.Bravery), ChampionPickPending: raw.player.ChampionPickPending, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionLocked: raw.player.ChampionLocked, ChampionName: championName(names, raw.player.ChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), HistoryState: "pending"}
+		progress.Players[index] = gameplayLivePlayer{CellID: raw.player.CellID, gameplayPlayer: gameplayPlayer{Taggable: !ref.TagBlocked && (ref.GameName != "" || ref.DisplayName != ""), PlayerRef: a.registerGameplayReferenceDetails(ref, tagSource), DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, Hidden: hidden, IsCurrent: self, Region: ref.Region}, TeamID: raw.team, IsAlly: self || arenaMode && phase == "ChampSelect", IdentityUnresolved: unresolved, ChampionID: raw.player.ChampionID, Bravery: arenaMode && phase == "ChampSelect" && (self || raw.team == 100) && (raw.player.ChampionID == -3 || raw.player.ChampionPickIntent == -3 || raw.player.Bravery), ChampionPickPending: raw.player.ChampionPickPending, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionLocked: raw.player.ChampionLocked, ChampionName: championName(names, raw.player.ChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), HistoryState: "pending"}
 	}
 	var progressMu sync.Mutex
 	publishLiveProgress(ctx, progress)
@@ -8185,7 +8202,14 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 					visibility = "UNHIDDEN"
 				}
 				summoner = mergeSummonerIdentity(loaded, summoner)
-				reference = mergeGameplayReferences(gameplayReferenceFromSummoner(summoner), reference)
+				freshReference := gameplayReferenceFromSummoner(summoner)
+				// A queried profile may reveal data for loading history during selection,
+				// but only a public live row or a verified in-game profile clears tags.
+				if phase != "ChampSelect" && gameplaySummonerHasName(loaded) {
+					freshReference.TagVisibilityKnown = true
+					freshReference.TagBlocked = false
+				}
+				reference = mergeGameplayReferences(freshReference, reference)
 			}
 			playerRef := reference.PlayerRef
 			validRef := validPlayerReference(playerRef)
@@ -8302,7 +8326,8 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			premadeInputs[index] = livePremadeInput{TeamID: raw.team, TeamParticipantID: raw.player.TeamParticipantID, Matches: cloneGameplayMatches(matches)}
 			playerMS[index] = time.Since(playerStarted).Milliseconds()
 			ready := response.Players[index]
-			ready.PlayerRef = a.registerGameplayReferenceDetails(ready.reference)
+			ready.PlayerRef = a.registerGameplayReferenceDetails(ready.reference, tagSource)
+			_, ready.Taggable = a.visibleTagReference(ready.PlayerRef)
 			progressMu.Lock()
 			progress.Players[index] = ready
 			if playersPublishedAt[index].IsZero() {
@@ -8395,7 +8420,8 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	for index := range response.Players {
 		player := &response.Players[index]
 		player.ProPlayer = a.matchProIdentity(proIndex, "live", player.reference, response.GameID)
-		player.PlayerRef = a.registerGameplayReferenceDetails(player.reference)
+		player.PlayerRef = a.registerGameplayReferenceDetails(player.reference, tagSource)
+		_, player.Taggable = a.visibleTagReference(player.PlayerRef)
 	}
 	snapshotStats := livePositionSnapshotStats{}
 	if phase == "ChampSelect" {

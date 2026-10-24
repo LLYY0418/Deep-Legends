@@ -145,10 +145,12 @@
   function entryDirection(entry) {
     if(entry.isNew)return "";
     // The unlabeled champion introduction is editorial context, not a change.
-    const lines=(entry.groups||[]).flatMap((g,i)=>i===0&&entry.championId>0&&!g.label&&(g.lines||[]).every(l=>l.text)?[]:g.lines||[]),directions=lines.map(lineDirection);
-    return directions.length&&directions.every(Boolean)&&new Set(directions).size===1?directions[0]:"";
+    const lines=(entry.groups||[]).flatMap((g,i)=>i===0&&entry.championId>0&&!g.label&&(g.lines||[]).every(l=>l.text)?[]:g.lines||[]),directions=lines.flatMap(line=>{const d=lineDirection(line);if(d)return [d];if(!line.text&&line.from!=null&&line.to!=null){const numbers=s=>(String(s).match(/[-+]?\d+(?:\.\d+)?/g)||[]).map(Number),a=numbers(line.from),b=numbers(line.to);if(a.length&&a.length===b.length&&a.some((n,i)=>b[i]>n)&&a.some((n,i)=>b[i]<n))return ["buff","nerf"];}return [];});
+    if(directions.length&&new Set(directions).size===1)return directions[0];
+    if(new Set(directions).size>1){const intro=(entry.groups||[]).filter(g=>!g.label).flatMap(g=>g.lines||[]).filter(l=>l.text).map(l=>l.text.replace(/在\d+\.\d+版本[^，。]*削弱后/g," ")).join(" "),nerf=intro.includes("削弱"),buff=/加强|增强/.test(intro);if(nerf!==buff)return nerf?"nerf":"buff";}
+    return "adjust";
   }
-  const directionClasses={buff:"is-buff",nerf:"is-nerf"};
+  const directionClasses={buff:"is-buff",nerf:"is-nerf",adjust:"is-adjust"};
   function renderSections(sections) {
     return sections
       .map((section) => {
@@ -169,7 +171,7 @@
           .map((entry) => {
             const image = icon(entry),direction=entryDirection(entry);
             const augment = entry.augmentId > 0 || /(?:^|-)augments$/.test(section.id);
-            return `<article class="pn-entry${image ? "" : " is-text-only"}${augment ? " is-augment" : ""}">${augment ? "" : image}<strong>${entry.isNew ? '<span class="pn-new">新增</span>' : ""}${augment ? image : ""}<span class="pn-entry-name">${escape(entry.name)}</span>${direction?`<span class="pn-direction ${directionClasses[direction]}" aria-hidden="true">${direction==="buff"?"↑":"↓"}</span>`:""}</strong><div>${(entry.groups || []).map((group, index) => `<div class="pn-group">${group.label ? `<span>${escape(group.label)}</span>` : ""}${(group.lines || []).map((line) => (line.text ? `<div class="pn-line${section.id === "champions" && index === 0 && !group.label ? " is-explanation" : ""}">${escape(line.text)}</div>` : `<div class="pn-line"><span class="k">${escape(line.k)}：</span><span class="from">${escape(line.from)}</span><span class="arrow">⇒</span><strong class="to${!entry.isNew&&lineDirection(line)?" "+directionClasses[lineDirection(line)]:""}">${escape(line.to)}</strong></div>`)).join("")}</div>`).join("")}</div></article>`;
+            return `<article class="pn-entry${image ? "" : " is-text-only"}${augment ? " is-augment" : ""}">${augment ? "" : image}<strong>${entry.isNew ? '<span class="pn-new">新增</span>' : ""}${augment ? image : ""}<span class="pn-entry-name">${escape(entry.name)}</span>${direction?`<span class="pn-direction ${directionClasses[direction]}" aria-label="${direction==="buff"?"增强":direction==="nerf"?"削弱":"调整"}">${direction==="buff"?"↑":direction==="nerf"?"↓":"⇅"}</span>`:""}</strong><div>${(entry.groups || []).map((group, index) => `<div class="pn-group">${group.label ? `<span>${escape(group.label)}</span>` : ""}${(group.lines || []).map((line) => (line.text ? `<div class="pn-line${section.id === "champions" && index === 0 && !group.label ? " is-explanation" : ""}">${escape(line.text)}</div>` : `<div class="pn-line"><span class="k">${escape(line.k)}：</span><span class="from">${escape(line.from)}</span><span class="arrow">⇒</span><strong class="to${!entry.isNew&&lineDirection(line)?" "+directionClasses[lineDirection(line)]:""}">${escape(line.to)}</strong></div>`)).join("")}</div>`).join("")}</div></article>`;
           })
           .join(
             "",

@@ -67,7 +67,7 @@ test('R301 slot/region/tab/same rune do not create draft; corrupt entry drops wh
 test('R301 draft cap evicts oldest; stale revision uses existing conflict; offline journal survives close',async()=>{
  const prefix='lol-loot-auto-config-draft-',disk={},rows=[];for(let id=2;id<=51;id++){const key=prefix+id+'-ranked';disk[key]='{}';rows.push({key,at:id});}disk[prefix+'index']=JSON.stringify(rows);
  const h=await draftEditor({disk,offline:true});let next;try{await h.click('[data-rune="101"]');h.w.dispatchEvent(new h.w.Event('pagehide'));assert.equal(JSON.parse(h.w.deepLegendsPreferenceStorage.getItem(prefix+'index')).length,50);assert.equal(h.w.deepLegendsPreferenceStorage.getItem(prefix+'2-ranked'),null);
- await h.w.deepLegendsPreferenceStorage.flush();next=await draftEditor({disk,saved:h.saved,local:h.local()});assert.equal(next.w.document.querySelector('[data-save-state]').textContent,'未保存');assert.equal(next.writes.length,0);next.saved.version++;await next.click('[data-act="save"]');assert(next.w.document.querySelector('.ac-feedback').textContent.includes('配置已更新'));assert.equal(next.writes.length,0);
+ await h.w.deepLegendsPreferenceStorage.flush();next=await draftEditor({disk,saved:h.saved,local:h.local()});assert.equal(next.w.document.querySelector('[data-save-state]').textContent,'未保存');assert.equal(next.writes.length,0);next.saved.version++;next.saved.champions[1].ranked.runes.selectedPerkIds[0]=0;await next.click('[data-act="save"]');assert(next.w.document.querySelector('.ac-feedback').textContent.includes('配置已更新'));assert.equal(next.writes.length,0);
  }finally{h.close();next?.close();}
 });
 test('R301 dialog refreshes only after ten-minute successful check and changed updates closed buttons',async()=>{

@@ -182,3 +182,7 @@
 .ptag-detail .ptag-btn svg { width:15px; height:15px; fill:currentColor; }
 .ptag-detail .ptag-btn.is-tagged { color:var(--primary-strong); }
 .ptag-modal .ptag-player-name { color:var(--primary-strong); }
+
+.summoner-level-row .ptag,.summoner-level-row .ptag-btn { box-sizing:border-box; height:20px; padding:2px 7px; border-radius:6px; font-size:10px; line-height:14px; }
+.summoner-level-row .ptag-btn { width:26px; }
+.summoner-level-row .ptag-inline { flex:none; flex-wrap:nowrap; }

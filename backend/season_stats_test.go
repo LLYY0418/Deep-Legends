@@ -34,7 +34,7 @@ func TestSeasonRecordRankedMatchMirrorsSeasonStatsCriteria(t *testing.T) {
 	first := cache.RankedMatches[0]
 	// 参团率要的是本队总击杀，不能把敌方的 20 杀算进来。
 	if first.TeamKills != 12 {
-		t.Fatalf("team kills = %d, want 14 (own team only)", first.TeamKills)
+		t.Fatalf("team kills = %d, want 15 (own team only)", first.TeamKills)
 	}
 	if first.Position != "middle" || first.Kills != 8 || first.Deaths != 2 || first.Assists != 6 || !first.Win {
 		t.Fatalf("unexpected ranked snapshot: %#v", first)
@@ -492,12 +492,12 @@ func TestSeasonRecordRankedMatchMirrorsMayhemCriteriaAndRecordsAugmentSample(t *
 // P0 判据 2：schema 升版后旧缓存必须触发重扫（失效逻辑在 loadSeasonStats）。
 // 工单原文要求 7→8；并行 R117 会话已经占用了 8（K/D/A 改逐场均值），
 // 所以本轮实际是 8→9，用户已裁决顺延。
-func TestSeasonStatsSchemaVersionIsFourteenAndPreservesEveryOlderFile(t *testing.T) {
-	if seasonStatsCacheSchemaVersion != 14 {
-		t.Fatalf("seasonStatsCacheSchemaVersion = %d, want 14", seasonStatsCacheSchemaVersion)
+func TestSeasonStatsSchemaVersionIsFifteenAndPreservesEveryOlderFile(t *testing.T) {
+	if seasonStatsCacheSchemaVersion != 15 {
+		t.Fatalf("seasonStatsCacheSchemaVersion = %d, want 15", seasonStatsCacheSchemaVersion)
 	}
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
-	for _, old := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13} {
+	for _, old := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14} {
 		cache := seasonStatsCache{SchemaVersion: old, Source: seasonStatsSource, Season: "S26", AccountHash: "account"}
 		if _, err := store.saveSeasonStatsReported(cache); err != nil {
 			t.Fatal(err)

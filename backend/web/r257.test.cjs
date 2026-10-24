@@ -6,7 +6,7 @@ const {read,compile,escapeHTML}=require('./r188-harness.cjs'),{expand}=require('
 const source=process.env.R257_GAMEPLAY_SOURCE ? fs.readFileSync(process.env.R257_GAMEPLAY_SOURCE,'utf8') : read('gameplay.js');
 const fixedNow=Date.parse('2026-10-08T08:00:00Z');
 class FixedDate extends Date {constructor(...args){super(...(args.length?args:[fixedNow]));}}
-const progress={season:'S26',complete:true,scanned:208,tableSupported:true,message:'已统计 208 场',upstreamCapped:true,rankedOldestAt:1775889886204,mayhemOldestAt:1778580000000};
+const progress={season:'S26',complete:true,scanned:208,tableSupported:true,message:'已统计 208 场',upstreamCapped:true,soloCapped:true,flexCapped:true,mayhemCapped:true,soloOldestAt:1775889886204,flexOldestAt:1775889886204,mayhemOldestAt:1778580000000};
 const ranks=[{queueType:'RANKED_SOLO_5X5',wins:60,losses:40},{queueType:'RANKED_FLEX_SR',wins:150,losses:163}];
 const noop=()=>{};
 function api(dom,s=source,deps={}){
@@ -22,19 +22,21 @@ function fixture(queue='440',p=progress,rs=ranks,s=source){
 }
 function lines(button){return JSON.parse(button.dataset.seasonDataNote);}
 function check(s){
- for(const [queue,date,official] of [['420','4月11日',false],['440','4月11日',true],['mayhem','5月12日',false]]){
+ const mismatch=fixture('440',{flexCapped:false},ranks,s);try{assert(lines(mismatch.root.querySelector('.season-data-note')).some(l=>l.includes('受官方接口限制')));}finally{mismatch.dom.window.close();}
+
+ for(const [queue,date,official] of [['420','4月11日',true],['440','4月11日',true],['mayhem','5月12日',false]]){
   const x=fixture(queue,progress,ranks,s);try{
    const button=x.root.querySelector('[data-season-data-note]');assert(button,queue);
    assert.equal(button.parentElement,x.root.querySelector('.champion-table-title'));
    assert.equal(button.previousElementSibling.tagName,'H2');assert.equal(button.nextElementSibling,null);
    assert(lines(button).some(line=>line.includes(date)),JSON.stringify(lines(button)));
    assert.equal(lines(button).some(line=>line.includes('官方总场次')),official);
-   if(official)assert(lines(button).includes('已统计 208 场 · 官方总场次 313 场'));
+   if(official)assert(lines(button).includes('已统计 208 场 · 官方总场次 '+(queue==='420'?100:313)+' 场'));
    if(queue==='mayhem')assert(lines(button).includes('已统计 208 场'));
   }finally{x.dom.window.close();}
  }
- for(const p of [{...progress,upstreamCapped:false},{...progress,rankedOldestAt:0},{...progress,rankedOldestAt:'broken'},null,{...progress,foreign:true}]){
-  const x=fixture('440',p,ranks,s);const note=x.root.querySelector('[data-season-data-note]');assert(note);assert.deepEqual(lines(note),['统计范围：当前整个赛季这一模式的对局。']);x.dom.window.close();
+ for(const p of [{...progress,flexCapped:false},null,{...progress,foreign:true}]){
+  const x=fixture('440',p,[],s);const note=x.root.querySelector('[data-season-data-note]');assert(note);assert.deepEqual(lines(note),['统计范围：当前整个赛季这一模式的对局。']);x.dom.window.close();
  }
  for(const rs of [[],[{...ranks[1],wins:0,losses:1}],[{...ranks[1],wins:null}],[{...ranks[1],losses:-1}]]){
   const x=fixture('440',progress,rs,s);assert.equal(lines(x.root.querySelector('button.season-data-note')).length,3,'invalid total omits whole count line');x.dom.window.close();
@@ -43,9 +45,9 @@ function check(s){
 test('R257 three tabs use stream dates and valid official totals; uncapped/foreign retain scope-only icon',()=>check(source));
 test('R257 local date format includes a different year, independent per-stream visibility and zero official totals',()=>{
  const dom=new JSDOM(''),f=api(dom),note=(p,q,g,rs)=>new JSDOM(f.renderSeasonDataNote(p,q,g,rs)).window.document.querySelector('button');
- assert(lines(note({...progress,rankedOldestAt:Date.parse('2025-12-31T16:01:00Z')},'440',208,ranks))[1].includes('1月1日'));
- assert(lines(note({...progress,rankedOldestAt:Date.parse('2025-12-30T16:01:00Z')},'440',208,ranks))[1].includes('2025年12月31日'));
- assert.deepEqual(lines(note({...progress,mayhemOldestAt:0},'mayhem',208,ranks)),['统计范围：当前整个赛季这一模式的对局。']);
+ assert(lines(note({...progress,flexOldestAt:Date.parse('2025-12-31T16:01:00Z')},'440',208,ranks))[1].includes('1月1日'));
+ assert(lines(note({...progress,flexOldestAt:Date.parse('2025-12-30T16:01:00Z')},'440',208,ranks))[1].includes('2025年12月31日'));
+ assert(lines(note({...progress,mayhemOldestAt:0},'mayhem',208,ranks))[1].includes('最近的部分对局'));
  assert(f.renderSeasonDataNote({...progress,rankedOldestAt:0},'mayhem',208,ranks));
  assert(lines(note(progress,'440',0,[{...ranks[1],wins:0,losses:0}])).includes('已统计 0 场 · 官方总场次 0 场'));
  dom.window.close();
@@ -78,7 +80,7 @@ test('R257 focus/Escape/hover/touch and body portal placement/lifecycle',async()
  button.click();button.remove();await new Promise(setImmediate);assert(panel.hidden);dom.window.close();
 });
 test('R257 assertions kill always-capped, wrong-stream and inverted official-total mutations',()=>{
- const mutations=[['cap','progress?.upstreamCapped&&',''],['date','progress?.mayhemOldestAt : progress?.rankedOldestAt','progress?.rankedOldestAt : progress?.mayhemOldestAt'],['total','official>=games','official<games']];
+ const mutations=[['cap','progress?.[mode+"Capped"]===true','true'],['date','progress?.[mode+"OldestAt"]','progress?.mayhemOldestAt'],['total','games<official','games>official']];
  for(const [name,from,to] of mutations){const target=require("./r188-harness.cjs").extract(source,"renderSeasonDataNote"),changed=target.replace(from,to);assert.notEqual(changed,target,name);const mutant=source.replace(target,changed);assert.notEqual(mutant,source,name);assert.throws(()=>check(mutant),assert.AssertionError,name);}
 });
 test('R257 copy respects existing static wording guards and reuses R241 styling',()=>{

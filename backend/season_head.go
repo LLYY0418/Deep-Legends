@@ -43,7 +43,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 	pages := make(chan page, 2)
 	done := make(chan string, 2)
 	seed := map[string]bool{}
-	for _, stream := range []string{"ranked", "mayhem"} {
+	for _, stream := range []string{"ranked", "flex", "mayhem"} {
 		cursor := scan.cache.Streams[stream]
 		if cursor.Complete {
 			cursor.ResumeIndex = 0
@@ -79,7 +79,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 		}(stream)
 	}
 	startStream("ranked")
-	for workers := 2; workers > 0; {
+	for workers := 3; workers > 0; {
 		select {
 		case stream := <-done:
 			workers--
@@ -87,6 +87,9 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 				scan.onStream(scan, stream)
 			}
 			if stream == "ranked" {
+				startStream("flex")
+			}
+			if stream == "flex" {
 				startStream("mayhem")
 			}
 		case p := <-pages:
@@ -151,7 +154,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 			}
 			scan.cache.Paused = scan.interrupted
 			scan.cache.Streams[p.stream] = cursor
-			scan.cache.Complete = len(scan.cache.Streams) == 2
+			scan.cache.Complete = len(scan.cache.Streams) == 3
 			scan.cache.CappedByUpstream = false
 			for _, c := range scan.cache.Streams {
 				scan.cache.Complete = scan.cache.Complete && c.Complete

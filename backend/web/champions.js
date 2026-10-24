@@ -1216,9 +1216,7 @@
 
   // 概览：海克斯推荐 → 开局配置 → 该英雄专属品质概率。
   function mayhemOverviewTabMarkup(detail) {
-    const version = detail.citation?.patch || detail.patch || "版本未知";
-    const date = detail.citation?.reportDate || "";
-    return `<p class="mayhem-data-status">${escapeHTML(detail.source || "来源未知")} · 数据版本 ${escapeHTML(version)}${date ? ` · ${escapeHTML(date)}` : ""}${detail.dataNotice ? ` · ${escapeHTML(detail.dataNotice)}` : ""}</p><div data-mayhem-augments>${renderRecommendedAugments(detail.recommendedAugments || [], detail.citation)}</div>${renderMayhemOpeningConfiguration(detail.build || {}, detail.buildCitation)}${renderMayhemHeroRarityPanel(detail.heroStageRarity)}`;
+    return `<div data-mayhem-augments>${renderRecommendedAugments(detail.recommendedAugments || [], detail.citation)}</div>${renderMayhemOpeningConfiguration(detail.build || {}, detail.buildCitation)}${renderMayhemHeroRarityPanel(detail.heroStageRarity)}`;
   }
 
   // 构筑：装备排行（P0-1/P0-2）+ 装备路线 + 技能加点。成装三件套
@@ -1404,9 +1402,7 @@
       const active = state.augmentRarity === value;
       return `<button type="button" role="tab" aria-selected="${active}" class="${active ? "is-active" : ""}" data-augment-rarity="${value}"><i class="is-${value}" aria-hidden="true"></i>${label}</button>`;
     }).join("");
-    const citation = state.augments?.citation;
-    const dataStatus = `${state.augments?.source || "来源未知"} · 数据版本 ${citation?.patch || "版本未知"}${citation?.reportDate ? ` · ${citation.reportDate}` : ""}${state.augments?.dataNotice ? ` · ${state.augments.dataNotice}` : ""}`;
-    return `<p class="mayhem-data-status">${escapeHTML(dataStatus)}</p><div class="mayhem-atlas">
+    return `<div class="mayhem-atlas">
       <section class="augment-directory mayhem-atlas-browser">
         <div class="mayhem-panel-head">
           <div><h3>海克斯图鉴</h3><p>${objectRows(state.augments?.rows).length} 个海克斯，按梯度与品质排列</p></div>

@@ -3,14 +3,15 @@
  const {state,renderLive,escapeHTML,renderItemIcon,renderRuneSpellIcons,renderUnifiedRuneBoard,runeConfigurationTitle,nodes,selectedRuneRecommendation,recommendedRuneSpellIDs,bindLiveNode,renderRecommendationArea,rememberLiveRecommendationMarkup,api,showToast}=window.deepLegendsGameAutoConfig;
  const labels={ranked:"排位",normal:"匹配",aram:"极地大乱斗",hextech:"海克斯大乱斗",urf:"无限火力",event:"活动模式"};
  const positions={top:"上路",jungle:"打野",middle:"中路",bottom:"下路",utility:"辅助"};
- function mode(data){const q=Number(data?.queueId),m=String(data?.gameMode||"").toUpperCase();if([1700,1710,1750].includes(q)||m==="CHERRY")return "";if([2300,2400,3270].includes(q)||["KIWI","ARAM_MAYHEM"].includes(m))return "hextech";if([420,440].includes(q))return "ranked";if([450,930,3220,720].includes(q)||m==="ARAM")return "aram";if([900,1900].includes(q)||m==="URF")return "urf";if([1300,1400].includes(q)||["ULTBOOK","NEXUSBLITZ"].includes(m))return "event";if([400,430,480,490,700,820,830,840,850,860,870,880,890,950,960].includes(q)||["CLASSIC","PRACTICETOOL"].includes(m)||!q&&Number(data?.mapId)===11)return "normal";return "";}
+ function mode(data){const q=Number(data?.queueId),m=String(data?.gameMode||"").toUpperCase();if([1700,1710,1750].includes(q)||m==="CHERRY")return "";if([2300,2400,3270].includes(q)||["KIWI","ARAM_MAYHEM"].includes(m))return "hextech";if([420,440].includes(q))return "ranked";if([450,930,3220,720].includes(q)||m==="ARAM")return "aram";if([900,1900].includes(q)||m==="URF")return "urf";if([1300,1400].includes(q)||["ULTBOOK","NEXUSBLITZ"].includes(m))return "event";if([400,430,480,490,700,820,830,840,850,860,870,880,890,950,960,3100].includes(q)||["CLASSIC","PRACTICETOOL"].includes(m)||!q&&Number(data?.mapId)===11)return "normal";return "";}
+ function resolveModeKey(all,m,position) {const keys=m==="ranked"?["ranked-"+position,"ranked"]:m==="normal"?["normal","ranked-"+position,"ranked"]:[m];return keys.find(k=>all?.[k])||m;}
  function selection(data){
   const self=data?.players?.find(p=>p.isCurrent),id=Number(self?.championId)||Number(self?.championPickIntent)||Number(data?.currentChampionId),m=mode(data),all=state.autoConfigSettings?.champions?.[id];
   const position=({mid:"middle",adc:"bottom",support:"utility"})[self?.position]||self?.position;
   if(!m)return null;
-  const key=m==="ranked"&&all?.["ranked-"+position]?"ranked-"+position:m,entry=all?.[key];
+  const key=resolveModeKey(all,m,position),entry=all?.[key];
   if(!entry||!entry.runes&&!entry.spells&&!entry.items?.starter?.length&&!entry.items?.core?.length&&!entry.items?.situational?.length)return null;
-  return {key:"custom",sourceLabel:"自配置",championId:id,modeKey:key,modeLabel:(labels[m]||"")+(key.startsWith("ranked-")?" · "+positions[position]:""),entry,...entry.runes,...entry.spells,selectedComplete:entry.runes?.selectedPerkIds?.length===9};
+  return {key:"custom",sourceLabel:"自配置",championId:id,modeKey:key,modeLabel:(labels[key.startsWith("ranked")?"ranked":key]||"")+(key.startsWith("ranked")?" · "+(positions[key.slice(7)]||"通用"):""),entry,...entry.runes,...entry.spells,selectedComplete:entry.runes?.selectedPerkIds?.length===9};
  }
  function prepare(data){const c=selection(data),self=data?.players?.find(p=>p.isCurrent),key=`${data?.gameId}:${Number(self?.championId)||Number(self?.championPickIntent)||0}:${mode(data)}:${c?.modeKey||""}:${!!c}`;if(key!==state.autoConfigViewKey){state.autoConfigViewKey=key;state.runeSourceTab=c?"custom":"opgg";state.selectedRecommendation=c?"custom":"opgg";}return c;}
  function update(next){state.autoConfig=next;if(state.section==="live")renderLive("sse");}
@@ -46,7 +47,7 @@
 
  // Move the same pair once, using the title row's actual intrinsic widths.
  const layoutRows=new Map(),dirtyRows=new Set(),widthChecks=new Set(),targetRows=new WeakMap(),targetWidths=new WeakMap();let spellFrame=0,spellDisposed=false;
- const spellWidthSignature=({head,pair})=>[head.clientWidth,pair.scrollWidth,...[...head.querySelectorAll("*")].filter(n=>n!==pair&&!pair.contains(n)).map(n=>n.scrollWidth)].join(":");
+ const spellWidthSignature=({head,pair,footer})=>[head.clientWidth,footer?.clientWidth,pair.scrollWidth,...[...head.querySelectorAll("*")].filter(n=>n!==pair&&!pair.contains(n)).map(n=>n.scrollWidth)].join(":");
  function scheduleCardSpells(row,widthOnly=false){if(spellDisposed)return;(widthOnly?widthChecks:dirtyRows).add(row);if(!spellFrame)spellFrame=requestAnimationFrame(()=>{spellFrame=0;const rows=new Set([...dirtyRows,...widthChecks]);for(const row of rows){const config=layoutRows.get(row);if(config&&(dirtyRows.has(row)||config.widthSignature!==spellWidthSignature(config)))layoutCardSpells(row);}dirtyRows.clear();widthChecks.clear();});}
  const layoutObserver=typeof ResizeObserver==="function"?new ResizeObserver(entries=>{for(const entry of entries){const row=targetRows.get(entry.target),width=entry.target.clientWidth,previous=targetWidths.get(entry.target);targetWidths.set(entry.target,width);if(row&&width!==previous)scheduleCardSpells(row);}}):null;
  function forgetSpellRow(row){const old=layoutRows.get(row);for(const target of old?.targets||[]){layoutObserver?.unobserve(target);targetRows.delete(target);targetWidths.delete(target);}layoutRows.delete(row);dirtyRows.delete(row);widthChecks.delete(row);}
@@ -55,9 +56,9 @@
   for(const row of document.querySelectorAll(".specialist-game-row")){
    const head=row.querySelector(".specialist-game-head,.custom-config-header"),pair=row.querySelector("[data-card-spells]"),fallback=row.querySelector(".rune-corner-spells,.sg-spells"),old=layoutRows.get(row);
    if(!head||!pair||!fallback){if(old)forgetSpellRow(row);continue;}
-   const targets=[row,...head.children].filter(n=>n!==pair);
-   if(old?.head===head&&old.pair===pair&&old.fallback===fallback&&old.targets.length===targets.length&&targets.every((n,i)=>old.targets[i]===n))continue;
-   if(old)forgetSpellRow(row);layoutRows.set(row,{head,pair,fallback,targets});
+   const footer=row.querySelector(".specialist-game-footer"),targets=[row,...head.children,...(footer?[footer,...footer.children]:[])].filter(n=>n!==pair);
+   if(old?.head===head&&old.pair===pair&&old.fallback===fallback&&old.footer===footer&&old.targets.length===targets.length&&targets.every((n,i)=>old.targets[i]===n))continue;
+   if(old)forgetSpellRow(row);layoutRows.set(row,{head,pair,fallback,footer,targets});
    // Header children also expose intrinsic title/status width changes without
    // watching unrelated live-page text updates or rereading every card's style.
    for(const target of targets){targetRows.set(target,row);targetWidths.set(target,target.clientWidth);layoutObserver?.observe(target);}
@@ -66,18 +67,27 @@
  }
  function layoutCardSpells(row){
    const config=layoutRows.get(row);if(!row.isConnected||!config)return;
-   const {head,pair,fallback}=config;
+   const {head,pair,fallback,footer}=config;
    const style=getComputedStyle(head),gap=parseFloat(style.columnGap)||0,padding=(parseFloat(style.paddingLeft)||0)+(parseFloat(style.paddingRight)||0);
    const children=[...head.children].filter(n=>n!==pair),previous=head.style.gridTemplateColumns;
    if(head.classList.contains("specialist-game-head"))head.style.gridTemplateColumns="max-content max-content max-content";
    const needed=children.reduce((w,n)=>w+n.scrollWidth,0)+pair.scrollWidth+gap*children.length+padding;head.style.gridTemplateColumns=previous;
    const wide=needed<=head.clientWidth;
-   if(wide){const status=head.querySelector('[role="status"]');if(pair.parentElement!==head)head.insertBefore(pair,status||null);}else if(pair.parentElement!==fallback)fallback.append(pair);
-   row.dataset.spellLayout=wide?"head":"board";
+   let bottom=false;
+   if(footer){
+     const order=footer.querySelector(".skill-order");if(order)order.style.setProperty("--card-skill-count",String(order.children.length));
+     const css=getComputedStyle(footer),pad=parseFloat(css.paddingLeft)+parseFloat(css.paddingRight),children=[...footer.children].filter(n=>n!==pair);
+     // Use intrinsic equipment widths and the complete skill grid at its usual cell width.
+     const footerNeeded=children.reduce((sum,n)=>{const order=n.querySelector(".skill-order");return sum+(order?order.children.length*30+(order.children.length-1)*3+[...n.children].filter(c=>c!==order).reduce((w,c)=>w+c.scrollWidth,0)+(parseFloat(getComputedStyle(n).columnGap)||0)*(n.children.length-1)+(parseFloat(getComputedStyle(n).paddingLeft)||0)+(parseFloat(getComputedStyle(n).paddingRight)||0):n.scrollWidth);},0)+pair.scrollWidth+(parseFloat(css.columnGap)||0)*children.length+pad;
+     bottom=children.length>0&&footerNeeded<=footer.clientWidth;
+   }
+   if(bottom){if(pair.parentElement!==footer)footer.append(pair);}
+   else if(wide){const status=head.querySelector('[role="status"]');if(pair.parentElement!==head)head.insertBefore(pair,status||null);}else if(pair.parentElement!==fallback)fallback.append(pair);
+   row.dataset.spellLayout=bottom?"footer":wide?"head":"board";
    config.widthSignature=spellWidthSignature(config);
  }
- const spellStructure=".specialist-game-row,.specialist-game-head,.custom-config-header,.rune-corner-spells,.sg-spells,[data-card-spells]";
- const spellMutation=new MutationObserver(records=>{let structure=false;for(const record of records){const pair=record.target.closest?.("[data-card-spells]"),head=record.target.closest?.(".specialist-game-head,.custom-config-header"),row=(pair||head)?.closest(".specialist-game-row");if(layoutRows.has(row))scheduleCardSpells(row,!pair);if([...record.addedNodes,...record.removedNodes].some(n=>n.nodeType===1&&(n.matches(spellStructure)||n.querySelector(spellStructure))))structure=true;}if(structure)syncSpellRows();});spellMutation.observe(nodes?.liveContent||document.body,{childList:true,subtree:true});
+ const spellStructure=".specialist-game-row,.specialist-game-head,.custom-config-header,.rune-corner-spells,.sg-spells,.specialist-game-footer,[data-card-spells]";
+ const spellMutation=new MutationObserver(records=>{let structure=false;for(const record of records){const pair=record.target.closest?.("[data-card-spells]"),head=record.target.closest?.(".specialist-game-head,.custom-config-header,.specialist-game-footer"),row=(pair||head)?.closest(".specialist-game-row");if(layoutRows.has(row))scheduleCardSpells(row,!pair);if([...record.addedNodes,...record.removedNodes].some(n=>n.nodeType===1&&(n.matches(spellStructure)||n.querySelector(spellStructure))))structure=true;}if(structure)syncSpellRows();});spellMutation.observe(nodes?.liveContent||document.body,{childList:true,subtree:true});
  const checkSpellWidths=()=>{if(layoutObserver)return;for(const config of layoutRows.values())for(const target of config.targets){const width=target.clientWidth;if(width!==targetWidths.get(target)){targetWidths.set(target,width);scheduleCardSpells(targetRows.get(target));}}};
  window.addEventListener("resize",checkSpellWidths);
  window.addEventListener("deep-legends:dispose",()=>{spellDisposed=true;cancelAnimationFrame(spellFrame);dirtyRows.clear();widthChecks.clear();layoutRows.clear();layoutObserver?.disconnect();spellMutation.disconnect();window.removeEventListener("resize",checkSpellWidths);},{once:true});

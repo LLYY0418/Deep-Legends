@@ -720,7 +720,7 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 	if itemsNormalized {
 		diagnosticResults["items"] = map[string]any{"status": results["items"], "normalized": true}
 	}
-	a.recordDiagnostic(map[string]any{"event": "auto_config_apply", "modeKey": modeKey, "results": diagnosticResults, "duration_ms": time.Since(started).Milliseconds(), "yielded": a.autoConfigYieldSnapshot()})
+	a.recordDiagnostic(map[string]any{"event": "auto_config_apply", "modeKey": modeKey, "resolvedModeKey": modeKey, "results": diagnosticResults, "duration_ms": time.Since(started).Milliseconds(), "yielded": a.autoConfigYieldSnapshot()})
 }
 
 func (a *app) autoConfigYieldSnapshot() map[string]bool {

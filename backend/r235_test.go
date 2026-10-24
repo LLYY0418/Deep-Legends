@@ -97,7 +97,7 @@ func TestR235HeadStreamsConcurrentAndFirstPagePush(t *testing.T) {
 		}
 		mu.Lock()
 		defer mu.Unlock()
-		if len(starts) != 2 {
+		if len(starts) != 3 {
 			t.Fatal(starts)
 		}
 		// R288 supersedes parallel heads: mayhem must not contend with ranked.

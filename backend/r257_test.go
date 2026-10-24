@@ -24,7 +24,7 @@ func TestR257PersistedBoundariesAcrossThreeEndpoints(t *testing.T) {
 			season, _ := currentRankedSeason(time.Now())
 			cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: season, AccountHash: a.storage.accountHash(Summoner{PUUID: ref.PlayerRef}), Complete: true, HeadCheckedAt: time.Now(), CappedByUpstream: tc.capped,
 				Stats:   []gameplaySeasonChampionStat{{ChampionID: 103, Games: 208}},
-				Streams: map[string]seasonStatsStream{"ranked": {Complete: true, CappedByUpstream: tc.ranked, OldestCreatedAt: 1775889886204}, "mayhem": {Complete: true, CappedByUpstream: tc.mayhem, OldestCreatedAt: 1778580000000}}}
+				Streams: map[string]seasonStatsStream{"ranked": {Complete: true, CappedByUpstream: tc.ranked, OldestCreatedAt: 1775889886204}, "flex": {Complete:true}, "mayhem": {Complete: true, CappedByUpstream: tc.mayhem, OldestCreatedAt: 1778580000000}}}
 			if _, err := a.storage.saveSeasonStatsReported(cache); err != nil {
 				t.Fatal(err)
 			}
@@ -56,7 +56,7 @@ func TestR257PersistedBoundariesAcrossThreeEndpoints(t *testing.T) {
 					t.Fatal(endpoint, "uncapped flag", p)
 				}
 				for key, want := range map[string]int64{"rankedOldestAt": 1775889886204, "mayhemOldestAt": 1778580000000} {
-					valid := tc.capped && ((key == "rankedOldestAt" && tc.ranked) || (key == "mayhemOldestAt" && tc.mayhem))
+					valid := true // Each mode exposes its known oldest time independently of cap.
 					got, ok := p[key]
 					if valid {
 						if !ok || got != float64(want) {

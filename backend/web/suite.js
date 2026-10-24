@@ -224,8 +224,8 @@
 
   function setConnected(connected) {
     state.connected = Boolean(connected);
-    offline.hidden = state.connected || state.tab === "config";
-    for (const subpanel of panels) subpanel.hidden = (subpanel.dataset.suitePanel !== "config" && !state.connected) || subpanel.dataset.suitePanel !== state.tab;
+    offline.hidden = state.connected;
+    for (const subpanel of panels) subpanel.hidden = !state.connected || subpanel.dataset.suitePanel !== state.tab;
     if (!state.connected) {
       clearTimeout(state.facadeRefreshTimer);
       clearTimeout(state.facadeChallengeRetryTimer);
@@ -258,14 +258,14 @@
       tab.tabIndex = active ? 0 : -1;
       if (active && focus) tab.focus();
     }
-    for (const subpanel of panels) subpanel.hidden = (subpanel.dataset.suitePanel !== "config" && !state.connected) || subpanel.dataset.suitePanel !== name;
+    for (const subpanel of panels) subpanel.hidden = !state.connected || subpanel.dataset.suitePanel !== name;
     if (standardMetrics) standardMetrics.hidden = ["champselect", "config"].includes(name);
  if (configMetrics) configMetrics.hidden = name !== "config";
- if (offline) offline.hidden = state.connected || name === "config";
+ if (offline) offline.hidden = state.connected;
     if (champSelectMetrics) champSelectMetrics.hidden = name !== "champselect";
     if (state.active && subtitle) subtitle.textContent = tabCopy[name];
     requestAnimationFrame(() => appScroll?.scrollTo({ top: Number(state.scroll[name] || 0), behavior: "instant" }));
-	if (state.active && (state.connected || name === "config")) void loadActiveTab(false);
+	if (state.active && (state.connected)) void loadActiveTab(false);
   }
 
   function setupTabs() {
@@ -284,7 +284,7 @@
   }
 
   function loadActiveTab(force = false) {
- if (state.tab === "config") return window.deepLegendsAutoConfig?.load(force);
+ if (state.tab === "config") return window.deepLegendsAutoConfig?.load(false);
     const loader = { watch: loadWatch, rig: loadRig, facade: loadFacade, sweep: loadClaims, champselect: loadChampSelect }[state.tab] || loadWatch;
     return loader(force);
   }
@@ -2098,7 +2098,7 @@
   panel.addEventListener("click", (event) => {
     const reload = event.target.closest("[data-suite-reload]");
     if (!reload) return;
-    ({ config: force=>window.deepLegendsAutoConfig?.load(force), watch: loadWatch, rig: loadRig, facade: () => loadFacade(true, false, "manual"), sweep: loadClaims, champselect: loadChampSelect }[reload.dataset.suiteReload])?.(true);
+    ({ config: force=>window.deepLegendsAutoConfig?.load(false), watch: loadWatch, rig: loadRig, facade: () => loadFacade(true, false, "manual"), sweep: loadClaims, champselect: loadChampSelect }[reload.dataset.suiteReload])?.(true);
   });
 
 

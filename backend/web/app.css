@@ -1228,3 +1228,5 @@ html[data-ui-preferences="pending"] #app-frame { visibility: hidden; }
 .update-icon-button .dot { display:none; top:0; right:0; }
 .update-icon-button.ready .dot { display:block; }
 @media(prefers-reduced-motion:reduce){.update-icon-button .update-border-progress{transition:none;}}
+
+.appearance-boot *, .appearance-boot *::before, .appearance-boot *::after { transition:none !important; }

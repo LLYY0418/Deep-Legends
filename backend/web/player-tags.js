@@ -9,7 +9,8 @@
   const records = new Map(),
     players = new Map(),
     queried = new Set(),
-    pending = new Map();
+    pending = new Map(),
+    edits = new Map(), cancelled = new Set();
   let catalog = [],
     version = 0,
     request = null,
@@ -32,12 +33,7 @@
     filter = "",
     sort = "met",
     initialized = false;
-  const eligible = (p) =>
-    p?.playerRef &&
-    !p.isCurrent &&
-    !p.hidden &&
-    !p.identityUnresolved &&
-    (p.gameName || p.displayName);
+  const eligible = (p) => p?.playerRef && !p.isCurrent && p.taggable === true;
   const shown = () =>
     (window.deepLegendsPreferenceStorage || localStorage).getItem(
       "lol-loot-mytags",
@@ -50,7 +46,7 @@
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     if (!r.ok)
-      throw Error((await r.text()).slice(0, 180) || "玩家标签保存失败");
+      throw Object.assign(Error((await r.text()).slice(0, 180) || "玩家标签保存失败"), {status:r.status});
     return r.json();
   }
   const empty = () => ({ tags: [], note: "" });
@@ -127,7 +123,7 @@
   function collect() {
     const blocked = new Set(
       (ctx()?.live()?.players || [])
-        .filter((p) => p.hidden || p.identityUnresolved || p.isCurrent)
+        .filter((p) => p.taggable !== true || p.isCurrent)
         .map((p) => p.playerRef),
     );
     for (const p of ctx()?.sources() || []) if(p.isCurrent)blocked.add(p.playerRef);
@@ -326,7 +322,8 @@
     );
   }
   function set(ref, value) {
-    records.set(ref, {
+    cancelled.delete(ref);
+    edits.set(ref, {
       ...records.get(ref),
       ...value,
       createdAt: records.get(ref)?.createdAt || Date.now(),
@@ -336,7 +333,6 @@
     saveError = "";
     clearTimeout(timer);
     timer = setTimeout(() => void flush().catch(() => {}), 300);
-    changed(ref);
     status("正在保存…");
   }
   function status(copy) {
@@ -346,42 +342,34 @@
   }
   async function flush() {
     clearTimeout(timer);
-    const batch = [...pending];
-    pending.clear();
-    saveTail = saveTail
-      .catch(() => {})
-      .then(async () => {
-        for (const [ref, value] of batch) {
-          try {
-            await api({ op: "update", playerRef: ref, ...value });
-            saveError = "";
-          } catch (e) {
-            if (!pending.has(ref)) pending.set(ref, value);
-            saveError = e.message;
-            throw e;
-          }
+    const batch=[...pending];pending.clear();
+    saveTail=saveTail.catch(()=>{}).then(async()=>{
+      let failure;
+      for(const [ref,value] of batch){
+        if(cancelled.has(ref))continue;
+        try{
+          await api({op:"update",playerRef:ref,...value});
+          records.set(ref,{...records.get(ref),...value});
+          if(!pending.has(ref))edits.delete(ref);
+          saveError="";changed(ref);
+        }catch(e){
+          if(!cancelled.has(ref)&&![400,404].includes(e.status)){if(!pending.has(ref))pending.set(ref,value);}
+          else {pending.delete(ref);edits.delete(ref);}
+          saveError=e.message;failure=e;
+          if(modal&&current===ref){renderModal();status(saveError);}
         }
-      });
-    try {
-      await saveTail;
-      status("✓ 已保存");
-    } catch (e) {
-      status("保存失败，请重试");
-      toast(e.message);
-      throw e;
-    }
+      }
+      if(failure)throw failure;
+    });
+    try{await saveTail;status("✓ 已保存");}catch(e){status(e.message);throw e;}
   }
-  async function close() {
-    try {
-      await flush();
-      if (pending.size) return;
-      modal?.parentElement.remove();
-      modal = null;
-      if (openerLive && !opener?.getClientRects().length) ctx().revealLive();
-      opener?.isConnected && opener.getClientRects().length
-        ? opener.focus()
-        : focusRef(openerRef);
-    } catch {}
+  function close() {
+    clearTimeout(timer);
+    for(const ref of edits.keys()){cancelled.add(ref);pending.delete(ref);}
+    edits.clear();schedule();
+    modal?.parentElement.remove();modal=null;
+    if(openerLive&&!opener?.getClientRects().length)ctx().revealLive();
+    opener?.isConnected&&opener.getClientRects().length?opener.focus():focusRef(openerRef);
   }
   function updateModalInfo() {
     if (!modal) return;
@@ -399,7 +387,7 @@
     modal.querySelector(".avatar").innerHTML = ctx().avatar(p);
   }
   function renderModal() {
-    const record = records.get(current) || empty();
+    const record = edits.get(current) || records.get(current) || empty();
     modal.innerHTML = `<header><span class="avatar"></span><div class="who"><strong></strong><small></small></div><div class="tools">${sequence.length > 1 ? `<button type="button" data-ptag-prev aria-label="上一位">‹</button><i>${sequence.indexOf(current) + 1} / ${sequence.length}</i><button type="button" data-ptag-next aria-label="下一位">›</button>` : ""}<button type="button" class="dialog-close-button control-icon-button" data-ptag-close aria-label="关闭"><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></header>${[
       ["neg", "负面（来自客户端举报项）"],
       ["pos", "正面"],
@@ -419,12 +407,12 @@
       )
       .join(
         "",
-      )}<label class="ptag-note"><span>备注</span><input aria-label="备注" maxlength="80" placeholder="可选，最多40字" value="${esc(record.note)}"></label><footer><span class="saved" role="status">${pending.size ? "正在保存…" : saveError ? "保存失败，请重试" : "✓ 已保存"}</span><div><button type="button" class="text-button clear" data-ptag-clear>清除标记</button><button type="button" class="done" data-ptag-close>完成</button></div></footer>`;
+      )}<label class="ptag-note"><span>备注</span><input aria-label="备注" maxlength="80" placeholder="可选，最多40字" value="${esc(record.note)}"></label><footer><span class="saved" role="status">${pending.size ? "正在保存…" : saveError ? esc(saveError) : "✓ 已保存"}</span><div><button type="button" class="text-button clear" data-ptag-clear>清除标记</button><button type="button" class="done" data-ptag-close>完成</button></div></footer>`;
     updateModalInfo();
     modal.querySelector("input").oninput = (e) => {
       const value = [...e.target.value].slice(0, 40).join("");
       e.target.value = value;
-      set(current, { ...records.get(current), note: value });
+      set(current, { ...(edits.get(current) || records.get(current)), note: value });
     };
     modal.querySelector("[data-ptag-toggle],input,[data-ptag-close]")?.focus();
   }
@@ -563,8 +551,8 @@
         catalog.push(t);
         if (select)
           set(current, {
-            ...records.get(current),
-            tags: [...(records.get(current)?.tags || []), t.id],
+            ...(edits.get(current) || records.get(current)),
+            tags: [...((edits.get(current) || records.get(current))?.tags || []), t.id],
           });
         overlay.remove();
         if (modal) renderModal();
@@ -760,7 +748,7 @@
         if (b.hasAttribute("data-ptag-open")) {
           await open(b.dataset.ptagOpen, b);
         } else if (b.hasAttribute("data-ptag-toggle")) {
-          const r = records.get(current) || empty(),
+          const r = edits.get(current) || records.get(current) || empty(),
             id = b.dataset.ptagToggle;
           set(current, {
             ...r,

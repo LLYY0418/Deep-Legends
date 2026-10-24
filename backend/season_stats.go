@@ -31,7 +31,7 @@ var seasonStartS26 = time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC)
 // 11 R216: Go v2 scores and champion/opponent table totals.
 // 12 R216 P4: adopted v2.1 scores; reject all persisted v2 table aggregates.
 // 13 R230: discard caches marked complete by malformed SGP history in 0.12.73.
-const seasonStatsCacheSchemaVersion = 14
+const seasonStatsCacheSchemaVersion = 15
 
 const seasonStatsSource = dataSourceSGP
 
@@ -302,6 +302,11 @@ type seasonStatsProgress struct {
 	RankedComplete bool   `json:"rankedComplete"`
 	Paused         bool   `json:"paused"`
 	UpstreamCapped bool   `json:"upstreamCapped,omitempty"`
+	SoloCapped     bool   `json:"soloCapped"`
+	FlexCapped     bool   `json:"flexCapped"`
+	MayhemCapped   bool   `json:"mayhemCapped"`
+	SoloOldestAt   int64  `json:"soloOldestAt,omitempty"`
+	FlexOldestAt   int64  `json:"flexOldestAt,omitempty"`
 	RankedOldestAt int64  `json:"rankedOldestAt,omitempty"`
 	MayhemOldestAt int64  `json:"mayhemOldestAt,omitempty"`
 	TableSupported bool   `json:"tableSupported,omitempty"`
@@ -317,16 +322,30 @@ type seasonStatsProgress struct {
 // alone cannot distinguish ranked from mayhem, and an uncapped stream's oldest
 // match is not an API limit. This projection performs no requests or scans.
 func (p *seasonStatsProgress) applyUpstreamBoundary(cache seasonStatsCache) {
-	p.RankedComplete = cache.Streams["ranked"].Complete || cache.Complete
+	solo, flex, mayhem := cache.Streams["ranked"], cache.Streams["flex"], cache.Streams["mayhem"]
+	p.RankedComplete = solo.Complete && flex.Complete || cache.Complete
 	p.Paused = cache.Paused
 	p.Collecting = p.Collecting && !p.Paused
-	p.UpstreamCapped = cache.CappedByUpstream
-	if cache.CappedByUpstream && cache.Streams["ranked"].CappedByUpstream {
-		p.RankedOldestAt = cache.Streams["ranked"].OldestCreatedAt
+	p.SoloCapped, p.FlexCapped, p.MayhemCapped = seasonModeCapped(cache, "ranked"), seasonModeCapped(cache, "flex"), mayhem.CappedByUpstream
+	p.SoloOldestAt, p.FlexOldestAt, p.MayhemOldestAt = solo.OldestCreatedAt, flex.OldestCreatedAt, mayhem.OldestCreatedAt
+	p.UpstreamCapped = p.SoloCapped || p.FlexCapped || p.MayhemCapped
+	p.RankedOldestAt = p.SoloOldestAt
+}
+
+func seasonModeCapped(cache seasonStatsCache, stream string) bool {
+	if !cache.Streams[stream].CappedByUpstream {
+		return false
 	}
-	if cache.CappedByUpstream && cache.Streams["mayhem"].CappedByUpstream {
-		p.MayhemOldestAt = cache.Streams["mayhem"].OldestCreatedAt
+	queue := int64(420)
+	if stream == "flex" {
+		queue = 440
+	} else if stream != "ranked" {
+		return true
 	}
+	if total, known := cache.OfficialTotals[queue]; known && cache.QueueStats[queue].Games >= total {
+		return false
+	}
+	return true
 }
 
 type seasonStatsStream struct {
@@ -338,7 +357,7 @@ type seasonStatsStream struct {
 	OldestCreatedAt  int64  `json:"oldest_created_at,omitempty"`
 }
 
-var seasonStreamTags = map[string][]string{"ranked": {"q_420", "q_440"}, "mayhem": {"q_2300", "q_2400", "q_3270"}}
+var seasonStreamTags = map[string][]string{"ranked": {"q_420"}, "flex": {"q_440"}, "mayhem": {"q_2300", "q_2400", "q_3270"}}
 var seasonWriteLocks sync.Map
 
 func seasonWriteLock(key string) *sync.Mutex {
@@ -347,6 +366,7 @@ func seasonWriteLock(key string) *sync.Mutex {
 }
 
 type seasonStatsCache struct {
+	OfficialTotals     map[int64]int                 `json:"official_totals,omitempty"`
 	Paused             bool                          `json:"paused,omitempty"`
 	EmptyHistory       map[string]seasonEmptyHistory `json:"emptyHistory,omitempty"`
 	SkippedUndecodable int                           `json:"skippedUndecodable,omitempty"`
@@ -404,6 +424,11 @@ func (s *localStore) loadSeasonStats(source, accountHash, season string) (season
 	if cache.SchemaVersion < seasonStatsCacheSchemaVersion && len(cache.Streams) == 0 {
 		cache.Complete = false
 	}
+	if cache.SchemaVersion < 15 {
+		delete(cache.Streams, "ranked")
+		delete(cache.Streams, "flex")
+		cache.Complete = false
+	}
 	cache.SchemaVersion = seasonStatsCacheSchemaVersion
 	return cache, nil
 }
@@ -421,6 +446,14 @@ func (s *localStore) saveSeasonStatsReported(cache seasonStatsCache) (seasonStat
 	lock.Lock()
 	defer lock.Unlock()
 	if disk, err := s.loadSeasonStats(cache.Source, cache.AccountHash, cache.Season); err == nil {
+		if cache.OfficialTotals == nil {
+			cache.OfficialTotals = map[int64]int{}
+		}
+		for q, n := range disk.OfficialTotals {
+			if current, ok := cache.OfficialTotals[q]; !ok || n > current {
+				cache.OfficialTotals[q] = n
+			}
+		}
 		if cache.EmptyHistory == nil {
 			cache.EmptyHistory = map[string]seasonEmptyHistory{}
 		}
@@ -486,11 +519,16 @@ func (s *localStore) saveSeasonStatsReported(cache seasonStatsCache) (seasonStat
 		for key, previous := range disk.Streams {
 			current := cache.Streams[key]
 			if previous.Complete && !current.Complete || !current.Complete && previous.ResumeIndex > current.ResumeIndex {
-				cache.Streams[key] = previous
+				current = previous
 			}
+			current.CappedByUpstream = current.CappedByUpstream || previous.CappedByUpstream
+			if previous.OldestCreatedAt > 0 && (current.OldestCreatedAt == 0 || previous.OldestCreatedAt < current.OldestCreatedAt) {
+				current.OldestCreatedAt = previous.OldestCreatedAt
+			}
+			cache.Streams[key] = current
 		}
 		if len(cache.Streams) > 0 {
-			cache.Complete = len(cache.Streams) == 2
+			cache.Complete = len(cache.Streams) == 3
 			for _, cursor := range cache.Streams {
 				cache.Complete = cache.Complete && cursor.Complete
 				cache.CappedByUpstream = cache.CappedByUpstream || cursor.CappedByUpstream
@@ -796,7 +834,7 @@ func (a *app) loadSeasonChampionStatsWithHistoryCache(ctx context.Context, clien
 		cache: cache, stats: stats, queueStats: queueStats, seen: seen,
 		seasonStartMillis: seasonStart.UnixMilli(), headOnly: true,
 		onStream: func(scan *seasonScanState, stream string) {
-			if stream == "ranked" && scan.cache.Streams[stream].Complete {
+			if (stream == "ranked" || stream == "flex") && scan.cache.Streams["ranked"].Complete && scan.cache.Streams["flex"].Complete {
 				a.recordRankWindow(client, serverID, playerRef, scan)
 			}
 		},
@@ -1046,6 +1084,7 @@ type seasonScanState struct {
 // 整季的尾巴永远补不上。所以只有真正扫到赛季起点之前、或上游没有更多数据时
 // 才算完整；撞到缓存只是说明"头部这一段已经有了"，要跳到 ResumeIndex 继续。
 func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUClient, serverID, playerRef string, scan *seasonScanState, budget int, useHistoryCache bool) {
+	a.captureSeasonOfficialTotals(&scan.cache, client, serverID, playerRef)
 	if scan.headOnly {
 		a.seasonScanHeadConcurrent(ctx, client, serverID, playerRef, scan, budget, useHistoryCache)
 		return
@@ -1061,7 +1100,7 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 		scan.cache.Streams = map[string]seasonStatsStream{}
 	}
 	scan.playerRef = playerRef
-	for _, stream := range []string{"ranked", "mayhem"} {
+	for _, stream := range []string{"ranked", "flex", "mayhem"} {
 		// Publishing a completed stream persists and clears newInfos. The next
 		// stream needs its own pending set while the same scan keeps running.
 		if scan.newInfos == nil {
@@ -1204,7 +1243,7 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 
 func (scan *seasonScanState) updateStreamProgress(ctx context.Context) {
 	scan.cache.Paused = scan.interrupted || ctx.Err() != nil
-	scan.cache.Complete = len(scan.cache.Streams) == 2
+	scan.cache.Complete = len(scan.cache.Streams) == 3
 	scan.cache.CappedByUpstream = false
 	scan.cache.ResumeIndex = 0
 	scan.cache.PendingIndex = 0
@@ -1257,8 +1296,15 @@ func (a *app) finishSeasonScan(scan *seasonScanState, names map[int64]string, ac
 		}
 	}
 	scan.newInfos = nil
+	_ = snapshots
+	snapshots = seasonTrimRankedMatches(&scan.cache)
 	solo, flex := snapshots[seasonQueueSoloDuo], snapshots[seasonQueueFlex]
 	mayhem := seasonMayhemSnapshot(snapshots)
+	for key, target := range map[string]*seasonRankedQueueSnapshot{"ranked": &solo, "flex": &flex, "mayhem": &mayhem} {
+		cursor := scan.cache.Streams[key]
+		target.Capped = seasonModeCapped(scan.cache, key)
+		target.Oldest = cursor.OldestCreatedAt
+	}
 	a.recordDiagnostic(map[string]any{
 		"event": "season_ranked_snapshot", "season": scan.cache.Season,
 		"solo": solo.Count, "flex": flex.Count,
@@ -1334,7 +1380,7 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 		}
 		scan := &seasonScanState{cache: cache, stats: stats, queueStats: queueStats, seen: seen, seasonStartMillis: seasonStart.UnixMilli()}
 		scan.onStream = func(scan *seasonScanState, stream string) {
-			if stream == "ranked" && scan.cache.Streams[stream].Complete {
+			if (stream == "ranked" || stream == "flex") && scan.cache.Streams["ranked"].Complete && scan.cache.Streams["flex"].Complete {
 				a.finishSeasonScan(scan, names, accountHash)
 				a.publishSeasonSnapshot(reference, playerRef, scan.cache)
 				a.recordRankWindow(client, serverID, playerRef, scan)

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -17,6 +19,11 @@ import (
 // Attached only when a confirmed Arena live snapshot is in ChampSelect/GameStart.
 // The existing discovery completion channel publishes the immutable before data.
 type arenaProgressionProbe struct {
+	account      string
+	platform     string
+	gameID       int64
+	at           time.Time
+	lobbyAt      time.Time
 	before       arenaProgressionSnapshot
 	beforeEvents map[string]float64
 	done         chan struct{}
@@ -52,7 +59,7 @@ func arenaProgressionKind(op lcuHelpOperation) string {
 	}
 	return ""
 }
-func (a *app) startArenaProgressionDiscovery(client *LCUClient, phase string) {
+func (a *app) startArenaProgressionDiscovery(client *LCUClient, phase string, gameIDs ...int64) {
 	if a == nil || client == nil || (phase != "ChampSelect" && phase != "GameStart") {
 		return
 	}
@@ -63,6 +70,17 @@ func (a *app) startArenaProgressionDiscovery(client *LCUClient, phase string) {
 		return
 	}
 	p := &arenaProgressionProbe{done: make(chan struct{}), sawGame: phase == "GameStart", beforeEvents: arenaProgressionEventSnapshot(s)}
+	if len(gameIDs) > 0 {
+		p.gameID = gameIDs[0]
+	}
+	p.at = time.Now()
+	a.mu.RLock()
+	self := a.summoner
+	a.mu.RUnlock()
+	if a.storage != nil {
+		p.account = a.storage.accountHash(self)
+	}
+	p.platform = clientRiotPlatform(client) + "/" + clientTencentServerID(client)
 	s.progression = p
 	s.mu.Unlock()
 	// Progression owns its pregame read even if the older discovery already ran.
@@ -84,6 +102,13 @@ func (a *app) startArenaProgressionDiscovery(client *LCUClient, phase string) {
 		self := a.summoner
 		a.mu.RUnlock()
 		p.before = a.readArenaProgressionSnapshot(ctx, client, arenaDiscoveryHelpAll(help), self)
+		s.mu.Lock()
+		a.persistArenaProgression(p)
+		s.mu.Unlock()
+		event := map[string]any{"event": "arena_fame_progression_before", "resolved_paths": p.before.ResolvedPaths, "before_status": p.before.Status, "before_http_status": p.before.HTTPStatus, "numeric_keys": len(p.before.Values)}
+		for _, part := range arenaFameDiscoveryParts(event) {
+			a.recordDiagnostic(part)
+		}
 	})
 	a.discoverArenaFame(client)
 }
@@ -325,10 +350,14 @@ func (a *app) observeArenaProgressionPhase(c *LCUClient, phase string) {
 	s := c.arenaDiscoveryState()
 	s.mu.Lock()
 	p := s.progression
+	if p == nil {
+		p = a.restoreArenaProgression(c)
+		s.progression = p
+	}
 	if p != nil && (phase == "GameStart" || phase == "InProgress" || phase == "Reconnect") {
 		p.sawGame = true
 	}
-	if phase != "Lobby" && phase != "None" {
+	if phase != "Lobby" && phase != "None" && phase != "EndOfGame" && phase != "PreEndOfGame" {
 		s.mu.Unlock()
 		return
 	}
@@ -337,6 +366,20 @@ func (a *app) observeArenaProgressionPhase(c *LCUClient, phase string) {
 		return
 	}
 	p.scheduled = true
+	delay := 2 * time.Minute
+	if p.lobbyAt.IsZero() {
+		p.lobbyAt = time.Now()
+		select {
+		case <-p.done:
+			a.persistArenaProgression(p)
+		default:
+		}
+	} else {
+		delay = time.Until(p.lobbyAt.Add(2 * time.Minute))
+		if delay < 0 {
+			delay = 0
+		}
+	}
 	schedule := s.schedule
 	if schedule == nil {
 		schedule = func(delay time.Duration, fn func()) func() {
@@ -344,7 +387,7 @@ func (a *app) observeArenaProgressionPhase(c *LCUClient, phase string) {
 			return func() { timer.Stop() }
 		}
 	}
-	s.stops = append(s.stops, schedule(2*time.Minute, func() { a.probeArenaProgressionAfter(c, s) }))
+	s.stops = append(s.stops, schedule(delay, func() { a.probeArenaProgressionAfter(c, s) }))
 	s.mu.Unlock()
 }
 func (a *app) probeArenaProgressionAfter(c *LCUClient, s *arenaFameDiscoveryState) {
@@ -386,6 +429,7 @@ func (a *app) probeArenaProgressionAfter(c *LCUClient, s *arenaFameDiscoveryStat
 		return
 	}
 	p.emitted = true
+	a.clearArenaProgression(p)
 	afterEvents := arenaProgressionEventSnapshot(s)
 	s.mu.Unlock()
 	eventChanges := arenaProgressionDiff(arenaProgressionSnapshot{Values: p.beforeEvents}, arenaProgressionSnapshot{Values: afterEvents})
@@ -436,4 +480,62 @@ func (c *LCUClient) observeArenaProgressionEvent(event LCUEvent) {
 		bounded[key] = values[key]
 	}
 	s.progressionEvents[path] = bounded
+}
+
+// Only filtered numeric leaves and approved GET templates survive restart. The
+// device-salted account hash and platform keep another account from consuming it.
+type arenaProgressionDisk struct {
+	Account  string                   `json:"account"`
+	Platform string                   `json:"platform"`
+	GameID   int64                    `json:"gameId"`
+	At       time.Time                `json:"at"`
+	LobbyAt  time.Time                `json:"lobbyAt,omitempty"`
+	Before   arenaProgressionSnapshot `json:"before"`
+}
+
+func (a *app) persistArenaProgression(p *arenaProgressionProbe) {
+	if a.storage == nil || p.emitted {
+		return
+	}
+	raw, err := json.Marshal(arenaProgressionDisk{Account: p.account, Platform: p.platform, GameID: p.gameID, At: p.at, LobbyAt: p.lobbyAt, Before: p.before})
+	if err == nil && len(raw) <= 256*1024 {
+		a.storage.mu.Lock()
+		defer a.storage.mu.Unlock()
+		_ = writeLocalStoreFile(a.storage, "arena-progression-before.json", raw)
+	}
+}
+func (a *app) clearArenaProgression(p *arenaProgressionProbe) {
+	if a.storage == nil {
+		return
+	}
+	a.storage.mu.Lock()
+	defer a.storage.mu.Unlock()
+	raw, err := readLocalStoreFile(a.storage, "arena-progression-before.json")
+	var disk arenaProgressionDisk
+	if err == nil && json.Unmarshal(raw, &disk) == nil && (p == nil || disk.At.Equal(p.at) && disk.GameID == p.gameID && disk.Account == p.account) {
+		_ = os.Remove(filepath.Join(a.storage.root, "arena-progression-before.json"))
+	}
+}
+func (a *app) restoreArenaProgression(c *LCUClient) *arenaProgressionProbe {
+	if a.storage == nil {
+		return nil
+	}
+	raw, err := readLocalStoreFile(a.storage, "arena-progression-before.json")
+	if err != nil {
+		return nil
+	}
+	var disk arenaProgressionDisk
+	if len(raw) > 256*1024 || json.Unmarshal(raw, &disk) != nil || time.Since(disk.At) > 30*time.Minute || time.Until(disk.At) > time.Minute {
+		a.clearArenaProgression(nil)
+		return nil
+	}
+	a.mu.RLock()
+	self := a.summoner
+	a.mu.RUnlock()
+	if disk.Account != a.storage.accountHash(self) || disk.Platform != clientRiotPlatform(c)+"/"+clientTencentServerID(c) {
+		return nil
+	}
+	p := &arenaProgressionProbe{account: disk.Account, platform: disk.Platform, before: disk.Before, gameID: disk.GameID, at: disk.At, lobbyAt: disk.LobbyAt, sawGame: true, done: make(chan struct{})}
+	close(p.done)
+	return p
 }

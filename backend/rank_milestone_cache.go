@@ -10,6 +10,7 @@ type milestoneCache struct {
 	mu      sync.Mutex
 	entries map[string]*gameplayRankMilestones
 	wins    map[string]map[string]int
+	totals  map[string]map[string]int
 }
 
 func (a *app) rankMilestoneKey(client *LCUClient, playerRef, server string) string {
