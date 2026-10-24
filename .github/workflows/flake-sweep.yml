@@ -141,11 +141,11 @@ jobs:
             index: 0
             iterations: 1
             os: windows-latest
-          - kind: linux-hexdata
+          - kind: linux-aramkit
             index: 0
             iterations: 1
             os: ubuntu-latest
-          - kind: windows-hexdata
+          - kind: windows-aramkit
             index: 0
             iterations: 1
             os: windows-latest
@@ -166,13 +166,13 @@ jobs:
       - name: Install desktop test dependencies
         run: npm ci --prefix desktop
       - name: Prepare pinned public compatibility fixture
-        if: matrix.kind == 'linux-race' || matrix.kind == 'windows-go' || endsWith(matrix.kind, '-hexdata')
+        if: matrix.kind == 'linux-race' || matrix.kind == 'windows-go' || endsWith(matrix.kind, '-aramkit')
         run: node scripts/prepare-r238-update-fixture.cjs
       - name: Prepare Go dependencies before offline samples
-        if: matrix.kind == 'linux-race' || matrix.kind == 'windows-go' || endsWith(matrix.kind, '-hexdata')
+        if: matrix.kind == 'linux-race' || matrix.kind == 'windows-go' || endsWith(matrix.kind, '-aramkit')
         run: go mod download
       - name: Require native Windows race compiler
-        if: matrix.kind == 'windows-hexdata'
+        if: matrix.kind == 'windows-aramkit'
         shell: pwsh
         run: |
           if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {

@@ -4743,7 +4743,6 @@ type gameplayRecommendationMatchup struct {
 // 三条共同红线：
 //  1. 数据全部来自「本人英雄」那一次 hero-json（weakAgainst / strongAgainst /
 //     teammateSynergies / terminalItemTrios）与全量 postmatch，两个页面都是推荐
-//     路径在同一次请求里刚刚拉过、已在缓存里的。R116-D 新增的 hexdata 上游请求
 //     数恒为 0（Anti-scope 第 1 条）。评审 4.2/4.4 算过反面：10 个英雄各拉一次
 //     是 10 请求 / 12 MB，最坏排队 11 秒 = ChampSelect 3 秒轮询周期的 3.67 倍，
 //     而 recordLoadFailure 对取消直接 return，熔断计数永远是 0，链路会陷入
@@ -5013,7 +5012,6 @@ const (
 // 攻速）」——只借产品思路，不接它的数据（方案第 294 行），所以这里没有一个外部
 // 数字：比例 1.0 就是「算术均值」本身。
 //
-// 为什么用均值而不是中位数、也不用绝对值：hexdata postmatch 这 5 项都是「每局
 // 均值 / 比率」，跨英雄可比（R116 实测 173 英雄无缺失字段），但极差巨大
 // （avgHealShield min 0.63 / mean 1595 / max 27543），任何绝对值门槛都会在
 // 上游改口径后立刻失效。用「相对全英雄均值的比例」是唯一不需要魔法数字的写法。
@@ -5037,19 +5035,6 @@ const gameplayTeamPortraitThresholdRatio = 1.0
 // ensureLiveRecommendations）。InProgress/Reconnect 的 10 人来自
 // session.GameData.TeamOne/TeamTwo，是既有能力。
 var gameplayRosterMatchupPhases = []string{"InProgress", "Reconnect"}
-
-// gameplayTeamPortraitFields 是 P1-5 用到的 5 项 postmatch 指标，键名与上游字段名
-// 逐字一致，顺序只影响诊断事件里的可读性。
-var gameplayTeamPortraitFields = []struct {
-	Key   string
-	Value func(hexdataPostmatchRow) float64
-}{
-	{"avgDamageTaken", func(row hexdataPostmatchRow) float64 { return row.AvgDamageTaken }},
-	{"avgCcTime", func(row hexdataPostmatchRow) float64 { return row.AvgCcTime }},
-	{"avgDmgMitigated", func(row hexdataPostmatchRow) float64 { return row.AvgDmgMitigated }},
-	{"avgHealShield", func(row hexdataPostmatchRow) float64 { return row.AvgHealShield }},
-	{"damageShare", func(row hexdataPostmatchRow) float64 { return row.DamageShare }},
-}
 
 // gameplayRosterChampionIDs 解析前端传来的逗号分隔英雄 ID 串。
 // 严格策略：任何一段不是 1..10000 的整数、或段数超过 gameplayRosterSideLimit，
@@ -5092,343 +5077,6 @@ func gameplayRosterWithout(ids []int, exclude int) []int {
 		}
 	}
 	return result
-}
-
-// gameplayMatchupNotices 是 P1-3 的交集计算（纯函数）：本人英雄 hero-json 的
-// weakAgainst / strongAgainst 与「当前对局敌方 championId 集合」求交，命中才生成
-// notice。按 |counterDelta| 降序、OpponentID 升序（保证同样输入必然同样输出），
-// 最多 gameplayRosterNoticeLimit 条；一条都没命中返回 nil。
-//
-// 交集比较的必须是 row.OpponentChampionID ↔ 敌方 roster。工单「对抗变异」要求
-// 验证：把这一侧写反（拿队友 roster 去比）会得到全零匹配，而测试必须能抓到这种
-// 「永远不命中」的隐蔽退化——见 gameplay_r116d_test.go 的
-// TestGameplayMatchupNoticesNeverMatchDegenerationIsDetected。
-func gameplayMatchupNotices(weak, strong []hexdataMatchupRow, enemyChampionIDs []int) []gameplayMatchupNotice {
-	if len(enemyChampionIDs) == 0 {
-		return nil
-	}
-	roster := make(map[int]struct{}, len(enemyChampionIDs))
-	for _, id := range enemyChampionIDs {
-		if id > 0 {
-			roster[id] = struct{}{}
-		}
-	}
-	var notices []gameplayMatchupNotice
-	collect := func(rows []hexdataMatchupRow, direction string) {
-		for _, row := range rows {
-			// OpponentChampionID 由 R116-A 从上游字符串安全转换而来，转换失败的
-			// 整条已被丢弃，所以这里 <= 0 只可能是上游给了 0；0 不是合法英雄 ID，
-			// 拿它去比对等于伪造一次命中。
-			if row.OpponentChampionID <= 0 {
-				continue
-			}
-			if _, hit := roster[row.OpponentChampionID]; !hit {
-				continue
-			}
-			notices = append(notices, gameplayMatchupNotice{
-				Direction: direction, OpponentID: row.OpponentChampionID, CounterDelta: row.CounterDelta,
-				Evidence: row.Evidence, ConfidenceLow: row.ConfidenceLow, ConfidenceHigh: row.ConfidenceHigh,
-			})
-		}
-	}
-	collect(weak, "weak")
-	collect(strong, "strong")
-	sort.SliceStable(notices, func(left, right int) bool {
-		leftDelta, rightDelta := math.Abs(notices[left].CounterDelta), math.Abs(notices[right].CounterDelta)
-		if leftDelta != rightDelta {
-			return leftDelta > rightDelta
-		}
-		return notices[left].OpponentID < notices[right].OpponentID
-	})
-	if len(notices) > gameplayRosterNoticeLimit {
-		notices = notices[:gameplayRosterNoticeLimit]
-	}
-	return notices
-}
-
-// gameplaySynergyNotices 是 P1-2 的交集计算（纯函数）：本人英雄的
-// teammateSynergies 与我方队友 championId 求交。排序与上限规则同
-// gameplayMatchupNotices，只是效果量换成 synergyDelta。
-// 这里不做「阵容协同 +X%」总分（Anti-scope 第 2 条）：7/172 的覆盖率
-// （单局命中率 18.8%）撑不起一个看起来很全面的总分。
-func gameplaySynergyNotices(synergies []hexdataSynergyRow, teammateChampionIDs []int) []gameplaySynergyNotice {
-	if len(teammateChampionIDs) == 0 {
-		return nil
-	}
-	roster := make(map[int]struct{}, len(teammateChampionIDs))
-	for _, id := range teammateChampionIDs {
-		if id > 0 {
-			roster[id] = struct{}{}
-		}
-	}
-	var notices []gameplaySynergyNotice
-	for _, row := range synergies {
-		if row.TeammateChampionID <= 0 {
-			continue
-		}
-		if _, hit := roster[row.TeammateChampionID]; !hit {
-			continue
-		}
-		notices = append(notices, gameplaySynergyNotice{
-			TeammateID: row.TeammateChampionID, SynergyDelta: row.SynergyDelta,
-			Evidence: row.Evidence, ConfidenceLow: row.ConfidenceLow, ConfidenceHigh: row.ConfidenceHigh,
-		})
-	}
-	sort.SliceStable(notices, func(left, right int) bool {
-		leftDelta, rightDelta := math.Abs(notices[left].SynergyDelta), math.Abs(notices[right].SynergyDelta)
-		if leftDelta != rightDelta {
-			return leftDelta > rightDelta
-		}
-		return notices[left].TeammateID < notices[right].TeammateID
-	})
-	if len(notices) > gameplayRosterNoticeLimit {
-		notices = notices[:gameplayRosterNoticeLimit]
-	}
-	return notices
-}
-
-// errGameplayHexdataPageNotCached 是「只读缓存」的哨兵错误。
-var errGameplayHexdataPageNotCached = errors.New("hexdata page is not cached")
-
-// gameplayPeekCachedHexdataPage 只读 hexdata 的内存/磁盘缓存，缓存未命中就返回
-// false，**绝不触发上游请求**。
-//
-// 这是 Anti-scope 第 1 条的执行手段。P1-2/P1-3/P1-5 要消费的 hero-json 与
-// postmatch 都由推荐路径（loadMayhemDetail → hexdata.load("hero-json") 与
-// mayhemPerformancePanel → loadHexdataPostmatch）在同一次请求里刚刚拉过，缓存键
-// 完全相同（buildID|kind|id），所以生产上这里必然是缓存命中。
-//
-// 之所以不直接再调一次 provider.hexdata.load：那条路在缓存未命中、熔断半开或
-// buildChecked 过期时会真的回源，而 recordLoadFailure 对取消直接 return，熔断
-// 计数永远涨不起来（评审 4.4）。「新增请求数恒为 0」必须是结构上成立的，
-// 不能靠调用顺序碰巧成立。loader 恒返回哨兵错误 → 结构上不可能发出 HTTP。
-func gameplayPeekCachedHexdataPage(ctx context.Context, provider *championProvider, kind, id string) ([]byte, bool) {
-	if provider == nil || provider.cache == nil || provider.hexdata == nil {
-		return nil, false
-	}
-	key := provider.hexdata.cacheKey(kind, id)
-	result, err := provider.cache.loadWithStatus(ctx, key, hexdataCacheTTL, hexdataCacheTTL, true, func(context.Context) ([]byte, error) {
-		return nil, errGameplayHexdataPageNotCached
-	})
-	if err != nil || len(result.data) == 0 {
-		return nil, false
-	}
-	return result.data, true
-}
-
-// gameplayHeroHexdataTables 取本人英雄 hero-json 里的三个数组（只读缓存）。
-// 取不到就返回 false，调用方必须一个提示都不生成——绝不为了「有内容」而去拉
-// 10 个英雄的 hero-json。
-func gameplayHeroHexdataTables(ctx context.Context, provider *championProvider, championID int64) (hexdataHeroDetailV2, bool) {
-	if championID <= 0 {
-		return hexdataHeroDetailV2{}, false
-	}
-	data, ok := gameplayPeekCachedHexdataPage(ctx, provider, "hero-json", strconv.FormatInt(championID, 10))
-	if !ok {
-		return hexdataHeroDetailV2{}, false
-	}
-	detail, err := parseHexdataHeroJSON(data)
-	if err != nil {
-		return hexdataHeroDetailV2{}, false
-	}
-	return detail, true
-}
-
-// gameplayPostmatchTable 取全量 postmatch（只读缓存）。
-func gameplayPostmatchTable(ctx context.Context, provider *championProvider) (map[int]hexdataPostmatchRow, map[int]map[string]bool, bool) {
-	data, ok := gameplayPeekCachedHexdataPage(ctx, provider, "postmatch", hexdataAggregateID)
-	if !ok {
-		return nil, nil, false
-	}
-	rows, present, _, err := parseHexdataPostmatchWithPresence(data)
-	if err != nil || len(rows) == 0 {
-		return nil, nil, false
-	}
-	return rows, present, true
-}
-
-// gameplayTeamPortraitAverages 是 5 项画像指标在全部英雄上的算术均值，键名与上游
-// 字段名逐字一致。HeroCount 是 postmatch 里的英雄总数（实测 173）。
-// 某一项一个英雄都没有时该键不存在 → 判据函数整套放弃，绝不用 0 当门槛。
-type gameplayTeamPortraitAverages struct {
-	Values    map[string]float64
-	HeroCount int
-}
-
-// gameplayTeamPortraitAveragesFrom 的口径与 R116-B P1-6 的 mayhemPerformancePanel
-// 完全一致：只统计「该字段确实出现过」的英雄（用 postmatch.Present 判定），
-// 不拿 0 顶替缺失值把均值拉低。B 的均值只存在于 championPerformanceMetric
-// .DeltaPercent 里、没有暴露成可复用的数字，所以这里自己算一份同样的口径，
-// 而不是把实测均值抄成魔法常量。
-func gameplayTeamPortraitAveragesFrom(heroes map[int]hexdataPostmatchRow, present map[int]map[string]bool) gameplayTeamPortraitAverages {
-	averages := gameplayTeamPortraitAverages{Values: make(map[string]float64, len(gameplayTeamPortraitFields)), HeroCount: len(heroes)}
-	if len(heroes) == 0 {
-		return averages
-	}
-	sums := make(map[string]float64, len(gameplayTeamPortraitFields))
-	counts := make(map[string]int, len(gameplayTeamPortraitFields))
-	for id, row := range heroes {
-		seen := present[id]
-		for _, field := range gameplayTeamPortraitFields {
-			if len(seen) > 0 && !seen[field.Key] {
-				continue
-			}
-			sums[field.Key] += field.Value(row)
-			counts[field.Key]++
-		}
-	}
-	for _, field := range gameplayTeamPortraitFields {
-		if counts[field.Key] > 0 {
-			averages.Values[field.Key] = sums[field.Key] / float64(counts[field.Key])
-		}
-	}
-	return averages
-}
-
-// gameplayTeamPortraitLabels 是 P1-5 的标签生成纯函数（工单要求：可测试的纯函数，
-// 不许把魔法数字散落在渲染代码里）。
-//
-// 判据（全部相对全英雄算术均值，没有任何绝对值门槛）：
-//   - 前排：avgDamageTaken ≥ 均值×ratio 且 avgDmgMitigated ≥ 均值×ratio（承伤）
-//   - 控制：avgCcTime ≥ 均值×ratio（开团）
-//   - 持续输出：damageShare ≥ 均值×ratio
-//
-// 我方阵容里「一个都没有」才产出对应的「缺 X」标签；三类都有人 → 返回 nil
-// （工单验证判据：不是生成一个空标签）。
-//
-// 工单列了 5 项指标，其中 avgHealShield（治疗与增益）本轮**不参与判定**：三个
-// 标签里没有一个能给它一个可辩护的判据位置，硬塞进去就是编造口径（数据准确性
-// 红线）。它照常算进 gameplayTeamPortraitAverages、照常进 gameplay_team_portrait
-// 诊断事件，等真要加「缺治疗/护盾」标签时直接用。
-func gameplayTeamPortraitLabels(rows []hexdataPostmatchRow, averages gameplayTeamPortraitAverages) []gameplayTeamPortraitLabel {
-	if len(rows) == 0 {
-		return nil
-	}
-	taken, takenOK := averages.Values["avgDamageTaken"]
-	mitigated, mitigatedOK := averages.Values["avgDmgMitigated"]
-	cc, ccOK := averages.Values["avgCcTime"]
-	share, shareOK := averages.Values["damageShare"]
-	// 任何一项均值缺失或 ≤ 0（除零 / 上游整字段没了）→ 整套判据失效，一个标签
-	// 都不生成。宁可不出提示，也不出一个用坏门槛算出来的提示。
-	if !takenOK || taken <= 0 || !mitigatedOK || mitigated <= 0 || !ccOK || cc <= 0 || !shareOK || share <= 0 {
-		return nil
-	}
-	ratio := gameplayTeamPortraitThresholdRatio
-	frontline, control, carry := false, false, false
-	for _, row := range rows {
-		if row.AvgDamageTaken >= taken*ratio && row.AvgDmgMitigated >= mitigated*ratio {
-			frontline = true
-		}
-		if row.AvgCcTime >= cc*ratio {
-			control = true
-		}
-		if row.DamageShare >= share*ratio {
-			carry = true
-		}
-	}
-	var labels []gameplayTeamPortraitLabel
-	if !frontline {
-		labels = append(labels, gameplayTeamPortraitLabel{Key: "frontline", Label: "缺前排"})
-	}
-	if !control {
-		labels = append(labels, gameplayTeamPortraitLabel{Key: "crowdControl", Label: "缺控制"})
-	}
-	if !carry {
-		labels = append(labels, gameplayTeamPortraitLabel{Key: "sustainedDamage", Label: "缺持续输出"})
-	}
-	return labels
-}
-
-// gameplayTeamPortraitFrom 把「我方 championId 列表 + 全量 postmatch」拼成 P1-5
-// 的结果。查不到 postmatch 的英雄直接跳过；能解析的英雄少于
-// gameplayTeamPortraitMinResolvedHeroes 个时整块返回 nil（证据不足明确降级），
-// 因为「5 人里缺 2 个数据」时「没有任何人是前排」这个结论不成立。
-func gameplayTeamPortraitFrom(rosterChampionIDs []int, heroes map[int]hexdataPostmatchRow, present map[int]map[string]bool) *gameplayTeamPortrait {
-	if len(rosterChampionIDs) == 0 || len(heroes) == 0 {
-		return nil
-	}
-	rows := make([]hexdataPostmatchRow, 0, len(rosterChampionIDs))
-	for _, id := range rosterChampionIDs {
-		if row, ok := heroes[id]; ok {
-			rows = append(rows, row)
-		}
-	}
-	if len(rows) < gameplayTeamPortraitMinResolvedHeroes {
-		return nil
-	}
-	averages := gameplayTeamPortraitAveragesFrom(heroes, present)
-	labels := gameplayTeamPortraitLabels(rows, averages)
-	if len(labels) == 0 {
-		return nil
-	}
-	return &gameplayTeamPortrait{
-		Labels: labels, RosterSize: len(rosterChampionIDs), ResolvedHeroes: len(rows), HeroPoolSize: averages.HeroCount,
-		MeasurementTechnique: fmt.Sprintf("队伍画像门槛是 %d 位英雄赛后每局均值的算术平均（Hexdata postmatch 全量聚合）：承伤与减伤、控制时长、输出占比三项里全队无人达到均值即提示缺口。这是本地约定的启发式判据，不是上游官方口径", averages.HeroCount),
-	}
-}
-
-// gameplayApplyRosterInsights 是 R116-D P1-2/P1-3/P1-5 的唯一接线点，
-// 由 handleGameplayRecommendations 在组装完 bundle 之后调用。
-//
-// 只在 hextech-aram（海斗）模式下工作：hero-json 与 postmatch 只有这条路径会拉，
-// 其它模式调进来就是缓存未命中 → 一个提示都不生成，也一个请求都不发。
-func (a *app) gameplayApplyRosterInsights(ctx context.Context, bundle *gameplayRecommendationBundle, query url.Values, provider *championProvider, championID int64, internalMode string) {
-	if a == nil || bundle == nil || internalMode != "hextech-aram" {
-		return
-	}
-	phase := strings.TrimSpace(query.Get("phase"))
-	allyIDs := gameplayRosterChampionIDs(query.Get("allyChampionIds"))
-	enemyIDs := gameplayRosterChampionIDs(query.Get("enemyChampionIds"))
-	// Anti-scope 第 4 条：ChampSelect 阶段一律不消费「对面 5 人」。
-	// 依据与放开位置见 gameplayRosterMatchupPhases 的注释。
-	matchupPhaseAllowed := false
-	for _, allowed := range gameplayRosterMatchupPhases {
-		if strings.EqualFold(phase, allowed) {
-			matchupPhaseAllowed = true
-			break
-		}
-	}
-	enemyCountBeforeGuard := len(enemyIDs)
-	if !matchupPhaseAllowed {
-		enemyIDs = nil
-	}
-	detail, detailOK := gameplayHeroHexdataTables(ctx, provider, championID)
-	teammateIDs := gameplayRosterWithout(allyIDs, int(championID))
-	if detailOK && len(enemyIDs) > 0 {
-		bundle.MatchupNotices = gameplayMatchupNotices(detail.WeakAgainst, detail.StrongAgainst, enemyIDs)
-	}
-	if detailOK && len(teammateIDs) > 0 {
-		bundle.SynergyNotices = gameplaySynergyNotices(detail.TeammateSynergies, teammateIDs)
-	}
-	heroes, present, postmatchOK := map[int]hexdataPostmatchRow(nil), map[int]map[string]bool(nil), false
-	if len(allyIDs) > 0 {
-		heroes, present, postmatchOK = gameplayPostmatchTable(ctx, provider)
-		if postmatchOK {
-			bundle.TeamPortrait = gameplayTeamPortraitFrom(allyIDs, heroes, present)
-		}
-	}
-	labelKeys := make([]string, 0, 3)
-	if bundle.TeamPortrait != nil {
-		for _, label := range bundle.TeamPortrait.Labels {
-			labelKeys = append(labelKeys, label.Key)
-		}
-	}
-	a.recordDiagnostic(map[string]any{
-		"event": "gameplay_roster_insights", "diagnostic_schema": 1,
-		"trace_id": bundle.TraceID, "recommendation_key": bundle.RecommendationKey,
-		"champion_id": championID, "internal_mode": internalMode, "phase": phase,
-		"ally_count": len(allyIDs), "teammate_count": len(teammateIDs),
-		"enemy_count": len(enemyIDs), "enemy_count_before_phase_guard": enemyCountBeforeGuard,
-		"matchup_phase_allowed": matchupPhaseAllowed,
-		"hero_json_cached":      detailOK, "postmatch_cached": postmatchOK,
-		"weak_against_rows": len(detail.WeakAgainst), "strong_against_rows": len(detail.StrongAgainst),
-		"synergy_rows":    len(detail.TeammateSynergies),
-		"matchup_notices": len(bundle.MatchupNotices), "synergy_notices": len(bundle.SynergyNotices),
-		"team_portrait_labels": labelKeys, "team_portrait_hero_pool": len(heroes),
-		// 结构性保证：gameplayPeekCachedHexdataPage 的 loader 恒返回哨兵错误，
-		// 这条路径发出的上游请求数恒为 0（Anti-scope 第 1 条）。
-		"upstream_requests_added": 0,
-	})
 }
 
 func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Request) {
@@ -5620,7 +5268,6 @@ func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Reque
 	bundle.GameMode = strings.ToUpper(strings.TrimSpace(query.Get("gameMode")))
 	bundle.Tier = tier
 	// R116-D P1-2/P1-3/P1-5：克制提示、协同提示与队伍画像缺口标签。
-	// 三个都只读推荐路径刚刚拉过的缓存（hero-json / postmatch），新增的 hexdata
 	// 上游请求数恒为 0（Anti-scope 第 1 条）；只在海斗模式产出，取不到就一个提示
 	// 都不生成，绝不为「有内容」去按英雄扇出请求。
 	diagnosticStage = "roster-insights"
@@ -6288,7 +5935,6 @@ func liveClientEntryIdentityKeys(entry map[string]any) []string {
 // 数字，全部安全跳过并计入 skipped，绝不 panic。海斗下的真实形状未经实测，所以
 // 键名一律走 liveClientMapValue 的大小写无关匹配（itemID / itemId / itemid 都认），
 // 数字同时接受 JSON number 与数字字符串（上游在别处确实把 ID 写成字符串，
-// hexdata 的 opponentChampionId 就是一例）。
 func parseLiveClientItems(entry map[string]any) (items []liveClientItem, elementKeys []string, seen, skipped int, present bool) {
 	if len(entry) == 0 {
 		return nil, nil, 0, 0, false
@@ -10362,10 +10008,8 @@ func (a *app) handleGameplayPerks(w http.ResponseWriter, r *http.Request) {
 	})
 	if err == nil {
 		payload = a.enrichPerkAugments(cacheKey, client, payload)
-		// Hexdata hero visits extend the observed ID index after the base perk
 		// catalog may already have been cached. Merge it on every response.
 		payload.Augments = mergeGameplayAugmentMetadata(payload.Augments, currentMayhemMetadataRows())
-		payload.Augments = mergeGameplayAugmentMetadata(payload.Augments, a.championDataProvider().observedHexdataAugments())
 		payload.Augments = preferBundledAugmentIcons(mergeGameplayAugmentMetadata(payload.Augments, bundledAugmentCatalog()))
 	}
 	source := payload.source

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -37,8 +38,11 @@ func TestR307ProgressionThreeGroupsIdentityDeltaAndEventPrivacy(t *testing.T) {
 	a := r175App(t)
 	after := false
 	calls := map[string]int{}
+	var callsMu sync.Mutex
 	c := &LCUClient{baseURL: "https://fixture", token: "fixture"}
 	c.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		callsMu.Lock()
+		defer callsMu.Unlock()
 		calls[r.URL.Path]++
 		if strings.HasSuffix(r.URL.Path, "configuration") {
 			if after {
@@ -71,7 +75,8 @@ func TestR307ProgressionThreeGroupsIdentityDeltaAndEventPrivacy(t *testing.T) {
 		}
 	}
 	var events []map[string]any
-	c.setDiagnosticObserver(func(e map[string]any) { events = append(events, e) })
+	var eventsMu sync.Mutex
+	c.setDiagnosticObserver(func(e map[string]any) { eventsMu.Lock(); events = append(events, e); eventsMu.Unlock() })
 	for _, uri := range []string{"/lol-progression/v1/groups/beta/instance-data", "/account-private/progression/v1/notifications/beta/12345"} {
 		c.observeArenaProgressionEvent(LCUEvent{URI: uri, Data: json.RawMessage(`{"counterValue":92842,"milestone":{"triggerValue":100},"message":"SECRET","playerId":12345}`)})
 	}

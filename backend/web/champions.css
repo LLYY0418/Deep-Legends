@@ -890,7 +890,7 @@
 
 /* ---- R128：英雄详情页切换与表现指标 ---- */
 .mayhem-detail-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.mayhem-detail-tabs { --tab-count: 3; display: grid; min-width: 0; flex: 1 1 auto; grid-template-columns: repeat(var(--tab-count),minmax(0,1fr)); padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.mayhem-detail-tabs { --tab-count: 2; display: grid; min-width: 0; flex: 1 1 auto; grid-template-columns: repeat(var(--tab-count),minmax(0,1fr)); padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
 /* Tab count arrives as data-tab-count: the page CSP blocks style="" attributes. */
 .mayhem-detail-tabs[data-tab-count="1"] { --tab-count: 1; }
 .mayhem-detail-tabs[data-tab-count="2"] { --tab-count: 2; }
@@ -904,14 +904,7 @@
 .mayhem-detail-panel { display: grid; min-width: 0; gap: 12px; }
 
 /* P0-1「较基准」：正数用既有胜率高亮色，负数用既有警示色，不新造配色。 */
-.mayhem-delta.is-delta-up { color: var(--success); }
-.mayhem-delta.is-delta-down { color: var(--warning); }
-.mayhem-without-item { color: var(--muted); }
-.mayhem-ranking-list dd.is-low-confidence { color: var(--warning); }
-.mayhem-ranking-list article.is-low-confidence { box-shadow: inset 2px 0 0 var(--warning); }
 .arena-option-card .is-low-confidence dd { color: var(--warning); }
-.arena-option-card .is-wilson dd { color: var(--muted); }
-.arena-option-card .is-hex-label dd { color: var(--primary-strong); }
 .arena-option-card[data-metric-count="5"] dl { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .arena-option-card[data-metric-count="6"] dl { grid-template-columns: repeat(3,minmax(0,1fr)); }
 /* 阶段视图多出「选取率」与「阶段基准」两格：指标数最多到 8，仍按三列排。
@@ -946,5 +939,5 @@
 .mayhem-overview-metrics[data-metric-count="1"] { --metric-columns:1; }
 .mayhem-overview-metrics[data-metric-count="2"] { --metric-columns:2; }
 
-.aramkit-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}.aramkit-controls label{display:flex;gap:6px;align-items:center}.aramkit-controls select,.mayhem-fit-head select,.mayhem-fit-head input{max-width:100%;background:var(--panel);color:inherit;border:1px solid var(--line);border-radius:6px;padding:6px}.aramkit-combos>div,.aramkit-combos details>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.aramkit-combo{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;padding:12px;border:1px solid var(--line);border-radius:8px}.aramkit-combo>span:last-child{flex-basis:100%;text-align:center}.aramkit-combo .augment-icon{width:38px;height:38px}.aramkit-combo button{border:0;background:transparent;padding:0;cursor:pointer}.aramkit-modifiers{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.aramkit-modifiers>span{padding:5px 8px;border:1px solid currentColor;border-radius:6px}.aramkit-balance article{padding:8px 0}.aramkit-balance article p{margin:5px 0;white-space:pre-wrap}.aramkit-balance kbd{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--line);border-radius:4px}.mayhem-fit-metrics{white-space:normal}.is-delta-up{color:var(--success,#38a578)}.is-delta-down{color:var(--danger,#dd6574)}
+.aramkit-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}.aramkit-controls label{display:flex;gap:6px;align-items:center}.aramkit-controls select,.mayhem-fit-head select,.mayhem-fit-head input{max-width:100%;background:var(--panel);color:inherit;border:1px solid var(--line);border-radius:6px;padding:6px}.aramkit-combos>div,.aramkit-combos details>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.aramkit-combo{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;padding:12px;border:1px solid var(--line);border-radius:8px}.aramkit-combo>span:last-child{flex-basis:100%;text-align:center}.aramkit-combo .augment-icon{width:38px;height:38px}.aramkit-combo button{border:0;background:transparent;padding:0;cursor:pointer}.aramkit-modifiers{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.aramkit-modifiers>span{padding:5px 8px;border:1px solid currentColor;border-radius:6px}.aramkit-balance article{padding:8px 0}.aramkit-balance article p{margin:5px 0;white-space:pre-wrap}.aramkit-balance kbd{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--line);border-radius:4px}.mayhem-fit-metrics{white-space:normal}.is-delta-up{color:var(--success)}.is-delta-down{color:var(--warning)}
 .aramkit-combo .is-silver .augment-icon{border:1px solid var(--rarity-silver)}.aramkit-combo .is-gold .augment-icon{border:1px solid var(--rarity-gold)}.aramkit-combo .is-prismatic .augment-icon{border:1px solid var(--rarity-prismatic-a)}

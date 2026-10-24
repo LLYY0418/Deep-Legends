@@ -507,7 +507,6 @@ func main() {
 	championProvider.cache = newChampionDataCache(store)
 	championProvider.imageCache = newPublicBinaryCache(store, "champion-images", 2048, 64<<20)
 	championProvider.communityImageCache = newCommunityImageCache(store)
-	championProvider.hexdata = newHexdataClient(championProvider, store)
 	if store != nil {
 		championProvider.diag = func(event map[string]any) { _ = store.appendDiagnostic(event) }
 	}

@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -180,11 +181,11 @@ func TestR307ARAMKitImmutableCacheAndConcurrency(t *testing.T) {
 
 func TestR307ARAMKitVersionRevalidationOfflineAndBackoff(t *testing.T) {
 	p := newChampionProvider()
-	calls := 0
+	var calls atomic.Int32
 	offline := false
 	build := "first"
 	p.client = &http.Client{Transport: r307Transport(func(req *http.Request) (*http.Response, error) {
-		calls++
+		calls.Add(1)
 		if offline {
 			return nil, fmt.Errorf("offline")
 		}
@@ -201,12 +202,12 @@ func TestR307ARAMKitVersionRevalidationOfflineAndBackoff(t *testing.T) {
 		t.Fatal(v, e)
 	}
 	_, e = c.current(t.Context())
-	if e != nil || calls != 1 {
+	if e != nil || calls.Load() != 1 {
 		t.Fatal("3-hour refresh policy")
 	}
 	c.checked = time.Time{}
 	_, e = c.current(t.Context())
-	if e != nil || calls != 2 {
+	if e != nil || calls.Load() != 2 {
 		t.Fatal("conditional validation")
 	}
 	build = "second"
@@ -221,9 +222,9 @@ func TestR307ARAMKitVersionRevalidationOfflineAndBackoff(t *testing.T) {
 	if e != nil || v.DataPath != "data/second" {
 		t.Fatal("offline last valid versions", v, e)
 	}
-	before := calls
+	before := calls.Load()
 	_, _ = c.current(t.Context())
-	if calls != before {
+	if calls.Load() != before {
 		t.Fatal("failure backoff ignored")
 	}
 	fresh := newChampionProvider().aramkitClient()
@@ -306,10 +307,11 @@ func TestR307ARAMKitRatingImmediateFailureFallsBack(t *testing.T) {
 }
 func TestR307ARAMKitRatingTracePrivacyAndRetryWindow(t *testing.T) {
 	now := time.Now()
-	calls := 0
+	var calls atomic.Int32
 	var event map[string]any
+	var eventMu sync.Mutex
 	client := newAramkitTestClient(r307Transport(func(req *http.Request) (*http.Response, error) {
-		calls++
+		calls.Add(1)
 		trace := httptrace.ContextClientTrace(req.Context())
 		trace.DNSStart(httptrace.DNSStartInfo{})
 		trace.DNSDone(httptrace.DNSDoneInfo{})
@@ -321,17 +323,19 @@ func TestR307ARAMKitRatingTracePrivacyAndRetryWindow(t *testing.T) {
 		return aramkitJSONResponse(503, `{}`), nil
 	}))
 	client.now = func() time.Time { return now }
-	client.observe = func(e map[string]any) { event = e }
+	client.observe = func(e map[string]any) { eventMu.Lock(); event = e; eventMu.Unlock() }
 	client.lookup(t.Context(), "synthetic-fixture", "0000")
 	client.lookup(t.Context(), "synthetic-fixture", "0000")
-	if calls != 1 {
+	if calls.Load() != 1 {
 		t.Fatal("negative cache missed")
 	}
 	now = now.Add(2*time.Minute + time.Millisecond)
 	client.lookup(t.Context(), "synthetic-fixture", "0000")
-	if calls != 2 {
+	if calls.Load() != 2 {
 		t.Fatal("automatic retry still blocked")
 	}
+	eventMu.Lock()
+	defer eventMu.Unlock()
 	for _, key := range []string{"host", "dns_ms", "connect_ms", "tls_ms", "ttfb_ms", "player_hash"} {
 		if _, ok := event[key]; !ok {
 			t.Fatal("missing diagnostic", key)
@@ -344,33 +348,8 @@ func TestR307ARAMKitRatingTracePrivacyAndRetryWindow(t *testing.T) {
 }
 
 func TestR307ARAMKitCompletePipelineReusesFilesAndNoRetiredRequests(t *testing.T) {
-	p := newChampionProvider()
+	p, calls := newARAMKitFixtureProvider(t, "")
 	r := r307Resources(t)
-	p.championMeta = r.Metadata
-	p.championIDs = map[string]int{"yasuo": 157}
-	var versions aramkitVersions
-	r307Fixture(t, "versions", &versions)
-	v, _ := selectARAMKitVersion(versions)
-	files := map[string][]byte{"/data/versions.json": r307Fixture(t, "versions", nil)}
-	for _, item := range []struct{ remote, fixture string }{{"champions", "champion-identities"}, {"augments", "augment-resources"}, {"items", "item-resources"}, {"summoner-spells", "spell-resources"}, {"archetypes", "archetypes"}} {
-		files["/"+v.ResourcePath+"/zh-CN/resources/"+item.remote+".json"] = r307Fixture(t, item.fixture, nil)
-	}
-	for _, item := range []struct{ remote, fixture string }{{"champion-rankings", "champion-rankings"}, {"augment-rankings", "augment-rankings"}, {"augment-rarity", "augment-rarity"}, {"champion-details/157", "champion-157"}, {"augment-details/1134", "augment-1134"}} {
-		files["/"+v.DataPath+"/stats/all/"+item.remote+".json"] = r307Fixture(t, item.fixture, nil)
-	}
-	calls := map[string]int{}
-	p.client = &http.Client{Transport: r307Transport(func(req *http.Request) (*http.Response, error) {
-		if req.URL.Host != aramkitDataCN {
-			t.Fatalf("unexpected host: %s", req.URL.Host)
-		}
-		b, ok := files[req.URL.Path]
-		if !ok {
-			t.Fatalf("unexpected request: %s", req.URL.Path)
-		}
-		calls[req.URL.Path]++
-		return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(string(b)))}, nil
-	})}
-	p.aramkitClient().dir = t.TempDir()
 	ranking, e := p.loadARAMKitRankings(t.Context())
 	if e != nil || len(ranking.Rows) != 10 || ranking.Rows[0].ChampionID != 157 || ranking.Rows[0].Grade != "S" {
 		t.Fatal(ranking, e)
@@ -447,4 +426,42 @@ func TestR307ARAMKitNetworkTargetsAndAssets(t *testing.T) {
 			t.Fatal("unsafe asset accepted")
 		}
 	}
+}
+
+func newARAMKitFixtureProvider(t *testing.T, root string) (*championProvider, map[string]int) {
+	t.Helper()
+	p := newChampionProvider()
+	r := r307Resources(t)
+	p.championMeta = r.Metadata
+	p.championIDs = map[string]int{"yasuo": 157}
+	var versions aramkitVersions
+	r307Fixture(t, "versions", &versions)
+	v, _ := selectARAMKitVersion(versions)
+	files := map[string][]byte{"/data/versions.json": r307Fixture(t, "versions", nil)}
+	for _, item := range []struct{ remote, fixture string }{{"champions", "champion-identities"}, {"augments", "augment-resources"}, {"items", "item-resources"}, {"summoner-spells", "spell-resources"}, {"archetypes", "archetypes"}} {
+		files["/"+v.ResourcePath+"/zh-CN/resources/"+item.remote+".json"] = r307Fixture(t, item.fixture, nil)
+	}
+	for _, item := range []struct{ remote, fixture string }{{"champion-rankings", "champion-rankings"}, {"augment-rankings", "augment-rankings"}, {"augment-rarity", "augment-rarity"}, {"champion-details/157", "champion-157"}, {"augment-details/1134", "augment-1134"}} {
+		files["/"+v.DataPath+"/stats/all/"+item.remote+".json"] = r307Fixture(t, item.fixture, nil)
+	}
+	calls := map[string]int{}
+	var callsMu sync.Mutex
+	p.client = &http.Client{Transport: r307Transport(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host != aramkitDataCN {
+			t.Fatalf("unexpected host: %s", req.URL.Host)
+		}
+		b, ok := files[req.URL.Path]
+		if !ok {
+			t.Fatalf("unexpected request: %s", req.URL.Path)
+		}
+		callsMu.Lock()
+		calls[req.URL.Path]++
+		callsMu.Unlock()
+		return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(string(b)))}, nil
+	})}
+	if root == "" {
+		root = t.TempDir()
+	}
+	p.aramkitClient().dir = root
+	return p, calls
 }

@@ -42,6 +42,7 @@ type aramkitClient struct {
 	memory   map[string][]byte
 	retry    map[string]time.Time
 	dir      string
+	readFile func(string) ([]byte, error)
 	versions aramkitVersionCache
 	checked  time.Time
 }
@@ -54,7 +55,7 @@ func (p *championProvider) aramkitClient() *aramkitClient {
 		if p.cache != nil {
 			dir = filepath.Join(filepath.Dir(p.cache.dir), "aramkit")
 		}
-		p.aramkit = &aramkitClient{provider: p, slots: make(chan struct{}, 2), flights: map[string]chan struct{}{}, memory: map[string][]byte{}, retry: map[string]time.Time{}, dir: dir}
+		p.aramkit = &aramkitClient{provider: p, slots: make(chan struct{}, 2), flights: map[string]chan struct{}{}, memory: map[string][]byte{}, retry: map[string]time.Time{}, dir: dir, readFile: os.ReadFile}
 		if dir != "" {
 			if b, e := os.ReadFile(filepath.Join(dir, "versions-cache.json")); e == nil {
 				_ = json.Unmarshal(b, &p.aramkit.versions)
@@ -92,6 +93,9 @@ func (c *aramkitClient) persist(name string, b []byte) {
 	}
 }
 func (c *aramkitClient) request(ctx context.Context, requestPath string, conditional *aramkitVersionCache) ([]byte, http.Header, int, error) {
+	if !c.provider.featureGates.enabled(featureGateAramkit) {
+		return nil, nil, 0, errors.New("ARAMKit source disabled")
+	}
 	select {
 	case c.slots <- struct{}{}:
 		defer func() { <-c.slots }()
@@ -159,13 +163,6 @@ func (c *aramkitClient) immutable(ctx context.Context, p string) ([]byte, error)
 			c.mu.Unlock()
 			return b, nil
 		}
-		if c.dir != "" {
-			if b, e := os.ReadFile(filepath.Join(c.dir, filepath.FromSlash(p))); e == nil && len(b) > 0 {
-				c.memory[p] = b
-				c.mu.Unlock()
-				return b, nil
-			}
-		}
 		if done := c.flights[p]; done != nil {
 			c.mu.Unlock()
 			select {
@@ -175,15 +172,32 @@ func (c *aramkitClient) immutable(ctx context.Context, p string) ([]byte, error)
 				return nil, ctx.Err()
 			}
 		}
-		if time.Now().Before(c.retry[p]) {
-			c.mu.Unlock()
-			return nil, errors.New("ARAMKit retry backoff")
-		}
+		backoff := time.Now().Before(c.retry[p])
 		done := make(chan struct{})
 		c.flights[p] = done
 		c.mu.Unlock()
-		b, _, _, e := c.request(ctx, p, nil)
-		if e == nil {
+		var b []byte
+		var e error
+		fresh := false
+		reader := c.readFile
+		if reader == nil {
+			reader = os.ReadFile
+		}
+		if c.dir != "" {
+			b, e = reader(filepath.Join(c.dir, filepath.FromSlash(p)))
+		}
+		if len(b) == 0 {
+			if backoff {
+				e = errors.New("ARAMKit retry backoff")
+			} else {
+				fresh = true
+				b, _, _, e = c.request(ctx, p, nil)
+			}
+		} else {
+			e = nil
+		}
+
+		if e == nil && fresh {
 			c.persist(p, b)
 		}
 		c.mu.Lock()
@@ -377,13 +391,13 @@ func verifyARAMKitChampions(rows map[string]aramkitResource, meta map[int]champi
 	sort.Ints(mismatch)
 	return valid, cases, mismatch
 }
-func (p *championProvider) loadARAMKitResources(ctx context.Context, v aramkitVersion) (aramkitResources, error) {
+func (p *championProvider) loadARAMKitChampionResources(ctx context.Context, v aramkitVersion) (aramkitResources, error) {
 	c := p.aramkitClient()
 	r := aramkitResources{Version: v}
 	for _, target := range []struct {
 		name string
 		out  any
-	}{{"champions", &r.Champions}, {"augments", &r.Augments}, {"items", &r.Items}, {"summoner-spells", &r.Spells}, {"archetypes", &r.Archetypes}} {
+	}{{"champions", &r.Champions}} {
 		b, e := c.immutable(ctx, v.ResourcePath+"/zh-CN/resources/"+target.name+".json")
 		if e != nil {
 			return r, e
@@ -416,6 +430,26 @@ func (p *championProvider) loadARAMKitResources(ctx context.Context, v aramkitVe
 	}
 	if len(mismatch) > 0 {
 		c.diagnostic("aramkit_champion_id_mismatch", map[string]any{"count": len(mismatch), "ids": mismatch})
+	}
+	return r, nil
+}
+func (p *championProvider) loadARAMKitResources(ctx context.Context, v aramkitVersion) (aramkitResources, error) {
+	r, e := p.loadARAMKitChampionResources(ctx, v)
+	if e != nil {
+		return r, e
+	}
+	c := p.aramkitClient()
+	for _, target := range []struct {
+		name string
+		out  any
+	}{{"augments", &r.Augments}, {"items", &r.Items}, {"summoner-spells", &r.Spells}, {"archetypes", &r.Archetypes}} {
+		b, e := c.immutable(ctx, v.ResourcePath+"/zh-CN/resources/"+target.name+".json")
+		if e != nil {
+			return r, e
+		}
+		if e = json.Unmarshal(b, target.out); e != nil {
+			return r, e
+		}
 	}
 	return r, nil
 }

@@ -257,13 +257,13 @@ func (a *app) recoverExternalNetwork() {
 	}
 	riotUserKeys.mu.Unlock()
 	clearRiotAccountNetworkFailures(a.riot, map[*riotProvider]bool{})
-	if p := a.champions; p != nil && p.hexdata != nil {
-		h := p.hexdata
-		h.mu.Lock()
-		h.state.Circuits = map[string]hexdataCircuitState{}
-		h.saveStateLocked()
-		h.mu.Unlock()
+	if p := a.champions; p != nil {
+		c := p.aramkitClient()
+		c.mu.Lock()
+		c.retry = map[string]time.Time{}
+		c.mu.Unlock()
 	}
+
 	if c := a.mayhemRatings; c != nil {
 		c.mu.Lock()
 		for key, item := range c.cache {

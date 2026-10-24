@@ -171,7 +171,6 @@
 	function normalizeArenaFirstTab(value) { return value === "mine" ? "mine" : "pros"; }
 	function normalizeRunePage(value) { const parsed = Number(value); return Number.isInteger(parsed) && parsed >= 0 && parsed <= 20 ? parsed : 0; }
 	function normalizeChampionDetailID(value) { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? parsed : 0; }
-  function usesHexdata(source) { return String(source || "").toLowerCase().includes("hexdata"); }
   function augmentRarityKey(value) {
     const key = String(value || "").replace(/^k/i, "").toLowerCase();
     return ["silver", "gold", "prismatic"].includes(key) ? key : "unknown";
@@ -641,7 +640,7 @@
 
   function championDetailErrorMessage(error) {
     const message = String(error?.message || "英雄详情读取失败");
-    if (message.includes("hexdata circuit is open") || message.includes("上游暂时不可用")) return "上游暂时不可用，请稍后再试";
+    if (message.includes("上游暂时不可用")) return "上游暂时不可用，请稍后再试";
     if (error?.name === "TimeoutError" || message.includes("本地请求超时")) return "网络超时，请重试";
     return message;
   }
@@ -654,9 +653,6 @@
     const refresh = state.mayhemForceRefresh ? "&refresh=1" : "";
     state.mayhemForceRefresh = false;
     void api(`/api/champions/detail?mode=aram-mayhem&champion=${encodeURIComponent(selected.champion)}${refresh}`, "mayhem-detail").then((detail) => {
-      if (detail?.recommendedAugments?.some((row) => row.assets?.some((asset) => asset.source === "hexdata" && asset.path))) {
-        window.dispatchEvent(new Event("deep-legends:augment-index-updated"));
-      }
       if (!current()) return;
       state.detail = detail;
       state.mayhemDetailError = "";
@@ -1264,92 +1260,15 @@
   }
 
   function renderMayhemItemRanking(rows, citation) {
-    // R116-B P0-2 排序护栏：这里以前按 score 降序、再按 games 降序重排（R63
-    // 「前端偷偷重排」的老毛病），一条「10 场胜率 100%」的行只要 score 高就能
-    // 插到「5000 场胜率 55%」前面。后端直出的顺序就是官方口径
-    // meta.recommendationPolicy.ranking = sample_tier_then_wilson_lower_bound_v1
-    // （rankingSignals: sample_tier → wilson_lower_bound → pick_rate → games），
-    // 所以前端一律不重排，原样渲染。
+    // Preserve the upstream ranking order.
     const rankingRows = objectRows(rows).slice(0, 8);
     if(!rankingRows.length)return "";
     const content = rankingRows.map((row, index) => {
       const asset = row.assets?.[0] || {};
       const icon = asset.source && asset.path ? assetImage(asset, "recommend-icon", true) : '<span class="mayhem-item-name-only" aria-hidden="true"></span>';
-      return `<article${mayhemSampleTierLabel(row) ? ' class="is-low-confidence"' : ""}><b>${index + 1}</b>${icon}<strong>${escapeHTML(asset.name || "未知装备")}</strong><dl><div><dt>胜率</dt><dd class="metric-win"${mayhemWilsonTooltip(row)}>${percent(row.winRate)}</dd></div><div><dt>场次</dt><dd>${compactNumber(row.games)}</dd></div>${mayhemDeltaCell(row.deltaWinRate)}${mayhemWithoutItemCell(row)}${mayhemSampleCell(row)}</dl></article>`;
+      return `<article><b>${index + 1}</b>${icon}<strong>${escapeHTML(asset.name || "未知装备")}</strong><dl><div><dt>胜率</dt><dd class="metric-win">${percent(row.winRate)}</dd></div><div><dt>场次</dt><dd>${compactNumber(row.games)}</dd></div></dl></article>`;
     }).join("");
     return `<section class="recommendation-section mayhem-item-ranking"><header><h3><span class="arena-section-icon" aria-hidden="true">◈</span>装备排行</h3><span class="section-count">${objectRows(rows).length} 件</span></header><div class="mayhem-ranking-list">${content || '<p class="mayhem-inline-empty">暂无装备排行样本。</p>'}</div></section>`;
-  }
-
-  // ---- R116-B P0-1 / P0-2 的行内标签（海克斯卡与装备排行共用）----
-  // deltaWinRate 是上游 0..1 原值（后端不换算，与 winRate 的百分数不同），
-  // 展示时 ×100。为 0 或字段缺失时返回空串：「较基准 +0.0%」没有信息量，
-  // 还会被读成「实测过、确实没有收益」（评审 6.1：取不到就整块隐藏）。
-  //
-  // 评审整改 A2：0 的判据必须放在 toFixed(1) 之后。原来只挡精确 0，挡不住被一位
-  // 小数抹成 0 的小值——任何 |deltaWinRate| < 0.00005 的行都会渲染出「较基准
-  // +0.0%」，正是工单 P0-1 判据明文禁止的那个字符串；而触发面不小（单英雄 118 条
-  // 装备行 + 499 条阶段行都走这个函数，「某阶段收益率实测接近 0」是完全正常的
-  // 上游取值）。格式化之后再判 "0.0" 就把整个舍入区间一起挡住了。
-  function mayhemDeltaLabel(deltaWinRate) {
-    const value = Number(deltaWinRate);
-    if (!Number.isFinite(value)) return "";
-    const points = value * 100;
-    const text = Math.abs(points).toFixed(1);
-    if (text === "0.0") return "";
-    return `${points > 0 ? "+" : "-"}${text}%`;
-  }
-
-  // 正数用既有的胜率高亮色（--success），负数用既有的警示色（--warning），
-  // 不新造配色（工单 P0-1-2）。
-  function mayhemDeltaTone(deltaWinRate) {
-    const value = Number(deltaWinRate);
-    if (!Number.isFinite(value) || value === 0) return "";
-    return value > 0 ? "is-delta-up" : "is-delta-down";
-  }
-
-  // 评审整改 B6：给「较基准」一个定义，别让它是个没有定义的词。装备行是英雄级
-  // 口径，实测 deltaWinRate = 这件装备的胜率 − 该英雄整体胜率（4 个英雄共 479 条
-  // 装备行零误差），tooltip 就把这句话原样给用户；不带任何算出来的数字，因为英雄
-  // 级基准值本身没有逐行下发。tabindex 与 data-tooltip-size 沿用 mayhemWilsonTooltip
-  // 的既有写法（键盘可达 + 紧凑气泡）。海克斯卡那边因为卡片外壳 overflow:hidden
-  // 装不下 tooltip，改用可见的「阶段基准」一格，见 mayhemAugmentConfidenceMetrics。
-  function mayhemDeltaCell(deltaWinRate) {
-    const label = mayhemDeltaLabel(deltaWinRate);
-    return label ? `<div><dt>较基准</dt><dd class="mayhem-delta ${mayhemDeltaTone(deltaWinRate)}" tabindex="0" data-tooltip="较基准 = 这件装备的胜率 − 该英雄整体胜率" data-tooltip-size="compact">${label}</dd></div>` : "";
-  }
-
-  // P0-1-3：「出 vs 不出」对照。withoutItemWinRate 后端已换算成百分数；
-  // 缺失或为 0 时整个单元格不渲染（0 会被读成「不出这件必败」）。
-  function mayhemWithoutItemCell(row) {
-    const value = Number(row?.withoutItemWinRate);
-    if (!Number.isFinite(value) || value <= 0) return "";
-    return `<div><dt>不出时</dt><dd class="mayhem-without-item" data-tooltip="不出这件装备时的胜率 ${percent(value)}">${percent(value)}</dd></div>`;
-  }
-
-  // P0-2-2：低样本徽记复用既有的 is-low-confidence 样式类，不新造一套。
-  // sampleTier 由后端按 meta.samplePolicy 算好直出；空串（meta 不可用）时
-  // 整块不渲染，前端不自己按 games 猜阈值。
-  function mayhemSampleTierLabel(row) {
-    return String(row?.sampleTier || "") === "low" ? "样本极少" : "";
-  }
-
-  function mayhemSampleCell(row) {
-    const label = mayhemSampleTierLabel(row);
-    return label ? `<div><dt>置信</dt><dd class="is-low-confidence">${label}</dd></div>` : "";
-  }
-
-  // P0-2-3：Wilson 下界只在高样本行给（低样本行的下界没有参考意义，那一行已经
-  // 有「样本极少」徽记）。wilsonLowerWinRate 是上游 0..1 原值，展示 ×100。
-  function mayhemWilsonLabel(row) {
-    if (String(row?.sampleTier || "") !== "high") return "";
-    const value = Number(row?.wilsonLowerWinRate);
-    if (!Number.isFinite(value) || value <= 0) return "";
-    return percent(value * 100);
-  }
-
-  function mayhemWilsonTooltip(row) {
-    const label = mayhemWilsonLabel(row);
-    return label ? ` tabindex="0" data-tooltip="95% 置信区间下界 ${label}" data-tooltip-size="compact"` : "";
   }
 
   function renderMayhemOpeningConfiguration(build, citation) {
@@ -1358,17 +1277,7 @@
     const boots = objectRows(build.boots).slice(0, 2);
     const spells = objectRows(build.summonerSpells).slice(0, 2);
     const group = (title, rows, kind) => `<section><h4>${title}</h4><div class="config-option-list">${rows.map((row) => renderConfigOption(row, kind, false, row.assets?.[0]?.source==="aramkit" ? aramkitRouteStats : null)).join("") || '<p class="muted">暂无样本</p>'}</div></section>`;
-    // R116-B P0-4：只有召唤师技能这一组显示胜率。它的数据源已经换成同时带
-    // winRate 与 pickRate 的那一份；出门装与鞋子仍然只有选用率，保持 false 不变
-    // ——它们的数据里没有胜率，跟着打开就是显示不存在的数据（工单 P0-4-2）。
-    // renderConfigOption 的三态开关本身一字未改，这里只用它的第四个参数
-    // （statsRenderer，与 renderDepthStats 同一套用法）。
-    //
-    // 为什么不直接传 null（＝既有的 renderOptionStats）：那个函数只用
-    // hasPick/hasWin 决定「整块要不要渲染」，之后两格是无条件输出的，所以一旦
-    // 上游波动、后端回退到只有选用率的那一份数据（winRate 为 0），它会照渲染
-    // 「胜率 0.00%」——那是显示不存在的数据。这里改成逐格判断：大于 0 才渲染，
-    // 两格都取不到就整块返回空串（工单 P0-4 判据 2 的「回退成 pickRate-only」）。
+    // RSC fallback rows can omit win rate; ARAMKit routes have real wins and samples.
     const spellStats = (row) => {
       const hasPick = Number(row?.pickRate) > 0;
       const hasWin = Number(row?.winRate) > 0;
@@ -1432,7 +1341,7 @@
     return `<button type="button" class="mayhem-atlas-row is-${escapeHTML(item.rarity || "unknown")}${active ? " is-active" : ""}" role="option" aria-selected="${active}" data-mayhem-augment="${Number(item.id)}">
       ${assetImage({ source: item.imageSource, path: item.imagePath, fallbackPath: item.imageFallbackPath, name: item.name, description: item.tooltip || item.description }, "augment-icon")}
       <span><strong>${escapeHTML(item.name)}</strong><small>${rarityLabel(item.rarity)}</small></span>
-      ${gradeBadge(item.grade, "atlas-augment-grade")}${Number(item.games)>0?`<small title="${number(item.games)} 场">${percent(item.winRate)} · ${percent(item.popularity)}</small>`:""}
+      ${gradeBadge(item.grade, "atlas-augment-grade")}${Number(item.games)>0?`<small data-tooltip="${number(item.games)} 场">${percent(item.winRate)} · ${percent(item.popularity)}</small>`:""}
     </button>`;
   }
 
@@ -1483,7 +1392,7 @@
     if (state.mayhemRarityError && !stages.length) return "";
     let body = '<p class="mayhem-inline-empty">正在读取品质分布…</p>';
     if (state.mayhemRarityLoading) body = '<p class="mayhem-inline-empty">正在读取品质分布…</p>';
-    else if (stages.length) body = `<div class="mayhem-rarity-stages">${stages.map((row) => `<article><b>第 ${Number(row.stage)} 阶段</b><span class="is-silver">白银 ${percent(row.silver)}</span><span class="is-gold">黄金 ${percent(row.gold)}</span><span class="is-prismatic">棱彩 ${percent(row.prismatic)}</span><small title="${number(row.games)} 场"></small></article>`).join("")}</div>`;
+    else if (stages.length) body = `<div class="mayhem-rarity-stages">${stages.map((row) => `<article><b>第 ${Number(row.stage)} 阶段</b><span class="is-silver">白银 ${percent(row.silver)}</span><span class="is-gold">黄金 ${percent(row.gold)}</span><span class="is-prismatic">棱彩 ${percent(row.prismatic)}</span><small data-tooltip="${number(row.games)} 场"></small></article>`).join("")}</div>`;
     return stages.length?`<details class="augment-directory mayhem-rarity-panel"><summary>海克斯品质分布</summary>${body}</details>`:"";
   }
 
@@ -1998,7 +1907,7 @@
     const body = entries.length
       ? `<div class="arena-option-grid mayhem-recommend-grid">${entries.map(renderMayhemRecommendedAugment).join("")}</div>`
       : `<p class="mayhem-inline-empty">${stage ? "这个阶段没有可展示的海克斯样本。" : "暂无可展示的海克斯推荐样本。"}</p>`;
-    return `<section class="recommendation-section mayhem-augment-ranking"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>海克斯推荐</h3><p>按综合评分、胜率与样本展示各品质前三项</p></div>${chips}</header>${body}</section>`;
+    return `<section class="recommendation-section mayhem-augment-ranking"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>海克斯推荐</h3><p>各品质前三项</p></div>${chips}</header>${body}</section>`;
   }
 
   // 当前生效的阶段号。斗魂/单双排路径恒为 0（英雄级汇总），它们的行里没有
@@ -2015,26 +1924,12 @@
     return objectRows(item?.stages).find((row) => Number(row?.stage) === wanted) || null;
   }
 
-  // 阶段视图下把父行的展示字段换成该阶段的值。汇总视图原样返回父行。
-  //
-  // 评审整改 A3：不能无条件展开。后端 championMetricStageRow 的展示字段全带
-  // omitempty，Go 的零值不进 JSON，于是「这个阶段没有这个值」在前端表现为「键不
-  // 存在」；`{ ...item, ...staged }` 会静默保留父行（英雄级汇总）的值，却把它显示
-  // 在「阶段 N」的 chip 下——口径混用且不披露（最容易触发的是 deltaWinRate：阶段
-  // 行缺这个键，卡片就会在阶段 3 下渲染出英雄级的「较基准 +11.2%」）。所以阶段
-  // 维度拥有的那几个字段一律以阶段行为准：键不在就置 undefined，让
-  // mayhemDeltaLabel / percent / mayhemSampleTierLabel 各自走隐藏分支（评审 6.1）。
-  // score / rarity / assets / description 这些阶段维度根本没有的字段继续沿用父行
-  // （「综合评分」的口径由 renderMayhemRecommendedAugment 显式标注成英雄级）。
-  //
-  // 键名列表写在函数体内而不是模块级 const：本函数被 champions.test.cjs 与
-  // r116b.test.cjs 的 compileFunctions 单独编译（依赖列表是固定的），模块级 const
-  // 会变成自由变量抛 ReferenceError（与 normalizeMayhemDetailTab 的 TDZ 教训同源）。
+  // Stage-owned values never inherit missing parent statistics.
   function mayhemAugmentStageItem(item, stage) {
     const staged = mayhemAugmentStageRow(item, stage);
     if (!staged) return item;
     const merged = { ...item, ...staged };
-    const stageOwnedKeys = ["winRate", "pickRate", "deltaWinRate", "wilsonLowerWinRate", "stageBaselineWinRate", "games", "hexLabel", "grade", "sampleTier"];
+    const stageOwnedKeys = ["winRate", "pickRate", "games", "grade"];
     for (const key of stageOwnedKeys) if (!Object.hasOwn(staged, key)) merged[key] = undefined;
     return merged;
   }
@@ -2085,9 +1980,7 @@
       name: meta?.name || base.name || "推荐海克斯",
       description: base.description || meta?.description || meta?.tooltip || "",
     };
-    // 阶段视图的字母来自阶段行自己的官方档位。实测英雄 157 的 499 条阶段行中
-    // 115 条与父行档位不同；缺失时隐藏徽章，不沿用英雄级字母。R150 已删去卡片上
-    // 重复的中文「官方档位」指标，hexLabel 仍由后端用于辨别官方/本地档位。
+    // A missing stage grade hides its badge.
     const stageGrade = stage ? String(item.grade || "").trim().toUpperCase() : "";
     const row = {
       assets: [asset],
@@ -2110,39 +2003,9 @@
         // 因为 mayhemAugmentStageItem 只覆盖阶段行真带着的键（评审整改 A3）。
         ...(stage && Number(item.pickRate) > 0 ? [["选取率", percent(item.pickRate), ""]] : []),
         ["样本", compactNumber(item.games), ""],
-        // 综合评分是英雄级的 hexScore：后端刻意没下发阶段级 hexScore（体积取舍，
-        // 见台账第 5 节），所以阶段视图里必须写明口径，不能让一个英雄级数字冒充
-        // 阶段数值（评审整改 B4 的第二半）。
-        ...(Number(item.score) > 0 ? [[stage ? "综合评分（英雄级）" : "综合评分", number(item.score, 1), "is-score"]] : []),
-        ...mayhemAugmentConfidenceMetrics(item),
       ],
     });
   }
-
-  // P0-1 / P0-2 / P0-5 / B6 的追加指标格，每一格都「有数据才出现」：字段缺失时
-  // 卡片保持原来的三格，不会冒出 undefined / NaN% / 0.0%（评审 6.1）。
-  function mayhemAugmentConfidenceMetrics(item) {
-    const metrics = [];
-    const delta = mayhemDeltaLabel(item?.deltaWinRate);
-    if (delta) metrics.push(["较基准", delta, `mayhem-delta ${mayhemDeltaTone(item.deltaWinRate)}`]);
-    // 评审整改 B6：「较基准」的基准必须可见，否则它是个没有定义的词（相对英雄？
-    // 相对阶段？相对全英雄？）。阶段行带 stageBaselineWinRate，实测口径精确成立
-    // （deltaWinRate = 阶段胜率 − 阶段基准胜率，英雄 157 的 499/499 条零误差），
-    // 所以在阶段视图里把基准值单列一格，用户能自己验算 61.66% − 57.05% = +4.6%。
-    // 卡片外壳是 overflow:hidden，逐格 data-tooltip 会被裁掉（P0-2 的 Wilson 下界
-    // 因此也是单独一格而不是 tooltip），所以这里用可见的一格而不是悬浮提示。
-    // 英雄级汇总行没有这个字段（上游只在 stages[] 里给），拿不到就整格不渲染。
-    const baseline = Number(item?.stageBaselineWinRate);
-    if (delta && Number.isFinite(baseline) && baseline > 0) metrics.push(["阶段基准", percent(baseline), "is-baseline"]);
-    const lowSample = mayhemSampleTierLabel(item);
-    if (lowSample) metrics.push(["置信", lowSample, "is-low-confidence"]);
-    else {
-      const wilson = mayhemWilsonLabel(item);
-      if (wilson) metrics.push(["95%下界", wilson, "is-wilson"]);
-    }
-    return metrics;
-  }
-
 
   function augmentMetaForAsset(asset) {
     const rows = objectRows(state.augments?.rows);

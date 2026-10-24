@@ -112,7 +112,6 @@ type championProvider struct {
 	yourGGLast            time.Time
 	arenaItemsAt          time.Time
 	arenaItems            []gameplayItem
-	hexdata               *hexdataClient
 	aramkit               *aramkitClient
 	featureGates          *featureGates
 	qq101ProbeMu          sync.Mutex
@@ -120,17 +119,10 @@ type championProvider struct {
 	qq101ProbeAt          map[string]time.Time
 	qq101Wait             time.Duration
 	// Keep the last valid augment catalog in memory so a transient empty
-	// Hexdata/OP.GG response cannot blank the atlas during refresh.
 	augmentCatalogMu    sync.Mutex
 	augmentCatalog      championAugmentResponse
 	augmentCatalogReady bool
 	augmentBackoff      communityDragonAugmentBackoff
-	observedAugmentMu   sync.Mutex
-	observedAugments    map[int64]gameplayAugment
-	observedLoaded      bool
-	observedLoadDone    chan struct{}
-	observedWriteActive bool
-	observedWriteDirty  bool
 	remoteAugmentMu     sync.RWMutex
 	remoteAugments      []gameplayAugment
 	mayhemWarmOnce      sync.Once
@@ -211,7 +203,6 @@ type championRankingRow struct {
 	TierLocallyCalculated bool     `json:"tierLocallyCalculated,omitempty"`
 }
 
-// championTierBand 是 /api/hexdata/meta 的 tierBands 原样透传（实测 5 条：
 // 1=前15%、2=15%-35%、3=35%-65%、4=65%-85%、5=后15%）。R116-B P0-5 要求官方
 // 档位的文案用上游给的标签，不在前端自己造一套「T1=超强」之类的解释。
 // meta 拿不到时留空，前端整块不渲染。
@@ -268,106 +259,35 @@ type championAssetDescription struct {
 }
 
 type championMetricRow struct {
-	Assets           []championAsset `json:"assets"`
-	Ultimate         *championAsset  `json:"ultimate,omitempty"`
-	Rarity           string          `json:"rarity,omitempty"`
-	Tier             string          `json:"tier,omitempty"`
-	Grade            string          `json:"grade,omitempty"`
-	Score            float64         `json:"score,omitempty"`
-	PickRate         float64         `json:"pickRate,omitempty"`
-	WinRate          float64         `json:"winRate,omitempty"`
-	Games            int             `json:"games,omitempty"`
-	GamesUnavailable bool            `json:"gamesUnavailable,omitempty"`
-	AveragePlacement float64         `json:"averagePlacement,omitempty"`
-	FirstPlaceRate   float64         `json:"firstPlaceRate,omitempty"`
-	SkillPriority    []string        `json:"skillPriority,omitempty"`
-	SkillOrder       []string        `json:"skillOrder,omitempty"`
-	// R116-A：以下字段来自 Hexdata JSON API 的官方口径，解析层原样保留。
-	// R116-B P0-5-1 起 applyLocalAugmentGrades 改为「官方优先、本地兜底」：
-	// HexLabel/HexTier 非空的行直接采用官方档位，本地分位只服务官方缺失的行。
-	// 官方口径与本地估算靠字段是否非空区分，不混成一个字段。
-	DeltaWinRate       float64 `json:"deltaWinRate,omitempty"`
-	WilsonLowerWinRate float64 `json:"wilsonLowerWinRate,omitempty"`
-	HexTier            string  `json:"hexTier,omitempty"`
-	HexLabel           string  `json:"hexLabel,omitempty"`
-	HexTierColor       string  `json:"hexTierColor,omitempty"`
-	OfficialTier       int     `json:"officialTier,omitempty"`
-	// 装备行专属：coreDelta = 带该装备胜率 − 不带该装备胜率；averageIndex 是
-	// 平均出装顺位；withoutItemWinRate 是不出这件装备时的胜率（百分数）。
-	CoreDelta          float64 `json:"coreDelta,omitempty"`
-	AverageIndex       float64 `json:"averageIndex,omitempty"`
-	WithoutItemWinRate float64 `json:"withoutItemWinRate,omitempty"`
-	// R116-B P0-2：样本分档（"low"/"medium"/"high"），阈值从
-	// /api/hexdata/meta 的 samplePolicy 读（实测 low 1..249、medium 250..999、
-	// high ≥1000），后端算好直出，前端不重复实现阈值逻辑。meta 不可用或
-	// samplePolicy 缺失时留空 → 前端整块不渲染（评审 6.1「取不到就整块隐藏」）。
-	SampleTier string `json:"sampleTier,omitempty"`
-	// R116-B P0-6：海克斯阶段（stage 1..4）明细。工单要求点阶段 chip 后
-	// 「前端本地」重渲染、不重新发请求，所以四个阶段必须随详情页一次下发。
-	// 只有海斗的海克斯行会有值；装备行与召唤师技能行留空（omitempty → 不下发）。
-	// 上游缺某个阶段时这里也不补零行（实测阶段 1 只有 121/126 条 augment 有
-	// stage 行）：前端拿不到 stage 就在该阶段视图里不渲染这条 augment，绝不用 0
-	// 顶替——0 会被渲染成「胜率 0%」，那是显示不存在的数据。
-	Stages []championMetricStageRow `json:"stages,omitempty"`
-	// R116-F P2：负向推荐（慎选）判据命中标记，以及判据①用到的「该英雄同稀有度
-	// 选取率中位数」（百分数，与 PickRate 同单位）。三条判据全在后端算：中位数的
-	// 池子是「该英雄全部同稀有度海克斯」，而前端只看得到每品质前三张卡（实测英雄
-	// 157 是 9/126），前端自己算出来的中位数必然是错的。判据与降级理由见
-	// hexdata.go 的 markMayhemNegativeRecommendations。
-	Caution               bool    `json:"caution,omitempty"`
-	CautionMedianPickRate float64 `json:"cautionMedianPickRate,omitempty"`
+	Assets           []championAsset          `json:"assets"`
+	Ultimate         *championAsset           `json:"ultimate,omitempty"`
+	Rarity           string                   `json:"rarity,omitempty"`
+	Tier             string                   `json:"tier,omitempty"`
+	Grade            string                   `json:"grade,omitempty"`
+	Score            float64                  `json:"score,omitempty"`
+	PickRate         float64                  `json:"pickRate,omitempty"`
+	WinRate          float64                  `json:"winRate,omitempty"`
+	Games            int                      `json:"games,omitempty"`
+	GamesUnavailable bool                     `json:"gamesUnavailable,omitempty"`
+	AveragePlacement float64                  `json:"averagePlacement,omitempty"`
+	FirstPlaceRate   float64                  `json:"firstPlaceRate,omitempty"`
+	SkillPriority    []string                 `json:"skillPriority,omitempty"`
+	SkillOrder       []string                 `json:"skillOrder,omitempty"`
+	Stages           []championMetricStageRow `json:"stages,omitempty"`
 }
 
-// championMetricStageRow 是 augments[].stages[] 的裁剪下发版本（R116-B P0-6）。
-// 上游每条 stage 行有 14 个字段，这里只保留「阶段视图要显示的 + 判断置信度要用
-// 的」9 个：实测单英雄 126 条 augment × 4 阶段的 JSON 体积从 140,138 B 降到
-// 102,135 B（-27%）。丢掉的 wins / tier / hexTier / hexScore /
-// recommendationScore 前端一个都不渲染——hexTier 是内部枚举名（实测 "hang"），
-// R150 起前端只用 Grade 画字母徽章；HexLabel 继续下发供后端判断官方档位，
-// 卡片不再把它渲染成另一项中文等级指标。
-//
-// R116-B 独立评审整改（B4 / B6）又调了一次这 9 个字段，一进一出体积反而更小
-// （同一套静态核算：102,008 B → 97,033 B，净减 4,975 B/英雄；砍 pickRate 省
-// 10,915 B，加 grade 花 5,940 B）：
-//   - 去掉 PickRate：前端零渲染（阶段视图的卡片只有胜率/样本/综合评分/较基准/
-//     官方档位/置信度/阶段基准七格，选取率不在其中）。R116-F 的「阶段 × 稀有度」
-//     概率分布读的是上游解析结构 hexdataAugmentRowV2 的 Stages[].PickRate，不走
-//     这个下发结构，所以砍掉它不影响 F。
-//   - 加上 Grade：阶段视图的字母徽章必须与同一张卡上的「官方档位」同口径，否则
-//     会出现「徽章 S（英雄级 hang）+ 官方档位 顶级（阶段级 top）」这种自相矛盾
-//     （实测英雄 157 的 499 条阶段行里有 115 条 hexTier 与父行不同）。字母档位
-//     仍然只由后端那一个官方档位映射函数算，前端不复制 hexTier/hexLabel → 字母
-//     的对照表；上游给 insufficient 时映射返回空串，前端据此整块隐藏徽章。
-//
-// 单位与父行 championMetricRow 逐字一致，前端不需要再判断该不该换算：
-//   - WinRate / PickRate / StageBaselineWinRate 是百分数（上游 0..1 已 ×100）；
-//   - DeltaWinRate / WilsonLowerWinRate 保持上游 0..1 原值，展示时前端自己 ×100。
-//
-// SampleTier 与父行同源：由 applyHexdataSampleTiers 按 meta.samplePolicy 的阈值
-// 算好直出（阶段行不按 hexdataMinimumSample 过滤，低样本阶段靠「样本极少」徽记
-// 披露而不是悄悄消失，否则 P0-2 就白做了）。
-//
-// 展示字段一律带 omitempty，所以「这个阶段没有这个值」在 JSON 里表现为键不存在。
-// 前端 mayhemAugmentStageItem 据此只覆盖阶段行真的带着的键（评审整改 A3），缺失
-// 的键置 undefined 走各自的隐藏分支，绝不静默沿用父行的英雄级数值。
 type championMetricStageRow struct {
-	Stage                int     `json:"stage"`
-	WinRate              float64 `json:"winRate,omitempty"`
-	PickRate             float64 `json:"pickRate,omitempty"`
-	DeltaWinRate         float64 `json:"deltaWinRate,omitempty"`
-	WilsonLowerWinRate   float64 `json:"wilsonLowerWinRate,omitempty"`
-	StageBaselineWinRate float64 `json:"stageBaselineWinRate,omitempty"`
-	Games                int     `json:"games,omitempty"`
-	HexLabel             string  `json:"hexLabel,omitempty"`
-	Grade                string  `json:"grade,omitempty"`
-	SampleTier           string  `json:"sampleTier,omitempty"`
+	Stage    int     `json:"stage"`
+	WinRate  float64 `json:"winRate,omitempty"`
+	PickRate float64 `json:"pickRate,omitempty"`
+	Games    int     `json:"games,omitempty"`
+	Grade    string  `json:"grade,omitempty"`
 }
 
 // normalizeChampionGrade is the only upstream-to-display-grade mapping.
 // YOUR.GG: OP/S/A/B/C/D/F remain unchanged. OP.GG numeric tiers:
 // 0→OP, 1→S, 2→A, 3→B, 4→C, 5→D (the live Arena page confirms 1..5
 // strongest to weakest; 0 is the existing OP.GG OP compatibility case).
-// Hexdata hero numeric tiers: 1→S, 2→A, 3→B, 4→C, 5→F. Hexdata augment
 // hexTier: hang→S, top→A, elite→B, npc→C, trap→F; insufficient/unknown→none.
 // Hero numeric tiers and augment hexTier describe different populations: this
 // is a display scale, not a claim that those upstream fields are equivalent.
@@ -389,39 +309,12 @@ func normalizeChampionGrade(source string, tier int, raw string) string {
 		if tier >= 0 && tier <= 5 {
 			return [...]string{"OP", "S", "A", "B", "C", "D"}[tier]
 		}
-	case "hexdata-hero":
-		if tier >= 1 && tier <= 5 {
-			return [...]string{"", "S", "A", "B", "C", "F"}[tier]
-		}
-	case "hexdata-augment":
-		switch strings.ToLower(strings.TrimSpace(raw)) {
-		case "hang":
-			return "S"
-		case "top":
-			return "A"
-		case "elite":
-			return "B"
-		case "npc":
-			return "C"
-		case "trap":
-			return "F"
-		}
 	case "opgg-augment-catalog":
 		if tier >= 0 && tier <= 5 {
 			return [...]string{"S", "A", "B", "C", "D", "F"}[tier]
 		}
 	}
 	return ""
-}
-
-func hexdataOfficialGrade(hexTier string) string {
-	return normalizeChampionGrade("hexdata-augment", 0, hexTier)
-}
-
-// hexdataRowHasOfficialGrade 判断这一行是否带可用的官方档位。只要官方给了
-// hexLabel 或可映射的 hexTier，本地分位算法就完全不参与这一行。
-func hexdataRowHasOfficialGrade(row championMetricRow) bool {
-	return strings.TrimSpace(row.HexLabel) != "" || hexdataOfficialGrade(row.HexTier) != ""
 }
 
 // applyLocalAugmentGrades：R116-B P0-5-1 起是「官方优先、本地兜底」。
@@ -433,7 +326,7 @@ func applyLocalAugmentGrades(rows []championMetricRow) {
 	scores := make([]float64, 0, len(rows))
 	localScores := make([]float64, len(rows))
 	for index := range rows {
-		if hexdataRowHasOfficialGrade(rows[index]) {
+		if rows[index].Grade != "" {
 			continue
 		}
 		localScores[index] = localAugmentScore(rows[index])
@@ -442,8 +335,7 @@ func applyLocalAugmentGrades(rows []championMetricRow) {
 		}
 	}
 	for index := range rows {
-		if hexdataRowHasOfficialGrade(rows[index]) {
-			rows[index].Grade = hexdataOfficialGrade(rows[index].HexTier)
+		if rows[index].Grade != "" {
 			continue
 		}
 		percentile := float64(len(rows)-index) / float64(max(1, len(rows)))
@@ -598,53 +490,6 @@ type championDetailResponse struct {
 	ArenaAugments       []championMetricRow    `json:"arenaAugments,omitempty"`
 	ArenaAugmentGroups  []arenaAugmentGroup    `json:"arenaAugmentGroups,omitempty"`
 	Build               championBuildSections  `json:"build"`
-	// R116-B P1-6：海斗赛后 22 项表现指标（含后端算好的「较全英雄平均」）。
-	// postmatch 取不到时留 nil → 前端整个「表现」tab 不渲染。
-	Performance *championPerformancePanel `json:"performance,omitempty"`
-	// R116-F P1：该英雄专属的「阶段 × 稀有度」概率分布（英雄口径），由 hero-json
-	// 的 augments[].stages[].pickRate 本地聚合而来，不发新请求。与全服口径的
-	// /api/champions/augment-rarity（hexdataRarityStage）并存、互不替换：全服口径
-	// 回答「整体分布」，这份回答「这个英雄」。取不到时留 nil → 前端整块不渲染。
-	HeroStageRarity []hexdataHeroStageRarityRow `json:"heroStageRarity,omitempty"`
-}
-
-// championPerformanceMetric 是 R116-B P1-6「表现」tab 的一项赛后指标。
-// 数值与「较全英雄平均」的差值全部在后端算好（工单 P1-6-2：不在前端算均值，
-// 避免把 173 英雄完整表下发到前端），前端只做展示。
-//
-// 量纲警告（R116 实测）：/api/hexdata/postmatch 的 22 项不是同一种量纲。
-//   - 18 项是每局均值（11 个 avg*）或比率/评分（damageShare、goldEfficiency、
-//     kda、killParticipation、multiKillRate、survivability、utilityScore），
-//     跨英雄可比 → 带 DeltaPercent。
-//   - doubleKills/tripleKills/quadraKills/pentaKills 是「该英雄全部对局的累计
-//     次数」，实测 pearson(总场次, doubleKills)=0.8117，对它们做 ±% 量到的是
-//     人气不是强度 → Cumulative=true 且 DeltaPercent 恒为 0，前端必须去掉
-//     ±% 并标注「累计次数（受出场场次影响，不可跨英雄直接比较）」。
-//
-// DeltaPercent=0 有两种含义（真的等于平均 / 无法计算），所以用 HasDelta 显式
-// 区分；HasDelta=false 时前端不渲染「较平均」标签（评审 6.1：取不到就隐藏）。
-type championPerformanceMetric struct {
-	Key          string  `json:"key"`
-	Label        string  `json:"label"`
-	Group        string  `json:"group"`
-	Value        float64 `json:"value"`
-	Format       string  `json:"format,omitempty"`
-	DeltaPercent float64 `json:"deltaPercent,omitempty"`
-	HasDelta     bool    `json:"hasDelta,omitempty"`
-	Cumulative   bool    `json:"cumulative,omitempty"`
-}
-
-// championPerformancePanel 是「表现」tab 的整块数据。HeroCount 是参与均值计算
-// 的英雄数（实测 173），Averages 只在后端用于算 DeltaPercent，不下发。
-type championPerformancePanel struct {
-	Metrics   []championPerformanceMetric `json:"metrics"`
-	HeroCount int                         `json:"heroCount,omitempty"`
-	// Groups 是四组的展示顺序；某一组的全部指标都缺失时该组整块不下发，
-	// 前端不留空态。
-	Groups   []string                `json:"groups,omitempty"`
-	Citation *championSourceCitation `json:"citation,omitempty"`
-	// R128 §2.3：前端不展示；字段保留供诊断与既有后端测试使用。
-	MeasurementTechnique string `json:"measurementTechnique,omitempty"`
 }
 
 type championAugmentResponse struct {
@@ -704,7 +549,6 @@ func newChampionProvider() *championProvider {
 		static: make(map[string]championAssetDescription), championKeys: make(map[string]string), championIDs: make(map[string]int), championMeta: make(map[int]championMetadata),
 		itemPurchasable: make(map[int64]bool), abilities: make(map[string]map[string]championAssetDescription), featureGates: newFeatureGates(), qq101Wait: qq101DetailWait,
 	}
-	provider.hexdata = newHexdataClient(provider, nil)
 	if err := provider.setNetworkSettings(defaultChampionNetworkSettings()); err != nil {
 		panic(err)
 	}
@@ -933,7 +777,7 @@ func (p *championProvider) fetchDirect(ctx context.Context, host, requestPath st
 }
 
 func allowedChampionHost(host string) bool {
-	return host == aramkitDataCN || host == aramkitDataCOM || host == opggChampionHost || host == opggWebAPIHost || host == opggPageHost || host == esportsOPGGHost || host == opggAssetHost || host == dataDragonHost || host == prestigeArtworkHost || host == communityDragonHost || host == yourGGArenaHost || host == hexdataHost || host == hexdataAssetHost || host == qq101Host
+	return host == aramkitDataCN || host == aramkitDataCOM || host == opggChampionHost || host == opggWebAPIHost || host == opggPageHost || host == esportsOPGGHost || host == opggAssetHost || host == dataDragonHost || host == prestigeArtworkHost || host == communityDragonHost || host == yourGGArenaHost || host == qq101Host
 }
 
 func (a *app) handleChampionCatalog(w http.ResponseWriter, r *http.Request) {
@@ -1405,8 +1249,6 @@ func validateChampionAssetPath(source, requestPath string) (string, bool) {
 		return prestigeArtworkHost, strings.HasPrefix(requestPath, gtimgChampionIconPrefix) || strings.HasPrefix(requestPath, gtimgSkinArtworkPrefix)
 	case "aramkit":
 		return aramkitDataCN, strings.HasPrefix(requestPath, "/assets/")
-	case "hexdata":
-		return hexdataAssetHost, hexdataAugmentIconPath(requestPath) == requestPath
 	case "builtin":
 		_, ok := bundledAugmentID(requestPath)
 		return "", ok
@@ -1599,10 +1441,6 @@ func (p *championProvider) championAssetLCUPath(source, requestPath string) (str
 
 func writeChampionResponse(w http.ResponseWriter, value any, err error) {
 	if err != nil {
-		if errors.Is(err, errHexdataCircuitOpen) {
-			http.Error(w, "上游暂时不可用，请稍后再试", http.StatusServiceUnavailable)
-			return
-		}
 		http.Error(w, "英雄数据暂时不可用，请稍后重试", http.StatusBadGateway)
 		return
 	}
@@ -2497,41 +2335,6 @@ type augmentChampionRaw struct {
 }
 
 func (p *championProvider) loadLegacyAugments(ctx context.Context) (championAugmentResponse, error) {
-	if p.hexdata != nil {
-		if page, pageErr := p.hexdata.load(ctx, "augments", "all", "/augments", "text/html,application/xhtml+xml", false); pageErr == nil {
-			if rows, citation, parseErr := parseHexdataAugments(page.Data); parseErr == nil && hexdataCitationComplete(citation) && (page.Cache == championCacheStateStale || p.hexdata.adoptCitation(citation)) {
-				catalog := p.loadAugmentMetadataCatalog(ctx)
-				byID := gameplayAugmentIndexAll(catalog)
-				for index := range rows {
-					if meta, ok := byID[rows[index].ID]; ok {
-						if strings.TrimSpace(rows[index].Description) == "" && strings.TrimSpace(meta.Description) != "" {
-							rows[index].Description = meta.Description
-						}
-						if rarity := normalizeAugmentRarity(meta.Rarity); rarity != "unknown" {
-							rows[index].Rarity = rarity
-						}
-						if source, path := augmentMetadataImage(meta.IconPath); path != "" {
-							rows[index].ImageSource, rows[index].ImagePath = source, path
-							if source == "communitydragon" {
-								rows[index].ImageFallbackPath = communityDragonGameAssetPath(meta.FallbackIconPath)
-							}
-						}
-					}
-					rows[index].Description = augmentDescriptionWithOfflineGuidance(rows[index].ID, rows[index].Description)
-				}
-				p.hexdata.promote("augments", "all", citation.BuildID, page.Data, page.FetchedAt)
-				p.hexdata.recordSuccess("augments", "/augments")
-				p.reportHexdataShape("augments", len(rows), hexdataTableFieldCount(page.Data), citation.BuildID)
-				response := championAugmentResponse{Source: "Hexdata", Mode: "aram-mayhem", FetchedAt: page.FetchedAt, EntertainmentSample: true, Citation: &citation, MeasurementTechnique: p.loadHexdataMeasurementTechnique(ctx), Rows: rows}
-				p.rememberAugmentCatalog(response)
-				return response, nil
-			} else {
-				p.hexdata.recordShapeFailure("augments", len(rows), hexdataTableFieldCount(page.Data), citation.BuildID)
-			}
-		} else {
-			p.reportHexdataFallback("augments", pageErr)
-		}
-	}
 	_, decoded, err := p.loadARAMPage(ctx)
 	if err != nil {
 		if cached, ok := p.rememberedAugmentCatalog(); ok {
@@ -2641,7 +2444,6 @@ func (p *championProvider) rememberedAugmentCatalog() (championAugmentResponse, 
 	return cloneChampionAugmentResponse(p.augmentCatalog), true
 }
 
-// Authenticated LCU metadata has priority; icons observed in successful Hexdata
 // hero JSON responses provide an offline fallback. CommunityDragon fills only
 // the remaining fields and IDs when available.
 func (p *championProvider) loadAugmentMetadataCatalog(ctx context.Context) []gameplayAugment {
@@ -2655,7 +2457,6 @@ func (p *championProvider) loadAugmentMetadataCatalog(ctx context.Context) []gam
 	return catalog
 }
 
-// Mayhem detail already has Hexdata icon, name and rarity. It may use cached
 // CommunityDragon enrichment, but must never wait for a fresh remote probe.
 func (p *championProvider) loadAugmentMetadataCatalogFast(ctx context.Context) []gameplayAugment {
 	var catalog []gameplayAugment
@@ -2666,7 +2467,6 @@ func (p *championProvider) loadAugmentMetadataCatalogFast(ctx context.Context) [
 	}
 	catalog = mergeGameplayAugmentMetadata(catalog, currentMayhemMetadataRows())
 	catalog = mergeGameplayAugmentMetadata(catalog, bundledAugmentCatalog())
-	catalog = mergeGameplayAugmentMetadata(catalog, p.observedHexdataAugments())
 	p.remoteAugmentMu.RLock()
 	catalog = mergeGameplayAugmentMetadata(catalog, p.remoteAugments)
 	p.remoteAugmentMu.RUnlock()
@@ -2674,14 +2474,11 @@ func (p *championProvider) loadAugmentMetadataCatalogFast(ctx context.Context) [
 }
 
 // R116-B 更正（原注释的前提已被实测证伪）：这里以前写的是「Riot 数据里到处
-// 都拿不到海克斯描述，唯一能渲染的中文描述来自 Hexdata 的海克斯页面，所以
-// 按需抓取」。自 R116-A 起海斗详情走 /api/hexdata/heroes/{id}，响应里的
 // augments[].augmentDescription 实测覆盖率 126/126 = 100%，描述已经随主响应
 // 一次拿全，per-augment 的页面扇出（mayhemAugmentCopy/augmentSlugs 那条链路）
 // 已整条删除。
 // 这个占位串现在只服务两条仍然存在的回退路径：① 海克斯图鉴目录（OP.GG /
 // CommunityDragon 元数据，ID ≥ 1000 的海斗海克斯确实没有描述字段）；
-// ② 图鉴里点开单个海克斯时按需读取的 Hexdata 页面解析失败。
 // 文案保持「海克斯图鉴中可读取说明」而不是「客户端可查看」——它指向的是站内
 // 图鉴入口，不是 League 客户端。
 const augmentOfflineDescription = "海克斯图鉴中可读取说明"

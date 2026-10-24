@@ -2,8 +2,8 @@
 import argparse, collections, json, math, statistics, subprocess
 from pathlib import Path, PureWindowsPath
 ROOT=Path(__file__).resolve().parents[1]
-HEXDATA_TESTS=['TestHexdataSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNone','TestHexdataColdRankingBudgetAndDiskRestart','TestR149MayhemCatalogsWarmConcurrentlyAndRestartFromDisk','TestR276HexdataRestartWaitsForStateAndUsesDisk','TestAdoptingNewBuildIDPrunesStaleHexdataFilesAsynchronously','TestPruneStaleHexdataBuildsRemovesExpiredBuildsOnly','TestPruneStaleHexdataBuildsMakesNoRequests','TestHexdataCircuitStatePersistsAcrossRestart','TestHexdataRestartClearsLongLivedPersistedCircuit','TestHexdataHTTP429OpensPersistentCircuitBeforeNextRequest']
-PLAN=[(kind,index,iterations) for kind,count,iterations in [('linux-race',8,5),('linux-renderers',5,2),('browser-main',4,5),('browser-r265',4,5),('windows-go',4,3),('windows-renderers',4,3),('windows-cold',1,1),('linux-hexdata',1,1),('windows-hexdata',1,1)] for index in range(count)]
+ARAMKIT_TESTS=['TestARAMKitSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNoImmutableRequests', 'TestARAMKitColdRankingBudgetAndDiskRestart']
+PLAN=[(kind,index,iterations) for kind,count,iterations in [('linux-race',8,5),('linux-renderers',5,2),('browser-main',4,5),('browser-r265',4,5),('windows-go',4,3),('windows-renderers',4,3),('windows-cold',1,1),('linux-aramkit',1,1),('windows-aramkit',1,1)] for index in range(count)]
 def upgrade_retry_evidence(folder,sha):
     errors=[];runs=[]
     if folder is None:return dict(total_retries=0,scope='no acceptance context supplied',runs=[]),[]
@@ -33,7 +33,7 @@ def upgrade_retry_evidence(folder,sha):
     return dict(total_retries=sum(r['total_retries'] for r in runs),scope='same-SHA acceptance CI; sweep does not execute installers',runs=runs),errors
 
 def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN,upgrade_folder=None):
-    errors=[];samples=[];hexdata_stress=[];metrics=collections.defaultdict(list);failures=collections.defaultdict(list)
+    errors=[];samples=[];aramkit_stress=[];metrics=collections.defaultdict(list);failures=collections.defaultdict(list)
     jobmap={j['name']:j for page in jobs for j in page.get('jobs',[])}
     if inventory is None:
         inventory={'linux':sorted(str(p.relative_to(ROOT)).replace('\\','/') for d in ['backend/web','desktop','scripts'] for p in (ROOT/d).glob('*.test.cjs')),'win32':sorted(str(p.relative_to(ROOT)).replace('\\','/') for p in (ROOT/'desktop').glob('*.test.cjs'))}
@@ -56,7 +56,7 @@ def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN,upgrade
         if job is None or not job.get('html_url') or job.get('conclusion')!='success':errors.append('missing/failed job '+name)
         if key not in seen_jobs:errors.append('missing samples '+name);continue
         directory,rows=seen_jobs[key]
-        labels=['hexdata'] if kind in ['linux-hexdata','windows-hexdata'] else ['full-go'] if kind in ['linux-race','windows-go'] else ['browser'] if kind.startswith('browser-') else ['calibration-before','renderers','calibration-after','budget'] if kind=='linux-renderers' else ['renderers'] if kind=='windows-renderers' else ['compile-cold','cold']
+        labels=['aramkit'] if kind in ['linux-aramkit','windows-aramkit'] else ['full-go'] if kind in ['linux-race','windows-go'] else ['browser'] if kind.startswith('browser-') else ['calibration-before','renderers','calibration-after','budget'] if kind=='linux-renderers' else ['renderers'] if kind=='windows-renderers' else ['compile-cold','cold']
         expected={(iteration,label) for iteration in range(iterations) for label in labels};actual=[(s.get('iteration'),s.get('label')) for s in rows]
         if set(actual)!=expected or len(actual)!=len(expected):errors.append('incomplete/duplicate iterations '+name)
         for s in rows:
@@ -70,35 +70,35 @@ def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN,upgrade
             samples.append(s)
         for iteration in range(iterations):
             base=directory/str(iteration)
-            if kind in ['linux-hexdata','windows-hexdata']:
-                stress=read(base/'hexdata/stress-summary.json');platform='linux' if kind=='linux-hexdata' else 'win32'
+            if kind in ['linux-aramkit','windows-aramkit']:
+                stress=read(base/'aramkit/stress-summary.json');platform='linux' if kind=='linux-aramkit' else 'win32'
                 if not isinstance(stress,dict):continue
                 stress_rows=stress.get('rows',[])
-                if stress.get('platform')!=platform or stress.get('sha')!=rows[0].get('sha') or stress.get('count')!=200 or stress.get('cpu')!=[1,2,4] or stress.get('strategy')!='per-test-default-timeout' or stress.get('exitCode')!=0:errors.append('wrong Hexdata stress command/identity '+name)
-                if sorted(r.get('test','') for r in stress_rows)!=sorted(HEXDATA_TESTS):errors.append('incomplete Hexdata test inventory '+name)
-                try:events=[json.loads(line) for line in (base/'hexdata/stress.jsonl').read_text().splitlines() if line]
-                except (OSError,ValueError):events=[];errors.append('missing/invalid Hexdata raw events '+name)
-                if any(e.get('Action')=='fail' for e in events) or any('WARNING: DATA RACE' in e.get('Output','') for e in events):errors.append('failed/racing Hexdata raw events '+name)
+                if stress.get('platform')!=platform or stress.get('sha')!=rows[0].get('sha') or stress.get('count')!=200 or stress.get('cpu')!=[1,2,4] or stress.get('strategy')!='per-test-default-timeout' or stress.get('exitCode')!=0:errors.append('wrong ARAMKit stress command/identity '+name)
+                if sorted(r.get('test','') for r in stress_rows)!=sorted(ARAMKIT_TESTS):errors.append('incomplete ARAMKit test inventory '+name)
+                try:events=[json.loads(line) for line in (base/'aramkit/stress.jsonl').read_text().splitlines() if line]
+                except (OSError,ValueError):events=[];errors.append('missing/invalid ARAMKit raw events '+name)
+                if any(e.get('Action')=='fail' for e in events) or any('WARNING: DATA RACE' in e.get('Output','') for e in events):errors.append('failed/racing ARAMKit raw events '+name)
                 invocations=stress.get('invocations',[]);combined=[]
-                if [i.get('test') for i in invocations]!=HEXDATA_TESTS:errors.append('incomplete/duplicate Hexdata invocation inventory '+name)
+                if [i.get('test') for i in invocations]!=ARAMKIT_TESTS:errors.append('incomplete/duplicate ARAMKit invocation inventory '+name)
                 for index,invocation in enumerate(invocations):
                     test=invocation.get('test');raw='invocation-'+str(index)+'.jsonl'
                     command=['go','test','-race','-json','-count=200','-cpu=1,2,4','-run','^('+str(test)+')$','./backend']
-                    if invocation.get('command')!=command or invocation.get('raw')!=raw or invocation.get('exitCode')!=0 or invocation.get('error') is not None:errors.append('invalid Hexdata invocation command/status '+name+'/'+str(test))
-                    try:part=[json.loads(line) for line in (base/'hexdata'/raw).read_text().splitlines() if line]
-                    except (OSError,ValueError):part=[];errors.append('missing/invalid Hexdata invocation raw '+name+'/'+str(test))
+                    if invocation.get('command')!=command or invocation.get('raw')!=raw or invocation.get('exitCode')!=0 or invocation.get('error') is not None:errors.append('invalid ARAMKit invocation command/status '+name+'/'+str(test))
+                    try:part=[json.loads(line) for line in (base/'aramkit'/raw).read_text().splitlines() if line]
+                    except (OSError,ValueError):part=[];errors.append('missing/invalid ARAMKit invocation raw '+name+'/'+str(test))
                     combined.extend(part)
-                    if sum(e.get('Action')=='pass' and e.get('Package')=='lol-loot-assistant/backend' and e.get('Test')==test for e in part)!=600 or sum(e.get('Action')=='pass' and e.get('Package')=='lol-loot-assistant/backend' and not e.get('Test') for e in part)!=1 or any(e.get('Action')=='fail' or 'WARNING: DATA RACE' in e.get('Output','') for e in part):errors.append('failed/partial Hexdata invocation '+name+'/'+str(test))
-                if combined!=events:errors.append('Hexdata combined raw differs from invocation evidence '+name)
+                    if sum(e.get('Action')=='pass' and e.get('Package')=='lol-loot-assistant/backend' and e.get('Test')==test for e in part)!=600 or sum(e.get('Action')=='pass' and e.get('Package')=='lol-loot-assistant/backend' and not e.get('Test') for e in part)!=1 or any(e.get('Action')=='fail' or 'WARNING: DATA RACE' in e.get('Output','') for e in part):errors.append('failed/partial ARAMKit invocation '+name+'/'+str(test))
+                if combined!=events:errors.append('ARAMKit combined raw differs from invocation evidence '+name)
 
-                for test in HEXDATA_TESTS:
+                for test in ARAMKIT_TESTS:
                     evidence=[r for r in stress_rows if r.get('test')==test]
                     passes=[e for e in events if e.get('Action')=='pass' and e.get('Test')==test]
-                    if len(evidence)!=1 or evidence[0].get('samples')!=600 or evidence[0].get('passed')!=600 or evidence[0].get('failed')!=0 or len(passes)!=600:errors.append('incomplete/failed Hexdata repetitions '+name+'/'+test)
+                    if len(evidence)!=1 or evidence[0].get('samples')!=600 or evidence[0].get('passed')!=600 or evidence[0].get('failed')!=0 or len(passes)!=600:errors.append('incomplete/failed ARAMKit repetitions '+name+'/'+test)
                     durations=[e.get('Elapsed') for e in passes]
-                    if not durations or any(not isinstance(v,(int,float)) or not math.isfinite(v) or v<0 for v in durations):errors.append('invalid Hexdata elapsed '+name+'/'+test)
+                    if not durations or any(not isinstance(v,(int,float)) or not math.isfinite(v) or v<0 for v in durations):errors.append('invalid ARAMKit elapsed '+name+'/'+test)
                     else:metrics[kind+'/'+test].extend(v*1000 for v in durations)
-                hexdata_stress.append(dict(kind=kind,jobLink=job.get('html_url') if job else None,**stress))
+                aramkit_stress.append(dict(kind=kind,jobLink=job.get('html_url') if job else None,**stress))
             elif kind in ['linux-renderers','windows-renderers']:
 
                 timing=read(base/'renderer-timings.json');platform='linux' if kind=='linux-renderers' else 'win32'
@@ -140,7 +140,7 @@ def summarize(folder,jobs,repo,run,inventory=None,catalog=None,plan=PLAN,upgrade
         signatures.append(dict(signature=signature,count=len(rows),denominator=len(samples),fraction=len(rows)/len(samples) if samples else 0,byKind=by_kind,jobLinks=sorted({row['jobLink'] for row in rows if row.get('jobLink')}),examples=rows))
     upgrade_retries,upgrade_errors=upgrade_retry_evidence(upgrade_folder,next(iter(shas)) if len(shas)==1 else None)
     errors.extend(upgrade_errors)
-    return dict(legacyInstallerRetries=upgrade_retries,success=bool(samples) and not errors and not signatures,sha=next(iter(shas)) if len(shas)==1 else None,runLink='https://github.com/'+repo+'/actions/runs/'+str(run),samples=len(samples),coverage={str(key):len(value[1]) for key,value in seen_jobs.items()},hexdataStress=hexdata_stress,errors=errors,failures=signatures,metrics={name:dict(count=len(values),min_ms=min(values),median_ms=statistics.median(values),max_ms=max(values)) for name,values in metrics.items()},sampleRecords=samples)
+    return dict(legacyInstallerRetries=upgrade_retries,success=bool(samples) and not errors and not signatures,sha=next(iter(shas)) if len(shas)==1 else None,runLink='https://github.com/'+repo+'/actions/runs/'+str(run),samples=len(samples),coverage={str(key):len(value[1]) for key,value in seen_jobs.items()},aramkitStress=aramkit_stress,errors=errors,failures=signatures,metrics={name:dict(count=len(values),min_ms=min(values),median_ms=statistics.median(values),max_ms=max(values)) for name,values in metrics.items()},sampleRecords=samples)
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--input',type=Path,required=True);p.add_argument('--jobs',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--repo',required=True);p.add_argument('--run',required=True);p.add_argument('--upgrade-evidence',type=Path,required=True);a=p.parse_args()
     summary=summarize(a.input,json.loads(a.jobs.read_text()),a.repo,a.run,upgrade_folder=a.upgrade_evidence)

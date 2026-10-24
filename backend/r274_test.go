@@ -69,30 +69,6 @@ func r274AuxiliaryStore(t *testing.T) *localStore {
 	return store
 }
 
-func TestR274HexdataStateReturnsBeforeDisk(t *testing.T) {
-	store := r274AuxiliaryStore(t)
-	h := newHexdataClient(newChampionProvider(), store)
-	g := r274Gate(t, h.stateDisk, "hexdata-state")
-	done := make(chan struct{})
-	go func() { h.recordFailure("heroes", 429, true); close(done) }()
-	r274Wait(t, g.entered, "Hexdata state writer not reached", h.stateDisk)
-	r274Wait(t, done, "Hexdata foreground waited for state write", h.stateDisk)
-	if !h.mu.TryLock() {
-		t.Fatal("Hexdata global lock held during state write")
-	}
-	h.mu.Unlock()
-	for range 4 {
-		h.recordFailure("heroes", 429, true)
-	}
-	g.unblock()
-	r274Flush(t, h.stateDisk)
-	data, err := os.ReadFile(h.statePath)
-	var saved hexdataState
-	if err != nil || json.Unmarshal(data, &saved) != nil || saved.Circuits["heroes"].Failures != 5 {
-		t.Fatal("latest coalesced Hexdata state not persisted", err, string(data))
-	}
-}
-
 func TestR274PrestigeReadAndWriteDoNotHoldStoreLock(t *testing.T) {
 	for _, operation := range []string{"prestige-read", "prestige-write"} {
 		t.Run(operation, func(t *testing.T) {
@@ -578,35 +554,64 @@ func TestR274ShutdownDrainsInitializedOwnersWithoutCreatingCaches(t *testing.T) 
 	}
 }
 
-func TestR274ObservedAugmentsReadOutsideProviderLock(t *testing.T) {
+func TestR274ARAMKitReadOutsideProviderLock(t *testing.T) {
 	p := newChampionProvider()
 	p.cache = newPublicBinaryCache(&localStore{root: t.TempDir()}, "fixture", 200, 2<<20)
-	p.observedWriteActive = true // Isolate startup read from unrelated background persistence.
-	path := "/assets/augments/icons/16.19/Fixture.png"
-	data, err := json.Marshal([]gameplayAugment{{ID: 1, Name: "old", IconPath: "hexdata:" + path}, {ID: 2, Name: "disk-only", IconPath: "hexdata:" + path}})
-	if err != nil {
-		t.Fatal(err)
+	c := p.aramkitClient()
+	c.dir = p.cache.dir
+	first := filepath.Join(c.dir, "data", "fixture", "first.json")
+	if e := os.MkdirAll(filepath.Dir(first), 0700); e != nil {
+		t.Fatal(e)
 	}
-	if err := p.cache.writeDisk(r274Envelope(observedHexdataAugmentsKey, string(data))); err != nil {
-		t.Fatal(err)
+	if e := os.WriteFile(first, []byte(`{"disk":true}`), 0600); e != nil {
+		t.Fatal(e)
 	}
-	g := r274Gate(t, p.cache, "read")
-	done := make(chan []gameplayAugment, 1)
-	go func() { done <- p.observedHexdataAugments() }()
-	r274Wait(t, g.entered, "observed disk read not reached", p.cache)
-	if !p.observedAugmentMu.TryLock() {
-		t.Fatal("observed disk read held provider lock")
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	c.readFile = func(name string) ([]byte, error) {
+		if name == first {
+			once.Do(func() { close(entered); <-release })
+		}
+		return os.ReadFile(name)
 	}
-	p.observedAugmentMu.Unlock()
-	observed := make(chan struct{}, 1)
+	p.client = &http.Client{Transport: r307Transport(func(req *http.Request) (*http.Response, error) {
+		return publicDataResponse(req, []byte(`{"fresh":true}`)), nil
+	})}
+	done := make(chan string, 1)
 	go func() {
-		p.observeHexdataAugments([]hexdataAugmentRowV2{{AugmentID: 1, AugmentName: "new", AugmentIconURL: path}})
-		observed <- struct{}{}
+		b, e := c.immutable(t.Context(), "data/fixture/first.json")
+		if e != nil {
+			done <- e.Error()
+		} else {
+			done <- string(b)
+		}
 	}()
-	r274Wait(t, observed, "live observation waited for startup disk read", p.cache)
-	g.unblock()
-	items := r274Wait(t, done, "startup read did not finish", p.cache)
-	if len(items) != 2 || items[0].Name != "new" || items[1].Name != "disk-only" {
-		t.Fatal("startup disk value overwrote live observation", items)
+	r274Wait(t, entered, "ARAMKit disk read not reached", p.cache)
+	if !p.mu.TryLock() {
+		t.Fatal("disk read held provider lock")
+	}
+	p.mu.Unlock()
+	if !c.mu.TryLock() {
+		t.Fatal("disk read held cache map lock")
+	}
+	c.mu.Unlock()
+	independent := make(chan string, 1)
+	go func() {
+		b, e := c.immutable(t.Context(), "data/fixture/second.json")
+		if e != nil {
+			independent <- e.Error()
+		} else {
+			independent <- string(b)
+		}
+	}()
+	if b := r274Wait(t, independent, "independent request waited for disk read", p.cache); b != `{"fresh":true}` {
+		t.Fatal(b)
+	}
+	close(release)
+	if b := r274Wait(t, done, "disk read did not finish", p.cache); b != `{"disk":true}` {
+		t.Fatal(b)
+	}
+	if len(c.memory) != 2 || string(c.memory["data/fixture/second.json"]) != `{"fresh":true}` {
+		t.Fatal("disk read overwrote independent result")
 	}
 }

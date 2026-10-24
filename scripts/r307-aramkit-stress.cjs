@@ -1,18 +1,7 @@
 'use strict';
 // Fixed candidate only; baseline failures never count as a clean sweep.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process');
-const tests=[
- 'TestHexdataSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNone',
- 'TestHexdataColdRankingBudgetAndDiskRestart',
- 'TestR149MayhemCatalogsWarmConcurrentlyAndRestartFromDisk',
- 'TestR276HexdataRestartWaitsForStateAndUsesDisk',
- 'TestAdoptingNewBuildIDPrunesStaleHexdataFilesAsynchronously',
- 'TestPruneStaleHexdataBuildsRemovesExpiredBuildsOnly',
- 'TestPruneStaleHexdataBuildsMakesNoRequests',
- 'TestHexdataCircuitStatePersistsAcrossRestart',
- 'TestHexdataRestartClearsLongLivedPersistedCircuit',
- 'TestHexdataHTTP429OpensPersistentCircuitBeforeNextRequest'
-];
+const tests=["TestARAMKitSameHeroTenConcurrentLoadsUseOneRequestAndRestartUsesNoImmutableRequests", "TestARAMKitColdRankingBudgetAndDiskRestart"];
 function runStress(out,run=spawnSync){
  const root=path.resolve(__dirname,'..');fs.mkdirSync(out,{recursive:true});
  const start=performance.now(),invocations=[],events=[],logs=[];
@@ -34,14 +23,14 @@ function runStress(out,run=spawnSync){
  const exitCode=invocations.every(r=>r.exitCode===0&&!r.error)?0:1;
  const summary={platform:process.platform,sha:process.env.GITHUB_SHA||null,count:200,cpu:[1,2,4],strategy:'per-test-default-timeout',invocations,exitCode,duration_ms:performance.now()-start,rows};
  fs.writeFileSync(path.join(out,'stress-summary.json'),JSON.stringify(summary,null,2)+'\n');
- assert.equal(summary.exitCode,0,'fixed Hexdata restart stress failed');
+ assert.equal(summary.exitCode,0,'fixed ARAMKit restart stress failed');
  assert(!log.includes('WARNING: DATA RACE'),'restart stress contains a race');
  for(const row of rows){assert.equal(row.samples,600,row.test+' must run 200 times at each CPU count');assert.equal(row.failed,0,row.test+' failed');}
  assert.equal(events.filter(e=>e.Action==='fail').length,0,'unknown restart stress failure');
  return summary;
 }
 function main(){
- assert(process.argv[2],'usage: node scripts/r276-hexdata-stress.cjs <out>');
+ assert(process.argv[2],'usage: node scripts/r307-aramkit-stress.cjs <out>');
  console.log(JSON.stringify(runStress(path.resolve(process.argv[2]))));
 }
 if(require.main===module)main();

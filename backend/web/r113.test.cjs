@@ -90,7 +90,6 @@ test('R113 ARAM live cards omit ranks and keep their three verified metrics',()=
   try {const doc=dom.window.document;
     assert.doesNotMatch(html,/钻石|未定级|其他/);assert.ok(doc.querySelector('.is-self .live-player-name'));
     assert.deepEqual([...doc.querySelectorAll('dt')].map(n=>n.textContent),['当前模式','胜率','KDA']);
-    assert.equal(doc.querySelector('.live-hexdata-link'),null);
   }finally{dom.window.close();}
 });
 

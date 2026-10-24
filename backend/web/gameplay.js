@@ -9226,7 +9226,6 @@
     // "ddragon:" 前缀表示后端目录来自 Data Dragon（未连接客户端时的兜底），
     // 通过联网资源代理加载而不是本机客户端。
     if (path.startsWith("ddragon:")) return `/api/champion-asset?source=ddragon&path=${encodeURIComponent(path.slice(8))}`;
-    if (path.startsWith("hexdata:")) return `/api/champion-asset?source=hexdata&path=${encodeURIComponent(path.slice(8))}`;
     if (path.startsWith("builtin:")) return `/api/champion-asset?source=builtin&path=${encodeURIComponent(path.slice(8))}`;
     return `/api/image?path=${encodeURIComponent(path)}${/\/augments\/icons\//i.test(path) ? "&art=2" : ""}`;
   }

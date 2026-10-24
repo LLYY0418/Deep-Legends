@@ -791,7 +791,7 @@
       augmentIds: hextechLiveAugments.slice(index % 4, (index % 4) + 4).map((row) => row.id),
     })),
     recommendations: {
-      source: "Hexdata",
+      source: "ARAMKit",
       resolvedMode: "hextech",
       resolvedRegion: "GLOBAL",
       dataVersion: PATCH,

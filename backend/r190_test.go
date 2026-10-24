@@ -42,9 +42,9 @@ func TestR190RiotOldCacheInvalidationV4AndHTTP(t *testing.T) {
 	t.Setenv("RIOT_API_KEY", "RGAPI-test")
 	var calls atomic.Int32
 	payload := `{"metadata":{"matchId":"KR_190"},"info":{"gameId":190,"participants":[{"participantId":4,"championId":22,"perks":{"styles":[{"style":8000,"selections":[{"perk":9111,"var1":804,"var2":300}]}]}}]}}`
-	p := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+	p := newPublicDataTestProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		calls.Add(1)
-		return hexdataResponse(r, []byte(payload)), nil
+		return publicDataResponse(r, []byte(payload)), nil
 	}))
 	riot := newRiotProvider(p)
 	var old riotMatch
@@ -113,48 +113,41 @@ func TestR190PerkCatalogTemplates(t *testing.T) {
 	}
 }
 
-func r190DetailPage(description string) []byte {
-	var body strings.Builder
-	body.WriteString(`<meta name="description" content="WRONG SEO 胜率 52.7%"><table><tbody>`)
-	for id := 1; id <= 12; id++ {
-		fmt.Fprintf(&body, `<tr><td><a href="/hero/%d-hero%d">英雄%d</a></td><td>90</td><td>60%%</td><td>1000</td></tr>`, id, id, id)
-	}
-	body.WriteString(`</tbody></table><section data-seo-guide><p>双刀流更适合先在英雄这类高分高样本英雄上考虑。` + description + `如果你的英雄机制能触发。</p></section>`)
-	return hexdataTestPage(body.String())
-}
-
 func TestR190AugmentDescriptionSources(t *testing.T) {
 	for _, description := range []string{"攻击时施加攻击特效。", "", augmentOfflineDescription} {
 		t.Run(description, func(t *testing.T) {
 			var arenaCalls, detailCalls atomic.Int32
-			catalog := strings.Replace(string(hexdataAugmentsTestPage()), "/augment/1000-augment1000", "/augment/1225-dual-wield", 1)
-			provider := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-				switch r.URL.Path {
-				case "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/cherry-augments.json":
-					return hexdataResponse(r, []byte(`[{"id":1225,"name":"元数据","description":"禁止补入的目录效果。"}]`)), nil
-				case "/latest/cdragon/arena/zh_cn.json":
-					arenaCalls.Add(1)
-					return hexdataResponse(r, []byte(`{"augments":[{"id":120,"name":"竞技场","desc":"获得护盾。","rarity":0}]}`)), nil
-				case "/augments":
-					return hexdataResponse(r, []byte(catalog)), nil
-				case "/augment/1225-dual-wield":
+			p, _ := newARAMKitFixtureProvider(t, "")
+			base := p.client.Transport
+			p.client.Transport = championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+				switch {
+				case strings.HasSuffix(r.URL.Path, "/resources/augments.json"):
 					detailCalls.Add(1)
-					return hexdataResponse(r, r190DetailPage(description)), nil
+					body, _ := json.Marshal(map[string]aramkitResource{"1225": {Name: "测试海克斯", Icon: "assets/augment/1225.webp", Tooltip: aramkitTooltip{}}})
+					var rows map[string]any
+					_ = json.Unmarshal(body, &rows)
+					rows["1225"].(map[string]any)["tooltip"] = map[string]any{"blocks": []any{map[string]any{"spans": []any{map[string]any{"type": "text", "text": description}}}}}
+					body, _ = json.Marshal(rows)
+					return publicDataResponse(r, body), nil
+				case r.URL.Host == communityDragonHost && strings.HasSuffix(r.URL.Path, "cherry-augments.json"):
+					return publicDataResponse(r, []byte(`[{"id":1225,"name":"元数据","description":"禁止补入的目录效果。"}]`)), nil
+				case r.URL.Host == communityDragonHost && strings.HasSuffix(r.URL.Path, "/arena/zh_cn.json"):
+					arenaCalls.Add(1)
+					return publicDataResponse(r, []byte(`{"augments":[{"id":120,"name":"竞技场","desc":"获得护盾。","rarity":0}]}`)), nil
 				default:
-					return hexdataResponse(r, hexdataTestPage("<p>fixture</p>")), nil
+					return base.RoundTrip(r)
 				}
-			}))
-			provider.hexdata.adoptCitation(championSourceCitation{Source: "Hexdata", Patch: "16.16", ReportDate: "2026-08-19", BuildID: hexdataTestBuild, CanonicalURL: "https://hexdata.com.cn/augments"})
-			items := loadGameplayAugmentDescriptions(context.Background(), []int64{1225, 120}, provider.gameplayAugmentDescription)
+			})
+			items := loadGameplayAugmentDescriptions(context.Background(), []int64{1225, 120}, p.gameplayAugmentDescription)
 			if items[1].Status != "ok" || items[1].Description != "获得护盾。" || arenaCalls.Load() == 0 || detailCalls.Load() != 1 {
 				t.Fatalf("source items=%#v arena=%d detail=%d", items, arenaCalls.Load(), detailCalls.Load())
 			}
 			if description != "" && description != augmentOfflineDescription {
 				if items[0].Status != "ok" || items[0].Description != description {
-					t.Fatalf("guide=%#v", items)
+					t.Fatal(items)
 				}
 			} else if items[0].Status != "unavailable" || items[0].Description != "" {
-				t.Fatalf("empty/placeholder=%#v", items)
+				t.Fatal(items)
 			}
 		})
 	}
@@ -194,7 +187,7 @@ func TestR190CommunityDragonTemplatesMergeAndFailure(t *testing.T) {
 	for _, fail := range []bool{false, true} {
 		t.Run(fmt.Sprint(fail), func(t *testing.T) {
 			var calls atomic.Int32
-			provider := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			provider := newPublicDataTestProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 				calls.Add(1)
 				if r.URL.Path != "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/perks.json" {
 					t.Errorf("unexpected path=%s", r.URL.Path)
@@ -202,7 +195,7 @@ func TestR190CommunityDragonTemplatesMergeAndFailure(t *testing.T) {
 				if fail {
 					return &http.Response{StatusCode: 503, Header: make(http.Header), Body: http.NoBody, Request: r}, nil
 				}
-				return hexdataResponse(r, []byte(`[{"id":9111,"name":"不覆盖","iconPath":"/do-not-use.png","endOfGameStatDescs":["回复生命值总和：@eogvar1@"]}]`)), nil
+				return publicDataResponse(r, []byte(`[{"id":9111,"name":"不覆盖","iconPath":"/do-not-use.png","endOfGameStatDescs":["回复生命值总和：@eogvar1@"]}]`)), nil
 			}))
 			a := &app{champions: provider}
 			perks := a.enrichPerkEffectTemplates(context.Background(), []gameplayPerk{{ID: 9111, Name: "凯旋", IconPath: "/keep.png"}})

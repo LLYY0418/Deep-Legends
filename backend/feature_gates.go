@@ -12,7 +12,6 @@ import (
 
 const (
 	featureGateOPGG        = "opgg"
-	featureGateHexdata     = "hexdata"
 	featureGateAramkit     = "aramkit-rating"
 	featureGateLolalytics  = "lolalytics"
 	featureGateQQ101       = "qq101"
@@ -20,7 +19,7 @@ const (
 )
 
 var defaultFeatureGateValues = map[string]bool{
-	featureGateOPGG: true, featureGateHexdata: true, featureGateAramkit: true, featureGateLolalytics: true, featureGateQQ101: true,
+	featureGateOPGG: true, featureGateAramkit: true, featureGateLolalytics: true, featureGateQQ101: true,
 }
 
 type featureGates struct {
@@ -103,9 +102,7 @@ func featureGateForChampionHost(host string) string {
 	switch strings.ToLower(strings.TrimSpace(host)) {
 	case opggChampionHost, opggWebAPIHost, opggPageHost, esportsOPGGHost:
 		return featureGateOPGG
-	case hexdataHost, hexdataAssetHost:
-		return featureGateHexdata
-	case aramkitRatingHost, aramkitRatingCNHost:
+	case aramkitRatingHost, aramkitRatingCNHost, aramkitDataCN, aramkitDataCOM:
 		return featureGateAramkit
 	case qq101Host:
 		return featureGateQQ101

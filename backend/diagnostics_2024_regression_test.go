@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,46 +12,35 @@ import (
 )
 
 func Test2024CurrentRarityDatasetDateAndDistribution(t *testing.T) {
-	page, err := os.ReadFile("testdata/diagnostics-2024/rarity.html")
-	if err != nil {
-		t.Fatal(err)
+	p, _ := newARAMKitFixtureProvider(t, "")
+	rows, e := p.loadARAMKitRarity(t.Context())
+	if e != nil || len(rows.Stages) != 4 {
+		t.Fatal(rows, e)
 	}
-	rows, citation, err := parseHexdataRarity(page)
-	if err != nil || !hexdataCitationComplete(citation) || citation.ReportDate != "2026-08-29" || citation.Patch != "16.17" || len(rows) != 4 {
-		t.Fatalf("current page rejected: %#v %#v %v", rows, citation, err)
+	silver, gold, prismatic := 0.121079, 0.596057, 0.240263
+	if rows.Stages[0].Games != 9152967 || rows.Stages[0].Silver != silver*100 || rows.Stages[0].Gold != gold*100 || rows.Stages[3].Prismatic != prismatic*100 {
+		t.Fatal("real distribution changed", rows)
 	}
-	if rows[0].Gold != 58.7 || rows[0].Games != 111451534 || rows[3].Prismatic != 26.5 {
-		t.Fatalf("wrong values: %#v", rows)
-	}
-	wrongPage := bytes.ReplaceAll(page, []byte(`"url":"https://hexdata.com.cn/augment-rarity"`), []byte(`"url":"https://hexdata.com.cn/other"`))
-	_, wrongCitation, _ := parseHexdataRarity(wrongPage)
-	if wrongCitation.ReportDate != "" {
-		t.Fatal("borrowed another page's date")
-	}
-	for _, replacement := range [][2]string{{"第 1 阶段", "第 14 阶段"}, {"第 4 阶段", "第 3 阶段"}, {"黄金 58.7%", "黄金 98.7%"}, {"111,451,534", "0"}} {
-		bad := bytes.ReplaceAll(page, []byte(replacement[0]), []byte(replacement[1]))
-		if _, _, err := parseHexdataRarity(bad); err == nil {
+
+	for _, replacement := range [][2]string{{`"1":{`, `"14":{`}, {`"4":{`, `"3":{`}, {`"probability":0.596057`, `"probability":0.996057`}, {`"sampleCount":9152967`, `"sampleCount":0`}} {
+		p, _ := newARAMKitFixtureProvider(t, "")
+		base := p.client.Transport
+		p.client.Transport = championRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.HasSuffix(req.URL.Path, "/augment-rarity.json") {
+				return publicDataResponse(req, bytes.ReplaceAll(r307Fixture(t, "augment-rarity", nil), []byte(replacement[0]), []byte(replacement[1]))), nil
+			}
+			return base.RoundTrip(req)
+		})
+		if _, e := p.loadARAMKitRarity(t.Context()); e == nil {
 			t.Fatalf("invalid distribution accepted: %v", replacement)
 		}
 	}
 }
-
 func Test2024RarityProviderAcceptsCurrentPage(t *testing.T) {
-	page, err := os.ReadFile("testdata/diagnostics-2024/rarity.html")
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := newChampionProvider()
-	p.client = &http.Client{Transport: championRoundTripFunc(func(req *http.Request) (*http.Response, error) {
-		body := []byte(`{}`)
-		if req.URL.Path == "/augment-rarity" {
-			body = page
-		}
-		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(bytes.NewReader(body)), ContentLength: int64(len(body)), Request: req}, nil
-	})}
-	response, err := p.loadHexdataRarity(context.Background())
-	if err != nil || len(response.Stages) != 4 || response.Citation == nil || response.Citation.ReportDate != "2026-08-29" {
-		t.Fatalf("provider still rejects live page: %#v %v", response, err)
+	p, _ := newARAMKitFixtureProvider(t, "")
+	response, e := p.loadARAMKitRarity(t.Context())
+	if e != nil || len(response.Stages) != 4 || response.Source != "ARAMKit" {
+		t.Fatal(response, e)
 	}
 }
 

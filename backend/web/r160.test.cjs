@@ -29,7 +29,6 @@ test('R160 gameplay icon proxy accepts only the explicit bundled scheme', () => 
   assert.ok(start > 0 && end > start);
   const proxyAsset = Function(`${gameplaySource.slice(start, end)}; return proxyAsset;`)();
   assert.equal(proxyAsset('builtin:/augments/2095.png'), '/api/champion-asset?source=builtin&path=%2Faugments%2F2095.png');
-  assert.equal(proxyAsset('hexdata:/assets/augments/icons/16.18/highroller_small.png'), '/api/champion-asset?source=hexdata&path=%2Fassets%2Faugments%2Ficons%2F16.18%2Fhighroller_small.png');
 });
 
 test('R160 overview augments paint from the fast catalog before perks arrive', () => {

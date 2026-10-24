@@ -84,7 +84,7 @@ func TestR277CNScoreLocalCacheAndDetail(t *testing.T) {
 					t.Errorf("unexpected endpoint %s", r.URL.Path)
 				}
 				data, _ := json.Marshal(game)
-				return hexdataResponse(r, data), nil
+				return publicDataResponse(r, data), nil
 			})}
 			cache, scope := client.historyGameStore()
 			if cached {
@@ -159,7 +159,7 @@ func TestR277CNScoreRejectsWrongScopeAndParticipant(t *testing.T) {
 				a.sgp.historyGamesLocked().putSGP("HN1", info)
 				body = r277CNBody(a, a.summoner.PUUID, "HN1", game.GameID)
 			}
-			client.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) { return hexdataResponse(r, []byte(`{"gameId":1}`)), nil })}
+			client.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) { return publicDataResponse(r, []byte(`{"gameId":1}`)), nil })}
 			w := r277ScoreRequest(a, body)
 			if w.Code == 200 {
 				t.Fatalf("%s exposed another scope/participant's cached score", kind)
@@ -324,7 +324,7 @@ func TestR277CNScoreRejectsSessionChangeDuringDetail(t *testing.T) {
 				}
 				sessionMu.Unlock()
 				data, _ := json.Marshal(game)
-				return hexdataResponse(r, data), nil
+				return publicDataResponse(r, data), nil
 			})}
 			w := r277ScoreRequest(a, body)
 			if w.Code != http.StatusConflict {

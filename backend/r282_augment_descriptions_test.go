@@ -15,7 +15,7 @@ import (
 
 func TestR282AugmentDescriptionFallbacks(t *testing.T) {
 	var calls atomic.Int32
-	p := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) { calls.Add(1); return nil, context.DeadlineExceeded }))
+	p := newPublicDataTestProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) { calls.Add(1); return nil, context.DeadlineExceeded }))
 	local := func(context.Context) []gameplayAugment {
 		return []gameplayAugment{{ID: 93, Description: "本机读取的真实结构说明"}}
 	}
@@ -40,7 +40,7 @@ func TestR282AugmentDescriptionFallbacks(t *testing.T) {
 	if err := p.cache.writeDisk(entry); err != nil {
 		t.Fatal(err)
 	}
-	p2 := newHexdataBudgetProvider(t, t.TempDir(), p.client.Transport)
+	p2 := newPublicDataTestProvider(t, t.TempDir(), p.client.Transport)
 	p2.cache.dir = p.cache.dir
 	stale := p2.resolveAugmentDescription(context.Background(), 93, nil)
 	if stale.Source != "stale_cache" || stale.Description != item.Description {
@@ -66,8 +66,8 @@ func TestR282AugmentDescriptionFallbacks(t *testing.T) {
 			t.Fatalf("transient %#v", got)
 		}
 	}
-	healthy := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		return hexdataResponse(r, []byte(`{"augments":[{"id":900,"name":"no description"}]}`)), nil
+	healthy := newPublicDataTestProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return publicDataResponse(r, []byte(`{"augments":[{"id":900,"name":"no description"}]}`)), nil
 	}))
 	missing := healthy.resolveAugmentDescription(context.Background(), 900, nil)
 	if missing.Status != "unavailable" || missing.ErrorKind != "not_found" {
@@ -111,12 +111,12 @@ func TestR282BundledDescriptionSnapshot(t *testing.T) {
 func TestR282LCUDescriptionCandidateFallback(t *testing.T) {
 	for _, tc := range []struct{ body, source, kind string }{{`[]`, "bundled", "invalid_shape"}, {`{"wrong":true}`, "bundled", "invalid_shape"}, {`[{"id":93,"name":"本机","description":"本地说明"}]`, "lcu", ""}, {`[{"id":1,"name":"其他","description":"其他说明"}]`, "bundled", "not_found"}} {
 		t.Run(tc.kind+tc.source, func(t *testing.T) {
-			p := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) { return nil, context.DeadlineExceeded }))
+			p := newPublicDataTestProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) { return nil, context.DeadlineExceeded }))
 			client := &LCUClient{baseURL: "https://fixture", token: "fixture", http: &http.Client{Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 				if r.URL.Path != "/lol-game-data/assets/v1/cherry-augments.json" {
 					t.Errorf("unexpected LCU path %s", r.URL.Path)
 				}
-				return hexdataResponse(r, []byte(tc.body)), nil
+				return publicDataResponse(r, []byte(tc.body)), nil
 			})}}
 			a := &app{connected: true, lcu: client, champions: p}
 			w := httptest.NewRecorder()
@@ -137,7 +137,7 @@ func TestR282LCUDescriptionCandidateFallback(t *testing.T) {
 }
 
 func TestR282StaleCatalogMissIsStillRetryable(t *testing.T) {
-	p := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) { return nil, errors.New("offline") }))
+	p := newPublicDataTestProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) { return nil, errors.New("offline") }))
 	key := championCacheKey(communityDragonHost, "/latest/cdragon/arena/zh_cn.json", "", "application/json")
 	_, err := p.cache.load(context.Background(), key, -time.Hour, 24*time.Hour, false, func(context.Context) ([]byte, error) { return []byte(`{"augments":[]}`), nil })
 	if err != nil {
@@ -174,7 +174,7 @@ func TestR282NewClientDiagnosticsPassCompleteHTTPHandler(t *testing.T) {
 }
 
 func TestR282FailedRefreshCannotRenewOldDescription(t *testing.T) {
-	p := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) { return nil, errors.New("offline") }))
+	p := newPublicDataTestProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) { return nil, errors.New("offline") }))
 	item := gameplayAugmentDescription{ID: 900, Status: "ok", Source: "cdragon", Description: "旧说明"}
 	p.saveAugmentDescription(item)
 	key := augmentDescriptionKey(900)

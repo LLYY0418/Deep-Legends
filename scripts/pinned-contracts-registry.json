@@ -21,7 +21,7 @@
       "snippet": "assert.deepEqual(await evaluate('window.__statusRenderFailures'),[],'status fixture must execute every production dependency');"
     }
   ],
-  "legacyBaselineSha": "e3e9b268a7dd31398f9a08d5cec7d22c164d995805943def2448eaf3ecc0a3d8",
+  "legacyBaselineSha": "0af8595a337fad0310bf276b7347976576680b31c60c25b9b28a35616efaf03e",
   "tests": [
     "scripts/r276-api-fault-policy.test.cjs",
     "scripts/r276-installed-demo.test.cjs",

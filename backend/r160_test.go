@@ -96,27 +96,7 @@ func TestR160ArenaAggregateHasBoundedDetailBudget(t *testing.T) {
 	}
 }
 
-func TestR160MayhemUsesBundledArtAndStrictProxy(t *testing.T) {
-	payload, _, err := parseHexdataHeroJSONWithStats(r116aFixture(t, "hexdata-hero-157.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	rows := hexdataAugmentMetricRows(payload.Augments)
-	if len(rows) == 0 || rows[0].Assets[0].ID != 2095 || rows[0].Assets[0].Source != "builtin" || rows[0].Assets[0].Path != "/augments/2095.png" {
-		t.Fatalf("mayhem artwork = %#v", rows)
-	}
-	for _, path := range []string{"/augments/0.png", "/augments/0110.png", "/augments/999999.png", "/augments/../110.png", "/augments/110.svg"} {
-		if _, ok := validateChampionAssetPath("builtin", path); ok {
-			t.Fatalf("invalid built-in path accepted: %q", path)
-		}
-	}
-	app := &app{}
-	w := httptest.NewRecorder()
-	app.handleChampionAsset(w, httptest.NewRequest(http.MethodGet, "/api/champion-asset?source=builtin&path=%2Faugments%2F2095.png", nil).WithContext(context.Background()))
-	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "image/png" {
-		t.Fatalf("bundled image response = %d %q", w.Code, w.Header().Get("Content-Type"))
-	}
-}
+
 
 func TestR160OverviewChampionNamesColdStart(t *testing.T) {
 	provider := newChampionProvider()

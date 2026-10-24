@@ -156,14 +156,14 @@
   {
     "file": "backend/connection_manager_test.go",
     "line": 30,
-    "target": "a.lcu",
+    "target": "a.connected",
     "source_sha256": "409d8f72239ea44a87a657ff69f09bcca8e944b664fdb000eb2b97f8d523ac87",
     "comment": "r276-capture-safe: TestR86ConnectionBackoffResetsAfterSuccessfulDiscovery: runConnectionManagerWith invokes discover and wait serially; wait cancels on its fourth call, then manager returns before attempt/delays assertions; app fields use a.mu"
   },
   {
     "file": "backend/connection_manager_test.go",
     "line": 30,
-    "target": "a.connected",
+    "target": "a.lcu",
     "source_sha256": "409d8f72239ea44a87a657ff69f09bcca8e944b664fdb000eb2b97f8d523ac87",
     "comment": "r276-capture-safe: TestR86ConnectionBackoffResetsAfterSuccessfulDiscovery: runConnectionManagerWith invokes discover and wait serially; wait cancels on its fourth call, then manager returns before attempt/delays assertions; app fields use a.mu"
   },
@@ -497,55 +497,6 @@
     "comment": "r276-capture-safe: TestItemSetApplyNeverReadsOrWritesSetsOutsideChampionSelect: the audited fixture operations in this test invoke this callback serially and return before requests is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
-    "file": "backend/hexdata_rejection_test.go",
-    "line": 21,
-    "target": "events",
-    "source_sha256": "81a5f3af1e3e2bbb4e2986368c51caa3e973d2914d5bbe20571c13e29951a67f",
-    "comment": "r276-capture-safe: TestHexdataUpstreamRejectionIsDiagnosedWithErrorCodeOnly: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
-  },
-  {
-    "file": "backend/hexdata_test.go",
-    "line": 143,
-    "target": "event",
-    "source_sha256": "db811db92123f977669baae5dc4aab7872a65b653be764aab0bb3793c25a12b7",
-    "comment": "r276-capture-safe: TestHexdataHeroShapeReportsActualRecommendationAndItemCounts: the audited fixture operations in this test invoke this callback serially and return before event is asserted; this source-bound exception does not permit a concurrent fixture caller"
-  },
-  {
-    "file": "backend/hexdata_test.go",
-    "line": 183,
-    "target": "events",
-    "source_sha256": "db811db92123f977669baae5dc4aab7872a65b653be764aab0bb3793c25a12b7",
-    "comment": "r276-capture-safe: TestHexdataShapeFailureDistinguishesParseFromEmptyPayload: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
-  },
-  {
-    "file": "backend/hexdata_test.go",
-    "line": 207,
-    "target": "event",
-    "source_sha256": "db811db92123f977669baae5dc4aab7872a65b653be764aab0bb3793c25a12b7",
-    "comment": "r276-capture-safe: TestInspectHexdataPayloadReportsRawFieldsWhenRowsAreRejected: the audited fixture operations in this test invoke this callback serially and return before event is asserted; this source-bound exception does not permit a concurrent fixture caller"
-  },
-  {
-    "file": "backend/hexdata_test.go",
-    "line": 336,
-    "target": "events",
-    "source_sha256": "db811db92123f977669baae5dc4aab7872a65b653be764aab0bb3793c25a12b7",
-    "comment": "r276-capture-safe: TestReportRSCRejectedItemsEmitsActualIDAndReason: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
-  },
-  {
-    "file": "backend/hexdata_test.go",
-    "line": 984,
-    "target": "got",
-    "source_sha256": "db811db92123f977669baae5dc4aab7872a65b653be764aab0bb3793c25a12b7",
-    "comment": "r276-capture-safe: TestHexdataRequestUsesHonestUserAgent: the audited fixture operations in this test invoke this callback serially and return before got is asserted; this source-bound exception does not permit a concurrent fixture caller"
-  },
-  {
-    "file": "backend/hexdata_test.go",
-    "line": 1021,
-    "target": "slept",
-    "source_sha256": "db811db92123f977669baae5dc4aab7872a65b653be764aab0bb3793c25a12b7",
-    "comment": "r276-capture-safe: TestHexdataPaceAllowsFourIdleBurstRequestsThenJitters: the audited fixture operations in this test invoke this callback serially and return before slept is asserted; this source-bound exception does not permit a concurrent fixture caller"
-  },
-  {
     "file": "backend/lcu_api_test.go",
     "line": 423,
     "target": "events",
@@ -798,6 +749,13 @@
     "comment": "r276-capture-safe: TestOfficialLoginLaunchRejectsOversizedBodyBeforeLaunching: the direct handleClientLaunch call rejects the oversized body before reaching the injected launcher; the same goroutine checks launched only after the handler returns"
   },
   {
+    "file": "backend/mayhem_rsc_test.go",
+    "line": 158,
+    "target": "events",
+    "source_sha256": "beb8c2b73eb854652b3c07ff61121065323f20e2a60a1d7ac1d504c8c98ac367",
+    "comment": "r276-capture-safe: TestReportRSCRejectedItemsEmitsActualIDAndReason: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
+  },
+  {
     "file": "backend/mayhem_sampler_test.go",
     "line": 27,
     "target": "now",
@@ -845,6 +803,20 @@
     "target": "calls",
     "source_sha256": "be80eb9e74b9f063f76c8f4e35ec6b5709772b70e6838e56a9818e78585d9450",
     "comment": "r276-capture-safe: TestProPublicFetchRejectsUnsafeRedirectsAndCookies: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
+  },
+  {
+    "file": "backend/pro_runes_opgg_test.go",
+    "line": 89,
+    "target": "calls",
+    "source_sha256": "57ef391c1ffb9aedf7bff97ddad14a911ba904f5a32eeb6a5be343d5de1f1ac4",
+    "comment": "r276-capture-safe: TestProOPGGAnonymousTransportAndBoundaries: the test directly calls fetchOPGGBuilds sequentially; client.Do invokes this Transport.RoundTrip inline and returns before mode/calls changes or assertions; no opggRecommend fan-out runs in this test"
+  },
+  {
+    "file": "backend/pro_runes_opgg_test.go",
+    "line": 232,
+    "target": "calls",
+    "source_sha256": "57ef391c1ffb9aedf7bff97ddad14a911ba904f5a32eeb6a5be343d5de1f1ac4",
+    "comment": "r276-capture-safe: TestProOPGGPaginationStopsAtThirtyDaysAndRejectsDisorder: opggLeagueBuilds fetches pages in its ordinary synchronous for loop through fetchOPGGBuilds/client.Do; both direct calls return before calls is inspected or disorder is changed"
   },
   {
     "file": "backend/qq101_test.go",
@@ -1066,14 +1038,14 @@
   {
     "file": "backend/r109_header_test.go",
     "line": 71,
-    "target": "last",
+    "target": "frames",
     "source_sha256": "a473eab1ef69d83c57c5a5d452acbd0182dc81b5fceeb219dc4b7f3e2226830b",
     "comment": "r276-capture-safe: TestR109RiotProgressAndCompleteCarryBackgroundAndProfileWithoutExtraReads: loadRiotOverview publishes on its main consumer goroutine, then waits for detail workers before returning (riot_api.go publishPartial/completedDetails)"
   },
   {
     "file": "backend/r109_header_test.go",
     "line": 71,
-    "target": "frames",
+    "target": "last",
     "source_sha256": "a473eab1ef69d83c57c5a5d452acbd0182dc81b5fceeb219dc4b7f3e2226830b",
     "comment": "r276-capture-safe: TestR109RiotProgressAndCompleteCarryBackgroundAndProfileWithoutExtraReads: loadRiotOverview publishes on its main consumer goroutine, then waits for detail workers before returning (riot_api.go publishPartial/completedDetails)"
   },
@@ -1193,42 +1165,42 @@
     "file": "backend/r157_test.go",
     "line": 43,
     "target": "events",
-    "source_sha256": "42ca60c1e602b323c501919617ee456fc832d6709628e38095d5dc061c8a7872",
+    "source_sha256": "b76c97d3c7d291a2aee80f135708764808c6e2801a1c01a67b6469779902d873",
     "comment": "r276-capture-safe: TestR157CommunityDragonAugmentBackoffAndRecovery: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r157_test.go",
     "line": 46,
     "target": "upstreamEvents",
-    "source_sha256": "42ca60c1e602b323c501919617ee456fc832d6709628e38095d5dc061c8a7872",
+    "source_sha256": "b76c97d3c7d291a2aee80f135708764808c6e2801a1c01a67b6469779902d873",
     "comment": "r276-capture-safe: TestR157CommunityDragonAugmentBackoffAndRecovery: the audited fixture operations in this test invoke this callback serially and return before upstreamEvents is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r157_test.go",
     "line": 197,
     "target": "cherryCalls",
-    "source_sha256": "42ca60c1e602b323c501919617ee456fc832d6709628e38095d5dc061c8a7872",
+    "source_sha256": "b76c97d3c7d291a2aee80f135708764808c6e2801a1c01a67b6469779902d873",
     "comment": "r276-capture-safe: TestR157CommunityDragonArenaSupplementBacksOffWithoutLosingBase: the audited fixture operations in this test invoke this callback serially and return before cherryCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r157_test.go",
     "line": 200,
     "target": "arenaCalls",
-    "source_sha256": "42ca60c1e602b323c501919617ee456fc832d6709628e38095d5dc061c8a7872",
+    "source_sha256": "b76c97d3c7d291a2aee80f135708764808c6e2801a1c01a67b6469779902d873",
     "comment": "r276-capture-safe: TestR157CommunityDragonArenaSupplementBacksOffWithoutLosingBase: the audited fixture operations in this test invoke this callback serially and return before arenaCalls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r160_test.go",
     "line": 81,
     "target": "called",
-    "source_sha256": "bbb46cfce0d402d6a1e8b1a787cf23e1757c91631cb8dbe7ccfe01aef85178e8",
+    "source_sha256": "60919170a43d0cc2002617d9e5dc5c51bc613fd16f9d62c5a70d172e20674998",
     "comment": "r276-capture-safe: TestR160ArenaAggregateHasBoundedDetailBudget: the audited fixture operations in this test invoke this callback serially and return before called is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r160_test.go",
     "line": 84,
     "target": "attempt",
-    "source_sha256": "bbb46cfce0d402d6a1e8b1a787cf23e1757c91631cb8dbe7ccfe01aef85178e8",
+    "source_sha256": "60919170a43d0cc2002617d9e5dc5c51bc613fd16f9d62c5a70d172e20674998",
     "comment": "r276-capture-safe: TestR160ArenaAggregateHasBoundedDetailBudget: the audited fixture operations in this test invoke this callback serially and return before attempt is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
@@ -2094,17 +2066,31 @@
   },
   {
     "file": "backend/r274_test.go",
-    "line": 256,
+    "line": 232,
     "target": "out",
-    "source_sha256": "c119abcc6e09eecf68a1e8293a37cc5deea23e3fef0fd916bd55c3f57dbdc717",
+    "source_sha256": "ad22f96ba634ab9e6efc562d9f4356f53f70154c0dd564744fe96a204ba6bbc5",
     "comment": "r276-capture-safe: TestR274IdentityReturnsBeforeDiskWrite: the controlled production call returns its result through done before the fixture reads captured state"
   },
   {
     "file": "backend/r274_test.go",
-    "line": 386,
+    "line": 362,
     "target": "priority",
-    "source_sha256": "c119abcc6e09eecf68a1e8293a37cc5deea23e3fef0fd916bd55c3f57dbdc717",
+    "source_sha256": "ad22f96ba634ab9e6efc562d9f4356f53f70154c0dd564744fe96a204ba6bbc5",
     "comment": "r276-capture-safe: TestR274PromotedLeaderDoesNotPersist: the controlled production call returns its result through done before the fixture reads captured state"
+  },
+  {
+    "file": "backend/r288_announcements_test.go",
+    "line": 15,
+    "target": "calls",
+    "source_sha256": "de55783f001d1a712c04ea9fdaf5f5976403a735bb89f0fc13832162ee0066ef",
+    "comment": "r276-capture-safe: TestR288AnnouncementV2AndLegacyFallback: each nonparallel subtest directly calls fetchAnnouncementDocument; its version/mirror nested loops issue client.Do sequentially and return before the calls slice is inspected"
+  },
+  {
+    "file": "backend/r290_github_test.go",
+    "line": 77,
+    "target": "requests",
+    "source_sha256": "884f2bd89347345d3e03fbe6f77379feca663d50ddf8482637075dfe64e59c61",
+    "comment": "r276-capture-safe: TestR290GithubStarsFailureCooldownAndZero: each nonparallel payload subtest directly calls handleGithubStars/githubStarCount sequentially; githubStarCount holds githubStars.mu and completes client.Do before returning; requests is checked only after the calls"
   },
   {
     "file": "backend/r29_test.go",
@@ -2257,7 +2243,7 @@
     "file": "backend/r86_disk_test.go",
     "line": 30,
     "target": "calls",
-    "source_sha256": "f77fa5d8bd069a9488377d7fd26b41796d3da2bad86f7eb6e604a2fa5e14ec84",
+    "source_sha256": "e55c1aeb5369b26b1e8d1ef0d7246965f99b9c202474a49ed7143bd851df38f2",
     "comment": "r276-capture-safe: TestR86EmptyProcessDiscoverySkipsDiskButErrorsRetainFallback: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
@@ -2641,14 +2627,14 @@
   {
     "file": "installer/completion_test.go",
     "line": 188,
-    "target": "operations",
+    "target": "dispatched",
     "source_sha256": "54fb829f7281ca9eeaf2e549457f0491c19a1f91686ebde485decca00b4c24d1",
     "comment": "r276-capture-safe: TestInstallerExitOnlyClosesItsWindowAndKeepsChildAlive: the scanner publishes lines over a channel and closes it on completion; process completion and done channels precede reads"
   },
   {
     "file": "installer/completion_test.go",
     "line": 188,
-    "target": "dispatched",
+    "target": "operations",
     "source_sha256": "54fb829f7281ca9eeaf2e549457f0491c19a1f91686ebde485decca00b4c24d1",
     "comment": "r276-capture-safe: TestInstallerExitOnlyClosesItsWindowAndKeepsChildAlive: the scanner publishes lines over a channel and closes it on completion; process completion and done channels precede reads"
   },
@@ -2746,28 +2732,28 @@
   {
     "file": "installer/internal/webviewhost/startup_test.go",
     "line": 36,
-    "target": "ready",
-    "source_sha256": "6c66ac1a6fd0c0c85ad174dc9c11c8da6833e25e4ec01a64e5718cc214c8e208",
-    "comment": "r276-capture-safe: TestWindowRequiresDocumentAndNavigation: the fixture calls Start/Message/NavigationCompleted/Timeout synchronously in test order"
-  },
-  {
-    "file": "installer/internal/webviewhost/startup_test.go",
-    "line": 36,
     "target": "failed",
     "source_sha256": "6c66ac1a6fd0c0c85ad174dc9c11c8da6833e25e4ec01a64e5718cc214c8e208",
     "comment": "r276-capture-safe: TestWindowRequiresDocumentAndNavigation: the fixture calls Start/Message/NavigationCompleted/Timeout synchronously in test order"
   },
   {
     "file": "installer/internal/webviewhost/startup_test.go",
-    "line": 81,
+    "line": 36,
     "target": "ready",
+    "source_sha256": "6c66ac1a6fd0c0c85ad174dc9c11c8da6833e25e4ec01a64e5718cc214c8e208",
+    "comment": "r276-capture-safe: TestWindowRequiresDocumentAndNavigation: the fixture calls Start/Message/NavigationCompleted/Timeout synchronously in test order"
+  },
+  {
+    "file": "installer/internal/webviewhost/startup_test.go",
+    "line": 81,
+    "target": "failures",
     "source_sha256": "6c66ac1a6fd0c0c85ad174dc9c11c8da6833e25e4ec01a64e5718cc214c8e208",
     "comment": "r276-capture-safe: TestStartupFailuresFallbackExactlyOnce: the fixture calls Start/Message/NavigationCompleted/Timeout synchronously in test order"
   },
   {
     "file": "installer/internal/webviewhost/startup_test.go",
     "line": 81,
-    "target": "failures",
+    "target": "ready",
     "source_sha256": "6c66ac1a6fd0c0c85ad174dc9c11c8da6833e25e4ec01a64e5718cc214c8e208",
     "comment": "r276-capture-safe: TestStartupFailuresFallbackExactlyOnce: the fixture calls Start/Message/NavigationCompleted/Timeout synchronously in test order"
   },
@@ -2924,33 +2910,5 @@
     "target": "calls",
     "source_sha256": "f4c1697295a343f2f98c706805ca4896519079234a3c77e5f298332e79765435",
     "comment": "r276-capture-safe: TestSilentDispatchNeverCreatesWindow: the audited fixture operations in this test invoke this callback serially and return before calls is asserted; this source-bound exception does not permit a concurrent fixture caller"
-  },
-  {
-    "file": "backend/pro_runes_opgg_test.go",
-    "line": 89,
-    "target": "calls",
-    "source_sha256": "57ef391c1ffb9aedf7bff97ddad14a911ba904f5a32eeb6a5be343d5de1f1ac4",
-    "comment": "r276-capture-safe: TestProOPGGAnonymousTransportAndBoundaries: the test directly calls fetchOPGGBuilds sequentially; client.Do invokes this Transport.RoundTrip inline and returns before mode/calls changes or assertions; no opggRecommend fan-out runs in this test"
-  },
-  {
-    "file": "backend/pro_runes_opgg_test.go",
-    "line": 232,
-    "target": "calls",
-    "source_sha256": "57ef391c1ffb9aedf7bff97ddad14a911ba904f5a32eeb6a5be343d5de1f1ac4",
-    "comment": "r276-capture-safe: TestProOPGGPaginationStopsAtThirtyDaysAndRejectsDisorder: opggLeagueBuilds fetches pages in its ordinary synchronous for loop through fetchOPGGBuilds/client.Do; both direct calls return before calls is inspected or disorder is changed"
-  },
-  {
-    "file": "backend/r288_announcements_test.go",
-    "line": 15,
-    "target": "calls",
-    "source_sha256": "de55783f001d1a712c04ea9fdaf5f5976403a735bb89f0fc13832162ee0066ef",
-    "comment": "r276-capture-safe: TestR288AnnouncementV2AndLegacyFallback: each nonparallel subtest directly calls fetchAnnouncementDocument; its version/mirror nested loops issue client.Do sequentially and return before the calls slice is inspected"
-  },
-  {
-    "file": "backend/r290_github_test.go",
-    "line": 77,
-    "target": "requests",
-    "source_sha256": "884f2bd89347345d3e03fbe6f77379feca663d50ddf8482637075dfe64e59c61",
-    "comment": "r276-capture-safe: TestR290GithubStarsFailureCooldownAndZero: each nonparallel payload subtest directly calls handleGithubStars/githubStarCount sequentially; githubStarCount holds githubStars.mu and completes client.Do before returning; requests is checked only after the calls"
   }
 ]

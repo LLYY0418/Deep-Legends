@@ -13,7 +13,7 @@ func TestFeatureGatesUseDefaultsAndApplyKnownOverrides(t *testing.T) {
 	if gates.enabled(featureGateOPGG) || gates.enabled("unknown") {
 		t.Fatalf("gate overrides = %#v", gates.values)
 	}
-	if !gates.enabled(featureGateHexdata) {
+	if !gates.enabled(featureGateAramkit) {
 		t.Fatal("unmentioned gate lost its default")
 	}
 }
@@ -36,8 +36,10 @@ func TestFeatureGateMapsQQ101Host(t *testing.T) {
 }
 
 func TestFeatureGateMapsARAMKitHost(t *testing.T) {
-	if got := featureGateForChampionHost(aramkitRatingHost); got != featureGateAramkit {
-		t.Fatalf("ARAMKit host gate = %q", got)
+	for _, host := range []string{aramkitRatingHost, aramkitRatingCNHost, aramkitDataCN, aramkitDataCOM} {
+		if got := featureGateForChampionHost(host); got != featureGateAramkit {
+			t.Fatalf("ARAMKit host gate = %q", got)
+		}
 	}
 	gates := newFeatureGates()
 	gates.apply(map[string]bool{featureGateAramkit: false})

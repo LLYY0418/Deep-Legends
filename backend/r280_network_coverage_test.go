@@ -172,14 +172,14 @@ func TestR280PACRoutesAreIsolatedAndRefresh(t *testing.T) {
 	defer proxy.Close()
 	p := newChampionProvider()
 	defer p.client.CloseIdleConnections()
-	p.systemProxyRoutes = map[string]string{opggPageHost: "", "kr.api.riotgames.com": proxy.URL, hexdataHost: "http://127.0.0.1:1"}
+	p.systemProxyRoutes = map[string]string{opggPageHost: "", "kr.api.riotgames.com": proxy.URL, aramkitDataCN: "http://127.0.0.1:1"}
 	parent := p.client.Transport.(*automaticNetworkTransport)
 	parent.probes = map[string]string{}
 	request := func(host string) *http.Request { r, _ := http.NewRequest("GET", "http://"+host+"/", nil); return r }
 	direct := r196RoundTrip(func(*http.Request) (*http.Response, error) { return updateResponse(200, []byte("direct")), nil })
 	parent.forRequest(request(opggPageHost)).direct = direct
-	parent.forRequest(request(hexdataHost)).direct = direct
-	for host, want := range map[string]string{opggPageHost: "direct", hexdataHost: "direct", "kr.api.riotgames.com": "proxy"} {
+	parent.forRequest(request(aramkitDataCN)).direct = direct
+	for host, want := range map[string]string{opggPageHost: "direct", aramkitDataCN: "direct", "kr.api.riotgames.com": "proxy"} {
 		res, err := p.client.Do(request(host))
 		if err != nil {
 			t.Fatal(host, err)
@@ -218,8 +218,8 @@ func TestR280PACRoutesAreIsolatedAndRefresh(t *testing.T) {
 	if bad.Code != 400 {
 		t.Fatal("accepted unrecognized PAC target", bad.Code)
 	}
-	if networkGroup("api.your.gg") == networkGroup(hexdataHost) || networkGroup(dataDragonHost) == networkGroup(hexdataHost) {
-		t.Fatal("independent sources share hexdata route choice")
+	if networkGroup("api.your.gg") == networkGroup(aramkitDataCN) || networkGroup(dataDragonHost) == networkGroup(aramkitDataCN) {
+		t.Fatal("independent sources share ARAMKit route choice")
 	}
 }
 

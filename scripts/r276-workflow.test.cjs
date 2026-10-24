@@ -38,14 +38,11 @@ test('R276 separate VMs preserve browser, mutation, upgrade and artifact gates',
  for(const module of ['backend','installer'])assert(job(ci,'windows-tests').includes('node scripts/r276-offline.cjs -- node scripts/run-ci-tests.cjs go '+module));
  assert.match(job(ci,'triage-legacy'),/name: chromium-guards-linux\n/);
 });
-test('R276 restart race stress is part of both sweeps, never a separate CI trigger',()=>{
- assert.doesNotMatch(ci,/hexdata-restart-stress:/);
- const sweep=fs.readFileSync(path.join(root,'.github/workflows/flake-sweep.yml'),'utf8');
- for(const kind of ['linux-hexdata','windows-hexdata'])assert.match(sweep,new RegExp('kind: '+kind+'\\n\\s+index: 0\\n\\s+iterations: 1'));
- assert.match(sweep,/Require native Windows race compiler/);assert.match(sweep,/if: matrix.kind == 'windows-hexdata'/);
- const stress=fs.readFileSync(path.join(root,'scripts/r276-hexdata-stress.cjs'),'utf8');assert.match(stress,/'-race','-json','-count=200','-cpu=1,2,4'/);
- assert.equal(require('./r276-hexdata-stress.cjs').tests.length,10);
- assert.match(job(ci,'quality-mutations'),/scripts\/r276-hexdata-mutations\.py/);
+test('R307 sweep coverage and retained stress proofs have complete commands',()=>{
+ const sweep=fs.readFileSync(path.join(root,'.github/workflows/flake-sweep.yml'),'utf8'),workflow=require('../desktop/node_modules/js-yaml').load(sweep);
+ assert.equal(workflow.jobs.samples.strategy.matrix.include.length,32);
+ const stress=require('./r276-targeted-stress.cjs');assert.deepEqual(stress.tests,['TestR196ProbeSelectsFastMirror','TestR206FullCollectionRefreshTranslationTimeoutUnderThreeSeconds']);
+ for(const match of ci.matchAll(/(?:node|python3) (scripts\/[A-Za-z0-9_.\/-]+)/g))assert(fs.existsSync(path.join(root,match[1])),match[1]);
  const browserJob=fs.readFileSync(path.join(root,'scripts/r276-browser-job.cjs'),'utf8');assert.match(browserJob,/census\.requireClean\(report,name\)/);assert.match(browserJob,/selected\.filter\(row=>row\[0\]!=='r275-offline'\)/);
 });
 

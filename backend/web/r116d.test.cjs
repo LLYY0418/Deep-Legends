@@ -62,11 +62,13 @@ function functionSource(source, name) {
 }
 
 function compileFunctions(source, names, dependencies = {}) {
+  names=require("./r211-harness-support.cjs").expand(source,names,dependencies);
+  dependencies=require("./r211-harness-support.cjs").environment(dependencies);
   const bodies = names.map((name) => functionSource(source, name));
   for (const helper of ["noteChampSelectReady", "noteChampSelectLatency"]) if (bodies.some(body=>body.includes(helper+"("))) bodies.push(functionSource(source,helper));
   if (bodies.some(body=>body.includes("champSelectEnemyPlaceholder("))) bodies.push(functionSource(source,"champSelectEnemyPlaceholder"));
   const dependencyNames = Object.keys(dependencies);
-  const factory = Function(...dependencyNames, `"use strict";\n${bodies.join("\n")}\nreturn { ${names.join(", ")} };`);
+  const factory = Function(...dependencyNames, `"use strict";\n${require("./r220-harness-support.cjs").prelude(source,{...dependencies,...Object.fromEntries(names.map(name=>[name,true]))})}${bodies.join("\n")}\nreturn { ${names.join(", ")} };`);
   return factory(...dependencyNames.map((name) => dependencies[name]));
 }
 
@@ -152,7 +154,7 @@ test("R116-D roster sends both sides in game and only allies during champion sel
 test("R116-D roster stays empty outside mayhem and for oversized sides", () => {
   const { liveRecommendationRoster } = rosterDeps();
 
-  // 克制/协同来自 hexdata hero-json、画像来自 hexdata postmatch，别的模式后端
+  // 克制/协同来自 退休源英雄统计、画像来自 退休源对局统计，别的模式后端
   // 根本没有这两份数据，前端也就不该传 roster（传了也只是被后端丢掉）。
   assert.deepEqual(liveRecommendationRoster(mayhemLive({ gameMode: "CLASSIC", mapId: 11 })), {
     phase: "", allyIds: [], enemyIds: [], matchupAllowed: false, signature: "",
@@ -183,13 +185,13 @@ test("R116-D roster stays empty outside mayhem and for oversized sides", () => {
 // 请求纪律：Anti-scope 第 1 条
 // ---------------------------------------------------------------------------
 
-test("R116-D sends champion ids only and never fetches per-champion hexdata", () => {
-  // 前端不许出现任何按英雄 ID 拼 hexdata 详情页的写法：那是评审 4.2/4.4 里
+test("R116-D sends champion ids only and never fetches per-champion ARAMKit", () => {
+  // 前端不许出现任何按英雄 ID 拼 ARAMKit 详情文件的写法：那是评审 4.2/4.4 里
   // 最危险的一项（10 请求 / 12 MB / 最坏排队 11 秒 / 熔断对取消失效）。
   // 注释里会出现这个路径（说明为什么不能这么拉），所以先把 // 注释剔掉再断言。
   const code = stripLineComments(gameplayScript);
-  assert.doesNotMatch(code, /\/api\/hexdata\/heroes\//, "gameplay.js must not address the hexdata hero endpoint in code");
-  assert.doesNotMatch(gameplayScript, /hexdata\.com\.cn/, "gameplay.js must not reach the hexdata origin directly");
+  assert.doesNotMatch(code, /\/stats\/all\/champion-details\//, "gameplay.js must not address the ARAMKit static hero endpoint in code");
+  assert.doesNotMatch(gameplayScript, /data\.aramkit\.(?:cn|com)/, "gameplay.js must not reach the ARAMKit static origin directly");
   // roster 参数只是 ID 列表，三个参数名都要在，且没有第四个「按英雄拉数据」的入口。
   for (const name of ["allyChampionIds", "enemyChampionIds", "liveRecommendationRoster"]) {
     assert.match(gameplayScript, new RegExp(name), `${name} is missing from gameplay.js`);

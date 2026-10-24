@@ -90,6 +90,7 @@ type championDataCache struct {
 func newChampionDataCache(store *localStore) *championDataCache {
 	cache := &championDataCache{entries: make(map[string]championCacheEnvelope), flights: make(map[string]*championCacheFlight)}
 	if store != nil {
+		removeRetiredMayhemCache(store)
 		cache.dir = filepath.Join(store.root, championDataCacheDirectory)
 		cache.migrationErr = cache.purgeDiskHost(yourGGArenaHost)
 	}
@@ -284,9 +285,6 @@ func (c *championDataCache) storeMemoryLocked(key string, entry championCacheEnv
 func (c *championDataCache) pathFor(key string) string {
 	hash := sha256.Sum256([]byte(key))
 	name := hex.EncodeToString(hash[:]) + ".json"
-	if strings.HasPrefix(key, "hexdata-") {
-		name = "hexdata-" + name
-	}
 	if strings.HasPrefix(key, "riot-identity-v1|proseed:") {
 		name = "proseed-" + name
 	}
@@ -308,11 +306,6 @@ func (c *championDataCache) readDiskMode(key string, asyncCleanup bool) (champio
 	}
 	path := c.pathFor(key)
 	info, err := os.Lstat(path)
-	// Failed startup migration must not make existing recovery data invisible.
-	if errors.Is(err, os.ErrNotExist) && strings.HasPrefix(key, "hexdata-") {
-		path = filepath.Join(c.dir, strings.TrimPrefix(filepath.Base(path), "hexdata-"))
-		info, err = os.Lstat(path)
-	}
 	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > championCacheMaxEntry*2 {
 		return championCacheEnvelope{}, errors.New("cache miss")
 	}
@@ -418,10 +411,10 @@ func championCacheDiskAllowed(key string) bool {
 	if strings.HasPrefix(key, "public-profile-icon|") || strings.HasPrefix(key, "pro-profile-v1|") || strings.HasPrefix(key, "pro-profile-v2|") {
 		return true
 	}
-	if strings.HasPrefix(key, "public-pro-snapshot-v1|") || strings.HasPrefix(key, "normalized-perks-v1|") || strings.HasPrefix(key, "normalized-perks-v2|") || strings.HasPrefix(key, "normalized-augments-v1|") || strings.HasPrefix(key, "riot-identity-v1|") || publicRiotMatchCacheKey(key) || (strings.HasPrefix(key, "riot-match-tier-v1|") && validRiotMatchID(strings.TrimPrefix(key, "riot-match-tier-v1|"))) || strings.HasPrefix(key, "kr-match-tier-v1|KR_") || strings.HasPrefix(key, "hexdata-") || strings.HasPrefix(key, "bootstrap|") || strings.HasPrefix(key, "v2|opgg-rsc|") || strings.HasPrefix(key, "v3|opgg-detail|") {
+	if strings.HasPrefix(key, "public-pro-snapshot-v1|") || strings.HasPrefix(key, "normalized-perks-v1|") || strings.HasPrefix(key, "normalized-perks-v2|") || strings.HasPrefix(key, "normalized-augments-v1|") || strings.HasPrefix(key, "riot-identity-v1|") || publicRiotMatchCacheKey(key) || (strings.HasPrefix(key, "riot-match-tier-v1|") && validRiotMatchID(strings.TrimPrefix(key, "riot-match-tier-v1|"))) || strings.HasPrefix(key, "kr-match-tier-v1|KR_") || strings.HasPrefix(key, "bootstrap|") || strings.HasPrefix(key, "v2|opgg-rsc|") || strings.HasPrefix(key, "v3|opgg-detail|") {
 		return true
 	}
-	for _, host := range []string{dataDragonHost, communityDragonHost, hexdataAssetHost, opggChampionHost, opggPageHost, qq101Host} {
+	for _, host := range []string{dataDragonHost, communityDragonHost, opggChampionHost, opggPageHost, qq101Host} {
 		if strings.HasPrefix(key, "v1|"+host+"|") {
 			return true
 		}
@@ -461,36 +454,6 @@ func (c *championDataCache) purgeDiskHost(host string) error {
 			_ = os.Remove(path)
 			continue
 		}
-		// This existing one-time startup scan also migrates old hashed Hexdata
-		// names before any generic LRU pruning is allowed to run.
-		if strings.HasPrefix(header.Key, "hexdata-") && !strings.HasPrefix(item.Name(), "hexdata-") {
-			hash := sha256.Sum256([]byte(header.Key))
-			if item.Name() != hex.EncodeToString(hash[:])+".json" {
-				continue
-			}
-			target := c.pathFor(header.Key)
-			if _, err := os.Lstat(target); err == nil {
-				if _, validErr := c.readDiskMode(header.Key, false); validErr == nil {
-					// A validated current-format value supersedes its duplicate.
-					if err := os.Remove(path); err != nil {
-						return err
-					}
-					continue
-				}
-				// Startup cleanup removes malformed regular files; never replace an
-				// untrusted target (e.g. a symlink) or discard the valid legacy copy.
-				if _, err := os.Lstat(target); !errors.Is(err, os.ErrNotExist) {
-					return errors.New("hexdata migration target is not replaceable")
-				}
-			}
-			if _, err := os.Lstat(target); errors.Is(err, os.ErrNotExist) {
-				if err := os.Rename(path, target); err != nil {
-					return err
-				}
-			} else if err != nil {
-				return err
-			}
-		}
 	}
 	return nil
 }
@@ -522,9 +485,9 @@ func (c *championDataCache) pruneDiskLocked() error {
 			continue
 		}
 		path := filepath.Join(c.dir, item.Name())
-		// Hexdata正文 and its validator state are user-facing recovery data.
+		// Seeded identity records remain protected recovery data.
 		// They must not be selected as generic LRU victims based on mtime.
-		protected := strings.HasPrefix(item.Name(), "hexdata-") || strings.HasPrefix(item.Name(), "proseed-")
+		protected := strings.HasPrefix(item.Name(), "proseed-")
 		if protected {
 			continue
 		}
@@ -547,76 +510,6 @@ func (c *championDataCache) pruneDiskLocked() error {
 		}
 	}
 	return nil
-}
-
-// hexdataStaleBuildGrace 是旧 buildID 落盘文件的宽限期：2 个 buildID 周期
-// （一个 patch 约 4 天）≈ 8 天。buildID 刚轮换时不能立刻删掉上一版数据，否则
-// checkedPage 的 PreviousBuildID 回退路径会被抽掉，造成回源请求风暴。
-const hexdataStaleBuildGrace = 8 * 24 * time.Hour
-
-// pruneStaleHexdataBuildsCount 回收已经过期的 buildID 对应的 hexdata- 落盘文件，
-// 补上「hexdata- 前缀永久豁免磁盘预算」留下的静默增长缺口。这是与
-// pruneDiskLocked 里 protected 判断并行的第二条清理路径：protected 继续防止
-// 「访问不频繁被普通 LRU 按 mtime 误杀」，这里只处理「buildID 已经过期」。
-// 文件名是 key 的 sha256（不含 buildID），所以 buildID 只能从信封的 Key 字段
-// （{buildID}|{kind}|{id}）里解出来。宽限期按 c.cacheNow() 比较，时间可注入。
-// 返回删除的文件数，供诊断事件使用。
-func (c *championDataCache) pruneStaleHexdataBuildsCount(currentBuildID string) (int, error) {
-	currentBuildID = strings.TrimSpace(currentBuildID)
-	if c.dir == "" || !strings.HasPrefix(currentBuildID, "hexdata-") {
-		return 0, nil
-	}
-	if c.migrationErr != nil {
-		return 0, c.migrationErr
-	}
-	c.diskMu.Lock()
-	defer c.diskMu.Unlock()
-	entries, err := os.ReadDir(c.dir)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return 0, nil
-		}
-		return 0, err
-	}
-	now := c.cacheNow()
-	removed := 0
-	for _, item := range entries {
-		name := item.Name()
-		// hexdata-state.json 是熔断/validator 状态，不是缓存信封，绝不能碰。
-		if !strings.HasPrefix(name, "hexdata-") || !strings.HasSuffix(name, ".json") || name == "hexdata-state.json" {
-			continue
-		}
-		info, infoErr := item.Info()
-		if infoErr != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > championCacheMaxEntry*2 {
-			continue
-		}
-		path := filepath.Join(c.dir, name)
-		data, readErr := c.readCacheFile(path)
-		if readErr != nil {
-			// 读不出来的文件一律不动：无法确认它属于哪个 buildID，删了就是猜。
-			continue
-		}
-		var entry championCacheEnvelope
-		if json.Unmarshal(data, &entry) != nil || strings.TrimSpace(entry.Key) == "" {
-			continue
-		}
-		buildID := strings.SplitN(entry.Key, "|", 2)[0]
-		if buildID == currentBuildID || !strings.HasPrefix(buildID, "hexdata-") {
-			continue
-		}
-		fetchedAt := entry.FetchedAt
-		if fetchedAt.IsZero() {
-			// 信封缺时间戳时退回文件 mtime，宽限期语义不变。
-			fetchedAt = info.ModTime()
-		}
-		if now.Sub(fetchedAt) < hexdataStaleBuildGrace {
-			continue
-		}
-		if os.Remove(path) == nil {
-			removed++
-		}
-	}
-	return removed, nil
 }
 
 func championCachePolicy(host, requestPath, accept string) (time.Duration, time.Duration, bool) {

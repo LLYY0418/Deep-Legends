@@ -83,7 +83,7 @@ func (p *championProvider) onlineAugmentDescription(ctx context.Context, id int6
 		if err != nil {
 			return augmentDescriptionFailure(id, err)
 		}
-		return augmentDescriptionFromRows(id, []gameplayAugment{{ID: id, Description: description}}, "hexdata")
+		return augmentDescriptionFromRows(id, []gameplayAugment{{ID: id, Description: description}}, "aramkit")
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, communityDragonAugmentRequestBudget)
 	defer cancel()

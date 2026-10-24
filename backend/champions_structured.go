@@ -200,7 +200,7 @@ func opggDetailRequest(mode string, championID int, position, tier string) (opgg
 		return opggModeSpec{}, "", nil, errors.New("unsupported OP.GG champion mode")
 	}
 	if mode == "hextech-aram" {
-		return opggModeSpec{}, "", nil, errors.New("hextech ARAM uses the independent Hexdata and OP.GG RSC path")
+		return opggModeSpec{}, "", nil, errors.New("hextech ARAM uses the independent ARAMKit and OP.GG RSC path")
 	}
 	requestPosition := spec.requestPosition(position)
 	if spec.PositionMode == opggPositionRequired && requestPosition == "" {

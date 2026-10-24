@@ -80,7 +80,7 @@ func (a *app) recordR278Diagnostic(w http.ResponseWriter, r clientDiagnosticRequ
 			}
 		case "source":
 			s, ok := value.(string)
-			if ok && (s == "complete" || s == "cards" || s == "progress" || s == "retained" || s == "event" || s == "status" || s == "circuit" || s == "fresh-503" || s == "bundled" || s == "remote" || s == "cache" || s == "stale_cache" || s == "lcu" || s == "cdragon" || s == "hexdata" || s == "none") {
+			if ok && (s == "complete" || s == "cards" || s == "progress" || s == "retained" || s == "event" || s == "status" || s == "circuit" || s == "fresh-503" || s == "bundled" || s == "remote" || s == "cache" || s == "stale_cache" || s == "lcu" || s == "cdragon" || s == "aramkit" || s == "none") {
 				event[key] = s
 			}
 		case "id", "notice_revision":

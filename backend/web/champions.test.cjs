@@ -20,9 +20,6 @@ const sharedGrades = Function(`${gradeSource}\nreturn { gradeBadge, gradeRank };
 // 渲染」的降级路径（评审 6.1）。
 const mayhemMetricHelpers = [
   "normalizeMayhemStage", "mayhemActiveStage", "mayhemAugmentStageRow", "mayhemAugmentStageItem",
-  "mayhemDeltaLabel", "mayhemDeltaTone", "mayhemDeltaCell", "mayhemWithoutItemCell",
-  "mayhemSampleTierLabel", "mayhemSampleCell", "mayhemWilsonLabel", "mayhemWilsonTooltip",
-  "mayhemAugmentConfidenceMetrics",
 ];
 const styles = fs.readFileSync(path.join(__dirname, "champions.css"), "utf8");
 
@@ -63,7 +60,8 @@ const friendsScript = fs.readFileSync(path.join(__dirname, "friends.js"), "utf8"
 const demoScript = fs.readFileSync(path.join(__dirname, "demo-data.js"), "utf8");
 const backend = fs.readFileSync(path.join(root, "champions.go"), "utf8");
 const structuredBackend = fs.readFileSync(path.join(root, "champions_structured.go"), "utf8");
-const hexdataBackend = fs.readFileSync(path.join(root, "hexdata.go"), "utf8");
+const aramkitBackend = fs.readFileSync(path.join(root, "aramkit_detail.go"), "utf8");
+const mayhemSharedBackend = fs.readFileSync(path.join(root,"mayhem_shared.go"),"utf8");
 const overviewCacheBackend = fs.readFileSync(path.join(root, "overview_cache.go"), "utf8");
 const mainSource = fs.readFileSync(path.join(root, "main.go"), "utf8");
 const arenaMatchDetailSource = fs.readFileSync(path.join(root, "arena_match_detail.go"), "utf8");
@@ -279,7 +277,7 @@ function assertR46Contracts({
 	js = gameplayScript,
 	appCSS = appStyles,
 	goSource = gameplayBackend,
-	hexSource = hexdataBackend,
+	aramSource = aramkitBackend,
 	cacheSource = overviewCacheBackend,
 } = {}) {
 	const cachePut = goFunctionSource(cacheSource, "putLocked");
@@ -287,8 +285,7 @@ function assertR46Contracts({
 	assert.match(cachePut, /for len\(cache\.entries\) > overviewQueryCacheMax/);
 	assert.match(cachePut, /cache\.removeElementLocked\(cache\.recent\.Back\(\)\)/);
 
-	assert.match(hexSource, /hexdataGlobalMetric\s*=\s*regexp\.MustCompile\(`[^`\n]*\[·，,\][^`\n]*`\)/);
-	assert.match(goFunctionSource(hexSource, "parseHexdataRarity"), /\[·，,\]/);
+	assert.match(aramSource, /WinRate: s\.WinRate \* 100/);
 
 	assert.match(goSource, /Augments\s+\[\]championMetricRow\s+`json:"augments"`/);
 	assert.doesNotMatch(goSource, /Augments\s+\[\]championMetricRow\s+`json:"augments,omitempty"`/);
@@ -463,7 +460,7 @@ test("R15 mutation probes fail for every new guard", () => {
   assert.throws(() => assert.match(sharedBuildStyles.replace("border-top: 0;", ""), /border-left:\s*1px solid var\(--line\);\s*border-top:\s*0;\s*\}/));
 });
 
-function assertR7Contract(js, css, structuredSource, hexdataSource, gameplaySource, gameplayCSSSource) {
+function assertR7Contract(js, css, structuredSource, aramkitSource, gameplaySource, gameplayCSSSource) {
 	assert.match(js, /gradeBadge\(row\.grade, "arena-option-grade"\)/);
 	assert.doesNotMatch(js, /快节奏团战/);
 	assert.match(css, /\.arena-overview-strip\s*\{[^}]*min-height:\s*132px/s);
@@ -473,7 +470,7 @@ function assertR7Contract(js, css, structuredSource, hexdataSource, gameplaySour
 	assert.doesNotMatch(css, /\.arena-overview-strip\s*\{\s*min-height:\s*118px/s);
 	assert.match(css, /\.arena-overview-secondary\s*\{[^}]*min-height:\s*22px/s);
 	assert.match(structuredSource, /applyLocalAugmentGrades\(response\.Build\.PrismItems\)/);
-	assert.match(hexdataSource, /func hexdataRankingRowsFromInsights\(/);
+	assert.match(aramkitSource, /func \(p \*championProvider\) loadARAMKitRankings\(/);
 	assert.match(gameplaySource, /function renderMatchDetailFailure\(gameID, detailState\)/);
 	assert.match(gameplaySource, /data-retry-match-detail/);
 	const matchSource = functionSource(gameplaySource, "renderMatch");
@@ -782,7 +779,6 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
   assert.match(script, /\/api\/champions\/augment-detail\?id=/);
   assert.match(script, /\/api\/champions\/augment-rarity/);
   assert.match(script, /if \(state\.mayhemView === "atlas"\)[\s\S]{0,100}loadMayhemAtlas\(\)/);
-  assert.match(script, /function usesHexdata\(source\)/);
   assert.match(script, /class="arena-option-grid mayhem-recommend-grid"/);
   assert.match(script, /return count < 3;/);
   assert.match(script, /gradeBadge\(row\.grade, "arena-option-grade"\)/);
@@ -791,9 +787,7 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
   assert.match(script, /\["样本", compactNumber\(item\.games\), ""\]/);
   // R116-B 评审整改 B4：阶段视图里这一格是英雄级的 hexScore（后端刻意不下发阶段级
   // 评分），标签必须写明口径，不能让英雄级数字冒充阶段数值。
-  assert.match(script, /\[stage \? "综合评分（英雄级）" : "综合评分", number\(item\.score, 1\), "is-score"\]/);
-  assert.match(script, /按综合评分、胜率与样本展示各品质前三项/);
-  assert.doesNotMatch(functionSource(script, "loadMayhemAugmentDetail"), /if \(!usesHexdata/);
+  assert.match(functionSource(script,"loadMayhemAugmentDetail"), /mayhemAugmentDetailCache/);
   assert.match(script, /if \(!state\.mayhemAugmentID && first\)/);
   // R128 §2.3：口径说明的转发函数与那段 citation 注释一并删除，界面上不再出现。
   assert.doesNotMatch(script, /citation\.patch|renderMeasurementTechnique|mayhem-measurement|mayhemDetailFooter/);
@@ -921,7 +915,7 @@ test("Mayhem and Arena augment cards render the same card shell", () => {
   }
   // 海斗是大乱斗口径，没有名次与吃鸡率。
   assert.match(arena, /data-metric-count="5"/);
-  assert.match(mayhem, /data-metric-count="3"/);
+  assert.match(mayhem, /data-metric-count="2"/);
   assert.doesNotMatch(mayhem, /平均名次|吃鸡率/);
   assert.match(styles, /\.arena-option-card\[data-metric-count="3"\] dl\s*\{[^}]*repeat\(3,minmax\(0,1fr\)\)/s);
 });
@@ -956,7 +950,7 @@ test("Mayhem augment cards carry the augment copy in the tooltip", () => {
 
 test("live recommendation panels do not render upstream provenance footers", () => {
   assert.doesNotMatch(gameplayScript, /function renderRecommendationCitation\(/);
-  assert.doesNotMatch(gameplayScript, /recommendation-source-line|数据来源 Hexdata|数据来源 OP\.GG/);
+  assert.doesNotMatch(gameplayScript, /recommendation-source-line|数据来源 ARAMKit|数据来源 OP\.GG/);
   assert.doesNotMatch(gameplayStyles, /\.recommendation-source-line/);
 });
 
@@ -1089,7 +1083,7 @@ test("R6 win rates, spell fallback, patch fallback, and subtitles are explicit",
   const routes = functionSource(script, "renderMayhemItemRoutes");
   assert.match(routes, /slice\(0, CORE_RECOMMENDATION_LIMIT\)/);
   assert.doesNotMatch(routes, /route-win-rate|renderConfigOption\(row, "route", true\)/);
-  assert.match(routes, /renderConfigOption\(row, "route", false\)/);
+  assert.match(routes, /renderConfigOption\(row, "route", false,row.assets/);
   // R116-B P0-4：只有召唤师技能这一组显示胜率，而且走的是 renderConfigOption 的
   // 第四个参数（statsRenderer）而不是三态开关的 null：既有的 renderOptionStats 只用
   // hasPick/hasWin 决定整块要不要渲染，之后两格无条件输出，上游回退到只有选用率的
@@ -1097,7 +1091,7 @@ test("R6 win rates, spell fallback, patch fallback, and subtitles are explicit",
   // 出门装与鞋子仍然只有选用率（false）：它们的数据里没有胜率，跟着打开就是
   // 显示不存在的数据。renderConfigOption 的三态开关本身没改。
   const opening = functionSource(script, "renderMayhemOpeningConfiguration");
-  assert.match(opening, /renderConfigOption\(row, kind, false\)/);
+  assert.match(opening, /renderConfigOption\(row, kind, false, row.assets/);
   assert.match(opening, /renderConfigOption\(row, "spell", null, spellStats\)/);
   assert.doesNotMatch(opening, /renderConfigOption\(row, kind, true\)|renderConfigOption\(row, "spell", true\)|option-win-rate/);
   assert.equal((opening.match(/renderConfigOption\(/g) || []).length, 2, "开局配置只允许两处 renderConfigOption：出门装/鞋子一组，召唤师技能一组");
@@ -1105,9 +1099,9 @@ test("R6 win rates, spell fallback, patch fallback, and subtitles are explicit",
   assert.match(functionSource(script, "renderMayhemSkillPlan"), /renderChampionSkillPlan\(skills, false\)/);
   assert.match(functionSource(script, "renderChampionSkillPlan"), /skill-win-rate/);
   const subtitles = ["renderMayhemOpeningConfiguration", "renderMayhemItemRoutes", "renderMayhemItemRanking", "renderRecommendedAugments", "renderMayhemAtlasDetail"].map((name) => functionSource(script, name)).join("\n");
-  assert.doesNotMatch(subtitles, /OP\.GG|Hexdata|hexdata|your\.gg|HexScore|globalHexScore/);
+  assert.doesNotMatch(subtitles, /OP\.GG|your\.gg|HexScore|globalHexScore/);
   const arenaSources = ["arenaFirstFailureCopy", "arenaFirstUnavailableCopy", "renderArenaFirstPlaces"].map((name) => functionSource(script, name)).join("\n");
-  assert.doesNotMatch(arenaSources, /OP\.GG|Hexdata|hexdata|YOUR\.GG|your\.gg/);
+  assert.doesNotMatch(arenaSources, /OP\.GG|YOUR\.GG|your\.gg/);
   assert.match(functionSource(script, "renderArenaAugments"), /return renderRecommendedAugments\(rows\)/);
   assert.doesNotMatch(functionSource(script, "renderArenaAugments"), /hex-rank|index \+ 1|slice\(3, 10\)/);
   assert.match(styles, /@media \(max-width: 1080px\)[\s\S]*?\.mayhem-atlas\s*\{\s*grid-template-columns:\s*minmax\(0,1fr\) minmax\(0,1fr\)/);
@@ -1145,7 +1139,7 @@ test("R7 prism grades, compact arena overview, recoverable match details, and cl
 	assert.match(failure, /data-retry-match-detail="123"/);
 	assert.match(failure, /&lt;script&gt;bad&lt;\/script&gt;/);
 	assert.doesNotMatch(failure, /<script>/);
-	assertR7Contract(script, styles, structuredBackend, hexdataBackend, gameplayScript, gameplayStyles);
+	assertR7Contract(script, styles, structuredBackend, aramkitBackend, gameplayScript, gameplayStyles);
 });
 
 test("R8 arena augment icons preserve semantic first-place tone without fabricated masks", () => {
@@ -1278,12 +1272,12 @@ test("R7 contracts reject UI, parser, backend grade, and retry mutations on true
 		const original = {
 			js: fs.readFileSync(copies.js, "utf8"), css: fs.readFileSync(copies.css, "utf8"),
 			structured: fs.readFileSync(path.join(temp, "champions_structured.go"), "utf8"),
-			hexdata: fs.readFileSync(path.join(temp, "hexdata.go"), "utf8"),
+			aramkit: fs.readFileSync(path.join(temp, "aramkit_detail.go"), "utf8"),
 			gameplay: fs.readFileSync(copies.gameplay, "utf8"), gameplayCSS: fs.readFileSync(copies.gameplayCSS, "utf8"),
 		};
 		const check = (overrides = {}) => assertR7Contract(
 			overrides.js || original.js, overrides.css || original.css,
-			overrides.structured || original.structured, overrides.hexdata || original.hexdata,
+			overrides.structured || original.structured, overrides.aramkit || original.aramkit,
 			overrides.gameplay || original.gameplay, overrides.gameplayCSS || original.gameplayCSS,
 		);
 		check();
@@ -1293,7 +1287,7 @@ test("R7 contracts reject UI, parser, backend grade, and retry mutations on true
 			".arena-overview-strip { position: relative; display: flex; min-height: 154px",
 		) }));
 		assert.throws(() => check({ structured: original.structured.replace("applyLocalAugmentGrades(response.Build.PrismItems)", "") }));
-		assert.throws(() => check({ hexdata: original.hexdata.replace("func hexdataRankingRowsFromInsights(", "func removedRankingRowsFromInsights(") }));
+		assert.throws(() => check({ aramkit: original.aramkit.replace("func (p *championProvider) loadARAMKitRankings(", "func (p *championProvider) removedRankings(") }));
 		assert.throws(() => check({ gameplay: original.gameplay.replaceAll("data-retry-match-detail", "data-broken-retry") }));
 		assert.throws(() => check({ gameplay: original.gameplay.replace("state.status = status;", "state.status = status; state.perks = null;") }));
 	} finally {
@@ -2756,22 +2750,10 @@ test("round 9 augment rendering uses upstream images, descriptions, and all rari
   assert.match(rendered, /获得总攻击速度。/);
 });
 
-test("R159 observed Hexdata icons render through the scoped image proxy in detail and match rows", () => {
-  const icon = "/assets/augments/icons/16.18/highroller_small.png";
-  const detail = compileFunctions(script, ["imageURL"]);
-  assert.equal(detail.imageURL("hexdata", icon), `/api/champion-asset?source=hexdata&path=${encodeURIComponent(icon)}&art=2`);
-
-  const state = { perks: { augments: [{ id: 2095, name: "掷骰狂人", rarity: "prismatic", iconPath: `hexdata:${icon}` }] } };
-  const rendered = compileFunctions(gameplayScript, ["proxyAsset", "assetIcon", "augmentMetadata", "augmentIconFigure"], {
-    state,
-    escapeHTML: value => String(value ?? ""),
-    wrapAugmentIcon: iconHTML => iconHTML,
-    iconFigure: () => "<fallback>",
-    pendingCatalogIcon: () => "<pending>",
-  }).augmentIconFigure(2095);
-  assert.match(rendered, /data-queued-src="\/api\/champion-asset\?source=hexdata&path=/);
-  assert.match(rendered, /highroller_small\.png/);
-  assert.doesNotMatch(rendered, /<fallback>|<pending>/);
+test("R307 ARAMKit icons use the scoped proxy in detail and live rows",()=>{
+ const icon='/assets/augment/3078-06a999a78b50.webp';const detail=compileFunctions(script,['imageURL']);assert.equal(detail.imageURL('aramkit',icon),`/api/champion-asset?source=aramkit&path=${encodeURIComponent(icon)}`);
+ const {renderLiveAugmentIcon}=compileFunctions(gameplayScript,['renderLiveAugmentIcon'],{wrapAugmentIcon:html=>html,remoteStaticIcon:(source,path)=>`<img data-source="${source}" data-path="${path}">`,augmentIconFigure:()=>'<fallback>',escapeHTML:String,liveRarityKey:v=>v});
+ const row={rarity:'gold',assets:[{id:3078,name:'鼓声暴起 低音轰鸣',source:'aramkit',path:icon}]};const html=renderLiveAugmentIcon(row,'hextech');assert.ok(html.includes(icon));assert.ok(html.includes('aramkit'));assert.doesNotMatch(html,/<fallback>/);
 });
 
 test("round 9 recommendation modes drive tabs, fallbacks, and ranked-only sources", () => {
@@ -3408,7 +3390,7 @@ test("champion detail tooltips include static numerical metadata and player alia
   assert.match(script, /bestScore === 100 \? item\.score === 100/);
 });
 
-test("network preload excludes Hexdata and starts only ranked and arena work", () => {
+test("network preload excludes Mayhem hero data and starts only ranked and arena work", () => {
   assert.match(script, /function beginStartupPreload\(\)/);
   assert.match(script, /beginStartupPreload\(\);[\s\S]*\}\)\(\);/s);
   assert.match(script, /preload-ranked/);
@@ -3493,15 +3475,10 @@ test("optional themes keep a neutral background and accent-only primary", () => 
   assert.match(appStyles, /data-theme="aurora"/);
 });
 
-// 图鉴详情：说明必须是海克斯本身的效果文案。hexdata 页面的 <meta name="description">
-// 是"…海克斯大乱斗胜率 53.2%，选取率 0.4%…"这类统计摘要，被当成说明展示过。
+// Descriptions come from the canonical resource, never a statistical summary.
 test("mayhem atlas description comes from the guide paragraph, not the SEO blurb", () => {
-  assert.match(hexdataBackend, /Description: hexdataAugmentGuideDescription\(document\)/);
-  assert.match(hexdataBackend, /func hexdataAugmentGuideDescription\(/);
-  assert.doesNotMatch(hexdataBackend, /func hexdataPageDescription\(/);
-  const guide = goFunctionSource(hexdataBackend, "hexdataAugmentGuideDescription");
-  assert.match(guide, /这类高分高样本英雄上考虑。/);
-  assert.match(guide, /如果你的英雄机制/);
+  assert.match(aramkitBackend,/Description: a.Description/);
+  assert.match(aramkitBackend,/p.loadARAMKitResources/);
   const description = functionSource(script, "mayhemAtlasDescription");
   assert.match(description, /state\.mayhemAugmentDetail/);
   assert.match(description, /AUGMENT_DESCRIPTION_PENDING/);
@@ -3533,11 +3510,11 @@ test("mayhem rarity panel disappears when the read fails", () => {
 test("augment metadata is looked up by ID without an icon-directory filter", () => {
   assert.doesNotMatch(structuredBackend, /filterGameplayAugmentsForMode/);
   assert.doesNotMatch(structuredBackend, /gameplayAugmentIndexForMode/);
-  assert.doesNotMatch(hexdataBackend, /gameplayAugmentIndexForMode/);
+  assert.doesNotMatch(aramkitBackend, /gameplayAugmentIndexForMode/);
   assert.doesNotMatch(backend, /gameplayAugmentIndexForMode/);
-  assert.match(hexdataBackend, /augmentMetadata = gameplayAugmentIndexAll\(p\.loadAugmentMetadataCatalogFast\(ctx\)\)/);
-  assert.match(hexdataBackend, /meta, ok := byID\[asset\.ID\]/);
-  assert.match(backend, /byID := gameplayAugmentIndexAll\(catalog\)/);
+  assert.match(aramkitBackend, /r\.Augments\[strconv\.Itoa\(s\.ID\)\]/);
+  assert.match(mayhemSharedBackend, /result\[int\(item\.ID\)\]/);
+  assert.match(mayhemSharedBackend, /result\[int\(item\.ID\)\] = item/);
 });
 
 // 海克斯的 _large.png 全彩大图只存在于游戏侧资源里；连着客户端时逐个 404，
@@ -4720,7 +4697,7 @@ test("live recommendation capability flags hide unsupported matchup and ban-rate
 	  assert.doesNotMatch(rankedMarkup, /champion-summary-tier|has-tier/);
 	  assert.match(gameplayBackend, /Tier\s+\*int\s+`json:"tier,omitempty"`/);
 	  assert.doesNotMatch(gameplayBackend, /ArenaStats/);
-	  assert.match(goFunctionSource(hexdataBackend, "loadMayhemDetail"), /response\.Stats\.Tier = &tier/);
+	  assert.match(aramkitBackend, /Grade: raw\.Champion\.Tier/);
 	  assert.match(gameplayStyles, /\.recommendation-champion-summary\.is-no-counters\.has-tier\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\) 72px[^}]*grid-template-areas:\s*"summary tier" "positions tier"/s);
 	  assert.match(gameplayStyles, /\.champion-summary-tier\s*\{[^}]*grid-area:\s*tier[^}]*place-content:\s*center[^}]*border-left:\s*1px solid var\(--line\)/s);
 	});
@@ -6454,10 +6431,6 @@ test("R46 contracts cover cache eviction, parsing, beacon, refresh, and TFT hand
 });
 
 test("R46 mutation probes reject all six required regressions", () => {
-	const globalMetricIndex = hexdataBackend.indexOf("hexdataGlobalMetric");
-	assert.notEqual(globalMetricIndex, -1);
-	const globalMetricTail = hexdataBackend.slice(globalMetricIndex).replace("[·，,]", "·");
-	const hexdataWithoutGlobalSeparatorTolerance = hexdataBackend.slice(0, globalMetricIndex) + globalMetricTail;
 	const probes = [
 		["B-1 overview cache eviction", () => assertR46Contracts({
 			cacheSource: overviewCacheBackend.replace(
@@ -6465,7 +6438,7 @@ test("R46 mutation probes reject all six required regressions", () => {
 				"if len(cache.entries) > overviewQueryCacheMax {",
 			),
 		})],
-		["C-1 separator tolerance", () => assertR46Contracts({ hexSource: hexdataWithoutGlobalSeparatorTolerance })],
+		["C-1 ARAMKit percent units", () => assertR46Contracts({ aramSource: aramkitBackend.replaceAll("WinRate: s.WinRate * 100", "WinRate: s.WinRate") })],
 		["C-3 explicit empty augment array", () => assertR46Contracts({
 			goSource: gameplayBackend.replace('`json:"augments"`', '`json:"augments,omitempty"`'),
 		})],
@@ -6888,7 +6861,7 @@ test("R117 mayhem augment spinner resets even when the view changed mid-flight",
 	const state = {
 		mode: "aram-mayhem", mayhemView: "atlas", mayhemAugmentID: 0, mayhemAugmentRequestToken: 0,
 		mayhemAugmentLoading: false, mayhemAugmentError: "", mayhemAugmentDetail: null,
-		mayhemAugmentDetailCache: new Map(), augments: { source: "hexdata" },
+		mayhemAugmentDetailCache: new Map(), augments: { source: "ARAMKit" },
 	};
 	const requested = [];
 	let renders = 0;
@@ -6896,7 +6869,6 @@ test("R117 mayhem augment spinner resets even when the view changed mid-flight",
 	const functions = compileFunctions(script, ["loadMayhemAugmentDetail"], {
 		state,
 		render: () => { renders += 1; },
-		usesHexdata: (source) => source === "hexdata",
 		api: (path) => { requested.push(path); return new Promise((resolve) => { release = resolve; }); },
 	});
 	functions.loadMayhemAugmentDetail({ id: 7, key: "hex-seven" });
@@ -6904,7 +6876,7 @@ test("R117 mayhem augment spinner resets even when the view changed mid-flight",
 	assert.deepEqual(requested, ["/api/champions/augment-detail?id=7&slug=hex-seven"]);
 	const rendersWhileLoading = renders;
 	state.mayhemView = "champions"; // 用户切走图鉴视图
-	release({ source: "hexdata", champions: [{ id: 7 }] });
+	release({ source: "ARAMKit", champions: [{ id: 7 }] });
 	await new Promise((resolve) => setImmediate(resolve));
 	assert.equal(state.mayhemAugmentLoading, false, "陈旧响应不得把 mayhemAugmentLoading 永久留在 true");
 	assert.equal(state.mayhemAugmentDetail, null, "陈旧响应不得写入详情");
@@ -6914,10 +6886,10 @@ test("R117 mayhem augment spinner resets even when the view changed mid-flight",
 	// 视图没变时正常路径必须仍然写详情、进缓存并重渲染。
 	state.mayhemView = "atlas";
 	functions.loadMayhemAugmentDetail({ id: 7, key: "hex-seven" });
-	release({ source: "hexdata", champions: [{ id: 7 }] });
+	release({ source: "ARAMKit", champions: [{ id: 7 }] });
 	await new Promise((resolve) => setImmediate(resolve));
 	assert.equal(state.mayhemAugmentLoading, false);
-	assert.deepEqual(state.mayhemAugmentDetail, { source: "hexdata", champions: [{ id: 7 }] });
+	assert.deepEqual(state.mayhemAugmentDetail, { source: "ARAMKit", champions: [{ id: 7 }] });
 	assert.equal(state.mayhemAugmentDetailCache.size, 1, "当前视图下的结果必须进缓存");
 	assert.ok(renders > rendersWhileLoading, "当前视图下必须重渲染");
 });
@@ -6999,10 +6971,9 @@ test("R148 changing Mayhem heroes resets the detail tab and its saved setting", 
       objectRows: (value) => Array.isArray(value) ? value : [],
       mayhemOverviewTabMarkup: () => "OVERVIEW-CONTENT",
       mayhemBuildTabMarkup: () => "BUILD-CONTENT",
-      renderMayhemPerformancePanel: () => "PERFORMANCE-CONTENT",
     },
   );
-  const detail = { performance: { metrics: [{ key: "kda" }] } };
+  const detail = { source:"ARAMKit" };
   primeMayhemDetail({ championId: 887 });
   assert.equal(state.mayhemDetailTab, "overview");
   assert.equal(state.mayhemStage, 0);

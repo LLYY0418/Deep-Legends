@@ -57,7 +57,7 @@ func TestR157CommunityDragonAugmentBackoffAndRecovery(t *testing.T) {
 					return r157Response(request, http.StatusOK, `[{"id":93,"nameTRA":"目录名称"}]`), nil
 				}
 				return r157Response(request, http.StatusOK, `{"augments":[]}`), nil
-			case dataDragonHost, opggChampionHost, hexdataHost:
+			case dataDragonHost, opggChampionHost, aramkitDataCN:
 				return r157Response(request, http.StatusOK, `{}`), nil
 			default:
 				t.Fatalf("unexpected host: %s", request.URL.Host)
@@ -87,8 +87,8 @@ func TestR157CommunityDragonAugmentBackoffAndRecovery(t *testing.T) {
 		if _, err := provider.fetch(context.Background(), opggChampionHost, "/api/global/champions/arena/versions", nil, 1<<20, "application/json"); err != nil {
 			t.Fatalf("OP.GG was blocked by CommunityDragon backoff: %v", err)
 		}
-		if _, err := provider.fetch(context.Background(), hexdataHost, "/api/hexdata/heroes/157", nil, 1<<20, "application/json"); err != nil {
-			t.Fatalf("Hexdata was blocked by CommunityDragon backoff: %v", err)
+		if _, err := provider.fetch(context.Background(), aramkitDataCN, "/data/versions.json", nil, 1<<20, "application/json"); err != nil {
+			t.Fatalf("ARAMKit was blocked by CommunityDragon backoff: %v", err)
 		}
 		if calls.Load() != 4 {
 			t.Fatalf("other-host calls = %d, want 4", calls.Load())
@@ -221,7 +221,7 @@ func TestR157CommunityDragonArenaSupplementBacksOffWithoutLosingBase(t *testing.
 }
 
 func TestR159MayhemDetailDoesNotWaitForFailedCatalog(t *testing.T) {
-	provider, _ := r116aMayhemProvider(t, &r116aRecorder{}, r116aFixture(t, "hexdata-hero-157.json"))
+	provider, _ := newARAMKitFixtureProvider(t, "")
 	provider.static["item/3032.png"] = championAssetDescription{Name: "测试装备"}
 	base := provider.client.Transport
 	var catalogCalls atomic.Int32
@@ -323,7 +323,7 @@ func TestR157ArenaDetailReturnsQuicklyAfterCatalogTimeout(t *testing.T) {
 func TestR157SlowCommunityDragonDoesNotExhaustGameplayOrManualDetail(t *testing.T) {
 
 	r287TimingScenario(t, func(r287Context *r287TimingContext) {
-		provider, _ := r116aMayhemProvider(t, &r116aRecorder{}, r116aFixture(t, "hexdata-hero-157.json"))
+		provider, _ := newARAMKitFixtureProvider(t, "")
 		provider.static["item/3032.png"] = championAssetDescription{Name: "测试装备"}
 		base := provider.client.Transport
 		var catalogCalls atomic.Int32

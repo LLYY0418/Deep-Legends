@@ -38,7 +38,7 @@ func TestR86EmptyProcessDiscoverySkipsDiskButErrorsRetainFallback(t *testing.T) 
 	}
 }
 
-func TestR86ChampionDiskMigrationPruneAndThrottle(t *testing.T) {
+func TestR86ChampionDiskPruneAndThrottle(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, championDataCacheDirectory)
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -46,21 +46,16 @@ func TestR86ChampionDiskMigrationPruneAndThrottle(t *testing.T) {
 	}
 	var keys []string
 	for i := 0; i < 3; i++ {
-		key := fmt.Sprintf("hexdata-old|hero|%d", i)
+		key := fmt.Sprintf("riot-identity-v1|proseed:fixture%d", i)
 		keys = append(keys, key)
 		data := []byte("fixture")
 		sum := sha256.Sum256(data)
 		entry := championCacheEnvelope{Schema: championCacheSchema, Key: key, Data: data, Hash: hex.EncodeToString(sum[:])}
 		payload, _ := json.Marshal(entry)
 		hash := sha256.Sum256([]byte(key))
-		if err := os.WriteFile(filepath.Join(dir, hex.EncodeToString(hash[:])+".json"), payload, 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "proseed-"+hex.EncodeToString(hash[:])+".json"), payload, 0600); err != nil {
 			t.Fatal(err)
 		}
-	}
-	// A interrupted prior migration may leave a corrupt new-name target.
-	firstHash := sha256.Sum256([]byte(keys[0]))
-	if err := os.WriteFile(filepath.Join(dir, "hexdata-"+hex.EncodeToString(firstHash[:])+".json"), []byte("corrupt"), 0600); err != nil {
-		t.Fatal(err)
 	}
 	c := newChampionDataCache(trackTestStore(t, &localStore{root: root}))
 	if c.migrationErr != nil {
@@ -101,7 +96,7 @@ func TestR86ChampionDiskMigrationPruneAndThrottle(t *testing.T) {
 	entries, _ := os.ReadDir(dir)
 	var total int64
 	for _, entry := range entries {
-		if !strings.HasPrefix(entry.Name(), "hexdata-") {
+		if !strings.HasPrefix(entry.Name(), "proseed-") {
 			info, _ := entry.Info()
 			total += info.Size()
 		}

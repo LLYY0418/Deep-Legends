@@ -18,20 +18,20 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 )
 
 func TestGameplayRecommendationBundleDropsAugmentStages(t *testing.T) {
-	recorder := &r116aRecorder{}
-	provider, _ := r116aMayhemProvider(t, recorder, r116aFixture(t, "hexdata-hero-157.json"))
+	provider, _ := newARAMKitFixtureProvider(t, "")
 	detail, err := provider.loadMayhemDetail(context.Background(), "157")
 	if err != nil {
 		t.Fatalf("loadMayhemDetail failed: %v", err)
 	}
-	source := r116bAugmentRow(t, detail.RecommendedAugments, 2095)
+	source := r116bAugmentRow(t, detail.RecommendedAugments, 3078)
 	if len(source.Stages) != 4 {
-		t.Fatalf("详情页的 augment 2095 应该带 4 条阶段行，实际 %d 条", len(source.Stages))
+		t.Fatalf("详情页的 augment 3078 应该带 4 条阶段行，实际 %d 条", len(source.Stages))
 	}
 
 	bundle := gameplayRecommendationsFromResolvedDetail(157, "", detail, gameplayRecommendationModeResolution{InternalMode: "hextech-aram", QueueID: 420})
@@ -45,20 +45,18 @@ func TestGameplayRecommendationBundleDropsAugmentStages(t *testing.T) {
 	}
 
 	// 只剥阶段维度：局内推荐页要渲染的字段必须逐字保留。
-	stripped := r116bAugmentRow(t, bundle.Augments, 2095)
-	if stripped.WinRate != source.WinRate || stripped.DeltaWinRate != source.DeltaWinRate ||
-		stripped.PickRate != source.PickRate || stripped.Score != source.Score ||
-		stripped.Games != source.Games || stripped.HexLabel != source.HexLabel ||
-		stripped.Grade != source.Grade || stripped.SampleTier != source.SampleTier ||
-		stripped.WilsonLowerWinRate != source.WilsonLowerWinRate {
-		t.Fatalf("剥 stages 时误伤了别的字段：\n got %#v\nwant %#v", stripped, source)
+	stripped := r116bAugmentRow(t, bundle.Augments, 3078)
+	expected := source
+	expected.Stages = nil
+	if !reflect.DeepEqual(stripped, expected) {
+		t.Fatalf("stage stripping changed shared fields: got %#v want %#v", stripped, expected)
 	}
 	if len(stripped.Assets) != len(source.Assets) {
 		t.Fatalf("资产列表被改动：%d vs %d", len(stripped.Assets), len(source.Assets))
 	}
 
 	// 值拷贝：详情页那份切片（还要进缓存与详情响应）不受影响。
-	if len(r116bAugmentRow(t, detail.RecommendedAugments, 2095).Stages) != 4 {
+	if len(r116bAugmentRow(t, detail.RecommendedAugments, 3078).Stages) != 4 {
 		t.Fatal("detail.RecommendedAugments 的 stages 被 bundle 转换清掉了（必须是值拷贝）")
 	}
 

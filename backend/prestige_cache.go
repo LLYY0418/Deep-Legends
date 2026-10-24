@@ -44,7 +44,6 @@ func (s *localStore) prestigeArtworkPath(instanceID string) string {
 }
 
 // The owner is initialized with memory operations only. Its worker handles
-// advisory artwork touches and coalesced Hexdata state snapshots, never under
 // localStore.mu. Artwork writes already run off the request path.
 func (s *localStore) auxiliaryCacheDisk() *championDataCache {
 	s.mu.Lock()

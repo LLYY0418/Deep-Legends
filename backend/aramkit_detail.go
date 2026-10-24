@@ -279,7 +279,7 @@ func (p *championProvider) loadARAMKitRankings(ctx context.Context) (championRan
 	if e != nil {
 		return championRankingResponse{}, e
 	}
-	r, e := p.loadARAMKitResources(ctx, v)
+	r, e := p.loadARAMKitChampionResources(ctx, v)
 	if e != nil {
 		return championRankingResponse{}, e
 	}
@@ -467,7 +467,7 @@ func (p *championProvider) loadARAMKitRarity(ctx context.Context) (championAugme
 		if !valid || len(seen) != 3 || total < 0.99 || total > 1.01 {
 			continue
 		}
-		row := hexdataRarityStage{Stage: n, Games: s.SampleCount}
+		row := championRarityStage{Stage: n, Games: s.SampleCount}
 		for _, v := range s.Rows {
 			switch v.Rarity {
 			case "silver":
@@ -481,8 +481,8 @@ func (p *championProvider) loadARAMKitRarity(ctx context.Context) (championAugme
 		out.Stages = append(out.Stages, row)
 	}
 	sort.Slice(out.Stages, func(i, j int) bool { return out.Stages[i].Stage < out.Stages[j].Stage })
-	if len(out.Stages) == 0 {
-		return out, errors.New("ARAMKit rarity stages empty")
+	if len(out.Stages) != 4 {
+		return out, errors.New("ARAMKit rarity stages incomplete")
 	}
 	return out, nil
 }
@@ -492,7 +492,7 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 	result, e := p.loadARAMKitDetail(ctx, champion)
 	if e == nil {
 		if p.diag != nil {
-			p.diag(map[string]any{"event": "mayhem_detail_phases_ms", "stats_source": "aramkit", "items_source": "aramkit", "total": time.Since(started).Milliseconds()})
+			p.diag(map[string]any{"event": "mayhem_detail_phases_ms", "stats_source": "aramkit", "items_source": "aramkit", "decorate": int64(0), "total": time.Since(started).Milliseconds()})
 		}
 		return result, nil
 	}

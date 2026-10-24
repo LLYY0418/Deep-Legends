@@ -136,23 +136,9 @@ func TestMayhemCurrentCatalogReplacesOldPoolAndKeepsHistoryMetadata(t *testing.T
 func TestMayhemCurrentDescriptionSupersedesPrePatchCache(t *testing.T) {
 	p := newChampionProvider()
 	p.cache = newChampionDataCache(&localStore{root: t.TempDir()})
-	p.saveAugmentDescription(gameplayAugmentDescription{ID: 3048, Description: "旧版本", Status: "ok", Source: "hexdata"})
+	p.saveAugmentDescription(gameplayAugmentDescription{ID: 3048, Description: "旧版本", Status: "ok", Source: "retired"})
 	got := p.resolveAugmentDescription(context.Background(), 3048, nil)
 	if got.Status != "ok" || got.Description == "旧版本" || got.Description == "" {
 		t.Fatal(got)
-	}
-}
-
-func TestMayhemReadingCachedCitationDoesNotPostponeVersionCheck(t *testing.T) {
-	p := newChampionProvider()
-	h := newHexdataClient(p, nil)
-	now := time.Now()
-	h.now = func() time.Time { return now }
-	old := now.Add(-13 * time.Hour)
-	h.state.BuildID = "hexdata-old"
-	h.state.BuildChecked = old
-	h.adoptCitation(championSourceCitation{Source: "Hexdata", Patch: "16.20", ReportDate: "2026-10-12", BuildID: "hexdata-old", CanonicalURL: "https://hexdata.com.cn/augments"})
-	if !h.snapshot().BuildChecked.Equal(old) {
-		t.Fatal("cached citation reset build freshness")
 	}
 }

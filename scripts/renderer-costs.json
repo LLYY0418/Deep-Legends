@@ -212,7 +212,6 @@
   "scripts/r276-api-fault-policy.test.cjs": 103,
   "scripts/r276-filter-geometry-fixture.test.cjs": 2711,
   "scripts/r276-fresh-chrome-fixture.test.cjs": 87,
-  "scripts/r276-hexdata-stress.test.cjs": 176,
   "scripts/r276-installed-demo.test.cjs": 211,
   "scripts/r276-offline.test.cjs": 262,
   "scripts/r276-powershell-fixture.test.cjs": 100,
@@ -248,5 +247,6 @@
   "scripts/verify-ci-test-filters.test.cjs": 14179,
   "scripts/verify-no-docs-tracked.test.cjs": 1046,
   "scripts/wait-migration.test.cjs": 180,
-  "scripts/wait-progress.test.cjs": 274
+  "scripts/wait-progress.test.cjs": 274,
+  "scripts/r307-aramkit-stress.test.cjs": 176
 }

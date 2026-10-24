@@ -239,7 +239,7 @@ func TestR280RecoveryClearsFailuresAndBroadcastsOnce(t *testing.T) {
 	riotRelays = &riotRelayState{nextTry: time.Now().Add(time.Hour), failures: 3, networkFailures: 3}
 	defer func() { riotRelays = oldRelay }()
 	p := newChampionProvider()
-	p.hexdata.state.Circuits = map[string]hexdataCircuitState{"heroes": {Failures: 3, Until: time.Now().Add(time.Hour)}}
+	p.aramkitClient().retry["versions"] = time.Now().Add(time.Hour)
 	r := newRiotProvider(p)
 	r.accountCache = map[string]riotAccountCacheEntry{"failed": {err: errors.New("network")}, "success": {account: riotAccount{PUUID: "fixture"}}}
 	c := newAramkitRatingClient(p, nil, nil)
@@ -255,7 +255,7 @@ func TestR280RecoveryClearsFailuresAndBroadcastsOnce(t *testing.T) {
 	if len(events) != 1 || !strings.Contains(<-events, "riot-relay-recovered") {
 		t.Fatal("recovery event count")
 	}
-	if riotRelays.failures != 0 || !riotRelays.nextTry.IsZero() || len(p.hexdata.state.Circuits) != 0 {
+	if riotRelays.failures != 0 || !riotRelays.nextTry.IsZero() || len(p.aramkitClient().retry) != 0 {
 		t.Fatal("backoff not cleared")
 	}
 	if _, ok := r.accountCache["failed"]; ok {

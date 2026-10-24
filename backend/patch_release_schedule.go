@@ -265,7 +265,7 @@ func (a *app) refreshPatchReleaseData(ctx context.Context, at time.Time) {
 
 func mayhemReleaseCacheKey(key string) bool {
 	return strings.HasPrefix(key, "v2|opgg-rsc|aram-mayhem|") ||
-		strings.HasPrefix(key, "hexdata-") || strings.HasPrefix(key, "bootstrap|") ||
+		strings.HasPrefix(key, "bootstrap|") ||
 		key == championCacheKey(opggPageHost, "/zh-cn/lol/modes/aram-mayhem", "", "text/html,application/xhtml+xml") ||
 		key == championCacheKey(opggChampionHost, "/api/contents/tiers", "type=aram_mayhem", "application/json")
 }

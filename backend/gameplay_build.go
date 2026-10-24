@@ -376,7 +376,7 @@ func augmentEffectDescription(value string) string {
 	if err != nil {
 		return ""
 	}
-	text := strings.TrimSpace(hexdataNodeText(document))
+	text := strings.TrimSpace(markupPlainText(document))
 	if text == "" || strings.Contains(text, augmentOfflineDescription) {
 		return ""
 	}
@@ -535,4 +535,20 @@ func (a *app) handleGameplayAugmentDescriptions(w http.ResponseWriter, r *http.R
 	respondJSON(w, struct {
 		Items []gameplayAugmentDescription `json:"items"`
 	}{items})
+}
+
+func markupPlainText(node *xhtml.Node) string {
+	var builder strings.Builder
+	var walk func(*xhtml.Node)
+	walk = func(current *xhtml.Node) {
+		if current.Type == xhtml.TextNode {
+			builder.WriteString(current.Data)
+			builder.WriteByte(' ')
+		}
+		for child := current.FirstChild; child != nil; child = child.NextSibling {
+			walk(child)
+		}
+	}
+	walk(node)
+	return strings.Join(strings.Fields(builder.String()), " ")
 }

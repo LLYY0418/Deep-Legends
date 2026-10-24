@@ -24,13 +24,6 @@ func TestR150NormalizeChampionGrade(t *testing.T) {
 		{"opgg", 0, "", "OP"}, {"opgg", 1, "", "S"}, {"opgg", 2, "", "A"},
 		{"opgg", 3, "", "B"}, {"opgg", 4, "", "C"}, {"opgg", 5, "", "D"},
 		{"opgg", -1, "", ""}, {"opgg", 6, "", ""},
-		{"hexdata-hero", 1, "", "S"}, {"hexdata-hero", 2, "", "A"}, {"hexdata-hero", 3, "", "B"},
-		{"hexdata-hero", 4, "", "C"}, {"hexdata-hero", 5, "", "F"},
-		{"hexdata-hero", 0, "", ""}, {"hexdata-hero", 6, "", ""},
-		{"hexdata-augment", 0, "hang", "S"}, {"hexdata-augment", 0, "top", "A"},
-		{"hexdata-augment", 0, "elite", "B"}, {"hexdata-augment", 0, "npc", "C"},
-		{"hexdata-augment", 0, "trap", "F"}, {"hexdata-augment", 0, "insufficient", ""},
-		{"hexdata-augment", 0, "", ""}, {"hexdata-augment", 0, "unknown", ""},
 		{"local", 0, "S", "S"}, {"local", 0, "A", "A"}, {"local", 0, "B", "B"}, {"local", 0, "OP", ""},
 		{"opgg-augment-catalog", 0, "", "S"}, {"opgg-augment-catalog", 1, "", "A"},
 		{"opgg-augment-catalog", 2, "", "B"}, {"opgg-augment-catalog", 3, "", "C"},
@@ -56,7 +49,7 @@ func TestR150YourGGOPAndSKeepDistinctGradesAndOrder(t *testing.T) {
 }
 
 func TestR150LocalGradeNeverBecomesDisplayedScore(t *testing.T) {
-	rows := []championMetricRow{{Games: 1000, WinRate: 60}, {Games: 1000, WinRate: 50}, {HexTier: "top", HexLabel: "顶级", Score: 88}}
+	rows := []championMetricRow{{Games: 1000, WinRate: 60}, {Games: 1000, WinRate: 50}, {Grade: "A", Score: 88}}
 	applyLocalAugmentGrades(rows)
 	if rows[0].Score != 0 || rows[1].Score != 0 || rows[0].Grade == "" || rows[1].Grade == "" || rows[2].Score != 88 || rows[2].Grade != "A" {
 		t.Fatalf("local/official grade and score = %+v", rows)

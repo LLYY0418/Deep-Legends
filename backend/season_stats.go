@@ -169,7 +169,6 @@ const seasonAugmentSampleLimit = 2000
 //
 // 只存 P2-6「选了某个海克斯之后通常出什么」这一个静态查询必要的字段。
 // 伤害/承伤/经济/22 项 postmatch 指标一律不存——那是英雄级统计，走
-// R116-A 的 /api/hexdata/postmatch，不在个人对局记录里重复存一份
 // （Anti-scope 第 4 条）。
 //
 // 只在海克斯大乱斗队列（2300/2400/3270）记录，经典排位没有海克斯。
@@ -1441,8 +1440,6 @@ func (a *app) startSeasonBackfill(client *LCUClient, reference gameplayReference
 
 const (
 	// seasonAugmentMinimumSample 是海克斯分组的最小样本门槛。
-	// 工单建议「复用 hexdataMinimumSample 类似的量级但按个人样本调低，比如
-	// 10 场」：hexdataMinimumSample = 250 是全服英雄级口径，个人样本一个赛季
 	// 打到 2000 场海斗已经是高频玩家，10 场是「看得出倾向、又不至于把 1 场
 	// 当规律」的下限。门槛可由调用方覆盖（HTTP 层暴露成查询参数）。
 	seasonAugmentMinimumSample = 10

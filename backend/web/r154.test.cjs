@@ -92,10 +92,10 @@ test("R154 open circuit and ordinary timeout show different detail errors", () =
   const fn = champions.match(/  function championDetailErrorMessage\(error\) \{[\s\S]*?\n  \}/)?.[0];
   assert.ok(fn);
   const message = Function(`${fn}; return championDetailErrorMessage;`)();
-  assert.equal(message(new Error("hexdata circuit is open")), "上游暂时不可用，请稍后再试");
+  assert.equal(message(new Error("上游暂时不可用")), "上游暂时不可用，请稍后再试");
   assert.equal(message(new Error("上游暂时不可用，请稍后再试")), "上游暂时不可用，请稍后再试");
   assert.equal(message(Object.assign(new Error("本地请求超时，请重试"), { name: "TimeoutError" })), "网络超时，请重试");
-  const mutant = fn.replace('if (message.includes("hexdata circuit is open") || message.includes("上游暂时不可用")) return "上游暂时不可用，请稍后再试";', '');
+  const mutant = fn.replace('if (message.includes("上游暂时不可用")) return "上游暂时不可用，请稍后再试";', '');
   const mutated = Function(`${mutant}; return championDetailErrorMessage;`)();
-  assert.notEqual(mutated(new Error("hexdata circuit is open")), message(new Error("hexdata circuit is open")));
+  assert.notEqual(mutated(new Error("上游暂时不可用")), message(new Error("上游暂时不可用")));
 });

@@ -114,7 +114,7 @@ func TestR191_03OneMissingDropsGroup(t *testing.T) {
 	}
 }
 func TestR191_04V2CacheRoundtrip(t *testing.T) {
-	p := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+	p := newPublicDataTestProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		t.Fatal("v2 should avoid network")
 		return nil, errors.New("unexpected")
 	}))
@@ -252,31 +252,29 @@ func TestR191_08DiagnosticExport(t *testing.T) {
 
 func r191AugmentProvider(t *testing.T, mode string) *championProvider {
 	t.Helper()
-	p := newHexdataBudgetProvider(t, t.TempDir(), championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		switch r.URL.Path {
-		case "/augments":
+	p, _ := newARAMKitFixtureProvider(t, "")
+	base := p.client.Transport
+	p.client.Transport = championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if strings.HasSuffix(r.URL.Path, "/resources/augments.json") {
 			if mode == "error" {
 				return nil, errors.New("directory fixture failure")
 			}
 			if mode == "invalid" {
-				return hexdataResponse(r, []byte("changed directory")), nil
+				return publicDataResponse(r, []byte("changed directory")), nil
 			}
-			catalog := string(hexdataAugmentsTestPage())
-			if mode != "not-found" {
-				catalog = strings.Replace(catalog, "/augment/1000-augment1000", "/augment/1225-dual-wield", 1)
+			if mode == "not-found" {
+				return publicDataResponse(r, []byte(`{}`)), nil
 			}
-			return hexdataResponse(r, []byte(catalog)), nil
-		case "/augment/1225-dual-wield":
-			return hexdataResponse(r, r190DetailPage("攻击时施加攻击特效。")), nil
-		case "/latest/plugins/rcp-be-lol-game-data/global/zh_cn/v1/cherry-augments.json":
-			return hexdataResponse(r, []byte(`[{"id":1225,"name":"元数据","description":"禁止补入的目录效果。"}]`)), nil
-		case "/latest/cdragon/arena/zh_cn.json":
-			return hexdataResponse(r, []byte(`{"augments":[]}`)), nil
-		default:
-			return hexdataResponse(r, hexdataTestPage("<p>fixture</p>")), nil
+			return publicDataResponse(r, []byte(`{"1225":{"name":"测试海克斯","icon":"assets/augment/1225.webp","tooltip":{"blocks":[{"spans":[{"type":"text","text":"攻击时施加攻击特效。"}]}]}}}`)), nil
 		}
-	}))
-	p.hexdata.adoptCitation(championSourceCitation{Source: "Hexdata", Patch: "16.16", ReportDate: "2026-08-19", BuildID: hexdataTestBuild, CanonicalURL: "https://hexdata.com.cn/augments"})
+		if strings.HasSuffix(r.URL.Path, "/augment-details/1225.json") {
+			return publicDataResponse(r, []byte(`{"augment":{"id":1225},"champions":{"all":[]}}`)), nil
+		}
+		if r.URL.Host == communityDragonHost {
+			return publicDataResponse(r, []byte(`{"augments":[]}`)), nil
+		}
+		return base.RoundTrip(r)
+	})
 	return p
 }
 func TestR191_11DirectoryFallbackHTTP(t *testing.T) {
@@ -304,8 +302,8 @@ func TestR191_12FallbackBuildUsesCurrentSnapshot(t *testing.T) {
 }
 func TestR191_13NormalGuide(t *testing.T) {
 	p := r191AugmentProvider(t, "normal")
-	detail, err := p.loadHexdataAugmentDetail(context.Background(), 1225, "")
-	if err != nil || detail.Source != "Hexdata" || detail.effectDescription != "攻击时施加攻击特效。" {
+	detail, err := p.loadCurrentAugmentDetail(context.Background(), 1225)
+	if err != nil || detail.Source != "ARAMKit" || detail.effectDescription != "攻击时施加攻击特效。" {
 		t.Fatalf("%+v %v", detail, err)
 	}
 	items := loadGameplayAugmentDescriptions(context.Background(), []int64{1225}, p.gameplayAugmentDescription)

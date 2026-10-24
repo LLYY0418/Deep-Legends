@@ -111,7 +111,6 @@ var networkProbeURLs = map[string]string{
 	"riot":      "https://kr.api.riotgames.com/lol/status/v4/platform-data",
 	"opgg":      "https://lol-api-champion.op.gg/",
 	"aramkit":   "https://api.aramkit.com/",
-	"hexdata":   "https://hexdata.com.cn/",
 	"community": "https://raw.communitydragon.org/latest/game/",
 }
 
@@ -125,8 +124,6 @@ func networkGroup(host string) string {
 		return "aramkit"
 	case strings.Contains(host, "communitydragon"):
 		return "community"
-	case host == hexdataHost || host == hexdataAssetHost:
-		return "hexdata"
 	default:
 		return host
 	}
