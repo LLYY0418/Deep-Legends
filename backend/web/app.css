@@ -887,10 +887,6 @@ body.is-demo .toast { bottom: 52px; }
 .update-icon-button { position: relative; min-width: 36px; min-height: 36px; color: var(--primary-strong); }
 .update-icon-button .control-icon { width: var(--topbar-icon-size); height: var(--topbar-icon-size); }
 .update-icon-button:hover { color: var(--primary-strong); background: var(--primary-soft); }
-.update-icon-button .dot {
-  position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%;
-  background: var(--danger); box-shadow: 0 0 0 2px var(--bg);
-}
 @keyframes update-breathe { 0%,100% { transform: none; } 50% { transform: translateY(-1.5px); } }
 .update-icon-button.fresh .control-icon { animation: update-breathe 1.6s ease-in-out 3; }
 .update-icon-button.busy { color: var(--muted); }
@@ -1102,7 +1098,8 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .toast{z-index:2147483646}.match-virtual-skeleton{display:flex;gap:16px;padding:20px}.match-virtual-skeleton span{height:48px;flex:1}
 
 
-#announcements-button{position:relative;flex:0 0 auto}#announcements-button.has-announcement-unread:after{content:'';position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--danger)}
+#announcements-button{position:relative;flex:0 0 auto}
+#announcements-button.has-announcement-unread:after,.update-icon-button .dot{content:'';position:absolute;top:-1px;right:-1px;width:min(6px,20%);height:min(6px,20%);border-radius:50%;background:var(--danger);pointer-events:none}
 
 @media (prefers-reduced-motion: reduce) { .player-search-query { scroll-behavior: auto; } }
 
@@ -1116,7 +1113,7 @@ img[data-queued-src]:not([data-image-ready]) { visibility: hidden; }
 .topbar :is(#announcements-button,#update-open){width:var(--topbar-control-size);padding:0;display:inline-flex;align-items:center;justify-content:center;background:var(--surface-strong);border:1px solid var(--line);border-radius:10px}
 
 .dialog-close-button{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;color:var(--ink);background:var(--surface-strong);border:1px solid var(--line);border-radius:8px}
-.topbar #update-button{min-width:0;width:var(--topbar-control-size);background:var(--surface-strong);border:1px solid var(--line);border-radius:10px}
+.topbar #update-button{min-width:0;width:var(--topbar-control-size);background:var(--surface-strong);border:0;border-radius:10px}
 
 .topbar :is(button, .player-search-fields) { flex-shrink:0; }
 .topbar .player-search-fields { flex-shrink:1; }
@@ -1222,11 +1219,11 @@ html[data-ui-preferences="pending"] #app-frame { visibility: hidden; }
 .settings-modal header{ display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px;}
 
 .update-icon-button .control-icon { fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.update-icon-button .update-border { position:absolute; inset:-1px; width:calc(100% + 2px); height:calc(100% + 2px); pointer-events:none; display:none; fill:none; }
-.update-icon-button.busy .update-border { display:block; }
-.update-icon-button .update-border-progress { stroke:var(--primary); stroke-width:1.5; vector-effect:non-scaling-stroke; stroke-dasharray:100; stroke-linecap:round; transition:stroke-dashoffset .3s ease; }
-.update-icon-button .dot { display:none; }
+.update-icon-button .update-border { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; fill:none; }
+.update-icon-button .update-border rect { x:.5px; y:.5px; width:calc(100% - 1px); height:calc(100% - 1px); rx:9.5px; stroke-width:1; }
+.update-icon-button .update-border-track { stroke:var(--line); }
+.update-icon-button .update-border-progress { display:none; stroke:var(--primary); stroke-dasharray:100; stroke-linecap:butt; transition:stroke-dashoffset .3s ease; }
+.update-icon-button.busy .update-border-progress { display:block; }
+.update-icon-button .dot { display:none; top:0; right:0; }
 .update-icon-button.ready .dot { display:block; }
 @media(prefers-reduced-motion:reduce){.update-icon-button .update-border-progress{transition:none;}}
-
-.update-icon-button .dot { top:3px; right:3px; box-shadow:none; }

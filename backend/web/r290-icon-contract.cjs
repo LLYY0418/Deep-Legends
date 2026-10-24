@@ -9,5 +9,7 @@ function assertArrow(svg){
  const progress=svg.parentElement.querySelector(".update-border .update-border-progress");assert(progress,"progress stays on button border");
  assert.equal(progress.getAttribute("pathLength"),"100");assert.equal(progress.getAttribute("stroke-dashoffset"),"100");
  assert.equal(progress.tagName.toLowerCase(),"rect");
+ assert.equal(progress.ownerSVGElement.hasAttribute("viewBox"),false,"border uses button CSS coordinates without stretching");
+ assert(progress.ownerSVGElement.querySelector(".update-border-track"),"actual outline shares rect geometry with progress");
 }
 module.exports={assertArrow};
