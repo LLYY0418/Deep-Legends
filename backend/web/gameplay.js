@@ -7083,6 +7083,8 @@
     return `<div data-live-notice="squad">${data?.arenaMySquadNotice ? `<p class="arena-my-squad-notice">${escapeHTML(data.arenaMySquadNotice)}</p>` : ""}</div>${renderRecommendationArea(data)}`;
   }
 
+  // R129 P1：参与 markup 比较与增量替换的 HTML 只能由快照数据和用户选择决定，
+  // 不能包含 state.liveLoading；瞬时加载状态只更新工具栏的 data-live-status。
   function renderLive(source = "direct") {
     if (state.destroyed || (state.section && state.section !== "live")) return;
     state.liveRenderSource = state.liveRenderTrigger || liveRenderTriggerLabel(source);

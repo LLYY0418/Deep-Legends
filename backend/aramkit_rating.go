@@ -346,15 +346,20 @@ func (c *aramkitRatingClient) pruneCacheLocked(now time.Time) {
 
 func (c *aramkitRatingClient) waitForPace(ctx context.Context) error {
 	c.paceMu.Lock()
-	defer c.paceMu.Unlock()
 	now := c.now()
-	delay := c.minimumDelay + c.jitter(c.maximumJitter) - now.Sub(c.lastRequest)
-	if !c.lastRequest.IsZero() && delay > 0 {
-		if err := c.sleep(ctx, delay); err != nil {
-			return err
+	scheduled := now
+	if !c.lastRequest.IsZero() {
+		next := c.lastRequest.Add(c.minimumDelay + c.jitter(c.maximumJitter))
+		if next.After(scheduled) {
+			scheduled = next
 		}
 	}
-	c.lastRequest = c.now()
+	c.lastRequest = scheduled
+	c.paceMu.Unlock()
+	// Reserve a slot under the lock, then wait with the lookup's shared deadline.
+	if delay := scheduled.Sub(now); delay > 0 {
+		return c.sleep(ctx, delay)
+	}
 	return nil
 }
 
@@ -582,9 +587,6 @@ func (a *app) handleGameplayMayhemRating(w http.ResponseWriter, r *http.Request)
 // Only the primary starts immediately. The alternate begins after three seconds,
 // or immediately after a failed primary. Both share one bounded lookup context.
 func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine string) aramkitRatingOutcome {
-	if e := c.waitForPace(ctx); e != nil {
-		return aramkitRatingOutcome{reason: "cancelled", result: "unavailable", response: unavailableMayhemRating("查询已取消", dataSourceFailed)}
-	}
 	parent := ctx
 	total := c.totalTimeout
 	if total <= 0 || total > 25*time.Second {
@@ -592,6 +594,13 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 	}
 	ctx, cancel := context.WithTimeout(ctx, total)
 	defer cancel()
+	if e := c.waitForPace(ctx); e != nil {
+		reason := "timeout"
+		if parent.Err() != nil {
+			reason = "cancelled"
+		}
+		return aramkitRatingOutcome{reason: reason, result: "unavailable", response: unavailableMayhemRating("查询已取消", dataSourceFailed)}
+	}
 	fallback := c.fallbackURL
 	// Existing injected endpoints remain self contained; tests can supply two local endpoints.
 	if c.baseURL != "https://"+aramkitRatingCNHost && fallback == "https://"+aramkitRatingHost {

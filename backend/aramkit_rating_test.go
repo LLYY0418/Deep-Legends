@@ -170,6 +170,33 @@ func TestAramkitRatingTimeoutFeatureGateSingleFlightAndPacing(t *testing.T) {
 	})
 }
 
+func TestR307ARAMKitRatingPacingSharesTotalDeadline(t *testing.T) {
+	client := newAramkitTestClient(aramkitRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		t.Error("an expired pacing reservation must not reach the network")
+		return nil, errors.New("unexpected request")
+	}))
+	client.totalTimeout = 20 * time.Millisecond
+	client.minimumDelay = time.Hour
+	client.lastRequest = client.now()
+	client.sleep = func(ctx context.Context, _ time.Duration) error {
+		if !client.paceMu.TryLock() {
+			t.Error("pacing wait held the reservation mutex")
+		} else {
+			client.paceMu.Unlock()
+		}
+		deadline, ok := ctx.Deadline()
+		if !ok || time.Until(deadline) > client.totalTimeout {
+			t.Error("pacing wait is outside the lookup deadline")
+			return context.DeadlineExceeded
+		}
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	if got := client.fetch(t.Context(), "fixture", "1"); got.reason != "timeout" || got.response.Available {
+		t.Fatalf("paced deadline outcome = %#v", got)
+	}
+}
+
 func TestAramkitRatingHandlerUsesOpaqueReferenceAndRejectsKR(t *testing.T) {
 	var requested atomic.Int32
 	client := newAramkitTestClient(aramkitRoundTripFunc(func(request *http.Request) (*http.Response, error) {

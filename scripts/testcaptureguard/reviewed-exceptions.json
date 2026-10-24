@@ -8,9 +8,9 @@
   },
   {
     "file": "backend/aramkit_rating_test.go",
-    "line": 203,
+    "line": 230,
     "target": "events",
-    "source_sha256": "ec0fb85719f895338f3ece294d39031475191f0b51d672ca25fa9b219a5e503b",
+    "source_sha256": "26a1838153ad766067666de31b81107af53b9e615b7a92120d04e2050849b9b2",
     "comment": "r276-capture-safe: TestAramkitDiagnosticsContainOnlyHashedIdentity: the audited fixture operations in this test invoke this callback serially and return before events is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
