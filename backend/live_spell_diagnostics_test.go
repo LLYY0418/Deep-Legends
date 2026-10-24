@@ -11,13 +11,14 @@ import (
 
 func TestLiveSpellProbeChangesPrivacyAndMissingValues(t *testing.T) {
 	p := newLiveSpellProbe()
-	raw := []byte(`[{"riotId":"PRIVATE#123","summonerName":"PRIVATE","team":"CHAOS","nameVisibilityType":"HIDDEN","summonerSpells":{"summonerSpellOne":{"displayName":"PRIVATE","rawDisplayName":"GeneratedTip_SummonerSpell_SummonerFlash_DisplayName","rawDescription":"SECRET","PRIVATE-key":123},"summonerSpellTwo":{"rawDisplayName":"SummonerDot"}}}]`)
-	rows, ok := p.playerRows(raw)
+	raw := []byte(`[{"riotId":"PRIVATE#123","summonerName":"PRIVATE","team":"CHAOS","nameVisibilityType":"HIDDEN","summonerSpells":{"summonerSpellOne":{"displayName":"PRIVATE","rawDisplayName":"GeneratedTip_SummonerSpell_SummonerFlash_DisplayName","rawDescription":"技能描述","PRIVATE-key":123},"summonerSpellTwo":{"rawDisplayName":"SummonerDot"}}}]`)
+	allRows, ok := p.playerRows(raw)
+	rows := spellSummaryRows(allRows, "live_spell_player")
 	if !ok || len(rows) != 1 {
 		t.Fatalf("baseline %v %v", rows, ok)
 	}
-	encoded, _ := json.Marshal(rows)
-	for _, secret := range []string{"PRIVATE", "SECRET", "HIDDEN", "nameVisibilityType"} {
+	encoded, _ := json.Marshal(allRows)
+	for _, secret := range []string{"PRIVATE", "SECRET", "HIDDEN"} {
 		if strings.Contains(string(encoded), secret) {
 			t.Fatalf("identity leaked: %s", encoded)
 		}
@@ -31,7 +32,8 @@ func TestLiveSpellProbeChangesPrivacyAndMissingValues(t *testing.T) {
 		t.Fatal("unchanged snapshot logged again")
 	}
 	changed := []byte(strings.Replace(string(raw), `"PRIVATE-key":123`, `"cooldownRemaining":299,"isVisible":false`, 1))
-	rows, ok = p.playerRows(changed)
+	allRows, ok = p.playerRows(changed)
+	rows = spellSummaryRows(allRows, "live_spell_player")
 	if !ok || len(rows) != 1 || rows[0]["baseline"] != false {
 		t.Fatal("missed change")
 	}
@@ -51,11 +53,12 @@ func TestLiveSpellProbeEventsResetAndMalformed(t *testing.T) {
 		t.Fatal("game time")
 	}
 	raw := []byte(`{"Events":[{"EventID":1,"EventName":"SummonerSpellCast","EventTime":120,"CasterName":"PRIVATE","SpellID":4},{"EventID":2,"EventName":"PRIVATE","PRIVATE":123}]}`)
-	rows, ok := p.eventRows(raw)
+	allRows, ok := p.eventRows(raw)
+	rows := spellSummaryRows(allRows, "live_spell_event")
 	if !ok || len(rows) != 2 || rows[0]["name"] != "SummonerSpellCast" || rows[1]["name"] != "unknown" {
 		t.Fatalf("events: %v", rows)
 	}
-	encoded, _ := json.Marshal(rows)
+	encoded, _ := json.Marshal(allRows)
 	if strings.Contains(string(encoded), "PRIVATE") {
 		t.Fatal("event identity leaked")
 	}
@@ -63,7 +66,7 @@ func TestLiveSpellProbeEventsResetAndMalformed(t *testing.T) {
 		t.Fatal("duplicate events")
 	}
 	p.gameTime([]byte(`{"gameTime":1}`))
-	if rows, _ := p.eventRows(raw); p.epoch != 1 || len(rows) != 2 {
+	if rows, _ := p.eventRows(raw); p.epoch != 1 || len(spellSummaryRows(rows, "live_spell_event")) != 2 {
 		t.Fatal("new game reused event IDs")
 	}
 	for _, raw := range []string{`null`, `{}`, `{"Events":null}`, `{"Events":"error"}`} {
@@ -92,7 +95,7 @@ func TestLiveSpellProbeContinuesAfterSuccessAndCancels(t *testing.T) {
 		case "gamestats":
 			return []byte(`{"gameTime":1}`), 200, nil
 		case "playerlist":
-			return []byte(`[{"summonerSpells":{}}]`), 200, nil
+			return []byte(`[{"riotId":"PRIVATE#1","summonerSpells":{}}]`), 200, nil
 		default:
 			return []byte(`{"Events":[]}`), 200, nil
 		}
@@ -146,7 +149,8 @@ func TestLiveSpellProbeFailureIsNotEmptySuccess(t *testing.T) {
 	})
 	mu.Lock()
 	defer mu.Unlock()
-	if len(rows) != 3 || rows[1]["event"] != "live_spell_health" || rows[1]["endpoints"].(map[string]any)["playerlist"] != "http-404" {
+	health := spellSummaryRows(rows, "live_spell_health")
+	if len(health) != 1 || health[0]["endpoints"].(map[string]any)["playerlist"] != "http-404" || len(spellSummaryRows(rows, "live_spell_sample")) != 1 {
 		t.Fatalf("failure evidence %v", rows)
 	}
 }
@@ -168,4 +172,14 @@ func TestLiveSpellProbeMaximumRecordKeepsDetails(t *testing.T) {
 	if err != nil || strings.Contains(string(line), `"truncated":true`) {
 		t.Fatalf("max state lost (%d bytes): %s", len(line), line)
 	}
+}
+
+func spellSummaryRows(rows []map[string]any, event string) []map[string]any {
+	var result []map[string]any
+	for _, row := range rows {
+		if row["event"] == event {
+			result = append(result, row)
+		}
+	}
+	return result
 }

@@ -2219,7 +2219,8 @@ func (a *app) recordAppStartDiagnostic(rotation ...bool) {
 	a.recordDiagnostic(map[string]any{
 		"event": "app_start", "version": version,
 		"build_fingerprint": buildFingerprint, "riot_key_source": riotKeySource(),
-		"log_rotation": len(rotation) > 0 && rotation[0],
+		"log_rotation":                 len(rotation) > 0 && rotation[0],
+		"live_spell_diagnostic_schema": liveSpellDiagnosticSchema,
 	})
 }
 
