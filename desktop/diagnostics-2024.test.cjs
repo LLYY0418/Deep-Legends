@@ -126,9 +126,10 @@ test("2024 rarity UI says selection distribution, retains all stages, hides fail
     const {state, renderMayhemRarityPanel:render} = dom.window.testWorkspace;
     assert.doesNotMatch(render(),/不代表抽取、刷新或保底概率/);
     state.mayhemRarityData = {stages:[1,2,3,4].map(stage=>({stage,silver:10,gold:60,prismatic:30,games:1000}))};
+    assert.match(render(),/aria-expanded="false"/);state.rarityOpen=true;
     const html = render();
-    assert.equal((html.match(/第 [1-4] 阶段/g)||[]).length,4);
-    assert.match(html,/<details/);assert.doesNotMatch(html,/查看四阶段/);
+    assert.equal((html.match(/<b>第 [1-4] 阶段/g)||[]).length,4);
+    assert.match(html,/aria-expanded="true"/);assert.doesNotMatch(html,/<details/);assert.doesNotMatch(html,/查看四阶段/);
     state.mayhemRarityData=null; state.mayhemRarityError="invalid source";
     assert.equal(render(),"");
   } finally { dom.window.close(); }

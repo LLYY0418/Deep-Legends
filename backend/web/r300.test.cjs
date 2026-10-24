@@ -74,7 +74,7 @@ test('R300 tags stay within name columns without adding grid cells; roster has m
 
 test('R300 recommendation import rejects excessive quantities and preserves unsupported-mode controls',async()=>{
  const h=await editor({catalog:{items:[{...starterPool()[0],priceTotal:0}]},detail:async()=>({ok:true,json:async()=>({build:{starterItems:[{assets:[{id:2003,count:90},{id:2003,count:20},{id:2003,count:-2},{id:2003,count:1.5}]}]}})})});
- try{await h.click('[data-act="import"]');assert.deepEqual(h.saved.champions['1'].ranked.items.starter,[{id:2003,count:90}]);for(const mode of ['aram','urf','event']){await h.click(`[data-mode="${mode}"]`);assert(h.w.document.querySelector('[data-act="import"]').disabled);assert.equal(h.saved.champions['1'][mode],undefined);}}finally{h.close();}
+ try{await h.click('[data-act="import"]');assert.equal(h.writes.length,0);await h.click('[data-act="save"]');assert.deepEqual(h.saved.champions['1'].ranked.items.starter,[{id:2003,count:90}]);for(const mode of ['aram','urf','event']){await h.click(`[data-mode="${mode}"]`);assert(h.w.document.querySelector('[data-act="import"]').disabled);assert.equal(h.saved.champions['1'][mode],undefined);}}finally{h.close();}
 });
 
 test('R300 settings backup preserves starter quantities and rejects invalid starter arrays',()=>{

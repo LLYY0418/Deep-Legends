@@ -41,7 +41,7 @@
 	    query: normalizeStoredSearch(readSetting(`champion-query-${initialMode}`, "")),
 	    augmentQuery: normalizeStoredSearch(readSetting("champion-augment-query", "")),
     augmentRarity: "all",
-    augmentGrade: "all", augmentStage: 0, augmentSort: "rank", fitStage: "all", fitQuery: "", itemScope: "unfiltered", itemSlot: "all", itemArchetype: "",
+    augmentGrade: "all", augmentStage: 0, augmentSort: "rank", fitStage: "all", fitQuery: "", itemScope: "unfiltered", itemSlot: "all", itemArchetype: "", itemSort: "pickRate", itemLimit: 10, atlasTab: "champions", rarityOpen: false,
 	    mayhemView: normalizeMayhemView(readSetting("champion-mayhem-view", "champions")),
     mayhemDetailTab: normalizeMayhemDetailTab(readSetting("champion-mayhem-detail-tab", "overview")),
     // 阶段筛选（P0-6）是会话内的视图状态，不持久化：换英雄后上游缺该阶段时
@@ -705,7 +705,7 @@
     state.mayhemAugmentRequestToken = token;
     const augmentID = Number(item.id);
     state.mayhemAugmentID = augmentID;
-    state.fitStage = "all"; state.fitQuery = "";
+    state.fitStage = "all"; state.fitQuery = ""; state.atlasTab = "champions"; state.atlasResetScroll = true;
     state.mayhemAugmentDetail = state.mayhemAugmentDetailCache.get(augmentID) || null;
     state.mayhemAugmentLoading = true;
     state.mayhemAugmentError = "";
@@ -1011,6 +1011,9 @@
   }
 
   function render() {
+    const atlasListTop=root.querySelector(".mayhem-atlas-list")?.scrollTop||0;
+    const atlasBodyTop=state.atlasResetScroll?0:root.querySelector(".mayhem-atlas-tab-content")?.scrollTop||0;
+    state.atlasResetScroll=false;
     const list = root.querySelector(".champion-table-scroll");
     // 重新进入英雄页时会先渲染一版加载态：那一版的英雄表要么不存在、要么
     // 只有骨架行，scrollTop 必然是 0。如果照常把它记下来，真正的位置就被
@@ -1021,6 +1024,8 @@
     else renderWorkspace();
 	window.deepLegendsSelects?.enhance(root);
     prepareImages();
+    const atlasList=root.querySelector(".mayhem-atlas-list"),atlasBody=root.querySelector(".mayhem-atlas-tab-content");
+    if(atlasList)atlasList.scrollTop=atlasListTop;if(atlasBody)atlasBody.scrollTop=atlasBodyTop;
     if (state.section === "champions" && state.mode === "aram-mayhem" && state.mayhemView === "atlas" && !state.augments && !state.mayhemAtlasLoading && !state.mayhemAtlasError) void loadMayhemAtlas();
     if (state.section === "champions" && state.mode === "aram-mayhem" && root.querySelector(".mayhem-rarity-panel") && !state.mayhemRarityData && !state.mayhemRarityLoading && !state.mayhemRarityError) void loadMayhemRarity();
     // R116-E P2-6：构筑 tab 真的渲染出来了才去拉个人海斗出装样本。
@@ -1184,7 +1189,7 @@
   // 表现 tab 只在后端真的下发了指标时出现：某组指标全缺时后端整组不下发，
   // 前端也不留一个点进去全是空的页签（评审 6.1）。
   function mayhemDetailTabSpecs(detail) {
-    const tabs = [["overview", "概览"], ["build", "构筑"]];
+    const tabs = [["overview", "海克斯"], ["build", "装备"]];
 
     return tabs;
   }
@@ -1212,7 +1217,7 @@
 
   // 概览：海克斯推荐 → 开局配置 → 该英雄专属品质概率。
   function mayhemOverviewTabMarkup(detail) {
-    return `${renderARAMKitBalance(detail.aramkit?.balance)}<div data-mayhem-augments>${renderRecommendedAugments(detail.recommendedAugments || [], detail.citation)}</div>${renderARAMKitCombos(detail.augmentCombinations)}${renderMayhemOpeningConfiguration(detail.build || {}, detail.buildCitation)}`;
+    return `<div data-mayhem-augments>${renderRecommendedAugments(detail.recommendedAugments || [], detail.citation)}</div>${renderARAMKitCombos(detail.augmentCombinations, "海克斯组合", 10, false, detail.stats?.winRate)}${renderARAMKitBalance(detail.aramkit?.balance)}`;
   }
 
   // 构筑：装备排行（P0-1/P0-2）+ 装备路线 + 技能加点。成装三件套
@@ -1249,6 +1254,7 @@
       button.setAttribute("aria-selected", String(isActive));
       button.tabIndex = isActive ? 0 : -1;
     }
+    window.deepLegendsSelects?.enhance(panels);
     prepareImages(panels);
     applyRenderedMetricStyles();
     return true;
@@ -1268,19 +1274,8 @@
 
   function renderMayhemOpeningConfiguration(build, citation) {
     if(![build.starterItems,build.boots,build.summonerSpells].some(rows=>objectRows(rows).length))return "";
-    const starters = objectRows(build.starterItems).slice(0, 2);
-    const boots = objectRows(build.boots).slice(0, 2);
-    const spells = objectRows(build.summonerSpells).slice(0, 2);
-    const group = (title, rows, kind) => `<section><h4>${title}</h4><div class="config-option-list">${rows.map((row) => renderConfigOption(row, kind, false, row.assets?.[0]?.source==="aramkit" ? aramkitRouteStats : null)).join("") || '<p class="muted">暂无样本</p>'}</div></section>`;
-    // RSC fallback rows can omit win rate; ARAMKit routes have real wins and samples.
-    const spellStats = (row) => {
-      const hasPick = Number(row?.pickRate) > 0;
-      const hasWin = Number(row?.winRate) > 0;
-      if (!hasPick && !hasWin) return "";
-      return `<dl class="option-stats">${hasPick ? `<div class="is-pick"><dt>选用率</dt><dd>${percent(row.pickRate)}</dd></div>` : ""}${hasWin ? `<div class="is-win"><dt>胜率</dt><dd>${percent(row.winRate)}</dd></div>` : ""}</dl>`;
-    };
-    const spellGroup = (title, rows) => `<section><h4>${title}</h4><div class="config-option-list">${rows.map((row) => renderConfigOption(row, "spell", null, spellStats)).join("") || '<p class="muted">暂无样本</p>'}</div></section>`;
-    return `<section class="recommendation-section champion-build-board mayhem-opening-config"><header><div><h3><span class="arena-section-icon" aria-hidden="true">✦</span>开局配置</h3><p>当前版本推荐出门装、鞋子与召唤师技能</p></div></header><div class="mayhem-opening-grid">${group("出门装", starters, "item")}${group("鞋子", boots, "item")}${spellGroup("召唤师技能", spells)}</div></section>`;
+    const group=(title,rows,kind,limit,starter=false)=>`<section><h4>${title}</h4><div class="config-option-list">${objectRows(rows).slice(0,limit).map(row=>`<article class="mayhem-opening-option"><div class="mayhem-opening-icons">${objectRows(row.assets).map(a=>assetImage(a,"recommend-icon",true)).join("")}</div>${starter||Number(row.winRate)>0||Number(row.pickRate)>0?`<dl class="option-stats">${Number(row.winRate)>0?`<div class="is-win"><dt>胜率</dt><dd>${percent(row.winRate)}</dd></div>`:""}${starter?`<div><dt>场次</dt><dd>${number(row.games)} 场</dd></div>`:Number(row.pickRate)>0?`<div class="is-pick"><dt>选取率</dt><dd>选取 ${percent(row.pickRate)}</dd></div>`:""}</dl>`:""}</article>`).join("")||'<p class="muted">暂无样本</p>'}</div></section>`;
+    return `<section class="recommendation-section champion-build-board mayhem-opening-config"><header><h3><span class="arena-section-icon" aria-hidden="true">✦</span>开局配置</h3></header><div class="mayhem-opening-grid">${group("出门装",build.starterItems,"item",3,true)}${group("鞋子",build.boots,"item",3)}${group("召唤师技能",build.summonerSpells,"spell",2)}</div></section>`;
   }
 
   // 技能加点从「开局配置」搬到「构筑」tab（工单三-tab 表格：构筑 = 装备排行 +
@@ -1319,12 +1314,12 @@
     return `<div class="mayhem-atlas">
       <section class="augment-directory mayhem-atlas-browser">
         <div class="mayhem-panel-head">
-          <div><h3>海克斯图鉴</h3></div>
+          <div><h3>海克斯图鉴</h3><span class="section-count">${objectRows(state.augments?.rows).length} 个</span></div>
           <label class="champion-search compact"><span aria-hidden="true">⌕</span><span class="sr-only">搜索海克斯</span><input type="search" value="${escapeHTML(state.augmentQuery)}" placeholder="搜索名称或效果" autocomplete="off" data-augment-search></label>
         </div>
-        ${renderMayhemRarityPanel()}<div class="augment-rarity-tabs mayhem-rarity-tabs" role="tablist" aria-label="海克斯品质">${filters}</div>
-        <div class="aramkit-controls"><label>梯度<select data-aramkit-filter="augmentGrade">${["all","S","A","B","C","D"].map(v=>`<option value="${v}" ${state.augmentGrade===v?"selected":""}>${v==="all"?"全部":v}</option>`).join("")}</select></label><label>阶段<select data-aramkit-filter="augmentStage">${[0,1,2,3,4].map(v=>`<option value="${v}" ${Number(state.augmentStage)===v?"selected":""}>${v?`第 ${v} 阶段`:"全部"}</option>`).join("")}</select></label><label>排序<select data-aramkit-filter="augmentSort">${[["rank","排名"],["winRate","胜率"],["popularity","选取率"]].map(([v,label])=>`<option value="${v}" ${state.augmentSort===v?"selected":""}>${label}</option>`).join("")}</select></label></div>
-        <div class="mayhem-atlas-list" role="listbox" aria-label="海克斯列表">${items.length ? items.map((item) => renderMayhemAtlasRow(item, selected)).join("") : renderEmpty("没有匹配的海克斯", "更换品质或清除搜索词后重试。")}</div>
+        <div class="augment-rarity-tabs mayhem-rarity-tabs" role="tablist" aria-label="海克斯品质">${filters}</div>
+        <div class="aramkit-controls"><label class="select-wrap"><select aria-label="梯度" data-aramkit-filter="augmentGrade">${["all","S","A","B","C","D"].map(v=>`<option value="${v}" ${state.augmentGrade===v?"selected":""}>${v==="all"?"全部":v}</option>`).join("")}</select></label><label class="select-wrap"><select aria-label="阶段" data-aramkit-filter="augmentStage">${[0,1,2,3,4].map(v=>`<option value="${v}" ${Number(state.augmentStage)===v?"selected":""}>${v?`第 ${v} 阶段`:"全部"}</option>`).join("")}</select></label><label class="select-wrap"><select aria-label="排序" data-aramkit-filter="augmentSort">${[["rank","排名"],["winRate","胜率"],["popularity","选取率"]].map(([v,label])=>`<option value="${v}" ${state.augmentSort===v?"selected":""}>${label}</option>`).join("")}</select></label></div>
+        ${renderMayhemRarityPanel()}<div class="mayhem-atlas-list" role="listbox" aria-label="海克斯列表">${items.length ? items.map((item) => renderMayhemAtlasRow(item, selected)).join("") : renderEmpty("没有匹配的海克斯", "更换品质或清除搜索词后重试。")}</div>
       </section>
       <section class="augment-directory mayhem-atlas-detail">${selected ? renderMayhemAtlasDetail(selected) : renderEmpty("选择一个海克斯", "点击左侧海克斯查看详情。")}</section>
 
@@ -1334,38 +1329,30 @@
   function renderMayhemAtlasRow(item, selected) {
     const active = Number(item.id) === Number(selected?.id);
     return `<button type="button" class="mayhem-atlas-row is-${escapeHTML(item.rarity || "unknown")}${active ? " is-active" : ""}" role="option" aria-selected="${active}" data-mayhem-augment="${Number(item.id)}">
-      ${assetImage({ source: item.imageSource, path: item.imagePath, fallbackPath: item.imageFallbackPath, name: item.name, description: item.tooltip || item.description }, "augment-icon")}
+      <b class="aramkit-rank">${number(item.rank)}</b>${assetImage({ source: item.imageSource, path: item.imagePath, fallbackPath: item.imageFallbackPath, name: item.name, description: item.tooltip || item.description }, "augment-icon")}
       <span><strong>${escapeHTML(item.name)}</strong><small>${rarityLabel(item.rarity)}</small></span>
-      ${gradeBadge(item.grade, "atlas-augment-grade")}${Number(item.games)>0?`<small data-tooltip="${number(item.games)} 场">${percent(item.winRate)} · ${percent(item.popularity)}</small>`:""}
+      ${gradeBadge(item.grade, "atlas-augment-grade")}${Number(item.games)>0?`<span class="mayhem-atlas-row-rates" data-tooltip="${number(item.games)} 场"><b class="win-rate-value">${percent(item.winRate)}</b><small>${percent(item.popularity)}</small></span>`:""}
     </button>`;
   }
 
   function renderMayhemAtlasDetail(item) {
-    const detail = state.mayhemAugmentDetail;
-    // 回退目录中的英雄适配信息也可直接展示，详情请求失败时不清空列表。
-    const pool = state.fitStage === "all" ? detail?.champions : detail?.championStages?.[state.fitStage];
-    const champions = objectRows(pool || item?.champions).filter(row=>!state.fitQuery || normalizeSearch(row.name).includes(normalizeSearch(state.fitQuery)));
-    const metrics = Number(item.games)>0 ? `<span>排名 <b>${number(item.rank)}</b></span><span>胜率 <b class="win-rate-value">${percent(item.winRate)}</b></span><span>选取率 <b>${percent(item.popularity)}</b></span><span>可选阶段 ${(item.availableStages||[]).join(" / ")}</span>` : "";
-    const fitRow = row => {
-      const metrics=[];
-      if(Number.isFinite(row.winRate))metrics.push(`胜率 <b class="win-rate-value">${percent(row.winRate)}</b>`);
-      if(Number.isFinite(row.popularity))metrics.push(`选取率 ${percent(row.popularity)}`);
-      if(Number.isFinite(row.championWinRate))metrics.push(`英雄胜率 ${percent(row.championWinRate)}`);
-      if(Number.isFinite(row.deltaWinRate))metrics.push(`<b class="${row.deltaWinRate>=0?"is-delta-up":"is-delta-down"}">${row.deltaWinRate>=0?"+":""}${number(row.deltaWinRate,1)}%</b>`);
-      if(Number(row.games)>0)metrics.push(`${number(row.games)} 场`);
-      return `<div class="mayhem-fit-row">${Number(row.rank)>0?`<b>${number(row.rank)}</b>`:""}${assetImage({source:row.imageSource,path:row.imagePath,name:row.name},"augment-champion-icon")}<strong>${escapeHTML(row.name)}</strong>${metrics.length?`<span class="mayhem-fit-metrics">${metrics.join(" · ")} ${gradeBadge(row.grade)}</span>`:""}</div>`;
-    };
-    const best = objectRows(detail?.champions).reduce((best,row)=>!best || Number(row.rank)>0 && (!(Number(best.rank)>0) || Number(row.rank)<Number(best.rank)) ? row : best,null);
-    const bestStage = objectRows(detail?.stages).filter(s=>Number(s.games)>=200).sort((a,b)=>b.winRate-a.winRate)[0];
-    const body = state.mayhemAugmentLoading && !detail ? renderDetailSkeleton() : `${best?`<div class="mayhem-fit-head"><h4>最佳适配英雄</h4><strong>${escapeHTML(best.name)}</strong>${bestStage?`<span>第 ${bestStage.stage} 阶段 · ${percent(bestStage.winRate)}</span>`:""}</div>`:""}
-      <div class="mayhem-fit-head"><h4>适配英雄</h4><select data-aramkit-filter="fitStage">${["all","1","2","3","4"].map(v=>`<option value="${v}" ${state.fitStage===v?"selected":""}>${v==="all"?"全部":`第 ${v} 阶段`}</option>`).join("")}</select><input type="search" aria-label="搜索适配英雄" placeholder="搜索英雄" value="${escapeHTML(state.fitQuery)}" data-aramkit-fit-search></div>
-      <div class="mayhem-fit-list">${champions.slice(0,10).map(fitRow).join("")}${champions.length>10?`<details><summary>展开</summary>${champions.slice(10).map(fitRow).join("")}</details>`:""}</div>${renderARAMKitCombos(detail?.combinations,"常见组合",5,true)}${objectRows(detail?.items).length?renderMayhemItemRanking(detail.items,null,true):""}`;
-    return `<header class="mayhem-atlas-detail-head is-${escapeHTML(item.rarity || "unknown")}">
-        ${assetImage({ source: item.imageSource, path: item.imagePath, fallbackPath: item.imageFallbackPath, name: item.name, description: item.tooltip || item.description }, "augment-icon")}
-        <div><span class="rarity-label is-${escapeHTML(item.rarity || "unknown")}">${rarityLabel(item.rarity)}</span><h3>${gradeBadge(item.grade, "atlas-detail-grade")}${escapeHTML(item.name)}</h3><p>海克斯${metrics ? ` · ${metrics}` : ""}</p></div>
-      </header>
-      <div class="mayhem-atlas-description">${escapeHTML(mayhemAtlasDescription(item))}</div>
-      <div class="mayhem-atlas-detail-body">${body}</div>`;
+    const detail=state.mayhemAugmentDetail;
+    const eligible=rows=>objectRows(rows).filter(row=>Number(row.games)>=200);
+    const all=eligible(detail?.champions||item.champions);
+    const identity=row=>{const meta=championMeta(row.championId||row.id);return {name:meta?.titleZh||meta?.nameZh||row.name||"",title:meta?.nameZh||"",source:meta?.imageSource||row.imageSource,path:meta?.imagePath||row.imagePath};};
+    const pool=state.fitStage==="all"?all:eligible(detail?.championStages?.[state.fitStage]);
+    const champions=pool.filter(row=>{const who=identity(row);return !state.fitQuery||normalizeSearch(who.name+who.title).includes(normalizeSearch(state.fitQuery));});
+    const combos=objectRows(detail?.combinations).filter(row=>row.assets?.length===2&&Number(row.games)>=200),items=eligible(detail?.items);
+    const best=[...all].sort((a,b)=>(Number(a.rank)||Infinity)-(Number(b.rank)||Infinity))[0];
+    const bestStage=eligible(detail?.stages).filter(row=>Number.isFinite(row.winRate)).sort((a,b)=>b.winRate-a.winRate)[0];
+    const delta=(value,label)=>Number.isFinite(value)?`<small class="${value>=0?"is-delta-up":"is-delta-down"}">${label} ${value>=0?"+":""}${number(value,1)}%</small>`:"";
+    const bestWho=best?identity(best):null;
+    const bestCards=`<div class="mayhem-atlas-best">${best?`<div>${assetImage({source:bestWho.source,path:bestWho.path,name:bestWho.name},"augment-champion-icon")}<div><small>最佳适配英雄</small><strong>${escapeHTML(bestWho.title?bestWho.title+" · "+bestWho.name:bestWho.name)}</strong></div><div class="mayhem-best-metrics"><b class="win-rate-value">${percent(best.winRate)}</b>${delta(Number.isFinite(best.championWinRate)?best.winRate-best.championWinRate:best.deltaWinRate,"较英雄")}</div></div>`:""}${bestStage?`<div><b class="mayhem-stage-number">${bestStage.stage}</b><div><small>最佳阶段</small><b>第 ${bestStage.stage} 阶段</b></div><div class="mayhem-best-metrics"><b class="win-rate-value">${percent(bestStage.winRate)}</b>${delta(bestStage.winRate-item.winRate,"较整体")}</div></div>`:""}</div>`;
+    const fitRow=(row,index)=>{const who=identity(row);return `<div class="mayhem-fit-row"><b>${number(row.rank||index+1)}</b><span class="mayhem-fit-who">${assetImage({source:who.source,path:who.path,name:who.name},"augment-champion-icon")}<strong>${escapeHTML(who.name)}</strong><small>${escapeHTML(who.title)}</small></span><b class="win-rate-value">${percent(row.winRate)}</b><span>${percent(row.popularity)}</span><span class="muted">${Number.isFinite(row.championWinRate)?percent(row.championWinRate):""}</span><span>${delta(Number.isFinite(row.championWinRate)?row.winRate-row.championWinRate:row.deltaWinRate,"")}</span><span class="muted">${number(row.games)}</span>${gradeBadge(row.grade)}</div>`;};
+    const tabs=[["champions","适配英雄",champions.length],["combinations","常见组合",combos.length],["items","搭配装备",items.length]];
+    const tabbar=`<div class="mayhem-atlas-tabs"><div class="aramkit-segments" role="tablist">${tabs.map(([key,name,count])=>`<button role="tab" type="button" data-atlas-tab="${key}" aria-selected="${state.atlasTab===key}" class="${state.atlasTab===key?"is-active":""}">${name} <small>${count}</small></button>`).join("")}</div>${state.atlasTab==="champions"?`<div class="mayhem-atlas-tools">${aramkitSelect("fitStage",[["all","全部阶段"],...[1,2,3,4].map(n=>[String(n),`第 ${n} 阶段`])],"适配英雄阶段")}<label class="champion-search compact"><input type="search" aria-label="搜索适配英雄" placeholder="搜索英雄" value="${escapeHTML(state.fitQuery)}" data-aramkit-fit-search></label></div>`:""}</div>`;
+    const body=state.atlasTab==="combinations"?renderARAMKitCombos(combos,"常见组合",combos.length,true):state.atlasTab==="items"?renderARAMKitItems(items,undefined,undefined,true):`<div class="mayhem-fit-list"><div class="mayhem-fit-columns"><span>#</span><span>英雄</span><span>搭配胜率</span><span>选取率</span><span>英雄胜率</span><span>胜率提升</span><span>场次</span><span>梯度</span></div>${champions.map(fitRow).join("")}</div>`;
+    return `<header class="mayhem-atlas-detail-head is-${escapeHTML(item.rarity||"unknown")}">${assetImage({source:item.imageSource,path:item.imagePath,fallbackPath:item.imageFallbackPath,name:item.name},"augment-icon")}<div><span class="rarity-label is-${escapeHTML(item.rarity||"unknown")}">${rarityLabel(item.rarity)}</span><h3>${gradeBadge(item.grade, "atlas-detail-grade")}<span>${escapeHTML(item.name)}</span></h3></div><div class="mayhem-atlas-metrics">${[["排名",item.rank?"#"+number(item.rank):""],["胜率",Number.isFinite(item.winRate)?percent(item.winRate):""],["选取率",Number.isFinite(item.popularity)?percent(item.popularity):""],["场次",item.games?compactNumber(item.games):""],["可选阶段",(item.availableStages||[]).join(" · ")]].map(([label,value])=>`<div><small>${label}</small><b class="${label==="胜率"?"win-rate-value":""}">${value}</b></div>`).join("")}</div></header><div class="mayhem-atlas-description">${escapeHTML(mayhemAtlasDescription(item))}</div><div class="mayhem-atlas-detail-body">${bestCards}${tabbar}<div class="mayhem-atlas-tab-content" role="tabpanel">${state.mayhemAugmentLoading&&!detail?renderDetailSkeleton():body}</div></div>`;
   }
 
   // 说明只认海克斯本身的效果文案。详情接口以前回的是页面 SEO 摘要
@@ -1396,7 +1383,8 @@
     let body = '<p class="mayhem-inline-empty">正在读取品质分布…</p>';
     if (state.mayhemRarityLoading) body = '<p class="mayhem-inline-empty">正在读取品质分布…</p>';
     else if (stages.length) body = `<div class="mayhem-rarity-stages">${stages.map((row) => `<article data-tooltip="${number(row.games)} 场"><b>第 ${Number(row.stage)} 阶段</b><span class="is-silver">白银 ${percent(row.silver)}</span><span class="is-gold">黄金 ${percent(row.gold)}</span><span class="is-prismatic">棱彩 ${percent(row.prismatic)}</span></article>`).join("")}</div>`;
-    return stages.length?`<details class="augment-directory mayhem-rarity-panel"><summary>海克斯品质分布</summary>${body}</details>`:"";
+    const stage=stages.find(row=>Number(row.stage)===(Number(state.augmentStage)||1))||stages[0];
+    return stages.length?`<section class="mayhem-rarity-panel"><button type="button" data-rarity-toggle aria-expanded="${state.rarityOpen}"><span>第 ${Number(stage.stage)} 阶段品质概率</span><span class="mayhem-rarity-bar">${["silver","gold","prismatic"].map(key=>`<i class="is-${key}" data-bar-width="${Number(stage[key])||0}"></i>`).join("")}</span><span aria-hidden="true">${state.rarityOpen?"▴":"▾"}</span></button>${state.rarityOpen?body:""}</section>`:"";
   }
 
   function renderArena() {
@@ -1970,7 +1958,7 @@
       metrics: [
         ["胜率", percent(item.winRate), "is-win"],
         ...(stage && Number(item.pickRate) > 0 ? [["选取率", percent(item.pickRate), ""]] : []),
-        ["样本", compactNumber(item.games), ""],
+        ["样本", item.games?compactNumber(item.games):"", ""],
       ],
     });
   }
@@ -2380,28 +2368,52 @@
 	return Math.max(0, ...values.map((candidate) => searchScore(normalizedQuery, candidate)));
   }
 
-  panel.addEventListener("change", event=>{const control=event.target.closest("[data-aramkit-filter]");if(control){state[control.dataset.aramkitFilter]=control.value;render();}});
+  panel.addEventListener("click",event=>{
+    const choice=event.target.closest("[data-aramkit-choice]");
+    if(choice){state[choice.dataset.aramkitChoice]=choice.dataset.value;if(["itemSort","itemScope"].includes(choice.dataset.aramkitChoice))state.itemLimit=10;render();return;}
+    if(event.target.closest("[data-aramkit-more]")){state.itemLimit+=10;render();return;}
+    const tab=event.target.closest("[data-atlas-tab]");if(tab){state.atlasTab=tab.dataset.atlasTab;state.atlasResetScroll=true;render();return;}
+    if(event.target.closest("[data-rarity-toggle]")){state.rarityOpen=!state.rarityOpen;render();}
+  });
+  panel.addEventListener("change", event=>{const control=event.target.closest("[data-aramkit-filter]");if(control){state[control.dataset.aramkitFilter]=control.value;if(control.dataset.aramkitFilter==="itemSlot")state.itemLimit=10;render();}});
   panel.addEventListener("input", event=>{if(event.target.matches("[data-aramkit-fit-search]")){const control=event.target;state.fitQuery=control.value;const start=control.selectionStart;render();const next=panel.querySelector("[data-aramkit-fit-search]");next?.focus();next?.setSelectionRange(start,start);}});
 
-  function renderARAMKitCombos(rows,title="海克斯组合",limit=6,jump=false) {
-    const valid=objectRows(rows).filter(row=>objectRows(row.assets).length===2&&Number(row.games)>=200).slice(0,10);
+  function renderARAMKitCombos(rows,title="海克斯组合",limit=10,jump=false,heroWin) {
+    const valid=objectRows(rows).filter(row=>objectRows(row.assets).length===2&&Number(row.games)>=200).slice(0,limit);
     if(!valid.length)return "";
-    const card=row=>`<article class="aramkit-combo">${row.assets.map((a,index)=>`${index?'<b>＋</b>':""}<${jump?"button":"span"} class="is-${a.rarity||augmentMetaForAsset(a)?.rarity||"unknown"}" ${jump?`type="button" data-mayhem-augment="${Number(a.id)}"`:""}>${assetImage(a,"augment-icon",true)}</${jump?"button":"span"}>`).join("")}<span><b class="win-rate-value">${percent(row.winRate)}</b> · ${number(row.games)} 场</span></article>`;
-    return `<section class="recommendation-section aramkit-combos"><header><h3>${escapeHTML(title)}</h3></header><div>${valid.slice(0,limit).map(card).join("")}</div>${valid.length>limit?`<details><summary>展开</summary><div>${valid.slice(limit).map(card).join("")}</div></details>`:""}</section>`;
+    const card=(row,index)=>`<article class="aramkit-combo"><b class="aramkit-rank">${index+1}</b><div class="aramkit-pair">${row.assets.map(a=>`<${jump?"button":"span"} class="is-${a.rarity||augmentMetaForAsset(a)?.rarity||"unknown"}" ${jump?`type="button" data-mayhem-augment="${Number(a.id)}"`:""}>${assetImage(a,"augment-icon",true)}</${jump?"button":"span"}>`).join("")}</div><div class="aramkit-combo-names"><strong>${escapeHTML(row.assets[0].name)}</strong><span>＋ ${escapeHTML(row.assets[1].name)}</span></div><div class="aramkit-combo-win"><b class="win-rate-value">${percent(row.winRate)}</b>${Number.isFinite(heroWin)?`<small class="${row.winRate-heroWin>=0?"is-delta-up":"is-delta-down"}">较英雄 ${row.winRate-heroWin>=0?"+":""}${number(row.winRate-heroWin,1)}%</small>`:""}</div><div class="aramkit-combo-games">${compactNumber(row.games)} 场${Number.isFinite(row.pickRate)?`<small>选取 ${percent(row.pickRate)}</small>`:""}</div></article>`;
+    return `<section class="recommendation-section aramkit-combos${jump?" is-atlas":""}"><header><h3><span class="arena-section-icon" aria-hidden="true">✚</span>${escapeHTML(title)}</h3></header><div class="aramkit-combo-list">${valid.map(card).join("")}</div></section>`;
   }
   function renderARAMKitBalance(balance) {
     const labels={damageDealt:"造成伤害",damageTaken:"承受伤害",abilityHaste:"技能急速",tenacity:"韧性",healing:"治疗效果",attackSpeed:"攻击速度",shielding:"护盾效果",energyRegen:"能量回复"};
     const modifiers=objectRows(balance?.modifiers).filter(m=>labels[m.key]);const abilities=objectRows(balance?.abilityChanges);
     if(!modifiers.length&&!abilities.length)return "";
-    const row=a=>`<article><strong><kbd>${escapeHTML(a.key)}</kbd> ${escapeHTML(a.ability)}</strong>${(a.lines||[]).map(line=>`<p>${escapeHTML(line)}</p>`).join("")}</article>`;
-    return `<section class="recommendation-section aramkit-balance"><header><h3>海斗英雄调整</h3></header><div class="aramkit-modifiers">${modifiers.map(m=>{const v=Number(m.value)*(m.unit==="percent"?100:1);const good=m.key==="damageTaken"?v<0:v>0;return `<span class="${good?"is-delta-up":"is-delta-down"}">${labels[m.key]} ${v>0?"+":""}${number(v,Number.isInteger(v)?0:1)}${m.unit==="percent"?"%":""}</span>`;}).join("")}</div>${abilities.slice(0,3).map(row).join("")}${abilities.length>3?`<details><summary>展开</summary>${abilities.slice(3).map(row).join("")}</details>`:""}</section>`;
+    const row=a=>`<article><kbd>${escapeHTML(a.key)}</kbd><div><strong>${escapeHTML(a.ability)}</strong>${(a.lines||[]).map(line=>`<p>${escapeHTML(line)}</p>`).join("")}</div></article>`;
+    const stats=modifiers.map(m=>{const v=Number(m.value)*(m.unit==="percent"?100:1),good=m.key==="damageTaken"?v<0:v>0;return `<div class="aramkit-stat ${good?"is-delta-up":"is-delta-down"}"><small>${labels[m.key]}</small><b>${v<0?"▼":"▲"} ${v>0?"+":""}${number(v,Number.isInteger(v)?0:1)}${m.unit==="percent"?"%":""}</b></div>`;}).join("");
+    return `<section class="recommendation-section aramkit-balance"><header><h3><span class="arena-section-icon" aria-hidden="true">↕</span>海斗英雄调整</h3></header><div class="aramkit-balance-grid${modifiers.length&&abilities.length?"":" is-single"}">${modifiers.length?`<section><h4>属性</h4><div class="aramkit-modifiers">${stats}</div></section>`:""}${abilities.length?`<section><h4>技能</h4>${abilities.map(row).join("")}</section>`:""}</div></section>`;
+  }
+  function aramkitSegments(key,rows) {
+    return `<div class="aramkit-segments" role="group">${rows.map(([v,label])=>`<button type="button" data-aramkit-choice="${key}" data-value="${escapeHTML(v)}" aria-pressed="${String(state[key])===v}" class="${String(state[key])===v?"is-active":""}">${label}</button>`).join("")}</div>`;
+  }
+  function aramkitSelect(key,rows,label) {
+    return `<label class="select-wrap"><span class="sr-only">${label}</span><select aria-label="${label}" data-aramkit-filter="${key}">${rows.map(([v,text])=>`<option value="${v}" ${String(state[key])===v?"selected":""}>${escapeHTML(text)}</option>`).join("")}</select></label>`;
+  }
+  function renderARAMKitItems(rows,heroWin,filtered,atlas=false) {
+    const all=objectRows(rows),sorted=atlas?[...all].sort((a,b)=>(Number(a.rank)||Infinity)-(Number(b.rank)||Infinity)):[...all].sort((a,b)=>state.itemSort==="rank"?(Number(a.rank)||Infinity)-(Number(b.rank)||Infinity):(Number(b[state.itemSort])||0)-(Number(a[state.itemSort])||0));
+    if(!sorted.length)return "";
+    const allowed=new Set(objectRows(filtered).map(row=>Number(row.assets?.[0]?.id)));
+    const content=sorted.slice(0,atlas?sorted.length:state.itemLimit).map((row,index)=>{const a=row.assets?.[0]||{},delta=row.winRate-heroWin;return `<article class="aramkit-single"><b class="aramkit-rank">${index+1}</b>${assetImage(a,"recommend-icon",true)}<strong>${escapeHTML(a.name||"未知装备")}${!atlas&&state.itemScope==="unfiltered"&&!allowed.has(Number(a.id))?'<small class="aramkit-linked">联动</small>':""}</strong><div><b class="win-rate-value">${percent(row.winRate)}</b><small>胜率</small></div><div>${percent(row.pickRate)}<small>选取率</small></div>${!atlas&&Number.isFinite(heroWin)&&Number.isFinite(row.winRate)?`<div class="${delta>=0?"is-delta-up":"is-delta-down"}"><b>${delta>=0?"+":""}${number(delta,1)}%</b><small>较英雄</small></div>`:""}</article>`;}).join("");
+    return `<div class="aramkit-single-list${atlas?" is-atlas":""}">${content}</div>${!atlas&&state.itemLimit<sorted.length?`<div class="aramkit-more"><button type="button" class="button button-secondary" data-aramkit-more>再显示 10 件（共 ${sorted.length} 件）</button></div>`:""}`;
   }
   function renderARAMKitBuild(detail) {
-    const scopes=detail.aramkit.scopes;const scope=scopes[state.itemScope]||scopes.unfiltered;const archetypes=objectRows(scope.archetypes);const archetype=archetypes.find(a=>a.key===state.itemArchetype)||archetypes[0];
-    const select=(key,rows)=>`<select data-aramkit-filter="${key}">${rows.map(([v,label])=>`<option value="${v}" ${String(state[key])===v?"selected":""}>${escapeHTML(label)}</option>`).join("")}</select>`;
-    const rows=state.itemSlot==="all"?scope.all:scope.slots?.[state.itemSlot]||[];
+    const scopes=detail.aramkit.scopes,scope=scopes[state.itemScope]||scopes.unfiltered,archetypes=objectRows(scope.archetypes),archetype=archetypes.find(a=>a.key===state.itemArchetype)||archetypes[0];
+    const selectedKey=archetype?.key||"";
+    const rows=state.itemSlot==="all"?scope.all:scope.slots?.[state.itemSlot]||[],filtered=state.itemSlot==="all"?scopes.filtered?.all:scopes.filtered?.slots?.[state.itemSlot];
     const build={...detail.build,coreItems:archetype?.routes||archetype?.core||[],starterItems:archetype?.starters||[],boots:archetype?.boots||[]};
-    return `<div class="aramkit-controls">${select("itemScope",[["unfiltered","原始数据"],["filtered","排除海克斯联动"]])}${select("itemSlot",[["all","全部装备"],...[1,2,3,4,5,6].map(n=>[String(n),`第 ${n} 件`])])}${select("itemArchetype",archetypes.map(a=>[a.key,`${a.name} · ${percent(a.winRate)} · ${percent(a.pickRate)} · ${number(a.games)} 场`]))}</div>${renderMayhemItemRanking(rows)}${renderMayhemItemRoutes(build)}${renderMayhemOpeningConfiguration(build)}${renderMayhemSkillPlan(detail.build)}<div data-mayhem-personal-builds-host>${renderMayhemPersonalBuilds(detail)}</div>`;
+    const routes=objectRows(build.coreItems).slice(0,CORE_RECOMMENDATION_LIMIT);
+    const archetypeButtons=`<div class="aramkit-segments" role="group" aria-label="流派">${archetypes.map(a=>`<button type="button" data-aramkit-choice="itemArchetype" data-value="${escapeHTML(a.key)}" class="${selectedKey===a.key?"is-active":""}" aria-pressed="${selectedKey===a.key}">${escapeHTML(a.name)} <small>${percent(a.pickRate)}</small></button>`).join("")}</div>`;
+    const core=routes.length?`<section class="recommendation-section aramkit-core"><header><h3><span class="arena-section-icon" aria-hidden="true">◇</span>核心出装</h3>${archetypeButtons}</header><div>${routes.map((row,index)=>`<article class="aramkit-route"><b class="aramkit-rank">${index+1}</b><div class="aramkit-route-chain">${objectRows(row.assets).slice(0,3).map((a,i)=>`${i?'<i>›</i>':""}${assetImage(a,"recommend-icon",true)}`).join("")}<small>${objectRows(row.assets).slice(0,3).map(a=>escapeHTML(a.name)).join(" · ")}</small></div><div><b class="win-rate-value">${percent(row.winRate)}</b><small>胜率</small></div><div>${percent(row.pickRate)}<small>选取率</small></div><div>${compactNumber(row.games)}<small>场次</small></div></article>`).join("")}</div></section>`:"";
+    return `<div class="aramkit-scope"><span>统计口径</span>${aramkitSegments("itemScope",[["unfiltered","原始数据"],["filtered","排除海克斯联动"]])}</div>${renderMayhemOpeningConfiguration(build)}${core}<section class="recommendation-section aramkit-items"><header><h3><span class="arena-section-icon" aria-hidden="true">◈</span>单件装备</h3><div class="aramkit-item-tools">${aramkitSelect("itemSlot",[["all","总体"],...[1,2,3,4,5,6].map(n=>[String(n),`第 ${n} 件`])],"第几件")}${aramkitSegments("itemSort",[["pickRate","常用"],["rank","综合排名"],["winRate","胜率"]])}</div></header>${renderARAMKitItems(rows,detail.stats?.winRate,filtered)}</section>${renderMayhemSkillPlan(detail.build)}<div data-mayhem-personal-builds-host>${renderMayhemPersonalBuilds(detail)}</div>`;
   }
 
   function filteredAugments() {

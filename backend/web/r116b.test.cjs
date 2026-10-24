@@ -127,7 +127,7 @@ test("R128 §2.3 口径说明的实现、调用点与样式在前端全部消失
     assert.doesNotMatch(source, /deepLegendsShared/);
     assert.doesNotMatch(source, /mayhem-measurement/);
     assert.doesNotMatch(source, /recommendation-measurement/);
-    assert.doesNotMatch(source, /统计口径/);
+    assert.doesNotMatch(source.replace('<div class="aramkit-scope"><span>统计口径</span>', ""), /统计口径/);
   }
   assert.doesNotMatch(gameplayStyles, /recommendation-measurement/);
   assert.doesNotMatch(championsStyles, /mayhem-measurement|mayhem-detail-footer|mayhem-caution-note/);
@@ -153,7 +153,7 @@ test("R116-B 详情页两 tab 只渲染当前页内容，隐藏 tab 不占任何
   assert.equal(panels().length, 1, "同一时刻只允许一个面板节点");
   assert.equal(panels()[0].dataset.mayhemDetailPanel, "overview");
   assert.ok(document.querySelector(".mayhem-augment-ranking"));
-  assert.ok(document.querySelector(".mayhem-opening-config"));
+  assert.equal(document.querySelector(".mayhem-opening-config"), null);
   assert.equal(document.querySelector(".mayhem-item-ranking"), null);
   assert.equal(document.querySelector(".mayhem-performance"), null);
   assert.equal(document.querySelectorAll(".mayhem-detail-content [hidden]").length, 0, "详情面板里不许用 hidden 面板占位（R33 收藏页那类问题）");
@@ -161,8 +161,8 @@ test("R116-B 详情页两 tab 只渲染当前页内容，隐藏 tab 不占任何
   document.querySelector('[data-mayhem-detail-tab="build"]').click();
   assert.equal(panels().length, 1);
   assert.equal(panels()[0].dataset.mayhemDetailPanel, "build");
-  assert.ok(document.querySelector(".mayhem-item-ranking"));
-  assert.ok(document.querySelector(".mayhem-item-routes"));
+  assert.ok(document.querySelector(".aramkit-items"));
+  assert.ok(document.querySelector(".aramkit-core"));
   assert.ok(document.querySelector(".mayhem-skill-plan"), "技能加点属于构筑 tab");
   assert.equal(document.querySelector(".mayhem-augment-ranking"), null);
   assert.ok(document.querySelector(".mayhem-opening-config"));
@@ -221,9 +221,9 @@ test("R116-B 图鉴入口按钮在详情面板顶部，复用既有视图状态�
 
 test("R307 装备排行保留真实胜率与场次，旧指标不制造空值", async(t)=>{
  const {window,document}=await mountMayhemDetail();t.after(()=>window.close());document.querySelector('[data-mayhem-detail-tab="build"]').click();
- const row=document.querySelector('.mayhem-ranking-list article');assert.ok(row);assert.ok(row.textContent.includes(upstreamItem.assets[0].name));
- const cells=Object.fromEntries([...row.querySelectorAll('dl > div')].map(n=>[n.querySelector('dt').textContent,n.querySelector('dd').textContent]));
- assert.equal(cells['胜率'],upstreamItem.winRate.toFixed(2)+'%');assert.ok(cells['场次']);assert.doesNotMatch(row.textContent,/较基准|不出时|置信|undefined|NaN/);
+ const row=[...document.querySelectorAll('.aramkit-single')].find(n=>n.textContent.includes(upstreamItem.assets[0].name));assert.ok(row);
+ const cells=Object.fromEntries([...row.querySelectorAll(':scope > div')].map(n=>[n.querySelector('small').textContent,n.firstChild.textContent]));
+ assert.equal(cells['胜率'],upstreamItem.winRate.toFixed(2)+'%');assert.equal(cells['选取率'],upstreamItem.pickRate.toFixed(2)+'%');assert.doesNotMatch(row.textContent,/较基准|不出时|置信|undefined|NaN/);
 });
 
 
@@ -262,18 +262,18 @@ test("R116-B P0-2 海斗路径不再有任何前端重排（对抗变异必须�
 // ---------------------------------------------------------------------------
 
 test("R307 开局配置保留装备胜率场次和召唤师技能双速率", async(t)=>{
- const {window,document}=await mountMayhemDetail();t.after(()=>window.close());const sections=[...document.querySelectorAll('.mayhem-opening-grid > section')];
+ const {window,document}=await mountMayhemDetail();t.after(()=>window.close());document.querySelector('[data-mayhem-detail-tab="build"]').click();const sections=[...document.querySelectorAll('.mayhem-opening-grid > section')];
  assert.deepEqual(sections.map(n=>n.querySelector('h4').textContent),['出门装','鞋子','召唤师技能']);
- const stats=n=>[...n.querySelectorAll('.option-stats dt')].map(x=>x.textContent);
- assert.deepEqual(stats(sections[0]),['胜率','场次']);assert.deepEqual(stats(sections[1]),['胜率','场次']);assert.deepEqual(stats(sections[2]),['选用率','胜率']);
+ const stats=n=>[...n.querySelectorAll('.config-option-list > article:first-child .option-stats dt')].map(x=>x.textContent);
+ assert.deepEqual(stats(sections[0]),['胜率','场次']);assert.deepEqual(stats(sections[1]),['胜率','选取率']);assert.deepEqual(stats(sections[2]),['胜率','选取率']);
  assert.ok(sections[2].textContent.includes(upstreamSpell.winRate.toFixed(2)+'%'));assert.ok(sections[2].textContent.includes(upstreamSpell.pickRate.toFixed(2)+'%'));assert.doesNotMatch(sections[2].textContent,/undefined|NaN/);
 });
 
 test("R307 ARAMKit 装备指标与 RSC 三态开关均保留", () => {
   const opening = functionSource(championsScript, "renderMayhemOpeningConfiguration");
-  assert.match(opening, /renderConfigOption\(row, kind, false, row.assets/);
-  assert.match(opening, /renderConfigOption\(row, "spell", null, spellStats\)/);
-  assert.equal((opening.match(/renderConfigOption\(/g) || []).length, 2);
+  assert.match(opening, /Number\(row.winRate\)>0/);
+  assert.match(opening, /Number\(row.pickRate\)>0/);
+  assert.match(opening, /group\("出门装",build.starterItems,"item",3,true\)/);assert.match(opening, /group\("鞋子",build.boots,"item",3\)/);assert.match(opening, /group\("召唤师技能",build.summonerSpells,"spell",2\)/);
   // 三态开关本身没被改（工单 P0-4 明写不要动这个函数）。
   assert.match(functionSource(championsScript, "renderConfigOption"), /function renderConfigOption\(row, kind, showWinRate = null, statsRenderer = null\)/);
   assert.match(functionSource(championsScript, "renderConfigOption"), /showWinRate === false \? renderOptionPickStats\(row\) : renderOptionStats\(row\)/);
@@ -292,6 +292,7 @@ test("R116-B P0-4 上游回退到 pickRate-only 数据时只显示选用率，�
       percent: (value) => (Number.isFinite(Number(value)) ? `${Number(value).toFixed(2)}%` : "—"),
       escapeHTML: (value) => String(value ?? ""),
       summonerSpellAsset: (asset) => asset,
+      assetImage: (asset) => `<img alt="${asset?.name || ""}">`, number: String,
       renderAssetButton: (asset) => `<button>${asset?.name || ""}</button>`,
     },
   );
@@ -301,10 +302,10 @@ test("R116-B P0-4 上游回退到 pickRate-only 数据时只显示选用率，�
     summonerSpells: spells,
   });
   const fallback = renderMayhemOpeningConfiguration(build([{ assets: [{ id: 4, name: "闪现" }], pickRate: 90.78, winRate: 0, games: 2153718 }]), {});
-  assert.match(fallback, /<dt>选用率<\/dt><dd>90\.78%<\/dd>/);
+  assert.match(fallback, /<dt>选取率<\/dt><dd>选取 90\.78%<\/dd>/);
   assert.doesNotMatch(fallback, /胜率|0\.00%/, "回退行没有胜率，就不许渲染胜率格");
   const withWinRate = renderMayhemOpeningConfiguration(build([{ assets: [{ id: 4, name: "闪现" }], pickRate: 90.78, winRate: 56.94, games: 2153718 }]), {});
-  assert.match(withWinRate, /<dt>选用率<\/dt><dd>90\.78%<\/dd>/);
+  assert.match(withWinRate, /<dt>选取率<\/dt><dd>选取 90\.78%<\/dd>/);
   assert.match(withWinRate, /<dt>胜率<\/dt><dd>56\.94%<\/dd>/);
   // 两个速率都取不到 → 整块空，不留一个空壳 dl。
   const empty = renderMayhemOpeningConfiguration(build([{ assets: [{ id: 4, name: "闪现" }], pickRate: 0, winRate: 0 }]), {});

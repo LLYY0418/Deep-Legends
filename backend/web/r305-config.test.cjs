@@ -7,7 +7,7 @@ source=source.replace('get saved(){return clone(saved);}', 'get saved(){return c
 const {editor}=new Function('require','__dirname',source+';return {editor};')(require,__dirname);
 test('R305 switches do not invalidate current draft and recommendation auto save',async()=>{
  const h=await editor();try{const d=h.w.document;for(const key of ['enabled','runes','spells','items']){const n=d.querySelector(`[data-enable="${key}"]`);n.checked=!n.checked;n.dispatchEvent(new h.w.Event('change',{bubbles:true}));await tick();await tick();}
- await h.click('[data-tab="kit"]');await h.click('[data-spell="4"]');await h.click('[data-slot="1"]');await h.click('[data-spell="14"]');await h.click('[data-act="save"]');assert.equal(h.writes.length,1);assert.equal(d.querySelector('dialog'),null);await h.click('[data-act="import"]');assert.equal(h.writes.length,2);assert.match(d.querySelector('.ac-feedback').textContent,/推荐已导入并保存/);
+ await h.click('[data-tab="kit"]');await h.click('[data-spell="4"]');await h.click('[data-slot="1"]');await h.click('[data-spell="14"]');await h.click('[data-act="save"]');assert.equal(h.writes.length,1);assert.equal(d.querySelector('dialog'),null);await h.click('[data-act="import"]');assert.equal(h.writes.length,1);assert.match(d.querySelector('.ac-feedback').textContent,/推荐已导入，请保存配置/);assert.equal(d.querySelector('[data-act="save"]').disabled,false);await h.click('[data-act="save"]');assert.equal(h.writes.length,2);
  }finally{h.close();}
 });
 test('R305 only the same champion and mode conflicts; reload discards and errors never open a modal',async()=>{

@@ -7883,7 +7883,7 @@
 	        : remoteStaticIcon(imageSource, imagePath, details.name || "海克斯", "large", false);
 	      return wrapAugmentIcon(icon, details, asset.id || row.id);
     }
-    return augmentIconFigure(asset.id || row.id, "large");
+    return wrapAugmentIcon(augmentIconFigure(asset.id || row.id, "large"), details, asset.id || row.id);
   }
 
   function renderLiveAugmentRecommendations(data, source) {
@@ -7937,7 +7937,7 @@
     if(source!=="hextech")return "";
     const rows=(liveRecommendationsFor(data)?.augmentCombinations||[]).filter(row=>row.assets?.length===2&&Number(row.games)>=200).slice(0,3);
     if(!rows.length)return "";
-    return `<section class="live-aramkit-combos"><h4>推荐组合</h4>${rows.map(row=>`<div>${row.assets.map((asset,index)=>`${index?'<b>＋</b>':""}${renderLiveAugmentIcon({assets:[asset]},source)}<strong>${escapeHTML(asset.name)}</strong>`).join("")}<span class="win-rate-value">${percent(row.winRate)}</span><small>${number(row.games)} 场</small></div>`).join("")}</section>`;
+    return `<section class="live-aramkit-combos"><h4>推荐组合 <small>前 ${rows.length} 组</small></h4><div class="live-aramkit-combo-grid">${rows.map(row=>`<article class="live-aramkit-combo"><div class="live-combo-pair">${row.assets.map(asset=>renderLiveAugmentIcon({assets:[asset]},source)).join("")}</div><div class="live-combo-names"><strong>${escapeHTML(row.assets[0].name)}</strong><span>＋ ${escapeHTML(row.assets[1].name)}</span></div><div class="live-combo-metrics"><b class="win-rate-value">${rate(row.winRate)}</b><small>${number(row.games)} 场</small></div></article>`).join("")}</div></section>`;
   }
 
   function insightScore(game) {
@@ -8572,14 +8572,15 @@
   }
 
   function renderLiveItemRanking(rows) {
-    const sorted = [...(rows || [])].sort((left, right) => (Number(right.score) || 0) - (Number(left.score) || 0) || (Number(right.games) || 0) - (Number(left.games) || 0));
-    const content = sorted.slice(0, 8).map((row, index) => {
+    const sorted = [...(rows || [])].sort((left, right) => (Number(right.pickRate) || 0) - (Number(left.pickRate) || 0) || (Number(right.games) || 0) - (Number(left.games) || 0));
+    const visible = sorted.slice(0, 10);
+    const content = visible.map((row, index) => {
       const asset = row.assets?.[0] || {};
       const itemID = Number(asset.id) || 0;
       const icon = itemID > 0 ? renderItemIcon(itemID) : '<span class="mayhem-item-name-only" aria-hidden="true"></span>';
       return `<article><b>${index + 1}</b><span class="live-ranking-icon">${icon}</span><strong>${escapeHTML(asset.name || "未知装备")}</strong><dl><div><dt>胜率</dt><dd class="metric-win">${rate(row.winRate)}</dd></div><div><dt>场次</dt><dd>${compactNumber(row.games)}</dd></div></dl></article>`;
     }).join("");
-    return `<section class="recommendation-section mayhem-item-ranking live-item-ranking"><header><h3>装备排行</h3><span class="section-count">${sorted.length} 件</span></header><div class="mayhem-ranking-list">${content}</div></section>`;
+    return `<section class="recommendation-section mayhem-item-ranking live-item-ranking"><header><h3>装备排行</h3><span class="section-count">${visible.length} 件 · 按常用</span></header><div class="mayhem-ranking-list">${content}</div></section>`;
   }
 
   function buildItemSetPayload(build, self, data) {

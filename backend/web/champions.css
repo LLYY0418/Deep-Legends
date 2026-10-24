@@ -300,10 +300,6 @@
 .mayhem-atlas-detail-head p b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .mayhem-atlas-description { flex: 0 0 auto; margin: 12px 14px; padding: 11px 12px; color: var(--tooltip-ink); background: var(--tooltip-surface); border: 1px solid var(--tooltip-line); border-radius: 9px; font-size: 11px; line-height: 1.65; white-space: pre-line; }
 .mayhem-atlas-detail-body { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; }
-.mayhem-fit-head { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 14px 9px; border-bottom: 1px solid var(--line); }
-.mayhem-fit-head h4 { margin: 0; font-size: 12px; }
-.mayhem-fit-head p { margin: 2px 0 0; color: var(--muted); font-size: 9px; }
-.mayhem-fit-head > span { color: var(--muted); font-size: 10px; }
 .mayhem-fit-list { display: grid; min-height: 0; flex: 1 1 auto; align-content: start; overflow-y: auto; }
 .mayhem-fit-row { display: grid; min-height: 48px; grid-template-columns: 22px 30px minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 7px 14px; border-bottom: 1px solid var(--line); }
 .mayhem-fit-row > b { color: var(--muted); font-size: 10px; text-align: center; font-variant-numeric: tabular-nums; }
@@ -939,5 +935,142 @@
 .mayhem-overview-metrics[data-metric-count="1"] { --metric-columns:1; }
 .mayhem-overview-metrics[data-metric-count="2"] { --metric-columns:2; }
 
-.aramkit-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}.aramkit-controls label{display:flex;gap:6px;align-items:center}.aramkit-controls select,.mayhem-fit-head select,.mayhem-fit-head input{max-width:100%;background:var(--surface);color:inherit;border:1px solid var(--line);border-radius:6px;padding:6px}.aramkit-combos>div,.aramkit-combos details>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.aramkit-combo{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;padding:12px;border:1px solid var(--line);border-radius:8px}.aramkit-combo>span:last-child{flex-basis:100%;text-align:center}.aramkit-combo .augment-icon{width:38px;height:38px}.aramkit-combo button{border:0;background:transparent;padding:0;cursor:pointer}.aramkit-modifiers{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.aramkit-modifiers>span{padding:5px 8px;border:1px solid currentColor;border-radius:6px}.aramkit-balance article{padding:8px 0}.aramkit-balance article p{margin:5px 0;white-space:pre-wrap}.aramkit-balance kbd{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--line);border-radius:4px}.mayhem-fit-metrics{white-space:normal}.is-delta-up{color:var(--success)}.is-delta-down{color:var(--danger)}
-.aramkit-combo .is-silver .augment-icon{border:1px solid var(--rarity-silver)}.aramkit-combo .is-gold .augment-icon{border:1px solid var(--rarity-gold)}.aramkit-combo .is-prismatic .augment-icon{border:1px solid var(--rarity-prismatic-a)}
+
+
+/* R308: shared ranked rows, controls and independent atlas panes. */
+.mayhem-detail-panels { container: mayhem-detail / inline-size; }
+.aramkit-segments { display:inline-flex; flex-wrap:wrap; gap:3px; padding:3px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }
+.aramkit-segments button { padding:6px 10px; border:1px solid transparent; border-radius:7px; color:var(--muted); background:transparent; font:inherit; font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer; }
+.aramkit-segments button.is-active { color:var(--primary-strong); background:var(--primary-soft); border-color:color-mix(in srgb,var(--primary) 55%,transparent); }
+.aramkit-segments small { color:var(--muted); font-size:11px; }
+.aramkit-scope { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 14px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); color:var(--muted); }
+.aramkit-core>header,.aramkit-items>header { flex-wrap:wrap; }
+.aramkit-core>header>.aramkit-segments,.aramkit-item-tools { margin-left:auto; }
+.aramkit-item-tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.aramkit-rank { color:var(--faint,var(--muted)); font-size:12px; text-align:center; }
+.aramkit-combo-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.aramkit-combo { display:grid; grid-template-columns:20px 74px minmax(0,1fr) auto auto; align-items:center; gap:9px; min-width:0; height:62px; padding:0 12px; border-bottom:1px solid var(--line); }
+.aramkit-combo:nth-child(odd) { border-right:1px solid var(--line); }
+.aramkit-pair { display:flex; align-items:center; }
+.aramkit-pair>span,.aramkit-pair>button { display:flex; flex:none; border:0; background:transparent; padding:0; }
+.aramkit-pair>:nth-child(2) { margin-left:-6px; border-radius:8px; box-shadow:0 0 0 3px var(--surface); }
+.aramkit-pair .augment-icon { width:40px; height:40px; border-radius:8px; }
+.aramkit-combo-names { display:grid; min-width:0; gap:3px; font-size:12px; }
+.aramkit-combo-names>* { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.aramkit-combo-names>span { color:var(--muted); }
+.aramkit-combo-win,.aramkit-combo-games { display:grid; gap:3px; text-align:right; font-size:12px; white-space:nowrap; }
+.aramkit-combo small { font-size:10px; }
+.aramkit-combo-games { color:var(--muted); }
+.aramkit-balance-grid { display:grid; grid-template-columns:minmax(220px,.7fr) minmax(0,1.3fr); }
+.aramkit-balance-grid.is-single { grid-template-columns:1fr; }
+.aramkit-balance-grid>section { padding:14px 16px; min-width:0; }
+.aramkit-balance-grid>section+section { border-left:1px solid var(--line); }
+.aramkit-balance h4 { color:var(--muted); font-size:12px; margin:0 0 10px; }
+.aramkit-modifiers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.aramkit-stat { display:grid; gap:5px; padding:10px 12px; border:1px solid color-mix(in srgb,currentColor 40%,var(--line)); border-radius:10px; background:color-mix(in srgb,currentColor 7%,var(--bg)); }
+.aramkit-stat small { color:var(--muted); }
+.aramkit-stat b { font-size:17px; }
+.aramkit-balance article { display:grid; grid-template-columns:44px minmax(0,1fr); gap:12px; padding:12px; background:var(--bg); border:1px solid var(--line); border-radius:10px; }
+.aramkit-balance article+article { margin-top:8px; }
+.aramkit-balance article p { margin:5px 0 0; line-height:1.65; white-space:pre-wrap; }
+.aramkit-balance kbd { display:grid; place-items:center; width:44px; height:44px; color:var(--primary-strong); background:var(--surface-strong); border:1px solid var(--line); border-radius:9px; font-size:15px; font-weight:800; }
+.mayhem-opening-grid { grid-template-columns:minmax(0,1.45fr) repeat(2,minmax(0,1fr)); }
+.mayhem-opening-option { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:var(--bg); min-width:0; }
+.mayhem-opening-icons { display:flex; flex-wrap:wrap; gap:4px; min-width:0; }
+.mayhem-opening-icons .recommend-icon { width:36px; height:36px; margin:0; flex:0 0 36px; }
+.mayhem-opening-option .option-stats { display:grid; grid-template-columns:1fr; gap:2px; margin:0; text-align:right; }
+.mayhem-opening-option .option-stats>div { display:block; }
+.mayhem-opening-option .option-stats dt { display:none; }
+.mayhem-opening-option .option-stats dd { margin:0; font-size:11px; color:var(--muted); }
+.mayhem-opening-option .option-stats .is-win dd { color:var(--success); font-size:13px; }
+.aramkit-route { display:grid; grid-template-columns:22px minmax(0,1fr) repeat(3,65px); gap:10px; align-items:center; min-height:58px; padding:8px 16px; border-bottom:1px solid var(--line); }
+.aramkit-route-chain { display:flex; gap:6px; align-items:center; min-width:0; }
+.aramkit-route-chain .recommend-icon { width:36px; height:36px; flex:none; margin:0; }
+.aramkit-route-chain i { color:var(--muted); font-style:normal; }
+.aramkit-route-chain small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-left:8px; color:var(--muted); }
+.aramkit-route>div:not(.aramkit-route-chain),.aramkit-single>div { text-align:right; font-size:12px; }
+.aramkit-route>div:not(.aramkit-route-chain)>small,.aramkit-single>div>small { display:block; margin-top:2px; color:var(--muted); font-size:10px; }
+.aramkit-single-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.aramkit-single { display:grid; grid-template-columns:20px 36px minmax(0,1fr) repeat(3,52px); align-items:center; gap:8px; min-width:0; height:56px; padding:0 12px; border-bottom:1px solid var(--line); }
+.aramkit-single:nth-child(odd) { border-right:1px solid var(--line); }
+.aramkit-single .recommend-icon { width:36px; height:36px; margin:0; }
+.aramkit-single>strong { display:flex; gap:5px; align-items:center; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+.aramkit-linked { color:var(--accent); background:color-mix(in srgb,var(--accent) 16%,transparent); border-radius:5px; padding:1px 4px; font-size:10px; }
+.aramkit-more { display:flex; justify-content:center; padding:10px; }
+.aramkit-more button { min-height:32px; font-size:12px; }
+.is-delta-up { color:var(--success); }.is-delta-down { color:var(--danger); }
+.aramkit-combo .is-silver .augment-icon { border:1px solid var(--rarity-silver); }
+.aramkit-combo .is-gold .augment-icon { border:1px solid var(--rarity-gold); }
+.aramkit-combo .is-prismatic .augment-icon { border:1px solid var(--rarity-prismatic-a); }
+@container mayhem-detail (max-width:759px) {
+ .mayhem-opening-grid { grid-template-columns:1fr; }
+ .mayhem-opening-grid>section+section { border-left:0; border-top:1px solid var(--line); }
+ .aramkit-single-list { grid-template-columns:1fr; }
+ .aramkit-single:nth-child(odd) { border-right:0; }
+ .aramkit-route-chain { flex-wrap:wrap; }.aramkit-route-chain small { flex-basis:100%; margin:0; }
+}
+@container mayhem-detail (max-width:719px) {
+ .aramkit-combo-list { grid-template-columns:1fr; }
+ .aramkit-combo:nth-child(odd) { border-right:0; }
+ .aramkit-balance-grid { grid-template-columns:1fr; }
+ .aramkit-balance-grid>section+section { border-left:0; border-top:1px solid var(--line); }
+}
+.mayhem-atlas { grid-template-columns:minmax(320px,340px) minmax(0,1fr); gap:12px; }
+.mayhem-atlas-browser,.mayhem-atlas-detail { height:var(--atlas-column-height); min-height:360px; overflow:hidden; }
+.mayhem-atlas-browser { overflow-y:auto; }
+.mayhem-atlas-browser .mayhem-panel-head { display:grid; gap:10px; padding:14px; }
+.mayhem-atlas-browser .mayhem-panel-head>div { display:flex; align-items:center; justify-content:space-between; }
+.mayhem-atlas-browser .champion-search { width:100%; }
+.mayhem-atlas-browser .aramkit-controls { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin:10px 14px; }
+.mayhem-atlas-browser .select-wrap { min-width:0; width:100%; }
+.mayhem-atlas-browser .mayhem-rarity-tabs { margin:0 14px; flex:none; }
+.mayhem-atlas-list { padding:0; flex:1 0 120px; }
+.mayhem-atlas-row { grid-template-columns:22px 40px minmax(0,1fr) 24px 54px; height:56px; min-height:56px; gap:8px; padding:0 14px; border:0; border-bottom:1px solid var(--line); border-radius:0; }
+.mayhem-atlas-row .augment-icon { width:40px; height:40px; }
+.mayhem-atlas-row.is-active { box-shadow:inset 3px 0 0 var(--primary); border-color:var(--line); }
+.mayhem-atlas-row .mayhem-atlas-row-rates { display:grid; justify-items:end; gap:3px; font-size:12px; }
+.mayhem-atlas-row strong { font-size:13px; }
+.mayhem-rarity-panel { flex:none; border-bottom:1px solid var(--line); }
+.mayhem-rarity-panel>button { display:flex; width:100%; align-items:center; justify-content:space-between; gap:8px; padding:9px 14px; border:0; background:transparent; color:var(--muted); font:inherit; font-size:11px; cursor:pointer; }
+.mayhem-rarity-bar { display:flex; overflow:hidden; height:6px; width:100px; border-radius:6px; }
+.mayhem-rarity-bar>.is-silver { background:var(--rarity-silver); }.mayhem-rarity-bar>.is-gold { background:var(--rarity-gold); }.mayhem-rarity-bar>.is-prismatic { background:var(--rarity-prismatic-a); }
+.mayhem-atlas-detail-head { padding:14px 16px; gap:14px; }
+.mayhem-atlas-detail-head h3 { font-size:20px; white-space:nowrap; }
+.mayhem-atlas-detail-head h3>span:last-child { overflow:hidden; text-overflow:ellipsis; }
+.mayhem-atlas-metrics { display:grid; grid-column:1/-1; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; }
+.mayhem-atlas-metrics>div { display:grid; gap:4px; min-width:0; padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }
+.mayhem-atlas-metrics small { font-size:11px; color:var(--muted); }.mayhem-atlas-metrics b { font-size:17px; white-space:nowrap; }
+.mayhem-atlas-description { margin:14px 18px 0; font-size:13px; color:var(--ink); background:var(--bg); border-color:color-mix(in srgb,var(--primary) 30%,var(--line)); }
+.mayhem-atlas-best { display:grid; grid-template-columns:1.3fr 1fr; gap:10px; margin:12px 18px 0; flex:none; }
+.mayhem-atlas-best>div { display:flex; align-items:center; gap:10px; padding:10px 12px; min-width:0; border:1px solid var(--line); border-radius:10px; background:var(--bg); }
+.mayhem-atlas-best>div>div { min-width:0; }.mayhem-atlas-best small { display:block; font-size:11px; color:var(--muted); }.mayhem-atlas-best strong { color:var(--primary-strong); font-size:14px; }
+.mayhem-best-metrics { margin-left:auto; text-align:right; flex:none; }
+.mayhem-best-metrics .is-delta-up { color:var(--success); }.mayhem-best-metrics .is-delta-down { color:var(--danger); }
+.mayhem-stage-number { display:grid; place-items:center; width:32px; height:34px; border:1px solid var(--line); border-radius:8px; }
+.mayhem-atlas-tabs { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:14px 18px 10px; border-bottom:1px solid var(--line); flex:none; }
+.mayhem-atlas-tools { display:flex; gap:8px; min-width:0; margin-left:auto; }
+.mayhem-atlas-tools input { width:130px; min-width:0; }
+.mayhem-atlas-tab-content { flex:1 1 auto; min-height:80px; overflow:auto; margin:0 18px; overscroll-behavior:contain; }
+.mayhem-atlas-tab-content .mayhem-fit-list { display:block; overflow:visible; }
+.mayhem-fit-columns,.mayhem-fit-row { display:grid; grid-template-columns:24px minmax(145px,1.6fr) repeat(4,minmax(65px,.7fr)) minmax(65px,.8fr) 28px; align-items:center; gap:8px; min-width:720px; padding:0; border-bottom:1px solid var(--line); }
+.mayhem-fit-columns { position:sticky; top:0; z-index:1; height:36px; color:var(--muted); background:var(--surface); font-size:11px; }
+.mayhem-fit-row { height:50px; min-height:50px; font-size:12px; }
+.mayhem-fit-columns>:nth-child(n+3),.mayhem-fit-row>:nth-child(n+3) { text-align:right; }
+.mayhem-fit-who { display:flex; align-items:center; gap:8px; min-width:0; }
+.mayhem-fit-who>strong { flex:none; font-size:13px; }.mayhem-fit-who>small { color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:11px; }
+.mayhem-atlas-tab-content .aramkit-combos { border:0; }.mayhem-atlas-tab-content .aramkit-combos>header { display:none; }
+.aramkit-combos.is-atlas .aramkit-combo-list,.aramkit-single-list.is-atlas { grid-template-columns:1fr; }
+.aramkit-single-list.is-atlas .aramkit-single { grid-template-columns:20px 36px minmax(0,1fr) 70px 70px; }
+.mayhem-atlas-tab-content .aramkit-combo:nth-child(odd),.aramkit-single-list.is-atlas .aramkit-single:nth-child(odd) { border-right:0; }
+@media(max-width:979px) { .mayhem-atlas { grid-template-columns:1fr; }.mayhem-atlas-detail { min-height:540px; }.mayhem-atlas-best { grid-template-columns:1fr; } }
+
+.aramkit-controls { display:flex; gap:8px; align-items:center; }
+.mayhem-atlas-browser .app-select { min-width:0; width:100%; max-width:100%; }
+.mayhem-atlas-browser .app-select-trigger { min-width:0; width:100%; padding-inline:8px; font-size:11px; }
+.mayhem-atlas-metrics b { overflow:hidden; text-overflow:ellipsis; }
+.mayhem-atlas-metrics>div:last-child b { font-size:13px; }
+.mayhem-atlas-best small { white-space:nowrap; }
+.mayhem-atlas-best strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mayhem-atlas-tools { display:grid; grid-template-columns:140px minmax(0,1fr); width:328px; flex:0 0 328px; max-width:100%; }
+.mayhem-atlas-tools .champion-search { min-width:0; width:100%; grid-template-columns:minmax(0,1fr); }
+.mayhem-atlas-tools input { width:100%; }

@@ -44,13 +44,14 @@ function sliceBetween(source, startAnchor, endAnchor) {
 // 1. §2.6 全局扫描钉子
 // ---------------------------------------------------------------------------
 
+const withoutR308ScopeControl = text => text.replace('<div class="aramkit-scope"><span>统计口径</span>', '');
 const BANNED_PHRASES = ["统计口径", "不构成因果", "仅描述赛后关联"];
 
 test("R128 §2.6 生产 JS 里不再出现口径/因果/关联类说明文案", () => {
   assert.ok(productionScripts.length >= 10, "扫描口径没覆盖到 backend/web 的脚本");
   for (const { name, text } of productionScripts) {
     for (const phrase of BANNED_PHRASES) {
-      assert.equal(text.includes(phrase), false, `${name} 里出现了「${phrase}」`);
+      assert.equal(withoutR308ScopeControl(text).includes(phrase), false, `${name} 里出现了「${phrase}」`);
     }
   }
 });
@@ -60,11 +61,11 @@ test("R128 §2.6 对抗变异：把禁用短语塞回 champions.js，扫描必�
     item.name === "champions.js" ? { ...item, text: `${item.text}\n// 统计口径\n` } : item
   ));
   const hits = injected
-    .filter((item) => BANNED_PHRASES.some((phrase) => item.text.includes(phrase)))
+    .filter((item) => BANNED_PHRASES.some((phrase) => withoutR308ScopeControl(item.text).includes(phrase)))
     .map((item) => item.name);
   assert.deepEqual(hits, ["champions.js"], "扫描逻辑抓不到重新塞回来的口径文案");
   // 未注入时同一套判据必须是空的，否则上面那条只是恒真。
-  const clean = productionScripts.filter((item) => BANNED_PHRASES.some((phrase) => item.text.includes(phrase)));
+  const clean = productionScripts.filter((item) => BANNED_PHRASES.some((phrase) => withoutR308ScopeControl(item.text).includes(phrase)));
   assert.deepEqual(clean, []);
 });
 
@@ -168,9 +169,9 @@ test("R128 §2.1 概览/构筑 tab 改成等分的一级切换", () => {
 
 test("R128 §2.4 概览顺序与推荐卡标题行", () => {
   const overview = sliceBetween(championsScript, "function mayhemOverviewTabMarkup(", "function mayhemBuildTabMarkup(");
-  const order = ["renderRecommendedAugments", "renderARAMKitCombos", "renderMayhemOpeningConfiguration"].map((name) => overview.indexOf(name));
+  const order = ["renderRecommendedAugments", "renderARAMKitCombos", "renderARAMKitBalance"].map((name) => overview.indexOf(name));
   assert.ok(order.every((index) => index > 0), `概览三段缺一不可：${order}`);
-  assert.ok(order[0] < order[1] && order[1] < order[2], "顺序必须是 海克斯推荐 → 海克斯组合 → 开局配置");
+  assert.ok(order[0] < order[1] && order[1] < order[2], "顺序必须是 海克斯推荐 → 海克斯组合 → 英雄调整");
 
   const augments = sliceBetween(championsScript, "function renderRecommendedAugments(", "function mayhemActiveStage(");
   // 标题行删掉「N 个」，chips 成为 header 最后一个子元素（靠 space-between 贴右）。

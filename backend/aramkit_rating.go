@@ -114,6 +114,12 @@ type mayhemRatingResponse struct {
 }
 
 type aramkitRatingOutcome struct {
+	endpoint          string
+	hedged            bool
+	otherHost         string
+	otherMS           int64
+	otherResult       string
+	elapsed           time.Duration
 	host              string
 	dns, connect, tls time.Duration
 	ttfb              time.Duration
@@ -511,13 +517,20 @@ func (c *aramkitRatingClient) recordContext(ctx context.Context, key string, cac
 	if c.identityHash != nil {
 		identity = c.identityHash(key)
 	}
-	c.observe(map[string]any{
+	fields := map[string]any{
 		"event": "mayhem_rating_lookup", "source": dataSourceARAMKit, "player_hash": identity,
 		"cache_hit": cacheHit, "cache_source": ctx.Value(aramkitRatingCacheSourceKey{}), "prefetch": ctx.Value(aramkitRatingPrefetchKey{}) == true, "coalesced": coalesced, "duration_ms": duration.Milliseconds(),
 		"host": outcome.host, "dns_ms": outcome.dns.Milliseconds(), "connect_ms": outcome.connect.Milliseconds(), "tls_ms": outcome.tls.Milliseconds(),
 		"ttfb_ms": outcome.ttfb.Milliseconds(), "bytes": outcome.bytes,
 		"code": outcome.code, "http_status": outcome.httpStatus, "result": outcome.result, "reason": outcome.reason,
-	})
+	}
+	if outcome.hedged {
+		fields["hedged"] = true
+		fields["other_host"] = outcome.otherHost
+		fields["other_ms"] = outcome.otherMS
+		fields["other_result"] = outcome.otherResult
+	}
+	c.observe(fields)
 }
 
 func (a *app) aramkitRatingIdentityHash(identity string) string {
@@ -610,12 +623,30 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 		return c.fetchEndpoint(ctx, c.baseURL, gameName, tagLine)
 	}
 	results := make(chan aramkitRatingOutcome, 2)
+	starts := map[string]time.Time{}
+	hostOf := func(endpoint string) string {
+		parsed, _ := url.Parse(endpoint)
+		if parsed == nil {
+			return ""
+		}
+		return parsed.Hostname()
+	}
 	launch := func(endpoint string) {
+		started := time.Now()
+		starts[endpoint] = started
 		go func() {
 			outcome := aramkitRatingOutcome{reason: "network_error", result: "unavailable", response: unavailableMayhemRating("暂不可用", dataSourceFailed)}
-			defer func() { results <- outcome }()
+			defer func() {
+				outcome.endpoint = endpoint
+				outcome.elapsed = time.Since(started)
+				outcome.host = hostOf(endpoint)
+				results <- outcome
+			}()
 			defer recoverPanic("aramkit.rating.endpoint")
 			outcome = c.fetchEndpoint(ctx, endpoint, gameName, tagLine)
+			if ctx.Err() == context.Canceled && !outcome.response.Available && outcome.reason == "network" {
+				outcome.reason = "cancelled"
+			}
 		}()
 	}
 	launch(c.baseURL)
@@ -628,14 +659,46 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 	alternate := false
 	completed := 0
 	var failure aramkitRatingOutcome
+	withOther := func(result, other aramkitRatingOutcome) aramkitRatingOutcome {
+		if !alternate {
+			return result
+		}
+		result.hedged = true
+		result.otherHost = other.host
+		result.otherMS = other.elapsed.Milliseconds()
+		result.otherResult = "失败"
+		if other.response.Available {
+			result.otherResult = "成功"
+		} else if other.reason == "cancelled" {
+			result.otherResult = "被取消"
+		}
+		if other.host == "" {
+			endpoint := c.baseURL
+			if result.endpoint == c.baseURL {
+				endpoint = fallback
+			}
+			result.otherHost = hostOf(endpoint)
+			result.otherMS = time.Since(starts[endpoint]).Milliseconds()
+			result.otherResult = "被取消"
+		}
+		return result
+	}
 	for {
 		select {
 		case result := <-results:
 			completed++
 			if result.response.Available {
 				cancel()
-				return result
+				other := failure
+				if completed == 1 && alternate {
+					select {
+					case other = <-results:
+					default:
+					}
+				}
+				return withOther(result, other)
 			}
+			previous := failure
 			failure = result
 			if !alternate {
 				alternate = true
@@ -643,7 +706,7 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 				launch(fallback)
 			}
 			if completed == 2 {
-				return failure
+				return withOther(failure, previous)
 			}
 		case <-timer.C:
 			if !alternate {
@@ -655,9 +718,9 @@ func (c *aramkitRatingClient) fetch(ctx context.Context, gameName, tagLine strin
 				return aramkitRatingOutcome{reason: "cancelled", result: "unavailable", response: unavailableMayhemRating("查询已取消", dataSourceFailed)}
 			}
 			if failure.reason != "" {
-				return failure
+				return withOther(failure, aramkitRatingOutcome{})
 			}
-			return aramkitRatingOutcome{reason: "timeout", result: "unavailable", response: unavailableMayhemRating("暂不可用", dataSourceFailed)}
+			return withOther(aramkitRatingOutcome{endpoint: c.baseURL, host: hostOf(c.baseURL), reason: "timeout", result: "unavailable", response: unavailableMayhemRating("暂不可用", dataSourceFailed)}, aramkitRatingOutcome{})
 		}
 	}
 }

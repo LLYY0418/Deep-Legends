@@ -784,7 +784,7 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
   assert.match(script, /gradeBadge\(row\.grade, "arena-option-grade"\)/);
   // 指标改成与斗魂同款的带标签列，不再是一行串起来的文字。
   assert.match(script, /\["胜率", percent\(item\.winRate\), "is-win"\]/);
-  assert.match(script, /\["样本", compactNumber\(item\.games\), ""\]/);
+  assert.match(script, /\["场次",item.games\?compactNumber\(item.games\):""\]/);
   // R116-B 评审整改 B4：阶段视图里这一格是英雄级的 hexScore（后端刻意不下发阶段级
   // 评分），标签必须写明口径，不能让英雄级数字冒充阶段数值。
   assert.match(functionSource(script,"loadMayhemAugmentDetail"), /mayhemAugmentDetailCache/);
@@ -802,7 +802,7 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
 	  assert.match(gameplayScript, /\["win", "胜率", row\.winRate, percent\]/);
 	  assert.match(gameplayScript, /\["pick", "选用率", row\.pickRate > 0 \? row\.pickRate : null, percent\]/);
 	  assert.match(gameplayScript, /\["games", "场次", row\.games, number\]/);
-  assert.match(script, /class="mayhem-fit-metrics"/);
+  assert.match(script, /class="mayhem-fit-columns"/);
   assert.doesNotMatch(styles, /\.mayhem-fit-row > span/);
 });
 
@@ -1091,10 +1091,10 @@ test("R6 win rates, spell fallback, patch fallback, and subtitles are explicit",
   // 出门装与鞋子仍然只有选用率（false）：它们的数据里没有胜率，跟着打开就是
   // 显示不存在的数据。renderConfigOption 的三态开关本身没改。
   const opening = functionSource(script, "renderMayhemOpeningConfiguration");
-  assert.match(opening, /renderConfigOption\(row, kind, false, row.assets/);
-  assert.match(opening, /renderConfigOption\(row, "spell", null, spellStats\)/);
+  assert.match(opening, /Number\(row.winRate\)>0/);
+  assert.match(opening, /Number\(row.pickRate\)>0/);
   assert.doesNotMatch(opening, /renderConfigOption\(row, kind, true\)|renderConfigOption\(row, "spell", true\)|option-win-rate/);
-  assert.equal((opening.match(/renderConfigOption\(/g) || []).length, 2, "开局配置只允许两处 renderConfigOption：出门装/鞋子一组，召唤师技能一组");
+  assert.match(opening, /group\("出门装",build.starterItems,"item",3,true\)/);assert.match(opening, /group\("鞋子",build.boots,"item",3\)/);assert.match(opening, /group\("召唤师技能",build.summonerSpells,"spell",2\)/);
   assert.doesNotMatch(opening, /skill-plan|技能加点/, "技能加点已搬到「构筑」tab");
   assert.match(functionSource(script, "renderMayhemSkillPlan"), /renderChampionSkillPlan\(skills, false\)/);
   assert.match(functionSource(script, "renderChampionSkillPlan"), /skill-win-rate/);
@@ -3495,7 +3495,7 @@ test("mayhem atlas columns share one height cap and scroll independently", () =>
   assert.match(styles, /\.mayhem-atlas-list\s*\{[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/s);
   assert.match(styles, /\.mayhem-fit-list\s*\{[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/s);
   assert.match(styles, /\.mayhem-atlas-detail-body\s*\{[^}]*min-height:\s*0/s);
-  assert.match(script, /<div class="mayhem-atlas-detail-body">\$\{body\}<\/div>/);
+  assert.match(script, /class="mayhem-atlas-tab-content" role="tabpanel"/);
 });
 
 // 用户明确要求：品质概率拿不到就别展示，不要留一个只有报错文案的空壳。
@@ -4109,8 +4109,8 @@ test("live mayhem item ranking renders the passed-through rows without a new req
     compactNumber: (value) => String(value ?? ""),
   });
   const markup = renderLiveItemRanking([
-    { score: 70, games: 500, winRate: 51, assets: [{ id: 3006, name: "狂战士胫甲" }] },
-    { score: 90, games: 200, winRate: 55, assets: [{ id: 126697, name: "狂妄" }] },
+    { score: 70, pickRate: 20, games: 500, winRate: 51, assets: [{ id: 3006, name: "狂战士胫甲" }] },
+    { score: 90, pickRate: 30, games: 200, winRate: 55, assets: [{ id: 126697, name: "狂妄" }] },
   ]);
   assert.ok(markup.indexOf('data-id="126697"') < markup.indexOf('data-id="3006"'));
   assert.match(markup, /装备排行/);
@@ -4418,7 +4418,7 @@ test("champion list rerenders preserve the inner table scroll position", () => {
   const nextList = { scrollTop: 0 };
   let queryCount = 0;
   const { render } = compileFunctions(script, ["render"], {
-    root: { querySelector: () => queryCount++ === 0 ? previousList : nextList },
+    root: { querySelector: selector => selector === ".champion-table-scroll" ? queryCount++ === 0 ? previousList : nextList : null },
     state: { mode: "ranked", selected: null, listScrollInner: 0 },
     renderWorkspace: () => {},
     renderDetail: () => {},

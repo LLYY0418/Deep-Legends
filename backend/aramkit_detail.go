@@ -93,7 +93,7 @@ type aramkitChampionView struct {
 }
 
 func (r aramkitResources) referenceRow(refs []aramkitItemRef, s aramkitStat, kind string) (championMetricRow, bool) {
-	row := championMetricRow{WinRate: s.WinRate * 100, PickRate: s.PickRate * 100, Games: s.SampleCount}
+	row := championMetricRow{Rank: s.Rank, WinRate: s.WinRate * 100, PickRate: s.PickRate * 100, Games: s.SampleCount}
 	for _, ref := range refs {
 		a, ok := r.asset(kind, ref.ID)
 		if !ok {
@@ -190,6 +190,7 @@ func parseARAMKitDetail(b []byte, id int, r aramkitResources) (championDetailRes
 				continue
 			}
 			view := aramkitBuildView{Key: a.Key, Name: name, WinRate: a.WinRate * 100, PickRate: a.PickRate * 100, Games: a.SampleCount}
+			openingChosen := false
 			for _, profile := range a.Profiles {
 				if row, ok := r.referenceRow(profile.ItemSet, profile.aramkitStat, "item"); ok && len(row.Assets) == 3 {
 					view.Core = append(view.Core, row)
@@ -198,6 +199,10 @@ func parseARAMKitDetail(b []byte, id int, r aramkitResources) (championDetailRes
 					if row, ok := r.referenceRow(route.PurchaseOrder, route.aramkitStat, "item"); ok {
 						view.Routes = append(view.Routes, row)
 					}
+					if openingChosen {
+						continue
+					}
+					openingChosen = true
 					for _, s := range route.Starters {
 						if row, ok := r.referenceRow(s.Items, s.aramkitStat, "item"); ok {
 							view.Starters = append(view.Starters, row)

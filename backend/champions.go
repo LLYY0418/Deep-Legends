@@ -259,6 +259,7 @@ type championAssetDescription struct {
 }
 
 type championMetricRow struct {
+	Rank             int                      `json:"rank,omitempty"`
 	Assets           []championAsset          `json:"assets"`
 	Ultimate         *championAsset           `json:"ultimate,omitempty"`
 	Rarity           string                   `json:"rarity,omitempty"`

@@ -104,10 +104,10 @@
       .filter(Boolean)
       .join("\n");
   }
-  function chips(ref) {
+  function chips(ref, displayOnly = false) {
     if (!shown() || !marked(ref)) return "";
     const ts = tags(records.get(ref));
-    return `<span class="ptag-row" data-ptag-chips="${esc(ref)}" data-ptag-open="${esc(ref)}" role="button" tabindex="0" data-tooltip="${esc(tooltip(ref))}">${ts
+    return `<span class="ptag-row" data-ptag-chips="${esc(ref)}" ${displayOnly?'tabindex="0"':`data-ptag-open="${esc(ref)}" role="button" tabindex="0"`} data-tooltip="${esc(tooltip(ref))}">${ts
       .slice(0, 2)
       .map(
         (t, i) =>
@@ -275,7 +275,7 @@
         .querySelector(".summoner-level-row > span")
         ?.insertAdjacentHTML(
           "afterend",
-          `<span class="ptag-inline">${chips(main.playerRef)}${button(main.playerRef)}</span>`,
+          `<span class="ptag-inline">${chips(main.playerRef, true)}</span>`,
         );
     }
     const live = ctx()?.live(),

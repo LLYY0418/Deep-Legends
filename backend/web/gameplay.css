@@ -2493,8 +2493,27 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .specialist-game-row[data-spell-layout="footer"] .sg-skills .skill-order { flex:none; width:calc(var(--card-skill-count) * 33px - 3px); }
 .specialist-game-row[data-spell-layout="footer"] .sg-skills .skill-order span { flex:0 0 30px; }
 
-.live-mayhem-badge{display:inline-flex;flex:0 0 auto;align-items:center;gap:4px;height:18px;line-height:18px;padding:0 4px;border-radius:4px;font-size:10px;white-space:nowrap;background:color-mix(in srgb,currentColor 10%,transparent)}.live-mayhem-badge.is-s{color:var(--rarity-gold)}.live-mayhem-badge.is-a{color:var(--success,#38a578)}.live-mayhem-badge.is-b{color:var(--accent,#648fd3)}.live-mayhem-badge.is-c{color:var(--muted)}.live-mayhem-badge.is-d{color:var(--danger,#a6656c)}.live-aramkit-combos>div{display:flex;align-items:center;gap:6px;height:36px;min-width:0;white-space:nowrap}.live-aramkit-combos>div strong{overflow:hidden;text-overflow:ellipsis;font-size:12px;min-width:0}.live-aramkit-combos>div>span.win-rate-value{margin-left:auto;flex-shrink:0}.live-aramkit-combos .game-icon{width:26px;height:26px}.live-aramkit-combos small{flex-shrink:0;color:var(--muted)}@media(max-width:1000px){.live-mayhem-badge>span,.live-aramkit-combos>div>strong{display:none}}
-@container recommendation-area (max-width:900px){.live-mayhem-badge>span,.live-aramkit-combos>div>strong{display:none}}
+.live-mayhem-badge{display:inline-flex;flex:0 0 auto;align-items:center;gap:4px;height:18px;line-height:18px;padding:0 4px;border-radius:4px;font-size:10px;white-space:nowrap;background:color-mix(in srgb,currentColor 10%,transparent)}.live-mayhem-badge.is-s{color:var(--rarity-gold)}.live-mayhem-badge.is-a{color:var(--success,#38a578)}.live-mayhem-badge.is-b{color:var(--accent,#648fd3)}.live-mayhem-badge.is-c{color:var(--muted)}.live-mayhem-badge.is-d{color:var(--danger,#a6656c)}@media(max-width:1000px){.live-mayhem-badge>span{display:none}}
+@container recommendation-area (max-width:900px){.live-mayhem-badge>span{display:none}}
+
+.live-aramkit-combos { padding:0 12px 12px; }
+.live-aramkit-combos h4 { display:flex; gap:8px; margin:0 0 8px; padding-top:10px; border-top:1px solid var(--line); font-size:13px; }
+.live-aramkit-combos small { color:var(--muted); font-size:11px; }
+.live-aramkit-combo-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.live-aramkit-combo { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; height:62px; min-width:0; padding:0 12px; background:var(--bg); border:1px solid var(--line); border-radius:10px; }
+.live-combo-pair { display:flex; align-items:center; }
+.live-combo-pair>.arena-augment-icon { display:flex; width:32px; height:32px; flex:none; }
+.live-combo-pair>.arena-augment-icon+.arena-augment-icon { margin-left:-6px; border-radius:8px; box-shadow:0 0 0 3px var(--bg); }
+.live-combo-pair .game-icon { width:32px; height:32px; }
+.live-combo-names { display:grid; gap:3px; min-width:0; font-size:12px; }
+.live-combo-names>* { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.live-combo-names>span { color:var(--muted); }
+.live-combo-metrics { display:grid; gap:3px; text-align:right; white-space:nowrap; }
+.live-item-ranking .mayhem-ranking-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.live-item-ranking .mayhem-ranking-list article { height:56px; min-height:56px; grid-template-columns:18px 36px minmax(0,1fr) auto; gap:8px; border:1px solid var(--line); background:var(--bg); }
+.live-item-ranking .game-icon { width:36px; height:36px; }
+.build-core-ranking-row.is-mayhem-build-row .item-core-column .config-option { min-height:56px; height:56px; }
+@container recommendation-area (max-width:900px) { .live-combo-names { display:none; }.live-aramkit-combo { grid-template-columns:auto auto; justify-content:space-between; gap:6px; padding-inline:8px; } }
 
 /* The same spell pair uses the opponent/status line before the shard corner. */
 .specialist-game-row[data-spell-layout="opponent"] .specialist-game-head{grid-template-columns:minmax(0,1fr) auto;align-items:center}
@@ -2507,3 +2526,15 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .specialist-game-row[data-spell-layout="opponent"] .custom-config-header>.cs-live-pill{grid-column:2;grid-row:1;justify-self:end}
 .specialist-game-row[data-spell-layout="opponent"] .custom-config-header>[role="status"]{grid-column:1;grid-row:2;margin-left:0;white-space:nowrap}
 .specialist-game-row[data-spell-layout="opponent"] .custom-config-header>[data-card-spells]{grid-column:2;grid-row:2;align-self:center;justify-self:end;margin-left:0}
+.live-augment-recommendations.is-hextech .live-augment-columns { grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:12px; }
+.live-augment-recommendations.is-hextech .live-augment-column+.live-augment-column { border-top:0; }
+.live-augment-recommendations.is-hextech .live-augment-column>div { grid-template-columns:1fr; padding:0; }
+.live-augment-recommendations.is-hextech .live-augment-column>header { padding:0 0 8px; min-height:28px; border-bottom:0; }
+@container recommendation-area (min-width:800px) {
+ .build-core-ranking-row.is-mayhem-build-row { grid-template-columns:minmax(260px,.75fr) minmax(0,1.25fr); }
+ .build-core-ranking-row.is-mayhem-build-row>.live-item-ranking { border-top:0; border-left:1px solid var(--line); }
+}
+.build-core-ranking-row.is-mayhem-build-row>.live-item-ranking>header { height:41px; min-height:41px; flex-wrap:nowrap; padding-block:8px; }
+.build-core-ranking-row.is-mayhem-build-row .item-core-column .option-stats.is-depth { grid-template-columns:repeat(2,48px); }
+.live-item-ranking>header .section-count { white-space:nowrap; font-size:10px; }
+.live-item-ranking>header h3 { white-space:nowrap; }

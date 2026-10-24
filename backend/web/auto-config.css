@@ -1,3 +1,5 @@
+:root { --ac-unsaved-dot:var(--danger); }
+[data-theme="crimson"] { --ac-unsaved-dot:var(--warning); }
 /* R298 设计稿参考样式：工具 › 配置（自动符文 / 召唤师技能 / 装备）
    只用项目主题变量；符文系颜色（--path）是语义色，五系固定，不随主题变化。
    类名前缀 ac-（auto config）。真实实现可改写进 suite.css / 新建 auto-config.css。 */
@@ -46,9 +48,7 @@
 .ac-champ-name { display:grid; min-width:0; gap:1px; }
 .ac-champ-name strong { font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ac-champ-name small { color:var(--muted); font-size:10.5px; }
-.ac-dots { display:grid; grid-template-columns:repeat(3,5px); gap:3px; }
-.ac-dots i { width:5px; height:5px; border-radius:50%; background:color-mix(in oklab,var(--muted) 30%,transparent); }
-.ac-dots i.on { background:var(--primary); box-shadow:0 0 0 1.5px color-mix(in oklab,var(--primary) 25%,transparent); }
+.ac-dots { display:flex; gap:4px; }
 
 .ac-editor { display:flex; flex-direction:column; padding:0; overflow:hidden; min-width:0; container:ac-editor / inline-size; }
 .ac-body > [data-ac-champs], .ac-body > [data-ac-editor] { display:contents; }
@@ -71,8 +71,6 @@
 .ac-mode:hover { color:var(--ink); border-color:var(--hex-line); }
 .ac-mode svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linejoin:round; stroke-linecap:round; }
 .ac-mode.is-active { color:var(--primary-strong); border-color:color-mix(in oklab,var(--primary) 55%,var(--line)); background:var(--primary-soft); font-weight:650; }
-.ac-mode .ac-mode-dot { width:6px; height:6px; border-radius:50%; background:transparent; border:1px solid color-mix(in oklab,var(--muted) 55%,transparent); }
-.ac-mode .ac-mode-dot.on { background:var(--primary); border-color:var(--primary); }
 .ac-positions { display:flex; align-items:center; gap:8px; padding:11px 16px 0; }
 .ac-pos { display:inline-flex; align-items:center; gap:5px; height:28px; line-height:1; padding:0 10px; border:1px solid transparent; border-radius:999px; background:transparent; color:var(--muted); font:inherit; font-size:11.5px; cursor:pointer; }
 .ac-pos:hover { color:var(--ink); background:var(--surface-strong); }
@@ -453,6 +451,11 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 .ac-validation-pulse { animation:ac-validation-pulse 650ms ease-out; }
 @keyframes ac-validation-pulse { 30% { outline:2px solid var(--warning); background:color-mix(in oklab,var(--warning) 14%,transparent); } }
 
-.ac-draft-dot { display:inline-block; flex:none; width:6px; height:6px; margin-left:5px; border:1.5px solid var(--primary); border-radius:50%; vertical-align:middle; }
 .ac-save-attempt { display:inline-flex; }
 .ac-save-attempt > button:disabled { pointer-events:none; }
+
+.ac-state-dot { display:inline-block; flex:none; width:8px; height:8px; border-radius:50%; background:var(--primary); }
+.ac-mode .ac-state-dot { width:9px; height:9px; }
+.ac-state-dot.is-unsaved { background:var(--ac-unsaved-dot); box-shadow:0 0 0 2px color-mix(in srgb,var(--ac-unsaved-dot) 25%,transparent); }
+/* Keep resize layout/paint invalidation inside the editor's independent regions. */
+.ac-champs { contain:layout paint; }

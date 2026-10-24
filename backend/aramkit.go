@@ -35,16 +35,17 @@ type aramkitVersionCache struct {
 	ETag, Modified string
 }
 type aramkitClient struct {
-	provider *championProvider
-	mu       sync.Mutex
-	slots    chan struct{}
-	flights  map[string]chan struct{}
-	memory   map[string][]byte
-	retry    map[string]time.Time
-	dir      string
-	readFile func(string) ([]byte, error)
-	versions aramkitVersionCache
-	checked  time.Time
+	provider      *championProvider
+	mu            sync.Mutex
+	slots         chan struct{}
+	flights       map[string]chan struct{}
+	memory        map[string][]byte
+	retry         map[string]time.Time
+	dir           string
+	readFile      func(string) ([]byte, error)
+	versions      aramkitVersionCache
+	caseDiffPaths map[string]bool
+	checked       time.Time
 }
 
 func (p *championProvider) aramkitClient() *aramkitClient {
@@ -426,7 +427,16 @@ func (p *championProvider) loadARAMKitChampionResources(ctx context.Context, v a
 	var cases, mismatch []int
 	r.Champions, cases, mismatch = verifyARAMKitChampions(r.Champions, meta)
 	if len(cases) > 0 {
-		c.diagnostic("aramkit_champion_key_case_diff", map[string]any{"count": len(cases), "ids": cases})
+		c.mu.Lock()
+		if c.caseDiffPaths == nil {
+			c.caseDiffPaths = map[string]bool{}
+		}
+		report := !c.caseDiffPaths[v.DataPath]
+		c.caseDiffPaths[v.DataPath] = true
+		c.mu.Unlock()
+		if report {
+			c.diagnostic("aramkit_champion_key_case_diff", map[string]any{"count": len(cases), "ids": cases})
+		}
 	}
 	if len(mismatch) > 0 {
 		c.diagnostic("aramkit_champion_id_mismatch", map[string]any{"count": len(mismatch), "ids": mismatch})
@@ -476,7 +486,7 @@ func (r aramkitResources) metric(s aramkitStat, kind string) (championMetricRow,
 	if !ok || !validARAMKitStat(s) {
 		return championMetricRow{}, false
 	}
-	return championMetricRow{Assets: []championAsset{a}, Rarity: a.Rarity, Grade: s.Tier, WinRate: s.WinRate * 100, PickRate: s.PickRate * 100, Games: s.SampleCount}, true
+	return championMetricRow{Rank: s.Rank, Assets: []championAsset{a}, Rarity: a.Rarity, Grade: s.Tier, WinRate: s.WinRate * 100, PickRate: s.PickRate * 100, Games: s.SampleCount}, true
 }
 func (r aramkitResources) metrics(rows []aramkitStat, kind string) []championMetricRow {
 	var out []championMetricRow

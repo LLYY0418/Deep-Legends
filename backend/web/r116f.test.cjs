@@ -125,7 +125,7 @@ test("R128 §2.4 海克斯推荐标题行右侧不再有「N 个」计数", asyn
 });
 
 test("R307 概览顺序为海克斯推荐、组合、开局配置与英雄调整",async(t)=>{
- const {window,document}=await mountMayhemDetail();t.after(()=>window.close());const selectors=['.mayhem-augment-ranking','.aramkit-combos','.mayhem-opening-config'];const nodes=selectors.map(s=>document.querySelector(s));assert.ok(nodes.every(Boolean));for(let i=1;i<nodes.length;i++)assert.ok(nodes[i-1].compareDocumentPosition(nodes[i])&4);for(const node of nodes)assert.equal(node.closest('[data-mayhem-detail-panel="overview"]'),document.querySelector('[data-mayhem-detail-panel="overview"]'));
+ const {window,document}=await mountMayhemDetail(detailFixture({aramkit:{...realDetail.aramkit,balance:{modifiers:[{key:'abilityHaste',unit:'number',value:10}]}}}));t.after(()=>window.close());assert.equal(document.querySelector('.mayhem-opening-config'),null);const selectors=['.mayhem-augment-ranking','.aramkit-combos','.aramkit-balance'];const nodes=selectors.map(s=>document.querySelector(s));assert.ok(nodes.every(Boolean));for(let i=1;i<nodes.length;i++)assert.ok(nodes[i-1].compareDocumentPosition(nodes[i])&4);for(const node of nodes)assert.equal(node.closest('[data-mayhem-detail-panel="overview"]'),document.querySelector('[data-mayhem-detail-panel="overview"]'));
 });
 
 
