@@ -140,7 +140,7 @@ function compile(names, dependencies = {}, script = source) {
     length = names.length;
     for (const name of ["bindLiveNode", "champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel", "liveClientPositionsPending", "clearRuneStarterRetries", "runeStarterTargetActive", "laneMatchupEnemies", "laneMatchupTier", "laneMatchupInference", "laneMatchupAvailability", "ensureLaneMatchupPositions", "laneMatchupPairKey", "laneMatchupOwnLocked", "ensureLaneMatchupPair", "recordLaneMatchupCandidateSkip", "laneMatchupUnavailableReason", "recordLaneMatchupCardDiagnostic", "liveRecommendationTier"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   }
-  for (const helper of ["championDisplayName", "noteChampSelectReady", "noteChampSelectLatency", "privacyName", "renderRankWindowNote", "liveTagVisible"]) if (!dependencies[helper] && !names.includes(helper) && names.some(name => functionSource(script,name).includes(helper+"("))) names.push(helper);
+  for (const helper of ["championDisplayName", "noteChampSelectReady", "noteChampSelectLatency", "privacyName", "renderRankWindowNote", "liveTagVisible", "bindSeasonDataNotes", "renderSeasonDataNote"]) if (!dependencies[helper] && !names.includes(helper) && names.some(name => functionSource(script,name).includes(helper+"("))) names.push(helper);
   dependencies = { readSetting: (_key, fallback) => fallback, recordItemSetClientDiagnostic: () => {}, document: { hidden: false, hasFocus:()=>true }, setTimeout, clearTimeout, riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, isSummonersRiftMatch: data => Number(data?.mapId) === 11, clusterPremadePlayers: players => players, window: {}, ...dependencies };
   dependencies.window = {deepLegendsPrivacy:require("./privacy.js"),...dependencies.window};
   const keys = Object.keys(dependencies);
@@ -517,7 +517,7 @@ test("R75 pro rows use shared game renderer, neutral unknown, real event and sam
   const state = { live: { mapId: 11 }, specialistPlayerTabs: new Map(), selectedRecommendation: "pro-1", summonerSpells: { spells: [{ id: 4, name: "闪现" }, { id: 11, name: "惩戒" }] } };
   const fn = compile(["renderSpecialistPlayers", "renderRuneSourceSection", "proRuneRecordLabel"], {
     state, proRequestTarget: () => ({key:"69:mid"}), specialistRequestTarget: () => ({key:"69:mid"}), positionLabel: value => value, livePositionDisplay: value => value, escapeHTML: x=>String(x??""), relativeTime:()=>"刚刚",
-    runeConfigurationTitle:()=>"电刑 + 坚决", renderUnifiedRuneBoard:()=>"<runes></runes>", renderItemIcon:id=>`<item>${id}</item>`, renderSummonerSpellIcon:id=>`<spell>${id}</spell>`, iconFigure:()=>"<icon></icon>",
+    runeConfigurationTitle:()=>"电刑 + 坚决", renderUnifiedRuneBoard:(_config,spells="")=>`<runes><span data-card-spells>${spells}</span></runes>`, renderItemIcon:id=>`<item>${id}</item>`, renderSummonerSpellIcon:id=>`<spell>${id}</spell>`, iconFigure:()=>"<icon></icon>",
   });
   const row = { key:"pro-1", title:"T1 Faker", playerName:"Faker", championId:69, position:"中路", opponentPlayerName:"GEN Chovy", eventLabel:"LCK · 2026-09-06 · T1 vs GEN 第 1 局", winKnown:false, recordGames:2, recordWins:1, recordPartial:true, selectedComplete:false, itemIds:[3364,2031,6692] };
   let html=fn.renderRuneSourceSection({key:"pro",items:[row],proStatus:{}},true);
@@ -530,7 +530,7 @@ test("R75 pro rows use shared game renderer, neutral unknown, real event and sam
   assert.doesNotMatch(html,/rune-spell-row/,"pro records must not render a separate spell row");
   html=fn.renderSpecialistPlayers([{...row,recordGames:3,recordWins:2}],"pro");assert.match(html,/aria-label="2胜1负，仅已确认场次"/);
   html=fn.renderSpecialistPlayers([{...row,spell1Id:4,spell2Id:11}],"specialist");
-  assert.match(html,/<div class="sg-spells"><spell>4<\/spell><spell>11<\/spell><\/div>/);
+  assert.match(html,/<span data-card-spells><spell>4<\/spell><spell>11<\/spell><\/span>/);
   assert.doesNotMatch(html,/rune-spell-row|召唤师技能|闪现|惩戒/);
   html=fn.renderRuneSourceSection({key:"pro",items:[row],proStatus:{readAt:new Date(Date.now()-600000).toISOString()}},true);
   assert.doesNotMatch(html,/缓存数据|无法连接职业赛事数据源/);assert.match(html,/data-retry-pro-runes/);assert.match(html,/当前显示上次读取结果/);
@@ -676,7 +676,7 @@ test("pro tabs keep every player and display latest five games per player withou
   const state={live:{},specialistPlayerTabs:new Map(),selectedRecommendation:""};
   const {renderSpecialistPlayers:render}=compile(["renderSpecialistPlayers","proRuneRecordLabel"],{
     state,proRequestTarget:()=>({key:"69:mid"}),escapeHTML:x=>String(x??""),
-    runeConfigurationTitle:()=>"相位猛冲 + 精密",renderUnifiedRuneBoard:()=>"<runes></runes>",renderItemIcon:id=>`<item>${id}</item>`,iconFigure:()=>"<icon></icon>",
+    runeConfigurationTitle:()=>"相位猛冲 + 精密",renderUnifiedRuneBoard:(_config,spells="")=>`<runes><span data-card-spells>${spells}</span></runes>`,renderItemIcon:id=>`<item>${id}</item>`,iconFigure:()=>"<icon></icon>",
     relativeTime:()=>{throw Error("relative time must not be rendered");},
   });
   const rows=[];
@@ -774,7 +774,7 @@ test('TheShy Camille official eight-perk response shows known shards without inv
 });
 
 test('KR unavailable season never renders recent20 as champion season statistics',()=>{
- const {renderChampionStats}=compile(['renderChampionStats'],{escapeHTML:String});
+ const {renderChampionStats}=compile(['renderChampionStats','renderSeasonDataNote'],{escapeHTML:String});
  const html=renderChampionStats([],{games:20,winRate:50},{seasonOnly:true,unavailable:true,message:'本赛季英雄统计暂不可用，请刷新重试'});
  assert.match(html,/本赛季英雄统计暂不可用/);
  assert.doesNotMatch(html,/champion-stat-row|50%|全部英雄/);
@@ -1158,7 +1158,7 @@ test("R174 full specialist and pro templates have no standalone spell row", () =
   const funcs = compile(["renderSpecialistPlayers", "proRuneRecordLabel"], {
     state, proRequestTarget: () => ({ key: "64:mid" }), specialistRequestTarget: () => ({ key: "64:mid" }),
     positionLabel: x => x, livePositionDisplay: x => x, escapeHTML: x => String(x ?? ""),
-    runeConfigurationTitle: () => "符文", renderUnifiedRuneBoard: () => "<runes></runes>",
+    runeConfigurationTitle: () => "符文", renderUnifiedRuneBoard: (_config,spells="")=>`<runes><span data-card-spells>${spells}</span></runes>`,
     renderItemIcon: id => '<i data-item="' + id + '"></i>',
     renderSummonerSpellIcon: id => '<i data-spell="' + id + '"></i>', iconFigure: () => "",
   });
@@ -1166,7 +1166,7 @@ test("R174 full specialist and pro templates have no standalone spell row", () =
     const html = funcs.renderSpecialistPlayers([{ key: "game-1", playerName: "Fixture", itemIds: [3006], spell1Id: 4, spell2Id: 11, recordGames: 1, recordWins: 1 }], source);
     const doc = new JSDOM(html).window.document;
     assert.equal(doc.querySelectorAll(".rune-spell-row").length, 0);
-    assert.equal(doc.querySelectorAll(".specialist-game-footer > .sg-spells").length, 1);
+    assert.equal(doc.querySelectorAll(".specialist-game-footer > .sg-spells").length, 0);
     assert.equal(doc.querySelectorAll("[data-spell]").length, 2);
   }
 });

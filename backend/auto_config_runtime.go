@@ -31,6 +31,7 @@ type autoConfigRuntime struct {
 	observed          int64
 	changedAt         time.Time
 	running           bool
+	skipReasons       map[string]bool
 	done              bool
 }
 
@@ -261,15 +262,30 @@ func (a *app) observeAutoConfigEvent(ctx context.Context, client *LCUClient, eve
 		a.triggerAutoConfig(ctx, client)
 	}
 }
-func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
-	settings := a.autoConfigSnapshot()
-	if !settings.Enabled {
+
+// Each reason is emitted at most once per champion-select session.
+func (a *app) recordAutoConfigSkip(reason, modeKey string) {
+	a.autoConfig.Lock()
+	r := &a.autoConfig.runtime
+	if r.skipReasons == nil {
+		r.skipReasons = map[string]bool{}
+	}
+	if r.skipReasons[reason] {
+		a.autoConfig.Unlock()
 		return
 	}
+	r.skipReasons[reason] = true
+	phase := a.autoConfig.phase
+	a.autoConfig.Unlock()
+	a.recordDiagnostic(map[string]any{"event": "auto_config_skip", "reason": reason, "modeKey": modeKey, "phase": phase})
+}
+func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
+	settings := a.autoConfigSnapshot()
 	a.autoConfig.Lock()
 	if a.autoConfig.processing {
 		a.autoConfig.queued = true
 		a.autoConfig.Unlock()
+		a.recordAutoConfigSkip("guard", "")
 		return
 	}
 	a.autoConfig.processing = true
@@ -289,14 +305,12 @@ func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
 		defer cancel()
 		var s lcuChampSelectSession
 		if client.RequestJSON(ctx, "GET", "/lol-champ-select/v1/session", nil, &s) != nil {
+			a.recordAutoConfigSkip("guard", "")
 			return
 		}
 		var flow lcuGameflowSession
 		_ = client.RequestJSON(ctx, "GET", "/lol-gameflow/v1/session", nil, &flow)
 		mode := autoConfigSessionMode(s, flow)
-		if mode == "" {
-			return
-		}
 		id := champSelectCurrentChampion(s)
 		key := autoConfigSessionKey(s)
 		a.autoConfig.Lock()
@@ -321,9 +335,23 @@ func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
 				r.cancel()
 			}
 		}
-		if r.done || !autoConfigLocked(s, mode) {
+		reason := ""
+		switch {
+		case !settings.Enabled:
+			reason = "disabled"
+		case !settings.Runes && !settings.Spells && !settings.Items:
+			reason = "category_off"
+		case mode == "":
+			reason = "no_mode"
+		case !autoConfigLocked(s, mode):
+			reason = "not_locked"
+		case r.done:
+			reason = "guard"
+		}
+		if reason != "" {
 			a.autoConfig.Unlock()
 			a.emitAutoConfig()
+			a.recordAutoConfigSkip(reason, mode)
 			return
 		}
 		delay := time.Duration(0)
@@ -335,10 +363,12 @@ func (a *app) triggerAutoConfig(parent context.Context, client *LCUClient) {
 		a.autoConfig.Unlock()
 		if delay > 0 {
 			if !waitWatchDelay(ctx, delay) {
+				a.recordAutoConfigSkip("guard", mode)
 				return
 			}
 		}
 		if err := a.autoConfigGuard(ctx, client, s, generation, id, mode); err != nil {
+			a.recordAutoConfigSkip("guard", mode)
 			return
 		}
 		position := ""
@@ -436,6 +466,7 @@ func (a *app) applyAutoConfigRunes(ctx context.Context, client *LCUClient, gener
 
 func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChampSelectSession, generation uint64, id int64, mode, modeKey string, entry autoConfigEntry, exists bool, manualApply ...bool) {
 	started := time.Now()
+	skip := func(reason string) { a.recordAutoConfigSkip(reason, modeKey) }
 	manual := len(manualApply) > 0 && manualApply[0]
 	guard := func() error {
 		if manual {
@@ -446,6 +477,10 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 	ctx = context.WithValue(ctx, autoConfigWriteGuardKey{}, guard)
 	catalog, catErr := a.loadAutoConfigCatalog(ctx)
 	settings := a.autoConfigSnapshot()
+	if !manual && !settings.Enabled {
+		skip("disabled")
+		return
+	}
 	results := map[string]string{}
 	pageID := int64(0)
 	name := bundledChampionNames()[id]
@@ -471,25 +506,33 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 		a.autoConfig.Unlock()
 		if !enabled || yielded || mode == "hextech" && kind == "runes" {
 			results[kind] = "skipped-disabled"
+			if !yielded {
+				skip("category_off")
+			}
 			if yielded {
 				results[kind] = "skipped-manual"
+				skip("yielded")
 			}
 			continue
 		}
 		if !exists || (kind == "runes" && entry.Runes == nil) || (kind == "spells" && entry.Spells == nil) || (kind == "items" && entry.Items == nil) {
 			results[kind] = "skipped-no-config"
+			skip("no_config")
 			continue
 		}
 		if catErr != nil {
+			skip("guard")
 			results[kind] = "failed"
 			continue
 		}
 		if guard() != nil {
+			skip("guard")
 			return
 		}
 		var err error
 		categoryGuard := func() error {
 			if err := guard(); err != nil {
+				skip("guard")
 				return err
 			}
 			current := a.autoConfigSnapshot()
@@ -497,7 +540,16 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 			a.autoConfig.Lock()
 			yielded := !manual && a.autoConfig.runtime.Yielded[kind]
 			a.autoConfig.Unlock()
+			if !manual && !current.Enabled {
+				skip("disabled")
+				return errors.New("自动配置已关闭")
+			}
 			if !enabled || yielded {
+				if yielded {
+					skip("yielded")
+				} else {
+					skip("category_off")
+				}
 				return errors.New("玩家已切换或已关闭此项")
 			}
 			return nil
@@ -507,15 +559,18 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 		case "runes":
 			if !autoConfigRunesComplete(entry.Runes, catalog) {
 				results[kind] = "skipped-incomplete"
+				skip("no_config")
 				continue
 			}
 			pageID, err = a.applyAutoConfigRunes(ctx, client, generation, oldPage, id, name, entry.Runes)
 		case "spells":
 			if a.validateAutoConfigCatalog(ctx, mode, autoConfigEntry{Spells: entry.Spells}, false) != nil {
 				results[kind] = "skipped-incomplete"
+				skip("no_config")
 				continue
 			}
 			if categoryGuard() != nil {
+				skip("guard")
 				return
 			}
 			err = applySummonerSpells(ctx, client, entry.Spells.Spell1ID, entry.Spells.Spell2ID)
@@ -534,10 +589,12 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 		case "items":
 			if a.validateAutoConfigCatalog(ctx, mode, autoConfigEntry{Items: entry.Items}, false) != nil {
 				results[kind] = "skipped-incomplete"
+				skip("no_config")
 				continue
 			}
 			_, current, e := a.gameplayClient()
 			if e != nil {
+				skip("guard")
 				return
 			}
 			mapID := int64(11)
@@ -564,6 +621,7 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 			}
 			if len(req.Blocks) == 0 {
 				results[kind] = "skipped-incomplete"
+				skip("no_config")
 				continue
 			}
 			a.itemSetMu.Lock()
@@ -580,6 +638,7 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 	r := &a.autoConfig.runtime
 	if r.generation != generation {
 		a.autoConfig.Unlock()
+		skip("guard")
 		return
 	}
 	r.ChampionID = id

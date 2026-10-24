@@ -124,9 +124,9 @@ func TestMayhemCurrentCatalogReplacesOldPoolAndKeepsHistoryMetadata(t *testing.T
 	if !found {
 		t.Fatal("new augment is missing effect/artwork")
 	}
-	attachPendingMayhemAugments(&catalog)
-	if len(catalog.PendingAugments) != 1 || catalog.PendingAugments[0].Name != "没法力，没问题" || catalog.PendingAugments[0].ID != 0 || catalog.PendingAugments[0].Description == "" {
-		t.Fatal("official addition with unknown ID was omitted or guessed")
+	raw, _ := json.Marshal(catalog)
+	if strings.Contains(string(raw), "pendingAugments") {
+		t.Fatal("obsolete pending payload")
 	}
 	if !mayhemAugmentAvailable(2031, "16.22.1") {
 		t.Fatal("a later reintroduction must not be suppressed")

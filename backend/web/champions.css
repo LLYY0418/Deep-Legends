@@ -208,16 +208,16 @@
 .mayhem-champions .tier-badge { width: 20px; height: 23px; }
 .mayhem-champions tr.is-selected { background: color-mix(in oklab,var(--primary) 14%,var(--surface)); box-shadow: inset 3px 0 0 var(--primary); }
 
-.mayhem-overview-strip { position: relative; display: flex; min-height: 108px; align-items: center; gap: 18px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.mayhem-overview-strip { --mayhem-edge:16px; position: relative; display: flex; min-height: 108px; align-items: center; gap: 18px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .mayhem-overview-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; transform: scale(1.015); }
 .mayhem-overview-shade { position: absolute; inset: 0; background: linear-gradient(90deg,rgb(8 8 9 / .9) 0%,rgb(8 8 9 / .72) 42%,rgb(8 8 9 / .42) 68%,rgb(8 8 9 / .68) 100%),linear-gradient(0deg,rgb(8 8 9 / .54),transparent 58%); }
 .mayhem-overview-identity, .mayhem-overview-metrics { position: relative; z-index: 1; }
-.mayhem-overview-identity { display: grid; min-width: 0; flex: 1 1 280px; grid-template-columns: 58px minmax(0,1fr); align-items: center; gap: 12px; padding: 14px 0 14px 16px; }
+.mayhem-overview-identity { display: grid; min-width: 0; flex: 1 1 280px; grid-template-columns: 58px minmax(0,1fr); align-items: center; gap: 12px; padding-block:14px; padding-left:var(--mayhem-edge); }
 .mayhem-overview-identity .champion-detail-portrait { width: 58px; height: 58px; border-radius: 10px; }
 .mayhem-overview-identity > div { display: grid; min-width: 0; }
 .mayhem-overview-identity > div > span, .mayhem-overview-identity small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .mayhem-overview-identity h2 { display: flex; align-items: center; gap: 7px; margin: 3px 0; font-size: 19px; }
-.mayhem-overview-metrics { display: grid; min-width: 310px; grid-template-columns: repeat(3,minmax(88px,1fr)); gap: 7px; padding: 12px 14px 12px 0; }
+.mayhem-overview-metrics { display: grid; --metric-columns:3; min-width: calc(var(--metric-columns) * 98px + var(--mayhem-edge)); grid-template-columns: repeat(var(--metric-columns),minmax(88px,1fr)); gap: 7px; padding-block:12px; padding-right:var(--mayhem-edge); }
 .mayhem-overview-metrics > div { display: grid; min-height: 70px; place-content: center; justify-items: center; gap: 2px; padding: 7px; background: color-mix(in oklab,var(--surface-strong) 76%,transparent); border: 1px solid var(--line); border-radius: 8px; text-align: center; }
 .mayhem-overview-metrics span { color: var(--muted); font-size: 9px; }
 .mayhem-overview-metrics strong { color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
@@ -342,9 +342,10 @@
 
 @container mayhem-pane (max-width: 760px) {
 	.mayhem-overview-strip { min-height: 94px; gap: 12px; }
-	.mayhem-overview-identity { flex-basis: 230px; grid-template-columns: 50px minmax(0,1fr); gap: 10px; padding: 11px 0 11px 14px; }
+	.mayhem-overview-strip { --mayhem-edge:14px; }
+	.mayhem-overview-identity { flex-basis: 230px; grid-template-columns: 50px minmax(0,1fr); gap: 10px; padding-block:11px; padding-left:var(--mayhem-edge); }
 	.mayhem-overview-identity .champion-detail-portrait { width: 50px; height: 50px; }
-	.mayhem-overview-metrics { min-width: 282px; gap: 6px; padding: 10px 12px 10px 0; }
+	.mayhem-overview-metrics { min-width:calc(var(--metric-columns) * 88px + var(--mayhem-edge)); gap: 6px; padding-block:10px; padding-right:var(--mayhem-edge); }
 	.mayhem-overview-metrics > div { min-height: 58px; padding: 5px; }
   .mayhem-ranking-list { grid-template-columns: 1fr; }
   .mayhem-ranking-list article, .mayhem-ranking-list article:nth-child(-n+2) { border-top: 1px solid var(--line); border-right: 0; }
@@ -360,7 +361,7 @@
 @container mayhem-pane (max-width: 520px) {
 	.mayhem-overview-strip { min-height: 0; align-items: stretch; flex-direction: column; gap: 0; }
 	.mayhem-overview-identity { width: 100%; flex: 0 0 auto; padding-right: 14px; }
-	.mayhem-overview-metrics { width: 100%; min-width: 0; padding: 0 12px 10px; }
+	.mayhem-overview-metrics { width: 100%; min-width: 0; padding:0; padding-inline:var(--mayhem-edge); padding-bottom:10px; }
   .mayhem-ranking-list article { grid-template-columns: 20px 42px minmax(0,1fr); }
   .mayhem-ranking-list article > .recommend-icon { width: 42px; height: 42px; }
   .mayhem-ranking-list article dl { grid-column: 3; }
@@ -731,7 +732,7 @@
 .arena-overview-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; transform: scale(1.015); }
 .arena-overview-shade { position: absolute; inset: 0; background: linear-gradient(90deg,rgb(8 8 9 / .9) 0%,rgb(8 8 9 / .72) 42%,rgb(8 8 9 / .42) 68%,rgb(8 8 9 / .68) 100%),linear-gradient(0deg,rgb(8 8 9 / .54),transparent 58%); }
 .arena-overview-identity, .arena-overview-metrics, .arena-overview-secondary { position: relative; z-index: 1; }
-.arena-overview-identity { display: grid; min-width: 0; flex: 1 1 260px; grid-template-columns: 58px minmax(0,1fr); align-items: center; gap: 12px; padding: 14px 0 14px 16px; }
+.arena-overview-identity { display: grid; min-width: 0; flex: 1 1 260px; grid-template-columns: 58px minmax(0,1fr); align-items: center; gap: 12px; padding-block:14px; padding-left:var(--mayhem-edge); }
 .arena-overview-identity .champion-detail-portrait { width: 58px; height: 58px; border-radius: 10px; }
 .arena-overview-identity > div { display: grid; min-width: 0; }
 .arena-overview-identity > div > span, .arena-overview-identity small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
@@ -965,6 +966,6 @@
 [data-theme="light"] .champion-detail-metrics .metric-ban strong{color:var(--danger)}
 [data-theme="light"] .arena-overview-secondary{background:var(--surface)}
 .mayhem-data-status { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
-.mayhem-official-additions { margin-bottom: 16px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; line-height: 1.65; }
-.mayhem-official-additions h3 { margin: 0 0 6px; font-size: 14px; }
-.mayhem-official-additions p { margin: 0; }
+
+.mayhem-overview-metrics[data-metric-count="1"] { --metric-columns:1; }
+.mayhem-overview-metrics[data-metric-count="2"] { --metric-columns:2; }

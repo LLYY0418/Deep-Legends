@@ -17,21 +17,22 @@ import (
 
 // The client owns this state; reconnecting creates a new observation scope.
 type arenaFameDiscoveryState struct {
-	mu             sync.Mutex
-	started        bool
-	done           chan struct{}
-	queues         map[string][]string
-	uris           []string
-	event          map[string]any
-	flushRequested bool
-	emitted        bool
-	lastPhase      string
-	postScheduled  bool
-	schedule       func(time.Duration, func()) func()
-	stops          []func()
-	operations     []lcuHelpOperation
-	baseline       map[string]map[string]float64
-	progression    *arenaProgressionProbe
+	mu                sync.Mutex
+	started           bool
+	done              chan struct{}
+	queues            map[string][]string
+	uris              []string
+	event             map[string]any
+	flushRequested    bool
+	emitted           bool
+	lastPhase         string
+	postScheduled     bool
+	schedule          func(time.Duration, func()) func()
+	stops             []func()
+	operations        []lcuHelpOperation
+	baseline          map[string]map[string]float64
+	progression       *arenaProgressionProbe
+	progressionEvents map[string]map[string]float64
 }
 
 var arenaDiscoveryName = regexp.MustCompile(`(?i)cherry|arena|fame|gladiator|progression|eog|end-of-game|pre-end-of-game`)
@@ -88,7 +89,7 @@ func arenaDiscoveryURI(uri string) string {
 		}
 		if _, err := strconv.ParseInt(p, 10, 64); err == nil || len(p) > 36 || !arenaDiscoverySegment.MatchString(p) {
 			parts[i] = "{id}"
-		} else if !strings.HasPrefix(p, "lol-") && !arenaDiscoveryVersion.MatchString(p) && !arenaDiscoveryName.MatchString(p) && !slices.Contains([]string{"current", "data", "stats", "status", "progress", "levels", "level", "tiers", "tier", "points", "xp", "rating", "ratings", "player", "players", "notifications", "update"}, p) {
+		} else if !strings.HasPrefix(p, "lol-") && !arenaDiscoveryVersion.MatchString(p) && !arenaDiscoveryName.MatchString(p) && !slices.Contains([]string{"current", "data", "stats", "status", "progress", "levels", "level", "tiers", "tier", "points", "xp", "rating", "ratings", "player", "players", "notifications", "update", "groups", "configuration", "instance-data", "catalog", "bags", "cherry-inventory"}, p) {
 			parts[i] = "{id}"
 		}
 
@@ -96,6 +97,7 @@ func arenaDiscoveryURI(uri string) string {
 	return strings.Join(parts, "/")
 }
 func (c *LCUClient) observeArenaDiscoveryEvent(event LCUEvent) {
+	c.observeArenaProgressionEvent(event)
 	if c == nil || !arenaDiscoveryObservedURI(event.URI) {
 		return
 	}

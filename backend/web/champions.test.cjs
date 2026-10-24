@@ -1799,7 +1799,7 @@ test("career ranked queue switches use one recent sample and ignore season scan 
 	assert.doesNotMatch(gameplayScript, /function renderSeasonProgressBadge/);
 	const entries = functionSource(gameplayScript, "careerSectionEntries");
 	assert.doesNotMatch(entries, /render(?:RecentRanked|Ability|PositionStats)\([^\n]*seasonStatsProgress/);
-	assert.match(entries, /renderChampionStats\(championRows, championOverall, championProgress\)/);
+	assert.match(entries, /renderChampionStats\(championRows, championOverall, championProgress,false,data.ranks\)/);
 	assert.match(entries, /championStatsPending\(championRows,championOverall,championProgress,tab\)/);
 	assert.match(entries, /const championProgress = opggSeason[\s\S]*: data\.seasonStatsProgress/);
 });
@@ -3441,7 +3441,7 @@ test("champion mode, searches, and tabs persist while transient detail state res
 	assert.match(reset, /state\.detail = null/);
 	assert.match(reset, /state\.selected = null/);
 	assert.match(reset, /state\.workspaceRequestToken \+= 1/);
-	assert.ok(script.includes("detailChampionID: normalizeChampionDetailID(readSetting(`champion-detail-id-${initialMode}`, \"\"))"));
+	assert.ok(script.includes("detailChampionID: initialMode === \"arena\" ? 0 : normalizeChampionDetailID(readSetting(`champion-detail-id-${initialMode}`, \"\"))"));
 	assert.doesNotMatch(script, /readSetting\("champion-(?:loading|error|request-token)/);
 });
 

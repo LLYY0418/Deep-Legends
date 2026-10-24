@@ -135,7 +135,6 @@ func (p *championProvider) loadAugments(ctx context.Context) (championAugmentRes
 		var result championAugmentResponse
 		result, err = parseCurrentMayhemCatalog(page, at)
 		if err == nil && comparePatchVersions(mayhemComparablePatch(result.Citation.Patch), mayhemComparablePatch(readCurrentMayhem().Patch)) >= 0 {
-			attachPendingMayhemAugments(&result)
 			if time.Since(at) > 30*time.Minute {
 				result.DataNotice = "上游暂不可用，显示上次读取的缓存"
 			}
@@ -154,48 +153,8 @@ func (p *championProvider) loadAugments(ctx context.Context) (championAugmentRes
 		return previous, nil
 	}
 	result := bundledCurrentMayhemCatalog()
-	attachPendingMayhemAugments(&result)
 	p.rememberAugmentCatalog(result)
 	return result, nil
-}
-
-func attachPendingMayhemAugments(catalog *championAugmentResponse) {
-	if catalog.Citation == nil {
-		return
-	}
-	docs, err := decodePatchNotes(bundledPatchNotes)
-	if err != nil {
-		return
-	}
-	names := map[string]bool{}
-	nameKey := func(name string) string { return strings.TrimRight(strings.TrimSpace(name), "！!") }
-	for _, row := range catalog.Rows {
-		names[nameKey(row.Name)] = true
-	}
-	for _, doc := range docs {
-		if mayhemComparablePatch(doc.Version) != mayhemComparablePatch(catalog.Citation.Patch) {
-			continue
-		}
-		for _, section := range doc.Modes.Mayhem.Sections {
-			if section.ID != "new-augments" {
-				continue
-			}
-			for _, entry := range section.Entries {
-				if names[nameKey(entry.Name)] {
-					continue
-				}
-				var lines []string
-				for _, group := range entry.Groups {
-					for _, line := range group.Lines {
-						if line.Text != "" {
-							lines = append(lines, line.Text)
-						}
-					}
-				}
-				catalog.PendingAugments = append(catalog.PendingAugments, championAugment{Name: entry.Name, Description: strings.Join(lines, "\n")})
-			}
-		}
-	}
 }
 
 func currentMayhemMetadataRows() []gameplayAugment {

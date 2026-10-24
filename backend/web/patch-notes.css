@@ -8,10 +8,9 @@
 .champion-head-title .text-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .champion-head-title .text-button b { padding: 1px 6px; color: var(--primary-strong); background: color-mix(in oklab, var(--primary) 14%, transparent); border-radius: 5px; font-size: 11.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
 
-/* 9) 版本更新弹窗：说明文字弱化；名称和新值使用主题主色，分组与新增标签使用主题辅助色。
-      不用红 / 绿表示增强 / 削弱（官方公告没有可靠的增强 / 削弱标记，按数字大小猜会出错：冷却变短是增强）。 */
+/* Numeric changes use direction-aware semantic colors; prose remains verbatim. */
 .pn-scrim { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgb(0 0 0 / .46); }
-.pn-dialog { display: grid; width: min(680px, 100%); max-height: min(720px, 100%); grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; color: var(--ink);
+.pn-dialog { display: grid; width: min(860px, calc(100% - 48px)); max-height: min(880px, calc(100% - 48px)); grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; color: var(--ink);
   background: var(--surface-strong); border: 1px solid color-mix(in oklab, var(--primary) 30%, var(--line)); border-radius: 14px; box-shadow: 0 24px 60px rgb(0 0 0 / .5); }
 .pn-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px 14px; border-bottom: 1px solid var(--line); }
 .pn-head h3 { margin: 0; font-size: 17px; }
@@ -66,3 +65,7 @@
 @keyframes pn-pulse { to { opacity:.4; } }
 @media(max-width:1000px){.champion-page-head{flex-wrap:wrap;gap:12px}.champion-head-title{gap:8px}.pn-head{flex-wrap:wrap;gap:8px}.pn-date{margin-left:0}.pn-close{margin-left:auto}.pn-scrim{padding:16px}}
 @media(prefers-reduced-motion:reduce){.pn-loading i{animation:none}}
+
+.pn-line .to.is-buff, .pn-direction.is-buff { color:var(--success); }
+.pn-line .to.is-nerf, .pn-direction.is-nerf { color:var(--danger); }
+.pn-direction { margin-left:6px; }

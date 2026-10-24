@@ -1013,11 +1013,11 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-session-copy { display: grid; min-width: 0; flex: 1 1 180px; }
 .live-session-copy strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .live-session-copy span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.live-current-position { display: inline-flex; min-height: 30px; flex: 0 0 auto; align-items: center; gap: 6px; margin-left: auto; padding: 4px 9px; color: var(--on-primary); background: var(--primary); border: 1px solid var(--primary-strong); border-radius: 999px; box-shadow: 0 2px 8px color-mix(in oklab,var(--primary) 24%,transparent); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.live-current-position { display: inline-flex; min-height: 30px; flex: 0 0 auto; align-items: center; gap: 6px; margin-left: 0; padding: 4px 9px; color: var(--on-primary); background: var(--primary); border: 1px solid var(--primary-strong); border-radius: 999px; box-shadow: 0 2px 8px color-mix(in oklab,var(--primary) 24%,transparent); font-size: 11px; font-weight: 800; white-space: nowrap; }
 .live-current-position .position-icon { width: 17px; height: 17px; filter: brightness(.2); }
 .live-position-mismatch { display: inline-grid; width: 16px; height: 16px; place-items: center; color: var(--primary); background: var(--on-primary); border-radius: 50%; font-size: 10px; line-height: 1; cursor: help; }
 .live-position-mismatch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.live-toolbar > .text-button { flex: 0 0 auto; margin-left: 0; }
+.live-toolbar > .live-toolbar-actions { flex: 0 0 auto; margin-left: 0; }
 .state-chip { display: inline-flex; width: fit-content; min-height: 26px; align-items: center; padding: 0 8px; color: var(--muted); background: var(--surface-strong); border-radius: 999px; font-size: 11px; font-weight: 650; }
 .state-chip.success { color: var(--primary-strong); background: var(--primary-soft); font-weight:600; }
 .live-teams { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; padding-top: 10px; }
@@ -1721,7 +1721,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .summoner-strip-copy > div { align-items: flex-start; flex-direction: column; gap: var(--identity-chip-gap); }
   .summoner-strip-copy span { font-size: 11px; }
   .live-toolbar { align-items: stretch; flex-direction: column; }
-  .live-toolbar > .text-button { align-self: flex-end; margin-left: 0; }
+  .live-toolbar > .live-toolbar-actions { align-self: flex-end; margin-left: 0; }
   .live-player-list.is-insight .insight-match-row { padding-left: 11px; }
   .unified-rune-board { grid-template-columns: 1fr; overflow: visible; }
   .unified-rune-column + .unified-rune-column { border-top: 1px solid var(--line); border-left: 0; }
@@ -2376,14 +2376,14 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 @container matches-column (max-width:720px){.match-pending .match-players{display:none}}
 .match-kda{justify-self:stretch}
 .match-pending [data-match-layout][data-icon-overlap]{grid-template-columns:124px minmax(0,96px) minmax(0,1fr)}
-/* Manual placeholders own row height; rich rows retain layout isolation without intrinsic estimates. */
+
 .match-list[data-match-virtualizer]>.match-entry{content-visibility:visible;contain-intrinsic-size:none;contain:layout style paint}
 .match-list[data-match-virtualizer]>.match-entry[data-virtual-match]{content-visibility:hidden;contain:strict}
 
 .career-column>.rank-career-section{display:flex;flex-direction:column}
 .career-column>.rank-career-section>header,.career-column>.rank-career-section>.rank-list{flex:none}
 
-/* R282: the identity footprint is identical from placeholders through complete. */
+
 .summoner-strip { --strip-avatar-size:72px; --strip-name-height:32px; --strip-meta-height:24px; --strip-level-height:20px; grid-template-columns:var(--strip-avatar-size) minmax(0,1fr) 217px; }
 .summoner-strip .game-icon.is-summoner-avatar { width:var(--strip-avatar-size);height:var(--strip-avatar-size); }
 .summoner-strip-copy>div { display:flex; flex-direction:row; flex-wrap:nowrap; height:var(--strip-name-height); gap:var(--identity-chip-gap); align-items:center; }
@@ -2440,7 +2440,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-toolbar {display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1fr) auto;align-items:center;}
 .live-toolbar .live-session-summary {grid-column:1;grid-row:1;}
 .live-toolbar [data-live-status] {grid-column:2;grid-row:1;}
-.live-toolbar > .text-button {grid-column:3;grid-row:1;}
+.live-toolbar > .live-toolbar-actions {grid-column:3;grid-row:1;}
 .live-toolbar [data-live-status] {min-width:0;flex:1 1 0;}
 .live-toolbar .live-refresh-status {flex-wrap:nowrap;white-space:nowrap;min-width:0;line-height:20px;}
 .live-refresh-status.is-service-outage {color:var(--primary);font-weight:600;justify-content:flex-end;min-height:34px;align-items:center;}
@@ -2450,7 +2450,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
  .live-toolbar {grid-template-columns:minmax(0,1fr) auto;row-gap:8px;}
  .live-toolbar .live-session-summary {grid-column:1/-1;grid-row:1;}
  .live-toolbar [data-live-status] {grid-column:1;grid-row:2;}
- .live-toolbar > .text-button {grid-column:2;grid-row:2;}
+ .live-toolbar > .live-toolbar-actions {grid-column:2;grid-row:2;}
 }
 
 /* Light theme uses its existing stronger brand shade for readable status text. */
@@ -2463,3 +2463,15 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .arena-detail-columns .arena-column-items, .arena-detail-player > .arena-detail-items { grid-column:1 / -1; justify-self:stretch; justify-content:flex-start; }
 .arena-detail-player > .arena-detail-items { margin-top:5px; flex-wrap:wrap; }
 .arena-detail-columns .arena-column-items { text-align:left; }
+
+.live-toolbar-actions { display:flex; align-items:center; gap:10px; }
+[data-card-spells] { display:inline-flex; flex:none; gap:5px; }
+.specialist-game-head > [data-card-spells], .custom-config-header > [data-card-spells] { margin-left:auto; }
+.specialist-game-row[data-spell-layout="head"] .rune-corner-spells { display:none; }
+.specialist-game-row:not([data-spell-layout]) [data-card-spells] { visibility:hidden; }
+
+.specialist-game-row[data-spell-layout="head"] .specialist-game-head { grid-template-columns:minmax(0,1fr) auto auto; align-items:center; }
+.custom-config-header:has(> [data-card-spells]) small { margin-left:0; }
+
+[data-card-spells] :is(.item-option-button,.game-icon) { width:34px; height:34px; flex:0 0 34px; padding:0; border-radius:8px; }
+.specialist-game-row[data-spell-layout="board"] .rune-corner-spells { display:flex; }

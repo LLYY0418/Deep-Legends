@@ -3599,6 +3599,7 @@ func normalizeAugmentRarity(value any) string {
 
 func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string) (championDetailResponse, error) {
 	started := time.Now()
+	statsSource, itemsSource := "none", "none"
 	var metaMS, heroMS, insightsMS, postmatchMS, rscMS, decorateMS int64
 	var rscPhases mayhemRSCPhases
 	var augmentMetadata map[int]gameplayAugment
@@ -3612,7 +3613,7 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 	}
 	defer func() {
 		if p.diag != nil {
-			p.diag(map[string]any{"event": "mayhem_detail_phases_ms", "meta": metaMS, "hero_json": heroMS,
+			p.diag(map[string]any{"event": "mayhem_detail_phases_ms", "stats_source": statsSource, "items_source": itemsSource, "meta": metaMS, "hero_json": heroMS,
 				"insights": insightsMS, "postmatch": postmatchMS, "rsc": rscMS,
 				"rsc_wire": rscPhases.wireMS, "rsc_parse": rscPhases.parseMS,
 				"rsc_descriptions": rscPhases.descriptionsMS,
@@ -3752,6 +3753,9 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 	// Meta is shared with the parallel official-tier request; it is not refetched.
 	if primaryErr == nil {
 		response.Patch, response.FetchedAt, response.Stats.WinRate = citation.Patch, fetchedAt, primary.HeroWinRate
+		if primary.HeroWinRate > 0 {
+			statsSource = "hexdata"
+		}
 		// R116-B P0-5-2：英雄级梯度接 hextech-insights.heroes[].tier（官方 T1-T5）。
 		// /api/hexdata/heroes/{id} 顶层只有 8 个数组、没有英雄级 tier，而
 		// items[].tier / augments[].tier 都是行级档位——拿它冒充英雄梯度就是
@@ -3765,6 +3769,9 @@ func (p *championProvider) loadMayhemDetail(ctx context.Context, champion string
 		response.Citation = &citation
 		response.RecommendedAugments = hexdataAugmentMetricRows(primary.Augments)
 		response.ItemRanking = hexdataItemMetricRows(primary.Items)
+		if len(response.ItemRanking) > 0 {
+			itemsSource = "hexdata"
+		}
 		spellPairs = hexdataSpellPairMetricRows(primary.SummonerSpellPairs)
 		applyHexdataSampleTiers(spellPairs, snapshot)
 		p.decorateHexdataAugmentsWithCatalog(response.RecommendedAugments, loadAugmentMetadata())

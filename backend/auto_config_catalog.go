@@ -168,6 +168,12 @@ func autoConfigStarterAllowed(i autoConfigItem, mode string) bool {
 	if mode == "aram" || mode == "hextech" {
 		mapID = "12"
 	}
+	// Client level-one shop offers only Warding Totem (3340) and Oracle Lens (3364).
+	for _, category := range i.Categories {
+		if category == "Trinket" && i.ID != 3340 && i.ID != 3364 {
+			return false
+		}
+	}
 	return i.ID > 0 && i.InStore && i.DisplayInItemSets && i.RequiredChampion == "" && i.RequiredAlly == "" && i.Maps[mapID] && i.Price >= 0 && i.Price <= autoConfigStarterBudget(mode)
 }
 func autoConfigConsumable(i autoConfigItem) bool {
@@ -292,10 +298,19 @@ func (a *app) validateAutoConfigCatalog(ctx context.Context, mode string, e auto
 			starterCatalog[item.ID] = item
 		}
 		total := int64(0)
+		trinkets := 0
 		for _, item := range e.Items.Starter {
 			meta, ok := starterCatalog[item.ID]
 			if !ok || !autoConfigStarterAllowed(meta, mode) || item.Count < 1 || item.Count > 99 || item.Count > 1 && !autoConfigConsumable(meta) {
 				return autoConfigError("出门装")
+			}
+			for _, category := range meta.Categories {
+				if category == "Trinket" {
+					trinkets++
+					if trinkets > 1 || item.Count != 1 {
+						return autoConfigError("饰品")
+					}
+				}
 			}
 			total += meta.Price * item.Count
 		}

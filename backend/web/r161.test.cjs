@@ -33,5 +33,5 @@ test('R161 partial ranked roster retries quickly and position chip has no reserv
   schedule();
   assert.deepEqual(delays, [5000]);
   assert.match(styles, /\.live-toolbar \[data-live-status\] \{[^}]*flex: 0 1 auto;/);
-  assert.match(styles, /\.live-toolbar > \.text-button \{[^}]*margin-left: 0;/);
+  assert.match(styles, /\.live-toolbar > \.live-toolbar-actions \{[^}]*margin-left: 0;/);
 });

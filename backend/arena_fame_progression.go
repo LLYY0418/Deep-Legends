@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -16,16 +17,19 @@ import (
 // Attached only when a confirmed Arena live snapshot is in ChampSelect/GameStart.
 // The existing discovery completion channel publishes the immutable before data.
 type arenaProgressionProbe struct {
-	before    arenaProgressionSnapshot
-	done      chan struct{}
-	scheduled bool
-	sawGame   bool
-	emitted   bool
+	before       arenaProgressionSnapshot
+	beforeEvents map[string]float64
+	done         chan struct{}
+	scheduled    bool
+	sawGame      bool
+	emitted      bool
 }
 type arenaProgressionSnapshot struct {
-	Values     map[string]float64
-	Status     map[string]string
-	Operations []lcuHelpOperation
+	Values        map[string]float64
+	Status        map[string]string
+	Operations    []lcuHelpOperation
+	ResolvedPaths map[string]string
+	HTTPStatus    map[string]int
 }
 type arenaProgressionDelta struct {
 	Before float64 `json:"before"`
@@ -58,7 +62,7 @@ func (a *app) startArenaProgressionDiscovery(client *LCUClient, phase string) {
 		s.mu.Unlock()
 		return
 	}
-	p := &arenaProgressionProbe{done: make(chan struct{}), sawGame: phase == "GameStart"}
+	p := &arenaProgressionProbe{done: make(chan struct{}), sawGame: phase == "GameStart", beforeEvents: arenaProgressionEventSnapshot(s)}
 	s.progression = p
 	s.mu.Unlock()
 	// Progression owns its pregame read even if the older discovery already ran.
@@ -73,7 +77,9 @@ func (a *app) startArenaProgressionDiscovery(client *LCUClient, phase string) {
 		ctx, cancel := context.WithTimeout(session, 30*time.Second)
 		defer cancel()
 		var help json.RawMessage
-		_ = client.RequestJSON(ctx, http.MethodGet, "/help?format=Full", nil, &help)
+		helpCtx, helpCancel := context.WithTimeout(ctx, 2*time.Second)
+		_ = client.RequestJSON(helpCtx, http.MethodGet, "/help?format=Full", nil, &help)
+		helpCancel()
 		a.mu.RLock()
 		self := a.summoner
 		a.mu.RUnlock()
@@ -203,7 +209,7 @@ func arenaProgressionPath(op lcuHelpOperation, self Summoner, group string) stri
 	return arenaDiscoveryGETPath(path, self)
 }
 func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, ops []lcuHelpOperation, self Summoner) arenaProgressionSnapshot {
-	snap := arenaProgressionSnapshot{Values: map[string]float64{}, Status: map[string]string{}, Operations: append([]lcuHelpOperation(nil), ops...)}
+	snap := arenaProgressionSnapshot{Values: map[string]float64{}, Status: map[string]string{}, Operations: append([]lcuHelpOperation(nil), ops...), ResolvedPaths: map[string]string{}, HTTPStatus: map[string]int{}}
 	selected := map[string]lcuHelpOperation{}
 	for _, op := range ops {
 		kind := arenaProgressionKind(op)
@@ -213,6 +219,36 @@ func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, op
 			}
 		}
 	}
+	for _, kind := range []string{"configuration", "instance-data", "cherry-inventory"} {
+		op := selected[kind]
+		snap.HTTPStatus[kind] = 0
+		if op.Path == "" || op.Method == "" {
+			names := map[string]string{"configuration": "GetLolProgressionV1GroupsConfiguration", "instance-data": "GetLolProgressionV1GroupsByGroupIdInstanceData", "cherry-inventory": "GetLolInventoryV1CherryInventory"}
+			name := names[kind]
+			probe, stop := context.WithTimeout(ctx, 2*time.Second)
+			var full json.RawMessage
+			err := c.RequestJSON(probe, http.MethodGet, "/help?target="+url.QueryEscape(name)+"&format=Full", nil, &full)
+			stop()
+			for _, candidate := range arenaDiscoveryHelpAll(full) {
+				if arenaProgressionKind(candidate) == kind && candidate.Method == http.MethodGet && candidate.Path != "" {
+					op = candidate
+					break
+				}
+			}
+			_ = err // Endpoint status is recorded below, without response strings.
+			if op.Path == "" || op.Method == "" {
+				op = lcuHelpOperation{Name: name, Method: http.MethodGet, Path: map[string]string{"configuration": "/lol-progression/v1/groups/configuration", "instance-data": "/lol-progression/v1/groups/{groupId}/instance-data", "cherry-inventory": "/lol-inventory/v1/cherry-inventory"}[kind]}
+			}
+			selected[kind] = op
+		}
+		if op.Method == http.MethodGet {
+			snap.ResolvedPaths[kind] = arenaDiscoveryURI(op.Path)
+		}
+	}
+	snap.Operations = nil
+	for _, kind := range []string{"configuration", "instance-data", "cherry-inventory"} {
+		snap.Operations = append(snap.Operations, selected[kind])
+	}
 	read := func(op lcuHelpOperation, group string) (json.RawMessage, string) {
 		path := arenaProgressionPath(op, self, group)
 		if path == "" {
@@ -221,9 +257,17 @@ func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, op
 		probe, stop := context.WithTimeout(ctx, 2*time.Second)
 		defer stop()
 		var raw json.RawMessage
-		if c.RequestJSON(probe, http.MethodGet, path, nil, &raw) != nil {
+		kind := arenaProgressionKind(op)
+		if err := c.RequestJSON(probe, http.MethodGet, path, nil, &raw); err != nil {
+			var httpErr *LCUHTTPError
+			if errors.As(err, &httpErr) {
+				snap.HTTPStatus[kind] = httpErr.StatusCode
+				return nil, fmt.Sprintf("http-%d", httpErr.StatusCode)
+			}
+			snap.HTTPStatus[kind] = 0
 			return nil, "read_failed"
 		}
+		snap.HTTPStatus[kind] = http.StatusOK
 		if !json.Valid(raw) {
 			return nil, "read_failed"
 		}
@@ -242,7 +286,7 @@ func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, op
 		snap.Status["instance-data"] = "configuration_unavailable"
 	} else {
 		snap.Status["instance-data"] = "ok"
-		for _, g := range groups {
+		for groupIndex, g := range groups {
 			raw, result := read(instance, g.id)
 			if result != "ok" {
 				snap.Status["instance-data"] = result
@@ -253,7 +297,7 @@ func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, op
 				label = "group"
 			}
 			// Group IDs come only from configuration and keep keys stable across reorderings.
-			label = label + "(" + g.id + ")"
+			label = fmt.Sprintf("%s[%d]", label, groupIndex)
 			for k, v := range arenaProgressionNumbers(raw) {
 				snap.Values[label+"/"+k] = v
 			}
@@ -300,7 +344,7 @@ func (a *app) observeArenaProgressionPhase(c *LCUClient, phase string) {
 			return func() { timer.Stop() }
 		}
 	}
-	s.stops = append(s.stops, schedule(20*time.Second, func() { a.probeArenaProgressionAfter(c, s) }))
+	s.stops = append(s.stops, schedule(2*time.Minute, func() { a.probeArenaProgressionAfter(c, s) }))
 	s.mu.Unlock()
 }
 func (a *app) probeArenaProgressionAfter(c *LCUClient, s *arenaFameDiscoveryState) {
@@ -342,9 +386,54 @@ func (a *app) probeArenaProgressionAfter(c *LCUClient, s *arenaFameDiscoveryStat
 		return
 	}
 	p.emitted = true
+	afterEvents := arenaProgressionEventSnapshot(s)
 	s.mu.Unlock()
-	event := map[string]any{"event": "arena_fame_progression_diff", "changes": changes, "before_status": p.before.Status, "after_status": after.Status}
+	eventChanges := arenaProgressionDiff(arenaProgressionSnapshot{Values: p.beforeEvents}, arenaProgressionSnapshot{Values: afterEvents})
+	event := map[string]any{"event": "arena_fame_progression_diff", "changes": changes, "before_status": p.before.Status, "after_status": after.Status, "resolved_paths": after.ResolvedPaths, "before_http_status": p.before.HTTPStatus, "after_http_status": after.HTTPStatus, "event_before": p.beforeEvents, "event_after": afterEvents, "event_changes": eventChanges}
 	for _, part := range arenaFameDiscoveryParts(event) {
 		a.recordDiagnostic(part)
 	}
+}
+
+// Caller holds discovery.mu. Numeric observations are bounded and never retain strings.
+func arenaProgressionEventSnapshot(s *arenaFameDiscoveryState) map[string]float64 {
+	out := map[string]float64{}
+	for path, values := range s.progressionEvents {
+		for key, value := range values {
+			out[path+"/"+key] = value
+		}
+	}
+	return out
+}
+func (c *LCUClient) observeArenaProgressionEvent(event LCUEvent) {
+	if c == nil || !(strings.HasPrefix(event.URI, "/lol-progression/v1/") || strings.Contains(event.URI, "/progression/v1/notifications/")) {
+		return
+	}
+	path := arenaDiscoveryURI(event.URI)
+	if path == "" {
+		return
+	}
+	values := arenaProgressionNumbers(event.Data)
+	s := c.arenaDiscoveryState()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.progressionEvents == nil {
+		s.progressionEvents = map[string]map[string]float64{}
+	}
+	if _, ok := s.progressionEvents[path]; !ok && len(s.progressionEvents) >= 32 {
+		return
+	}
+	bounded := map[string]float64{}
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if len(bounded) >= 256 {
+			break
+		}
+		bounded[key] = values[key]
+	}
+	s.progressionEvents[path] = bounded
 }

@@ -279,7 +279,7 @@ test("R116-E card headings stay truthful once mayhem games are counted", () => {
 });
 
 test("R116-E the season champion card no longer calls every game ranked", () => {
-  const { renderChampionStats } = compileFunctions(gameplayScript, ["renderChampionStats"], renderDependencies);
+  const { renderChampionStats } = compileFunctions(gameplayScript, ["renderChampionStats","renderSeasonDataNote"], renderDependencies);
   // 放开队列过滤后 seasonChampionStats 里也含海斗场次，兜底文案不能再写「场排位」。
   const fallback = renderChampionStats([{ games: 12 }], {}, { complete: true });
   assert.match(fallback, /12 场对局/);

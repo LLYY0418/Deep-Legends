@@ -50,7 +50,7 @@ func TestR286ProgressionBeforeAfterReadOnlyResolvedFromFullHelp(t *testing.T) {
 				}
 				switch r.URL.Path {
 				case "/help":
-					if r.URL.RawQuery != "format=Full" {
+					if r.URL.Query().Get("format") != "Full" {
 						t.Error("must resolve Full help")
 					}
 					if kind == "unresolved" {
@@ -109,7 +109,7 @@ func TestR286ProgressionBeforeAfterReadOnlyResolvedFromFullHelp(t *testing.T) {
 			}{}, timers...)
 			timersMu.Unlock()
 			for _, timer := range scheduled {
-				if timer.delay == 20*time.Second {
+				if timer.delay == 20*time.Second || timer.delay == 2*time.Minute {
 					timer.fn()
 				}
 			}
@@ -126,7 +126,7 @@ func TestR286ProgressionBeforeAfterReadOnlyResolvedFromFullHelp(t *testing.T) {
 				if len(changes) != 3 {
 					t.Fatal(changes)
 				}
-				v := changes["ArenaSeason(cherry-season)/counters.fame"].(map[string]any)
+				v := changes["ArenaSeason[0]/counters.fame"].(map[string]any)
 				if v["before"] != float64(10) || v["after"] != float64(25) {
 					t.Fatal(v)
 				}
@@ -142,7 +142,7 @@ func TestR286ProgressionBeforeAfterReadOnlyResolvedFromFullHelp(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			if kind == "unresolved" {
-				if len(calls) != 3 || event["before_status"].(map[string]any)["configuration"] != "unresolved" {
+				if calls["/lol-progression/v1/groups/configuration"] != 2 || calls["/lol-inventory/v1/cherry-inventory"] != 2 || event["before_status"].(map[string]any)["configuration"] != "http-404" {
 					t.Fatal(calls, event)
 				}
 			} else {
@@ -224,7 +224,7 @@ func TestR286ProgressionExplicitGroupIDsAndExistingDiscovery(t *testing.T) {
 		t.Fatal("existing discovery swallowed pregame progression")
 	}
 	<-p.done
-	if p.before.Status["configuration"] != "unresolved" {
+	if p.before.Status["configuration"] != "empty" {
 		t.Fatal(p.before)
 	}
 	a.observeArenaDiscoveryPhase(c, "Lobby")

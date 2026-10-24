@@ -132,6 +132,16 @@
       ? `<li><span class="pn-list-name">${escape(parts[1])}</span><span class="pn-list-description">${escape(parts[2])}</span></li>`
       : `<li>${escape(item)}</li>`;
   }
+  function lineDirection(line) {
+    if(line.text||line.from==null||line.to==null)return "";
+    const numbers=s=>(String(s).match(/[-+]?\d+(?:\.\d+)?/g)||[]).map(Number);
+    const from=numbers(line.from),to=numbers(line.to);if(!from.length||from.length!==to.length)return "";
+    const up=to.some((n,i)=>n>from[i]),down=to.some((n,i)=>n<from[i]);if(up===down)return "";
+    const lower=/冷却|法力消耗|能量消耗|生命值消耗|消耗|花费|价格|总价|施法时间|前摇|充能时间|重新装填时间/.test(line.k||"");
+    return up!==lower?"buff":"nerf";
+  }
+  function entryDirection(entry) {if(entry.isNew)return "";const kinds=new Set((entry.groups||[]).flatMap(g=>(g.lines||[]).map(lineDirection)).filter(Boolean));return kinds.size===1?[...kinds][0]:"";}
+  const directionClasses={buff:"is-buff",nerf:"is-nerf"};
   function renderSections(sections) {
     return sections
       .map((section) => {
@@ -150,9 +160,9 @@
           : `${count} ${unit}`;
         return `<section class="pn-section"><h4>${escape(section.title)}${count ? ` <small>${caption}</small>` : ""}</h4>${section.intro ? `<p class="pn-intro">${escape(section.intro)}</p>` : ""}${entries
           .map((entry) => {
-            const image = icon(entry);
+            const image = icon(entry),direction=entryDirection(entry);
             const augment = entry.augmentId > 0 || /(?:^|-)augments$/.test(section.id);
-            return `<article class="pn-entry${image ? "" : " is-text-only"}${augment ? " is-augment" : ""}">${augment ? "" : image}<strong>${entry.isNew ? '<span class="pn-new">新增</span>' : ""}${augment ? image : ""}<span class="pn-entry-name">${escape(entry.name)}</span></strong><div>${(entry.groups || []).map((group, index) => `<div class="pn-group">${group.label ? `<span>${escape(group.label)}</span>` : ""}${(group.lines || []).map((line) => (line.text ? `<div class="pn-line${section.id === "champions" && index === 0 && !group.label ? " is-explanation" : ""}">${escape(line.text)}</div>` : `<div class="pn-line"><span class="k">${escape(line.k)}：</span><span class="from">${escape(line.from)}</span><span class="arrow">⇒</span><strong class="to">${escape(line.to)}</strong></div>`)).join("")}</div>`).join("")}</div></article>`;
+            return `<article class="pn-entry${image ? "" : " is-text-only"}${augment ? " is-augment" : ""}">${augment ? "" : image}<strong>${entry.isNew ? '<span class="pn-new">新增</span>' : ""}${augment ? image : ""}<span class="pn-entry-name">${escape(entry.name)}</span>${direction?`<span class="pn-direction ${directionClasses[direction]}" aria-hidden="true">${direction==="buff"?"↑":"↓"}</span>`:""}</strong><div>${(entry.groups || []).map((group, index) => `<div class="pn-group">${group.label ? `<span>${escape(group.label)}</span>` : ""}${(group.lines || []).map((line) => (line.text ? `<div class="pn-line${section.id === "champions" && index === 0 && !group.label ? " is-explanation" : ""}">${escape(line.text)}</div>` : `<div class="pn-line"><span class="k">${escape(line.k)}：</span><span class="from">${escape(line.from)}</span><span class="arrow">⇒</span><strong class="to${!entry.isNew&&lineDirection(line)?" "+directionClasses[lineDirection(line)]:""}">${escape(line.to)}</strong></div>`)).join("")}</div>`).join("")}</div></article>`;
           })
           .join(
             "",

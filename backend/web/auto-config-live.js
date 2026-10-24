@@ -25,13 +25,14 @@
  }
  window.addEventListener("pagehide",flushShifts);
  window.addEventListener("deep-legends:dispose",()=>{shiftObserver?.disconnect();clearTimeout(shiftTimer);flushShifts();},{once:true});
-  function renderCustomConfiguration(config){
+  function renderCustomConfiguration(config) {
     const entry=config.entry,auto=state.autoConfig?.championId===config.championId?state.autoConfig:null;
-    const status=auto?.yielded?.runes||auto?.yielded?.spells?"已手动应用其他推荐，本局不自动应用":Object.values(auto?.results||{}).includes("applied")?"已应用到客户端":"锁定后自动应用";
-    const groups=[["出门装",entry.items?.starter||[]],["核心",(entry.items?.core||[]).map(id=>({id,count:1}))],["备选",(entry.items?.situational||[]).map(id=>({id,count:1}))]].filter(([,items])=>items.length);
+    const settings=state.autoConfigSettings;
+    const status=!settings?.enabled||!["runes","spells","items"].some(k=>settings[k])?"自动配置已关闭":auto?.yielded?.runes||auto?.yielded?.spells?"已手动应用其他推荐，本局不自动应用":Object.values(auto?.results||{}).includes("applied")?"已应用到客户端":"锁定后自动应用";
+    const groups=[["出门装",entry.items?.starter||[]],["最终装备",(entry.items?.core||[]).map(id=>({id,count:1}))]].filter(([,items])=>items.length);
     const items=groups.map(([label,ids])=>`<div class="sg-items"><span class="sg-label">${label}</span><div class="sg-icons">${ids.map(item=>`<span class="custom-config-item">${renderItemIcon(item.id)}${item.count>1?`<b>×${item.count}</b>`:""}</span>`).join("")}</div></div>`).join("");
     const spells=entry.spells?renderRuneSpellIcons(entry.spells):"";
-    return `<article class="specialist-game-row custom-config-card is-selected" data-custom-config><header class="custom-config-header"><strong>${escapeHTML(entry.runes?runeConfigurationTitle(config):"自配置")}</strong><span class="cs-live-pill">${escapeHTML(config.modeLabel)}</span><small role="status">${status}</small></header>${entry.runes?renderUnifiedRuneBoard(config,spells):spells?`<div class="sg-spells">${spells}</div>`:""}${items?`<div class="specialist-game-footer">${items}</div>`:""}</article>`;
+    return `<article class="specialist-game-row custom-config-card is-selected" data-custom-config><header class="custom-config-header"><strong>${escapeHTML(entry.runes?runeConfigurationTitle(config):"自配置")}</strong><span class="cs-live-pill">${escapeHTML(config.modeLabel)}</span><small role="status">${status}</small></header>${entry.runes?renderUnifiedRuneBoard(config,spells):spells?`<div class="sg-spells"><span data-card-spells>${spells}</span></div>`:""}${items?`<div class="specialist-game-footer">${items}</div>`:""}</article>`;
   }
   function updateLiveRuneSelection(root){
     const panel=nodes.liveContent?.querySelector("#recommendation-panel-runes")||root;
@@ -43,6 +44,27 @@
   }
   async function applyCustomConfiguration(button,config){button.disabled=true;button.textContent="正在应用…";try{const result=await api("/api/auto-config/apply",{method:"POST",body:JSON.stringify({championId:config.championId})},"apply-runes",15000);showToast(Object.values(result.results||{}).includes("failed")?"部分配置未能应用，请重试":Object.values(result.results||{}).includes("applied")?"自配置已应用到客户端":"配置尚不完整或已取消，未写入客户端");renderLive("selection");}catch(error){showToast(error.message);}finally{button.disabled=false;button.textContent="应用所选配置";}}
 
+ // Move the same pair once, using the title row's actual intrinsic widths.
+ const layoutRows=new Set(),layoutObserver=typeof ResizeObserver==="function"?new ResizeObserver(()=>layoutCardSpells()):null;
+ function layoutCardSpells(){
+  for(const row of layoutRows)if(!row.isConnected){layoutObserver?.unobserve(row);layoutRows.delete(row);}
+  for(const row of document.querySelectorAll(".specialist-game-row")){
+   const head=row.querySelector(".specialist-game-head,.custom-config-header"),pair=row.querySelector("[data-card-spells]");if(!head||!pair)continue;
+   if(!layoutRows.has(row)){layoutRows.add(row);layoutObserver?.observe(row);}
+   const fallback=row.querySelector(".rune-corner-spells,.sg-spells");if(!fallback)continue;
+   const style=getComputedStyle(head),gap=parseFloat(style.columnGap)||0,padding=(parseFloat(style.paddingLeft)||0)+(parseFloat(style.paddingRight)||0);
+   const children=[...head.children].filter(n=>n!==pair),previous=head.style.gridTemplateColumns;
+   if(head.classList.contains("specialist-game-head"))head.style.gridTemplateColumns="max-content max-content max-content";
+   const needed=children.reduce((w,n)=>w+n.scrollWidth,0)+pair.scrollWidth+gap*children.length+padding;head.style.gridTemplateColumns=previous;
+   const wide=needed<=head.clientWidth;
+   if(wide){const status=head.querySelector('[role="status"]');if(pair.parentElement!==head)head.insertBefore(pair,status||null);}else if(pair.parentElement!==fallback)fallback.append(pair);
+   row.dataset.spellLayout=wide?"head":"board";
+  }
+ }
+ const spellMutation=new MutationObserver(()=>layoutCardSpells());spellMutation.observe(nodes?.liveContent||document.body,{childList:true,subtree:true});
+ window.addEventListener("resize",layoutCardSpells);
+ window.addEventListener("deep-legends:dispose",()=>{layoutObserver?.disconnect();spellMutation.disconnect();},{once:true});
+ layoutCardSpells();
  window.deepLegendsAutoConfigLive={selection,prepare,renderCustomConfiguration,updateLiveRuneSelection,applyCustomConfiguration};
  window.addEventListener("deep-legends:auto-config",e=>update(e.detail||{}));
  window.addEventListener("deep-legends:auto-config-settings",e=>{state.autoConfigSettings=e.detail;state.autoConfigViewKey="";if(state.section==="live")renderLive("settings");});

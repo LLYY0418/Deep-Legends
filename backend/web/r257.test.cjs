@@ -34,33 +34,33 @@ function check(s){
   }finally{x.dom.window.close();}
  }
  for(const p of [{...progress,upstreamCapped:false},{...progress,rankedOldestAt:0},{...progress,rankedOldestAt:'broken'},null,{...progress,foreign:true}]){
-  const x=fixture('440',p,ranks,s);assert.equal(x.root.querySelector('.season-data-note'),null);assert.equal(x.root.querySelector('[data-season-data-note]'),null);x.dom.window.close();
+  const x=fixture('440',p,ranks,s);const note=x.root.querySelector('[data-season-data-note]');assert(note);assert.deepEqual(lines(note),['统计范围：当前整个赛季这一模式的对局。']);x.dom.window.close();
  }
  for(const rs of [[],[{...ranks[1],wins:0,losses:1}],[{...ranks[1],wins:null}],[{...ranks[1],losses:-1}]]){
   const x=fixture('440',progress,rs,s);assert.equal(lines(x.root.querySelector('button.season-data-note')).length,3,'invalid total omits whole count line');x.dom.window.close();
  }
 }
-test('R257 three tabs use stream dates and valid official totals; uncapped/foreign leave no icon slot',()=>check(source));
+test('R257 three tabs use stream dates and valid official totals; uncapped/foreign retain scope-only icon',()=>check(source));
 test('R257 local date format includes a different year, independent per-stream visibility and zero official totals',()=>{
  const dom=new JSDOM(''),f=api(dom),note=(p,q,g,rs)=>new JSDOM(f.renderSeasonDataNote(p,q,g,rs)).window.document.querySelector('button');
  assert(lines(note({...progress,rankedOldestAt:Date.parse('2025-12-31T16:01:00Z')},'440',208,ranks))[1].includes('1月1日'));
  assert(lines(note({...progress,rankedOldestAt:Date.parse('2025-12-30T16:01:00Z')},'440',208,ranks))[1].includes('2025年12月31日'));
- assert.equal(f.renderSeasonDataNote({...progress,mayhemOldestAt:0},'mayhem',208,ranks),'');
+ assert.deepEqual(lines(note({...progress,mayhemOldestAt:0},'mayhem',208,ranks)),['统计范围：当前整个赛季这一模式的对局。']);
  assert(f.renderSeasonDataNote({...progress,rankedOldestAt:0},'mayhem',208,ranks));
  assert(lines(note(progress,'440',0,[{...ranks[1],wins:0,losses:0}])).includes('已统计 0 场 · 官方总场次 0 场'));
  dom.window.close();
 });
-test('R257 updated scope leaves overview without a note and keeps the table arrow working',()=>{
+test('R257 updated scope keeps overview note and table arrow working',()=>{
  const dom=new JSDOM('<main></main>',{pretendToBeVisual:true}),root=dom.window.document.querySelector('main'),f=api(dom);
  for(const p of [progress,{...progress,upstreamCapped:false},null]){
   root.innerHTML=f.renderChampionStats([],{games:208},p);
-  assert.equal(root.querySelector('.season-data-note'),null);assert.equal(root.querySelector('[data-season-data-note]'),null);
+  assert(root.querySelector('.season-data-note'));assert(lines(root.querySelector('[data-season-data-note]'))[0].includes('当前整个赛季这一模式'));
  }
  root.innerHTML=f.renderChampionStats([],{games:208},progress);
  const arrow=root.querySelector('[data-overview-subpage]');assert.match(arrow.previousSibling.textContent,/已统计 208 场/);
  let navigations=0;const deps={window:dom.window,document:dom.window.document,state:{},requestAnimationFrame:noop,setTimeout:noop,matchTierScrollRoot:()=>null,bindSummonerCopy:noop,bindPlayerLinks:noop,bindOverviewShareControls:noop,bindMatchFilterControls:noop,bindRankHistoryControls:noop,bindRankedQueueControls:noop,bindMayhemRatingControls:noop,bindMatchEntryControls:noop,bindMatchDetailControls:noop,bindMatchSentinel:noop,openOverviewSubpage:()=>navigations++,rerenderTab:noop};
  compile(source,expand(source,['bindOverviewContent'],deps),deps).bindOverviewContent(root,{});
- arrow.click();assert.equal(navigations,1);assert.equal(dom.window.document.querySelector('.season-data-note-popover'),null);
+ arrow.click();assert.equal(navigations,1);assert(dom.window.document.querySelector('.season-data-note-popover').hidden);
  dom.window.close();
 });
 test('R257 focus/Escape/hover/touch and body portal placement/lifecycle',async()=>{
@@ -77,8 +77,8 @@ test('R257 focus/Escape/hover/touch and body portal placement/lifecycle',async()
  button.click();doc.dispatchEvent(new dom.window.Event('scroll'));assert(panel.hidden);
  button.click();button.remove();await new Promise(setImmediate);assert(panel.hidden);dom.window.close();
 });
-test('R257 assertions kill always-visible, wrong-stream and inverted official-total mutations',()=>{
- const mutations=[['cap','!progress?.upstreamCapped || ',''],['date','progress?.mayhemOldestAt : progress?.rankedOldestAt','progress?.rankedOldestAt : progress?.mayhemOldestAt'],['total','official>=games','official<games']];
+test('R257 assertions kill always-capped, wrong-stream and inverted official-total mutations',()=>{
+ const mutations=[['cap','progress?.upstreamCapped&&',''],['date','progress?.mayhemOldestAt : progress?.rankedOldestAt','progress?.rankedOldestAt : progress?.mayhemOldestAt'],['total','official>=games','official<games']];
  for(const [name,from,to] of mutations){const target=require("./r188-harness.cjs").extract(source,"renderSeasonDataNote"),changed=target.replace(from,to);assert.notEqual(changed,target,name);const mutant=source.replace(target,changed);assert.notEqual(mutant,source,name);assert.throws(()=>check(mutant),assert.AssertionError,name);}
 });
 test('R257 copy respects existing static wording guards and reuses R241 styling',()=>{

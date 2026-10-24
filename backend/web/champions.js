@@ -30,6 +30,7 @@
 
   const initialMode = normalizeMode(readSetting("champion-mode", "ranked"));
   migrateChampionModePreferences(initialMode);
+  try { localStorage.removeItem("lol-loot-champion-detail-id-arena"); } catch (_) {}
 
   const state = {
     section: "overview",
@@ -101,7 +102,7 @@
     workspaceRequestToken: 0,
     detailRequestToken: 0,
 	    runePage: normalizeRunePage(readSetting("champion-rune-page", "0")),
-	    detailChampionID: normalizeChampionDetailID(readSetting(`champion-detail-id-${initialMode}`, "")),
+	    detailChampionID: initialMode === "arena" ? 0 : normalizeChampionDetailID(readSetting(`champion-detail-id-${initialMode}`, "")),
     playerDetour: false,
   };
 
@@ -140,7 +141,7 @@
     resetTransientChampionState({ restorePosition: true });
     state.mode = mode;
     writeSetting("champion-mode", mode);
-    state.detailChampionID = normalizeChampionDetailID(readSetting(`champion-detail-id-${mode}`, ""));
+    state.detailChampionID = mode === "arena" ? 0 : normalizeChampionDetailID(readSetting(`champion-detail-id-${mode}`, ""));
     state.query = normalizeStoredSearch(readSetting(`champion-query-${mode}`, ""));
     state.rankings = null;
     state.augments = null;
@@ -332,7 +333,7 @@
 
   function prepareArenaSelection() {
     if (state.mode !== "arena") return null;
-    const rows = rankingRows();
+    const rows = filteredChampionRows();
     if (!rows.length) {
       state.selected = null;
       state.detail = null;
@@ -340,7 +341,6 @@
       return null;
     }
     const row = rows.find((item) => Number(item.championId) === Number(state.selected?.championId))
-      || rows.find((item) => Number(item.championId) === Number(state.detailChampionID))
       || rows[0];
     const selected = arenaSelectedRow({ ...(state.selected || {}), ...row });
     if (!selected) {
@@ -368,6 +368,7 @@
   }
 
   async function enterChampionSection() {
+    if(state.mode === "arena"){state.selected=null;state.detail=null;state.detailChampionID=0;state.arenaDetailKey=0;}
     const preload = state.preload;
     let hydrated = false;
     if (preload) {
@@ -487,7 +488,7 @@
     const championID = normalizeChampionDetailID(row?.championId);
     if (!championID) return;
     state.detailChampionID = championID;
-    writeSetting(`champion-detail-id-${state.mode}`, championID);
+    if(state.mode!=="arena")writeSetting(`champion-detail-id-${state.mode}`, championID);
     if (state.mode === "arena") {
       selectArenaChampion(row);
       return;
@@ -611,7 +612,6 @@
       return null;
     }
     const row = rows.find((item) => Number(item.championId) === Number(state.selected?.championId))
-      || rows.find((item) => Number(item.championId) === Number(state.detailChampionID))
       || rows[0];
     const selected = mayhemSelectedRow({ ...(state.selected || {}), ...row });
     if (!selected) return null;
@@ -921,7 +921,7 @@
   }
 
   function restorePersistedChampionSelection() {
-    if (!state.detailChampionID || state.mode === "aram-mayhem" && state.mayhemView !== "champions") return null;
+    if (state.mode === "arena" || !state.detailChampionID || state.mode === "aram-mayhem" && state.mayhemView !== "champions") return null;
     if (state.selected && Number(state.selected.championId) === Number(state.detailChampionID)) return state.selected;
     if (!Array.isArray(state.rankings?.rows)) return null;
     const row = rankingRows().find((item) => Number(item.championId) === Number(state.detailChampionID));
@@ -1148,11 +1148,14 @@
     // 本地分档冒充官方档位。
     const heroTier = mayhemHeroTier(row, detail);
     const localNote = heroTier?.locallyCalculated ? '<small class="mayhem-tier-local">本地估算</small>' : "";
+    const sample=Number(detail?.stats?.games)||Number(row.play)||0;
+    const rate=Number(detail?.stats?.winRate)||Number(row.winRate)||0;
+    const metricCards=[...(rate>0||sample>0?[metric("胜率",percent(rate))]:[]),...(sample>0?[metric("样本",compactNumber(sample))]:[]),...(heroTier&&(rate>0||sample>0)?[metric("梯度",gradeBadge(heroTier.grade,"is-metric"))]:[])];
     const overview = `<section class="mayhem-overview-strip">
       <img class="mayhem-overview-art" data-queued-src="${heroArtworkURL(meta, source, path)}" data-artwork-fallback="${escapeHTML(heroArtworkFallbackURL(meta))}" alt="" aria-hidden="true" decoding="async" data-champion-image>
       <span class="mayhem-overview-shade" aria-hidden="true"></span>
       <div class="mayhem-overview-identity"><span class="champion-detail-portrait"><img data-queued-src="${imageURL(source, path)}" alt="${escapeHTML(title)}" decoding="async" data-champion-image><span>${escapeHTML(title.slice(0, 1))}</span></span><div><h2>${escapeHTML(title)} ${heroTier ? gradeBadge(heroTier.grade, "arena-title-tier") : ""}</h2><small>${escapeHTML(subtitle)} · 总榜第 ${Number(row.rank) || "—"} 位${localNote}</small></div></div>
-      <div class="mayhem-overview-metrics">${metric("胜率", percent(detail?.stats?.winRate ?? row.winRate))}${metric("样本", compactNumber(row.play))}${heroTier ? metric("梯度", gradeBadge(heroTier.grade, "is-metric")) : ""}</div>
+      ${metricCards.length?`<div class="mayhem-overview-metrics" data-metric-count="${metricCards.length}">${metricCards.join("")}</div>`:""}
     </section>`;
     if (state.mayhemDetailLoading && !detail) return overview + renderDetailSkeleton();
     if (state.mayhemDetailError && !detail) return overview + renderError(state.mayhemDetailError, true);
@@ -1264,6 +1267,7 @@
     // （rankingSignals: sample_tier → wilson_lower_bound → pick_rate → games），
     // 所以前端一律不重排，原样渲染。
     const rankingRows = objectRows(rows).slice(0, 8);
+    if(!rankingRows.length)return "";
     const content = rankingRows.map((row, index) => {
       const asset = row.assets?.[0] || {};
       const icon = asset.source && asset.path ? assetImage(asset, "recommend-icon", true) : '<span class="mayhem-item-name-only" aria-hidden="true"></span>';
@@ -1402,8 +1406,7 @@
     }).join("");
     const citation = state.augments?.citation;
     const dataStatus = `${state.augments?.source || "来源未知"} · 数据版本 ${citation?.patch || "版本未知"}${citation?.reportDate ? ` · ${citation.reportDate}` : ""}${state.augments?.dataNotice ? ` · ${state.augments.dataNotice}` : ""}`;
-    const pending = objectRows(state.augments?.pendingAugments);
-    return `<p class="mayhem-data-status">${escapeHTML(dataStatus)}</p>${pending.length ? `<section class="mayhem-official-additions"><h3>官方新增 · 上游尚未收录</h3>${pending.map(row => `<p><strong>${escapeHTML(row.name)}</strong>：${escapeHTML(row.description)}</p>`).join("")}</section>` : ""}<div class="mayhem-atlas">
+    return `<p class="mayhem-data-status">${escapeHTML(dataStatus)}</p><div class="mayhem-atlas">
       <section class="augment-directory mayhem-atlas-browser">
         <div class="mayhem-panel-head">
           <div><h3>海克斯图鉴</h3><p>${objectRows(state.augments?.rows).length} 个海克斯，按梯度与品质排列</p></div>
@@ -3022,7 +3025,7 @@
     if (state.section === "champions" && previous !== "champions") {
       if (state.playerDetour) {
         state.playerDetour = false;
-        render();
+        if(state.mode==="arena")enterChampionSection();else render();
         return;
       }
       // 数据还在路上时会先渲染一版矮得多的加载态，滚动位置必须等到真正

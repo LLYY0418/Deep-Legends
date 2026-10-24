@@ -500,6 +500,7 @@ type gameplayPerkStat struct {
 }
 
 type gameplayParticipant struct {
+	IsCurrent      bool               `json:"isCurrent,omitempty"`
 	ProPlayer      *proIdentityBadge  `json:"proPlayer,omitempty"`
 	ParticipantID  int64              `json:"participantId"`
 	TeamID         int64              `json:"teamId"`
@@ -3336,6 +3337,10 @@ func (a *app) publicizeMatchReferencesWithProIndex(match *gameplayMatch, index p
 			PlayerRef: participant.PlayerRef, DisplayName: participant.DisplayName, GameName: participant.GameName,
 			TagLine: participant.TagLine, ProfileIconID: participant.ProfileIconID,
 		})
+		a.mu.RLock()
+		currentPUUID := a.summoner.PUUID
+		a.mu.RUnlock()
+		participant.IsCurrent = gameplayLivePlayerIsCurrent(reference, currentPUUID, nil, nil)
 		participant.ProPlayer = a.matchProIdentity(index, "match", reference, match.GameID)
 		participant.PlayerRef = a.registerGameplayReferenceDetails(reference)
 	}

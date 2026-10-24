@@ -34,6 +34,7 @@
     initialized = false;
   const eligible = (p) =>
     p?.playerRef &&
+    !p.isCurrent &&
     !p.hidden &&
     !p.identityUnresolved &&
     (p.gameName || p.displayName);
@@ -126,9 +127,10 @@
   function collect() {
     const blocked = new Set(
       (ctx()?.live()?.players || [])
-        .filter((p) => p.hidden || p.identityUnresolved)
+        .filter((p) => p.hidden || p.identityUnresolved || p.isCurrent)
         .map((p) => p.playerRef),
     );
+    for (const p of ctx()?.sources() || []) if(p.isCurrent)blocked.add(p.playerRef);
     for (const ref of blocked) players.delete(ref);
     for (const p of ctx()?.sources() || []) {
       if (eligible(p) && !blocked.has(p.playerRef)) {
@@ -184,7 +186,7 @@
         p = players.get(ref);
       if (target.closest(".ptag-modal,.ptag-manage-card")) continue;
       if (!eligible(p)) {
-        target.querySelectorAll(".pmark,.pmark-add").forEach((n) => n.remove());
+        target.querySelectorAll(".pmark,.pmark-add,.ptag-btn").forEach((n) => n.remove());
         target.classList.remove("is-marked");
         delete target._ptagSignature;
         const card = target.closest(".live-player");
@@ -216,7 +218,7 @@
       target._ptagSignature = signature;
       const roster = target.closest(".match-team-list,.arena-team-roster");
       if (roster) {
-        target.querySelectorAll(".pmark,.pmark-add").forEach((n) => n.remove());
+        target.querySelectorAll(".pmark,.pmark-add,.ptag-btn").forEach((n) => n.remove());
         target.classList.toggle("is-marked", shown() && marked(ref));
         const icon = target.querySelector(".game-icon");
         if (marked(ref) && shown() && icon) {
@@ -271,10 +273,10 @@
             ?.querySelector(`[data-player-ref="${CSS.escape(p.playerRef)}"]`),
       );
       const main = ctx()?.overviewPlayer?.(strip) || p;
-      if (!eligible(main)) continue;
       strip.querySelectorAll(".ptag-inline").forEach((n) => n.remove());
+      if (!eligible(main)) continue;
       strip
-        .querySelector("h2")
+        .querySelector(".summoner-level-row > span")
         ?.insertAdjacentHTML(
           "afterend",
           `<span class="ptag-inline">${chips(main.playerRef)}${button(main.playerRef)}</span>`,
@@ -385,7 +387,7 @@
     if (!modal) return;
     const p = players.get(current);
     if (!p) return;
-    modal.querySelector(".who strong").textContent = "标记 " + ctx().name(p);
+    modal.querySelector(".who strong").innerHTML = "标记 <span class=\"ptag-player-name\">" + esc(ctx().name(p)) + "</span>";
     modal.querySelector(".who small").textContent = [
       ctx().info(p),
       records.get(current)?.lastMet?.at
@@ -590,7 +592,7 @@
   function renderSettings() {
     const root = document.getElementById("player-tags-settings");
     if (!root) return;
-    const rows = [...records].filter(([r]) => marked(r));
+    const rows = [...records].filter(([r]) => marked(r)&&eligible(players.get(r)));
     const usages = (id) => rows.filter(([, r]) => r.tags.includes(id)).length;
     root.innerHTML = `<nav class="ptag-subtabs" role="tablist" aria-label="玩家标签"><button type="button" role="tab" aria-selected="${settingsTab === "tags"}" data-ptag-tab="tags">标签管理</button><button type="button" role="tab" aria-selected="${settingsTab === "players"}" data-ptag-tab="players">已标记玩家</button></nav>`;
     if (settingsTab === "tags")

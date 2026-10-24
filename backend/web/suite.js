@@ -224,7 +224,7 @@
 
   function setConnected(connected) {
     state.connected = Boolean(connected);
-    offline.hidden = state.connected;
+    offline.hidden = state.connected || state.tab === "config";
     for (const subpanel of panels) subpanel.hidden = (subpanel.dataset.suitePanel !== "config" && !state.connected) || subpanel.dataset.suitePanel !== state.tab;
     if (!state.connected) {
       clearTimeout(state.facadeRefreshTimer);

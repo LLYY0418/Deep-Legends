@@ -48,14 +48,14 @@ test("2024 real mode buttons isolate champion and search memories across all mod
     for (const [mode, id, query] of [["ranked",103,"阿狸"],["aram-mayhem",81,"伊泽"],["arena",50,"斯维因"]]) {
       switchMode(mode);
       assert.equal(s.selected, null, "previous-mode runtime selection must be reset");
-      assert.equal(s.detailChampionID, id);
+      assert.equal(s.detailChampionID, mode==="arena"?0:id);
       assert.equal(s.query, query);
       s.rankings = {rows:[{championId:103},{championId:81},{championId:50}]};
-      assert.equal(api.restorePersistedChampionSelection().championId, id);
+      if(mode==="arena")assert.equal(api.restorePersistedChampionSelection(),null);else assert.equal(api.restorePersistedChampionSelection().championId,id);
     }
     const stored = Object.fromEntries(Object.keys(w.localStorage).map(key => [key,w.localStorage.getItem(key)]));
     const reloaded = workspace(stored);
-    assert.equal(reloaded.window.testWorkspace.state.detailChampionID, 50);
+    assert.equal(reloaded.window.testWorkspace.state.detailChampionID, 0);
     assert.equal(reloaded.window.testWorkspace.state.query, "斯维因");
     reloaded.window.close();
   } finally { w.close(); }

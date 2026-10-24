@@ -644,7 +644,6 @@ type championPerformancePanel struct {
 
 type championAugmentResponse struct {
 	DataNotice          string                  `json:"dataNotice,omitempty"`
-	PendingAugments     []championAugment       `json:"pendingAugments,omitempty"`
 	Source              string                  `json:"source"`
 	Mode                string                  `json:"mode"`
 	FetchedAt           time.Time               `json:"fetchedAt"`
@@ -2608,7 +2607,6 @@ func (p *championProvider) loadLegacyAugments(ctx context.Context) (championAugm
 }
 
 func cloneChampionAugmentResponse(value championAugmentResponse) championAugmentResponse {
-	value.PendingAugments = append([]championAugment(nil), value.PendingAugments...)
 	value.Rows = append([]championAugment(nil), value.Rows...)
 	for index := range value.Rows {
 		value.Rows[index].Champions = append([]championAugmentChampion(nil), value.Rows[index].Champions...)
