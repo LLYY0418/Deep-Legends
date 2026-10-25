@@ -46,15 +46,16 @@ test('R311 real hero DOM switches both lists, retains expansion, normalizes old 
   assert.match(doc.querySelector('.arena-augment-section header').textContent,/按梯度展示前九项/);
   c.state.arenaSort='winRate';assert.deepEqual(Array.from(c.arenaOrderRows(rows)),[...rows].reverse());
   await c.openDetail(row(3));assert.equal(c.state.arenaSort,'games');assert.equal(c.state.arenaExpanded.augments,false);
- } finally {window.close();}
+ } finally {window.__r311.state.arenaRequestToken += 1;window.dispatchEvent(new window.Event("deep-legends:dispose"));window.close();}
 });
 
 test('R311 live Arena shows four per rarity ordered by games and always win plus games; hextech remains three by tier',()=>{
- const rt=runtime(),rows=dataRows();
- const deps={window:{deepLegendsRuntime:rt},gradeRank:rt.gradeRank,gradeBadge:rt.gradeBadge,state:{liveRecommendationFailures:new Map()},escapeHTML:String,liveChampionAugmentRows:()=>rows,normalizeAugmentRarity:v=>({key:v}),augmentTooltipText:a=>a.name,renderLiveAugmentIcon:r=>`<i data-id="${r.id}"></i>`,percent:n=>`${n}%`,number:String};
+ const rt=runtime(),rows=dataRows(),comboSources=[];
+ const deps={window:{deepLegendsRuntime:rt},gradeRank:rt.gradeRank,gradeBadge:rt.gradeBadge,state:{liveRecommendationFailures:new Map()},renderLiveARAMKitCombos:(_data,source)=>{comboSources.push(source);return source==='hextech'?'<section data-r311-combos>海克斯组合</section>':'';},escapeHTML:String,liveChampionAugmentRows:()=>rows,normalizeAugmentRarity:v=>({key:v}),augmentTooltipText:a=>a.name,renderLiveAugmentIcon:r=>`<i data-id="${r.id}"></i>`,percent:n=>`${n}%`,number:String};
  const render=Function(...Object.keys(deps),extract(read('gameplay.js'),'renderLiveAugmentRecommendations')+';return renderLiveAugmentRecommendations;')(...Object.values(deps));
  for(const source of ['arena','hextech']){
   const dom=new JSDOM(render({},source));const doc=dom.window.document;
+  assert.equal(comboSources.at(-1),source);assert.equal(!!doc.querySelector('[data-r311-combos]'),source==='hextech','Arena omits combos; Hextech keeps them');
   for(const [j,key] of ['silver','gold','prismatic'].entries()){
    const ids=[...doc.querySelectorAll(`.is-${key}.live-augment-column [data-id]`)].map(e=>+e.dataset.id);
    assert.deepEqual(ids,source==='arena'?[16+j,13+j,10+j,7+j]:[1+j,4+j,7+j]);
@@ -84,6 +85,6 @@ test('R311 live Arena equipment sorts complete candidates before each display li
  assert.deepEqual(ids(doc,'.item-core-column'),[1,2,3,4,5]);dom.window.close();
  const rankingDeps={window:{deepLegendsRuntime:rt},escapeHTML:String,renderItemIcon:()=>'',rate:String,compactNumber:String};
  const ranking=Function(...Object.keys(rankingDeps),extract(read('gameplay.js'),'renderLiveItemRanking')+';return renderLiveItemRanking;')(...Object.values(rankingDeps));
- const flat=dataRows();dom=new JSDOM(ranking(flat,true));assert.deepEqual([...dom.window.document.querySelectorAll('article strong')].map(e=>e.textContent),[18,17,16,15,14,13,12,11].map(i=>'推荐'+i));dom.window.close();
- dom=new JSDOM(ranking(flat,false));assert.deepEqual([...dom.window.document.querySelectorAll('article strong')].map(e=>e.textContent),[1,2,3,4,5,6,7,8].map(i=>'推荐'+i));dom.window.close();
+ const flat=dataRows().map((row,i)=>({...row,pickRate:100-Math.floor(i/2)}));dom=new JSDOM(ranking(flat,true));assert.deepEqual([...dom.window.document.querySelectorAll('article strong')].map(e=>e.textContent),[18,17,16,15,14,13,12,11,10,9].map(i=>'推荐'+i));dom.window.close();
+ dom=new JSDOM(ranking(flat,false));assert.deepEqual([...dom.window.document.querySelectorAll('article strong')].map(e=>e.textContent),[2,1,4,3,6,5,8,7,10,9].map(i=>'推荐'+i));dom.window.close();
 });
