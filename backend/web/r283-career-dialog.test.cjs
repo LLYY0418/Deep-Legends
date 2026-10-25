@@ -80,6 +80,7 @@ test('R283 P18 every rendered dialog action is bound, tooltip-only controls are 
 
 test('R283 P17 failed live cards keep only the current-mode failure summary',async()=>{
  const f=await fixture();try{
+  f.w.eval(fs.readFileSync(__dirname+'/live-arena.js','utf8'));
   for(const queueId of [420,450,2300,1750]){
    const data={phase:'InProgress',queueId,gameMode:queueId===1750?'CHERRY':queueId===2300?'ARAM':'CLASSIC',mapId:queueId===420?11:12,available:true,players:Array.from({length:6},(_,i)=>({playerRef:'test-'+i,gameName:'玩家'+i,championId:1,historyState:'failed',recentGames:[],teamId:100,isAlly:true,isCurrent:i===0}))};
    const doc=new f.w.DOMParser().parseFromString(f.g.renderLiveInsights(data),'text/html'),cards=[...doc.querySelectorAll('[data-live-player-row^="card:"]')];assert.equal(cards.length,6);

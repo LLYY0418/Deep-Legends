@@ -17,7 +17,15 @@ async function waitForRender(w, predicate, label = "render did not become ready"
     }
   }});
 }
-function waitForOverview(w, matchCount = 17) {
+async function waitForOverview(w, matchCount = 17) {
+  if(matchCount>20){
+    await waitForRender(w,()=>w.document.querySelectorAll(".match-list .match-entry").length>=20,"initial twenty matches did not become ready");
+    while(w.document.querySelectorAll(".match-list .match-entry").length<matchCount){
+      const before=w.document.querySelectorAll(".match-list .match-entry").length;
+      const more=w.document.querySelector("[data-load-more]");assert.ok(more,"real show-more control must exist");more.click();
+      await waitForRender(w,()=>w.document.querySelectorAll(".match-list .match-entry").length>before,"show more did not reveal the next window");
+    }
+  }
   return waitForRender(w, () => {
     const root = w.document.getElementById("overview-content");
     return root?.querySelector(".summoner-strip") && root.querySelector(".career-column")

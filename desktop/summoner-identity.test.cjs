@@ -50,6 +50,11 @@ function functionSource(source, name) {
 }
 
 function compileFunctions(source, names, dependencies = {}) {
+  if(source===gameplaySource) {
+    const harness=require('../backend/web/r211-harness-support.cjs');
+    dependencies=harness.environment(dependencies);
+    names=harness.expand(source,names,dependencies);
+  }
   if (source === gameplaySource && !names.includes("cancelOverviewProgress") && names.some(name => functionSource(source, name).includes("cancelOverviewProgress("))) names = [...names, "cancelOverviewProgress"];
   const dependencyNames = Object.keys(dependencies);
   const factory = Function(

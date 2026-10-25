@@ -2331,7 +2331,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
   .match-filterbar.gameplay-skeleton { display: flex; min-height: 46px; }
 .match-filterbar.gameplay-skeleton button { color: transparent; pointer-events: none; background-image: linear-gradient(100deg,var(--skeleton-base) 20%,var(--skeleton-glint) 42%,var(--skeleton-base) 64%); background-size: 220% 100%; animation: skeleton 1.3s linear infinite; }
 
-.rank-row.gameplay-skeleton:not(.career-pending) span { height: 18px; min-height: 18px; }
+.rank-row .rank-record.gameplay-skeleton span, .rank-row.gameplay-skeleton:not(.career-pending) span { height: 18px; min-height: 18px; }
 .rank-row.gameplay-skeleton .rank-crest { height: 44px; min-height: 44px; }
 .rank-row.gameplay-skeleton > div { display: grid; gap: 8px; }
 .match-filterbar.gameplay-skeleton > span { min-height: 0; height: 30px; width: 45%; }
@@ -2501,9 +2501,9 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-aramkit-combos small { color:var(--muted); font-size:11px; }
 .live-aramkit-combo-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
 .live-aramkit-combo { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; height:62px; min-width:0; padding:0 12px; background:var(--bg); border:1px solid var(--line); border-radius:10px; }
-.live-combo-pair { display:flex; align-items:center; }
+.live-combo-pair { display:flex; align-items:center; gap:6px; }
 .live-combo-pair>.arena-augment-icon { display:flex; width:32px; height:32px; flex:none; }
-.live-combo-pair>.arena-augment-icon+.arena-augment-icon { margin-left:-6px; border-radius:8px; box-shadow:0 0 0 3px var(--bg); }
+
 .live-combo-pair .arena-augment-icon > .game-icon { width:100%; height:100%; flex-basis:100%; }
 .live-combo-names { display:grid; gap:3px; min-width:0; font-size:12px; }
 .live-combo-names>* { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -2538,3 +2538,11 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .build-core-ranking-row.is-mayhem-build-row .item-core-column .option-stats.is-depth { grid-template-columns:repeat(2,48px); }
 .live-item-ranking>header .section-count { white-space:nowrap; font-size:10px; }
 .live-item-ranking>header h3 { white-space:nowrap; }
+
+.live-combo-names>strong { color:var(--ink); font-size:12px; font-weight:700; }
+.live-combo-plus { color:var(--muted); font-weight:600; }
+.recent-ranked-section .recent-casual-mode { color:var(--ink); font-size:16px; font-weight:700; }
+.recent-ranked-section>header { justify-content:flex-start; }
+.recent-ranked-section>header>.career-section-tools { margin-left:auto; }
+.custom-config-card .sg-starters+.sg-items { margin-left:22px; padding-left:22px; border-left:1px solid var(--line); }
+@container sgrow (max-width:700px) { .custom-config-card .specialist-game-footer { gap:12px; } .custom-config-card .sg-starters+.sg-items { margin:0; padding:0; border:0; } }

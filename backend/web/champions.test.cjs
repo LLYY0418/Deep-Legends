@@ -81,6 +81,7 @@ test("R69 career-column reentry preserves match width through the 1600 DIP band"
 });
 
 function functionSource(source, name) {
+  if(source.includes("R309 deferred history renderer: "+name)||source.includes("R309 deferred live renderer: "+name))source=require("./r277-deferred-fixture.cjs").join(source);
   let start = source.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `${name} source not found`);
   if (source.slice(Math.max(0, start - 6), start) === "async ") start -= 6;
@@ -3017,7 +3018,7 @@ test("server-filtered flex switch makes one fresh first-page request", async () 
 	assert.match(gameplayScript, /while \(tab\.filterPagingToken === token && tab\.matchFilter === filter\)/);
 	assert.match(gameplayScript, /visible >= state\.settings\.matchCount/);
 	assert.match(gameplayScript, /正在查找更早的\$\{escapeHTML\(matchFilterDisplayLabel\(tab\)\)\}对局…第/);
-  assert.match(gameplayScript, /function renderFilteredMatchView\(tab, restoreScroll = false\)[\s\S]*querySelector\("\.match-list"\)/);
+  assert.match(gameplayScript, /function renderFilteredMatchView\(tab, restoreScroll = false, keepControls = false\)[\s\S]*querySelector\("\.match-list"\)/);
   assert.doesNotMatch(gameplayScript, /data-match-filter[^\n]+rerender\(\)/);
 	assert.match(gameplayScript, /upstreamAdditions = additions\.length/);
   assert.match(gameplayScript, /tab\.paginationStalls >= 2[\s\S]*pagination\.autoPaused = true/);

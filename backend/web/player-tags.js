@@ -506,18 +506,27 @@
       modal.querySelectorAll("[data-ptag-toggle]")[Number(e.key) - 1]?.click();
     }
   }
+  let undoCleanup=()=>{};
+  function alignPlayerTagUndo(node) {const main=document.querySelector(".app-main"),rect=main?.getBoundingClientRect();node.style.left=(rect?(rect.left+rect.right)/2:innerWidth/2)+"px";}
   function undo(ref, old) {
+    undoCleanup();
     document.querySelector(".ptag-undo")?.remove();
     const n = document.createElement("div");
     n.className = "ptag-undo";
     n.innerHTML = '<span>已清除标记</span><button type="button">撤销</button>';
     document.body.append(n);
-    const timeout = setTimeout(() => n.remove(), 5000);
+    alignPlayerTagUndo(n);
+    const align=()=>alignPlayerTagUndo(n),resize=typeof ResizeObserver==="function"?new ResizeObserver(align):null;
+    const main=document.querySelector(".app-main");if(main)resize?.observe(main);
+    const appearance=new MutationObserver(align);appearance.observe(document.documentElement,{attributes:true,attributeFilter:["data-sidebar","data-ui-scale"]});
+    window.addEventListener("resize",align);
+    const timeout = setTimeout(()=>undoCleanup(),5000);
+    undoCleanup=()=>{clearTimeout(timeout);resize?.disconnect();appearance.disconnect();window.removeEventListener("resize",align);n.remove();};
     n.querySelector("button").onclick = () => {
       clearTimeout(timeout);
       set(ref, old);
       if (modal && current === ref) renderModal();
-      n.remove();
+      undoCleanup();
     };
   }
   function newTag(select) {
@@ -849,7 +858,7 @@
         keepalive: true,
       }).catch(() => {});
   });
-  window.addEventListener("deep-legends:dispose",()=>{observer?.disconnect();clearTimeout(timer);},{once:true});
+  window.addEventListener("deep-legends:dispose",()=>{observer?.disconnect();clearTimeout(timer);undoCleanup();},{once:true});
   window.deepLegendsPlayerTags = Object.freeze({
     signature: (match) =>
       (match.participants || [])

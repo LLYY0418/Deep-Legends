@@ -5,7 +5,7 @@ const {editor}=new Function('require','__dirname',read('r300.test.cjs').split("t
 test('R307 dirty champion mode and position switches retain drafts and markers without dialogs',async()=>{
  const h=await editor();try{const d=h.w.document;
  await h.click('[data-col="sub"][data-row="3"]');const selected=d.querySelector('[data-col="sub"][data-row="3"].is-picked').dataset.rune;
- assert(d.querySelector('[data-champ="1"] .ac-state-dot.is-unsaved'));assert(d.querySelector('[data-mode="ranked"] .ac-state-dot.is-unsaved'));assert(d.querySelector('[data-pos=""] .ac-state-dot.is-unsaved'));
+ assert(d.querySelector('[data-champ="1"] .ac-state-dot.is-unsaved'));assert.equal(d.querySelector('[data-mode="ranked"] .ac-state-dot'),null);assert(d.querySelector('[data-tab="runes"] .ac-state-dot.is-unsaved'));assert(d.querySelector('[data-pos=""] .ac-state-dot.is-unsaved'));
  for(const [away,back]of [['[data-champ="2"]','[data-champ="1"]'],['[data-mode="aram"]','[data-mode="ranked"]'],['[data-pos="top"]','[data-pos=""]']]){
  await h.click(away);assert.equal(d.querySelector('dialog[open]'),null);await h.click(back);assert.equal(d.querySelector('[data-save-state]').textContent,'未保存');assert.equal(d.querySelector(`[data-rune="${selected}"]`).getAttribute('aria-pressed'),'true');}
  assert.equal(d.querySelector('.ac-pos-label'),null);await h.click('[data-act="save"]');assert.equal(d.querySelectorAll('.ac-state-dot.is-unsaved').length,0);assert.equal(h.writes.length,1);

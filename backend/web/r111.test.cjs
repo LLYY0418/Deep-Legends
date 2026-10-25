@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {JSDOM}=require('../../desktop/node_modules/jsdom');
 const read=n=>fs.readFileSync(path.join(__dirname,n),'utf8'),flush=()=>new Promise(setImmediate);
 function extract(src,name){let start=src.indexOf(`function ${name}(`);assert.ok(start>=0,name);if(src.slice(start-6,start)==='async ')start-=6;return src.slice(start,src.indexOf('\n  }',start)+4)}
-function compile(file,names,deps){return Function(...Object.keys(deps),names.map(n=>extract(read(file),n)).join('\n')+`\nreturn {${names.join(',')}}`)(...Object.values(deps))}
+function compile(file,names,deps){names=require("./r211-harness-support.cjs").expand(read(file),names,deps);return Function(...Object.keys(deps),names.map(n=>extract(read(file),n)).join('\n')+`\nreturn {${names.join(',')}}`)(...Object.values(deps))}
 function queue(t){const dom=new JSDOM('<main></main>',{url:'http://localhost',runScripts:'outside-only'}),w=dom.window;
  let observer; w.IntersectionObserver=class{constructor(cb){this.cb=cb;observer=this}observe(){}disconnect(){}};
  w.eval(read('image-queue.js'));t.after(()=>{w.dispatchEvent(new w.Event('deep-legends:dispose'));w.close()});

@@ -33,7 +33,7 @@
     if(!entry.runes&&!entry.spells&&!["starter","core","situational"].some(k=>entry.items?.[k]?.length))return "";
     const status=auto?.yielded?.runes||auto?.yielded?.spells?"已手动应用其他推荐，本局不自动应用":Object.values(auto?.results||{}).includes("applied")?"已应用到客户端":"锁定后自动应用";
     const groups=[["出门装",entry.items?.starter||[]],["最终装备",(entry.items?.core||[]).map(id=>({id,count:1}))]].filter(([,items])=>items.length);
-    const items=groups.map(([label,ids])=>`<div class="sg-items"><span class="sg-label">${label}</span><div class="sg-icons">${ids.map(item=>`<span class="custom-config-item">${renderItemIcon(item.id)}${item.count>1?`<b>×${item.count}</b>`:""}</span>`).join("")}</div></div>`).join("");
+    const items=groups.map(([label,ids])=>`<div class="sg-items${label==="出门装"?" sg-starters":""}"><span class="sg-label">${label}</span><div class="sg-icons">${ids.map(item=>`<span class="custom-config-item">${renderItemIcon(item.id)}${item.count>1?`<b>×${item.count}</b>`:""}</span>`).join("")}</div></div>`).join("");
     const spells=entry.spells?renderRuneSpellIcons(entry.spells):"";
     return `<article class="specialist-game-row custom-config-card is-selected" data-custom-config><header class="custom-config-header"><strong>${escapeHTML(entry.runes?runeConfigurationTitle(config):"自配置")}</strong><span class="cs-live-pill">${escapeHTML(config.modeLabel)}</span><small role="status">${status}</small></header>${entry.runes?renderUnifiedRuneBoard(config,spells):spells?`<div class="sg-spells"><span data-card-spells>${spells}</span></div>`:""}${items?`<div class="specialist-game-footer">${items}</div>`:""}</article>`;
   }

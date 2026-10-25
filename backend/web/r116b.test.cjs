@@ -67,6 +67,7 @@ async function mountMayhemDetail(detail = detailFixture(), { mode = "aram-mayhem
 }
 
 function functionSource(source, name) {
+  if(source.includes("R309 deferred history renderer: "+name)||source.includes("R309 deferred live renderer: "+name))source=require("./r277-deferred-fixture.cjs").join(source);
   const start = source.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `${name} not found`);
   let depth = 0;
@@ -198,10 +199,11 @@ test("R116-B 表现 tab 只在后端下发指标时出现，缺数据不留空�
   assert.equal(document.querySelector(".mayhem-performance"), null);
 });
 
+// R309: historical case ID retained; the current assertion follows the new requirement.
 test("R116-B 图鉴入口按钮在详情面板顶部，复用既有视图状态机而不是新路由", () => {
   const toolbar = functionSource(championsScript, "mayhemDetailToolbar");
-  assert.match(toolbar, /class="mayhem-atlas-entry" data-mayhem-view="atlas"/);
-  assert.match(toolbar, /离开当前英雄/);
+  assert.doesNotMatch(toolbar, /mayhem-atlas-entry|data-mayhem-view="atlas"/);
+  assert.doesNotMatch(toolbar, /离开当前英雄/);
   // 点击后走的是既有的 mayhemView 分支（原地切换），没有新增路由或页面。
   assert.match(championsScript, /const mayhemView = event\.target\.closest\("\[data-mayhem-view\]"\)/);
   assert.match(championsScript, /state\.mayhemView === "atlas" \? renderMayhemAtlas\(filteredAugments\(\)\)/);
@@ -212,7 +214,7 @@ test("R116-B 图鉴入口按钮在详情面板顶部，复用既有视图状态�
   for (const name of ["mayhemOverviewTabMarkup", "mayhemBuildTabMarkup"]) {
     assert.doesNotMatch(functionSource(championsScript, name), /renderMayhemAtlas|renderMayhemRarityPanel/);
   }
-  assert.match(championsStyles, /\.mayhem-atlas-entry\s*\{[^}]*border:\s*1px dashed/s, "入口按钮要在视觉上区别于三个 tab");
+  assert.match(championsScript, /class="mayhem-atlas-list-entry"/, "窄屏图鉴目录使用列表入口");
 });
 
 // ---------------------------------------------------------------------------

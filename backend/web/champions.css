@@ -894,8 +894,8 @@
 .mayhem-detail-tabs button { min-height: 42px; padding: 0 10px; color: color-mix(in oklab,var(--ink) 72%,transparent); background: transparent; border: 1px solid transparent; border-radius: 7px; font-size: 13px; font-weight: 750; white-space: nowrap; }
 .mayhem-detail-tabs button:hover { color: var(--ink); background: var(--surface-strong); }
 .mayhem-detail-tabs button.is-active { color: var(--primary); background: var(--primary-soft); border-color: color-mix(in oklab,var(--primary) 44%,var(--line)); box-shadow: inset 0 -2px 0 var(--primary); }
-.mayhem-atlas-entry { display: inline-flex; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; font-size: 11px; font-weight: 700; }
-.mayhem-atlas-entry:hover { color: var(--ink); border-color: color-mix(in oklab,var(--primary) 44%,var(--line)); }
+.mayhem-atlas-list-entry { display: inline-flex; min-height: 42px; flex: 0 0 auto; align-items: center; gap: 6px; padding: 0 10px; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; font-size: 11px; font-weight: 700; }
+.mayhem-atlas-list-entry:hover { color: var(--ink); border-color: color-mix(in oklab,var(--primary) 44%,var(--line)); }
 .mayhem-detail-panels { display: grid; gap: 12px; }
 .mayhem-detail-panel { display: grid; min-width: 0; gap: 12px; }
 
@@ -916,7 +916,7 @@
 @media (max-width: 700px) {
   .mayhem-detail-tabs { flex: 1 0 100%; }
   .mayhem-detail-tabs button { min-height: 44px; }
-  .mayhem-atlas-entry { min-height: 40px; }
+  .mayhem-atlas-list-entry { min-height: 40px; }
 }
 
 [data-theme="light"] .mayhem-detail-tabs button.is-active{color:var(--primary-strong)}
@@ -1074,3 +1074,29 @@
 .mayhem-atlas-tools { display:grid; grid-template-columns:140px minmax(0,1fr); width:328px; flex:0 0 328px; max-width:100%; }
 .mayhem-atlas-tools .champion-search { min-width:0; width:100%; grid-template-columns:minmax(0,1fr); }
 .mayhem-atlas-tools input { width:100%; }
+
+/* R309 atlas follows the same narrow container breakpoint as hero tiers. */
+.mayhem-atlas-list-entry { display:none; align-items:center; gap:10px; grid-column:1 / -1; color:var(--muted); font-size:12px; }
+.mayhem-atlas-browser,.mayhem-atlas-detail { min-height:0; }
+.mayhem-atlas-detail-head { display:flex; flex-wrap:wrap; }
+.mayhem-atlas-detail-head>.augment-icon { flex:none; }
+.mayhem-atlas-detail-head>div:not(.mayhem-atlas-description) { flex:0 1 auto; }
+.mayhem-atlas-detail-head>.mayhem-atlas-description { flex:1 1 240px; max-width:470px; margin:0 0 0 auto; }
+.mayhem-atlas-metrics { padding:14px 18px 0; flex:none; }
+.mayhem-fit-columns,.mayhem-fit-row { grid-template-columns:24px minmax(145px,1.6fr) repeat(5,minmax(65px,.7fr)) 28px; column-gap:24px; padding-right:22px; }
+.mayhem-fit-columns>:first-child,.mayhem-fit-row>:first-child { text-align:right; }
+.mayhem-fit-columns>:last-child,.mayhem-fit-row>:last-child { justify-self:end; }
+.mayhem-tier-dialog-content>.mayhem-atlas-browser { display:flex; width:100%; height:100%; max-height:none; min-height:0; border:0; border-radius:0; }
+@container mayhem-page (max-width:1020px) {
+ .mayhem-atlas { grid-template-columns:minmax(0,1fr); }
+ .mayhem-atlas>.mayhem-atlas-browser { display:none; }
+ .mayhem-atlas-list-entry { display:flex; }
+ .mayhem-atlas-detail-head>.mayhem-atlas-description { flex-basis:100%; width:100%; max-width:none; margin:0; }
+}
+
+.aramkit-combo-names>strong { display:block; color:var(--ink); font-size:13px; font-weight:700; line-height:1.45; }
+.aramkit-plus { color:var(--muted); font-weight:600; }
+.aramkit-combos.is-atlas .aramkit-combo { grid-template-columns:24px 86px minmax(140px,1fr) repeat(3,80px); column-gap:24px; padding-right:22px; }
+.aramkit-combo-pick { display:grid; gap:3px; text-align:right; font-size:12px; }
+.aramkit-combo-pick small,.aramkit-combos.is-atlas .aramkit-combo-games small { color:var(--muted); }
+.aramkit-combos.is-atlas .aramkit-combo-games { color:var(--ink); }

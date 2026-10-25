@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const source = fs.readFileSync(path.join(__dirname, 'gameplay.js'), 'utf8');
+const source = require("./r277-deferred-fixture.cjs").join(fs.readFileSync(path.join(__dirname, 'gameplay.js'), 'utf8'));
 const styles = fs.readFileSync(path.join(__dirname, 'gameplay.css'), 'utf8');
 
 function extract(name) {

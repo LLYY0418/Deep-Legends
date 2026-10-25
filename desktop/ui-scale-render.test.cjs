@@ -10,6 +10,10 @@ const appSource=fs.readFileSync(path.join(web,"app.js"),"utf8");
 function boot({bridge,preference,migrated,source=appSource}={}) {
   const dom=new JSDOM(fs.readFileSync(path.join(web,"index.html"),"utf8"),{url:"http://127.0.0.1:1/?demo",runScripts:"outside-only",pretendToBeVisual:true});
   const w=dom.window;
+  const realTimeout=w.setTimeout.bind(w),realClear=w.clearTimeout.bind(w),scaleTimers=new Map();let timerId=-1,clock=0;
+  w.setTimeout=(fn,ms,...args)=>{if(ms!==150)return realTimeout(fn,ms,...args);const id=timerId--;scaleTimers.set(id,{at:clock+ms,fn:()=>fn(...args)});return id;};
+  w.clearTimeout=id=>scaleTimers.delete(id)||realClear(id);
+  w.__advanceScaleTimer=ms=>{clock+=ms;for(const [id,timer]of scaleTimers)if(timer.at<=clock){scaleTimers.delete(id);timer.fn();}};
   w.IntersectionObserver=class{observe(){}unobserve(){}disconnect(){}};
   w.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
   w.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
@@ -40,6 +44,8 @@ function resize(w,width,height){
   Object.defineProperty(w,"innerWidth",{value:width,configurable:true});
   Object.defineProperty(w,"innerHeight",{value:height,configurable:true});
   w.dispatchEvent(new w.Event("resize"));
+  w.__advanceScaleTimer(149);
+  w.__advanceScaleTimer(1);
   return new Promise(resolve=>w.requestAnimationFrame(()=>setImmediate(resolve)));
 }
 test("scaling applies without the desktop bridge and follows the window size",async()=>{

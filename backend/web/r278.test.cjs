@@ -37,9 +37,10 @@ test('R278 P7 observer survives a blocked append and retries when loading finish
  f.bindMatchSentinel(container,tab);assert(cb,'must bind while loading');cb([{isIntersecting:true}]);root.dispatchEvent(new dom.window.WheelEvent('wheel',{deltaY:10}));if(timers.length)await timers.shift()();assert.equal(disconnected,0);assert.equal(calls,0);tab.loadingMore=false;state.observer.check();if(timers.length)await timers.shift()();assert.equal(calls,1);assert.equal(disconnected,1);assert.equal(state.observer,null);assert(events.some(v=>v[1]==='started' && v[2].started));
  }finally{dom.window.close()}
 });
-test('R278 P8 positive time boundary remains search-local; NOT continues older and stop remains usable',async()=>{
+test('R278 P8 positive time boundary remains search-local; NOT continues older and stop remains usable',async(t)=>{
+ t.mock.timers.enable({apis:['Date'],now:Date.now()});
  const now=Date.now(),rows=Array.from({length:200},(_,i)=>({gameId:i+1,createdAt:now-i*86400000/2,participants:[{championId:i===90?999:103}]})),tab={advancedConditions:{time:{values:['d30']},hero:{values:['999']}},data:{matches:rows.slice(0,20),pagination:{hasMore:true}}};let cursor=20;
- const ctx={rows:()=>tab.data.matches,version:()=>tab.data.matches,cursor:()=>cursor,now:()=>now,subject:m=>m.participants[0],tags:()=>[],isActive:()=>true,render(){},load:async n=>{tab.data.matches=tab.data.matches.concat(rows.slice(cursor,cursor+n));cursor+=n;return true;}};
+ const ctx={rows:()=>tab.data.matches,version:()=>tab.data.matches,cursor:()=>cursor,now:()=>now,subject:m=>m.participants[0],tags:()=>[],isActive:()=>true,render(){},load:async n=>{tab.data.matches=tab.data.matches.concat(rows.slice(cursor,cursor+n));cursor+=n;t.mock.timers.tick(250);return true;}};
  await af.find(tab,ctx);assert.equal(tab.data.pagination.hasMore,true);assert.equal(tab.advancedSearch.stopReason,'time_boundary');tab.advancedConditions.time.not=true;ctx.progress=()=>{if(cursor>=120 && tab.advancedSearch.running)af.cancel(tab)};await af.find(tab,ctx);assert(cursor>=120);assert.equal(tab.advancedSearch.stopReason,'user_stop');
 });
 test('R278 P9 chromas keep blue marker without sidebar marker; skin SSE needs no status refresh',()=>{

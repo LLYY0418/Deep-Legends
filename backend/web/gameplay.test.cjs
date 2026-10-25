@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const source = fs.readFileSync(path.join(__dirname, "gameplay.js"), "utf8");
+const source = require("./r277-deferred-fixture.cjs").join(fs.readFileSync(path.join(__dirname, "gameplay.js"), "utf8"));
 const cssSource = fs.readFileSync(path.join(__dirname, "gameplay.css"), "utf8");
 const demoSource = fs.readFileSync(path.join(__dirname, "demo-data.js"), "utf8");
 
@@ -95,6 +95,7 @@ test("2326 manual and automatic current-game failures retain their own trigger",
 
 
 function functionSource(script, name) {
+  if(script.includes("R309 deferred history renderer: "+name)||script.includes("R309 deferred live renderer: "+name))script=require("./r277-deferred-fixture.cjs").join(script);
   const marker = `function ${name}(`;
   const markerStart = script.indexOf(marker);
   const asyncStart = script.lastIndexOf("async ", markerStart);
@@ -140,7 +141,7 @@ function compile(names, dependencies = {}, script = source) {
     length = names.length;
     for (const name of ["bindLiveNode", "champSelectEnemyPlaceholder", "stampLiveRows", "preserveLiveImages", "patchLiveRosterPanel", "liveClientPositionsPending", "clearRuneStarterRetries", "runeStarterTargetActive", "laneMatchupEnemies", "laneMatchupTier", "laneMatchupInference", "laneMatchupAvailability", "ensureLaneMatchupPositions", "laneMatchupPairKey", "laneMatchupOwnLocked", "ensureLaneMatchupPair", "recordLaneMatchupCandidateSkip", "laneMatchupUnavailableReason", "recordLaneMatchupCardDiagnostic", "liveRecommendationTier"]) if (!dependencies[name] && !names.includes(name) && names.some(n => functionSource(script, n).includes(name + "("))) names.push(name);
   }
-  for (const helper of ["championDisplayName", "noteChampSelectReady", "noteChampSelectLatency", "privacyName", "renderRankWindowNote", "liveTagVisible", "bindSeasonDataNotes", "renderSeasonDataNote"]) if (!dependencies[helper] && !names.includes(helper) && names.some(name => functionSource(script,name).includes(helper+"("))) names.push(helper);
+  for (const helper of ["reportRankRecordState","acceptRankRecords","ensureRankRecordFill","refreshSeasonSummary","championDisplayName", "noteChampSelectReady", "noteChampSelectLatency", "privacyName", "renderRankWindowNote", "liveTagVisible", "bindSeasonDataNotes", "renderSeasonDataNote"]) if (!dependencies[helper] && !names.includes(helper) && names.some(name => functionSource(script,name).includes(helper+"("))) names.push(helper);
   dependencies = { readSetting: (_key, fallback) => fallback, recordItemSetClientDiagnostic: () => {}, document: { hidden: false, hasFocus:()=>true }, setTimeout, clearTimeout, riotTab: tab => tab?.region === "kr", isARAMRelatedMatch: () => false, isSummonersRiftMatch: data => Number(data?.mapId) === 11, clusterPremadePlayers: players => players, window: {}, ...dependencies };
   dependencies.window = {deepLegendsPrivacy:require("./privacy.js"),...dependencies.window};
   const keys = Object.keys(dependencies);

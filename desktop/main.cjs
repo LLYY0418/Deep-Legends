@@ -764,9 +764,9 @@ function createMainWindow() {
       applyUiScale(mainWindow, uiScaleState().value);
       publishUiScale();
       persistBounds();
-    }, 300);
+    }, 150);
   };
-  require("./window-resize-trace.cjs").attachWindowResizeTrace(mainWindow,{scale:()=>uiScaleState().value});
+  require("./window-resize-trace.cjs").attachWindowResizeTrace(mainWindow,{scale:()=>currentUiScale});
   mainWindow.on("resize", scheduleBoundsWrite);
   mainWindow.on("move", scheduleBoundsWrite);
   mainWindow.on("show",()=>mainWindow?.webContents.send("desktop-window-visible"));

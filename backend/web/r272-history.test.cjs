@@ -14,13 +14,14 @@ test('time search consumes new unique pages from loaded cursor, reaches 40/60/80
   const tab={advancedConditions:{time:{values:['d30']},hero:{values:['999']}},data:{matches:rows.slice(0,20),pagination:{hasMore:true}}},calls=[],diagnostics=[];let cursor=20;
   const ctx={rows:()=>tab.data.matches,version:()=>tab.data.matches,cursor:()=>cursor,now:()=>now,subject:m=>m.participants[0],tags:()=>[],foreign:()=>foreign,isActive:()=>true,render(){},progress(){},diagnostic:(reason,fields)=>diagnostics.push({reason,...fields}),load:async n=>{calls.push({beg:cursor,count:n});const page=rows.slice(cursor,cursor+n);tab.data.matches=tab.data.matches.concat(page);cursor+=page.length;tab.data.pagination.hasMore=cursor<80;return true;}};
   await af.find(tab,ctx);assert.equal(tab.data.matches.length,80,'one search continues across all pages to the actual time boundary');
-  assert.deepEqual(calls.map(c=>c.beg),[20,40,60]);assert.equal(tab.advancedSearch.stopReason,'no_more');assert.match(af.empty(tab,ctx),/近\s*30\s*天的\s*80\s*场|已查完可查询的\s*80\s*场/);assert.doesNotMatch(af.empty(tab,ctx),/data-af-continue/);
+  assert.deepEqual(calls.map(c=>c.beg),[20,40,60]);assert.equal(tab.advancedSearch.stopReason,'upstream_window');assert.match(af.empty(tab,ctx),/近\s*30\s*天的\s*80\s*场|已查完可查询的\s*80\s*场/);assert.doesNotMatch(af.empty(tab,ctx),/data-af-continue/);
   assert(diagnostics.some(d=>d.exhausted===true));
  }
 });
+// R309: historical case ID retained; the current assertion follows the new requirement.
 test('four presets migrate obsolete season without losing hero/result and empty saved state is read only',()=>{
  const presets=[{name:'s',conditions:{time:{values:['season']},hero:{values:['103']}}},{name:'s+d7',conditions:{time:{values:['season','d7']},result:{values:['win']}}},{name:'days',conditions:{time:{values:['d3']}}},{name:'hero',conditions:{hero:{values:['86']}}}];
- const storage={getItem:()=>JSON.stringify(presets)};const migrated=af.readPresets(storage);assert.equal(migrated.length,4);assert.equal(migrated[0].conditions.time,undefined);assert.deepEqual(migrated[0].conditions.hero.values,['103']);assert.deepEqual(migrated[1].conditions.time.values,['d7']);assert.deepEqual(migrated[1].conditions.result.values,['win']);
+ const storage={getItem:()=>JSON.stringify(presets)};const migrated=af.readPresets(storage);assert.equal(migrated.length,4);assert.deepEqual(migrated[0].conditions.time.values,['season']);assert.deepEqual(migrated[0].conditions.hero.values,['103']);assert.deepEqual(migrated[1].conditions.time.values,['season','d7']);assert.deepEqual(migrated[1].conditions.result.values,['win']);
 });
 test('actual advanced context cursor never falls back to obsolete time cursor',()=>{
  const noop=()=>{},tab={nextBegIndex:20,historyTimeCursor:0,data:{pagination:{begIndex:0,count:20}},advancedConditions:{time:{values:['d30']}}};

@@ -160,10 +160,10 @@ test("titlebar, minimum size, reload, resize and display events run through the 
   assert.deepEqual(h.zoom,[],"the shell must never zoom the page itself");
   h.resetScales();
   for(let i=0;i<20;i++){h.window.emit("resize");h.tick(10);}
-  h.tick(299);assert.deepEqual(h.scales(),[]);
+  h.tick(149);assert.deepEqual(h.scales(),[]);
   h.tick(1);assert.deepEqual(h.scales(),[]);
   h.window.bounds={width:3840,height:2160};h.window.emit("resize");
-  h.tick(299);assert.deepEqual(h.scales(),[]);h.tick(1);
+  h.tick(149);assert.deepEqual(h.scales(),[]);h.tick(1);
   assert.deepEqual(h.scales(),[2]);assert.deepEqual(h.minimum.at(-1),[1560,1200]);assert.equal(h.overlays.at(-1).height, 56);
   h.window.webContents.emit("did-finish-load");h.window.webContents.emit("did-finish-load");
   assert.deepEqual(h.scales(),[2,2,2],"reload must reapply even at the same step");

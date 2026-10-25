@@ -14,10 +14,11 @@ test('R86 image listeners and tab scroll remain bounded including independent im
       }
       function r86OriginalRender(container, tab) {`);
       if(mutate)source=source.replace('function prepareImages(container) {','function prepareImages(container) { for(const image of container.querySelectorAll("img")){image.addEventListener("load",()=>{});image.addEventListener("error",()=>{});}');
-      return source;
+      return source.replace(/\}\)\(\);\s*$/, "window.__r86RenderImages=()=>renderOverviewBodyContent(overviewContainer(activeTab()),activeTab());\n})();");
     }});
     try {
-      await settled();
+      await require("./renderer-wait.cjs").waitForOverview(w,200);
+      w.__r86RenderImages();
       assert.equal(w.document.querySelectorAll('.match-list .match-entry').length,200);
       assert.ok(w.__r86ListenerMax<1000,`listeners=${w.__r86ListenerMax}`);
       let styles=0;const original=w.getComputedStyle.bind(w);w.getComputedStyle=(...args)=>{styles++;return original(...args)};

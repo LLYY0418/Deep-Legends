@@ -147,10 +147,10 @@ test("R128 §2.3-C 状态/错误/数据回退提示保留不动", () => {
 
 test("R128 §2.1 概览/构筑 tab 改成等分的一级切换", () => {
   const toolbar = sliceBetween(championsScript, "function mayhemDetailToolbar(", "function mayhemDetailPanelMarkup(");
-  // tab 组带上真实页签数，CSS 据此等分；图鉴入口仍是独立按钮。
+  // tab 组带上真实页签数，CSS 据此等分；详情工具栏不再带图鉴入口。
   assert.ok(toolbar.includes('data-mayhem-detail-tabs data-tab-count="${specs.length}"'));
   assert.match(championsStyles, /\.mayhem-detail-tabs\[data-tab-count="2"\] \{ --tab-count: 2; \}/, "页面 CSP 禁止 style 属性，页签数靠属性选择器生效");
-  assert.match(toolbar, /class="mayhem-atlas-entry" data-mayhem-view="atlas"/);
+  assert.doesNotMatch(toolbar, /mayhem-atlas-entry|data-mayhem-view="atlas"/);
   assert.doesNotMatch(toolbar, /data-tooltip|<small|<p>/, "tab 区不得新增说明文字或提示气泡");
 
   assert.match(championsStyles, /\.mayhem-detail-tabs \{[^}]*flex: 1 1 auto;[^}]*grid-template-columns: repeat\(var\(--tab-count\),minmax\(0,1fr\)\)/);
@@ -158,7 +158,7 @@ test("R128 §2.1 概览/构筑 tab 改成等分的一级切换", () => {
   assert.match(championsStyles, /\.mayhem-detail-tabs button \{[^}]*min-height: 42px;[^}]*font-size: 13px;[^}]*font-weight: 750/);
   assert.doesNotMatch(championsStyles, /\.mayhem-detail-tabs button \{[^}]*color: var\(--muted\)/, "未选中态不得再用 --muted");
   assert.match(championsStyles, /\.mayhem-detail-tabs button\.is-active \{[^}]*color: var\(--primary\);[^}]*box-shadow: inset 0 -2px 0 var\(--primary\);/);
-  assert.match(championsStyles, /\.mayhem-atlas-entry \{[^}]*min-height: 42px;[^}]*flex: 0 0 auto/);
+  assert.match(championsScript, /class="mayhem-atlas-list-entry"/);
   // 窄屏：tab 组独占一行、按钮 44px，图鉴入口换到下一行。
   const narrow = championsStyles.slice(championsStyles.lastIndexOf("@media (max-width: 700px)"));
   assert.match(narrow, /\.mayhem-detail-tabs \{ flex: 1 0 100%; \}/);

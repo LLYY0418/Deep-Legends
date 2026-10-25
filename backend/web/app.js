@@ -3016,6 +3016,7 @@
   let appliedUiScale = 0;
   let sidebarOverride = null;
   let uiScaleFrame = 0;
+  let uiScaleResizeTimer = 0;
 
   function autoUiScale(width = window.innerWidth, height = window.innerHeight) {
     const raw = Math.min(Number(width) / UI_SCALE_BASE_WIDTH, Number(height) / UI_SCALE_BASE_HEIGHT);
@@ -3036,7 +3037,7 @@
     const fields={mode:fixed?'fixed':'auto',multiplier:scale,windowWidth:window.innerWidth,windowHeight:window.innerHeight,screenWidth:window.screen.width,screenHeight:window.screen.height,devicePixelRatio:window.devicePixelRatio};
     const signature=JSON.stringify(fields);
     if(state.zoomDiagnosticSignature!==signature && window.reportFlowDiagnostic){state.zoomDiagnosticSignature=signature;window.reportFlowDiagnostic('ui_zoom_state','applied',fields);}
-    if (scale === appliedUiScale) return scale;
+    if (scale === appliedUiScale) { applySidebar(); return scale; }
     appliedUiScale = scale;
     document.documentElement.style.setProperty("--ui-zoom", String(scale));
     document.documentElement.dataset.uiScale = String(scale);
@@ -3048,6 +3049,12 @@
   }
 
   function scheduleUiScale() {
+    clearTimeout(uiScaleResizeTimer);
+    if (!preferredUiScale()) {
+      // Settle automatic zoom after resizing.
+      uiScaleResizeTimer = setTimeout(() => { uiScaleResizeTimer = 0; applyUiScale(); }, 150);
+      return;
+    }
     if (uiScaleFrame) return;
     uiScaleFrame = requestAnimationFrame(() => { uiScaleFrame = 0; applyUiScale(); });
   }
@@ -3096,6 +3103,7 @@
     }
     applyUiScale();
     window.addEventListener("resize", scheduleUiScale, { passive: true });
+    window.addEventListener("deep-legends:dispose", () => { clearTimeout(uiScaleResizeTimer); cancelAnimationFrame(uiScaleFrame); }, { once:true });
     if (!window.desktopScale || !el.settingUiScale) return;
     const unsubscribe = window.desktopScale.onChanged?.(receiveUiScale);
     window.addEventListener("deep-legends:dispose", () => unsubscribe?.(), { once: true });

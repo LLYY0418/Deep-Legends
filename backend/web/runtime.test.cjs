@@ -128,3 +128,23 @@ test('business modules do not retain local escapeHTML implementations', () => {
   assert.match(source, /window\.deepLegendsRuntime\.escapeHTML/, file);
  }
 });
+test('R309 P11 rank diagnostics reject unknown enums and never drop an in-flight final transition',async()=>{
+ const sent=[],resolve=[];const context={window:{},fetch:(_url,init)=>{sent.push(JSON.parse(init.body));return new Promise(r=>resolve.push(r));}};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'runtime.js'),'utf8'),context);
+ const valid={
+ rank_record_state:{reason:'known',queue:'solo',state:'known',source:'season',cause:'refresh',ranked_complete:true,render_seq:1,foreign:true},
+ rank_record_final_state:{reason:'known',queue:'flex',state:'known',source:'season-cache',foreign:true},
+ rank_record_downgrade_blocked:{reason:'retained',queue:'solo',source:'season',foreign:true},
+ rank_record_fill_retry:{reason:'error',result:'error',attempt:3,foreign:true},
+ ranked_record_resolved:{reason:'resolved',branch:'budget',queue:'solo',filled_by:'season-cache',upstream_complete:false,progress_complete:true,pending:false},
+ };
+ for(const [event,fields]of Object.entries(valid)) {
+  for(const key of ['reason','queue','state','source','cause','result','branch','filled_by'])if(key in fields){const bad={...fields,[key]:'unknown'};assert.equal(context.window.reportFlowDiagnostic(event,bad.reason,bad),false,event+' '+key);}
+  context.window.reportFlowDiagnostic(event,fields.reason,{...fields,playerRef:'secret-player',gameName:'secret-name'});
+ }
+ assert.equal(sent.length,5);assert.doesNotMatch(JSON.stringify(sent),/secret/);
+ for(let i=0;i<40;i++)context.window.reportFlowDiagnostic('rank_record_state','known',{...valid.rank_record_state,render_seq:i+2});
+ assert.equal(sent.length,45,'rank state cannot be discarded at the generic 32-pending cap');
+ context.window.reportFlowDiagnostic('rank_record_final_state','known',valid.rank_record_final_state);assert.equal(sent.length,46,'identical final state is delivered even while pending');
+ resolve.forEach(r=>r({status:204}));await new Promise(setImmediate);
+});

@@ -6,9 +6,7 @@ const source = fs.readFileSync(process.env.R89_GAMEPLAY_SOURCE || require('node:
 function body(name) {
   const m=new RegExp(`\\n  (?:async )?function ${name}\\(`).exec(source);
   assert.ok(m,name);
-  const rest=source.slice(m.index+1);
-  const end=/\n  (?:async )?function \w+\(/.exec(rest);
-  return end?rest.slice(0,end.index):rest;
+  return require('./r188-harness.cjs').extract(source,name);
 }
 function compile(names,deps={}) { names=require("./r211-harness-support.cjs").expand(source,names,deps); return Function(...Object.keys(deps),require('./r220-harness-support.cjs').prelude(source,deps)+names.map(body).join('\n')+`\nreturn {${names.join(',')}};`)(...Object.values(deps)); }
 test('R258 supplements follow the first history card and survive ref adoption without duplicates',async()=>{

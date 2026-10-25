@@ -42,9 +42,10 @@ test('R230 completion event immediately refreshes even below 100 games and insid
  const f=functions(['handleSeasonProgress'],{state,overviewGroupForSection:()=> 'players',activeTab:()=>tab,document:{getElementById:()=>null},refreshSeasonSummary:async()=>{calls++},overviewSectionForGroup:()=> 'overview',requestAnimationFrame:fn=>fn(),clearTimeout:()=>{},markSeasonRefreshPending:()=>{}});
  assert.equal(await f.handleSeasonProgress({type:'season-progress',account:'account',season:'S26',scanned:90,complete:true},1500),true);assert.equal(calls,1);
 });
-test('R230 null atlas is skeleton; loaded directory filtered to zero is empty; render triggers one automatic request',()=>{
- const state={section:'champions',mode:'aram-mayhem',mayhemView:'atlas',augments:null,listScrollInner:0,mayhemAtlasLoading:false},root={querySelector:()=>null};let requests=0;
- const render=compile(champions,['render'],{state,root,window:{},renderWorkspace:()=>{},renderDetail:()=>{},prepareImages:()=>{},applyRenderedMetricStyles:()=>{},mountArenaMatchCards:()=>{},mountMayhemTierDialog:()=>{},mountArenaTierDialog:()=>{},requestAnimationFrame:()=>{},loadMayhemAtlas:()=>{requests++;state.mayhemAtlasLoading=true}});
+test('R230 null atlas is skeleton; loaded directory filtered to zero is empty; render triggers one automatic request',(t)=>{
+ const dom=new JSDOM('<main></main>');t.after(()=>dom.window.close());
+ const state={section:'champions',mode:'aram-mayhem',mayhemView:'atlas',augments:null,listScrollInner:0,mayhemAtlasLoading:false},root=dom.window.document.querySelector('main');let requests=0;
+ const render=compile(champions,['render'],{state,root,document:dom.window.document,getComputedStyle:dom.window.getComputedStyle.bind(dom.window),innerHeight:dom.window.innerHeight,window:{},renderWorkspace:()=>{},renderDetail:()=>{},prepareImages:()=>{},applyRenderedMetricStyles:()=>{},mountArenaMatchCards:()=>{},mountMayhemTierDialog:()=>{},mountArenaTierDialog:()=>{},requestAnimationFrame:()=>{},loadMayhemAtlas:()=>{requests++;state.mayhemAtlasLoading=true}});
  render.render();render.render();assert.equal(requests,1);
  const atlas=compile(champions,['renderMayhemAtlas'],{state,renderSkeleton:()=> 'skeleton',renderError:()=> 'error',objectRows:v=>v||[],escapeHTML,renderEmpty:title=>title,renderMayhemRarityPanel:()=>'',renderMayhemAtlasDetail:()=>''});
  assert.equal(atlas.renderMayhemAtlas([]),'skeleton');state.augments={rows:[{id:1}]};assert.match(atlas.renderMayhemAtlas([]),/没有匹配的海克斯/);

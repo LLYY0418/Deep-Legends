@@ -18,7 +18,7 @@ const { bootDemoApp, settled } = require("./overview-render-helpers.cjs");
       return source;
     } });
     try {
-      await settled();
+      await require("./renderer-wait.cjs").waitForOverview(w,matchCount);
       const d = w.document, hooks = w.__r86CardTest, tab = hooks.activeTab();
       const match = tab.data.matches.find(item => !hooks.matchPlayerGroups(item).arena);
       assert.ok(match);

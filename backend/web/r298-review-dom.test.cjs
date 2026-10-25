@@ -19,7 +19,7 @@ async function editor(keys=['N','M'],eventGameMode='') {
   return {ok:true,json:async()=>clone(value),text:async()=>''};
  };
  w.eval(fs.readFileSync(path.join(__dirname,'auto-config.js'),'utf8'));await w.deepLegendsAutoConfig.load();
- const click=async selector=>{const node=w.document.querySelector(selector);assert(node,selector);node.click();await tick();};
+ const click=async selector=>{const node=w.document.querySelector(selector);assert(node,selector);node.click();await tick();if(selector==='[data-tab="kit"]'){for(const act of ['start-spells','start-items']){const start=w.document.querySelector(`[data-act="${act}"]`);if(start){start.click();await tick();}}}};
  return {w,dom,writes,click,get saved(){return clone(saved)},close:()=>w.close()};
 }
 for(const keys of [['D','F'],['N','M']])test(`R298 real DOM spell picks save and reload in ${keys.join('/')}`,async()=>{

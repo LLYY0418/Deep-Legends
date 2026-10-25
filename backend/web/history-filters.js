@@ -6,7 +6,7 @@
 })(typeof window === 'undefined' ? globalThis : window, () => {
   'use strict';
   const categories = {result:'结果',hero:'英雄',position:'位置',time:'时间',coplayer:'同局玩家',multikill:'多杀',performance:'表现',duration:'对局时长'};
-  const labels = {win:'胜利',loss:'失败',top:'上路',jungle:'打野',middle:'中路',bottom:'下路',utility:'辅助',today:'今天',d3:'近 3 天',d7:'近 7 天',d30:'近 30 天',3:'三杀',4:'四杀',5:'五杀',mvp:'MVP',svp:'SVP',top3:'前三',zero:'零阵亡',short:'< 20 分钟',medium:'20–30 分钟',long:'30–40 分钟',verylong:'> 40 分钟'};
+  const labels = {win:'胜利',loss:'失败',top:'上路',jungle:'打野',middle:'中路',bottom:'下路',utility:'辅助',today:'今天',d3:'近 3 天',d7:'近 7 天',d30:'近 30 天',m2:'近 2 个月',m3:'近 3 个月',m4:'近 4 个月',m5:'近 5 个月',season:'整个赛季',3:'三杀',4:'四杀',5:'五杀',mvp:'MVP',svp:'SVP',top3:'前三',zero:'零阵亡',short:'< 20 分钟',medium:'20–30 分钟',long:'30–40 分钟',verylong:'> 40 分钟'};
   const tagLabels={damage:'输出',efficiency:'伤转率',control:'控制',heal:'治疗',shield:'护盾',tank:'承伤',kills:'击杀',participation:'参团',tower:'拆塔',gold:'经济',cs:'补兵',solo:'单杀',dive:'越塔',defense:'塔之子',advantage:'压刀',hook:'好钩'};
   const key = 'deep-legends-history-presets-v1';
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -18,7 +18,7 @@
     const output = {};
     for (const category of Object.keys(categories)) {
       const c = input?.[category]; if (!c || typeof c !== 'object') continue;
-      const values = [...new Set((Array.isArray(c.values) ? c.values : []).filter(v => typeof v === 'string' && (category !== 'time' || ['today','d3','d7','d30'].includes(v))).slice(0,512))];
+      const values = [...new Set((Array.isArray(c.values) ? c.values : []).filter(v => typeof v === 'string' && (category !== 'time' || ['today','d3','d7','d30','m2','m3','m4','m5','season'].includes(v))).slice(0,512))];
       const thresholds = {};
       if (category === 'performance') for (const name of ['kda','score','kp']) if (numeric(c.thresholds?.[name]) && Number(c.thresholds[name]) >= 0) thresholds[name] = Math.min(name === 'kp' ? 100 : 1000, Number(c.thresholds[name]));
       if (values.length || Object.keys(thresholds).length) output[category] = {values, not:c.not === true, ...(category === 'performance' ? {scope:c.scope === 'all' ? 'all' : 'team', thresholds} : {}), ...(category === 'multikill' ? {atLeast:c.atLeast === true} : {}), ...(category === 'coplayer' ? {side:['team','opponent'].includes(c.side) ? c.side : 'either'} : {})};
@@ -41,6 +41,21 @@
   }
   function rift(match) { return Number(match.mapId)===11 || !Number(match.mapId) && ['solo','flex','match'].includes(match.modeGroup); }
   function timeValue(value) { const date = new Date(numeric(value) ? Number(value) : value); return Number.isFinite(date.getTime()) ? date.getTime() : NaN; }
+  function calendarMonthStart(now,months) {
+    const source=new Date(now),date=new Date(now),day=source.getDate();
+    date.setDate(1);date.setMonth(date.getMonth()-months);
+    const last=new Date(date.getFullYear(),date.getMonth()+1,0).getDate();date.setDate(Math.min(day,last));return date.getTime();
+  }
+  function timeStart(value,ctx,now=ctx.now?.()??Date.now()) {
+    if(value==='season'){if(ctx.seasonStart==null||ctx.seasonStart==='')return NaN;const date=new Date(timeValue(ctx.seasonStart));if(!Number.isFinite(date.getTime()))return NaN;date.setUTCHours(0,0,0,0);return date.getTime();}
+    if(/^m[2-5]$/.test(value))return calendarMonthStart(now,Number(value.slice(1)));
+    if(value==='today'){const date=new Date(now);date.setHours(0,0,0,0);return date.getTime();}
+    return ['d3','d7','d30'].includes(value)?now-Number(value.slice(1))*86400000:NaN;
+  }
+  function timeOptions(ctx) {return ['today','d3','d7','d30','m2','m3','m4','m5',...(Number.isFinite(timeStart('season',ctx))?['season']:[])];}
+  function oldestTime(rows) {let oldest=Infinity;for(const row of rows){const value=timeValue(row.createdAt);if(Number.isFinite(value))oldest=Math.min(oldest,value);}return oldest;}
+  function dateDay(value) {return Number.isFinite(value)?new Date(value).toISOString().slice(0,10):'';}
+  function scanLimit(tab,ctx) {return ctx.foreign?.()?100:conditions(tab).time?.values?.length&&!conditions(tab).time.not?1000:300;}
   function matchesValue(category,value,c,match,ctx) {
     const s = ctx.subject(match); if (!s) return false;
     switch(category) {
@@ -48,8 +63,7 @@
       case 'hero': return String(s.championId)===value;
       case 'position': return rift(match) && s.position===value;
       case 'time': {
-        const now=ctx.now?.() ?? Date.now(), day=new Date(now); day.setHours(0,0,0,0);
-        const start=value==='today' ? day.getTime() : now-Number(value.slice(1))*86400000;
+        const now=ctx.now?.() ?? Date.now(),start=timeStart(value,ctx,now);
         const at=timeValue(match.createdAt);return Number.isFinite(start) && at>=start && at<=now;
       }
       case 'coplayer': return (match.participants || []).some(p=>p!==s && p.playerRef===value && (c.side==='either' || !c.side || (c.side==='team' ? sameTeam(s,p) : !sameTeam(s,p))));
@@ -82,10 +96,14 @@
     if(category==='position' && (!rift(match) || !['top','jungle','middle','bottom','utility'].includes(s?.position)))return false;
     return c.not ? !matched : matched;
   }
-  function filter(rows,tab,ctx) { const cs=conditions(tab);return rows.filter(match=>Object.entries(cs).every(([category,c])=>matchesCategory(category,c,match,ctx))); }
+  function filter(rows,tab,ctx) {const cs=conditions(tab),search=tab.advancedSearch,signature=JSON.stringify(cs),cache=search?.running;
+    if(cache&&search.cachedRows===rows&&search.cachedLength===rows.length&&search.cachedSignature===signature)return search.cachedMatches;
+    const filterContext=cache?{...ctx,now:()=>search.now}:ctx,matches=rows.filter(match=>Object.entries(cs).every(([category,c])=>matchesCategory(category,c,match,filterContext)));
+    if(cache){search.cachedRows=rows;search.cachedLength=rows.length;search.cachedSignature=signature;search.cachedMatches=matches;}return matches;
+  }
   function options(rows,category,ctx,c={values:[]}) {
     const map=new Map();
-    const fixed={result:['win','loss'],position:['top','jungle','middle','bottom','utility'],time:['today','d3','d7','d30'],multikill:['3','4','5'],performance:['mvp','svp','top3','zero'],duration:['short','medium','long','verylong']}[category] || [];
+    const fixed={result:['win','loss'],position:['top','jungle','middle','bottom','utility'],time:timeOptions(ctx),multikill:['3','4','5'],performance:['mvp','svp','top3','zero'],duration:['short','medium','long','verylong']}[category] || [];
     for(const value of fixed)map.set(value,{value,label:labels[value],count:0,wins:0,recent:0});
     const add=(value,label,match,subject,extra={})=>{
       if(!value)return;const id=String(value),entry=map.get(id) || {value:id,label:label || id,count:0,wins:0,recent:0,...extra};
@@ -99,7 +117,7 @@
         for(const value of ['mvp','svp','top3','zero'])if(matchesValue(category,value,c,match,ctx))add(value,labels[value],match,s);
         for(const tag of ctx.tags(match,s) || [])if(c.scope!=='all' || tag.star)add('tag:'+tag.kind,tag.label.replace(/×.*/,''),match,s,{kind:tag.kind});
       } else {
-        const values=category==='result'?['win','loss']:category==='position'?['top','jungle','middle','bottom','utility']:category==='time'?['today','d3','d7','d30']:category==='multikill'?['3','4','5']:['short','medium','long','verylong'];
+        const values=category==='result'?['win','loss']:category==='position'?['top','jungle','middle','bottom','utility']:category==='time'?timeOptions(ctx):category==='multikill'?['3','4','5']:['short','medium','long','verylong'];
         for(const value of values)if(matchesValue(category,value,c,match,ctx))add(value,labels[value],match,s);
       }
     }
@@ -129,8 +147,13 @@
   }
   function writePresets(storage,saved) {try{storage.setItem(key,JSON.stringify(saved.slice(0,12)));return true;}catch(_){return false;} }
   function blocked(tab,ctx) {
-    if(tab.advancedSearch?.boundary?.reached && tab.advancedSearch.boundary.signature===JSON.stringify(conditions(tab)))return {reason:'time_boundary',copy:'已查完当前时间条件的对局'};
-    if(!(ctx.hasMore?.() ?? tab.data?.pagination?.hasMore))return {reason:'no_more',copy:'已查完全部可查询的对局'};
+    const range=serverTimeRange(tab,ctx),time=timeLabel(tab),positive=time&&!conditions(tab).time.not,oldest=oldestTime(ctx.rows()),oldestDay=dateDay(oldest);
+    const boundary=tab.advancedSearch?.boundary;
+    if(positive&&((boundary?.reached&&boundary.signature===JSON.stringify(conditions(tab)))||Number.isFinite(oldest)&&oldest<range.startTime*1000))return {reason:'time_boundary',copy:`已查完${labels[time]}的对局（最早查到 ${oldestDay}）`};
+    if(!(ctx.hasMore?.() ?? tab.data?.pagination?.hasMore)){
+      if(positive&&Number.isFinite(oldest)&&range.startTime)return {reason:'upstream_window',copy:`战绩服务只提供到 ${oldestDay} 的对局（${time==='season'?'本赛季':labels[time]}从 ${dateDay(range.startTime*1000)} 开始），更早的对局无法查询。已查完能查到的 ${scannedCount(tab,ctx)} 场。`};
+      return {reason:'no_more',copy:'已查完全部可查询的对局'};
+    }
     if(ctx.outage?.())return {reason:'outage',copy:'战绩服务暂时中断，恢复后可继续'};
     const seconds=Math.ceil(((ctx.quotaUntil?.() || tab.advancedSearch?.quotaUntil || 0)-Date.now())/1000);
     if(seconds>0)return {reason:'quota',copy:`查询额度恢复中，约 ${seconds} 秒后可继续`};
@@ -139,36 +162,37 @@
   function cancel(tab, abort) {const search=tab.advancedSearch;if(search?.running && !search.stopping){search.stopping=true;search.cancelled=true;abort?.();search.progress?.();}}
   async function find(tab,ctx) {
     if(!active(tab) || tab.advancedSearch?.running || !ctx.isActive() || blocked(tab,ctx))return false;
-    const token=(tab.advancedSearch?.token || 0)+1,limit=ctx.foreign?.()?100:300,started=Date.now();
-    const search={token,running:true,stopping:false,cancelled:false,scanned:0,pages:0,bytes:0,stopReason:'done',progress:ctx.progress || ctx.render};tab.advancedSearch=search;search.progress();
+    const token=(tab.advancedSearch?.token || 0)+1,limit=scanLimit(tab,ctx),started=Date.now();
+    let paintedAt=0;
+    const progress=(force=false)=>{const at=Date.now();if(force||at-paintedAt>=250){paintedAt=at;search.progress();}};
+    const search={token,limit,now:ctx.now?.()??Date.now(),running:true,stopping:false,cancelled:false,scanned:0,pages:0,bytes:0,stopReason:'done',progress:ctx.progress || ctx.render};tab.advancedSearch=search;search.progress();
     try {
       while(!search.stopping && ctx.isActive() && !tab.closed && tab.advancedSearch===search) {
         const block=blocked(tab,ctx);if(block){search.stopReason=block.reason;break;}
-        if(!ctx.hasMore && filter(ctx.rows(),tab,ctx).length>=10 || search.scanned>=limit)break;
+        // Existing behavior scans the round limit, regardless of hit count.
+        if(search.scanned>=limit)break;
         const before=new Set(ctx.rows().map(m=>String(m.gameId))),count=Math.min(20,limit-search.scanned);
         const loaded=await ctx.load(count,serverTimeRange(tab,ctx));search.pages++;search.bytes+=Number(ctx.pageBytes?.() || 0);
         const consumed=ctx.pageScanned?.() ?? new Set(ctx.rows().filter(m=>!before.has(String(m.gameId))).map(m=>String(m.gameId))).size;search.scanned+=consumed;
         if(search.stopping){search.stopReason='user_stop';break;}
-        const failure=blocked(tab,ctx);if(failure){search.stopReason=failure.reason;break;}
-        search.progress();
         const range=serverTimeRange(tab,ctx);
         if(!conditions(tab).time?.not && range.startTime && loaded && ctx.rows().some(m=>timeValue(m.createdAt)<range.startTime*1000)){search.boundary={signature:JSON.stringify(conditions(tab)),reached:true};search.stopReason='time_boundary';break;}
+        const failure=blocked(tab,ctx);if(failure){search.stopReason=failure.reason;break;}
+        progress(search.scanned>=limit);
         if(!loaded || consumed<=0 || tab.data?.pagination?.moreError){search.stopReason='error';break;}
       }
     } catch(error) {search.stopReason=search.stopping?'user_stop':'error';}
     finally {
       if(search.cancelled)search.stopReason='user_stop';
       search.running=false;search.stopping=false;
-      ctx.diagnostic?.('history_search_client',{scanned:search.scanned,hits:filter(ctx.rows(),tab,ctx).length,pages:search.pages,stop_reason:search.stopReason,durationMs:Date.now()-started,averagePageBytes:search.pages?Math.round(search.bytes/search.pages):0,beg_index:ctx.cursor(),time_range:serverTimeRange(tab,ctx).startTime?new Date(serverTimeRange(tab,ctx).startTime*1000).toISOString().slice(0,10):'',new_unique:search.scanned,exhausted:!(ctx.hasMore?.() ?? tab.data?.pagination?.hasMore)});
+      if(!search.reported){search.reported=true;ctx.diagnostic?.('history_search_client',{scanned:search.scanned,hits:filter(ctx.rows(),tab,ctx).length,pages:search.pages,stop_reason:search.stopReason,durationMs:Date.now()-started,averagePageBytes:search.pages?Math.round(search.bytes/search.pages):0,beg_index:ctx.cursor(),time_range:!conditions(tab).time?.not?dateDay(serverTimeRange(tab,ctx).startTime*1000):'',time_value:timeLabel(tab)||'',oldest_created_at_day:dateDay(oldestTime(ctx.rows())),new_unique:search.scanned,exhausted:!(ctx.hasMore?.() ?? tab.data?.pagination?.hasMore)});}
       if(tab.advancedSearch===search)search.progress();
     }
     return true;
   }
   function serverTimeRange(tab,ctx) {
     const c=conditions(tab).time;if(!c || !c.values.length)return {};
-    const now=ctx.now?.() ?? Date.now(),today=new Date(now);today.setHours(0,0,0,0);
-    const starts={today:today.getTime(),d3:now-3*86400000,d7:now-7*86400000,d30:now-30*86400000};
-    const values=c.values.map(v=>starts[v]);if(values.some(v=>!Number.isFinite(v)))return {};
+    const now=ctx.now?.() ?? Date.now(),values=c.values.map(v=>timeStart(v,ctx,now));if(values.some(v=>!Number.isFinite(v)))return {};
     return c.not ? {startTime:1,endTime:Math.floor(Math.min(...values)/1000)-1} : {startTime:Math.floor(Math.min(...values)/1000),endTime:Math.floor(now/1000)};
   }
   function ui(tab) {return tab.advancedMenu ||= {open:false,page:'conditions',category:'result',query:'',sort:'count',renaming:-1};}
@@ -251,7 +275,7 @@
     const category=m.category || 'result',c=draft(tab,category),query=m.query.toLowerCase().trim();m.category=category;
     let opts=cachedOptions(tab,category,ctx,c).filter(o=>!query || searchOption(o,category,query,ctx));
     const compare=(a,b)=>category==='hero' && m.sort==='winrate' ? b.wins/b.count-a.wins/a.count : category==='hero' && m.sort==='recent' ? b.recent-a.recent : b.count-a.count;
-    opts=opts.slice().sort(compare);m.order=opts.map(o=>o.value);
+    opts=category==='time'?opts.slice():opts.slice().sort(compare);m.order=opts.map(o=>o.value);
     if(category==='coplayer' && !query)opts=opts.slice(0,200);
     const limit=m.limit || 300,more=opts.length>limit;opts=opts.slice(0,limit);
     const segment=category==='coplayer' ? [['team','队友'],['opponent','对手'],['either','都行']] : category==='performance' ? [['team','队内最高'],['all','全场最高']] : [];
@@ -278,23 +302,51 @@
   }
   function counts(tab,ctx) {
     const search=tab.advancedSearch,count=filter(ctx.rows(),tab,ctx).length,scanned=scannedCount(tab,ctx);
-    return `<span class="af-count">符合 <b>${count}</b> 场</span><span>已查 <b>${scanned}</b> 场</span>${search?.running?`<progress max="${ctx.foreign?.()?100:300}" value="${search.scanned}" aria-label="查找进度"></progress>${button(search.stopping?'正在停止…':'停止',`data-af-stop${search.stopping?' disabled':''}`)}`:`${button('常用','data-af-show-saved')}${button('清除','data-af-clear')}`}`;
+    return `<span class="af-count">符合 <b data-af-hit-count>${count}</b> 场</span><span>已查 <b data-af-scanned-count>${scanned}</b> 场</span>${search?.running?`<progress max="${search.limit||scanLimit(tab,ctx)}" value="${search.scanned}" aria-label="查找进度"></progress>${button(search.stopping?'正在停止…':'停止',`data-af-stop${search.stopping?' disabled':''}`)}`:''}${button('常用','data-af-show-saved')}${button('清除','data-af-clear')}`;
   }
+  function updateCounts(node,tab,ctx) {
+    const search=tab.advancedSearch,running=!!search?.running;
+    if(!!node.querySelector('[data-af-stop]')!==running||!node.querySelector('[data-af-hit-count]')){node.innerHTML=counts(tab,ctx);return;}
+    node.querySelector('[data-af-hit-count]').textContent=filter(ctx.rows(),tab,ctx).length;
+    node.querySelector('[data-af-scanned-count]').textContent=scannedCount(tab,ctx);
+    const progress=node.querySelector('progress');if(progress){progress.value=search.scanned;progress.max=search.limit||scanLimit(tab,ctx);}
+    const stop=node.querySelector('[data-af-stop]');if(stop){stop.disabled=!!search.stopping;stop.textContent=search.stopping?'正在停止…':'停止';}
+  }
+  let actionWindow=0,actionCount=0;
+  function measureAction(tab,ctx,action) {
+    const at=Date.now();if(at-actionWindow>=60000){actionWindow=at;actionCount=0;}if(actionCount++>=20)return;
+    const clock=()=>globalThis.performance?.now?.()??Date.now(),started=clock();let longest=0,observer;
+    const consume=entries=>{for(const entry of entries)if(entry.startTime>=started)longest=Math.max(longest,entry.duration);};
+    try{if(globalThis.PerformanceObserver?.supportedEntryTypes?.includes('longtask')){observer=new PerformanceObserver(list=>consume(list.getEntries()));observer.observe({type:'longtask'});}}catch{}
+    const frame=ctx.container?.()?.ownerDocument?.defaultView?.requestAnimationFrame||globalThis.requestAnimationFrame|| (fn=>setTimeout(fn,0));
+    frame(()=>setTimeout(()=>{if(observer){consume(observer.takeRecords());observer.disconnect();}ctx.diagnostic?.('filter_action_client',{action,rows_loaded:tab.data?.matches?.length||ctx.rows().length,rows_rendered:ctx.container?.()?.querySelectorAll('.match-entry').length||0,click_to_paint_ms:Math.max(0,clock()-started),longtask_ms:longest});},0));
+  }
+  function conditionCapsules(tab,ctx) {return capsules(conditions(tab),ctx)+button('+ 条件','data-af-add class="af-add"');}
   function renderConditions(tab,context) {
     if(!active(tab))return '';const ctx=context();
-    return `<div class="af-conditionbar" data-af-conditions><div class="af-capsules">${capsules(conditions(tab),ctx)}${button('+ 条件','data-af-add class="af-add"')}</div><div class="af-counts" data-af-counts>${counts(tab,ctx)}</div></div>`;
+    return `<div class="af-conditionbar" data-af-conditions><div class="af-capsules">${capsules(conditions(tab),ctx)}${button('+ 条件','data-af-add class="af-add"')}</div><div class="af-counts" data-af-counts>${counts(tab,ctx)}</div></div><div data-af-message>${statusMessage(tab,ctx)}</div>`;
   }
+  function syncControls(bar,tab,ctx) {
+    const root=bar.querySelector('[data-af-root]'),n=Object.keys(conditions(tab)).length;
+    if(root){root.classList.toggle('is-active',n>0);let badge=root.querySelector('b');if(n){if(!badge){badge=bar.ownerDocument.createElement('b');root.querySelector('[data-af-open]').append(badge);}badge.textContent=n;}else badge?.remove();}
+    let row=bar.querySelector('[data-af-conditions]');
+    if(!n){row?.remove();bar.querySelector('[data-af-message]')?.remove();return;}
+    if(!row){bar.insertAdjacentHTML('beforeend',renderConditions(tab,()=>ctx));return;}
+    row.querySelector('.af-capsules').innerHTML=conditionCapsules(tab,ctx);updateCounts(row.querySelector('[data-af-counts]'),tab,ctx);updateMessage(bar,tab,ctx);
+  }
+  function statusMessage(tab,ctx) {const block=blocked(tab,ctx);return ['time_boundary','upstream_window'].includes(block?.reason)?`<p class="af-status-message${block.reason==='upstream_window'?' af-upstream-warning':''}">${escape(block.copy)}</p>`:'';}
+  function updateMessage(container,tab,ctx) {const node=container.querySelector('[data-af-message]');if(node){const html=statusMessage(tab,ctx);if(node.innerHTML!==html)node.innerHTML=html;}}
   function scannedCount(tab,ctx) {return ctx.scannedCount?.() ?? new Set(ctx.rows().map(m=>String(m.gameId))).size;}
   function timeLabel(tab) {
     const values=conditions(tab).time?.values || [];
-    return ['d30','d7','d3','today'].find(v=>values.includes(v));
+    return ['season','m5','m4','m3','m2','d30','d7','d3','today'].find(v=>values.includes(v));
   }
   function empty(tab,ctx) {
     if(tab.advancedSearch?.running)return '<div class="af-empty" role="status"><strong>正在查找…</strong></div>';
     const block=blocked(tab,ctx),error=tab.data?.pagination?.moreError;
-    if(block?.reason==='no_more' && !error){
+    if(['no_more','time_boundary','upstream_window'].includes(block?.reason) && !error){
       const n=scannedCount(tab,ctx),time=timeLabel(tab),copy=time && !conditions(tab).time.not?`${labels[time]}的 ${n} 场对局中没有符合条件的对局`:`已查完可查询的 ${n} 场对局，没有符合条件的对局`;
-      return `<div class="af-empty"><strong>${escape(copy)}</strong></div>`;
+      return `<div class="af-empty"><strong>${escape(copy)}</strong>${block.reason==='upstream_window'?`<p class="af-upstream-warning">${escape(block.copy)}</p>`:''}</div>`;
     }
     return `<div class="af-empty"><strong>没有符合的对局</strong>${block?`<p data-af-blocked>${escape(block.copy)}</p>`:error?`<p>${escape(error)}</p>`:''}${button(block?.reason==='quota'?block.copy:'继续往前查找',`data-af-continue${block?' disabled':''}`)}</div>`;
   }
@@ -347,7 +399,7 @@
       container.querySelector('[data-af-open]')?.setAttribute('aria-expanded','true');refresh(container,t,ctx,structure);
       (menu.querySelector('[data-af-query]:not([hidden])') || menu.querySelector('[data-af-page]'))?.focus();
     };
-    const close=(t,ctx)=>{const m=ui(t),next=normalize(editing(t)),changed=JSON.stringify(next)!==JSON.stringify(conditions(t));m.open=false;m.capsulesExpanded=false;delete m.conditions;const menu=menuFor(container);if(menu?._afOwner===container)releaseFooterLayout(menu);unlock();container.querySelector('[data-af-open]')?.setAttribute('aria-expanded','false');try{if(changed){t.advancedConditions=next;ctx.change();}else ctx.flush?.();}finally{if(menu?._afOwner===container){menu.close?.();menu.removeAttribute('open');menu.hidden=true;}container.querySelector('[data-af-open]')?.focus();doc.defaultView?.requestAnimationFrame?.(()=>container.querySelector('[data-af-open]')?.focus());}};
+    const close=(t,ctx)=>{const m=ui(t),next=normalize(editing(t)),changed=JSON.stringify(next)!==JSON.stringify(conditions(t));m.open=false;m.capsulesExpanded=false;delete m.conditions;const menu=menuFor(container);if(menu?._afOwner===container)releaseFooterLayout(menu);unlock();container.querySelector('[data-af-open]')?.setAttribute('aria-expanded','false');try{if(changed){t.advancedConditions=next;measureAction(t,ctx,'change');ctx.change('change');}else ctx.flush?.();}finally{if(menu?._afOwner===container){menu.close?.();menu.removeAttribute('open');menu.hidden=true;}container.querySelector('[data-af-open]')?.focus();doc.defaultView?.requestAnimationFrame?.(()=>container.querySelector('[data-af-open]')?.focus());}};
     const open=(t,ctx,category='result',page='conditions')=>{const m=ui(t);if(!m.open)m.conditions=clone(conditions(t));Object.assign(m,{open:true,category,page,query:'',renaming:-1,limit:300,capsulesExpanded:false});if(category==='hero')ctx.ensureSearch?.();if(!container.querySelector('[data-af-root]')){ctx.render?.();if(!container.querySelector('[data-af-root]'))return;}show(t,ctx);};
     container._afClose=()=>close(container._afBoundTab,container._afContext());
     if(ui(tab).open)show(tab,context(),false);else unlock();
@@ -368,9 +420,9 @@
       else if('afAdd'in d)open(t,ctx);
       else if('afShowSaved'in d)open(t,ctx,m.category,'saved');
       else if('afPage'in d){m.page=d.afPage;m.renaming=-1;refresh(container,t,ctx,true);}
-      else if('afRemove'in d){const next={...editing(t)};delete next[d.afRemove];if(m.open){m.conditions=next;refresh(container,t,ctx);}else{t.advancedConditions=next;ctx.change();}}
-      else if('afClear'in d){if(m.open){m.conditions={};refresh(container,t,ctx);}else{t.advancedConditions={};ctx.change();}}
-      else if('afStop'in d){ctx.stop();refresh(container,t,ctx);}
+      else if('afRemove'in d){measureAction(t,ctx,'remove');const next={...editing(t)};delete next[d.afRemove];if(m.open){m.conditions=next;refresh(container,t,ctx);}else{t.advancedConditions=next;ctx.change('remove');}}
+      else if('afClear'in d){measureAction(t,ctx,'clear');if(m.open){m.conditions={};refresh(container,t,ctx);}else{t.advancedConditions={};ctx.change('clear');}}
+      else if('afStop'in d){target.disabled=true;target.textContent='正在停止…';measureAction(t,ctx,'stop');ctx.stop();refresh(container,t,ctx);}
       else if('afContinue'in d)ctx.find();
       else if('afSort'in d){m.sort=d.afSort;refresh(container,t,ctx,true);}
       else if('afMore'in d){m.limit=(m.limit || 300)+300;refresh(container,t,ctx,true);}
@@ -419,5 +471,97 @@
       }
     }
   }
-  return Object.freeze({blocked,serverTimeRange,categories,normalize,active,filter,options,multikill,participation,readPresets,savePreset,saveCurrentPreset,cancel,find,render,renderConditions,bind,refresh,decorate,empty,footer,counts});
+  function createGameplay(dependencies) {
+    const {state,filteredMatches,activeTab,overviewGroupForSection,connected,matchSubject,matchDataTags,ensureHistoryFilterStyles,iconFigure,positionIcon,renderMultiKillTag,overviewContainer,prepareImages,showToast,rerenderTab,cancelAdvancedMatchSearch,riotTab,historyServiceState,loadOverview,renderFilteredMatchView,appendOverviewMatches,restoreMatchScrollTop,api,normalizedPagination}=dependencies;
+async function ensureHistoryFilterSearch(tab) {
+    if(state.historyFilterCatalog || state.historyFilterCatalogFlight)return;
+    const catalog=window.deepLegendsChampionSearch?.getCatalog?.();
+    if(catalog?.champions) {state.historyFilterCatalog=catalog;return;}
+    state.historyFilterCatalogFlight=true;
+    try {const value=await api("/api/champions/catalog",{},"history-filter-catalog",25000);if(Array.isArray(value?.champions))state.historyFilterCatalog=value;}
+    catch(error){if(error.name!=="RequestCancelled")showToast("英雄搜索读取失败");}
+    finally {state.historyFilterCatalogFlight=false;}
+    if(tab?.advancedMenu?.open && !tab.closed && overviewContainer(tab)) {
+      globalThis.deepLegendsHistoryFilters?.refresh(overviewContainer(tab),tab,advancedFilterContext(tab));
+    }
+  }
+function advancedHistoryState(tab) {
+    const signature=JSON.stringify([tab.matchFilter || 'all',tab.advancedConditions || {}]);
+    if(tab.advancedHistory?.signature!==signature)tab.advancedHistory={signature,next:0,hasMore:true,seen:new Set(),scanned:new Set((tab.data?.matches || []).map(m=>String(m.gameId)))};
+    return tab.advancedHistory;
+  }
+function advancedHistoryHasMore(tab) {
+    const scan=advancedHistoryState(tab);
+    return !scan.active && tab.data?.pagination?.hasMore || (scan.active || (tab.matchFilter || 'all')!=='all') && scan.hasMore;
+  }
+async function loadAdvancedHistory(tab,count,range={}) {
+    const scan=advancedHistoryState(tab),bounded=riotTab(tab) && range.endTime>0;
+    if(!scan.active && tab.data?.pagination?.hasMore && !bounded) {
+      const before=new Set((tab.data?.matches || []).map(m=>String(m.gameId)));
+      const loaded=await loadOverview(tab,false,true,true,false,count);
+      scan.lastScanned=(tab.data?.matches || []).filter(m=>!before.has(String(m.gameId))).length;
+      for(const m of tab.data?.matches || [])scan.scanned.add(String(m.gameId));
+      return loaded;
+    }
+    scan.active=true;
+    if(!scan.hasMore || tab.closed)return false;
+    const generation=tab.overviewRequestToken,body={playerRef:tab.playerRef || tab.data?.player?.playerRef,count,begIndex:scan.next,matchFilter:'all',region:tab.region || '',serverId:tab.serverId || '',...(bounded?range:{})};
+    const payload=await api('/api/gameplay/overview',{method:'POST',body:JSON.stringify(body)},`overview-search:${tab.key}`,riotTab(tab)?190000:45000);
+    if(tab.closed || tab.overviewRequestToken!==generation || tab.advancedHistory!==scan)return false;
+    const pagination=normalizedPagination(payload,scan.next),rows=payload.matches || [];
+    scan.next=pagination.nextBegIndex;scan.hasMore=Boolean(pagination.hasMore);
+    scan.lastScanned=0;
+    for(const match of rows){const id=String(match.gameId);if(!scan.seen.has(id)){scan.seen.add(id);scan.lastScanned++;}scan.scanned.add(id);}
+    const merged=new Map((tab.data?.matches || []).map(m=>[String(m.gameId),m]));
+    for(const match of rows)merged.set(String(match.gameId),match);
+    const old=tab.data?.matches||[],older=rows.every(row=>!old.length||Number(row.createdAt)<=Number(old.at(-1).createdAt)),unique=rows.filter(row=>!old.some(m=>String(m.gameId)===String(row.gameId)));
+    tab.data={...tab.data,matches:older&&unique.length===rows.length?[...old,...rows]:[...merged.values()].sort((a,b)=>Number(b.createdAt)-Number(a.createdAt))};
+    tab.lastOverviewPageBytes=new TextEncoder().encode(JSON.stringify(payload)).length;
+    if(!rows.length && scan.hasMore)throw Error('历史分页没有推进');
+    return true;
+  }
+function advancedFilterContext(tab) {
+    const af=globalThis.deepLegendsHistoryFilters;
+    const rows=()=>{const raw=tab.data?.matches||[],cached=tab.advancedBaseRows;if(cached?.raw===raw&&cached.filter===tab.matchFilter)return cached.rows;const result=filteredMatches(raw,{...tab,advancedConditions:{}});tab.advancedBaseRows={raw,filter:tab.matchFilter,rows:result};return result;};
+    const isActive=()=>!state.destroyed && !tab.closed && (tab.overlay ? state.overlay.at(-1)===tab : activeTab(overviewGroupForSection())===tab) && (!tab.current || connected());
+    return {rows,version:()=>tab.data?.matches || tab,subject:match=>matchSubject(match,tab.data?.player?.playerRef || tab.playerRef),tags:matchDataTags,
+      seasonStart:tab.data?.seasonStart,storage:{getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)},
+      hasMore:()=>advancedHistoryHasMore(tab),pageScanned:()=>advancedHistoryState(tab).lastScanned,scannedCount:()=>advancedHistoryState(tab).scanned.size,
+      cursor:()=>tab.advancedHistory?.active?tab.advancedHistory.next:Number(tab.nextBegIndex || Number(tab.data?.pagination?.begIndex || 0)+Number(tab.data?.pagination?.count || 0)),
+      heroSearch:(query,id,label)=>window.deepLegendsChampionSearch?.scoreOption(query,id,label) || window.deepLegendsRuntime.scoreChampionSearchOption(query,id,label,state.historyFilterCatalog?.champions?.find(row=>Number(row.id)===Number(id))),
+      ensureSearch:()=>{void ensureHistoryFilterSearch(tab);},
+      stylesReady:()=>Boolean(state.historyFilterStylesReady),ensureStyles:ensureHistoryFilterStyles,
+      icon:(id,label)=>iconFigure("champion",id,label,"small",false),positionIcon,multiTag:renderMultiKillTag,
+      container:()=>overviewContainer(tab),prepare:prepareImages,error:showToast,
+      diagnostic:(reason,fields)=>window.reportFlowDiagnostic?.(['history_search_client','filter_action_client'].includes(reason)?reason:'overview_rerender_client',reason==='history_search_client'?fields.stop_reason:reason==='filter_action_client'?fields.action:reason,fields),
+      flush:()=>{if(tab.overviewRenderDeferred){tab.overviewRenderDeferred=false;rerenderTab(tab,'filter_closed');}},
+      isActive,
+      stop:()=>cancelAdvancedMatchSearch(tab,true),foreign:()=>riotTab(tab),outage:()=>Boolean(historyServiceState(tab)),quotaUntil:()=>tab.quotaRetry?.retryAt || tab.searchQuotaUntil || 0,pageBytes:()=>tab.lastOverviewPageBytes || 0,
+      load:(count,range)=>loadAdvancedHistory(tab,count,range),
+      find:()=>af.find(tab,advancedFilterContext(tab)),
+      render:()=>{if(isActive()) {renderFilteredMatchView(tab);prepareImages(overviewContainer(tab));}},
+      progress:()=>{if(isActive()){appendOverviewMatches(tab,[]);clearTimeout(tab.searchCountdownTimer);const seconds=Math.ceil((tab.searchQuotaUntil-Date.now())/1000);if(seconds>0)tab.searchCountdownTimer=setTimeout(()=>{if(!tab.closed && isActive())advancedFilterContext(tab).progress();},1000);}},
+      change:(action='change')=>{
+        const signature=JSON.stringify(tab.advancedConditions||{}),version=Number(tab.matchViewRevision||0);
+        if(tab.filterChangeSignature===signature&&tab.filterChangeVersion===version)return;
+        tab.filterChangeSignature=signature;cancelAdvancedMatchSearch(tab);
+        tab.filteredVisibleCount=20;tab.matchViewRevision=version+1;tab.filterChangeVersion=tab.matchViewRevision;
+        restoreMatchScrollTop(tab);
+        const container=overviewContainer(tab),caps=container?.querySelector('[data-af-conditions] .af-capsules');
+        if(caps){if(af.active(tab))caps.innerHTML=af.conditionCapsules(tab,advancedFilterContext(tab));else container.querySelector('[data-af-conditions]')?.remove();}
+        const revision=tab.matchViewRevision;
+        requestAnimationFrame(()=>setTimeout(()=>{
+          if(tab.closed||tab.matchViewRevision!==revision)return;
+          const deferred=tab.overviewRenderDeferred;tab.overviewRenderDeferred=false;
+          if(!deferred&&isActive()&&container?._overviewViewTab===tab&&container._afBoundTab===tab&&!tab.overviewSubpage)renderFilteredMatchView(tab,false,true);
+          else rerenderTab(tab,'filter_commit');
+          prepareImages(overviewContainer(tab));
+          if(af.active(tab)&&!(action==='remove'&&af.filter(rows(),tab,advancedFilterContext(tab)).length>=20))void af.find(tab,advancedFilterContext(tab));
+        },0));
+      },
+    };
+  }
+    return {ensureHistoryFilterSearch,advancedHistoryState,advancedHistoryHasMore,loadAdvancedHistory,advancedFilterContext};
+  }
+  return Object.freeze({syncControls,createGameplay,calendarMonthStart,timeStart,timeOptions,scanLimit,timeLabel,updateMessage,updateCounts,measureAction,conditionCapsules,blocked,serverTimeRange,categories,normalize,active,filter,options,multikill,participation,readPresets,savePreset,saveCurrentPreset,cancel,find,render,renderConditions,bind,refresh,decorate,empty,footer,counts});
 });

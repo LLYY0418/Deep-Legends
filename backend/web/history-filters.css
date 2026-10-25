@@ -128,3 +128,6 @@
 .af-savebar{border:0!important}.af-current-conditions>header{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.af-current-conditions>header small{color:var(--muted);font-weight:400}.af-name-error::placeholder{color:var(--danger)}.af-name-error{animation:af-name-shake 300ms linear}.af-savebar{padding-inline:6px}[data-af-save-error]{color:var(--danger);font-size:12px;min-height:16px}@keyframes af-name-shake{0%,100%{transform:translateX(0)}16%,50%,83%{transform:translateX(-4px)}33%,66%{transform:translateX(4px)}}@media(prefers-reduced-motion:reduce){.af-name-error{animation:none}}
 
 .af-modal-footer .af-capsule .af-capsule-remove{padding-inline:5px}
+
+.af-status-message { margin:10px 0; padding:10px 12px; border-radius:9px; background:var(--surface-strong); color:var(--muted); font-size:12px; line-height:1.7; }
+.af-upstream-warning { color:var(--warning); background:color-mix(in srgb,var(--warning) 12%,transparent); }

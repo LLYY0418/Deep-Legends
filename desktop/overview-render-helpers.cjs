@@ -12,6 +12,7 @@ const gameplayStyles = fs.readFileSync(path.join(WEB, "gameplay.css"), "utf8");
 const suiteStyles = fs.readFileSync(path.join(WEB, "suite.css"), "utf8");
 
 function functionSource(source, name) {
+  if(source.includes("R309 deferred history renderer: "+name)||source.includes("R309 deferred live renderer: "+name))source=require("../backend/web/r277-deferred-fixture.cjs").join(source);
   let start = source.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `${name} source not found`);
   if (source.slice(Math.max(0, start - 6), start) === "async ") start -= 6;
@@ -168,7 +169,11 @@ function bootDemoApp(options = {}) {
         if (!String(url).startsWith('/api/gameplay/overview')) return response;
         const payload = await response.json(), original = payload.matches;
         payload.matches = Array.from({length:options.matchCount}, (_,index) => ({...JSON.parse(JSON.stringify(original[index % original.length])),gameId:1000000+index}));
-        payload.pagination = {begIndex:0,count:options.matchCount,hasMore:false};
+        if(options.pagedMatches){
+          const body=JSON.parse(args[0]?.body||"{}"),params=new URL(String(url),w.location.href).searchParams,beg=Number(body.begIndex||params.get("begIndex")||0),all=payload.matches;
+          payload.matches=all.slice(beg,beg+20);payload.pagination={begIndex:beg,count:payload.matches.length,nextBegIndex:beg+payload.matches.length,hasMore:beg+20<all.length};
+          options.onOverviewPage?.({beg,count:payload.matches.length});
+        }else payload.pagination = {begIndex:0,count:options.matchCount,hasMore:false};
         return new w.Response(JSON.stringify(payload), {status:200});
       };
     }

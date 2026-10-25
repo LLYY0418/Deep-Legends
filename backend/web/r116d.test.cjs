@@ -12,7 +12,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const gameplayScript = fs.readFileSync(path.join(__dirname, "gameplay.js"), "utf8");
+const gameplayScript = require("./r277-deferred-fixture.cjs").join(fs.readFileSync(path.join(__dirname, "gameplay.js"), "utf8"));
 const gameplayStyles = fs.readFileSync(path.join(__dirname, "gameplay.css"), "utf8");
 
 // ---------------------------------------------------------------------------
@@ -20,6 +20,7 @@ const gameplayStyles = fs.readFileSync(path.join(__dirname, "gameplay.css"), "ut
 // ---------------------------------------------------------------------------
 
 function functionSource(source, name) {
+  if(source.includes("R309 deferred live renderer: "+name))source=require("./r277-deferred-fixture.cjs").join(source);
   let start = source.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `${name} source not found`);
   // async function 的 async 前缀必须一起带上，否则切出来的函数体里有 await

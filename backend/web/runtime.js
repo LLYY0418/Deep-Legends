@@ -124,6 +124,7 @@
       flowSamples.set(encoded, Date.now());
       if (flowSamples.size > 128) flowSamples.delete(flowSamples.keys().next().value);
       flowPending.delete(encoded);
+      return true;
     } catch (_) {
       increment("transportFailed");
       flowDelivery.transportHTTPStatus = status;
@@ -136,6 +137,7 @@
         increment("transportDropped");
         flowPending.delete(encoded);
       }
+      return false;
     } finally {
       if (timer !== undefined) clearTimeout(timer);
       sampledPending.delete(body.event);
@@ -228,6 +230,8 @@
   window.addEventListener?.('pagehide',flushLocalDiagnostics);
   let exportSequence = 0;
   window.flushFlowDiagnostics = async () => {
+    const rankReports=[];window.dispatchEvent?.(new CustomEvent("deep-legends:diagnostic-export",{detail:rankReports}));
+    await Promise.all(rankReports);
     window.deepLegendsOverviewArt?.flush();
     // Export must not race a just-clicked filter's telemetry. Wait briefly,
     // then record remaining pending work rather than claiming a complete drain.
@@ -244,16 +248,46 @@
       const body={event,reason,championRestore:{source:fields.source,mode:fields.mode,championId:Number(fields.championId)||0}},encoded=JSON.stringify(body);
       if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
     }
+    if(event==="filter_action_client"){
+      if(!["clear","remove","stop","change"].includes(reason)||fields.action!==reason)return;
+      const r278={action:reason};for(const key of ["rows_loaded","rows_rendered","click_to_paint_ms","longtask_ms"])r278[key]=Math.max(0,Math.min(3600000,Number(fields[key])||0));
+      const body={event,reason,r278},encoded=JSON.stringify(body);if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
+    }
+    if(event==="mayhem_augment_detail_client"){
+      if(reason!=="read")return;
+      const body={event,reason,r278:{augment_id:fields.augment_id,source:fields.source,ms:fields.ms,result:fields.result}},encoded=JSON.stringify(body);
+      if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
+    }
     if(event==="window_resize_trace"){
       if(!["will-resize","resize","summary"].includes(reason))return;
       const body={event,reason,resizeTrace:fields},encoded=JSON.stringify(body);
       if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
     }
-    if(event==="rank_record_state") {
-      if(!["solo","flex"].includes(fields.queue) || !["known","collecting","paused","unavailable"].includes(fields.state) || reason!==fields.state)return;
-      const body={event,reason,queue:fields.queue,state:fields.state},encoded=JSON.stringify(body);
-      if(flowPending.size>=32 || flowPending.has(encoded))return;
-      flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
+    if(event==="ranked_record_resolved") {
+      if(reason!=="resolved"||!["normal","budget","stream-first"].includes(fields.branch)||!["solo","flex"].includes(fields.queue)||!["season","season-cache","none"].includes(fields.filled_by))return false;
+      const body={event,reason,branch:fields.branch,queue:fields.queue,upstream_complete:fields.upstream_complete===true,filled_by:fields.filled_by,progress_complete:fields.progress_complete===true,pending:fields.pending===true},encoded=JSON.stringify(body);
+      flowPending.add(encoded);return sendFlowDiagnostic(body,encoded,0);
+    }
+    if(["rank_record_state","rank_record_final_state","rank_record_downgrade_blocked","rank_record_fill_retry"].includes(event)) {
+      const sources=["upstream","season","season-cache","none"],states=["known","collecting","paused","unavailable"];
+      let body={event,reason};
+      if(event==="rank_record_fill_retry") {
+        if(!["ok","error"].includes(reason)||fields.result!==reason||!Number.isInteger(fields.attempt)||fields.attempt<1||fields.attempt>3)return false;
+        Object.assign(body,{attempt:fields.attempt,result:fields.result,foreign:fields.foreign===true});
+      }else {
+        if(!["solo","flex"].includes(fields.queue)||!sources.includes(fields.source))return false;
+        Object.assign(body,{queue:fields.queue,source:fields.source,foreign:fields.foreign===true});
+        if(event==="rank_record_downgrade_blocked"){if(reason!=="retained")return false;}
+        else {
+          if(!states.includes(fields.state)||reason!==fields.state)return false;
+          body.state=fields.state;
+          if(event==="rank_record_state") {
+            if(!["initial","refresh","season-fill","retained","cache"].includes(fields.cause)||!Number.isSafeInteger(fields.render_seq)||fields.render_seq<1)return false;
+            Object.assign(body,{cause:fields.cause,ranked_complete:fields.ranked_complete===true,render_seq:fields.render_seq});
+          }
+        }
+      }
+      const encoded=JSON.stringify(body);flowPending.add(encoded);return sendFlowDiagnostic(body,encoded,0);
     }
     if(['build_spells_client','augment_description_client','overview_art_client','career_cards_render','match_virtual_client','pool_render_client','history_outage_retry','client_follow_client','history_outage_ui','overview_reference_fallback','match_autoload_client','collection_new_marker','overview_reload_reason','announcement_state'].includes(event)){
       const allowed=['mode','spell1Id_missing','spell1Id_zero','spell1Id_value','spell2Id_missing','spell2Id_zero','spell2Id_value','augment_id','retry_count','error_kind','gave_up','video_path_present','reduced_motion','video_rendered','src_set','playing','error_code','media_http_status','rerender_count','card','games','generation','view','item_count','rendered_cards','result','duration_ms','collapsed','hydrated','height_mismatch_max_px','zoom','from_group','to_group','search_from','search_to','applied','source','count','bound','near','requested','started','blocked_reason','latency_ms','matches_before','matches_after','id','notice_revision','durationMs'];
@@ -304,7 +338,7 @@
       for(const key of ['count','latest_game_id','latest_ended_at','all_list_count','missing_count'])body[key]=Math.max(0,Math.min(Number.MAX_SAFE_INTEGER,Math.floor(Number(fields[key])||0)));
     }
     if(event==='overview_rerender_client'){body.renderReason=String(fields.reason || reason).slice(0,80);body.tabType=['self','cn','riot','pro'].includes(fields.tabType)?fields.tabType:'cn';body.filterRetained=fields.filterRetained===true;body.modalOpen=fields.modalOpen===true;}
-    if(event==='history_search_client'){for(const k of ['scanned','hits','pages','averagePageBytes'])body[k]=Math.max(0,Math.min(16*1024*1024,Number(fields[k])||0));body.stop_reason=reason;body.durationMs=Math.max(0,Math.min(3600000,Number(fields.durationMs)||0));for(const k of ['beg_index','new_unique'])body[k]=Math.max(0,Math.min(10000,Math.floor(Number(fields[k])||0)));body.exhausted=fields.exhausted===true;if(/^\d{4}-\d{2}-\d{2}$/.test(fields.time_range||''))body.time_range=fields.time_range;}
+    if(event==='history_search_client'){for(const k of ['scanned','hits','pages','averagePageBytes'])body[k]=Math.max(0,Math.min(16*1024*1024,Number(fields[k])||0));body.stop_reason=reason;body.durationMs=Math.max(0,Math.min(3600000,Number(fields.durationMs)||0));for(const k of ['beg_index','new_unique'])body[k]=Math.max(0,Math.min(10000,Math.floor(Number(fields[k])||0)));body.exhausted=fields.exhausted===true;for(const k of ['time_range','oldest_created_at_day'])if(/^\d{4}-\d{2}-\d{2}$/.test(fields[k]||'')&&fields[k]!=='1970-01-01')body[k]=fields[k];if(['today','d3','d7','d30','m2','m3','m4','m5','season'].includes(fields.time_value))body.time_value=fields.time_value;}
     if(event==='overview_scroll_reset' || event==='overview_reference_expired'){body.tabType=['self','cn','riot','pro'].includes(fields.tab_type)?fields.tab_type:'cn';if(event==='overview_scroll_reset'){body.renderReason=String(fields.render_reason||'').slice(0,80);for(const k of ['scroll_before','scroll_after'])body[k]=Math.max(0,Math.min(1000000,Math.floor(Number(fields[k])||0)));}else{body.append=fields.append===true;body.key_change_ms=Math.max(-1,Math.min(86400000,Math.floor(Number(fields.key_change_ms) || 0)));}}
     if(event === "summoner_copy") {
       body.ok=Boolean(fields.ok);
@@ -609,16 +643,20 @@ if (typeof window !== "undefined" && typeof document !== "undefined") installSta
 
 // R307: next-frame timing and long tasks share the native drag identifier.
 (() => {
-  let drag=0,count=0,max=0,frame=0,last=null;
+  if(typeof document === "undefined" || !document.documentElement?.dataset || typeof MutationObserver !== "function")return;
+  let drag=0,count=0,max=0,frame=0,last=null,zoomChanges=0,sidebarChanges=0,lastResizeAt=0;
+  let zoom=document.documentElement.dataset.uiScale,sidebar=document.documentElement.dataset.sidebar;
+  const changes=new MutationObserver(()=>{const z=document.documentElement.dataset.uiScale,s=document.documentElement.dataset.sidebar;if(drag&&performance.now()-lastResizeAt<150){if(z!==zoom)zoomChanges++;if(s!==sidebar)sidebarChanges++;}zoom=z;sidebar=s;});
+  changes.observe(document.documentElement,{attributes:true,attributeFilter:["data-ui-scale","data-sidebar"]});
   const consume=entries=>{if(drag)for(const e of entries){count++;max=Math.max(max,e.duration);}};
   let observer;try{if(typeof PerformanceObserver==="function" && PerformanceObserver.supportedEntryTypes?.includes("longtask")){observer=new PerformanceObserver(list=>consume(list.getEntries()));observer.observe({type:"longtask",buffered:false});}}catch(_){}
   const receive=value=>{
-    if(drag!==value.drag){drag=value.drag;count=max=0;}
+    if(drag!==value.drag){drag=value.drag;count=max=zoomChanges=sidebarChanges=0;}
     if(value.reason==="summary"&&observer)consume(observer.takeRecords());
-    const at=performance.now();last={...value,innerWidth,innerHeight,longtaskCount:count,longtaskMaxMs:max};
+    const at=performance.now();if(value.reason!=="summary")lastResizeAt=at;last={...value,innerWidth,innerHeight,longtaskCount:count,longtaskMaxMs:max,zoomChanges,sidebarChanges};
     if(frame)cancelAnimationFrame(frame);
     frame=requestAnimationFrame(()=>{frame=0;const v=last;window.reportFlowDiagnostic?.("window_resize_trace",v.reason,{...v,nextFrameMs:performance.now()-at});if(v.reason==="summary")drag=0;});
   };
   const off=window.desktopWindow?.onResizeTrace?.(receive);
-  window.addEventListener?.("deep-legends:dispose",()=>{off?.();observer?.disconnect();cancelAnimationFrame(frame);},{once:true});
+  window.addEventListener?.("deep-legends:dispose",()=>{off?.();observer?.disconnect();changes.disconnect();cancelAnimationFrame(frame);},{once:true});
 })();

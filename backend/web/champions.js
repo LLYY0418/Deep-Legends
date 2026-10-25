@@ -240,7 +240,8 @@
     const fallbackPath = asset?.fallbackPath || asset?.imageFallbackPath || "";
     const fallbackImage = isLargeAugment && asset?.source && fallbackPath ? imageURL(asset.source, fallbackPath) : "";
     const fallbackData = fallbackImage ? ` data-augment-fallback="${escapeHTML(fallbackImage)}"` : "";
-    return `<span class="champion-asset ${className}"${fallbackData}${withTooltip ? ` tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}"` : ""}><img data-queued-src="${image}" alt="${escapeHTML(name)}" loading="lazy" decoding="async" data-champion-image><span aria-hidden="true">${escapeHTML(name.slice(0, 1))}</span></span>`;
+    const loaded=prepareImages.loadedURLs?.has(image);
+    return `<span class="champion-asset ${className}${loaded?" has-loaded-image":""}"${fallbackData}${withTooltip ? ` tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}"` : ""}><img ${loaded?"src":"data-queued-src"}="${image}" alt="${escapeHTML(name)}" loading="lazy" decoding="async" data-champion-image><span aria-hidden="true">${escapeHTML(name.slice(0, 1))}</span></span>`;
   }
 
   function refreshChampionWorkspace() {
@@ -662,7 +663,11 @@
   }
 
   async function loadMayhemAtlas(force = false) {
-    if (state.mayhemAtlasLoading || state.augments && !force) return;
+    if (state.augments && !force) {
+      if(!state.mayhemAugmentDetail&&!state.mayhemAugmentLoading&&!state.mayhemAugmentError){const selected=objectRows(state.augments.rows).find(row=>Number(row.id)===Number(state.mayhemAugmentID));if(selected)loadMayhemAugmentDetail(selected,true);}
+      return;
+    }
+    if (state.mayhemAtlasLoading) return;
     const token=Number(state.mayhemAtlasRequestToken||0)+1;state.mayhemAtlasRequestToken=token;
     state.mayhemAtlasLoading = true;
     state.mayhemAtlasError = "";
@@ -699,25 +704,28 @@
     }
   }
 
-  function loadMayhemAugmentDetail(item) {
+  function loadMayhemAugmentDetail(item,restore=false) {
     if (!item || Number(item.id) <= 0) return;
     const token = state.mayhemAugmentRequestToken + 1;
     state.mayhemAugmentRequestToken = token;
     const augmentID = Number(item.id);
     state.mayhemAugmentID = augmentID;
-    state.fitStage = "all"; state.fitQuery = ""; state.atlasTab = "champions"; state.atlasResetScroll = true;
+    if(!restore){state.fitStage = "all"; state.fitQuery = ""; state.atlasTab = "champions"; state.atlasResetScroll = true;}
     state.mayhemAugmentDetail = state.mayhemAugmentDetailCache.get(augmentID) || null;
+    if(state.mayhemAugmentDetail){window.reportFlowDiagnostic?.("mayhem_augment_detail_client","read",{augment_id:augmentID,source:"cache",ms:0,result:"ok"});render();return;}
+    const started=performance.now();
+    const report=result=>window.reportFlowDiagnostic?.("mayhem_augment_detail_client","read",{augment_id:augmentID,source:"network",ms:Math.round(performance.now()-started),result});
     state.mayhemAugmentLoading = true;
     state.mayhemAugmentError = "";
     render();
     const current = () => token === state.mayhemAugmentRequestToken && state.mode === "aram-mayhem" && state.mayhemView === "atlas" && state.mayhemAugmentID === augmentID;
     void api(`/api/champions/augment-detail?id=${augmentID}&slug=${encodeURIComponent(item.key || "")}`, "mayhem-augment-detail").then((detail) => {
-      if (!current()) return;
+      if (!current()) {report("stale");return;}
       state.mayhemAugmentDetail = detail;
-      state.mayhemAugmentDetailCache.set(augmentID, detail);
+      state.mayhemAugmentDetailCache.set(augmentID, detail);report("ok");
     }).catch((error) => {
-      if (!current()) return;
-      state.mayhemAugmentError = error?.message || "海克斯详情读取失败";
+      if (!current()) {report("stale");return;}
+      report("error");state.mayhemAugmentError = error?.message || "海克斯详情读取失败";
     }).finally(() => {
       if (token !== state.mayhemAugmentRequestToken) return;
       state.mayhemAugmentLoading = false;
@@ -1026,7 +1034,7 @@
     prepareImages();
     const atlasList=root.querySelector(".mayhem-atlas-list"),atlasBody=root.querySelector(".mayhem-atlas-tab-content");
     if(atlasList)atlasList.scrollTop=atlasListTop;if(atlasBody)atlasBody.scrollTop=atlasBodyTop;
-    if (state.section === "champions" && state.mode === "aram-mayhem" && state.mayhemView === "atlas" && !state.augments && !state.mayhemAtlasLoading && !state.mayhemAtlasError) void loadMayhemAtlas();
+    if (state.section === "champions" && state.mode === "aram-mayhem" && state.mayhemView === "atlas" && (!state.augments || !state.mayhemAugmentDetail&&!state.mayhemAugmentLoading&&!state.mayhemAugmentError) && !state.mayhemAtlasLoading && !state.mayhemAtlasError) void loadMayhemAtlas();
     if (state.section === "champions" && state.mode === "aram-mayhem" && root.querySelector(".mayhem-rarity-panel") && !state.mayhemRarityData && !state.mayhemRarityLoading && !state.mayhemRarityError) void loadMayhemRarity();
     // R116-E P2-6：构筑 tab 真的渲染出来了才去拉个人海斗出装样本。
     // 与上面 mayhem-rarity 的懒加载同一套口径：不在渲染函数里发请求，
@@ -1036,6 +1044,7 @@
     mountArenaMatchCards();
     mountMayhemTierDialog();
     mountArenaTierDialog();
+    syncChampionViewport();
     requestAnimationFrame(() => {
       const nextList = root.querySelector(".champion-table-scroll");
       if (!nextList) return;
@@ -1045,6 +1054,15 @@
     });
   }
 
+  function syncChampionViewport() {
+    if(state.section!=="champions")return;
+    const entry=root.querySelector(".mayhem-atlas-list-entry,.mayhem-tier-entry");
+    if(state.mayhemDialogOpen&&entry&&getComputedStyle(entry).display==="none")closeMayhemTierDialog(false);
+    const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1;
+    const atlas=root.querySelector(".mayhem-atlas");
+    if(atlas){const detail=atlas.querySelector(".mayhem-atlas-detail"),height=Math.max(0,(innerHeight-detail.getBoundingClientRect().top)/zoom-16);atlas.style.setProperty("--atlas-column-height",height+"px");}
+    for(const list of root.querySelectorAll(".mayhem-workspace>.mayhem-champions,.arena-workspace>.arena-champions,.aram-champions")){const height=Math.max(0,(innerHeight-list.getBoundingClientRect().top)/zoom-16);list.style.height=height+"px";list.style.maxHeight=height+"px";}
+  }
   function renderWorkspace() {
     root.innerHTML = `
       <header class="champion-page-head">
@@ -1203,8 +1221,7 @@
     const active = mayhemDetailActiveTab(detail);
     const specs = mayhemDetailTabSpecs(detail);
     const tabs = specs.map(([key, label]) => `<button type="button" role="tab" id="mayhem-detail-tab-${key}" aria-controls="mayhem-detail-panel-${key}" aria-selected="${active === key}" tabindex="${active === key ? "0" : "-1"}" class="${active === key ? "is-active" : ""}" data-mayhem-detail-tab="${key}">${label}</button>`).join("");
-    // 海克斯图鉴与稀有度分布是跨英雄的全局维度，保留独立入口并复用既有视图状态机。
-    return `<div class="mayhem-detail-toolbar"><div class="mayhem-detail-tabs" role="tablist" aria-label="英雄详情分区" data-mayhem-detail-tabs data-tab-count="${specs.length}">${tabs}</div><button type="button" class="mayhem-atlas-entry" data-mayhem-view="atlas" aria-label="离开当前英雄，查看全局海克斯图鉴与稀有度分布"><span aria-hidden="true">◈</span>海克斯图鉴</button></div>`;
+    return `<div class="mayhem-detail-toolbar"><div class="mayhem-detail-tabs" role="tablist" aria-label="英雄详情分区" data-mayhem-detail-tabs data-tab-count="${specs.length}">${tabs}</div></div>`;
   }
 
   // 只渲染当前 tab 的内容：隐藏 tab 一个节点都不进 DOM，因此不可能占布局高度
@@ -1312,6 +1329,7 @@
       return `<button type="button" role="tab" aria-selected="${active}" class="${active ? "is-active" : ""}" data-augment-rarity="${value}"><i class="is-${value}" aria-hidden="true"></i>${label}</button>`;
     }).join("");
     return `<div class="mayhem-atlas">
+      <div class="mayhem-atlas-list-entry"><button class="button button-primary" data-open-mayhem-tiers>海克斯列表</button><span>当前：${escapeHTML(selected?.name||"未选择")} · 第 ${items.findIndex(row=>row===selected)+1} / ${objectRows(state.augments?.rows).length}</span></div>
       <section class="augment-directory mayhem-atlas-browser">
         <div class="mayhem-panel-head">
           <div><h3>海克斯图鉴</h3><span class="section-count">${objectRows(state.augments?.rows).length} 个</span></div>
@@ -1321,8 +1339,9 @@
         <div class="aramkit-controls"><label class="select-wrap"><select aria-label="梯度" data-aramkit-filter="augmentGrade">${["all","S","A","B","C","D"].map(v=>`<option value="${v}" ${state.augmentGrade===v?"selected":""}>${v==="all"?"全部":v}</option>`).join("")}</select></label><label class="select-wrap"><select aria-label="阶段" data-aramkit-filter="augmentStage">${[0,1,2,3,4].map(v=>`<option value="${v}" ${Number(state.augmentStage)===v?"selected":""}>${v?`第 ${v} 阶段`:"全部"}</option>`).join("")}</select></label><label class="select-wrap"><select aria-label="排序" data-aramkit-filter="augmentSort">${[["rank","排名"],["winRate","胜率"],["popularity","选取率"]].map(([v,label])=>`<option value="${v}" ${state.augmentSort===v?"selected":""}>${label}</option>`).join("")}</select></label></div>
         ${renderMayhemRarityPanel()}<div class="mayhem-atlas-list" role="listbox" aria-label="海克斯列表">${items.length ? items.map((item) => renderMayhemAtlasRow(item, selected)).join("") : renderEmpty("没有匹配的海克斯", "更换品质或清除搜索词后重试。")}</div>
       </section>
-      <section class="augment-directory mayhem-atlas-detail">${selected ? renderMayhemAtlasDetail(selected) : renderEmpty("选择一个海克斯", "点击左侧海克斯查看详情。")}</section>
+      <span data-mayhem-list-marker hidden></span><section class="augment-directory mayhem-atlas-detail">${selected ? renderMayhemAtlasDetail(selected) : renderEmpty("选择一个海克斯", "点击左侧海克斯查看详情。")}</section>
 
+      <dialog class="mayhem-tier-dialog" id="mayhem-tier-dialog" aria-label="海克斯列表"><div class="mayhem-tier-dialog-sheet"><header><div><h2>海克斯列表</h2><p>${items.length} 个 · 点一项后自动关闭</p></div><button class="icon-button control-icon-button tier-dialog-close" aria-label="关闭海克斯列表" data-close-mayhem-tiers><svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></header><div class="mayhem-tier-dialog-content"></div></div></dialog>
     </div>`;
   }
 
@@ -1352,7 +1371,7 @@
     const tabs=[["champions","适配英雄",champions.length],["combinations","常见组合",combos.length],["items","搭配装备",items.length]];
     const tabbar=`<div class="mayhem-atlas-tabs"><div class="aramkit-segments" role="tablist">${tabs.map(([key,name,count])=>`<button role="tab" type="button" data-atlas-tab="${key}" aria-selected="${state.atlasTab===key}" class="${state.atlasTab===key?"is-active":""}">${name} <small>${count}</small></button>`).join("")}</div>${state.atlasTab==="champions"?`<div class="mayhem-atlas-tools">${aramkitSelect("fitStage",[["all","全部阶段"],...[1,2,3,4].map(n=>[String(n),`第 ${n} 阶段`])],"适配英雄阶段")}<label class="champion-search compact"><input type="search" aria-label="搜索适配英雄" placeholder="搜索英雄" value="${escapeHTML(state.fitQuery)}" data-aramkit-fit-search></label></div>`:""}</div>`;
     const body=state.atlasTab==="combinations"?renderARAMKitCombos(combos,"常见组合",combos.length,true):state.atlasTab==="items"?renderARAMKitItems(items,undefined,undefined,true):`<div class="mayhem-fit-list"><div class="mayhem-fit-columns"><span>#</span><span>英雄</span><span>搭配胜率</span><span>选取率</span><span>英雄胜率</span><span>胜率提升</span><span>场次</span><span>梯度</span></div>${champions.map(fitRow).join("")}</div>`;
-    return `<header class="mayhem-atlas-detail-head is-${escapeHTML(item.rarity||"unknown")}">${assetImage({source:item.imageSource,path:item.imagePath,fallbackPath:item.imageFallbackPath,name:item.name},"augment-icon")}<div><span class="rarity-label is-${escapeHTML(item.rarity||"unknown")}">${rarityLabel(item.rarity)}</span><h3>${gradeBadge(item.grade, "atlas-detail-grade")}<span>${escapeHTML(item.name)}</span></h3></div><div class="mayhem-atlas-metrics">${[["排名",item.rank?"#"+number(item.rank):""],["胜率",Number.isFinite(item.winRate)?percent(item.winRate):""],["选取率",Number.isFinite(item.popularity)?percent(item.popularity):""],["场次",item.games?compactNumber(item.games):""],["可选阶段",(item.availableStages||[]).join(" · ")]].map(([label,value])=>`<div><small>${label}</small><b class="${label==="胜率"?"win-rate-value":""}">${value}</b></div>`).join("")}</div></header><div class="mayhem-atlas-description">${escapeHTML(mayhemAtlasDescription(item))}</div><div class="mayhem-atlas-detail-body">${bestCards}${tabbar}<div class="mayhem-atlas-tab-content" role="tabpanel">${state.mayhemAugmentLoading&&!detail?renderDetailSkeleton():body}</div></div>`;
+    return `<header class="mayhem-atlas-detail-head is-${escapeHTML(item.rarity||"unknown")}">${assetImage({source:item.imageSource,path:item.imagePath,fallbackPath:item.imageFallbackPath,name:item.name},"augment-icon")}<div><span class="rarity-label is-${escapeHTML(item.rarity||"unknown")}">${rarityLabel(item.rarity)}</span><h3>${gradeBadge(item.grade, "atlas-detail-grade")}<span>${escapeHTML(item.name)}</span></h3></div><div class="mayhem-atlas-description">${escapeHTML(mayhemAtlasDescription(item))}</div></header><div class="mayhem-atlas-metrics">${[["排名",item.rank?"#"+number(item.rank):""],["胜率",Number.isFinite(item.winRate)?percent(item.winRate):""],["选取率",Number.isFinite(item.popularity)?percent(item.popularity):""],["场次",item.games?compactNumber(item.games):""],["可选阶段",(item.availableStages||[]).join(" · ")]].map(([label,value])=>`<div><small>${label}</small><b class="${label==="胜率"?"win-rate-value":""}">${value}</b></div>`).join("")}</div><div class="mayhem-atlas-detail-body">${bestCards}${tabbar}<div class="mayhem-atlas-tab-content" role="tabpanel">${state.mayhemAugmentLoading&&!detail?renderDetailSkeleton():body}</div></div>`;
   }
 
   // 说明只认海克斯本身的效果文案。详情接口以前回的是页面 SEO 摘要
@@ -1671,9 +1690,9 @@
   }
 
   function mountMayhemTierDialog() {
-    if (state.mode !== "aram-mayhem" || state.mayhemView !== "champions") return;
+    if (state.mode !== "aram-mayhem") return;
     const dialog = root.querySelector("#mayhem-tier-dialog");
-    const list = root.querySelector(".mayhem-champions");
+    const list = root.querySelector(state.mayhemView==="atlas"?".mayhem-atlas-browser":".mayhem-champions");
     const content = dialog?.querySelector(".mayhem-tier-dialog-content");
     const marker = root.querySelector("[data-mayhem-list-marker]");
     if (!dialog || !list || !content || !marker) return;
@@ -1693,20 +1712,20 @@
 
   function openMayhemTierDialog(trigger) {
     const dialog = root.querySelector("#mayhem-tier-dialog");
-    const list = root.querySelector(".mayhem-champions");
+    const list = root.querySelector(state.mayhemView==="atlas"?".mayhem-atlas-browser":".mayhem-champions");
     const content = dialog?.querySelector(".mayhem-tier-dialog-content");
     if (!dialog || !list || !content) return;
     state.mayhemDialogOpen = true;
     state.mayhemDialogReturnFocus = trigger || document.activeElement;
     content.append(list);
     if (!dialog.open) dialog.showModal();
-    list.querySelector("[data-champion-search]")?.focus({ preventScroll: true });
+    list.querySelector("[data-champion-search],[data-augment-search]")?.focus({ preventScroll: true });
   }
 
   function closeMayhemTierDialog(restoreFocus = true) {
     state.mayhemDialogOpen = false;
     const dialog = root.querySelector("#mayhem-tier-dialog");
-    const list = root.querySelector(".mayhem-champions");
+    const list = root.querySelector(state.mayhemView==="atlas"?".mayhem-atlas-browser":".mayhem-champions");
     const marker = root.querySelector("[data-mayhem-list-marker]");
     if (!restoreFocus) state.mayhemDialogReturnFocus = null;
     if (marker && list) marker.before(list);
@@ -2370,18 +2389,26 @@
 
   panel.addEventListener("click",event=>{
     const choice=event.target.closest("[data-aramkit-choice]");
-    if(choice){state[choice.dataset.aramkitChoice]=choice.dataset.value;if(["itemSort","itemScope"].includes(choice.dataset.aramkitChoice))state.itemLimit=10;render();return;}
-    if(event.target.closest("[data-aramkit-more]")){state.itemLimit+=10;render();return;}
+    if(choice){state[choice.dataset.aramkitChoice]=choice.dataset.value;if(["itemSort","itemScope"].includes(choice.dataset.aramkitChoice))state.itemLimit=10;redrawARAMKitBuild();return;}
+    if(event.target.closest("[data-aramkit-more]")){state.itemLimit+=10;redrawARAMKitBuild();return;}
     const tab=event.target.closest("[data-atlas-tab]");if(tab){state.atlasTab=tab.dataset.atlasTab;state.atlasResetScroll=true;render();return;}
     if(event.target.closest("[data-rarity-toggle]")){state.rarityOpen=!state.rarityOpen;render();}
   });
-  panel.addEventListener("change", event=>{const control=event.target.closest("[data-aramkit-filter]");if(control){state[control.dataset.aramkitFilter]=control.value;if(control.dataset.aramkitFilter==="itemSlot")state.itemLimit=10;render();}});
+  panel.addEventListener("change", event=>{const control=event.target.closest("[data-aramkit-filter]");if(control){state[control.dataset.aramkitFilter]=control.value;if(control.dataset.aramkitFilter==="itemSlot"){state.itemLimit=10;redrawARAMKitBuild();}else render();}});
   panel.addEventListener("input", event=>{if(event.target.matches("[data-aramkit-fit-search]")){const control=event.target;state.fitQuery=control.value;const start=control.selectionStart;render();const next=panel.querySelector("[data-aramkit-fit-search]");next?.focus();next?.setSelectionRange(start,start);}});
 
+  function redrawARAMKitBuild() {
+    const host=root.querySelector('[data-mayhem-detail-panel="build"]');
+    if(!host||!state.detail)return;
+    const scrolls=[];for(let node=host;node;node=node.parentElement)scrolls.push([node,node.scrollTop,node.scrollLeft]);
+    host.innerHTML=mayhemBuildTabMarkup(state.detail);
+    window.deepLegendsSelects?.enhance(host);prepareImages(host);applyRenderedMetricStyles();
+    for(const [node,top,left]of scrolls){node.scrollTop=top;node.scrollLeft=left;}
+  }
   function renderARAMKitCombos(rows,title="海克斯组合",limit=10,jump=false,heroWin) {
     const valid=objectRows(rows).filter(row=>objectRows(row.assets).length===2&&Number(row.games)>=200).slice(0,limit);
     if(!valid.length)return "";
-    const card=(row,index)=>`<article class="aramkit-combo"><b class="aramkit-rank">${index+1}</b><div class="aramkit-pair">${row.assets.map(a=>`<${jump?"button":"span"} class="is-${a.rarity||augmentMetaForAsset(a)?.rarity||"unknown"}" ${jump?`type="button" data-mayhem-augment="${Number(a.id)}"`:""}>${assetImage(a,"augment-icon",true)}</${jump?"button":"span"}>`).join("")}</div><div class="aramkit-combo-names"><strong>${escapeHTML(row.assets[0].name)}</strong><span>＋ ${escapeHTML(row.assets[1].name)}</span></div><div class="aramkit-combo-win"><b class="win-rate-value">${percent(row.winRate)}</b>${Number.isFinite(heroWin)?`<small class="${row.winRate-heroWin>=0?"is-delta-up":"is-delta-down"}">较英雄 ${row.winRate-heroWin>=0?"+":""}${number(row.winRate-heroWin,1)}%</small>`:""}</div><div class="aramkit-combo-games">${compactNumber(row.games)} 场${Number.isFinite(row.pickRate)?`<small>选取 ${percent(row.pickRate)}</small>`:""}</div></article>`;
+    const card=(row,index)=>`<article class="aramkit-combo"><b class="aramkit-rank">${index+1}</b><div class="aramkit-pair">${row.assets.map(a=>`<${jump?"button":"span"} class="is-${a.rarity||augmentMetaForAsset(a)?.rarity||"unknown"}" ${jump?`type="button" data-mayhem-augment="${Number(a.id)}"`:""}>${assetImage(a,"augment-icon",true)}</${jump?"button":"span"}>`).join("")}</div><div class="aramkit-combo-names"><strong>${escapeHTML(row.assets[0].name)}</strong><strong><span class="aramkit-plus">＋</span> ${escapeHTML(row.assets[1].name)}</strong></div><div class="aramkit-combo-win"><b class="win-rate-value">${percent(row.winRate)}</b>${jump?"<small>胜率</small>":""}${Number.isFinite(heroWin)?`<small class="${row.winRate-heroWin>=0?"is-delta-up":"is-delta-down"}">较英雄 ${row.winRate-heroWin>=0?"+":""}${number(row.winRate-heroWin,1)}%</small>`:""}</div><div class="aramkit-combo-games">${compactNumber(row.games)}${jump?"<small>场次</small>":" 场"}${!jump&&Number.isFinite(row.pickRate)?`<small>选取 ${percent(row.pickRate)}</small>`:""}</div>${jump?`<div class="aramkit-combo-pick">${percent(row.pickRate)}<small>选取率</small></div>`:""}</article>`;
     return `<section class="recommendation-section aramkit-combos${jump?" is-atlas":""}"><header><h3><span class="arena-section-icon" aria-hidden="true">✚</span>${escapeHTML(title)}</h3></header><div class="aramkit-combo-list">${valid.map(card).join("")}</div></section>`;
   }
   function renderARAMKitBalance(balance) {
@@ -2438,7 +2465,7 @@
   function renderEmpty(title, copy) { return `<div class="champion-state"><span aria-hidden="true">◇</span><strong>${title}</strong><p>${copy}</p><button class="text-button" type="button" data-champion-clear>清除筛选</button></div>`; }
   function prepareImages(container = root) {
     for (const image of container.querySelectorAll("[data-champion-image]")) {
-      const loaded = () => { image.hidden = false; image.parentElement?.classList.add("has-loaded-image"); if (image.closest(".augment-icon,.arena-augment-icon")) {if(window.deepLegendsAugmentArtwork)window.deepLegendsAugmentArtwork.prepare(image);else void window.deepLegendsSections?.load("augment-artwork").then(()=>window.deepLegendsAugmentArtwork?.prepare(image)).catch(()=>{});} };
+      const loaded = () => { (prepareImages.loadedURLs||=new Set()).add(image.getAttribute("src"));image.hidden = false; image.parentElement?.classList.add("has-loaded-image"); if (image.closest(".augment-icon,.arena-augment-icon")) {if(window.deepLegendsAugmentArtwork)window.deepLegendsAugmentArtwork.prepare(image);else void window.deepLegendsSections?.load("augment-artwork").then(()=>window.deepLegendsAugmentArtwork?.prepare(image)).catch(()=>{});} };
       const failed = () => {
         const holder = image.parentElement;
         const artworkFallback = holder?.dataset.artworkFallback || image.dataset.artworkFallback;
@@ -2459,11 +2486,12 @@
           image.setAttribute("data-queued-src", fallback);
           return;
         }
-        image.hidden = true;
+        prepareImages.loadedURLs?.delete(image.getAttribute("src"));image.hidden = true;
         holder?.classList.remove("has-loaded-image");
       };
       if (image.getAttribute("src") && image.complete) image.naturalWidth > 0 ? loaded() : failed();
       else {
+        image.hidden = false;
         image.addEventListener("load", loaded, { once: true });
         image.addEventListener("error", failed, { once: true });
       }
@@ -2581,7 +2609,7 @@
     const mayhemAugment = event.target.closest("[data-mayhem-augment]");
     if (mayhemAugment) {
       const item = objectRows(state.augments?.rows).find((row) => Number(row.id) === Number(mayhemAugment.dataset.mayhemAugment));
-      if (item) loadMayhemAugmentDetail(item);
+      if (item) {closeMayhemTierDialog(false);loadMayhemAugmentDetail(item);}
       return;
     }
     if (event.target.closest("[data-load-mayhem-rarity]")) { loadMayhemRarity(); return; }
@@ -2840,6 +2868,11 @@
     void openDetail({ championId, key: detail.key, position: normalizePosition(detail.position) }, "open-champion");
   });
 
+  let viewportFrame=0;
+  const scheduleViewport=()=>{cancelAnimationFrame(viewportFrame);viewportFrame=requestAnimationFrame(syncChampionViewport);};
+  const viewportObserver=typeof ResizeObserver==="function"?new ResizeObserver(scheduleViewport):null;viewportObserver?.observe(root);
+  window.addEventListener("resize",scheduleViewport);
+  window.addEventListener("deep-legends:dispose",()=>{viewportObserver?.disconnect();window.removeEventListener("resize",scheduleViewport);cancelAnimationFrame(viewportFrame);},{once:true});
   window.addEventListener("pagehide", flushChampionSearch);
   window.deepLegendsChampionSearch = Object.freeze({ scoreOption: scoreChampionSelectOption, getCatalog: () => state.catalog });
   window.deepLegendsChampionAsset = Object.freeze({ imageHTML: assetImage, imageURL });

@@ -21,7 +21,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require(path.join(__dirname, "..", "..", "desktop", "node_modules", "jsdom"));
 
-const gameplayScript = fs.readFileSync(path.join(__dirname, "gameplay.js"), "utf8");
+const gameplayScript = require("./r277-deferred-fixture.cjs").join(fs.readFileSync(path.join(__dirname, "gameplay.js"), "utf8"));
 
 const FUNCTION_NAMES = [
   "liveHistoryStateOf", "liveHistorySettled", "insightScore", "renderInsightMatches",

@@ -50,11 +50,13 @@ test('R258 P7 existing data tags obey ARAM/Arena eligibility, scope and numeric 
  tab.advancedConditions.performance=condition(['zero']);assert.equal(af.filter([rift],tab,c).length,1);
 });
 
+// R309: historical case ID retained; the current assertion follows the new requirement.
 test('R258 P7 time migrates the removed season value and duration categories partition boundaries',()=>{
  const c=ctx();for(const [duration,value] of [[1199,'short'],[1200,'medium'],[1800,'long'],[2400,'long'],[2401,'verylong']])assert.equal(af.filter([match(1,{durationSeconds:duration})],{advancedConditions:{duration:condition([value])}},c).length,1);
  const tab={advancedConditions:{time:condition(['season'])}};
- assert.deepEqual(af.normalize(tab.advancedConditions),{});
- assert(!af.options([],"time",c).some(o=>o.value==="season"));
+ assert.deepEqual(af.normalize(tab.advancedConditions),{time:{values:["season"],not:false}});
+ assert(!af.options([],"time",{...c,seasonStart:undefined}).some(o=>o.value==="season"));
+ assert(af.options([],"time",{...c,seasonStart:"2026-01-08"}).some(o=>o.value==="season"));
 });
 
 function searchFixture() {
