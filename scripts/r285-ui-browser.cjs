@@ -3,6 +3,7 @@ const assert=require('node:assert/strict'),spells=require('../backend/testdata/r
 withBrowser(async({page,results,errors})=>{
  for(const theme of ['dark','light']){
   const p=await page(theme);await p.until('__r278Game.activeTab()?.data&&!__r278Game.activeTab().loading');
+  await p.evaluate("deepLegendsSections.load('live-arena')");
   await p.call('Emulation.setDeviceMetricsOverride',{width:2200,height:1800,deviceScaleFactor:1,mobile:false});
   await p.evaluate(`window.__r285Spells=${JSON.stringify(spells)};__r278Game.state.summonerSpells={spells:__r285Spells};const stage=document.createElement('main');stage.id='r285-stage';stage.style.cssText='position:absolute;top:20px;left:20px;width:1250px;z-index:9999;background:var(--bg);padding:16px;container-type:inline-size;container-name:recommendation-area';document.body.append(stage);`);
   for(const zoom of [1,1.5])for(const queueId of [420,450,2400])for(const side of [100,200])for(const hidden of [1,2]){

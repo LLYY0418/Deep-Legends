@@ -5,7 +5,7 @@ root=pathlib.Path(__file__).resolve().parents[1];out=pathlib.Path(args.output);o
 mutations=[
  ('same-class-and','backend/web/history-filters.js',[('c.values.some(value=>matchesValue','c.values.every(value=>matchesValue')],'R258_FILTER_SOURCE'),
  ('without-atleast','backend/web/history-filters.js',[('function multikill(subject, level, atLeast = false) {','function multikill(subject, level, atLeast = false) { atLeast = false;')],'R258_FILTER_SOURCE'),
- ('without-300-limit','backend/web/history-filters.js',[(' || search.scanned>=300',''),('Math.min(20,300-search.scanned)','20')],'R258_FILTER_SOURCE'),
+ ('without-300-limit','backend/web/history-filters.js',[('if(search.scanned>=limit)break;','if(false)break;'),('Math.min(20,limit-search.scanned)','20')],'R258_FILTER_SOURCE'),
  ('without-player-switch-cancel','backend/web/gameplay.js',[('if(globalThis.deepLegendsHistoryFilters && activeTab() !== tab) cancelAdvancedMatchSearch(activeTab());','')],'R258_FILTER_GAMEPLAY_SOURCE')]
 before={p:hashlib.sha256((root/p).read_bytes()).hexdigest() for _,p,*_ in mutations};rows=[]
 for name,target,edits,envkey in mutations:

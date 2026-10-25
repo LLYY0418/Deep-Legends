@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const {withBrowser}=require('./r280-browser-fixture.cjs');
 async function run(){await withBrowser(async({page,results,errors,out})=>{
  const p=await page('dark');await p.until("document.querySelector('.match-entry') && !__r278Game.activeTab().loading");
+ await p.evaluate("deepLegendsSections.load('live-arena')");
  await p.evaluate("localStorage.setItem('lol-loot-ui-scale','1');document.documentElement.dataset.uiScale='1';document.documentElement.style.setProperty('--ui-zoom','1');__r278App.activateSection('favorites')");
  await p.until("__r278App.state.items.length>0");
  await p.evaluate("(()=>{const s=__r278App.state;s.poolItems=Array.from({length:80},(_,i)=>({...s.items[0],id:10000+i,name:'奖池皮肤'+i,owned:true}));s.poolsLoaded=true;s.poolCatalogLoaded=true;s.poolLoading=false;s.poolError='';s.poolView='owned';__r278App.activateFavoritesPage('pools');__r278App.renderPoolCatalog();})()");

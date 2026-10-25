@@ -37,7 +37,11 @@ with tempfile.TemporaryDirectory(prefix='r272-mutants-') as temp:
  overlay('lost-postgame-refresh',[('backend/gameplay_refresh.go','a.scheduleCollectionEventRefresh(0)','// discarded postgame inventory')],'^TestR272CollectionEventAndPostgame$/InProgress')
  overlay('lost-known-arena-squad',[('backend/arena_live_grouping.go','for _, ally := range remembered {\n\t\tmatchIndex := -1','for _, ally := range remembered[:0] {\n\t\tmatchIndex := -1')],'^TestR272ArenaKnownTrioSurvivesMissingMember$')
  def javascript(name,relative,before,after,envkey):
-  original=(ROOT/relative).read_text();assert before in original,(name,relative)
+  original=(ROOT/relative).read_text()
+  if name=='old-time-cursor':
+   original=subprocess.run(['node','-e',"process.stdout.write(require('./backend/web/r277-deferred-fixture.cjs').join(require('node:fs').readFileSync('backend/web/gameplay.js','utf8')))"],cwd=ROOT,capture_output=True,text=True,check=True).stdout
+   assert original.count(before)==1,(name,relative)
+  assert before in original,(name,relative)
   target=temp/(name+'.js');target.write_text(original.replace(before,after,1));run(name,js,{envkey:str(target)},True)
  javascript('badge-only-no-placement','backend/web/gameplay.js','const evaluation=scorePlacementChip(record,true);','const evaluation=scoreBadgeChip(record);','R272_GAMEPLAY_SOURCE')
  javascript('score-placement-not-pinned','backend/web/gameplay.js','tag.priority===60000','tag.priority===-1','R272_GAMEPLAY_SOURCE')

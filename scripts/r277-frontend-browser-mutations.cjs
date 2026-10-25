@@ -6,7 +6,7 @@ fs.mkdirSync(report,{recursive:true});
 const cases=[
  ['p4-height','gameplay.css','.is-pending-strip .game-icon.is-summoner-avatar{border-radius:50%}','.summoner-strip.is-pending-strip{height:116px!important;min-height:116px!important}.is-pending-strip .game-icon.is-summoner-avatar{border-radius:50%}','"key":"strip"'],
  ['p8-binding','gameplay.js','function bindRankHistoryControls(container) {','function bindRankHistoryControls(container) { return;','0 !== 3'],
- ['p9-full-render','gameplay.js','    const list = container.querySelector(".match-list");\n    if (list && additions.length','    const list = container.querySelector(".match-list");\n    if(list && additions.length)list.innerHTML=(tab.data.matches || []).map(match=>renderMatch(match,tab.data.player.playerRef,tab)).join("");\n    if (list && additions.length','sample.sameList && sample.sameFirst'],
+ ['p9-full-render','gameplay.js','    const list = container.querySelector(".match-list");\n    if(list && additions.length','    const list = container.querySelector(".match-list");\n    if(list)list.innerHTML=(tab.data.matches || []).map(match=>renderMatch(match,tab.data.player.playerRef,tab)).join("");\n    if(list && additions.length','sample.sameList && sample.sameFirst'],
 ];
 cases.push(['p7-auto-sidebar','app.js',
  'forced: scale >= 1.5 || narrow', 'forced: false', 'automatic sidebar collapse']);
