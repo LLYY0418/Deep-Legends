@@ -7898,9 +7898,7 @@
       };
       const tooltip = augmentTooltipText(tooltipDetails, asset.id || row.id);
       const hasMetric = (value) => value !== null && value !== undefined && String(value).trim() !== "" && Number.isFinite(Number(value));
-      const metrics = source === "arena"
-        ? [["win", "胜率", row.winRate, percent], ["pick", "选用率", row.pickRate > 0 ? row.pickRate : null, percent], ["games", "场次", row.games, number]]
-        : [["win", "胜率", row.winRate, percent], ["games", "场次", row.games, number]];
+      const metrics = [["win", "胜率", row.winRate, percent], ["games", "场次", row.games, number]];
       const stats = metrics.filter(([, , value]) => hasMetric(value)).slice(0, 2).map(([key, label, value, formatter]) => {
         const suffix = key === "games" ? " 场" : "";
         return `<span class="live-augment-stat is-${key}"><span>${label}</span><b>${escapeHTML(formatter(value))}${suffix}</b></span>`;
@@ -7912,11 +7910,13 @@
     const definitions = [["silver", "白银"], ["gold", "黄金"], ["prismatic", "棱彩"]];
     const hasUnknown = rows.some((row) => !definitions.some(([key]) => normalizeAugmentRarity(row.rarity || row.assets?.[0]?.rarity).key === key));
     const columns = [...definitions, ...(hasUnknown ? [["unknown", "品质待确认"]] : [])].map(([key, label]) => {
-      const matches = rows
-        .filter((row) => normalizeAugmentRarity(row.rarity || row.assets?.[0]?.rarity).key === key)
-        .sort((left, right) => gradeRank(left.grade) - gradeRank(right.grade)
+      const qualityRows = rows.filter((row) => normalizeAugmentRarity(row.rarity || row.assets?.[0]?.rarity).key === key);
+      const ordered = source === "arena"
+        ? window.deepLegendsRuntime.orderArenaRows(qualityRows, "games")
+        : qualityRows.sort((left, right) => gradeRank(left.grade) - gradeRank(right.grade)
           || (Number(right.score) || 0) - (Number(left.score) || 0)
-          || (Number(right.games) || 0) - (Number(left.games) || 0)).slice(0, 3);
+          || (Number(right.games) || 0) - (Number(left.games) || 0));
+      const matches = ordered.slice(0, source === "arena" ? 4 : 3);
       if (!matches.length) return "";
       return `<section class="live-augment-column is-${key}"><header><span aria-hidden="true"></span><strong>${label}</strong><small>${matches.length} 个</small></header><div>${matches.map(renderRow).join("")}</div></section>`;
     }).filter(Boolean).join("");
@@ -8427,9 +8427,11 @@
 
   function renderBuildRecommendation(build, self, abilities, data) {
     if (!build) return recommendationEmptyPanel(liveRecommendationChampionId(self) || Number(data?.currentChampionId) ? "等待推荐出装与技能数据" : "请先选定英雄", "仅展示召唤师技能、技能加点与真实装备分布。");
-    // The backend orders rows only after applying its minimum-games guard.
-    // Keep that order here so tiny samples can never jump the queue locally.
-    const inUpstreamOrder = (options, limit = options.length) => [...options].slice(0, limit);
+    const augmentSource = liveAugmentRecommendationSource(data);
+    const isArenaBuild = augmentSource === "arena";
+    const isMayhemBuild = augmentSource === "hextech";
+    const inUpstreamOrder = (options, limit = options.length) => (isArenaBuild
+      ? window.deepLegendsRuntime.orderArenaRows(options, "games") : [...options]).slice(0, limit);
     const spellOptions = inUpstreamOrder(build.spellOptions || (build.spells ? [{ ids: build.spells, stats: build.spellStats || {} }] : []), 2);
     const starterOptions = inUpstreamOrder(build.starterOptions || (build.starterItems ? [{ ids: build.starterItems, stats: build.starterStats || {} }] : []), 3);
     const bootOptions = inUpstreamOrder(build.bootOptions || (build.boots ? [{ ids: build.boots, stats: build.bootStats || {} }] : []), 3);
@@ -8448,9 +8450,7 @@
 	    const hasOpeningConfiguration = spellOptions.length > 0 || starterOptions.length > 0;
 	    const summaryLayout = capabilities.hasAugments ? (hasOpeningConfiguration ? "is-mayhem" : "is-arena") : "is-standard";
 	    const buildLayout = capabilities.hasAugments ? (hasOpeningConfiguration ? "is-mayhem-build" : "is-arena-build") : "is-standard-build";
-    const augmentSource = liveAugmentRecommendationSource(data);
-    const isArenaBuild = augmentSource === "arena";
-    const isMayhemBuild = augmentSource === "hextech";
+
 	    const summary = [
 	      starterOptions.length ? `<section class="build-summary-starter"><h3>出门装</h3>${optionList(starterOptions, "item", "该模式没有出门装样本")}</section>` : "",
 	      spellOptions.length ? `<section class="build-summary-spells"><h3>召唤师技能</h3>${optionList(spellOptions, "spell", "该模式不使用召唤师技能")}</section>` : "",
@@ -8465,8 +8465,7 @@
     const chainStatus = String(build.itemChainStatus || "");
     const hasChainStatus = chainStatus === "ready" || chainStatus === "unavailable";
     const depthGroups = capabilities.hasItemDepths ? [["第四件", fourthOptions, Number(build.fourthSample) || 0], ["第五件", fifthOptions, Number(build.fifthSample) || 0], ["第六件", sixthOptions, Number(build.sixthSample) || 0]]
-      // 第六件没有样本就整列不展示（辅助位普遍撑不到第六件，op.gg 本来就不给）；
-      // 第四/第五件保留空态，区分上游没有样本与读取失败。
+      // 第六件无样本时隐藏；第四/第五件保留空态。
       .filter(([label, options]) => (label === "第六件" ? options.length > 0 : hasChainStatus || options.length))
       .map(([label, options, sample]) => {
         const empty = chainStatus === "unavailable" ? `${label}推荐暂不可用，稍后重试` : "该阶段暂无可用样本";
@@ -8484,13 +8483,13 @@
         : `<section class="late-option-band is-prismatic"><h3>棱彩装备</h3>${optionList(prismOptions, "item", "暂无棱彩装备样本")}</section>` : "",
     ].filter(Boolean).join("");
     const itemRanking = liveRecommendationsFor(data)?.itemRanking || [];
-	    const itemRankingContent = itemRanking.length ? renderLiveItemRanking(itemRanking) : "";
+	    const itemRankingContent = itemRanking.length ? renderLiveItemRanking(itemRanking, isArenaBuild) : "";
     const rankingLayoutClass = isMayhemBuild ? " is-mayhem-build-row" : "";
     return `<section class="build-recommendation ${buildLayout}"><header class="build-recommendation-heading"><h3>装备推荐</h3>${upstreamSampleOrder}</header><div class="build-summary-bar ${summaryLayout}">${summary}</div>${lateBands}<div class="build-core-ranking-row${rankingLayoutClass}">${itemBuildLayout}${itemRankingContent}</div></section>${action}`;
   }
 
-  function renderLiveItemRanking(rows) {
-    const sorted = [...(rows || [])].sort((left, right) => (Number(right.pickRate) || 0) - (Number(left.pickRate) || 0) || (Number(right.games) || 0) - (Number(left.games) || 0));
+  function renderLiveItemRanking(rows, arena = false) {
+    const sorted = arena ? window.deepLegendsRuntime.orderArenaRows(rows, "games") : [...(rows || [])].sort((left, right) => (Number(right.pickRate) || 0) - (Number(left.pickRate) || 0) || (Number(right.games) || 0) - (Number(left.games) || 0));
     const visible = sorted.slice(0, 10);
     const content = visible.map((row, index) => {
       const asset = row.assets?.[0] || {};

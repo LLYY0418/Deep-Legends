@@ -12,7 +12,7 @@ const appStyles = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
 const script = fs.readFileSync(path.join(__dirname, "champions.js"), "utf8");
 const runtimeScript = fs.readFileSync(path.join(__dirname, "runtime.js"), "utf8");
 const gradeSource = runtimeScript.slice(runtimeScript.indexOf("  const GRADE_ORDER ="), runtimeScript.indexOf("  window.deepLegendsRuntime ="));
-const sharedGrades = Function(`${gradeSource}\nreturn { gradeBadge, gradeRank };`)();
+const sharedGrades = Function(`${gradeSource}\nreturn { gradeBadge, gradeRank, orderArenaRows };`)();
 // R128 §2.3：统计口径说明已从全项目 UI 删除，shared.js 与它的测试桩一并移除。
 
 // R116-B：P0-1「较基准」/ P0-2 置信度 / P0-5 官方档位 / P0-6 阶段筛选的行内助手。
@@ -178,6 +178,7 @@ function compileFunctions(source, names, dependencies = {}) {
   dependencies = require("./r211-harness-support.cjs").environment({ recordLiveRecommendationRender: () => {}, ensureLiveRecommendationForRender: () => {}, ...dependencies });
   const bodies = names.map((name) => functionSource(source, name));
   const compiledDependencies = { state:{},gradeBadge: sharedGrades.gradeBadge, gradeRank: sharedGrades.gradeRank, isSummonersRiftMatch: data => Number(data?.mapId) === 11, ...dependencies };
+  compiledDependencies.window.deepLegendsRuntime ||= sharedGrades;
   if (source.includes("function loadOverview(")) {
     compiledDependencies.riotTab ||= tab => tab?.region === "kr";
     for (const name of ["matchesPending", "renderPendingMatches", "reportDeferredMatchesCard", "syncOverviewSupplementRefs", "overviewSupplementTarget"]) {
@@ -412,7 +413,7 @@ function assertR13ItemColumnContract(championJS, championCSS, liveJS, liveCSS) {
 function assertR15PerformanceAndBuildContracts() {
   assert.match(gameplayBackend, /shouldLoadOverviewHistory\(reference, playerRef, matches\)/);
   assert.match(gameplayBackend, /matchHistoryOn\(ctx, client, reference\.ServerID, playerRef, 0, maximumSummaryMatchCount, !force\)/);
-  assert.match(gameplayBackend, /capGameplayCoreOptions\(bundle\.Build\.CoreOptions\)/);
+  assert.match(gameplayBackend, /capGameplayCoreOptions\(bundle\.Build\.CoreOptions, resolution\.InternalMode\)/);
   assert.match(gameplayBackend, /func capGameplayCoreOptions[\s\S]*?if len\(options\) > championCoreRecommendationLimit \{[\s\S]*?return options\[:championCoreRecommendationLimit\]/);
   assert.match(gameplayBackend, /"event": "overview_load_cost"/);
   assert.match(gameplayBackend, /if !isCurrent && shouldLoadOverviewHistory\(reference, playerRef, matches\)/);
@@ -801,7 +802,7 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
 	  assert.match(gameplayStyles, /\.live-augment-column > div\s*\{[^}]*repeat\(4,minmax\(0,1fr\)\)[^}]*gap:\s*8px/s);
 	  assert.doesNotMatch(gameplayScript, /\["HexScore", row\.score/);
 	  assert.match(gameplayScript, /\["win", "胜率", row\.winRate, percent\]/);
-	  assert.match(gameplayScript, /\["pick", "选用率", row\.pickRate > 0 \? row\.pickRate : null, percent\]/);
+	  assert.doesNotMatch(functionSource(gameplayScript, "renderLiveAugmentRecommendations"), /\["pick", "选用率"/);
 	  assert.match(gameplayScript, /\["games", "场次", row\.games, number\]/);
   assert.match(script, /class="mayhem-fit-columns"/);
   assert.doesNotMatch(styles, /\.mayhem-fit-row > span/);
@@ -4742,7 +4743,7 @@ test("live skill plan keeps four distinct controls on narrow screens", () => {
   assert.match(buildNarrow, /\.skill-copy \.skill-name, \.skill-copy small\s*\{[^}]*display:\s*none/s);
 });
 
-test("live augments group before limiting, retaining the top three of each rarity", () => {
+test("hextech augments retain tier ordering and the top three of each rarity", () => {
 	  const state = { liveRecommendationFailures: new Map() };
 	  const rows = Array.from({ length: 12 }, (_, index) => ({
     rarity: ["silver", "gold", "prismatic"][index % 3],
@@ -4764,7 +4765,7 @@ test("live augments group before limiting, retaining the top three of each rarit
     percent: (value) => `${value ?? 0}%`,
     number: (value) => String(value ?? 0),
   });
-	  const markup = renderLiveAugmentRecommendations({ players: [] }, "arena");
+	  const markup = renderLiveAugmentRecommendations({ players: [] }, "hextech");
 	  assert.match(markup, /class="live-augment-columns"/);
 	  assert.match(markup, /<h3>海克斯推荐<\/h3>/);
   assert.equal((markup.match(/class="live-augment-column is-/g) || []).length, 3);
@@ -4784,12 +4785,13 @@ test("live augments group before limiting, retaining the top three of each rarit
 	  assert.equal(metriclessCards.length, 9);
 	  assert.doesNotMatch(metriclessCards.join(""), /<small>|—/);
 
-	  renderedRows = [{ rarity: "silver", grade: "S", pickRate: 8, winRate: 64, assets: [{ id: 97, name: "斗魂推荐" }] }];
+	  renderedRows = [{ rarity: "silver", grade: "S", pickRate: 8, winRate: 64, games: 888, assets: [{ id: 97, name: "斗魂推荐" }] }];
 	  const arenaMarkup = renderLiveAugmentRecommendations({ players: [] }, "arena");
 	  const arenaCard = arenaMarkup.match(/<article class="live-augment-option[\s\S]*?<\/article>/)?.[0] || "";
-	  assert.ok(arenaCard.indexOf('class="live-augment-stat is-win"') < arenaCard.indexOf('class="live-augment-stat is-pick"'), "Arena stats must show win rate before pick rate");
+	  assert.ok(arenaCard.indexOf('class="live-augment-stat is-win"') < arenaCard.indexOf('class="live-augment-stat is-games"'), "Arena stats must show win rate before games");
 	  assert.match(arenaCard, /class="live-augment-stat is-win"[\s\S]*胜率[\s\S]*64%/);
-	  assert.match(arenaCard, /class="live-augment-stat is-pick"[\s\S]*选用率[\s\S]*8%/);
+	  assert.match(arenaCard, /class="live-augment-stat is-games"[\s\S]*场次[\s\S]*888 场/);
+	  assert.doesNotMatch(arenaCard, /class="live-augment-stat is-pick"/);
 	  assert.doesNotMatch(arenaCard.replace(/\s(?:data-tooltip|aria-label)="[^"]*"/g, ""), /白银|黄金|棱彩|HexScore/);
 
 	  renderedRows = [{ rarity: "silver", grade: "S", winRate: 61, games: 321, assets: [{ id: 100, name: "官方海克斯", description: "官方描述" }] }];
@@ -4801,9 +4803,9 @@ test("live augments group before limiting, retaining the top three of each rarit
 
 	  renderedRows = [{ rarity: "silver", grade: "S", winRate: 60, pickRate: 7, games: 555, assets: [{ id: 101, name: "回退海克斯" }] }];
 	  const allMetricsCard = renderLiveAugmentRecommendations({ players: [] }, "arena").match(/<article class="live-augment-option[\s\S]*?<\/article>/)?.[0] || "";
-	  assert.ok(allMetricsCard.indexOf('class="live-augment-stat is-win"') < allMetricsCard.indexOf('class="live-augment-stat is-pick"'));
-	  assert.match(allMetricsCard, /class="live-augment-stat is-pick"[\s\S]*选用率[\s\S]*7%/);
-	  assert.doesNotMatch(allMetricsCard, /class="live-augment-stat is-games"/);
+	  assert.ok(allMetricsCard.indexOf('class="live-augment-stat is-win"') < allMetricsCard.indexOf('class="live-augment-stat is-games"'));
+	  assert.match(allMetricsCard, /class="live-augment-stat is-games"[\s\S]*场次[\s\S]*555 场/);
+	  assert.doesNotMatch(allMetricsCard, /class="live-augment-stat is-pick"/);
 	  assert.equal((allMetricsCard.match(/class="live-augment-stat is-/g) || []).length, 2);
 
 	  renderedRows = [{ rarity: "silver", grade: "S", score: 92.4, winRate: 62, games: 12480, assets: [{ id: 98, name: "海斗推荐" }] }];
@@ -4844,7 +4846,7 @@ test("arena detail augments use the shared three-column option grid", () => {
   const { renderArenaAugmentSection } = compileFunctions(script, ["renderArenaAugmentSection"], {
     state,
     arenaRarityKey: (value) => ({ 0: "silver", 4: "gold", 8: "prismatic", silver: "silver", gold: "gold", prismatic: "prismatic" }[String(value)] || "unknown"),
-    sortedGradeRows: (rows) => rows,
+    arenaOrderRows: (rows) => rows,
     renderArenaOptionCard: (row) => `<article data-augment="${row.assets?.[0]?.id || 0}"></article>`,
     renderArenaExpand: () => "",
   });
@@ -6787,11 +6789,11 @@ test("returning to a section restores its scroll position past the loading skele
 test("captured Arena equipment matches YOUR.GG preview order and expands to every source item", () => {
   const capture = JSON.parse(fs.readFileSync(path.join(root, "testdata/arena-items/yourgg-122-20260909.json"), "utf8")).response;
   const catalog = new Map(JSON.parse(fs.readFileSync(path.join(root, "testdata/arena-items/catalog-20260909.json"), "utf8")).map(item => [item.id, item]));
-  const state = { arenaExpanded: {prism:false,core:false} };
-  const functions = compileFunctions(script, ["objectRows", "sortedArenaItemRows", "renderArenaItemSection", "renderArenaCoreSection", "renderArenaExpand", "renderArenaOptionCard", "augmentGrade", "percent"], {
+  const state = { arenaSort: "tier", arenaExpanded: {prism:false,core:false} };
+  const functions = compileFunctions(script, ["objectRows", "arenaOrderRows", "renderArenaItemSection", "renderArenaCoreSection", "renderArenaExpand", "renderArenaOptionCard", "augmentGrade", "percent"], {
     state, escapeHTML: x => String(x ?? ""), number: x => String(x ?? "—"), compactNumber: x => String(x ?? "—"),
     renderAssetButton: asset => `<span data-item-id="${asset.id}">${asset.name}</span>`,
-    sortedArenaRows: rows => rows, renderArenaSlimRow: () => "",
+    renderArenaSlimRow: () => "",
   });
   const toRows = values => values.map(value => ({
     assets:[{id:value.itemId,kind:"item",name:catalog.get(value.itemId)?.name || "未知装备"}],
@@ -6821,9 +6823,9 @@ test("captured Arena equipment matches YOUR.GG preview order and expands to ever
 });
 
 test("Arena equipment sorting retains low samples, missing metadata and ungraded items", () => {
-  const {sortedArenaItemRows} = compileFunctions(script,["objectRows","sortedArenaItemRows"]);
+  const {arenaOrderRows} = compileFunctions(script,["objectRows","arenaOrderRows"], {state: {arenaSort: "tier"}});
   const rows = [{grade:"A",score:99,games:1,id:1},{grade:"A",score:10,games:100,id:2},{grade:"S",games:0,id:3},{games:50,id:4}];
-  assert.deepEqual(sortedArenaItemRows(rows).map(row=>row.id), [3,1,2,4]);
+  assert.deepEqual(arenaOrderRows(rows).map(row=>row.id), [3,1,2,4]);
   assert.deepEqual(rows.map(row=>row.id),[1,2,3,4],"do not mutate source array");
 });
 

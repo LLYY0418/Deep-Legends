@@ -10,7 +10,7 @@ const runtime = read("runtime.js");
 const css = read("app.css");
 const championCSS = read("champions.css");
 const gradeSource = runtime.slice(runtime.indexOf("  const GRADE_ORDER ="), runtime.indexOf("  window.deepLegendsRuntime ="));
-const grades = Function(`${gradeSource}\nreturn { gradeBadge, gradeRank };`)();
+const grades = Function(`${gradeSource}\nreturn { gradeBadge, gradeRank, orderArenaRows };`)();
 
 function functionSource(source, name) {
   const start = source.indexOf(`function ${name}(`);
@@ -33,12 +33,12 @@ function functionSource(source, name) {
 }
 
 function compile(source, names, deps = {}) {
-  const injected = { gradeBadge: grades.gradeBadge, gradeRank: grades.gradeRank, ...deps };
+  const injected = { gradeBadge: grades.gradeBadge, gradeRank: grades.gradeRank, window: {deepLegendsRuntime: grades}, ...deps };
   return Function(...Object.keys(injected), `"use strict";\n${names.map((name) => functionSource(source, name)).join("\n")}\nreturn { ${names.join(",")} };`)(...Object.values(injected));
 }
 
 function renderArenaHeader(source = script, rowGrade = "OP") {
-  const state = { arenaDetailLoading: true, detail: { arenaStats: { tier: 2, rank: 22, games: 505, winRate: 53.27, averagePlacement: 3.36, pickRate: 14.38 } }, arenaSort: "winRate" };
+  const state = { arenaDetailLoading: true, detail: { arenaStats: { tier: 2, rank: 22, games: 505, winRate: 53.27, averagePlacement: 3.36, pickRate: 14.38 } }, arenaSort: "games" };
   const { renderArenaDetailPane } = compile(source, ["renderArenaDetailPane", "arenaOverviewMetric", "renderArenaSortBar"], {
     state,
     escapeHTML: String,
@@ -109,7 +109,7 @@ function checkCard(source = script) {
 
 test("R150 local augment score stays hidden; official item score and hexagon remain", () => {
   checkCard();
-  assert.match(script, /按档位与样本展示前九项/);
+  assert.match(script, /按\$\{state.arenaSort === "tier" \? "梯度" : "场次"\}展示前九项/);
   assert.doesNotMatch(functionSource(script, "renderMayhemRecommendedAugment"), /官方档位/);
   assert.match(championCSS, /\.arena-augment-section \.arena-option-card\[data-metric-count="4"\] dl \{ grid-template-columns: repeat\(2,minmax\(0,1fr\)\)/);
   const scoreMutation = script.replace("...(Number(row.score) > 0 ?", "...(true ?");
@@ -121,9 +121,9 @@ test("R150 local augment score stays hidden; official item score and hexagon rem
 });
 
 test("R150 grade sorting uses letter then official score then samples", () => {
-  const { sortedGradeRows, sortedArenaItemRows } = compile(script, ["sortedGradeRows", "sortedArenaItemRows"], { objectRows: (rows) => rows });
+  const { arenaOrderRows } = compile(script, ["arenaOrderRows"], { objectRows: (rows) => rows, state: {arenaSort: "tier"} });
   const rows = [{ id: 1, grade: "S", score: 90, games: 1 }, { id: 2, grade: "OP", score: 1, games: 1 }, { id: 3, grade: "S", score: 90, games: 10 }, { id: 4, grade: "", score: 100, games: 100 }];
-  for (const sort of [sortedGradeRows, sortedArenaItemRows]) assert.deepEqual(sort(rows).map((row) => row.id), [2, 3, 1, 4]);
+  for (const sort of [arenaOrderRows]) assert.deepEqual(sort(rows).map((row) => row.id), [2, 3, 1, 4]);
   assert.deepEqual(rows.map((row) => row.id), [1, 2, 3, 4]);
 });
 

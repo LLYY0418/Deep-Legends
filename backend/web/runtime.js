@@ -82,6 +82,15 @@
     const icon = grade === "OP" ? "op" : `yourgg-${grade.toLowerCase()}`;
     return `<img class="tier-badge${extra ? ` ${extra}` : ""}" src="/tier-icons/${icon}.svg" alt="梯度 ${grade}" decoding="async">`;
   };
+  function orderArenaRows(rows, mode = "games") {
+    const metric = (row, key) => Number(row?.[key] ?? row?.stats?.[key]) || 0;
+    return [...(rows || [])].sort((left, right) => {
+      const grade = gradeRank(left?.grade) - gradeRank(right?.grade);
+      const score = metric(right, "score") - metric(left, "score");
+      const games = metric(right, "games") - metric(left, "games");
+      return mode === "tier" ? grade || score || games : games || score || grade;
+    });
+  }
   // Catalog search metadata.
   function scoreChampionSearchOption(query, value, label, meta) {
     const normalize=value=>String(value || "").normalize("NFKC").toLocaleLowerCase("zh-CN").replace(/[\s\p{P}\p{S}]+/gu, "");
@@ -101,7 +110,7 @@
       .sort((left, right) => (maxedAt[left] ?? 99) - (maxedAt[right] ?? 99) || counts[right] - counts[left]);
     return ranked.length >= 2 ? ranked : [];
   }
-  window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options), escapeHTML, gradeRank, gradeBadge, scoreChampionSearchOption, skillPriority });
+  window.deepLegendsRuntime = Object.freeze({ createCache: (options) => new ResponseCache(options), escapeHTML, gradeRank, gradeBadge, orderArenaRows, scoreChampionSearchOption, skillPriority });
   let manualRefreshSerial=0;
   const flowSamples = new Map();
   const flowPending = new Set();

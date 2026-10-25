@@ -248,13 +248,12 @@ test("R116-B P0-2 海斗路径不再有任何前端重排（对抗变异必须�
   const recommended = functionSource(championsScript, "renderRecommendedAugments");
   assert.doesNotMatch(recommended, /\.sort\(/, "海克斯推荐只按稀有度各取前三，保持后端顺序");
   assert.match(recommended, /return count < 3;/);
-  // 护栏只动海斗调用点：sortedGradeRows 函数体与斗魂/YOUR.GG 三处边界原样保留。
-  const sorted = functionSource(championsScript, "sortedGradeRows");
-  assert.match(sorted, /gradeRank\(left\.grade\) - gradeRank\(right\.grade\)/);
-  assert.match(sorted, /Number\(right\.score\)/);
-  assert.match(championsScript, /const sorted = sortedGradeRows\(filtered\);/, "斗魂 renderArenaAugmentSection 仍用 sortedGradeRows");
-  assert.match(championsScript, /Grade, official score, then sample count/);
-  assert.match(functionSource(championsScript, "sortedArenaRows"), /const metric = state\.arenaSort;/);
+  // R311 gives Arena a dedicated switch; Mayhem still preserves upstream order.
+  assert.doesNotMatch(routes, /arenaOrderRows/);
+  assert.doesNotMatch(recommended, /arenaOrderRows/);
+  assert.match(functionSource(championsScript, "arenaOrderRows"), /window\.deepLegendsRuntime\.orderArenaRows/);
+  assert.match(championsScript, /const sorted = arenaOrderRows\(filtered\);/);
+  assert.match(runtimeScript, /mode === "tier" \? grade \|\| score \|\| games : games \|\| score \|\| grade/);
 });
 
 

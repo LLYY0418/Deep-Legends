@@ -4846,6 +4846,7 @@ type gameplayRecommendationBuild struct {
 }
 
 type gameplayRecommendationOption struct {
+	Score            float64                     `json:"score,omitempty"`
 	IDs              []int64                     `json:"ids"`
 	Grade            string                      `json:"grade,omitempty"`
 	GamesUnavailable bool                        `json:"gamesUnavailable,omitempty"`
@@ -5232,7 +5233,7 @@ func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Reque
 	diagnosticStage = "roster-insights"
 	// ARAMKit has no matchup or teammate tables; these panels stay hidden.
 	coreIn := len(detail.Build.CoreItems)
-	bundle.Build.CoreOptions = capGameplayCoreOptions(bundle.Build.CoreOptions)
+	bundle.Build.CoreOptions = capGameplayCoreOptions(bundle.Build.CoreOptions, resolution.InternalMode)
 	a.recordDiagnostic(map[string]any{"event": "live_build_shape", "diagnostic_schema": 2, "trace_id": traceID, "recommendation_key": recommendationKey, "core_in": coreIn, "core_out": len(bundle.Build.CoreOptions)})
 	a.recordDiagnostic(map[string]any{
 		"event": "live_recommendations_response", "diagnostic_schema": 2, "trace_id": traceID, "recommendation_key": recommendationKey,
@@ -6847,7 +6848,11 @@ func shouldLoadOverviewHistory(reference gameplayReference, playerRef string, ma
 	return reference.ServerID != "" && validPlayerReference(playerRef) && len(matches) == 0
 }
 
-func capGameplayCoreOptions(options []gameplayRecommendationOption) []gameplayRecommendationOption {
+func capGameplayCoreOptions(options []gameplayRecommendationOption, mode string) []gameplayRecommendationOption {
+	// Arena's client must sort the complete candidate set by games first.
+	if mode == "arena" {
+		return options
+	}
 	if len(options) > championCoreRecommendationLimit {
 		return options[:championCoreRecommendationLimit]
 	}
@@ -7100,7 +7105,7 @@ func recommendationOptions(rows []championMetricRow) []gameplayRecommendationOpt
 				stats.FirstPlaceRate = &firstPlaceRate
 			}
 			grade := strings.ToUpper(strings.TrimSpace(firstNonEmpty(row.Grade, row.Tier)))
-			result = append(result, gameplayRecommendationOption{IDs: ids, Grade: grade, GamesUnavailable: row.GamesUnavailable, Stats: stats})
+			result = append(result, gameplayRecommendationOption{IDs: ids, Grade: grade, Score: row.Score, GamesUnavailable: row.GamesUnavailable, Stats: stats})
 		}
 	}
 	return result

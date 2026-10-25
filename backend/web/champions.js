@@ -86,7 +86,7 @@
     listScrollRestorePending: false,
     preload: null,
     preloaded: Object.create(null),
-    arenaSort: "winRate",
+    arenaSort: "games",
     arenaRarity: "all",
     arenaExpanded: { augments: false, prism: false, core: false },
 	    arenaFirstTab: normalizeArenaFirstTab(readSetting("champion-arena-first-tab", "pros")),
@@ -830,7 +830,7 @@
   }
 
   function resetArenaControls() {
-    state.arenaSort = "winRate";
+    state.arenaSort = "games";
     state.arenaRarity = "all";
     state.arenaExpanded = { augments: false, prism: false, core: false };
 	    state.arenaFirstTab = normalizeArenaFirstTab(readSetting("champion-arena-first-tab", "pros"));
@@ -1311,11 +1311,7 @@
     return `<section class="recommendation-section champion-build-board mayhem-item-routes"><header><div><h3><span class="arena-section-icon" aria-hidden="true">◇</span>装备路线</h3><p>核心装备路线与后续成装顺序</p></div></header><div class="mayhem-build-grid"><section><div class="config-option-list">${routes.map((row) => renderConfigOption(row, "route", false,row.assets?.[0]?.source==="aramkit"?aramkitRouteStats:null)).join("") || '<p class="muted">暂无样本</p>'}</div></section></div></section>`;
   }
 
-  // R116-B P0-2 排序护栏：这里以前调 sortedGradeRows（按 grade → score → games
-  // 重排），同样忽略样本分档，低样本行能靠一个高 score 插队。海斗路径改成保持
-  // 后端直出顺序，与对局推荐页 renderBuildRecommendation 的 inUpstreamOrder 一致。
-  // sortedGradeRows 函数体一字未改：它同时服务 renderArenaAugmentSection 的
-  // 斗魂路径（那边读的是 YOUR.GG/用户显式排序，属另一套口径，不许动）。
+  // 海斗保持后端样本分档顺序；斗魂使用独立排序。
   function mayhemRouteRows(rows) {
     return objectRows(rows);
   }
@@ -1514,25 +1510,12 @@
   }
 
   function renderArenaSortBar() {
-    const options = [["winRate", "按胜率"], ["firstPlaceRate", "按吃鸡率"], ["averagePlacement", "按平均名次"], ["games", "按场次"]];
-    return `<div class="arena-chips arena-sort-chips" role="group" aria-label="竞技场数据排序">${options.map(([value, label]) => `<button type="button" class="${state.arenaSort === value ? "is-active" : ""}" data-arena-sort="${value}">${label}</button>`).join("")}</div>`;
+    const options = [["games", "按场次"], ["tier", "按梯度"]];
+    return `<div class="arena-chips arena-sort-chips" role="group" aria-label="斗魂数据排序">${options.map(([value, label]) => `<button type="button" aria-pressed="${state.arenaSort === value}" class="${state.arenaSort === value ? "is-active" : ""}" data-arena-sort="${value}">${label}</button>`).join("")}</div>`;
   }
 
-  function sortedArenaRows(rows) {
-    const metric = state.arenaSort;
-    return [...(rows || [])].sort((left, right) => {
-      const leftValue = Number(left?.[metric]) || 0;
-      const rightValue = Number(right?.[metric]) || 0;
-      const primary = metric === "averagePlacement" ? leftValue - rightValue : rightValue - leftValue;
-      return primary || (Number(right?.games) || 0) - (Number(left?.games) || 0);
-    });
-  }
-  function sortedGradeRows(rows) {
-    const list = objectRows(rows);
-    return [...list].sort((left, right) => {
-      const grade = gradeRank(left.grade) - gradeRank(right.grade);
-      return grade || (Number(right.score) || 0) - (Number(left.score) || 0) || (Number(right.games) || 0) - (Number(left.games) || 0);
-    });
+  function arenaOrderRows(rows) {
+    return window.deepLegendsRuntime.orderArenaRows(objectRows(rows), state.arenaSort);
   }
 
   function arenaRarityKey(value) {
@@ -1546,24 +1529,16 @@
       : [{ rarity: 0, rows: detail.arenaAugments || [] }];
     const allRows = groups.flatMap((group) => (group.rows || []).map((row) => ({ ...row, rarity: arenaRarityKey(row.rarity) !== "unknown" ? arenaRarityKey(row.rarity) : arenaRarityKey(group.rarity) })));
     const filtered = state.arenaRarity === "all" ? allRows : allRows.filter((row) => arenaRarityKey(row.rarity) === state.arenaRarity);
-    const sorted = sortedGradeRows(filtered);
+    const sorted = arenaOrderRows(filtered);
     const visible = state.arenaExpanded.augments ? sorted : sorted.slice(0, 9);
     const scores = sorted.map((row) => row.score);
     const filters = [["all", "全部"], ["silver", "银色"], ["gold", "黄金"], ["prismatic", "棱彩"]];
-    return `<section class="arena-data-section arena-augment-section"><header><div><span class="arena-section-icon" aria-hidden="true">✦</span><span><h3>海克斯推荐</h3><small>按档位与样本展示前九项 · ${allRows.length} 条</small></span></div><div class="arena-chips arena-rarity-chips" role="tablist" aria-label="海克斯品质">${filters.map(([value, label]) => `<button type="button" role="tab" aria-selected="${state.arenaRarity === value}" class="${state.arenaRarity === value ? "is-active" : ""}" data-arena-rarity="${value}"><i class="is-${value}" aria-hidden="true"></i>${label}</button>`).join("")}</div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "augment", index, scores)).join("")}</div>${renderArenaExpand("augments", sorted.length, 9)}` : '<div class="arena-section-empty">该品质暂无海克斯样本</div>'}</section>`;
+    return `<section class="arena-data-section arena-augment-section"><header><div><span class="arena-section-icon" aria-hidden="true">✦</span><span><h3>海克斯推荐</h3><small>按${state.arenaSort === "tier" ? "梯度" : "场次"}展示前九项 · ${allRows.length} 条</small></span></div><div class="arena-chips arena-rarity-chips" role="tablist" aria-label="海克斯品质">${filters.map(([value, label]) => `<button type="button" role="tab" aria-selected="${state.arenaRarity === value}" class="${state.arenaRarity === value ? "is-active" : ""}" data-arena-rarity="${value}"><i class="is-${value}" aria-hidden="true"></i>${label}</button>`).join("")}</div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "augment", index, scores)).join("")}</div>${renderArenaExpand("augments", sorted.length, 9)}` : '<div class="arena-section-empty">该品质暂无海克斯样本</div>'}</section>`;
   }
 
-  // Preserve every upstream item. Grade, official score, then sample count
-  // determine presentation order; the hero ranking itself keeps upstream order.
-  function sortedArenaItemRows(rows) {
-    return [...objectRows(rows)].sort((left, right) =>
-      gradeRank(left.grade) - gradeRank(right.grade)
-        || (Number(right.score) || 0) - (Number(left.score) || 0)
-        || (Number(right.games) || 0) - (Number(left.games) || 0));
-  }
 
 	function renderArenaItemSection(title, copy, rows, kind) {
-    const sorted = sortedArenaItemRows(rows);
+    const sorted = arenaOrderRows(rows);
 		const visible = state.arenaExpanded[kind] ? sorted : sorted.slice(0, 6);
 		const scores = sorted.map((row) => row.score);
 		if (!sorted.length) return "";
@@ -1571,11 +1546,11 @@
   }
 
   function renderArenaCoreSection(build) {
-    const sorted = sortedArenaItemRows(build.coreItems || []);
+    const sorted = arenaOrderRows(build.coreItems || []);
     const visible = state.arenaExpanded.core ? sorted : sorted.slice(0, 6);
     const scores = sorted.map((row) => row.score);
     if (!sorted.length && !(build.boots || []).length) return "";
-    return `<section class="arena-data-section arena-core-section"><header><div><span class="arena-section-icon" aria-hidden="true">◇</span><span><h3>核心物品</h3><small>核心装备统计 · ${sorted.length} 条</small></span></div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "core", index, scores)).join("")}</div>${renderArenaExpand("core", sorted.length)}` : ""}<div class="arena-slim-rows">${renderArenaSlimRow(sortedArenaRows(build.boots || []).slice(0, 3))}</div></section>`;
+    return `<section class="arena-data-section arena-core-section"><header><div><span class="arena-section-icon" aria-hidden="true">◇</span><span><h3>核心物品</h3><small>核心装备统计 · ${sorted.length} 条</small></span></div></header>${visible.length ? `<div class="arena-option-grid">${visible.map((row, index) => renderArenaOptionCard(row, "core", index, scores)).join("")}</div>${renderArenaExpand("core", sorted.length)}` : ""}<div class="arena-slim-rows">${renderArenaSlimRow(arenaOrderRows(build.boots || []).slice(0, 3))}</div></section>`;
   }
 
   // 斗魂与海斗共用同一张海克斯卡片：DOM 与类名一致，样式就不会再走偏。
@@ -2620,7 +2595,7 @@
     if (arenaTierTrigger) { openArenaTierDialog(arenaTierTrigger); return; }
     if (event.target.closest("[data-close-arena-tiers]")) { closeArenaTierDialog(); return; }
     const arenaSort = event.target.closest("[data-arena-sort]");
-    if (arenaSort) { state.arenaSort = arenaSort.dataset.arenaSort; render(); return; }
+    if (arenaSort) { state.arenaSort = arenaSort.dataset.arenaSort === "tier" ? "tier" : "games"; render(); return; }
     const arenaRarity = event.target.closest("[data-arena-rarity]");
     if (arenaRarity) {
       state.arenaRarity = arenaRarity.dataset.arenaRarity;

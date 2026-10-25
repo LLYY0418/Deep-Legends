@@ -754,7 +754,9 @@
 .arena-chips, .arena-first-tabs { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 3px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
 .arena-chips button, .arena-first-tabs button { min-height: 36px; padding: 0 10px; color: var(--muted); background: transparent; border: 0; border-radius: 8px; font-size: 10px; white-space: nowrap; }
 .arena-chips button:hover:not(:disabled), .arena-first-tabs button:hover:not(:disabled) { color: var(--ink); background: var(--surface-strong); }
-.arena-chips button.is-active, .arena-first-tabs button.is-active { color: var(--ink); background: var(--surface-strong); box-shadow: 0 0 0 1px var(--line); font-weight: 750; }
+.arena-first-tabs button.is-active { color: var(--ink); background: var(--surface-strong); box-shadow: 0 0 0 1px var(--line); font-weight: 750; }
+.arena-sort-chips button.is-active, .arena-sort-chips button.is-active:hover:not(:disabled),
+.arena-rarity-chips button.is-active, .arena-rarity-chips button.is-active:hover:not(:disabled) { color: var(--ink); background: var(--primary-soft); box-shadow: 0 0 0 1px color-mix(in oklab,var(--primary) 55%,transparent); font-weight: 750; }
 .arena-chips button:disabled, .arena-first-tabs button:disabled { cursor: not-allowed; opacity: .45; }
 .arena-sort-chips { margin-left: auto; }
 .arena-rarity-chips button { display: inline-flex; align-items: center; gap: 5px; }

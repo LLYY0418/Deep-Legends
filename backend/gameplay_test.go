@@ -510,7 +510,7 @@ func TestGameplayCoreOptionsPreserveTheFullUpstreamLimit(t *testing.T) {
 		rows[index].Assets = []championAsset{{ID: index + 1}}
 	}
 	options := recommendationOptions(rows)
-	got := capGameplayCoreOptions(options)
+	got := capGameplayCoreOptions(options, "ranked")
 	if len(got) != want || got[0].IDs[0] != 1 || got[want-1].IDs[0] != want {
 		t.Fatalf("core options = %#v, want the first %d options", got, want)
 	}

@@ -11,11 +11,12 @@ function snapshot(phase='ChampSelect', spells=[4,32], gameId=9014523366) {
   return {available:true, phase, gameId, queueId:2400, gameMode:'KIWI', mapId:12, players:[{isCurrent:true, teamId:100, championId:420, position:'other', spell1Id:spells[0], spell2Id:spells[1]}]};
 }
 function harness(apiImpl = async () => ({recommendations:payload()})) {
-  const dom = new JSDOM('<main></main>');
+  const dom = new JSDOM('<main></main>', {runScripts:'outside-only'});
+  dom.window.eval(fs.readFileSync(path.join(__dirname,'runtime.js'),'utf8'));
   const state = {live:null, liveRecommendations:new Map(), liveRecommendationScopes:new Map(), liveRecommendationSpells:new Map(), liveRecommendationTraces:new Map(), liveRecommendationFlights:new Map(), liveRecommendationFailures:new Map(), liveRecommendationRosters:new Map(), liveRecommendationSkipDiagnostics:new Set(), livePositionOverride:new Map(), liveGameGeneration:0, recommendationTab:'build'};
   const calls=[], diagnostics=[];
   let f;
-  const deps={state, URLSearchParams, USE_CHAMPION_PICK_INTENT_FOR_RECOMMENDATIONS:false, R116D_MATCHUP_PHASES:['gamestart','inprogress'], R116D_ROSTER_SIDE_LIMIT:5,
+  const deps={window:dom.window,state, URLSearchParams, USE_CHAMPION_PICK_INTENT_FOR_RECOMMENDATIONS:false, R116D_MATCHUP_PHASES:['gamestart','inprogress'], R116D_ROSTER_SIDE_LIMIT:5,
     liveRecommendationTier:()=> 'emerald_plus', isHextechClassic:()=>false, isOrdinaryHextechMatch:()=>false, isHextechQualifier:()=>false, queueDefinitionFor:()=>null,
     api:async url=>{calls.push(url);return apiImpl(url)}, fetch:async(_url,opts)=>{diagnostics.push(JSON.parse(opts.body));return {ok:true}},
     renderLive:()=>{if(state.live)dom.window.document.querySelector('main').innerHTML=f.renderRecommendationArea(state.live)},
