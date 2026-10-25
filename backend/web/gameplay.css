@@ -2504,7 +2504,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-combo-pair { display:flex; align-items:center; }
 .live-combo-pair>.arena-augment-icon { display:flex; width:32px; height:32px; flex:none; }
 .live-combo-pair>.arena-augment-icon+.arena-augment-icon { margin-left:-6px; border-radius:8px; box-shadow:0 0 0 3px var(--bg); }
-.live-combo-pair .game-icon { width:32px; height:32px; }
+.live-combo-pair .arena-augment-icon > .game-icon { width:100%; height:100%; flex-basis:100%; }
 .live-combo-names { display:grid; gap:3px; min-width:0; font-size:12px; }
 .live-combo-names>* { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .live-combo-names>span { color:var(--muted); }

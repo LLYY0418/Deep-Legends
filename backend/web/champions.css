@@ -1037,7 +1037,7 @@
 .mayhem-atlas-detail-head { padding:14px 16px; gap:14px; }
 .mayhem-atlas-detail-head h3 { font-size:20px; white-space:nowrap; }
 .mayhem-atlas-detail-head h3>span:last-child { overflow:hidden; text-overflow:ellipsis; }
-.mayhem-atlas-metrics { display:grid; grid-column:1/-1; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; }
+.mayhem-atlas-metrics { display:grid; grid-column:1/-1; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:8px; }
 .mayhem-atlas-metrics>div { display:grid; gap:4px; min-width:0; padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }
 .mayhem-atlas-metrics small { font-size:11px; color:var(--muted); }.mayhem-atlas-metrics b { font-size:17px; white-space:nowrap; }
 .mayhem-atlas-description { margin:14px 18px 0; font-size:13px; color:var(--ink); background:var(--bg); border-color:color-mix(in srgb,var(--primary) 30%,var(--line)); }
@@ -1067,7 +1067,7 @@
 .aramkit-controls { display:flex; gap:8px; align-items:center; }
 .mayhem-atlas-browser .app-select { min-width:0; width:100%; max-width:100%; }
 .mayhem-atlas-browser .app-select-trigger { min-width:0; width:100%; padding-inline:8px; font-size:11px; }
-.mayhem-atlas-metrics b { overflow:hidden; text-overflow:ellipsis; }
+.mayhem-atlas-metrics b { white-space:normal; overflow-wrap:anywhere; }
 .mayhem-atlas-metrics>div:last-child b { font-size:13px; }
 .mayhem-atlas-best small { white-space:nowrap; }
 .mayhem-atlas-best strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
