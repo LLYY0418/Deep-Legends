@@ -1,6 +1,47 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),{JSDOM}=require('../../desktop/node_modules/jsdom');
 const {read,compile}=require('./r188-harness.cjs'),af=require('./history-filters.js');
+test('R309 ordinary twenty-match network pages display every loaded row without search conditions',async()=>{
+ const dom=new JSDOM('<main><div class="matches-column"><div class="match-list"></div><div data-match-sentinel></div></div></main>'),document=dom.window.document,root=document.querySelector('main'),list=root.querySelector('.match-list');
+ const tab={key:'ordinary-pages',playerRef:'fixture-player',region:'cn',serverId:'HN1',matchFilter:'all',advancedConditions:{},openMatches:new Set()},state={controllers:new Map(),settings:{matchCount:20}},requests=[],noop=()=>{};
+ let f;
+ const render=()=>{if(tab.data){f.reconcileFilteredMatchList(list,tab);f.appendOverviewMatches(tab,[]);}};
+ f=compile(read('gameplay.js'),['loadOverview','normalizedPagination','loadNextMatchWindow','revealLoadedMatchWindow','filteredMatches','matchRenderWindow','reconcileFilteredMatchList','appendOverviewMatches','paginationCopyFor','matchSentinelShouldHide','bindMatchSentinel'],{
+  document,window:{},state,MAX_BROWSE_MATCHES:1000,AUTO_PAGE_DELAY_MS:400,AUTO_PAGE_MAX_BACKOFF_MS:8000,number:String,escapeHTML:require('./r188-harness.cjs').escapeHTML,
+  connected:()=>true,tabReady:()=>true,riotTab:()=>false,tabGroup:()=> 'cn',overviewContainer:()=>root,rerenderTab:render,matchObserverKey:()=> 'matchObserver',
+  showLoadingMoreState:noop,showToast:message=>assert.fail(message),loadOPGGSeasonSummary:noop,loadOverviewCurrentGame:noop,loadMayhemRating:noop,syncOverviewSupplementRefs:noop,rememberTabPlayerRef:noop,playerLabel:()=> 'Fixture',renderCapabilitySettings:noop,computeOverviewStreak:()=>null,reportDeferredMatchesCard:noop,
+  renderMatch:match=>`<article class="match-entry" data-match-id="${match.gameId}"></article>`,bindOverviewContent:noop,applyRenderedMetricStyles:noop,prepareImages:noop,patchLPChip:noop,boundMatchDOM:noop,observeMatchTierVisibility:noop,fitMatchTags:noop,matchTierScope:()=> 'season',
+  api:async(path,options)=>{
+   assert.equal(path,'/api/gameplay/overview');const request=JSON.parse(options.body);requests.push(request);assert.equal(request.count,20);assert.equal(request.begIndex,(requests.length-1)*20);assert.equal(request.matchFilter,'all');assert(requests.length<=3,'unexpected additional page');
+   return {player:{playerRef:'fixture-player',region:'cn',serverId:'HN1'},ranks:[],matches:Array.from({length:20},(_,i)=>({gameId:request.begIndex+i+1,queueId:420})),pagination:{begIndex:request.begIndex,count:20,hasMore:requests.length<3}};
+  },
+ });
+ const assertRows=count=>{assert.equal(tab.data.matches.length,count);assert.equal(list.querySelectorAll('.match-entry').length,count);assert.deepEqual([...list.children].map(row=>Number(row.dataset.matchId)),Array.from({length:count},(_,i)=>i+1));assert.deepEqual(tab.advancedConditions,{});};
+ try{
+  assert.equal(await f.loadOverview(tab),true);assertRows(20);
+  for(const count of [40,60]){const more=root.querySelector('[data-load-more]');assert(more,'production pagination exposes the next page');more.click();for(let turn=0;turn<10&&tab.loadingMore;turn++)await new Promise(setImmediate);assert.equal(tab.loadingMore,false);assertRows(count);}
+  assert.deepEqual(requests.map(request=>[request.begIndex,request.count]),[[0,20],[20,20],[40,20]]);assert.equal(root.querySelector('[data-load-more]'),null);assert.equal(Boolean(tab.data.pagination.hasMore),false);
+ }finally{dom.window.close();}
+});
+test('R309 revealing loaded rows consumes scroll intent before the sentinel is rebound',async()=>{
+ const dom=new JSDOM('<div id="app-scroll"><main><div class="match-list"></div><div data-match-sentinel></div></main></div>'),w=dom.window,scroll=w.document.getElementById('app-scroll'),root=scroll.firstChild,list=root.querySelector('.match-list');
+ const tab={data:{matches:Array.from({length:60},(_,i)=>({gameId:i+1,queueId:420})),pagination:{hasMore:true}},openMatches:new Set()},frames=[],timers=[],observers=[];let network=0;
+ class IO{constructor(callback){this.callback=callback;observers.push(this);}observe(){}disconnect(){}}
+ const f=compile(read('gameplay.js'),['bindMatchSentinel','revealLoadedMatchWindow','appendOverviewMatches','reconcileFilteredMatchList','filteredMatches','matchRenderWindow'],{
+  document:w.document,window:{IntersectionObserver:IO,requestAnimationFrame:fn=>frames.push(fn)},IntersectionObserver:IO,state:{},matchObserverKey:()=> 'matchObserver',overviewContainer:()=>root,
+  clearTimeout(){},setTimeout:fn=>(timers.push(fn),timers.length),loadOverview:async()=>{network++;return true;},
+  renderMatch:match=>`<article class="match-entry" data-match-id="${match.gameId}"></article>`,bindOverviewContent(){},applyRenderedMetricStyles(){},prepareImages(){},patchLPChip(){},
+  boundMatchDOM(){},observeMatchTierVisibility(){},fitMatchTags(){},matchTierScope:()=> 'season',paginationCopyFor:()=> '',matchSentinelShouldHide:()=>false,
+ });
+ const flush=async()=>{assert(frames.length<=1);while(frames.length)frames.shift()();assert(timers.length<=1);while(timers.length)await timers.shift()();};
+ const near=()=>observers.at(-1).callback([{isIntersecting:true}]);
+ try{
+  f.reconcileFilteredMatchList(list,tab);f.bindMatchSentinel(root,tab);assert.equal(list.children.length,20);near();await flush();assert.equal(list.children.length,20);
+  scroll.dispatchEvent(new w.WheelEvent('wheel',{deltaY:100}));await flush();assert.equal(list.children.length,40);assert.equal(observers.length,2);
+  near();await flush();assert.equal(list.children.length,40,'a new observer must await a second user gesture');assert.equal(network,0);
+  scroll.dispatchEvent(new w.WheelEvent('wheel',{deltaY:100}));await flush();assert.equal(list.children.length,60);near();await flush();assert.equal(list.children.length,60);assert.equal(network,0);
+ }finally{dom.window.close();}
+});
 test('R309 clearing 1000 rows renders twenty and loaded windows reveal twenty before any network',()=>{
  const dom=new JSDOM('<main><div class="match-list"></div></main>'),root=dom.window.document.querySelector('main'),tab={data:{matches:Array.from({length:1000},(_,i)=>({gameId:i+1}))},openMatches:new Set()};let network=0;
  const f=compile(read('gameplay.js'),['matchRenderWindow','revealLoadedMatchWindow','loadNextMatchWindow'],{filteredMatches:rows=>rows,overviewContainer:()=>root,reconcileFilteredMatchList:(list,t)=>list.innerHTML=f.matchRenderWindow(t.data.matches,t).map(m=>`<article class="match-entry" data-match-id="${m.gameId}"></article>`).join(''),appendOverviewMatches(){},loadOverview:()=>network++});

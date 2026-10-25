@@ -3036,6 +3036,21 @@ func TestGameplayLiveUsesCurrentChampionWhenRosterIsUnavailable(t *testing.T) {
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	a := &app{connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root})}
+	// The real CHERRY pregame probe may persist after the response returns.
+	// Join it before the fixture removes its store; do not race the writer.
+	defer func() {
+		s := client.arenaDiscoveryState()
+		s.mu.Lock()
+		probe := s.progression
+		s.mu.Unlock()
+		if probe != nil {
+			select {
+			case <-probe.done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("real Arena progression probe did not finish before fixture cleanup")
+			}
+		}
+	}()
 	recorder := httptest.NewRecorder()
 	a.handleGameplayLive(recorder, httptest.NewRequest(http.MethodGet, "/api/gameplay/live", nil))
 	if recorder.Code != http.StatusOK {

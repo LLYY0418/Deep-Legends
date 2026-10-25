@@ -411,7 +411,7 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 .ac-save-state { display:inline-flex; padding:3px 8px; border-radius:6px; font-size:11px; white-space:nowrap; color:var(--muted); background:var(--surface-strong); }
 .ac-tabs > .ac-save-state { margin-left:auto; }
 .ac-save-state.ac-saved { color:var(--primary-strong); background:var(--primary-soft); }
-.ac-save-state.ac-dirty { color:var(--warning); background:color-mix(in oklab,var(--warning) 15%,var(--surface)); }
+.ac-save-state.ac-dirty { color:var(--ac-unsaved-dot); background:color-mix(in oklab,var(--ac-unsaved-dot) 15%,var(--surface)); }
 .ac-tabs .ac-feedback { flex-basis:100%; margin-bottom:6px; }
 .ac-items { --ac-shop-height:398px; align-items:start; }
 .ac-filter { height:var(--ac-shop-height); max-height:var(--ac-shop-height); overflow-y:auto; box-sizing:border-box; }

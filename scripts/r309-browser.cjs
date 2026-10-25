@@ -1,4 +1,5 @@
 'use strict';
+const {waitForVisibleImages}=require('./screenshot-assets.cjs');
 const {browser}=require('./r297-browser-harness.cjs');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const detail=require('../backend/testdata/r308/detail-response.json');
@@ -24,7 +25,11 @@ function assetFixture(req,res){const u=new URL(req.url,'http://fixture');if(!['/
  if(name==='champions.js'){const s=data.toString(),i=s.lastIndexOf('})();');return Buffer.from(s.slice(0,i)+'window.__r308={state,render,loadMayhemAugmentDetail,renderARAMKitBalance,prepareImages};\n'+s.slice(i));}return data;
  }});
  const settle=()=>b.evaluate(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
- const shot=async name=>{await settle();await b.shot(name);report.screenshots.push(name+'.png');};
+ const shot=async name=>{
+ await settle();
+ await waitForVisibleImages(b,'#champions-root img[data-champion-image],.recommendation-area img');
+ await b.shot(name);report.screenshots.push(name+'.png');
+ };
  try{
  await b.call('Page.addScriptToEvaluateOnNewDocument',{source:`localStorage.setItem('lol-loot-champion-mode','aram-mayhem')`});
  await b.call('Emulation.setDeviceMetricsOverride',{width:1920,height:2100,deviceScaleFactor:1,mobile:false});
@@ -80,6 +85,10 @@ function assetFixture(req,res){const u=new URL(req.url,'http://fixture');if(!['/
  const alignment=await b.evaluate(`(()=>{const cols=[...__probe.querySelectorAll('.live-augment-column')].map(n=>n.getBoundingClientRect()),combos=[...__probe.querySelectorAll('.live-aramkit-combo')].map(n=>n.getBoundingClientRect()),core=[...__probe.querySelectorAll('.item-core-column .config-option')].map(n=>n.getBoundingClientRect()),rank=[...__probe.querySelectorAll('.live-item-ranking article')].map(n=>n.getBoundingClientRect());return{columnDiffs:cols.map((r,i)=>Math.abs(r.left-combos[i].left)),coreHeights:core.map(r=>r.height),rankHeights:rank.map(r=>r.height),coreYs:core.map(r=>r.top),rankYs:rank.filter((_,i)=>i%2===0).map(r=>r.top)}})()`);assert(alignment.columnDiffs.every(x=>x<=1));assert(alignment.coreHeights.every(x=>x===56));assert(alignment.rankHeights.every(x=>x===56));assert(alignment.coreYs.every((y,i)=>Math.abs(y-alignment.rankYs[i])<=1),JSON.stringify(alignment));report.checks.push({width,alignment});await shot('live-'+width);
  }
  const tip=await b.evaluate(`(()=>{const icon=__probe.querySelector('.live-combo-pair [data-tooltip]');icon.focus();return icon.dataset.tooltip})()`);await b.until('document.querySelector("#global-tooltip[data-shown=true]")');await b.evaluate('new Promise(r=>setTimeout(r,150))');const tipStyle=await b.evaluate(`(()=>{const n=document.querySelector('#global-tooltip'),s=getComputedStyle(n);return{opacity:s.opacity,background:s.backgroundColor,topLayer:n.matches(':popover-open'),text:n.textContent}})()`);assert.equal(tipStyle.opacity,'1');assert(tipStyle.topLayer);assert(tipStyle.text.includes(tip.split('\n')[0]));await shot('live-tooltip');report.checks.push({tooltip:tipStyle});
+ await b.call('Emulation.setDeviceMetricsOverride',{width:1600,height:1150,deviceScaleFactor:1,mobile:false});
+ await b.evaluate(`(async()=>{document.activeElement?.blur();await deepLegendsSections.load('auto-config-live');const live=deepLegendsGameAutoConfig.nodes.liveContent;live.hidden=false;live.replaceChildren(__probe);document.querySelector('.app-scroll').replaceChildren(live);__r297.state.autoConfigSettings={enabled:true,runes:true,spells:true,items:true};__probe.innerHTML=deepLegendsAutoConfigLive.renderCustomConfiguration({championId:164,modeLabel:'排位 · 上路',entry:{spells:{spell1Id:4,spell2Id:14},items:{starter:[{id:1054,count:1},{id:2003,count:1}],core:[3078,3071,3053]}}});__r308.prepareImages(__probe);})()`);await settle();
+ await b.until(`__probe.querySelector('.custom-config-card')?.dataset.spellLayout==='footer'`);assert.equal(await b.evaluate(`__probe.querySelectorAll('.specialist-game-footer [data-card-spells] img').length`),2);
+ const divider=await b.evaluate(`(()=>{const n=__probe.querySelector('.sg-starters+.sg-items'),s=getComputedStyle(n);return{margin:s.marginLeft,padding:s.paddingLeft,border:s.borderLeftWidth,overflow:n.scrollWidth>n.clientWidth+1}})()`);assert.deepEqual(divider,{margin:'22px',padding:'22px',border:'1px',overflow:false});report.checks.push({customConfigDivider:divider});await shot('live-custom-config');
  assert.deepEqual(report.regressions,[],"numeric metrics must remain fully visible and real combo icons must fill their frame content box");report.missingAssets=[...missing];assert.deepEqual(report.missingAssets,[],'all screenshots require actual image assets');assert.deepEqual(b.errors,[]);report.errors=b.errors;
  }catch(e){report.missingAssets=[...missing];await b.shot('failure');report.failure=e.stack;throw e;}finally{fs.writeFileSync(path.join(out,'result.json'),JSON.stringify(report,null,2));await b.stop();}
  console.log(JSON.stringify(report));

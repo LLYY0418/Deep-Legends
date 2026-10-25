@@ -5674,6 +5674,7 @@
   function revealLoadedMatchWindow(tab) {
     const rows=filteredMatches(tab.data?.matches||[],tab),count=Number(tab.filteredVisibleCount||20);
     if(rows.length<=count)return false;
+    tab.matchAutoloadRequested=false;
     tab.filteredVisibleCount=count+20;const container=overviewContainer(tab);reconcileFilteredMatchList(container?.querySelector('.match-list'),tab);appendOverviewMatches(tab,[],true);return true;
   }
   function loadNextMatchWindow(tab) {if(revealLoadedMatchWindow(tab))return Promise.resolve(true);tab.filteredVisibleCount=Number(tab.filteredVisibleCount||20)+20;return loadOverview(tab,false,true,true);}

@@ -17,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix='r269-mutants-') as temp:
  ('p3-hide-zero-choices',[('for(const value of fixed)map.set(value,{value,label:labels[value],count:0,wins:0,recent:0});','')]),
  ('p4-resurrect-stale-edit',[("if(!m.open)m.conditions=clone(conditions(t))","if(!m.open && !m.conditions)m.conditions=clone(conditions(t))"),("delete m.conditions;","")]),
  ('p5-stop-keeps-request',[("abort?.();",";")]),
- ('p5-foreign-scan-300',[("ctx.foreign?.()?100:300","ctx.foreign?.()?300:300")])]
+ ('p5-foreign-scan-300',[("function scanLimit(tab,ctx) {return ctx.foreign?.()?100:","function scanLimit(tab,ctx) {return ctx.foreign?.()?300:")])]
  run('node-original',['node','--test','backend/web/r269.test.cjs'])
  for name,changes in node:
   mutant=source

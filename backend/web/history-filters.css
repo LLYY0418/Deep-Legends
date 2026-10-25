@@ -131,3 +131,8 @@
 
 .af-status-message { margin:10px 0; padding:10px 12px; border-radius:9px; background:var(--surface-strong); color:var(--muted); font-size:12px; line-height:1.7; }
 .af-upstream-warning { color:var(--warning); background:color-mix(in srgb,var(--warning) 12%,transparent); }
+.af-pane .af-options:has(> [data-af-option="m2"]) { grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.af-pane .af-options:has(> [data-af-option="m2"]) > button { flex-direction:column; align-items:flex-start; justify-content:center; gap:4px; min-height:76px; padding:11px 14px; }
+.af-options:has(> [data-af-option="m2"]) strong { font-size:13.5px; }
+.af-options:has(> [data-af-option="m2"]) small { font-size:12px; }
+.af-options:has(> [data-af-option="m2"]) > button.is-active strong { color:var(--primary-strong); }
