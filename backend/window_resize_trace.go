@@ -14,21 +14,23 @@ type resizeBounds struct {
 
 func (a *app) recordWindowResizeTrace(w http.ResponseWriter, r clientDiagnosticRequest) {
 	var v struct {
-		Reason        string        `json:"-"`
-		Drag          int64         `json:"drag"`
-		Sample        int           `json:"sample"`
-		Bounds        resizeBounds  `json:"bounds"`
-		ContentBounds resizeBounds  `json:"contentBounds"`
-		NextBounds    *resizeBounds `json:"nextBounds,omitempty"`
-		Minimum       [2]int        `json:"minimum"`
-		Zoom          float64       `json:"zoom"`
-		InnerWidth    int           `json:"innerWidth"`
-		InnerHeight   int           `json:"innerHeight"`
-		NextFrameMS   float64       `json:"nextFrameMs"`
-		LongtaskCount int           `json:"longtaskCount"`
-		LongtaskMaxMS float64       `json:"longtaskMaxMs"`
+		ZoomChanges    int           `json:"zoomChanges"`
+		SidebarChanges int           `json:"sidebarChanges"`
+		Reason         string        `json:"-"`
+		Drag           int64         `json:"drag"`
+		Sample         int           `json:"sample"`
+		Bounds         resizeBounds  `json:"bounds"`
+		ContentBounds  resizeBounds  `json:"contentBounds"`
+		NextBounds     *resizeBounds `json:"nextBounds,omitempty"`
+		Minimum        [2]int        `json:"minimum"`
+		Zoom           float64       `json:"zoom"`
+		InnerWidth     int           `json:"innerWidth"`
+		InnerHeight    int           `json:"innerHeight"`
+		NextFrameMS    float64       `json:"nextFrameMs"`
+		LongtaskCount  int           `json:"longtaskCount"`
+		LongtaskMaxMS  float64       `json:"longtaskMaxMs"`
 	}
-	if len(r.ResizeTrace) == 0 || json.Unmarshal(r.ResizeTrace, &v) != nil || v.Sample < 1 || v.Sample > 60 || v.Drag <= 0 || v.Zoom < .1 || v.Zoom > 8 || v.InnerWidth < 0 || v.InnerWidth > 100000 || v.NextFrameMS < 0 || v.NextFrameMS > 60000 || v.LongtaskCount < 0 || v.LongtaskMaxMS < 0 || v.LongtaskMaxMS > 60000 {
+	if len(r.ResizeTrace) == 0 || json.Unmarshal(r.ResizeTrace, &v) != nil || v.Sample < 1 || v.Sample > 60 || v.Drag <= 0 || v.Zoom < .1 || v.Zoom > 8 || v.InnerWidth < 0 || v.InnerWidth > 100000 || v.NextFrameMS < 0 || v.NextFrameMS > 60000 || v.ZoomChanges < 0 || v.SidebarChanges < 0 || v.LongtaskCount < 0 || v.LongtaskMaxMS < 0 || v.LongtaskMaxMS > 60000 {
 		http.Error(w, "invalid resize trace", 400)
 		return
 	}

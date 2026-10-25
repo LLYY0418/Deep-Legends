@@ -293,6 +293,17 @@ func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, op
 		if path == "" {
 			return nil, "unresolved"
 		}
+		c.mu.RLock()
+		version := c.gameVersion
+		c.mu.RUnlock()
+		cacheKey := version + "|" + path
+		state := c.arenaDiscoveryState()
+		state.mu.Lock()
+		cachedStatus := state.deadProgressionPaths[cacheKey]
+		state.mu.Unlock()
+		if cachedStatus != 0 {
+			return nil, fmt.Sprintf("http-%d", cachedStatus)
+		}
 		probe, stop := context.WithTimeout(ctx, 2*time.Second)
 		defer stop()
 		var raw json.RawMessage
@@ -304,6 +315,14 @@ func (a *app) readArenaProgressionSnapshot(ctx context.Context, c *LCUClient, op
 			var httpErr *LCUHTTPError
 			if errors.As(err, &httpErr) {
 				snap.HTTPStatus[kind] = httpErr.StatusCode
+				if httpErr.StatusCode == 404 {
+					state.mu.Lock()
+					if state.deadProgressionPaths == nil {
+						state.deadProgressionPaths = map[string]int{}
+					}
+					state.deadProgressionPaths[cacheKey] = httpErr.StatusCode
+					state.mu.Unlock()
+				}
 				return nil, fmt.Sprintf("http-%d", httpErr.StatusCode)
 			}
 			snap.HTTPStatus[kind] = 0
@@ -506,6 +525,12 @@ func arenaProgressionEventSnapshot(s *arenaFameDiscoveryState) map[string]float6
 func (c *LCUClient) observeArenaProgressionEvent(event LCUEvent) {
 	if c == nil || !(strings.HasPrefix(event.URI, "/lol-progression/v1/") || strings.Contains(event.URI, "/progression/v1/notifications/")) {
 		return
+	}
+	c.diagnosticMu.Lock()
+	observeFame := c.arenaFameObserve
+	c.diagnosticMu.Unlock()
+	if observeFame != nil {
+		observeFame(event)
 	}
 	path := arenaDiscoveryURI(event.URI)
 	if path == "" {

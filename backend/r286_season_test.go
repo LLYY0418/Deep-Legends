@@ -16,7 +16,7 @@ func TestR286RankedCompletesWithoutMayhem(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := &app{}
-	ranks, _ := a.applySeasonRankWinRateFallback([]gameplayRank{{QueueType: "RANKED_SOLO_5x5", Wins: 7, WinRate: -1}}, EndpointCapability{}, p, map[int64]gameplayAggregate{420: {Games: 10, Wins: 7, Losses: 3, WinRate: 70}})
+	ranks, _ := a.applySeasonRankWinRateFallback([]gameplayRank{{QueueType: "RANKED_SOLO_5x5", Wins: 7, WinRate: -1}}, EndpointCapability{}, seasonRankRecordSnapshot{progress: p, byQueue: map[int64]gameplayAggregate{420: {Games: 10, Wins: 7, Losses: 3, WinRate: 70}}})
 	if ranks[0].Losses != 3 || ranks[0].WinRate != 70 {
 		t.Fatalf("ranked complete must ignore stuck mayhem: %+v", ranks)
 	}
@@ -125,7 +125,7 @@ func TestR286RankRecordDiagnosticHTTP(t *testing.T) {
 	a := r175App(t)
 	for _, queue := range []string{"solo", "flex"} {
 		for _, state := range []string{"known", "collecting", "paused", "unavailable"} {
-			r := httptest.NewRequest("POST", "/api/diagnostics/client", strings.NewReader(`{"event":"rank_record_state","reason":"`+state+`","queue":"`+queue+`","state":"`+state+`"}`))
+			r := httptest.NewRequest("POST", "/api/diagnostics/client", strings.NewReader(`{"event":"rank_record_state","reason":"`+state+`","queue":"`+queue+`","state":"`+state+`","source":"season","cause":"initial","render_seq":1}`))
 			w := httptest.NewRecorder()
 			a.handleClientDiagnostic(w, r)
 			if w.Code != 204 {

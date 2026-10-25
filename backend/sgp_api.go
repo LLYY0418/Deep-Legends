@@ -1155,7 +1155,8 @@ type sgpRankedStats struct {
 	HighestPreviousSeasonAchievedTier string           `json:"highestPreviousSeasonAchievedTier"`
 	HighestPreviousSeasonAchievedRank string           `json:"highestPreviousSeasonAchievedRank"`
 	// cherryRaw keeps the raw CHERRY entry for the R263 shape diagnostic.
-	cherryRaw json.RawMessage
+	cherryRaw   json.RawMessage
+	fameScanRaw json.RawMessage
 }
 
 // rankedStatsOn 在当前登录的国服子服务器读取排位。接口路径虽然接受
@@ -1191,6 +1192,7 @@ func (p *sgpProvider) rankedStatsOn(ctx context.Context, client *LCUClient, serv
 	})
 	stats := sgpRankedStats{
 		Queues:                            make([]sgpRankedQueue, 0, len(payload.Queues)),
+		fameScanRaw:                       append(json.RawMessage(nil), raw...),
 		HighestPreviousSeasonEndTier:      payload.HighestPreviousSeasonEndTier,
 		HighestPreviousSeasonEndRank:      payload.HighestPreviousSeasonEndRank,
 		HighestPreviousSeasonAchievedTier: payload.HighestPreviousSeasonAchievedTier,

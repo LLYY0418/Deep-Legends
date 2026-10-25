@@ -23,9 +23,12 @@ import (
 var arenaFameLevelThresholds = []int{100, 1600, 3600, 6100, 9100, 12600, 16600, 21600, 26600, 31600, 37600, 47600}
 
 type gameplayArenaFame struct {
-	Level int    `json:"level"`
-	Fame  int    `json:"fame"`
-	Tier  string `json:"tier"`
+	Level      int        `json:"level"`
+	Fame       int        `json:"fame"`
+	Tier       string     `json:"tier"`
+	Source     string     `json:"source,omitempty"`
+	ObservedAt *time.Time `json:"observedAt,omitempty"`
+	LastDelta  *int       `json:"lastDelta,omitempty"`
 }
 
 func arenaLevelForFame(fame int) int {
@@ -105,6 +108,9 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 	state.mu.Lock()
 	if entry, ok := state.fame.entries[key]; ok && time.Since(entry.at) < arenaFameCacheTTL {
 		state.mu.Unlock()
+		if isCurrent && entry.value == nil {
+			return a.ownArenaFame(client)
+		}
 		return entry.value
 	}
 	state.mu.Unlock()
@@ -127,6 +133,9 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 		if err := client.RequestJSON(ctx, http.MethodGet, path, nil, &payload); err == nil {
 			source = dataSourceLCU
 			queueTypes = arenaDiscoveryQueueTypes(payload)
+			if !isCurrent {
+				a.scanOtherArenaFame(client, playerRef, "lcu", payload)
+			}
 			if isCurrent {
 				client.rememberArenaQueueTypes(source, queueTypes)
 			}
@@ -146,6 +155,9 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 	if !found && a.sgp != nil && clientRiotPlatform(client) == "" && serverID != "" && !isRemoteTencentServer(client, serverID) {
 		if stats, err := a.sgp.rankedStatsOn(ctx, client, serverID, playerRef, isCurrent, privacy); err == nil {
 			source = dataSourceSGP
+			if !isCurrent {
+				a.scanOtherArenaFame(client, playerRef, "sgp", stats.fameScanRaw)
+			}
 			queueTypes = []string{}
 			for _, q := range stats.Queues {
 				if arenaDiscoveryIdentifier.MatchString(q.QueueType) {
@@ -165,7 +177,13 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 			}
 		}
 	}
+	if !isCurrent {
+		a.probeOtherArenaChallenges(ctx, client, playerRef)
+	}
 	if source == "" {
+		if isCurrent {
+			return a.ownArenaFame(client)
+		}
 		return nil // transient failure: do not cache
 	}
 	value, reason := arenaFameFromRated(tier, rating)
@@ -189,12 +207,18 @@ func (a *app) loadLiveArenaFame(ctx context.Context, client *LCUClient, referenc
 	}
 	state.fame.entries[key] = arenaFameCacheEntry{value: value, at: time.Now()}
 	state.mu.Unlock()
+	if isCurrent {
+		return a.ownArenaFame(client)
+	}
 	return value
 }
 
 // recordArenaFameShape records, once per source and self/other, the CHERRY
 // entry key names plus a fixed set of scalar values. No identity is recorded.
 func (a *app) recordArenaFameShape(source string, isSelf, found bool, raw json.RawMessage, reason string, queueTypes ...[]string) {
+	if !isSelf {
+		return // Other-player responses are inspected only by the key-path scanner.
+	}
 	logKey := source + "|" + map[bool]string{true: "self", false: "other"}[isSelf]
 	state := a.r263()
 	state.mu.Lock()

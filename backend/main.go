@@ -55,24 +55,27 @@ type app struct {
 	announcementsOnce sync.Once
 	announcements     *announcementCache
 
-	license                         *licenseManager
-	collectionDataRetry             *time.Timer
-	collectionDataRetryCount        int
-	collectionDataRetryClient       *LCUClient
-	champLite                       champSelectLiteState
-	liveSnapshots                   liveSnapshotCache
-	liveClientAllGameData           func(context.Context) ([]byte, int, error)
-	liveClientAllGameDataMu         sync.Mutex
-	liveClientAllGameDataKeys       map[string]struct{}
-	mayhemSamplerMu                 sync.Mutex
-	mayhemSamplerGameID             int64
-	mayhemSamplerClient             *LCUClient
-	mayhemSamplerDoneGameID         int64
-	mayhemSamplerCancel             context.CancelCauseFunc
-	mayhemSamplerNow                func() time.Time
-	mayhemSamplerWait               func(context.Context, time.Duration) bool
-	gameplayFlow                    gameplayFlowState
-	overviewTimeout                 func(context.Context, time.Duration) (context.Context, context.CancelFunc)
+	license                   *licenseManager
+	collectionDataRetry       *time.Timer
+	collectionDataRetryCount  int
+	collectionDataRetryClient *LCUClient
+	champLite                 champSelectLiteState
+	liveSnapshots             liveSnapshotCache
+	liveClientAllGameData     func(context.Context) ([]byte, int, error)
+	liveClientAllGameDataMu   sync.Mutex
+	liveClientAllGameDataKeys map[string]struct{}
+	mayhemSamplerMu           sync.Mutex
+	mayhemSamplerGameID       int64
+	mayhemSamplerClient       *LCUClient
+	mayhemSamplerDoneGameID   int64
+	mayhemSamplerCancel       context.CancelCauseFunc
+	mayhemSamplerNow          func() time.Time
+	mayhemSamplerWait         func(context.Context, time.Duration) bool
+	gameplayFlow              gameplayFlowState
+	overviewTimeout           func(context.Context, time.Duration) (context.Context, context.CancelFunc)
+	// Optional observation seam: lets tests order a persisted snapshot update
+	// after the first read without changing the snapshot or request budget.
+	overviewSnapshotLoaded          func()
 	updates                         *updateManager
 	runtimeCancel                   context.CancelFunc
 	proRefreshContext               context.Context
@@ -330,6 +333,10 @@ type app struct {
 	proIdentityDiagnosticMu             sync.Mutex
 	proIdentityDiagnosticKeys           map[[32]byte]struct{}
 	proIdentityDiagnosticOrder          [][32]byte
+	rankRecordMu                        sync.Mutex
+	rankRecordCache                     map[string]*seasonRankRecordPlayer
+	rankRecordClock                     uint64
+	rankedRecordBuckets                 map[string]*rankedRecordBucket
 	rankedWinrateDiagnosticMu           sync.Mutex
 	rankedWinrateDiagnosticBuckets      map[string]*rankedWinrateDiagnosticBucket
 	lcuGameflowShapeDiagnosticMu        sync.Mutex
@@ -1506,6 +1513,7 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	a.bindHistoryGameCache(client)
 	a.bindColdRequestCounters(client)
 	client.setDiagnosticObserver(a.recordDiagnostic)
+	a.bindArenaFameEvents(client)
 	client.mu.RLock()
 	seed := client.discoverySummoner
 	client.mu.RUnlock()
@@ -1653,6 +1661,7 @@ func (a *app) queueCollectionRefresh(source string) {
 func (a *app) refreshWithClient(client *LCUClient) bool {
 	a.bindHistoryGameCache(client)
 	client.setDiagnosticObserver(a.recordDiagnostic)
+	a.bindArenaFameEvents(client)
 	a.mu.RLock()
 	queuedEvent := a.collectionRefreshPending
 	a.mu.RUnlock()
@@ -1837,6 +1846,7 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 
 func (a *app) refreshAccountWithClient(client *LCUClient) {
 	client.setDiagnosticObserver(a.recordDiagnostic)
+	a.bindArenaFameEvents(client)
 	a.mu.Lock()
 	if a.syncing || !a.clientSessionConnectedLocked() || a.lcu != client {
 		a.mu.Unlock()
@@ -2034,6 +2044,10 @@ func (a *app) recordDiagnostic(event map[string]any) {
 	}
 	if eventName, _ := event["event"].(string); eventName == "ranked_winrate_resolved" {
 		a.aggregateRankedWinrateDiagnostic(event, time.Now())
+		return
+	}
+	if eventName, _ := event["event"].(string); eventName == "ranked_record_resolved" {
+		a.aggregateRankedRecordDiagnostic(event, time.Now())
 		return
 	}
 	if eventName, ok := event["event"].(string); ok && isNoisyDiagnosticEvent(eventName) {

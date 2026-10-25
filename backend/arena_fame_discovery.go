@@ -17,6 +17,7 @@ import (
 
 // The client owns this state; reconnecting creates a new observation scope.
 type arenaFameDiscoveryState struct {
+	deadProgressionPaths  map[string]int
 	mu                    sync.Mutex
 	started               bool
 	done                  chan struct{}
@@ -35,6 +36,11 @@ type arenaFameDiscoveryState struct {
 	progressionEvents     map[string]map[string]float64
 	progressionGroupIDs   map[string]bool
 	progressionGroupPaths map[string]bool
+	fameGroupChanged      bool
+	fameThresholdMismatch bool
+	fameOtherRef          string
+	fameOtherSources      map[string]bool
+	fameOtherChallenges   bool
 }
 
 var arenaDiscoveryName = regexp.MustCompile(`(?i)cherry|arena|fame|gladiator|progression|eog|end-of-game|pre-end-of-game`)

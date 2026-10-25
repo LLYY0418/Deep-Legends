@@ -16,8 +16,17 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			body := `{"event":"` + event + `","reason":"` + reason + `","key":"13:middle:CLASSIC:11:4-12","championId":13,"queueId":420,"position":"MID"}`
 
-			if event == "rank_record_state" {
-				body = `{"event":"rank_record_state","reason":"` + reason + `","queue":"solo","state":"` + reason + `"}`
+			if event == "rank_record_state" || event == "rank_record_final_state" {
+				body = `{"event":"` + event + `","reason":"` + reason + `","queue":"solo","state":"` + reason + `","source":"season","cause":"initial","render_seq":1}`
+			}
+			if event == "rank_record_downgrade_blocked" {
+				body = `{"event":"` + event + `","reason":"retained","queue":"solo","source":"season"}`
+			}
+			if event == "rank_record_fill_retry" {
+				body = `{"event":"` + event + `","reason":"` + reason + `","result":"` + reason + `","attempt":1}`
+			}
+			if event == "ranked_record_resolved" {
+				body = `{"event":"` + event + `","reason":"resolved","branch":"normal","queue":"solo","filled_by":"season"}`
 			}
 			if event == "match_filter_view" {
 				body = `{"event":"match_filter_view","reason":"render","source":"view-cache","filter":"all"}`
@@ -60,6 +69,12 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 			}
 			if event == "window_resize_trace" {
 				body = `{"event":"window_resize_trace","reason":"` + reason + `","resizeTrace":{"drag":1,"sample":1,"zoom":1,"innerWidth":858}}`
+			}
+			if event == "filter_action_client" {
+				body = `{"event":"` + event + `","reason":"` + reason + `","r278":{"action":"` + reason + `","rows_loaded":1000,"rows_rendered":20,"click_to_paint_ms":25,"longtask_ms":0}}`
+			}
+			if event == "mayhem_augment_detail_client" {
+				body = `{"event":"` + event + `","reason":"read","r278":{"augment_id":1,"source":"cache","ms":0,"result":"ok"}}`
 			}
 			request := httptest.NewRequest(http.MethodPost, "/api/diagnostics/client", strings.NewReader(body))
 			(&app{}).handleClientDiagnostic(recorder, request)

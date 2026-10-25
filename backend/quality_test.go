@@ -677,6 +677,7 @@ var privacyMkdirCallPins = map[string]int{
 }
 
 var privacyStoreWriteCallPins = map[string]int{
+	"arena_fame_events.go":       1, // arena-fame-events.json: declared salted account/server binding, own event counters/milestones and previous-event delta; at most 64 accounts, local only.
 	"arena_fame_progression.go":  1, // arena-progression-before.json: declared filtered numeric snapshot, salted account/platform/game binding and 30m expiry.
 	"patch_release_schedule.go":  1, // Root patch-release-schedule.json: declared public release dates and local refresh status; no account data.
 	"ui_preferences.go":          1, // Root ui-preferences.json: local UI choices/read revisions; no new directory.

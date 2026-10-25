@@ -142,7 +142,7 @@ func TestR286ProgressionBeforeAfterReadOnlyResolvedFromFullHelp(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			if kind == "unresolved" {
-				if calls["/lol-progression/v1/groups/configuration"] != 2 || calls["/lol-inventory/v1/cherry-inventory"] != 2 || event["before_status"].(map[string]any)["configuration"] != "http-404" {
+				if calls["/lol-progression/v1/groups/configuration"] != 1 || calls["/lol-inventory/v1/cherry-inventory"] != 1 || event["before_status"].(map[string]any)["configuration"] != "http-404" {
 					t.Fatal(calls, event)
 				}
 			} else {

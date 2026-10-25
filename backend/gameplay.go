@@ -337,6 +337,8 @@ type gameplayRank struct {
 	Wins           int    `json:"wins"`
 	Losses         int    `json:"losses"`
 	WinRate        int    `json:"winRate"`
+	RecordSource   string `json:"recordSource"`
+	RecordPending  bool   `json:"recordPending"`
 	Provisional    bool   `json:"provisional"`
 	seasonFallback bool   // Internal provenance; never used as an LP baseline.
 }
@@ -1528,6 +1530,9 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		started := time.Now()
 		stats, progress, ranked, byQueue := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
 		seasonCh <- seasonResult{stats, progress, ranked, byQueue, started, time.Now()}
+		if a.overviewSnapshotLoaded != nil {
+			a.overviewSnapshotLoaded()
+		}
 	}()
 	type rankResult struct {
 		value          rankScoreEntry
@@ -1681,9 +1686,8 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	season := <-seasonCh
 	phases.markSpan("season_snapshot", season.started, season.finished)
 	seasonStats, seasonProgress, seasonRanked, seasonByQueue := season.stats, season.progress, season.ranked, season.byQueue
-	if latest, progress, ranked, queues := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef); progress.Scanned > seasonProgress.Scanned {
-		seasonStats, seasonProgress, seasonRanked, seasonByQueue = latest, progress, ranked, queues
-	}
+	seasonStats, seasonProgress, seasonRanked, seasonByQueue = a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
+	rankSnapshot := seasonRankRecordSnapshot{progress: seasonProgress, byQueue: seasonByQueue, ranked: seasonRanked, player: reference.ServerID + "|" + playerRef, branch: "normal"}
 	response.SeasonChampionStats = seasonStats
 	response.SeasonStatsProgress = seasonProgress
 	response.SeasonOverall = seasonStatsOverall(seasonStats)
@@ -1704,7 +1708,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 		ready := map[string]bool{}
 		select {
 		case result := <-rankCh:
-			response.Ranks, result.value.capability = a.applySeasonRankWinRateFallback(result.value.ranks, result.value.capability, season.progress, seasonByQueue)
+			response.Ranks, result.value.capability = a.applySeasonRankWinRateFallback(result.value.ranks, result.value.capability, rankSnapshot.withBranch("budget"))
 			response.RankMilestones = rankMilestonesForRegion(localRankRegion, result.value.milestones)
 			response.Capabilities = append(response.Capabilities, result.value.capability)
 			ready["ranked-stats"] = true
@@ -1754,7 +1758,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 	rankEntry := rankResultValue.value
 	ranks := append([]gameplayRank(nil), rankEntry.ranks...)
 	rankMilestones, rankCapability := rankEntry.milestones, rankEntry.capability
-	ranks, rankCapability = a.applySeasonRankWinRateFallback(ranks, rankCapability, seasonProgress, seasonByQueue)
+	ranks, rankCapability = a.applySeasonRankWinRateFallback(ranks, rankCapability, rankSnapshot)
 	capabilities = append(capabilities, rankCapability)
 	response.RankMilestones = rankMilestonesForRegion(localRankRegion, rankMilestones)
 	// 刷新 LP 追踪基线：下一场结算时据此计算胜点变化。
@@ -3726,51 +3730,6 @@ func rankMilestonesForRegion(region string, milestones *gameplayRankMilestones) 
 		return nil
 	}
 	return milestones
-}
-
-// applySeasonRankWinRateFallback fills only records with an incomplete
-// win/loss pair after the season scan is complete, using the already-loaded
-// aggregate for that exact queue. Incomplete scans keep the upstream empty
-// state so the capability detail remains reachable by the client.
-func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability EndpointCapability, progress seasonStatsProgress, seasonByQueue map[int64]gameplayAggregate) ([]gameplayRank, EndpointCapability) {
-	if !progress.RankedComplete {
-		return ranks, capability
-	}
-	filled := 0
-	filledGames, filledWins, filledLosses := 0, 0, 0
-	for index := range ranks {
-		if ranks[index].WinRate >= 0 {
-			continue
-		}
-		queueID := int64(0)
-		switch ranks[index].QueueType {
-		case "RANKED_SOLO_5x5":
-			queueID = 420
-		case "RANKED_FLEX_SR":
-			queueID = 440
-		}
-		season, ok := seasonByQueue[queueID]
-		if !ok || season.Games <= 0 {
-			continue
-		}
-		ranks[index].seasonFallback = true
-		ranks[index].Wins = season.Wins
-		ranks[index].Losses = season.Losses
-		ranks[index].WinRate = season.WinRate
-		filled++
-		filledGames += season.Games
-		filledWins += season.Wins
-		filledLosses += season.Losses
-	}
-	if filled == 0 {
-		return ranks, capability
-	}
-	capability.Detail = "上游未返回排位负场，已按赛季战绩聚合补全胜率"
-	a.recordDiagnostic(map[string]any{
-		"event": "sgp_ranked_stats_season_fallback", "ranks_filled": filled,
-		"games": filledGames, "wins": filledWins, "losses": filledLosses,
-	})
-	return ranks, capability
 }
 
 func (a *app) loadGameplayRanksContext(ctx context.Context, client *LCUClient, playerRef string, current bool) ([]gameplayRank, *gameplayRankMilestones, EndpointCapability, error) {

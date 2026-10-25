@@ -9,6 +9,10 @@ func (a *app) publishOverviewCards(ctx context.Context, player Summoner, referen
 	if !ok || ctx.Err() != nil {
 		return
 	}
+	if len(ranks) > 0 {
+		_, progress, ranked, queues := a.loadSeasonChampionStatsSnapshot(reference, player, player.PUUID)
+		ranks, capability = a.applySeasonRankWinRateFallback(ranks, capability, seasonRankRecordSnapshot{progress: progress, ranked: ranked, byQueue: queues, player: reference.ServerID + "|" + player.PUUID, branch: "stream-first"})
+	}
 	partial := gameplayOverview{
 		Player:     gameplayPlayer{PlayerRef: player.PUUID, DisplayName: gameplayDisplayName(player), GameName: player.GameName, TagLine: player.TagLine, ProfileIconID: player.ProfileIconID, SummonerLevel: player.SummonerLevel, Region: reference.Region, ServerID: reference.ServerID, ServerName: tencentServerName(reference.ServerID), IsCurrent: isCurrent, reference: reference},
 		Pagination: gameplayPagination{Partial: true},
