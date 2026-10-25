@@ -4,7 +4,6 @@ const { bootDemoApp, settled, installWindowCleanup } = require("./overview-rende
 installWindowCleanup(test);
 
 test('R86 image listeners and tab scroll remain bounded including independent image-listener bypass', async () => {
-  async function check(mutate=false) {
     const {window:w,errors}=bootDemoApp({matchCount:200,gameplaySourceTransform:source=>{
       source=source.replace('function renderOverviewBodyContent(container, tab) {',`function renderOverviewBodyContent(container, tab) {
         const oldAdd=window.EventTarget.prototype.addEventListener;
@@ -13,11 +12,12 @@ test('R86 image listeners and tab scroll remain bounded including independent im
         try { return r86OriginalRender(container,tab); } finally {window.EventTarget.prototype.addEventListener=oldAdd;window.__r86ListenerMax=Math.max(window.__r86ListenerMax||0,calls);}
       }
       function r86OriginalRender(container, tab) {`);
-      if(mutate)source=source.replace('function prepareImages(container) {','function prepareImages(container) { for(const image of container.querySelectorAll("img")){image.addEventListener("load",()=>{});image.addEventListener("error",()=>{});}');
+      source=source.replace('function prepareImages(container) {','function prepareImages(container) { if(window.__r86ImageListenerMutant)for(const image of container.querySelectorAll("img")){image.addEventListener("load",()=>{});image.addEventListener("error",()=>{});}');
       return source.replace(/\}\)\(\);\s*$/, "window.__r86RenderImages=()=>renderOverviewBodyContent(overviewContainer(activeTab()),activeTab());\n})();");
     }});
-    try {
-      await require("./renderer-wait.cjs").waitForOverview(w,200);
+  async function check(mutate=false) {
+      w.__r86ImageListenerMutant=mutate;
+      w.__r86ListenerMax=0;
       w.__r86RenderImages();
       assert.equal(w.document.querySelectorAll('.match-list .match-entry').length,200);
       assert.ok(w.__r86ListenerMax<1000,`listeners=${w.__r86ListenerMax}`);
@@ -27,7 +27,10 @@ test('R86 image listeners and tab scroll remain bounded including independent im
       await new Promise(resolve=>w.requestAnimationFrame(()=>resolve()));
       assert.ok(styles<=2,`computed styles=${styles}`);
       assert.deepEqual(errors,[]);
-    }finally{w.close()}
+      w.getComputedStyle=original;
   }
-  await check();await assert.rejects(check(true),{name:'AssertionError'});
+  try {
+    await require("./renderer-wait.cjs").waitForOverview(w,200);
+    await check();await assert.rejects(check(true),{name:'AssertionError',message:/listeners=/});
+  }finally{w.close()}
 });

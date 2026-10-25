@@ -2,9 +2,18 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const web = __dirname;
+// Only immutable source text is shared. Mutants use their full final source as
+// the key; compile() still instantiates fresh closures with each test's state.
+const extractedSources = new Map();
 function read(name, directory = web) { const source=fs.readFileSync(path.join(directory,name),'utf8');return name==='gameplay.js'?require('./r277-deferred-fixture.cjs').join(source):source; }
 function extract(source, name) {
   if(source.includes('R277 deferred detail renderer: '+name)||source.includes('R309 deferred history renderer: '+name)||source.includes('R309 deferred live renderer: '+name))source=require('./r277-deferred-fixture.cjs').join(source);
+  let functions = extractedSources.get(source);
+  if (!functions) {
+    if (extractedSources.size >= 8) extractedSources.delete(extractedSources.keys().next().value);
+    extractedSources.set(source, functions = new Map());
+  }
+  if (functions.has(name)) return functions.get(name);
   let start = source.indexOf(`function ${name}(`);
   if (start < 0) throw Error(`Missing function ${name}`);
   if (source.slice(start - 6, start) === 'async ') start -= 6;
@@ -15,7 +24,11 @@ function extract(source, name) {
     if (quote) { if (escaped) escaped = false; else if (c === '\\') escaped = true; else if (c === quote) quote = ''; continue; }
     if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
     if (c === '{') depth++;
-    if (c === '}' && --depth === 0) return source.slice(start, i + 1);
+    if (c === '}' && --depth === 0) {
+      const body = source.slice(start, i + 1);
+      functions.set(name, body);
+      return body;
+    }
   }
   throw Error(`Unbalanced function ${name}`);
 }

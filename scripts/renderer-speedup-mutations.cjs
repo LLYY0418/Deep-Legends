@@ -12,6 +12,7 @@ const rows=[];
 for(const testFile of targets){
  const sandbox=fs.mkdtempSync(path.join(os.tmpdir(),'renderer-speedup-mutant-'));
  fs.mkdirSync(path.join(sandbox,'backend/web'),{recursive:true});fs.mkdirSync(path.join(sandbox,'desktop'),{recursive:true});fs.mkdirSync(path.join(sandbox,'scripts'),{recursive:true});
+ fs.symlinkSync(path.join(root,'scripts/lib'),path.join(sandbox,'scripts/lib'),'dir');
  for(const name of fs.readdirSync(path.join(root,'backend/web')))fs.symlinkSync(path.join(root,'backend/web',name),path.join(sandbox,'backend/web',name));
  for(const name of fs.readdirSync(path.join(root,'desktop')))if(name.endsWith('.cjs')||name==='package.json')fs.copyFileSync(path.join(root,'desktop',name),path.join(sandbox,'desktop',name));
  fs.symlinkSync(path.join(root,'desktop/node_modules'),path.join(sandbox,'desktop/node_modules'),'dir');
@@ -22,6 +23,10 @@ for(const testFile of targets){
   file='scripts/r82-startup-ab.ps1';source=fs.readFileSync(path.join(root,file),'utf8');
   const boundary='$_.Value -eq $setupHash';assert.equal(source.split(boundary).length,2);
   mutant=source.replace(boundary,'$_.Name -eq [IO.Path]::GetFileName($setupPath)');
+ }else if(testFile==='desktop/overview-render-200-images.test.cjs'){
+  file='backend/web/gameplay.js';source=fs.readFileSync(path.join(root,file),'utf8');
+  const boundary='function prepareImages(container) {';assert.equal(source.split(boundary).length,2);
+  mutant=source.replace(boundary,boundary+' for(const image of container.querySelectorAll("img")){image.addEventListener("load",()=>{});image.addEventListener("error",()=>{});}');
  }else if(testFile==='desktop/pro-players.test.cjs'){
   file='backend/web/pro-players.js';source=fs.readFileSync(path.join(root,file),'utf8');
   const boundary='function render() {';assert.equal(source.split(boundary).length,2);
