@@ -1,0 +1,49 @@
+name: R312 real Windows resize measurements
+on:
+  push:
+    branches: [codex/diagnostic-r279-r312-resize]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Configure real desktop
+        shell: powershell
+        run: |
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          Add-Type -AssemblyName System.Windows.Forms
+          [System.Windows.Forms.Screen]::PrimaryScreen.Bounds | Out-String | Write-Output
+      - name: Download exact published 0.13.0 package
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.13.0 --pattern 'Deep-Legends-Setup-0.13.0-public.exe' --dir "$env:RUNNER_TEMP/r312-baseline"
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline download failed' }
+          $setup="$env:RUNNER_TEMP/r312-baseline/Deep-Legends-Setup-0.13.0-public.exe"
+          $hash=(Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne 'c1864cd6c805ba3321339e5893902566356f576fb7237c2c9b6baf17955a1070') { throw "Baseline hash mismatch: $hash" }
+          7z x $setup "-o$env:RUNNER_TEMP/r312-extract" -y
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS extract failed' }
+          $archive=Get-ChildItem "$env:RUNNER_TEMP/r312-extract" -Recurse -Filter app-64.7z | Select-Object -First 1
+          if (-not $archive) { throw 'Packaged application archive missing' }
+          7z x $archive.FullName "-o$env:RUNNER_TEMP/r312-app" -y
+          if ($LASTEXITCODE -ne 0) { throw 'Application extract failed' }
+      - name: Measure baseline and individual resize candidates
+        shell: pwsh
+        run: |
+          node scripts/r312-windows-resize.cjs "$env:RUNNER_TEMP/r312-app/Deep Legends.exe" "$env:RUNNER_TEMP/r312-evidence"
+          if ($LASTEXITCODE -ne 0) { throw 'Native desktop measurement failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r312-real-windows-resize
+          path: ${{ runner.temp }}/r312-evidence/**
+          if-no-files-found: warn
