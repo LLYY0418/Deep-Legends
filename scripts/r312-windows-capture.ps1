@@ -22,6 +22,7 @@ public class R312Capture {
   SetProcessDPIAware();var h=new IntPtr(handle);Directory.CreateDirectory(output);SetForegroundWindow(h);
   var screen=System.Windows.Forms.Screen.PrimaryScreen.Bounds;if(screen.Width<1560||screen.Height<900)throw new Exception("Desktop too small: "+screen);
   SetWindowPos(h,new IntPtr(-1),20,20,800,850,0x0040);Thread.Sleep(1000);
+  using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-before.png"),ImageFormat.Png);}
   Rect windowRect;GetWindowRect(h,out windowRect);int mouseX=windowRect.right-2,mouseY=(windowRect.top+windowRect.bottom)/2;
   bool hit=false;for(int offset=1;offset<=12;offset++){mouseX=windowRect.right-offset;var packed=new IntPtr((mouseY<<16)|(mouseX&65535));if(SendMessage(h,0x84,IntPtr.Zero,packed).ToInt64()==11){hit=true;break;}}
   if(!hit)throw new Exception("Right resize border hit test must be HTRIGHT");
@@ -33,14 +34,16 @@ public class R312Capture {
    double target=i*16.0;while(clock.Elapsed.TotalMilliseconds<target)Thread.Sleep(0);
    mouseX+=i<60?12:-12;Mouse(mouseX,mouseY,0xA001,screen.Width,screen.Height);Thread.Sleep(3);
    GetClientRect(h,out rect);origin=new Point();ClientToScreen(h,ref origin);int right=origin.x+rect.right;
-   var bitmap=new Bitmap(rect.right,rect.bottom,PixelFormat.Format32bppArgb);
-   using(var g=Graphics.FromImage(bitmap))g.CopyFromScreen(origin.x,origin.y,0,0,bitmap.Size,CopyPixelOperation.SourceCopy);
+   int added=Math.Max(0,right-previousRight),stripWidth=added>0?added:12;
+   var bitmap=new Bitmap(stripWidth,Math.Max(1,rect.bottom-70),PixelFormat.Format32bppArgb);
+   using(var g=Graphics.FromImage(bitmap))g.CopyFromScreen(right-stripWidth,origin.y+70,0,0,bitmap.Size,CopyPixelOperation.SourceCopy);
    long white=0,pixels=0;
-   if(right>previousRight){int left=Math.Max(0,previousRight-origin.x);for(int y=70;y<bitmap.Height;y++)for(int x=left;x<bitmap.Width;x++){var c=bitmap.GetPixel(x,y);if(.2126*c.R+.7152*c.G+.0722*c.B>200)white++;pixels++;}total+=pixels;bright+=white;}
+   if(added>0){var locked=bitmap.LockBits(new Rectangle(0,0,bitmap.Width,bitmap.Height),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);try{var bytes=new byte[Math.Abs(locked.Stride)*bitmap.Height];Marshal.Copy(locked.Scan0,bytes,0,bytes.Length);for(int y=0;y<bitmap.Height;y++)for(int x=0;x<bitmap.Width;x++){int k=y*Math.Abs(locked.Stride)+x*4;if(.2126*bytes[k+2]+.7152*bytes[k+1]+.0722*bytes[k]>200)white++;pixels++;}}finally{bitmap.UnlockBits(locked);}total+=pixels;bright+=white;}
    rows.Add("{\"frame\":"+i+",\"atMs\":"+clock.Elapsed.TotalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture)+",\"width\":"+width+",\"pixels\":"+pixels+",\"bright\":"+white+"}");frames.Add(bitmap);previousRight=right;
   }
   } finally {Mouse(mouseX,mouseY,0x8004,screen.Width,screen.Height);}
-  double elapsed=clock.Elapsed.TotalSeconds;double fps=120/elapsed;
+  double elapsed=clock.Elapsed.TotalSeconds;
+  using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-after.png"),ImageFormat.Png);}double fps=120/elapsed;
   for(int i=0;i<frames.Count;i++){frames[i].Save(Path.Combine(output,"frame-"+i.ToString("D3")+".png"),ImageFormat.Png);frames[i].Dispose();}
   File.WriteAllText(Path.Combine(output,"frames.json"),"["+string.Join(",",rows)+"]");
   if(fps<30)throw new Exception("Capture below required 30fps: "+fps);
