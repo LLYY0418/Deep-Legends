@@ -22,9 +22,12 @@ public class R312Capture {
  static void Mouse(int x,int y,uint flags,int sw,int sh){var input=new Input{type=0,mouse=new MouseInput{dx=(int)Math.Round(x*65535.0/(sw-1)),dy=(int)Math.Round(y*65535.0/(sh-1)),flags=flags}};if(SendInput(1,new[]{input},Marshal.SizeOf(typeof(Input)))!=1)throw new Exception("SendInput failed "+Marshal.GetLastWin32Error());}
  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
  [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+ [DllImport("user32.dll",EntryPoint="SystemParametersInfoW")] static extern bool SetSystemParameter(uint action,uint parameter,IntPtr value,uint flags);
+ [DllImport("user32.dll",EntryPoint="SystemParametersInfoW")] static extern bool GetSystemParameter(uint action,uint parameter,ref int value,uint flags);
  [DllImport("winmm.dll")] static extern uint timeBeginPeriod(uint period);
  [DllImport("winmm.dll")] static extern uint timeEndPeriod(uint period);
  public static string Run(long handle,string output){
+  int previousDrag=0;GetSystemParameter(0x26,0,ref previousDrag,0);if(!SetSystemParameter(0x25,1,IntPtr.Zero,2))throw new Exception("Enable full-window dragging failed");
   timeBeginPeriod(1);SetProcessDPIAware();var h=new IntPtr(handle);Directory.CreateDirectory(output);SetForegroundWindow(h);
   var screen=System.Windows.Forms.Screen.PrimaryScreen.Bounds;if(screen.Width<1560||screen.Height<900)throw new Exception("Desktop too small: "+screen);
   SetWindowPos(h,new IntPtr(-1),20,20,800,850,0x0040);Thread.Sleep(1000);
@@ -38,7 +41,7 @@ public class R312Capture {
   try { for(int i=0;i<120;i++){
    int width=i<60?800+(i+1)*12:1520-(i-59)*12;
    double target=i*16.0;while(clock.Elapsed.TotalMilliseconds<target)Thread.Sleep(0);
-   mouseX+=i<60?12:-12;Mouse(mouseX,mouseY,0xA001,screen.Width,screen.Height);Thread.Sleep(3);
+   mouseX+=i<60?12:-12;Mouse(mouseX,mouseY,0xA001,screen.Width,screen.Height);Thread.Sleep(1);
    GetClientRect(h,out rect);origin=new Point();ClientToScreen(h,ref origin);int right=origin.x+rect.right;
    int added=Math.Max(0,right-previousRight),stripWidth=added>0?added:12;
    var bitmap=new Bitmap(stripWidth,Math.Max(1,rect.bottom-70),PixelFormat.Format32bppArgb);
@@ -49,7 +52,7 @@ public class R312Capture {
   }
   } finally {Mouse(mouseX,mouseY,0x8004,screen.Width,screen.Height);}
   double elapsed=clock.Elapsed.TotalSeconds;
-  using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-after.png"),ImageFormat.Png);}double fps=120/elapsed;timeEndPeriod(1);
+  using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-after.png"),ImageFormat.Png);}double fps=120/elapsed;timeEndPeriod(1);SetSystemParameter(0x25,(uint)previousDrag,IntPtr.Zero,2);
   for(int i=0;i<frames.Count;i++){frames[i].Save(Path.Combine(output,"frame-"+i.ToString("D3")+".png"),ImageFormat.Png);frames[i].Dispose();}
   File.WriteAllText(Path.Combine(output,"frames.json"),"["+string.Join(",",rows)+"]");
 
