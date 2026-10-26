@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 env:
-  R312_EXPECTED_LATEST: '0.13.0'
+  R312_EXPECTED_LATEST: '0.13.1'
 jobs:
   capture:
     runs-on: windows-latest
