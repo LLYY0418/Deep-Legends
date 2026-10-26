@@ -30,12 +30,12 @@ jobs:
           $setup="$env:RUNNER_TEMP/r312-baseline/Deep-Legends-Setup-0.13.0-public.exe"
           $hash=(Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($hash -ne 'c1864cd6c805ba3321339e5893902566356f576fb7237c2c9b6baf17955a1070') { throw "Baseline hash mismatch: $hash" }
-          7z x $setup "-o$env:RUNNER_TEMP/r312-extract" -y
-          if ($LASTEXITCODE -ne 0) { throw 'NSIS extract failed' }
-          $archive=Get-ChildItem "$env:RUNNER_TEMP/r312-extract" -Recurse -Filter app-64.7z | Select-Object -First 1
-          if (-not $archive) { throw 'Packaged application archive missing' }
-          7z x $archive.FullName "-o$env:RUNNER_TEMP/r312-app" -y
-          if ($LASTEXITCODE -ne 0) { throw 'Application extract failed' }
+          $install="$env:RUNNER_TEMP/r312-app"
+          $process=Start-Process -FilePath $setup -ArgumentList "--update --dest `"$install`"" -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP/r312-installer-stdout.log" -RedirectStandardError "$env:RUNNER_TEMP/r312-installer-stderr.log"
+          if (-not $process.WaitForExit(180000)) { Stop-Process -Id $process.Id -Force; throw 'Real Go installer timed out' }
+          if ($process.ExitCode -ne 0) { throw "Go installer failed: $($process.ExitCode)" }
+          if (-not (Test-Path "$install/Deep Legends.exe")) { throw 'Installed application missing' }
+          Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($install,[StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
       - name: Measure baseline and individual resize candidates
         shell: pwsh
         run: |
