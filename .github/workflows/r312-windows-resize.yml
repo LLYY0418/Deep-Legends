@@ -59,12 +59,13 @@ jobs:
             Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($root,[StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
             Start-Sleep -Milliseconds 200
           }
-          node -e "const f=require('./desktop/node_modules/@electron/fuses');f.flipFuses(process.argv[1],{version:f.FuseVersion.V1,[f.FuseV1Options.EnableNodeCliInspectArguments]:true}).catch(e=>{console.error(e);process.exitCode=1})" "$env:RUNNER_TEMP/r312-app/Deep Legends.exe"
+          Copy-Item "$root/Deep Legends.exe" "$root/Deep Legends Inspect.exe" -Force
+          node -e "const f=require('./desktop/node_modules/@electron/fuses');f.flipFuses(process.argv[1],{version:f.FuseVersion.V1,[f.FuseV1Options.EnableNodeCliInspectArguments]:true}).catch(e=>{console.error(e);process.exitCode=1})" "$env:RUNNER_TEMP/r312-app/Deep Legends Inspect.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Diagnostic inspect fuse failed' }
       - name: Measure baseline and individual resize candidates
         shell: pwsh
         run: |
-          node scripts/r312-windows-resize.cjs "$env:RUNNER_TEMP/r312-app/Deep Legends.exe" "$env:RUNNER_TEMP/r312-evidence"
+          node scripts/r312-windows-resize.cjs "$env:RUNNER_TEMP/r312-app/Deep Legends Inspect.exe" "$env:RUNNER_TEMP/r312-evidence"
           if ($LASTEXITCODE -ne 0) { throw 'Native desktop measurement failed' }
       - uses: actions/upload-artifact@v4
         if: always()
