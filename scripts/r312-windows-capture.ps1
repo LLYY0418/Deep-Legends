@@ -35,8 +35,8 @@ public class R312Capture {
   using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-before.png"),ImageFormat.Png);}
   File.WriteAllText(Path.Combine(output,"ready.txt"),"ready");var readyClock=Stopwatch.StartNew();while(!File.Exists(Path.Combine(output,"go.txt"))){if(readyClock.Elapsed.TotalSeconds>20)throw new Exception("Capture start handshake timed out");Thread.Sleep(5);}
   Rect windowRect;GetWindowRect(h,out windowRect);int mouseX=windowRect.right-8,mouseY=(windowRect.top+windowRect.bottom)/2;
-  bool hit=false;for(int offset=10;offset<=32;offset++){mouseX=windowRect.right-offset;var packed=new IntPtr((mouseY<<16)|(mouseX&65535));if(SendMessage(h,0x84,IntPtr.Zero,packed).ToInt64()==11){hit=true;break;}}
-  if(!hit)throw new Exception("Right resize border hit test must be HTRIGHT");
+  var hitAudit=new List<string>();bool hit=false;for(int offset=8;offset<=32;offset++){mouseX=windowRect.right-offset;var packed=new IntPtr((mouseY<<16)|(mouseX&65535));var code=SendMessage(h,0x84,IntPtr.Zero,packed).ToInt64();hitAudit.Add(offset+":"+code);if(code==11){hit=true;break;}}
+  File.WriteAllText(Path.Combine(output,"hit-test.txt"),"window="+windowRect.left+","+windowRect.top+","+windowRect.right+","+windowRect.bottom+" hwnd="+h+" hits="+string.Join(",",hitAudit));if(!hit)throw new Exception("Right resize border hit test must be HTRIGHT");
   Mouse(mouseX,mouseY,0x8001,screen.Width,screen.Height);Thread.Sleep(150);Mouse(mouseX,mouseY,0x8002,screen.Width,screen.Height);Thread.Sleep(100);
   var frames=new List<Bitmap>();var rows=new List<string>();var clock=Stopwatch.StartNew();long total=0,bright=0;int previousRight=0;Point cursor;GetCursorPos(out cursor);File.WriteAllText(Path.Combine(output,"input-start.txt"),"target="+mouseX+","+mouseY+" cursor="+cursor.x+","+cursor.y+" down="+GetAsyncKeyState(1)+" hwnd="+h+" screen="+screen);
   Rect rect;Point origin=new Point();GetClientRect(h,out rect);ClientToScreen(h,ref origin);previousRight=origin.x+rect.right;

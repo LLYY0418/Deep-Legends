@@ -51,9 +51,9 @@ const run=(cmd,args)=>new Promise((resolve,reject)=>{const p=spawn(cmd,args,{std
    if(['b','ab','crimson-b','light-b'].includes(variant)){const color=theme==='crimson'?'#0E0C0D':theme==='light'?'#ffffff':'#0B0E14';await native(`(()=>{const w=process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>!w.isDestroyed()&&w.webContents.getURL().startsWith('http://127.0.0.1'));w.setBackgroundColor('${color}');w.setTitleBarOverlay({color:'${color}'});return w.getBackgroundColor();})()`);}
    const nativeAfter=await native(`process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>!w.isDestroyed()&&w.webContents.getURL().startsWith('http://127.0.0.1')).getBackgroundColor()`);
    await sleep(2000);await evaluate('__r312Long=[];__r312Trace=[]');
-   // CDP Browser window id is not a HWND. Enumerate native windows in PowerShell by PID tree/title.
-   const pidFile=path.join(dir,'pid.txt');await run('powershell.exe',['-NoProfile','-Command',`Add-Type -AssemblyName System.Windows.Forms; Get-Process -Id ${child.pid} | Where-Object {$_.MainWindowHandle -ne 0} | Select-Object -First 1 -ExpandProperty MainWindowHandle | Set-Content '${pidFile.replaceAll("'","''")}'`]);
-   const hwnd=fs.readFileSync(pidFile,'utf8').replace(/^\uFEFF/,'').trim();assert(BigInt(hwnd)>0n,'real HWND');
+   // Read this BrowserWindow's own native HWND, not an arbitrary process window.
+   const hwnd=await native(`process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>!w.isDestroyed()&&w.webContents.getURL().startsWith('http://127.0.0.1')).getNativeWindowHandle().readBigUInt64LE().toString()`);assert(BigInt(hwnd)>0n,'real HWND');
+   fs.writeFileSync(path.join(dir,'window-audit.json'),JSON.stringify({variant,theme,windowState,hwnd,nativeBefore,nativeAfter,pageColor},null,2));
    const captureTask=run('powershell.exe',['-NoProfile','-File',path.join(__dirname,'r312-windows-capture.ps1'),'-Window',hwnd,'-Output',dir]);let captureError;captureTask.catch(error=>{captureError=error});
    for(let i=0;i<2000&&!fs.existsSync(path.join(dir,'ready.txt'));i++){if(captureError)throw captureError;await sleep(10);}assert(fs.existsSync(path.join(dir,'ready.txt')),'capture ready handshake');await evaluate('__r312Long=[];__r312Trace=[]');fs.writeFileSync(path.join(dir,'go.txt'),'go');await captureTask;
    await sleep(500);const tasks=await evaluate('__r312Long'),trace=await evaluate('__r312Trace'),capture=JSON.parse(fs.readFileSync(path.join(dir,'capture.json'),'utf8').replace(/^\uFEFF/,''));
