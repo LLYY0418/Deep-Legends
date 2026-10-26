@@ -3,15 +3,15 @@
 const fs=require('node:fs'),path=require('node:path'),net=require('node:net'),{spawn}=require('node:child_process'),assert=require('node:assert/strict');
 const executable=path.resolve(process.argv[2]),out=path.resolve(process.argv[3]);fs.mkdirSync(out,{recursive:true});
 const detail=require('../backend/testdata/r308/detail-response.json'),directory=require('../backend/testdata/r307/champion-directory.json');
-const catalog={champions:Object.entries(directory).map(([id,m])=>({...m,id:Number(id),slug:m.key.toLowerCase(),imageSource:'gtimg',imagePath:'/images/lol/act/img/champion/'+m.key+'.png'}))};
+const catalog={tiers:[],champions:Object.entries(directory).map(([id,m])=>({...m,id:Number(id),slug:m.key.toLowerCase(),imageSource:'gtimg',imagePath:'/images/lol/act/img/champion/'+m.key+'.png'}))};
 const ranking={rows:Array.from({length:120},(_,i)=>({championId:Number(Object.keys(directory)[i%Object.keys(directory).length]),rank:i+1,grade:'B',winRate:52,pickRate:5,play:3000}))};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const run=(cmd,args)=>new Promise((resolve,reject)=>{const p=spawn(cmd,args,{stdio:'inherit'});p.once('error',reject);p.once('exit',c=>c===0?resolve():reject(Error(cmd+' exit '+c)));});
 (async()=>{
  const results=[];
- let iteration=0;for(const variant of (process.env.R312_VARIANTS?.split(',')||['baseline','c2','baseline','c2','baseline','c2','a','b','c'])){
+ let iteration=0;for(const variant of (process.env.R312_VARIANTS?.split(',')||['baseline','c','baseline','c','baseline','c','c2c','ap','b'])){
   const dir=path.join(out,String(++iteration).padStart(2,'0')+'-'+variant);fs.mkdirSync(dir,{recursive:true});const port=await new Promise(r=>{const server=net.createServer();server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>r(port));});});
-  const args=['--remote-debugging-port='+port,'--user-data-dir='+path.join(dir,'user-data'),...(['c','a2c'].includes(variant)?['--disable-gpu']:[])];
+  const args=['--remote-debugging-port='+port,'--user-data-dir='+path.join(dir,'user-data'),...(['c','a2c','c2c'].includes(variant)?['--disable-gpu']:[])];
   const child=spawn(executable,args,{env:{...process.env,LOL_LOOT_DATA_DIR:path.join(dir,'backend-data')},stdio:['ignore','pipe','pipe']});const logs=[];child.stdout.on('data',c=>logs.push(String(c)));child.stderr.on('data',c=>logs.push(String(c)));
   let ws;
   try{
@@ -35,7 +35,7 @@ const run=(cmd,args)=>new Promise((resolve,reject)=>{const p=spawn(cmd,args,{std
    const paintStrategy=`(()=>{const style=document.createElement('style');style.textContent='html.is-resizing * {box-shadow:none!important;backdrop-filter:none!important;filter:none!important;transition:none!important;animation:none!important}';addEventListener('DOMContentLoaded',()=>document.head.append(style),{once:true});window.desktopWindow.onResizeTrace(v=>{if(v.reason==='will-resize')document.documentElement.classList.add('is-resizing');if(v.reason==='summary')requestAnimationFrame(()=>document.documentElement.classList.remove('is-resizing'));});})();`;
    const setup=`localStorage.setItem('lol-loot-champion-mode','aram-mayhem');localStorage.setItem('lol-loot-theme','dark');localStorage.setItem('lol-loot-demo','1');window.__r312Long=[];window.__r312Trace=[];window.desktopWindow.onResizeTrace(v=>__r312Trace.push(v));new PerformanceObserver(l=>__r312Long.push(...l.getEntries().map(e=>({at:e.startTime,absoluteAt:performance.timeOrigin+e.startTime,duration:e.duration})))).observe({type:'longtask'});window.EventSource=class{addEventListener(){}close(){}};
     (()=>{const wrap=delegate=>function(...args){const url=new URL(typeof args[0]==='string'?args[0]:args[0].url,location.href),p=url.pathname;const value=p==='/api/champions/catalog'?${JSON.stringify(catalog)}:p==='/api/champions/rankings'?${JSON.stringify(ranking)}:p==='/api/champions/detail'?${JSON.stringify(detail)}:null;return value?Promise.resolve(new Response(JSON.stringify(value))):Reflect.apply(delegate,window,args);};let current=wrap(window.fetch);Object.defineProperty(window,'fetch',{configurable:true,get:()=>current,set:delegate=>{current=wrap(delegate)}});})();`;
-   await call('Page.addScriptToEvaluateOnNewDocument',{source:setup+(["a","ab"].includes(variant)?resizeStrategy:["a2","a2c"].includes(variant)?freezeStrategy:variant==="c2"?paintStrategy:"")});
+   await call('Page.addScriptToEvaluateOnNewDocument',{source:setup+(["a","ab","ap"].includes(variant)?resizeStrategy+(variant==="ap"?paintStrategy:""):["a2","a2c"].includes(variant)?freezeStrategy:["c2","c2c"].includes(variant)?paintStrategy:"")});
    const origin=new URL(target.url).origin;await call('Page.navigate',{url:origin+'/?demo&section=champions'});
    const until=async(expression,label)=>{for(let i=0;i<400;i++){try{if(await evaluate(expression))return;}catch(error){if(!/context|navigat/i.test(error.message))throw error;}await sleep(100);}throw Error('Timeout '+label+': '+await evaluate('document.body.innerText.slice(0,1600)'));};
    await until(`Boolean(document.querySelector('[data-champion-row="120"]'))`,'hero list');

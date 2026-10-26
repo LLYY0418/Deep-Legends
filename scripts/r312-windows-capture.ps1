@@ -20,6 +20,7 @@ public class R312Capture {
  [DllImport("user32.dll",SetLastError=true)] static extern uint SendInput(uint count,Input[] inputs,int size);
  [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h,uint msg,IntPtr w,IntPtr l);
  static void Mouse(int x,int y,uint flags,int sw,int sh){var input=new Input{type=0,mouse=new MouseInput{dx=(int)Math.Round(x*65535.0/(sw-1)),dy=(int)Math.Round(y*65535.0/(sh-1)),flags=flags}};if(SendInput(1,new[]{input},Marshal.SizeOf(typeof(Input)))!=1)throw new Exception("SendInput failed "+Marshal.GetLastWin32Error());}
+ [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h,int command);
  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
  [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
  [DllImport("user32.dll",EntryPoint="SystemParametersInfoW")] static extern bool SetSystemParameter(uint action,uint parameter,IntPtr value,uint flags);
@@ -28,9 +29,9 @@ public class R312Capture {
  [DllImport("winmm.dll")] static extern uint timeEndPeriod(uint period);
  public static string Run(long handle,string output){
   int previousDrag=0;GetSystemParameter(0x26,0,ref previousDrag,0);if(!SetSystemParameter(0x25,1,IntPtr.Zero,2))throw new Exception("Enable full-window dragging failed");
-  timeBeginPeriod(1);SetProcessDPIAware();var h=new IntPtr(handle);Directory.CreateDirectory(output);SetForegroundWindow(h);
+  timeBeginPeriod(1);SetProcessDPIAware();var h=new IntPtr(handle);Directory.CreateDirectory(output);ShowWindow(h,9);SetForegroundWindow(h);
   var screen=System.Windows.Forms.Screen.PrimaryScreen.Bounds;if(screen.Width<1560||screen.Height<900)throw new Exception("Desktop too small: "+screen);
-  SetWindowPos(h,new IntPtr(-1),20,20,800,850,0x0040);Thread.Sleep(1000);
+  SetWindowPos(h,new IntPtr(-1),20,20,800,850,0x0060);Thread.Sleep(1000);
   using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-before.png"),ImageFormat.Png);}
   File.WriteAllText(Path.Combine(output,"ready.txt"),"ready");var readyClock=Stopwatch.StartNew();while(!File.Exists(Path.Combine(output,"go.txt"))){if(readyClock.Elapsed.TotalSeconds>20)throw new Exception("Capture start handshake timed out");Thread.Sleep(5);}
   Rect windowRect;GetWindowRect(h,out windowRect);int mouseX=windowRect.right-8,mouseY=(windowRect.top+windowRect.bottom)/2;
