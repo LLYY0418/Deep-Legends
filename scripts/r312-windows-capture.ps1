@@ -10,6 +10,10 @@ public class R312Capture {
  [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int height,uint flags);
  [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr h,out Rect r);
  [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr h,ref Point p);
+ [DllImport("user32.dll")] static extern bool GetCursorPos(out Point p);
+ [DllImport("user32.dll")] static extern short GetAsyncKeyState(int key);
+ [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point p);
+ [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr h,uint flags);
  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h,out Rect r);
  [StructLayout(LayoutKind.Sequential)] struct MouseInput {public int dx,dy;public uint mouseData,flags,time;public UIntPtr extra;}
  [StructLayout(LayoutKind.Sequential)] struct Input {public uint type;public MouseInput mouse;}
@@ -25,11 +29,11 @@ public class R312Capture {
   var screen=System.Windows.Forms.Screen.PrimaryScreen.Bounds;if(screen.Width<1560||screen.Height<900)throw new Exception("Desktop too small: "+screen);
   SetWindowPos(h,new IntPtr(-1),20,20,800,850,0x0040);Thread.Sleep(1000);
   using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-before.png"),ImageFormat.Png);}
-  Rect windowRect;GetWindowRect(h,out windowRect);int mouseX=windowRect.right-2,mouseY=(windowRect.top+windowRect.bottom)/2;
-  bool hit=false;for(int offset=1;offset<=12;offset++){mouseX=windowRect.right-offset;var packed=new IntPtr((mouseY<<16)|(mouseX&65535));if(SendMessage(h,0x84,IntPtr.Zero,packed).ToInt64()==11){hit=true;break;}}
+  Rect windowRect;GetWindowRect(h,out windowRect);int mouseX=windowRect.right-8,mouseY=(windowRect.top+windowRect.bottom)/2;
+  bool hit=false;for(int offset=8;offset<=16;offset++){mouseX=windowRect.right-offset;var packed=new IntPtr((mouseY<<16)|(mouseX&65535));if(SendMessage(h,0x84,IntPtr.Zero,packed).ToInt64()==11&&GetAncestor(WindowFromPoint(new Point{x=mouseX,y=mouseY}),2)==h){hit=true;break;}}
   if(!hit)throw new Exception("Right resize border hit test must be HTRIGHT");
   Mouse(mouseX,mouseY,0x8001,screen.Width,screen.Height);Thread.Sleep(150);Mouse(mouseX,mouseY,0x8002,screen.Width,screen.Height);Thread.Sleep(100);
-  var frames=new List<Bitmap>();var rows=new List<string>();var clock=Stopwatch.StartNew();long total=0,bright=0;int previousRight=0;
+  var frames=new List<Bitmap>();var rows=new List<string>();var clock=Stopwatch.StartNew();long total=0,bright=0;int previousRight=0;Point cursor;GetCursorPos(out cursor);File.WriteAllText(Path.Combine(output,"input-start.txt"),"target="+mouseX+","+mouseY+" cursor="+cursor.x+","+cursor.y+" down="+GetAsyncKeyState(1)+" hwnd="+h+" screen="+screen);
   Rect rect;Point origin=new Point();GetClientRect(h,out rect);ClientToScreen(h,ref origin);previousRight=origin.x+rect.right;
   try { for(int i=0;i<120;i++){
    int width=i<60?800+(i+1)*12:1520-(i-59)*12;
@@ -41,15 +45,15 @@ public class R312Capture {
    using(var g=Graphics.FromImage(bitmap))g.CopyFromScreen(right-stripWidth,origin.y+70,0,0,bitmap.Size,CopyPixelOperation.SourceCopy);
    long white=0,pixels=0;
    if(added>0){var locked=bitmap.LockBits(new Rectangle(0,0,bitmap.Width,bitmap.Height),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);try{var bytes=new byte[Math.Abs(locked.Stride)*bitmap.Height];Marshal.Copy(locked.Scan0,bytes,0,bytes.Length);for(int y=0;y<bitmap.Height;y++)for(int x=0;x<bitmap.Width;x++){int k=y*Math.Abs(locked.Stride)+x*4;if(.2126*bytes[k+2]+.7152*bytes[k+1]+.0722*bytes[k]>200)white++;pixels++;}}finally{bitmap.UnlockBits(locked);}total+=pixels;bright+=white;}
-   rows.Add("{\"frame\":"+i+",\"atMs\":"+clock.Elapsed.TotalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture)+",\"width\":"+width+",\"pixels\":"+pixels+",\"bright\":"+white+"}");frames.Add(bitmap);previousRight=right;
+   GetCursorPos(out cursor);rows.Add("{\"actualRight\":"+right+",\"cursorX\":"+cursor.x+",\"leftButton\":"+GetAsyncKeyState(1)+",\"frame\":"+i+",\"atMs\":"+clock.Elapsed.TotalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture)+",\"width\":"+width+",\"pixels\":"+pixels+",\"bright\":"+white+"}");frames.Add(bitmap);previousRight=right;
   }
   } finally {Mouse(mouseX,mouseY,0x8004,screen.Width,screen.Height);}
   double elapsed=clock.Elapsed.TotalSeconds;
   using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-after.png"),ImageFormat.Png);}double fps=120/elapsed;timeEndPeriod(1);
   for(int i=0;i<frames.Count;i++){frames[i].Save(Path.Combine(output,"frame-"+i.ToString("D3")+".png"),ImageFormat.Png);frames[i].Dispose();}
   File.WriteAllText(Path.Combine(output,"frames.json"),"["+string.Join(",",rows)+"]");
-  if(fps<30)throw new Exception("Capture below required 30fps: "+fps);
-  return "{\"input\":\"SendInput-held-right-border\",\"frames\":120,\"expandFrames\":60,\"shrinkFrames\":60,\"stepPx\":12,\"fps\":"+fps.ToString(System.Globalization.CultureInfo.InvariantCulture)+",\"pixels\":"+total+",\"bright\":"+bright+",\"whiteRatio\":"+((double)bright/total).ToString(System.Globalization.CultureInfo.InvariantCulture)+",\"desktopWidth\":"+screen.Width+",\"desktopHeight\":"+screen.Height+"}";
+
+  return "{\"input\":\"SendInput-held-right-border\",\"frames\":120,\"expandFrames\":60,\"shrinkFrames\":60,\"stepPx\":12,\"fps\":"+fps.ToString(System.Globalization.CultureInfo.InvariantCulture)+",\"pixels\":"+total+",\"bright\":"+bright+",\"whiteRatio\":"+(total==0?0:(double)bright/total).ToString(System.Globalization.CultureInfo.InvariantCulture)+",\"desktopWidth\":"+screen.Width+",\"desktopHeight\":"+screen.Height+"}";
  }
 }
 '@

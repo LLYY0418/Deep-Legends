@@ -41,9 +41,9 @@ const run=(cmd,args)=>new Promise((resolve,reject)=>{const p=spawn(cmd,args,{std
    const hwnd=fs.readFileSync(pidFile,'utf8').replace(/^\uFEFF/,'').trim();assert(BigInt(hwnd)>0n,'real HWND');
    await run('powershell.exe',['-NoProfile','-File',path.join(__dirname,'r312-windows-capture.ps1'),'-Window',hwnd,'-Output',dir]);
    await sleep(500);const tasks=await evaluate('__r312Long'),trace=await evaluate('__r312Trace'),capture=JSON.parse(fs.readFileSync(path.join(dir,'capture.json'),'utf8').replace(/^\uFEFF/,''));
-   assert(trace.some(v=>v.reason==='will-resize'),'SendInput must cause native will-resize');assert(trace.some(v=>v.reason==='summary'),'native resize summary');
+   
    const result={variant,trace,...capture,longtaskCount:tasks.length,longtaskMaxMs:Math.max(0,...tasks.map(t=>t.duration)),longtasks:tasks,page:await evaluate(`({url:location.href,title:document.title,hero:document.querySelector('.mayhem-detail-content')?.textContent.slice(0,160),background:getComputedStyle(document.documentElement).backgroundColor})`)};
-   results.push(result);fs.writeFileSync(path.join(dir,'result.json'),JSON.stringify(result,null,2));
+   results.push(result);fs.writeFileSync(path.join(dir,'result.json'),JSON.stringify(result,null,2));assert(capture.fps>=30,'desktop capture >=30fps');assert(capture.pixels>0,'actual newly exposed pixels');assert(trace.some(v=>v.reason==='will-resize'),'SendInput must cause native will-resize');assert(trace.some(v=>v.reason==='summary'),'native resize summary');
    fs.writeFileSync(path.join(out,'comparison.json'),JSON.stringify(results,null,2));
   }catch(error){fs.writeFileSync(path.join(dir,'failure.txt'),error.stack);throw error;}finally{ws?.close();if(child.exitCode===null)await run('taskkill',['/PID',String(child.pid),'/T','/F']).catch(()=>{});await sleep(1000);fs.writeFileSync(path.join(dir,'app.log'),logs.join(''));}
  }
