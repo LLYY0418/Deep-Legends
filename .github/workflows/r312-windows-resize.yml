@@ -31,8 +31,21 @@ jobs:
           $hash=(Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($hash -ne 'c1864cd6c805ba3321339e5893902566356f576fb7237c2c9b6baf17955a1070') { throw "Baseline hash mismatch: $hash" }
           $install="$env:RUNNER_TEMP/r312-app"
+          New-Item -ItemType Directory -Force $install,"$env:RUNNER_TEMP/r312-evidence" | Out-Null
+          $env:LOL_LOOT_DATA_DIR="$env:RUNNER_TEMP/r312-install-data"
+          $env:RIOT_API_KEY='RGAPI-00000000-0000-0000-0000-000000000000'
+          . ./scripts/r271-installer-diagnostics.ps1
+          $started=Get-Date
           $process=Start-Process -FilePath $setup -ArgumentList "--update --dest `"$install`"" -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP/r312-installer-stdout.log" -RedirectStandardError "$env:RUNNER_TEMP/r312-installer-stderr.log"
-          if (-not $process.WaitForExit(180000)) { Stop-Process -Id $process.Id -Force; throw 'Real Go installer timed out' }
+          $deadline=(Get-Date).AddSeconds(180)
+          while (-not $process.WaitForExit(50)) {
+            if ((Get-Date) -gt $deadline) {
+              Save-R271SetupFailure -File $setup -Version '0.13.0' -Process $process -StartedAt $started -Prefix "$env:RUNNER_TEMP/r312-installer" -StartupLog "$env:TEMP/DeepLegendsSetup-startup.log"
+              Stop-Process -Id $process.Id -Force
+              throw 'Real Go installer timed out'
+            }
+          }
+          $process.WaitForExit()
           if ($process.ExitCode -ne 0) { throw "Go installer failed: $($process.ExitCode)" }
           if (-not (Test-Path "$install/Deep Legends.exe")) { throw 'Installed application missing' }
           Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($install,[StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
@@ -45,5 +58,8 @@ jobs:
         if: always()
         with:
           name: r312-real-windows-resize
-          path: ${{ runner.temp }}/r312-evidence/**
+          path: |
+            ${{ runner.temp }}/r312-evidence/**
+            ${{ runner.temp }}/r312-installer-*
+            ${{ runner.temp }}/DeepLegendsSetup-startup.log
           if-no-files-found: warn
