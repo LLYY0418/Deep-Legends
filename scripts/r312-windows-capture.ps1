@@ -40,7 +40,7 @@ public class R312Capture {
   var frames=new List<Bitmap>();var rows=new List<string>();var clock=Stopwatch.StartNew();long total=0,bright=0;int previousRight=0;Point cursor;GetCursorPos(out cursor);File.WriteAllText(Path.Combine(output,"input-start.txt"),"target="+mouseX+","+mouseY+" cursor="+cursor.x+","+cursor.y+" down="+GetAsyncKeyState(1)+" hwnd="+h+" screen="+screen);
   Rect rect;Point origin=new Point();GetClientRect(h,out rect);ClientToScreen(h,ref origin);previousRight=origin.x+rect.right;
   int inputStep=0;long inputStartMs=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),inputEndMs=0;Exception inputFailure=null;
-  var inputThread=new Thread(()=>{try{for(int i=0;i<120;i++){double target=i*(1000.0/60);while(clock.Elapsed.TotalMilliseconds<target)Thread.Sleep(0);mouseX+=i<60?12:-12;Mouse(mouseX,mouseY,0xA001,screen.Width,screen.Height);Volatile.Write(ref inputStep,i+1);}}catch(Exception e){inputFailure=e;}finally{Mouse(mouseX,mouseY,0x8004,screen.Width,screen.Height);inputEndMs=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();}});
+  var inputThread=new Thread(()=>{try{for(int i=0;i<120;i++){double target=i*(1000.0/60);while(clock.Elapsed.TotalMilliseconds<target)Thread.Sleep(1);mouseX+=i<60?12:-12;Mouse(mouseX,mouseY,0xA001,screen.Width,screen.Height);Volatile.Write(ref inputStep,i+1);}}catch(Exception e){inputFailure=e;}finally{Mouse(mouseX,mouseY,0x8004,screen.Width,screen.Height);inputEndMs=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();}});
   inputThread.Start();
   double sampledSeconds=0;try{while(inputThread.IsAlive){
    GetClientRect(h,out rect);origin=new Point();ClientToScreen(h,ref origin);int right=origin.x+rect.right;
