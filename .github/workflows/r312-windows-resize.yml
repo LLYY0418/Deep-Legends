@@ -5,6 +5,8 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  R312_EXPECTED_LATEST: '0.13.0'
 jobs:
   capture:
     runs-on: windows-latest
@@ -50,6 +52,7 @@ jobs:
           if (-not (Test-Path "$install/Deep Legends.exe")) { throw 'Installed application missing' }
           Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($install,[StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
       - name: Enable main-process inspection for native background audit only
+        if: env.R312_EXPECTED_LATEST == ''
         shell: pwsh
         run: |
           npm ci --prefix desktop
@@ -63,6 +66,7 @@ jobs:
           node -e "const f=require('./desktop/node_modules/@electron/fuses');f.flipFuses(process.argv[1],{version:f.FuseVersion.V1,[f.FuseV1Options.EnableNodeCliInspectArguments]:true}).catch(e=>{console.error(e);process.exitCode=1})" "$env:RUNNER_TEMP/r312-app/Deep Legends Inspect.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Diagnostic inspect fuse failed' }
       - name: Prepare an installed copy with the exact product native-theme change
+        if: env.R312_EXPECTED_LATEST == ''
         shell: pwsh
         run: |
           $candidate="$env:RUNNER_TEMP/r312-native-candidate"
@@ -72,12 +76,19 @@ jobs:
           node -e "const f=require('./desktop/node_modules/@electron/fuses');f.flipFuses(process.argv[1],{version:f.FuseVersion.V1,[f.FuseV1Options.EnableEmbeddedAsarIntegrityValidation]:false}).catch(e=>{console.error(e);process.exitCode=1})" "$candidate/Deep Legends Inspect.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Diagnostic candidate fuse failed' }
       - name: Measure baseline and individual resize candidates
+        if: env.R312_EXPECTED_LATEST == ''
         shell: pwsh
         env:
           R312_CANDIDATE_EXE: ${{ runner.temp }}/r312-native-candidate/Deep Legends Inspect.exe
         run: |
           node scripts/r312-windows-resize.cjs "$env:RUNNER_TEMP/r312-app/Deep Legends Inspect.exe" "$env:RUNNER_TEMP/r312-evidence"
           if ($LASTEXITCODE -ne 0) { throw 'Native desktop measurement failed' }
+      - name: Verify original 0.13.0 client checks the real published update service
+        if: env.R312_EXPECTED_LATEST != ''
+        shell: pwsh
+        run: |
+          node scripts/r312-old-client-update.cjs "$env:RUNNER_TEMP/r312-app/Deep Legends.exe" "$env:RUNNER_TEMP/r312-evidence/old-client-update" $env:R312_EXPECTED_LATEST
+          if ($LASTEXITCODE -ne 0) { throw 'Original old-client update detection failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
