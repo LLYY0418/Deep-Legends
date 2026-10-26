@@ -335,6 +335,7 @@ type gameplayRank struct {
 	Division       string `json:"division,omitempty"`
 	LeaguePoints   int    `json:"leaguePoints"`
 	Wins           int    `json:"wins"`
+	OfficialWins   int    `json:"officialWins"`
 	Losses         int    `json:"losses"`
 	WinRate        int    `json:"winRate"`
 	RecordSource   string `json:"recordSource"`

@@ -10,14 +10,12 @@ test('R309 section dots and shared tooltips exclude mode dots; section reset pre
  for(const sel of ['[data-pos=""]','[data-champ="1"]','[data-tab="runes"]','[data-tab="kit"]'])assert(d.querySelector(sel+' .is-saved'),sel);
  assert.equal(d.querySelectorAll('.ac-editor [title],.ac-dots [title]').length,0);
  assert.equal(d.querySelector('[data-pos=""] .ac-state-dot').dataset.tooltip,'通用 · 已保存');
- await h.click('[data-tab="kit"]');await h.click('[data-section="spells"][data-act="clear"]');
- assert.equal(d.querySelector('.ac-spells'),null);assert(d.querySelector('[data-act="start-spells"]'));
- assert.equal(d.querySelector('[data-save-state="spells"]').textContent,'未配置');
- assert(d.querySelector('[data-tab="kit"] .is-unsaved'));
- await h.click('[data-section="items"][data-act="clear"]');assert.equal(d.querySelector('.ac-items'),null);assert(d.querySelector('[data-act="start-items"]'));
- await h.click('[data-section="spells"][data-act="revert"]');assert(d.querySelector('.ac-spells'));assert.equal(d.querySelector('.ac-items'),null);
- await h.click('[data-act="save"]');assert.deepEqual(h.saved.champions[1].ranked.spells,config.champions[1].ranked.spells);assert.equal(h.saved.champions[1].ranked.items,undefined);
- await h.click('[data-act="start-items"]');assert(d.querySelector('.ac-items'));await h.click('[data-section="spells"][data-act="clear"]');await h.click('[data-act="start-spells"]');assert(d.querySelector('.ac-spells'));
+ await h.click('[data-col="sub"][data-row="3"]');await h.click('[data-tab="kit"]');await h.click('[data-section="spells"][data-act="clear"]');assert(d.querySelector('dialog[open]'));await h.click('[data-section-clear-confirm]');
+ assert.equal(d.querySelector('.ac-spells'),null);assert(d.querySelector('[data-act="start-spells"]'));assert.equal(d.querySelector('[data-save-state="spells"]').textContent,'未配置');assert(d.querySelector('[data-tab="runes"] .is-unsaved'));
+ await h.click('[data-section="items"][data-act="clear"]');await h.click('[data-section-clear-confirm]');assert.equal(d.querySelector('.ac-items'),null);assert(d.querySelector('[data-act="start-items"]'));
+ await h.click('[data-act="start-spells"]');await h.click('[data-spell="6"]');await h.click('[data-section="spells"][data-act="revert"]');assert(d.querySelector('[data-act="start-spells"]'));assert.equal(d.querySelector('.ac-items'),null);
+ await h.click('[data-act="save"]');assert.equal(h.saved.champions[1].ranked.spells,undefined);assert.equal(h.saved.champions[1].ranked.items,undefined);assert.equal(h.saved.champions[1].ranked.runes.selectedPerkIds[5],14);
+ await h.click('[data-act="start-items"]');assert(d.querySelector('.ac-items'));await h.click('[data-act="start-spells"]');assert(d.querySelector('.ac-spells'));
  }finally{h.close();}
 });
 test('R309 all-clear cancels unchanged, sends one immediate DELETE, clears drafts and saved markers',async()=>{
@@ -39,7 +37,7 @@ test('R309 delete failure preserves displayed data and draft markers',async()=>{
  }finally{h.close();}
 });
 test('R309 imports save automatically and keep recoverable drafts on save failure',async()=>{
- for(const saveFails of [false,true]){const h=await editor({legacySections:false,saveFails});try{const d=h.w.document;await h.click('[data-act="import"]');assert.equal(h.calls.filter(c=>c.method==='PUT'&&c.url.startsWith('/api/auto-config/champions/')).length,1);
+ for(const saveFails of [false,true]){const h=await editor({legacySections:false,saveFails,runeIDs:[1,2,3,4,12,14,5008,5008,5001]});try{const d=h.w.document;await h.click('[data-act="import"]');assert.equal(h.calls.filter(c=>c.method==='PUT'&&c.url.startsWith('/api/auto-config/champions/')).length,1);
  if(saveFails){assert.match(d.querySelector('.ac-feedback').textContent,/推荐已导入，但保存失败/);assert(h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked'));assert.equal(d.querySelector('[data-act="save"]').disabled,false);}else{assert.match(d.querySelector('.ac-feedback').textContent,/推荐已导入并保存/);assert.equal(h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked'),null);assert.equal(d.querySelector('[data-act="save"]').disabled,true);}
  }finally{h.close();}}
 });

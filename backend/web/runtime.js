@@ -274,7 +274,7 @@
     }
     if(event==="ranked_record_resolved") {
       if(reason!=="resolved"||!["normal","budget","stream-first"].includes(fields.branch)||!["solo","flex"].includes(fields.queue)||!["season","season-cache","none"].includes(fields.filled_by))return false;
-      const body={event,reason,branch:fields.branch,queue:fields.queue,upstream_complete:fields.upstream_complete===true,filled_by:fields.filled_by,progress_complete:fields.progress_complete===true,pending:fields.pending===true},encoded=JSON.stringify(body);
+      const body={event,reason,branch:fields.branch,queue:fields.queue,upstream_complete:fields.upstream_complete===true,filled_by:fields.filled_by,progress_complete:fields.progress_complete===true,pending:fields.pending===true,cache_reused:fields.cache_reused===true,wins_delta:Number.isInteger(fields.wins_delta)?fields.wins_delta:0},encoded=JSON.stringify(body);
       flowPending.add(encoded);return sendFlowDiagnostic(body,encoded,0);
     }
     if(["rank_record_state","rank_record_final_state","rank_record_downgrade_blocked","rank_record_fill_retry"].includes(event)) {
@@ -653,16 +653,16 @@ if (typeof window !== "undefined" && typeof document !== "undefined") installSta
 // R307: next-frame timing and long tasks share the native drag identifier.
 (() => {
   if(typeof document === "undefined" || !document.documentElement?.dataset || typeof MutationObserver !== "function")return;
-  let drag=0,count=0,max=0,frame=0,last=null,zoomChanges=0,sidebarChanges=0,lastResizeAt=0;
+  let drag=0,count=0,max=0,frame=0,last=null,zoomChanges=0,sidebarChanges=0,lastResizeAt=0,resizingClass=false;
   let zoom=document.documentElement.dataset.uiScale,sidebar=document.documentElement.dataset.sidebar;
   const changes=new MutationObserver(()=>{const z=document.documentElement.dataset.uiScale,s=document.documentElement.dataset.sidebar;if(drag&&performance.now()-lastResizeAt<150){if(z!==zoom)zoomChanges++;if(s!==sidebar)sidebarChanges++;}zoom=z;sidebar=s;});
   changes.observe(document.documentElement,{attributes:true,attributeFilter:["data-ui-scale","data-sidebar"]});
   const consume=entries=>{if(drag)for(const e of entries){count++;max=Math.max(max,e.duration);}};
   let observer;try{if(typeof PerformanceObserver==="function" && PerformanceObserver.supportedEntryTypes?.includes("longtask")){observer=new PerformanceObserver(list=>consume(list.getEntries()));observer.observe({type:"longtask",buffered:false});}}catch(_){}
   const receive=value=>{
-    if(drag!==value.drag){drag=value.drag;count=max=zoomChanges=sidebarChanges=0;}
+    if(drag!==value.drag){drag=value.drag;count=max=zoomChanges=sidebarChanges=0;resizingClass=false;}
     if(value.reason==="summary"&&observer)consume(observer.takeRecords());
-    const at=performance.now();if(value.reason!=="summary")lastResizeAt=at;last={...value,innerWidth,innerHeight,longtaskCount:count,longtaskMaxMs:max,zoomChanges,sidebarChanges};
+    const at=performance.now();if(value.reason!=="summary")lastResizeAt=at;resizingClass ||= document.documentElement.classList.contains("is-resizing");last={...value,theme:document.documentElement.dataset.theme||value.theme,resizingClass,innerWidth,innerHeight,longtaskCount:count,longtaskMaxMs:max,zoomChanges,sidebarChanges};
     if(frame)cancelAnimationFrame(frame);
     frame=requestAnimationFrame(()=>{frame=0;const v=last;window.reportFlowDiagnostic?.("window_resize_trace",v.reason,{...v,nextFrameMs:performance.now()-at});if(v.reason==="summary")drag=0;});
   };

@@ -19,12 +19,11 @@ func (s seasonRankRecordSnapshot) withBranch(branch string) seasonRankRecordSnap
 	return s
 }
 
-type seasonRankRecordValue struct{ wins, losses, winRate, games, scanned int }
+type seasonRankRecordValue struct{ wins, losses, winRate, games, scanned, upstreamWins int }
 type seasonRankRecordPlayer struct {
 	season  string
 	touched uint64
 	queues  map[int64]seasonRankRecordValue
-	pending map[int64]int
 }
 type rankedRecordBucket struct {
 	event  map[string]any
@@ -57,7 +56,14 @@ func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability En
 			delete(a.rankRecordCache, snapshot.player)
 			cached = nil
 		}
-		if !ranksHaveUnverifiedWinRate(ranks) {
+		allUpstream := true
+		for _, rank := range ranks {
+			if rank.WinRate < 0 || rank.seasonFallback {
+				allUpstream = false
+				break
+			}
+		}
+		if allUpstream {
 			delete(a.rankRecordCache, snapshot.player)
 			cached = nil
 		} else {
@@ -72,7 +78,7 @@ func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability En
 					}
 					delete(a.rankRecordCache, oldest)
 				}
-				cached = &seasonRankRecordPlayer{season: snapshot.progress.Season, queues: make(map[int64]seasonRankRecordValue), pending: make(map[int64]int)}
+				cached = &seasonRankRecordPlayer{season: snapshot.progress.Season, queues: make(map[int64]seasonRankRecordValue)}
 				a.rankRecordCache[snapshot.player] = cached
 			}
 			a.rankRecordClock++
@@ -87,13 +93,18 @@ func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability En
 		if queue == 0 {
 			continue
 		}
+		officialWins := rank.Wins
+		if rank.seasonFallback {
+			officialWins = rank.OfficialWins
+		}
+		rank.OfficialWins = officialWins
+		winsDelta := 0
 		upstreamComplete := rank.WinRate >= 0 && !rank.seasonFallback
 		rank.RecordSource = "upstream"
 		rank.RecordPending = false
 		if upstreamComplete {
 			if cached != nil {
 				delete(cached.queues, queue)
-				delete(cached.pending, queue)
 			}
 		} else {
 			rank.RecordSource = "none"
@@ -101,37 +112,21 @@ func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability En
 			rank.RecordPending = !snapshot.progress.RankedComplete || snapshot.progress.Paused || snapshot.byQueue == nil && snapshot.progress.Scanned > 0
 			var value seasonRankRecordValue
 			source := ""
-			if cached != nil {
-				if previous, ok := cached.queues[queue]; ok && rank.Wins != previous.wins {
-					delete(cached.queues, queue)
-					cached.pending[queue] = rank.Wins
-				}
+			previous, known := seasonRankRecordCached(cached, queue)
+			if known {
+				winsDelta = officialWins - previous.upstreamWins
 			}
-			changed := false
-			if cached != nil {
-				_, changed = cached.pending[queue]
-			}
-			if changed && (!snapshot.progress.RankedComplete || !exists || aggregate.Wins != rank.Wins) {
-				rank.RecordPending = true
-			} else if previous, ok := seasonRankRecordCached(cached, queue); snapshot.progress.Paused && ok && previous.wins == rank.Wins {
+			absorbed := known && (aggregate.Games > previous.games || winsDelta != 0 && aggregate.Wins-previous.wins == winsDelta)
+			if known && (snapshot.progress.Paused || !snapshot.progress.RankedComplete || !exists || aggregate.Games < previous.games || winsDelta != 0 && !absorbed) {
 				value, source = previous, "season-cache"
 			} else if snapshot.progress.RankedComplete && exists && aggregate.Games > 0 {
-				value = seasonRankRecordValue{aggregate.Wins, aggregate.Losses, aggregate.WinRate, aggregate.Games, snapshot.progress.Scanned}
+				value = seasonRankRecordValue{wins: aggregate.Wins, losses: aggregate.Losses, winRate: aggregate.WinRate, games: aggregate.Games, scanned: snapshot.progress.Scanned, upstreamWins: officialWins}
 				source = "season"
 				if cached != nil {
 					cached.queues[queue] = value
-					delete(cached.pending, queue)
 				}
-			} else if cached != nil {
-				if previous, ok := cached.queues[queue]; ok {
-					if rank.Wins == previous.wins {
-						value, source = previous, "season-cache"
-					} else {
-						delete(cached.queues, queue)
-						cached.pending[queue] = rank.Wins
-						rank.RecordPending = true
-					}
-				}
+			} else if known {
+				value, source = previous, "season-cache"
 			}
 			if source != "" {
 				rank.Wins, rank.Losses, rank.WinRate = value.wins, value.losses, value.winRate
@@ -152,7 +147,7 @@ func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability En
 		if filledBy == "upstream" {
 			filledBy = "none"
 		}
-		diagnostics = append(diagnostics, map[string]any{"event": "ranked_record_resolved", "branch": branch, "queue": label, "upstream_complete": upstreamComplete, "filled_by": filledBy, "progress_complete": snapshot.progress.RankedComplete, "pending": rank.RecordPending})
+		diagnostics = append(diagnostics, map[string]any{"event": "ranked_record_resolved", "branch": branch, "queue": label, "upstream_complete": upstreamComplete, "filled_by": filledBy, "progress_complete": snapshot.progress.RankedComplete, "pending": rank.RecordPending, "cache_reused": rank.RecordSource == "season-cache", "wins_delta": winsDelta})
 	}
 	a.rankRecordMu.Unlock()
 	for _, event := range diagnostics {
@@ -174,7 +169,7 @@ func seasonRankRecordCached(player *seasonRankRecordPlayer, queue int64) (season
 }
 
 func (a *app) aggregateRankedRecordDiagnostic(event map[string]any, now time.Time) {
-	key := fmt.Sprint(event["branch"], "|", event["queue"], "|", event["upstream_complete"], "|", event["filled_by"], "|", event["progress_complete"], "|", event["pending"])
+	key := fmt.Sprint(event["branch"], "|", event["queue"], "|", event["upstream_complete"], "|", event["filled_by"], "|", event["progress_complete"], "|", event["pending"], "|", event["cache_reused"], "|", event["wins_delta"])
 	minute := now.UTC().Truncate(time.Minute)
 	var previous map[string]any
 	a.rankRecordMu.Lock()

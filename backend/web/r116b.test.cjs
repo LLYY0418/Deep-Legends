@@ -128,7 +128,7 @@ test("R128 §2.3 口径说明的实现、调用点与样式在前端全部消失
     assert.doesNotMatch(source, /deepLegendsShared/);
     assert.doesNotMatch(source, /mayhem-measurement/);
     assert.doesNotMatch(source, /recommendation-measurement/);
-    assert.doesNotMatch(source.replace('<div class="aramkit-scope"><span>统计口径</span>', ""), /统计口径/);
+    assert.doesNotMatch(source, /统计口径/);
   }
   assert.doesNotMatch(gameplayStyles, /recommendation-measurement/);
   assert.doesNotMatch(championsStyles, /mayhem-measurement|mayhem-detail-footer|mayhem-caution-note/);

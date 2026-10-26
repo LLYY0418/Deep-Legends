@@ -1455,14 +1455,14 @@
     const samePlayer=server===(previous?.player?.serverId || tab.serverId || "") && player===(previous?.player?.playerRef || tab.playerRef) && season===(previous?.seasonStatsProgress?.season || season);
     const oldRanks=samePlayer ? previous?.ranks || [] : [];
     const ranks=(data.ranks || []).map(incoming=>{
-      let rank={...incoming};
+      let rank={...incoming,officialWins:Number(incoming.officialWins ?? incoming.wins)};
       const old=oldRanks.find(r=>r.queueType===rank.queueType && ["season","season-cache"].includes(r.recordSource)) || saved.get(rank.queueType);
       if(Number(rank.winRate)<0 && old && Number(old.winRate)>=0) {
-        if(Number(rank.wins)===Number(old.wins)) {
+        if(Number(incoming.officialWins ?? incoming.wins)===Number(old.officialWins)) {
           rank={...rank,wins:old.wins,losses:old.losses,winRate:old.winRate,recordSource:old.recordSource,recordPending:false};
           tab.rankRecordCause="retained";
           window.reportFlowDiagnostic?.("rank_record_downgrade_blocked","retained",{queue:rank.queueType==="RANKED_SOLO_5x5"?"solo":"flex",source:rank.recordSource,foreign:!tab.current});
-        }else {saved.delete(rank.queueType);rank.recordPending=true;}
+        }else {saved.delete(rank.queueType);rank.recordBaseline={officialWins:old.officialWins,wins:old.wins,losses:old.losses};rank.recordPending=true;}
       }
       if(Number(rank.winRate)>=0 && ["season","season-cache"].includes(rank.recordSource))saved.set(rank.queueType,{...rank});
       else if(Number(rank.winRate)>=0)saved.delete(rank.queueType);
@@ -1509,8 +1509,10 @@
         tab.data.ranks=(tab.data.ranks || []).map(rank=>{
           const key=rank.queueType==="RANKED_SOLO_5x5" ? "420" : rank.queueType==="RANKED_FLEX_SR" ? "440" : "";
           const queue=data.seasonQueueStats?.[key];
-          if(!queue || !(Number(rank.winRate)<0 || ["season","season-cache"].includes(rank.recordSource)) || rank.recordPending===true && Number(queue.wins)!==Number(rank.wins))return rank;
-          tab.seasonRanksFilled.add(key);return {...rank,wins:queue.wins,losses:queue.losses,winRate:queue.winRate,recordSource:"season",recordPending:false};
+          if(!queue || !(Number(rank.winRate)<0 || ["season","season-cache"].includes(rank.recordSource)))return rank;
+          const baseline=rank.recordBaseline || (Number(rank.winRate)>=0?rank:null),official=Number(rank.officialWins ?? rank.wins);
+          if(baseline){const games=Number(baseline.wins)+Number(baseline.losses),delta=official-Number(baseline.officialWins);if(Number(queue.games)<games || delta!==0 && !(Number(queue.games)>games || Number(queue.wins)-Number(baseline.wins)===delta))return rank;}
+          tab.seasonRanksFilled.add(key);const {recordBaseline,...known}=rank;return {...known,officialWins:Number(rank.officialWins ?? rank.wins),wins:queue.wins,losses:queue.losses,winRate:queue.winRate,recordSource:"season",recordPending:false};
         });
       }
       tab.data=acceptRankRecords(tab,tab.data,"season-fill");
@@ -3245,7 +3247,7 @@
       if(skeleton)return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record gameplay-skeleton" aria-label="正在统计中"><span></span><span></span></div></div>`;
       const record = recordKnown ? `${number(rank.wins)}胜 ${number(rank.losses)}负` : paused ? `${number(rank.wins)}胜 · 统计已暂停` : collecting ? `${number(rank.wins)}胜 · 正在统计中` : `${number(rank.wins)}胜 · 负场未提供`;
 	  const unavailableDetail = paused ? "官方战绩服务暂时中断，恢复后自动继续统计" : collecting ? "正在统计中" : (rankedCapability?.detail || "上游未提供负场，无法计算胜率");
-	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 <b class="win-rate-value">${percent(rank.winRate)}</b>` : collecting ? "正在统计中" : "胜率暂不可用"}</span></div></div>`;
+	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown || collecting ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 <b class="win-rate-value">${percent(rank.winRate)}</b>` : collecting ? "" : "胜率暂不可用"}</span></div></div>`;
     }).join("");
     return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress)}</h3><div class="rank-header-tools">${mmr}</div></header><div class="rank-list${rows.includes('gameplay-skeleton')?' career-pending':''}">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;
   }

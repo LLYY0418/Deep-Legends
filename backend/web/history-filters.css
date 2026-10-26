@@ -136,3 +136,6 @@
 .af-options:has(> [data-af-option="m2"]) strong { font-size:13.5px; }
 .af-options:has(> [data-af-option="m2"]) small { font-size:12px; }
 .af-options:has(> [data-af-option="m2"]) > button.is-active strong { color:var(--primary-strong); }
+
+.af-conditionbar button { cursor:pointer; }
+.af-conditionbar button:disabled { cursor:default; }

@@ -15,6 +15,7 @@ func (a *app) recordRankRecordClientDiagnostic(w http.ResponseWriter, r clientDi
 	case "ranked_record_resolved":
 		valid = r.Reason == "resolved" && slices.Contains([]string{"normal", "budget", "stream-first"}, r.RankRecordBranch) && slices.Contains([]string{"solo", "flex"}, r.RankRecordQueue) && slices.Contains([]string{"season", "season-cache", "none"}, r.RankRecordFilledBy)
 		event["branch"], event["queue"], event["upstream_complete"], event["filled_by"], event["progress_complete"], event["pending"] = r.RankRecordBranch, r.RankRecordQueue, r.RankRecordUpstream, r.RankRecordFilledBy, r.RankRecordProgress, r.RankRecordPending
+		event["cache_reused"], event["wins_delta"] = r.RankRecordCacheReused, r.RankRecordWinsDelta
 	default:
 		valid = slices.Contains([]string{"solo", "flex"}, r.RankRecordQueue) && slices.Contains([]string{"upstream", "season", "season-cache", "none"}, r.Source)
 		event["queue"], event["source"], event["foreign"] = r.RankRecordQueue, r.Source, r.RankRecordForeign

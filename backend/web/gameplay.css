@@ -499,7 +499,7 @@
 .ability-radar-player { fill: color-mix(in oklab,var(--primary-strong) 20%,transparent); stroke: var(--primary-strong); stroke-width: 2; }
 .ability-radar-points circle { fill: var(--primary-strong); stroke: var(--surface); stroke-width: 1.5; }
 .ability-radar-controls { position: absolute; inset: 0; pointer-events: none; }
-.ability-radar-metric { position: absolute; display: grid; min-width: 48px; min-height: 38px; padding: 3px 4px; transform: translate(-50%,-50%); place-content: center; color: var(--muted); background: transparent; border: 0; border-radius: 4px; font: inherit; font-size: 10px; line-height: 1.2; text-align: center; cursor: help; pointer-events: auto; }
+.ability-radar-metric { position: absolute; display: grid; min-width: 48px; min-height: 38px; padding: 3px 4px; transform: translate(-50%,-50%); place-content: center; color: var(--muted); background: transparent; border: 0; border-radius: 4px; font: inherit; font-size: 10px; line-height: 1.2; text-align: center; cursor: pointer; pointer-events: auto; }
 .ability-radar-metric.is-metric-0 { left: 50%; top: 12%; }
 .ability-radar-metric.is-metric-1 { left: 79%; top: 25%; }
 .ability-radar-metric.is-metric-2 { left: 86%; top: 61%; }
@@ -2546,3 +2546,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .recent-ranked-section>header>.career-section-tools { margin-left:auto; }
 .custom-config-card .sg-starters+.sg-items { margin-left:22px; padding-left:22px; border-left:1px solid var(--line); }
 @container sgrow (max-width:700px) { .custom-config-card .specialist-game-footer { gap:12px; } .custom-config-card .sg-starters+.sg-items { margin:0; padding:0; border:0; } }
+
+/* R312: grid-aligned rank placeholders must retain measurable width. */
+.rank-row .rank-record.gameplay-skeleton span { width: 76px; height: 12px; min-height: 12px; }
+.rank-row .rank-record.gameplay-skeleton span + span { width: 52px; height: 10px; min-height: 10px; }

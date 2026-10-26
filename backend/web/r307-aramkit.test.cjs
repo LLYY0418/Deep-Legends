@@ -22,7 +22,7 @@ test('R307 live grade rounds and updates from cached hero IDs with pending and m
 
 test('R307 atlas fallback hides missing deltas, uses best rank and real item pick rate',()=>{
  const state={atlasTab:'champions',fitStage:'all',fitQuery:'',mayhemAugmentDetail:{champions:[{id:1,name:'次名',rank:2,winRate:50,popularity:2,games:300},{id:2,name:'首名',rank:1,winRate:60,popularity:3,games:400,deltaWinRate:17.1}],items:[{assets:[{name:'测试装备'}],games:321,pickRate:12.34,winRate:56.78}]}};
- const f=compile(source,['renderMayhemAtlasDetail','renderARAMKitItems','aramkitSelect'],{...common,state,rarityLabel:()=>'',mayhemAtlasDescription:()=>'',renderARAMKitCombos:()=>'',renderDetailSkeleton:()=>'',compactNumber:String});
+ const f=compile(source,['renderMayhemAtlasDetail','renderARAMKitItems','aramkitSelect'],{...common,state,rarityLabel:()=>'',renderMayhemAtlasDescription:()=>'',renderARAMKitCombos:()=>'',renderDetailSkeleton:()=>'',compactNumber:String});
  const html=f.renderMayhemAtlasDetail({id:1134});assert.match(html,/最佳适配英雄<\/small><strong>首名<\/strong>/);assert.match(html,/\+17\.1%/);assert.doesNotMatch(html,/—%|NaN|undefined/);state.atlasTab='items';assert.match(f.renderMayhemAtlasDetail({id:1134}),/12\.3%<small>选取率/);state.atlasTab='champions';assert.doesNotMatch(html,/场次<\/dt>/);
  state.mayhemAugmentDetail.champions[1].deltaWinRate=-2.5;assert.match(f.renderMayhemAtlasDetail({id:1134}),/is-delta-down"> -2\.5%/);
 });

@@ -70,15 +70,16 @@ test("scale mutants turn the corresponding geometry guards red", () => {
   assert.throws(()=>assert.equal(noQuantize.autoScaleFor({width:3840,height:1600}),1.78));
 });
 
-function harness({source=mainSource, stored, width=1920, height=1080}={}) {
+function harness({source=mainSource, stored, storedAppearance, platform="win32", width=1920, height=1080}={}) {
   const files = new Map(stored === undefined ? [] : [[storedScalePath, stored]]);
+  if(storedAppearance!==undefined)files.set(path.join("/user-data","appearance-theme.json"),storedAppearance);
   const writes=[], windows=[], zoom=[], minimum=[], overlays=[], timers=new Map();
   let now=0, seq=0;
   const ipcMain = new EventEmitter();
   ipcMain.handlers=new Map();
   ipcMain.handle=(key,fn)=>ipcMain.handlers.set(key,fn);
   ipcMain.removeHandler=key=>ipcMain.handlers.delete(key);
-  const nativeTheme=new EventEmitter();
+  const nativeTheme=new EventEmitter();nativeTheme.themeSource="system";
   const screen=new EventEmitter();
   screen.getAllDisplays=()=>[];
   screen.getPrimaryDisplay=()=>({workAreaSize:{width:1920,height:1080}});
@@ -87,7 +88,7 @@ function harness({source=mainSource, stored, width=1920, height=1080}={}) {
   Object.assign(app,{setAppUserModelId(){},requestSingleInstanceLock:()=>true,whenReady:()=>({then(){}}),getPath:()=>"/user-data",quit(){},isPackaged:true});
   class BrowserWindow extends EventEmitter {
     constructor(options) {
-      super(); this.options=options;this.bounds={x:0,y:0,width,height};this.destroyed=false;
+      super(); this.options=options;this.nativeThemeAtCreation=nativeTheme.themeSource;this.bounds={x:0,y:0,width,height};this.destroyed=false;
       this.url="http://127.0.0.1:8787/";
       this.webContents=new EventEmitter();
       Object.assign(this.webContents,{session:{},mainFrame:{},isDestroyed:()=>this.destroyed,getURL:()=>this.url,setZoomFactor:value=>zoom.push(value),send:(...args)=>{
@@ -110,7 +111,7 @@ function harness({source=mainSource, stored, width=1920, height=1080}={}) {
     setContentBounds(){}
     isFullScreen(){return false;}
     setTitleBarOverlay(overlay){overlays.push(overlay);}
-    setBackgroundColor(){}
+    setBackgroundColor(color){this.backgroundColor=color;}
     setContentProtection(value){assert.equal(typeof value,"boolean");this.contentProtection=value;}
     loadURL(){return Promise.resolve();}
   }
@@ -132,7 +133,7 @@ function harness({source=mainSource, stored, width=1920, height=1080}={}) {
       if(name==="./license-gate.cjs")return {readLicenseSnapshot:async()=>({state:"ACTIVE",generation:1})};
       if(name.startsWith("./"))return require(name);
       return require(name);
-    },__dirname,process:{on(){},platform:"win32",env:{}},URL,Buffer,console,
+    },__dirname,process:{on(){},platform,env:{}},URL,Buffer,console,
     setTimeout(fn,delay){const id=++seq;timers.set(id,{fn,time:now+delay});return id;},
     clearTimeout(id){timers.delete(id);},setImmediate(fn){fn();},
   });
@@ -180,6 +181,24 @@ test("titlebar, minimum size, reload, resize and display events run through the 
   h.window.bounds={width:1920,height:1080};h.screen.emit("display-metrics-changed");assert.equal(h.scales().at(-1),1);
   h.window.emit("closed");assert.equal(h.screen.listenerCount("display-metrics-changed"),0);
   assert.equal(h.nativeTheme.listenerCount("updated"),0);assert.equal(h.ipcMain.listenerCount("desktop-scale-set"),0);
+});
+
+test("R312 Windows native Chromium theme follows cached and live appearance before a resize", () => {
+  for(const [storedAppearance,expected] of [[undefined,"dark"],[JSON.stringify({theme:"light"}),"light"],[JSON.stringify({theme:"dark"}),"dark"],["invalid","dark"],[JSON.stringify({theme:"crimson"}),"dark"]]){
+    const h=harness({storedAppearance});
+    assert.equal(h.nativeTheme.themeSource,expected);
+    assert.equal(h.window.nativeThemeAtCreation,expected,"native theme must be ready before BrowserWindow creates its resize surface");
+    assert.equal(h.window.options.backgroundColor,expected==="light"?"#ffffff":"#0B0E14");
+    for(const theme of ["light","dark","light"]){
+      h.ipcMain.emit("desktop-theme",{sender:h.window.webContents},theme);
+      assert.equal(h.nativeTheme.themeSource,theme);
+      assert.equal(h.window.backgroundColor,theme==="light"?"#ffffff":"#0B0E14");
+      assert.equal(h.overlays.at(-1).color,h.window.backgroundColor);
+    }
+    h.ipcMain.emit("desktop-theme",{},"untrusted-theme");assert.equal(h.nativeTheme.themeSource,"light");
+  }
+  const mac=harness({platform:"darwin",storedAppearance:JSON.stringify({theme:"dark"})});
+  assert.equal(mac.nativeTheme.themeSource,"system");mac.ipcMain.emit("desktop-theme",{},"light");assert.equal(mac.nativeTheme.themeSource,"system");
 });
 
 test("IPC restores independent preferences, normalizes fixed values and rejects untrusted senders", () => {

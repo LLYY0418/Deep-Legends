@@ -45,7 +45,7 @@ function assetFixture(req,res){const u=new URL(req.url,'http://fixture');if(!['/
  assert(await b.evaluate(`Boolean(document.querySelector('[data-aramkit-filter=itemSlot]').closest('label.select-wrap')&&document.querySelector('.aramkit-item-tools .app-select'))`));
  const count=await b.evaluate('document.querySelectorAll(".aramkit-single").length');await b.evaluate(`document.querySelector('[data-aramkit-more]').click()`);assert.equal(await b.evaluate('document.querySelectorAll(".aramkit-single").length'),count+10);
  for(const sort of ['rank','winRate','pickRate']){await b.evaluate(`document.querySelector('[data-aramkit-choice="itemSort"][data-value="${sort}"]').click()`);assert.equal(await b.evaluate('__r308.state.itemSort'),sort);}
- await b.evaluate(`document.querySelector('[data-aramkit-choice="itemScope"][data-value="filtered"]').click()`);assert.equal(await b.evaluate('document.querySelectorAll(".aramkit-linked").length'),0);
+ assert.equal(await b.evaluate('document.querySelectorAll(".aramkit-scope,[data-aramkit-choice=itemScope]").length'),0);await b.evaluate('__r308.state.itemLimit=999;__r308.render()');assert(await b.evaluate('document.querySelectorAll(".aramkit-linked").length>0'));
  report.checks.push('items: scope/sort/slot unified menu, additive pagination, opening no overflow 1920/1440/1100/860');
  for(const width of [1920,1440,1100]){
  await b.call('Emulation.setDeviceMetricsOverride',{width,height:1150,deviceScaleFactor:1,mobile:false});

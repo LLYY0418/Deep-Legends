@@ -90,7 +90,7 @@
     flushDraft();
     cancelImport();change();S.tab="runes";loadDraft();render();
   }
-  function dirty(cancel=true){const content=draftContent(S.draft);if(content===lastContent)return;if(cancel)cancelImport();lastContent=content;S.dirty=content!==draftContent(stored());S.feedback="";S.error="";clearTimeout(draftTimer);if(S.dirty)draftTimer=setTimeout(flushDraft,300);else removeDraft();const feedback=root.querySelector(".ac-feedback");if(feedback)feedback.hidden=true;for(const n of root.querySelectorAll("[data-save-state]"))n.outerHTML=saveState(n.dataset.saveState);for(const n of root.querySelectorAll('[data-act="save"]')){n.disabled=!canSave();n.textContent=S.dirty?"保存":"已保存";}for(const n of root.querySelectorAll('[data-act="revert"]'))n.disabled=!sectionDirty(n.dataset.section);updateDraftMarkers();}
+  function dirty(cancel=true){const content=draftContent(S.draft);if(content===lastContent)return;if(cancel)cancelImport();lastContent=content;S.dirty=content!==draftContent(stored());S.feedback="";S.error="";clearTimeout(draftTimer);if(S.dirty)draftTimer=setTimeout(flushDraft,300);else removeDraft();const feedback=root.querySelector(".ac-feedback");if(feedback)feedback.hidden=true;for(const n of root.querySelectorAll("[data-save-state]"))n.outerHTML=saveState(n.dataset.saveState);refreshSaveButtons();for(const n of root.querySelectorAll('[data-act="revert"]'))n.disabled=!!S.savingSection||!sectionDirty(n.dataset.section);updateDraftMarkers();}
   function openModal(title,content){
     const opener=document.activeElement;
     if(window.deepLegendsSettingsModal)window.deepLegendsSettingsModal(title,content);
@@ -114,19 +114,20 @@
     content.addEventListener("click",async e=>{const b=e.target.closest("[data-act]");if(!b||b.disabled)return;const buttons=[...content.querySelectorAll("button")].map(n=>[n,n.disabled]);buttons.forEach(([n])=>n.disabled=true);try{await action(b.dataset.act);}catch(error){copyDialog?.close();reportError(error);}finally{buttons.forEach(([n,disabled])=>n.disabled=disabled);}});
     content.querySelector("input:not(:disabled)")?.focus();
   }
-  function confirmPending(){
+  function confirmPending(section){
+    const name=sectionName(section),others=otherSections(section);
     if(pendingDialog?.open)return;
     const opener=document.activeElement,content=document.createElement("div");
     content.className="ac-confirm";
-    content.innerHTML=`<p>导入推荐会替换当前草稿，未保存的修改将会丢失。</p><p class="ac-confirm-error" role="alert" hidden></p><div class="ac-confirm-actions"><button class="button button-secondary" data-act="stay">取消</button><button class="button button-primary" data-act="discard">放弃修改并导入</button></div>`;
-    pendingDialog=openModal("有未保存的修改",content);
+    content.innerHTML=`<p>从推荐导入会替换<b class="ac-confirm-highlight">${name}</b>里未保存的修改，${others}不受影响。</p><p class="ac-confirm-error" role="alert" hidden></p><div class="ac-confirm-actions"><button class="button button-secondary" data-act="stay">取消</button><button class="button button-primary" data-act="discard">放弃修改并导入</button></div>`;
+    pendingDialog=openModal(name+"有未保存的修改",content);
     const dialog=pendingDialog;
     dialog.addEventListener("close",()=>{if(pendingDialog===dialog){pendingDialog=null;S.pending=null;}if(opener?.isConnected)opener.focus({preventScroll:true});},{once:true});
     content.addEventListener("click",async e=>{const button=e.target.closest("[data-act]");if(!button||button.disabled)return;const buttons=[...content.querySelectorAll("button")].map(n=>[n,n.disabled]);buttons.forEach(([n])=>n.disabled=true);try{await action(button.dataset.act);}catch(error){reportError(error);}finally{buttons.forEach(([n,disabled])=>n.disabled=disabled);}});
     (content.querySelector('[data-act="stay"]')||dialog.querySelector("[data-ac-close]")).focus({preventScroll:true});
   }
   function closePending(){const dialog=pendingDialog;pendingDialog=null;S.pending=null;dialog?.close();}
-  function importStatus(){for(const b of root.querySelectorAll('[data-act="import"]')){b.disabled=S.importing||!["ranked","normal","hextech"].includes(S.mode);b.textContent=S.importing?"正在导入…":"从推荐导入";b.setAttribute("aria-busy",String(S.importing));}}
+  function importStatus(){for(const b of root.querySelectorAll('[data-act="import"]')){b.disabled=!!S.savingSection||S.importing||!["ranked","normal","hextech"].includes(S.mode);b.textContent=S.importing?"正在导入…":"从推荐导入";b.setAttribute("aria-busy",String(S.importing));}}
   function reportError(error){S.error=error.message;S.feedback="";render();}
   function syncSettings(next){
     if(!next)return;
@@ -149,15 +150,25 @@
     if(p&&!!p.spell1Id!==!!p.spell2Id)return "召唤师技能只选了一个";
     return "";
   }
+  const sectionName=section=>({runes:"符文",spells:"召唤师技能",items:"装备"}[section]);
+  const otherSections=section=>["runes","spells","items"].filter(s=>s!==section).map(sectionName).join("和");
+  function sectionValidation(section,value=S.draft){
+    const r=value?.[section];
+    if(section==="runes"&&r){const missing=r.selectedPerkIds.filter(id=>!id).length;if(missing)return `符文还差 ${missing} 个没选`;if(r.selectedPerkIds.some(id=>!perk(id)))return "已失效符文，请重新选择";}
+    if(section==="spells"&&r&&!!r.spell1Id!==!!r.spell2Id)return "召唤师技能只选了一个";
+    return "";
+  }
+  function canSaveSection(section){return !S.savingSection&&!S.importing&&sectionDirty(section)&&!sectionValidation(section);}
+  function refreshSaveButtons(){for(const n of root.querySelectorAll('[data-act="save"]')){const section=n.dataset.section;n.disabled=section?!canSaveSection(section):!canSave();n.textContent=section?sectionDirty(section)||!hasSection(stored(),section)?"保存"+sectionName(section):"已保存":S.dirty?"保存":"已保存";}}
   function canSave(){return S.dirty&&!!S.draft&&!validationMessage();}
   function statusMarkup(){const text=S.error||validationMessage()||S.feedback;return `<div class="ac-feedback" role="${S.error||validationMessage()?"alert":"status"}" data-tooltip="${esc(text)}" data-tooltip-size="compact" ${text?"":"hidden"}><span>${esc(text)}</span>${S.error?.includes("配置已更新")?'<button class="text-button" data-act="reload">重新读取</button>':""}</div>`;}
   function highlightValidation(){const message=validationMessage();if(!message)return;const nodes=message.startsWith("符文还差")?root.querySelectorAll('.ac-group:not([data-group="sub"]) .ac-row:not(.is-picked),.ac-group[data-group="sub"]:has([data-sub-progress]:not(.is-picked))'):message==="召唤师技能只选了一个"?root.querySelectorAll('.ac-slot:has(.ac-slot-empty)'):[];for(const n of nodes){n.classList.add("ac-validation-pulse");n.addEventListener("animationend",()=>n.classList.remove("ac-validation-pulse"),{once:true});}}
   function sectionContent(value,section) {const content=JSON.parse(draftContent(value));return JSON.stringify(section==="kit"?{spells:content.spells,items:content.items}:content[section]);}
   function hasSection(value,section) {const content=JSON.parse(draftContent(value));return section==="kit"?!!(content.spells||content.items):!!content[section];}
   function sectionDirty(section) {return sectionContent(S.draft,section)!==sectionContent(stored(),section);}
-  function saveState(section="runes") {const exists=hasSection(S.draft,section),changed=sectionDirty(section),date=new Date(stored()?.updatedAt),stamp=Number.isNaN(date.getTime())?"":date.toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});return `<span data-save-state="${section}" class="ac-save-state ${!exists?"":changed?"ac-dirty":"ac-saved"}">${!exists?"未配置":changed?"未保存":"已保存 "+stamp}</span>`;}
-  function saveButton() {return `<span class="ac-save-attempt" data-save-attempt><button class="button button-primary" data-act="save" ${canSave()?"":"disabled"}>${S.dirty?"保存":"已保存"}</button></span>`;}
-  function editorActions(section="runes") {return `<div class="ac-action-row">${statusMarkup()}<div class="ac-editor-actions">${section!=="spells"?'<button class="button button-secondary ac-import" data-act="import">从推荐导入</button>':""}<button class="button button-secondary" data-act="clear" data-section="${section}" ${hasSection(S.draft,section)?"":"disabled"}>清空${{runes:"符文",spells:"召唤师技能",items:"装备"}[section]}</button><button class="button button-secondary" data-act="revert" data-section="${section}" ${sectionDirty(section)?"":"disabled"}>还原</button>${saveButton()}</div></div>`;}
+  function saveState(section="runes") {const exists=hasSection(S.draft,section),changed=sectionDirty(section),date=new Date(stored()?.updatedAt),stamp=Number.isNaN(date.getTime())?"":date.toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});return `<span data-save-state="${section}" class="ac-save-state ${changed?"ac-dirty":!exists?"":"ac-saved"}">${changed?"未保存":!exists?"未配置":"已保存 "+stamp}</span>`;}
+  function saveButton(section="") {const changed=section?sectionDirty(section):S.dirty,enabled=section?canSaveSection(section):canSave(),label=section?changed||!hasSection(stored(),section)?"保存"+sectionName(section):"已保存":S.dirty?"保存":"已保存";return `<span class="ac-save-attempt" data-save-attempt="${section}"><button class="button ${!section||changed?"button-primary":"button-secondary"}" data-act="save" ${section?`data-section="${section}"`:""} ${enabled?"":"disabled"}>${label}</button></span>`;}
+  function editorActions(section="runes") {return `<div class="ac-action-row">${statusMarkup()}<div class="ac-editor-actions">${section!=="spells"?`<button class="button button-secondary ac-import" data-act="import" data-section="${section}">从推荐导入</button>`:""}<button class="button button-secondary" data-act="clear" data-section="${section}" ${hasSection(S.draft,section)&&!S.savingSection?"":"disabled"}>清空${sectionName(section)}</button><button class="button button-secondary" data-act="revert" data-section="${section}" ${sectionDirty(section)&&!S.savingSection?"":"disabled"}>还原</button>${saveButton(section)}</div></div>`;}
   function tabDot(section,name) {const changed=sectionDirty(section);if(!changed&&!hasSection(S.draft,section))return "";return dotMarkup(changed,name);}
   function dotMarkup(unsaved,name) {const label=(name?name+" · ":"")+(unsaved?"有未保存的修改":"已保存");return `<i class="ac-state-dot ${unsaved?"is-unsaved":"is-saved"}" data-tooltip="${esc(label)}" data-tooltip-size="compact" aria-label="${esc(label)}"></i>`;}
   function runeBtn(p,row,col,selected,i){return `<button class="ac-rune${selected?" is-picked":""}" data-rune="${p.id}" data-row="${row}" data-col="${col}" aria-pressed="${selected}" aria-label="${esc(p.name)}" data-ac-tooltip="${esc(tip(p))}" data-i="${i}">${col==="shards"?`<span class="ac-shard-icon">${icon(p.iconPath).replace("<img ","<img data-shard-art ")}</span>`:icon(p.iconPath)}<span class="ring"></span></button>`;}
@@ -250,7 +261,7 @@
     const key=root.querySelector(".ac-bn-key");if(key){const label=perk(r.selectedPerkIds[0])?.name||"未选基石";key.lastChild.textContent=label;key.classList.toggle("is-empty",!r.selectedPerkIds[0]);}
     const warning=root.querySelector(".ac-stage-warn");if(warning)warning.hidden=complete();
     const invalid=root.querySelector("[data-invalid-runes]");if(invalid)invalid.hidden=!r.selectedPerkIds.some(id=>id&&!perk(id));
-    for(const saveButton of root.querySelectorAll('[data-act="save"]')){saveButton.disabled=!canSave();saveButton.textContent=S.dirty?"保存":"已保存";}
+    refreshSaveButtons();
     const feedback=root.querySelector(".ac-feedback");if(feedback)feedback.outerHTML=statusMarkup();updateDraftMarkers();renderedEditor=editor();layout();
   }
 
@@ -306,7 +317,50 @@
     window.dispatchEvent(new CustomEvent("deep-legends:auto-config-settings",{detail:next}));
     S.error="";render();return unchanged;
   }
-  async function importRecommendation(){
+  async function saveSection(section,candidate=S.draft){
+    if(S.savingSection)return false;
+    const error=sectionValidation(section,candidate);if(error)throw Error(error);
+    const id=S.champ,key=modeKey(),value=clone(candidate?.[section]??null),before=sectionContent(stored(),section),draftBefore=sectionContent(S.draft,section),beforeStored=clone(stored()||{});
+    S.savingSection=section;refreshSaveButtons();importStatus();
+    try{
+      const request=saveQueue.catch(()=>{}).then(async()=>{
+        const latest=await api("/api/auto-config/settings"),entry=latest.champions?.[id]?.[key];
+        if(sectionContent(entry,section)!==before)throw Error("配置已更新，请重新读取后保存");
+        const merged=clone(entry||{});delete merged.updatedAt;
+        if(value)merged[section]=value;else delete merged[section];
+        if(merged.spells&&!merged.spells.spell1Id&&!merged.spells.spell2Id)delete merged.spells;
+        if(!hasSection(merged,"items"))delete merged.items;
+        const empty=!["runes","spells","items"].some(s=>hasSection(merged,s));
+        return api(`/api/auto-config/champions/${id}/${key}`,empty?"DELETE":"PUT",empty?undefined:merged);
+      });
+      saveQueue=request;const next=await request;S.settings=next;
+      if(S.champ===id&&modeKey()===key){
+        S.draft||={};
+        for(const part of ["runes","spells","items"]){
+          const unchanged=sectionContent(S.draft,part)===(part===section?draftBefore:sectionContent(beforeStored,part));
+          if(unchanged){if(stored()?.[part])S.draft[part]=clone(stored()[part]);else delete S.draft[part];}
+        }
+        draftBase=draftContent(stored());lastContent=draftContent(S.draft);S.dirty=lastContent!==draftBase;
+        S.spellEditing=!!S.draft?.spells;S.itemEditing=hasSection(S.draft,"items");readSecondary();
+        if(S.dirty)flushDraft();else removeDraft();
+      }else{
+        try{const raw=preferences().getItem(draftKey(id,key));if(raw){const row=JSON.parse(raw),entry=next.champions?.[id]?.[key];
+          for(const part of ["runes","spells","items"]){if(sectionContent(row.value,part)===(part===section?draftBefore:sectionContent(beforeStored,part))){if(entry?.[part])row.value[part]=clone(entry[part]);else delete row.value[part];}}
+          row.baseContent=draftContent(entry);if(draftContent(row.value)===row.baseContent)removeDraft(id,key);else preferences().setItem(draftKey(id,key),JSON.stringify(row));
+        }}catch(_){/* Keep an unreadable draft for the normal load validator. */}
+      }
+      window.dispatchEvent(new CustomEvent("deep-legends:auto-config-settings",{detail:next}));S.error="";return true;
+    }finally{S.savingSection="";render();}
+  }
+  function confirmClearSection(section){
+    if(clearDialog?.open||S.savingSection)return;
+    const content=document.createElement("div"),name=sectionName(section),label=`${title(champ())} · ${modeName()}`;content.className="ac-confirm";
+    content.innerHTML=`<p>将立即清空并保存「${esc(label)}」的<b class="ac-confirm-highlight">${name}</b>，${otherSections(section)}不受影响。</p><div class="ac-confirm-actions"><button class="button button-secondary" data-section-clear-cancel>取消</button><button class="button ac-danger" data-section-clear-confirm>清空</button></div>`;
+    const dialog=clearDialog=openModal("清空"+name,content);dialog.addEventListener("close",()=>{if(clearDialog===dialog)clearDialog=null;},{once:true});
+    content.querySelector("[data-section-clear-cancel]").onclick=()=>dialog.close();
+    content.querySelector("[data-section-clear-confirm]").onclick=async()=>{if(S.savingSection)return;const buttons=[...dialog.querySelectorAll("button")];buttons.forEach(b=>b.disabled=true);try{cancelImport();const candidate=clone(S.draft||{});delete candidate[section];await saveSection(section,candidate);S.feedback="已清空并保存"+name;}catch(error){S.error="清空失败："+error.message;}finally{dialog.close();render();}};
+  }
+  async function importRecommendation(section="runes"){
     cancelImport();const generation=S.generation,c=champ(),mode=S.mode,pos=mode==="ranked"?S.pos:"";
     const controller=new AbortController();importController=controller;S.importing=true;S.error="";S.feedback="正在读取推荐…";importStatus();
     const timer=setTimeout(()=>controller.abort(),25000);
@@ -342,11 +396,11 @@
         cost+=item.priceTotal*count;
       }
       if(core.length||starter.length){draft.items={starter,core:[...new Set(core)].slice(0,6),situational:[]};imported++;}
-      if(!imported)throw Error("当前没有可导入的推荐配置，请稍后重试");
-      normalizeStarterTrinkets(draft,S.catalog);S.draft=draft;S.spellEditing=!!draft.spells;S.itemEditing=hasSection(draft,"items");readSecondary();dirty(false);flushDraft();
-      try{if(S.dirty)await save();if(current())S.feedback="推荐已导入并保存";}catch(error){if(current()){S.error="推荐已导入，但保存失败："+error.message;flushDraft();}}render();
+      if(!hasSection(draft,section))throw Error("当前没有可导入的推荐配置，请稍后重试");
+      normalizeStarterTrinkets(draft,S.catalog);S.draft||={};S.draft[section]=draft[section];S.spellEditing=!!S.draft.spells;S.itemEditing=hasSection(S.draft,"items");readSecondary();dirty(false);flushDraft();
+      try{await saveSection(section);if(current())S.feedback="推荐已导入并保存";}catch(error){if(current()){S.error="推荐已导入，但保存失败："+error.message;flushDraft();}}render();
     }catch(error){if(current())reportError(controller.signal.aborted?Error("推荐读取超时，请重试"):error);}
-    finally{clearTimeout(timer);if(current()){S.importing=false;importController=null;importStatus();}}
+    finally{clearTimeout(timer);if(current()){S.importing=false;importController=null;importStatus();refreshSaveButtons();}}
   }
   let clearDialog=null;
   function confirmClearAll() {
@@ -367,8 +421,8 @@
     return catalogFlight;
   }
 
-  async function action(name,section=S.tab==="runes"?"runes":"items"){switch(name){case "clear-champ-search":S.q="";render();root.querySelector("[data-champ-search]").focus();break;case "retry":await load(true);break;case "refresh-catalog":await refreshCatalog();break;case "start":S.draft=fresh();dirty();render();break;case "start-runes":S.draft||={};S.draft.runes=fresh().runes;dirty();render();break;case "save":await save();break;case "reload":S.settings=await api("/api/auto-config/settings");removeDraft();loadDraft();render();break;case "start-spells":S.draft||={};S.spellEditing=true;render();break;case "start-items":S.draft||={};S.itemEditing=true;render();break;case "clear-all":confirmClearAll();break;case "revert":{S.draft||={};if(stored()?.[section])S.draft[section]=clone(stored()[section]);else delete S.draft[section];S.spellEditing=!!S.draft.spells;S.itemEditing=hasSection(S.draft,"items");readSecondary();dirty();render();break;}case "clear":if(S.draft){delete S.draft[section];if(section==="spells")S.spellEditing=false;if(section==="items")S.itemEditing=false;readSecondary();dirty();render();}break;case "stay":closePending();break;case "discard":{removeDraft();const next=S.pending,kind=S.pendingKind;closePending();cancelImport();await next?.();if(kind!=="import"){S.tab="runes";loadDraft();render();}break;}case "copy":openCopy();break;case "copy-cancel":copyDialog?.close();break;case "copy-save":{const targets=[...copyDialog.querySelectorAll("[data-copy-target]:checked:not(:disabled)")].map(n=>n.dataset.copyTarget);if(!targets.length)throw Error("请先选择复制目标");publishSettings(await api("/api/auto-config/copy","POST",{championId:S.champ,from:modeKey(),targets}));S.error="";copyDialog.close();render();break;}case "import":if(S.dirty){S.pendingKind="import";S.pending=importRecommendation;confirmPending();}else await importRecommendation();break;case "swap":{const p=S.draft.spells;if(p)[p.spell1Id,p.spell2Id]=[p.spell2Id,p.spell1Id];dirty();render();break;}case "filters-clear":S.filters.clear();render();}}
-  root.addEventListener("click",async event=>{if(event.target.closest("[data-save-attempt]")&&!canSave()){highlightValidation();return;}const b=event.target.closest("button,[data-remove],[data-clear-spell],[data-item-group]");if(!b||b.disabled)return;if(b.dataset.itemGroup){S.itemGroup=b.dataset.itemGroup;S.budgetError=false;render();return;}try{if(b.dataset.act){await action(b.dataset.act,b.dataset.section);return;}if(b.dataset.champ){if(+b.dataset.champ===S.champ)return;move(()=>S.champ=+b.dataset.champ);return;}if(b.dataset.mode){if(b.dataset.mode===S.mode)return;move(()=>S.mode=b.dataset.mode);return;}if(b.hasAttribute("data-pos")){if(b.dataset.pos===S.pos)return;move(()=>S.pos=b.dataset.pos);return;}if(b.dataset.tab){if(S.mode==="hextech"&&b.dataset.tab==="runes")return;S.tab=b.dataset.tab;render();return;}if(b.dataset.jump){document.querySelector(`[data-suite-tab="${b.dataset.jump}"]`)?.click();return;}if(b.dataset.configured){S.configured=b.dataset.configured==="1";if(!S.configured)locatePending=true;render();return;}if(b.dataset.pickPath){const r=S.draft.runes,id=+b.dataset.style;if(b.dataset.pickPath==="primary"){const old=r.primaryStyleId;if(id===r.subStyleId){r.subStyleId=old;S.subPicks={};S.subOrder=[];r.selectedPerkIds[4]=r.selectedPerkIds[5]=0;}r.primaryStyleId=id;r.selectedPerkIds.splice(0,4,0,0,0,0);}else{r.subStyleId=id;S.subPicks={};S.subOrder=[];r.selectedPerkIds[4]=r.selectedPerkIds[5]=0;}dirty();render();root.querySelector(".ac-buildname")?.classList.add("is-swap");for(const col of root.querySelectorAll(b.dataset.pickPath==="primary"?".ac-col":".ac-col.is-secondary")){col.classList.add("is-entering");setTimeout(()=>col.classList.remove("is-entering"),700);}return;}if(b.dataset.rune){const id=+b.dataset.rune,row=+b.dataset.row,col=b.dataset.col,r=S.draft.runes;if(col==="primary")r.selectedPerkIds[row]=id;else if(col==="shards")r.selectedPerkIds[6+row]=id;else{selectSecondary(S.subOrder,row,id,S.subPicks);r.selectedPerkIds.splice(4,2,...[...Object.values(S.subPicks),0,0].slice(0,2));}dirty();updateRuneSelection();ripple(b);return;}if(b.hasAttribute("data-slot")){const slot=Number(b.dataset.slot);if(slot===0||slot===1)S.slot=slot;render();return;}if(b.hasAttribute("data-clear-spell")){if(S.draft.spells)S.draft.spells[+b.dataset.clearSpell?"spell2Id":"spell1Id"]=0;dirty();render();return;}if(b.dataset.spell){const pair=[S.draft.spells?.spell1Id||0,S.draft.spells?.spell2Id||0],id=+b.dataset.spell;const other=1-S.slot;if(pair[other]===id)pair[other]=pair[S.slot];pair[S.slot]=id;S.draft.spells={spell1Id:pair[0],spell2Id:pair[1]};dirty();render();return;}if(b.dataset.item){addItem(+b.dataset.item,S.itemGroup);return;}if(b.dataset.build){S.itemGroup=b.dataset.build.split(":")[0];S.budgetError=false;render();root.querySelector(`[data-build="${b.dataset.build}"]`)?.focus({preventScroll:true});return;}if(b.dataset.remove){const [group,index]=b.dataset.remove.split(":");S.draft.items[group].splice(+index,1);dirty();render();return;}}catch(error){reportError(error);}});
+  async function action(name,section=S.tab==="runes"?"runes":"items"){switch(name){case "clear-champ-search":S.q="";render();root.querySelector("[data-champ-search]").focus();break;case "retry":await load(true);break;case "refresh-catalog":await refreshCatalog();break;case "start":S.draft=fresh();dirty();render();break;case "start-runes":S.draft||={};S.draft.runes=fresh().runes;dirty();render();break;case "save":if(arguments.length>1&&section)await saveSection(section);else await save();break;case "reload":S.settings=await api("/api/auto-config/settings");removeDraft();loadDraft();render();break;case "start-spells":S.draft||={};S.spellEditing=true;render();break;case "start-items":S.draft||={};S.itemEditing=true;render();break;case "clear-all":confirmClearAll();break;case "revert":{S.draft||={};if(stored()?.[section])S.draft[section]=clone(stored()[section]);else delete S.draft[section];S.spellEditing=!!S.draft.spells;S.itemEditing=hasSection(S.draft,"items");readSecondary();dirty();render();break;}case "clear":confirmClearSection(section);break;case "stay":closePending();break;case "discard":{const next=S.pending,kind=S.pendingKind;closePending();cancelImport();await next?.();if(kind!=="import"){S.tab="runes";loadDraft();render();}break;}case "copy":openCopy();break;case "copy-cancel":copyDialog?.close();break;case "copy-save":{const targets=[...copyDialog.querySelectorAll("[data-copy-target]:checked:not(:disabled)")].map(n=>n.dataset.copyTarget);if(!targets.length)throw Error("请先选择复制目标");publishSettings(await api("/api/auto-config/copy","POST",{championId:S.champ,from:modeKey(),targets}));S.error="";copyDialog.close();render();break;}case "import":if(S.savingSection)break;if(sectionDirty(section)){S.pendingKind="import";S.pending=()=>importRecommendation(section);confirmPending(section);}else await importRecommendation(section);break;case "swap":{const p=S.draft.spells;if(p)[p.spell1Id,p.spell2Id]=[p.spell2Id,p.spell1Id];dirty();render();break;}case "filters-clear":S.filters.clear();render();}}
+  root.addEventListener("click",async event=>{const attempt=event.target.closest("[data-save-attempt]");if(attempt&&!(attempt.dataset.saveAttempt?canSaveSection(attempt.dataset.saveAttempt):canSave())){highlightValidation();return;}const b=event.target.closest("button,[data-remove],[data-clear-spell],[data-item-group]");if(!b||b.disabled)return;if(b.dataset.itemGroup){S.itemGroup=b.dataset.itemGroup;S.budgetError=false;render();return;}try{if(b.dataset.act){if(b.dataset.section)await action(b.dataset.act,b.dataset.section);else await action(b.dataset.act);return;}if(b.dataset.champ){if(+b.dataset.champ===S.champ)return;move(()=>S.champ=+b.dataset.champ);return;}if(b.dataset.mode){if(b.dataset.mode===S.mode)return;move(()=>S.mode=b.dataset.mode);return;}if(b.hasAttribute("data-pos")){if(b.dataset.pos===S.pos)return;move(()=>S.pos=b.dataset.pos);return;}if(b.dataset.tab){if(S.mode==="hextech"&&b.dataset.tab==="runes")return;S.tab=b.dataset.tab;render();return;}if(b.dataset.jump){document.querySelector(`[data-suite-tab="${b.dataset.jump}"]`)?.click();return;}if(b.dataset.configured){S.configured=b.dataset.configured==="1";if(!S.configured)locatePending=true;render();return;}if(b.dataset.pickPath){const r=S.draft.runes,id=+b.dataset.style;if(b.dataset.pickPath==="primary"){const old=r.primaryStyleId;if(id===r.subStyleId){r.subStyleId=old;S.subPicks={};S.subOrder=[];r.selectedPerkIds[4]=r.selectedPerkIds[5]=0;}r.primaryStyleId=id;r.selectedPerkIds.splice(0,4,0,0,0,0);}else{r.subStyleId=id;S.subPicks={};S.subOrder=[];r.selectedPerkIds[4]=r.selectedPerkIds[5]=0;}dirty();render();root.querySelector(".ac-buildname")?.classList.add("is-swap");for(const col of root.querySelectorAll(b.dataset.pickPath==="primary"?".ac-col":".ac-col.is-secondary")){col.classList.add("is-entering");setTimeout(()=>col.classList.remove("is-entering"),700);}return;}if(b.dataset.rune){const id=+b.dataset.rune,row=+b.dataset.row,col=b.dataset.col,r=S.draft.runes;if(col==="primary")r.selectedPerkIds[row]=id;else if(col==="shards")r.selectedPerkIds[6+row]=id;else{selectSecondary(S.subOrder,row,id,S.subPicks);r.selectedPerkIds.splice(4,2,...[...Object.values(S.subPicks),0,0].slice(0,2));}dirty();updateRuneSelection();ripple(b);return;}if(b.hasAttribute("data-slot")){const slot=Number(b.dataset.slot);if(slot===0||slot===1)S.slot=slot;render();return;}if(b.hasAttribute("data-clear-spell")){if(S.draft.spells)S.draft.spells[+b.dataset.clearSpell?"spell2Id":"spell1Id"]=0;dirty();render();return;}if(b.dataset.spell){const pair=[S.draft.spells?.spell1Id||0,S.draft.spells?.spell2Id||0],id=+b.dataset.spell;const other=1-S.slot;if(pair[other]===id)pair[other]=pair[S.slot];pair[S.slot]=id;S.draft.spells={spell1Id:pair[0],spell2Id:pair[1]};dirty();render();return;}if(b.dataset.item){addItem(+b.dataset.item,S.itemGroup);return;}if(b.dataset.build){S.itemGroup=b.dataset.build.split(":")[0];S.budgetError=false;render();root.querySelector(`[data-build="${b.dataset.build}"]`)?.focus({preventScroll:true});return;}if(b.dataset.remove){const [group,index]=b.dataset.remove.split(":");S.draft.items[group].splice(+index,1);dirty();render();return;}}catch(error){reportError(error);}});
   function addItem(id,target,index,source=null){
     const items=itemLists(),item=itemLookup(id);if(!item)return false;
     const snapshot=clone(items),starting=target==="starter";

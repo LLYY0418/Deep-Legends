@@ -17,7 +17,7 @@ const path = require("node:path");
 const webRoot = __dirname;
 const repoRoot = path.join(__dirname, "..", "..");
 const read = (...parts) => fs.readFileSync(path.join(...parts), "utf8");
-const readWeb = (name) => read(webRoot, name);
+const readWeb = (name) => name==="champions.js" && process.env.R128_CHAMPIONS_SOURCE ? fs.readFileSync(process.env.R128_CHAMPIONS_SOURCE,"utf8") : read(webRoot, name);
 
 const championsScript = readWeb("champions.js");
 const gameplayScript = readWeb("gameplay.js");
@@ -44,14 +44,13 @@ function sliceBetween(source, startAnchor, endAnchor) {
 // 1. §2.6 全局扫描钉子
 // ---------------------------------------------------------------------------
 
-const withoutR308ScopeControl = text => text.replace('<div class="aramkit-scope"><span>统计口径</span>', '');
 const BANNED_PHRASES = ["统计口径", "不构成因果", "仅描述赛后关联"];
 
 test("R128 §2.6 生产 JS 里不再出现口径/因果/关联类说明文案", () => {
   assert.ok(productionScripts.length >= 10, "扫描口径没覆盖到 backend/web 的脚本");
   for (const { name, text } of productionScripts) {
     for (const phrase of BANNED_PHRASES) {
-      assert.equal(withoutR308ScopeControl(text).includes(phrase), false, `${name} 里出现了「${phrase}」`);
+      assert.equal(text.includes(phrase), false, `${name} 里出现了「${phrase}」`);
     }
   }
 });
@@ -61,11 +60,11 @@ test("R128 §2.6 对抗变异：把禁用短语塞回 champions.js，扫描必�
     item.name === "champions.js" ? { ...item, text: `${item.text}\n// 统计口径\n` } : item
   ));
   const hits = injected
-    .filter((item) => BANNED_PHRASES.some((phrase) => withoutR308ScopeControl(item.text).includes(phrase)))
+    .filter((item) => BANNED_PHRASES.some((phrase) => item.text.includes(phrase)))
     .map((item) => item.name);
   assert.deepEqual(hits, ["champions.js"], "扫描逻辑抓不到重新塞回来的口径文案");
   // 未注入时同一套判据必须是空的，否则上面那条只是恒真。
-  const clean = productionScripts.filter((item) => BANNED_PHRASES.some((phrase) => withoutR308ScopeControl(item.text).includes(phrase)));
+  const clean = productionScripts.filter((item) => BANNED_PHRASES.some((phrase) => item.text.includes(phrase)));
   assert.deepEqual(clean, []);
 });
 

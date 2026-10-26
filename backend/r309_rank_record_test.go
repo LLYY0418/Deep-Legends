@@ -36,7 +36,7 @@ func TestR309RankRecordCacheAndPending(t *testing.T) {
 	changed := r309UnknownRanks()
 	changed[0].Wins++
 	pending, _ := a.applySeasonRankWinRateFallback(changed, EndpointCapability{}, snapshot)
-	if pending[0].WinRate != -1 || !pending[0].RecordPending || pending[0].RecordSource != "none" || pending[1].RecordSource != "season-cache" {
+	if pending[0].Wins != 162 || pending[0].Losses != 168 || pending[0].RecordPending || pending[0].RecordSource != "season-cache" || pending[1].RecordSource != "season-cache" {
 		t.Fatal(pending)
 	}
 	snapshot.progress.Season = "S27"
@@ -168,7 +168,7 @@ func TestR309ChangedWinsCannotReviveTheOldCompletedAggregate(t *testing.T) {
 	changed[0].Wins++
 	for range 6 {
 		ranks, _ := a.applySeasonRankWinRateFallback(changed, EndpointCapability{}, snapshot)
-		if ranks[0].WinRate != -1 || !ranks[0].RecordPending || ranks[1].WinRate != 36 {
+		if ranks[0].Wins != 162 || ranks[0].Losses != 168 || ranks[0].RecordPending || ranks[0].RecordSource != "season-cache" || ranks[1].WinRate != 36 {
 			t.Fatal(ranks)
 		}
 	}

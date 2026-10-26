@@ -3485,7 +3485,7 @@ test("mayhem atlas description comes from the guide paragraph, not the SEO blurb
   assert.match(description, /state\.mayhemAugmentDetail/);
   assert.match(description, /AUGMENT_DESCRIPTION_PENDING/);
   assert.match(description, /上游未提供这个海克斯的说明。/);
-  assert.match(script, /class="mayhem-atlas-description">\$\{escapeHTML\(mayhemAtlasDescription\(item\)\)\}/);
+  assert.match(script, /class="mayhem-atlas-description">\$\{renderMayhemAtlasDescription\(item\)\}/);
 });
 
 // 左右两列必须共用同一个高度上限并各自滚动：右侧 12 位适配英雄比左侧列表长时，

@@ -79,6 +79,8 @@ let shutdownStarted = false;
 const appearanceCachePath=path.join(app.getPath("userData"),"appearance-theme.json");
 let rendererTheme = "dark";
 try { const cached=JSON.parse(fs.readFileSync(appearanceCachePath,"utf8"));if(["light","dark"].includes(cached.theme))rendererTheme=cached.theme; } catch (_) {}
+// Windows uses Chromium's native palette for newly exposed resize surfaces.
+if (process.platform === "win32") nativeTheme.themeSource = rendererTheme;
 let modalOpen = false;
 let shareExportController = null;
 let backendStarted = false;
@@ -766,7 +768,7 @@ function createMainWindow() {
       persistBounds();
     }, 150);
   };
-  require("./window-resize-trace.cjs").attachWindowResizeTrace(mainWindow,{scale:()=>currentUiScale});
+  require("./window-resize-trace.cjs").attachWindowResizeTrace(mainWindow,{scale:()=>currentUiScale,theme:()=>rendererTheme});
   mainWindow.on("resize", scheduleBoundsWrite);
   mainWindow.on("move", scheduleBoundsWrite);
   mainWindow.on("show",()=>mainWindow?.webContents.send("desktop-window-visible"));
@@ -913,6 +915,7 @@ function createMainWindow() {
     if (mainWindow && !mainWindow.isDestroyed() && (theme === "dark" || theme === "light")) {
       if(rendererTheme!==theme){try {fs.writeFileSync(appearanceCachePath+".tmp",JSON.stringify({theme}),{mode:0o600});fs.renameSync(appearanceCachePath+".tmp",appearanceCachePath);} catch (_) {}}
       rendererTheme = theme;
+      if (process.platform === "win32") nativeTheme.themeSource = rendererTheme;
       syncTitleBar();
       mainWindow.setBackgroundColor(titleBarOverlay(rendererTheme).color);
     }

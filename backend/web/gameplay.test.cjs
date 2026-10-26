@@ -962,7 +962,9 @@ test("R117 rank win-rate degradation is disclosed on screen, not only set on the
   const collecting = helpers.renderRanks(incomplete, capability("客户端未返回排位负场，胜率暂不展示"), [], [], { collecting: true });
   assert.doesNotMatch(collecting, /win-rate-value/, "半成品战绩不得渲染成胜率");
   assert.match(collecting, /107胜 · 正在统计中/);
-  assert.match(collecting, /data-tooltip="正在统计中"/);
+  // R312 keeps the visible collecting label once and leaves the secondary line empty.
+  assert.match(collecting, /107胜 · 正在统计中<\/b><span><\/span>/);
+  assert.equal((collecting.match(/正在统计中/g) || []).length, 1);
 
   // 扫描完成但上游确实没给负场：必须把后端写的 capability.detail 披露出来。
   const degraded = helpers.renderRanks(incomplete, capability("上游未返回排位负场，已按赛季战绩聚合补全胜率"), [], [], { collecting: false });

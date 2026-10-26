@@ -12,7 +12,7 @@ test('R305 switches do not invalidate current draft and recommendation auto save
 });
 test('R305 only the same champion and mode conflicts; reload discards and errors never open a modal',async()=>{
  const h=await editor();try{const d=h.w.document;await h.click('[data-tab="kit"]');await h.click('[data-spell="4"]');await h.click('[data-slot="1"]');await h.click('[data-spell="14"]');h.update(s=>s.champions[2]={ranked:{spells:{spell1Id:4,spell2Id:14}}});await h.click('[data-act="save"]');assert.equal(h.writes.length,1);
- await h.click('[data-act="swap"]');h.update(s=>s.champions[1].ranked={spells:{spell1Id:4,spell2Id:6}});await h.click('[data-tab="kit"]');await h.click('[data-act="clear"][data-section="spells"]');await h.click('[data-act="save"]');assert.equal(h.writes.length,1);assert.match(d.querySelector('.ac-feedback').textContent,/配置已更新/);assert(d.querySelector('[data-act="reload"]'));assert.equal(d.querySelector('dialog'),null);await h.click('[data-act="reload"]');assert.equal(d.querySelector('[data-save-state]').textContent.startsWith('已保存'),true);
+ await h.click('[data-act="swap"]');h.update(s=>s.champions[1].ranked={spells:{spell1Id:4,spell2Id:6}});await h.click('[data-tab="kit"]');await h.click('[data-act="clear"][data-section="spells"]');await h.click('[data-section-clear-confirm]');await h.click('[data-act="save"]');assert.equal(h.writes.length,1);assert.match(d.querySelector('.ac-feedback').textContent,/配置已更新/);assert(d.querySelector('[data-act="reload"]'));assert.equal(d.querySelector('dialog[open]'),null);await h.click('[data-act="reload"]');assert.equal(d.querySelector('[data-save-state]').textContent.startsWith('已保存'),true);
  }finally{h.close();}
 });
 test('R305 incomplete runes and single spell explain disabled save',async()=>{

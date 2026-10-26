@@ -1835,7 +1835,7 @@ func TestSeasonRankWinRateFallbackDoesNotFillIncompleteScan(t *testing.T) {
 		420: {Games: 50, Wins: 30, Losses: 20, WinRate: 60},
 	}})
 	expected := original
-	expected.RecordSource, expected.RecordPending = "none", true
+	expected.RecordSource, expected.RecordPending, expected.OfficialWins = "none", true, original.Wins
 	if len(ranks) != 1 || ranks[0] != expected {
 		t.Fatalf("incomplete scan changed rank: %#v", ranks)
 	}

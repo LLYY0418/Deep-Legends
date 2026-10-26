@@ -13,7 +13,7 @@ test('R307 dirty champion mode and position switches retain drafts and markers w
  }finally{h.close();}
 });
 test('R307 missing selections pulse only on a disabled save attempt and can pulse again',async()=>{
- const h=await editor();try{const d=h.w.document;await h.click('[data-act="clear"]');assert.equal(d.querySelector('.ac-validation-pulse'),null);await h.click('[data-act="start-runes"]');assert.match(d.querySelector('.ac-feedback').textContent,/符文还差 9/);assert.equal(d.querySelector('.ac-validation-pulse'),null);
+ const h=await editor();try{const d=h.w.document;await h.click('[data-act="clear"]');await h.click('[data-section-clear-confirm]');assert.equal(d.querySelector('.ac-validation-pulse'),null);await h.click('[data-act="start-runes"]');assert.match(d.querySelector('.ac-feedback').textContent,/符文还差 9/);assert.equal(d.querySelector('.ac-validation-pulse'),null);
  await h.click('[data-col="primary"][data-row="0"]');assert.equal(d.querySelector('.ac-validation-pulse'),null);assert(d.querySelector('[data-act="save"]').disabled);
  for(let i=0;i<2;i++){await h.click('[data-save-attempt]');const nodes=[...d.querySelectorAll('.ac-validation-pulse')];assert(nodes.length>0);for(const n of nodes)n.dispatchEvent(new h.w.Event('animationend'));assert.equal(d.querySelector('.ac-validation-pulse'),null);}assert.equal(h.writes.length,0);
  }finally{h.close();}

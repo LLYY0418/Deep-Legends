@@ -755,6 +755,7 @@
 .arena-chips button, .arena-first-tabs button { min-height: 36px; padding: 0 10px; color: var(--muted); background: transparent; border: 0; border-radius: 8px; font-size: 10px; white-space: nowrap; }
 .arena-chips button:hover:not(:disabled), .arena-first-tabs button:hover:not(:disabled) { color: var(--ink); background: var(--surface-strong); }
 .arena-first-tabs button.is-active { color: var(--ink); background: var(--surface-strong); box-shadow: 0 0 0 1px var(--line); font-weight: 750; }
+.mayhem-stage-chips button.is-active, .mayhem-stage-chips button.is-active:hover:not(:disabled),
 .arena-sort-chips button.is-active, .arena-sort-chips button.is-active:hover:not(:disabled),
 .arena-rarity-chips button.is-active, .arena-rarity-chips button.is-active:hover:not(:disabled) { color: var(--ink); background: var(--primary-soft); box-shadow: 0 0 0 1px color-mix(in oklab,var(--primary) 55%,transparent); font-weight: 750; }
 .arena-chips button:disabled, .arena-first-tabs button:disabled { cursor: not-allowed; opacity: .45; }
@@ -945,7 +946,6 @@
 .aramkit-segments button { padding:6px 10px; border:1px solid transparent; border-radius:7px; color:var(--muted); background:transparent; font:inherit; font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer; }
 .aramkit-segments button.is-active { color:var(--primary-strong); background:var(--primary-soft); border-color:color-mix(in srgb,var(--primary) 55%,transparent); }
 .aramkit-segments small { color:var(--muted); font-size:11px; }
-.aramkit-scope { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 14px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); color:var(--muted); }
 .aramkit-core>header,.aramkit-items>header { flex-wrap:wrap; }
 .aramkit-core>header>.aramkit-segments,.aramkit-item-tools { margin-left:auto; }
 .aramkit-item-tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -1055,7 +1055,7 @@
 .mayhem-atlas-tab-content { flex:1 1 auto; min-height:80px; overflow:auto; margin:0 18px; overscroll-behavior:contain; }
 .mayhem-atlas-tab-content .mayhem-fit-list { display:block; overflow:visible; }
 .mayhem-fit-columns,.mayhem-fit-row { display:grid; grid-template-columns:24px minmax(145px,1.6fr) repeat(4,minmax(65px,.7fr)) minmax(65px,.8fr) 28px; align-items:center; gap:8px; min-width:720px; padding:0; border-bottom:1px solid var(--line); }
-.mayhem-fit-columns { position:sticky; top:0; z-index:1; height:36px; color:var(--muted); background:var(--surface); font-size:11px; }
+.mayhem-fit-columns { position:sticky; top:0; z-index:5; height:36px; color:var(--muted); background:var(--surface); font-size:11px; }
 .mayhem-fit-row { height:50px; min-height:50px; font-size:12px; }
 .mayhem-fit-columns>:nth-child(n+3),.mayhem-fit-row>:nth-child(n+3) { text-align:right; }
 .mayhem-fit-who { display:flex; align-items:center; gap:8px; min-width:0; }
@@ -1083,7 +1083,7 @@
 .mayhem-atlas-detail-head { display:flex; flex-wrap:wrap; }
 .mayhem-atlas-detail-head>.augment-icon { flex:none; }
 .mayhem-atlas-detail-head>div:not(.mayhem-atlas-description) { flex:0 1 auto; }
-.mayhem-atlas-detail-head>.mayhem-atlas-description { flex:1 1 240px; max-width:470px; margin:0 0 0 auto; }
+.mayhem-atlas-detail-head>.mayhem-atlas-description { flex:0 1 auto; width:fit-content; max-width:min(520px,58%); margin:0 0 0 auto; padding:8px 12px; background:var(--surface-strong); border:1px solid var(--line); border-radius:8px; font-size:12.5px; line-height:1.6; }
 .mayhem-atlas-metrics { padding:14px 18px 0; flex:none; }
 .mayhem-fit-columns,.mayhem-fit-row { grid-template-columns:24px minmax(145px,1.6fr) repeat(5,minmax(65px,.7fr)) 28px; column-gap:24px; padding-right:22px; }
 .mayhem-fit-columns>:first-child,.mayhem-fit-row>:first-child { text-align:right; }
@@ -1102,3 +1102,6 @@
 .aramkit-combo-pick { display:grid; gap:3px; text-align:right; font-size:12px; }
 .aramkit-combo-pick small,.aramkit-combos.is-atlas .aramkit-combo-games small { color:var(--muted); }
 .aramkit-combos.is-atlas .aramkit-combo-games { color:var(--ink); }
+
+.mayhem-description-value { color:var(--primary-strong); font-weight:700; }
+.mayhem-fit-row { position:relative; z-index:0; }
