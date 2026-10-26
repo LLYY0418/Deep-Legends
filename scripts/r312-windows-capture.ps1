@@ -18,8 +18,10 @@ public class R312Capture {
  static void Mouse(int x,int y,uint flags,int sw,int sh){var input=new Input{type=0,mouse=new MouseInput{dx=(int)Math.Round(x*65535.0/(sw-1)),dy=(int)Math.Round(y*65535.0/(sh-1)),flags=flags}};if(SendInput(1,new[]{input},Marshal.SizeOf(typeof(Input)))!=1)throw new Exception("SendInput failed "+Marshal.GetLastWin32Error());}
  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
  [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+ [DllImport("winmm.dll")] static extern uint timeBeginPeriod(uint period);
+ [DllImport("winmm.dll")] static extern uint timeEndPeriod(uint period);
  public static string Run(long handle,string output){
-  SetProcessDPIAware();var h=new IntPtr(handle);Directory.CreateDirectory(output);SetForegroundWindow(h);
+  timeBeginPeriod(1);SetProcessDPIAware();var h=new IntPtr(handle);Directory.CreateDirectory(output);SetForegroundWindow(h);
   var screen=System.Windows.Forms.Screen.PrimaryScreen.Bounds;if(screen.Width<1560||screen.Height<900)throw new Exception("Desktop too small: "+screen);
   SetWindowPos(h,new IntPtr(-1),20,20,800,850,0x0040);Thread.Sleep(1000);
   using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-before.png"),ImageFormat.Png);}
@@ -43,7 +45,7 @@ public class R312Capture {
   }
   } finally {Mouse(mouseX,mouseY,0x8004,screen.Width,screen.Height);}
   double elapsed=clock.Elapsed.TotalSeconds;
-  using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-after.png"),ImageFormat.Png);}double fps=120/elapsed;
+  using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-after.png"),ImageFormat.Png);}double fps=120/elapsed;timeEndPeriod(1);
   for(int i=0;i<frames.Count;i++){frames[i].Save(Path.Combine(output,"frame-"+i.ToString("D3")+".png"),ImageFormat.Png);frames[i].Dispose();}
   File.WriteAllText(Path.Combine(output,"frames.json"),"["+string.Join(",",rows)+"]");
   if(fps<30)throw new Exception("Capture below required 30fps: "+fps);
