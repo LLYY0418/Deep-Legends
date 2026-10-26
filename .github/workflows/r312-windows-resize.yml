@@ -60,6 +60,8 @@ jobs:
           name: r312-real-windows-resize
           path: |
             ${{ runner.temp }}/r312-evidence/**
+            "!${{ runner.temp }}/r312-evidence/**/user-data/**"
+            "!${{ runner.temp }}/r312-evidence/**/backend-data/**"
             ${{ runner.temp }}/r312-installer-*
             ${{ runner.temp }}/DeepLegendsSetup-startup.log
           if-no-files-found: warn
