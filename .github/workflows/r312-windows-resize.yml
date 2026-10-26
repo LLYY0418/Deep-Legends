@@ -54,6 +54,11 @@ jobs:
         run: |
           npm ci --prefix desktop
           if ($LASTEXITCODE -ne 0) { throw 'Diagnostic dependencies failed' }
+          $root="$env:RUNNER_TEMP/r312-app"
+          1..10 | ForEach-Object {
+            Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($root,[StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+            Start-Sleep -Milliseconds 200
+          }
           node -e "const f=require('./desktop/node_modules/@electron/fuses');f.flipFuses(process.argv[1],{version:f.FuseVersion.V1,[f.FuseV1Options.EnableNodeCliInspectArguments]:true}).catch(e=>{console.error(e);process.exitCode=1})" "$env:RUNNER_TEMP/r312-app/Deep Legends.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Diagnostic inspect fuse failed' }
       - name: Measure baseline and individual resize candidates
