@@ -10,3 +10,12 @@ test('missing Draft is a failure; target/asset IDs-digests/sums/manifest cannot 
 test('branch parameter is explicit and defaults in collection; duplicate/missing options are errors',()=>{assert.equal(parse(['--sha',sha,'--run','100','--draft','v0.1.2','--branch','codex/release-0.1.2-r287']).branch,'codex/release-0.1.2-r287');assert.equal(parse(['--sha',sha,'--run','100','--draft','v0.1.2']).branch,undefined);assert.throws(()=>parse(['--sha',sha]),/Missing/);assert.throws(()=>parse(['--sha',sha,'--sha',other]),/Usage/);});
 
 test('CLI distinguishes ready, required review, and invalid evidence exits',()=>{const {exitStatus}=require('./release-readiness.cjs');assert.equal(exitStatus({validated:true,readyToPublish:true}),0);assert.equal(exitStatus({validated:true,readyToPublish:false}),2);assert.equal(exitStatus({validated:false,readyToPublish:false}),1);});
+
+test('R309 readiness requires both renderer matrix jobs and their aggregate to succeed',()=>{
+ const d=fixture();d.workflow.jobs['quality-web']={strategy:{matrix:{shard:[1,2]}},steps:[]};d.workflow.jobs['quality-web-total']={needs:['quality-web'],steps:[]};
+ const names=['quality-web (1)','quality-web (2)','quality-web-total'];
+ d.jobs.push(...names.map((name,n)=>({name,id:1000+n,observedAttempt:1,conclusion:'success',steps:[{name:'complete',conclusion:'success'}]})));
+ assert.equal(assess(d).validated,true);
+ assert(names.every(name=>expectedJobs(d.workflow).includes(name)));
+ for(const name of names){const missing=structuredClone(d);missing.jobs=missing.jobs.filter(j=>j.name!==name);assert.equal(assess(missing).validated,false);const failed=structuredClone(d);failed.jobs.find(j=>j.name===name).conclusion='failure';assert.equal(assess(failed).validated,false);}
+});

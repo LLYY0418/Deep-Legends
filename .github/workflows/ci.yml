@@ -109,25 +109,31 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.13'
+          go-version: 1.24.13
           cache: true
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - name: Install quality fixture Node dependencies
         if: ${{ !cancelled() }}
         run: npm ci --prefix desktop
       - name: Audit browser process and directory cleanup
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 1 }}
         run: node scripts/check-browser-cleanup.cjs --json="$RUNNER_TEMP/browser-cleanup-audit.json"
       - name: Validate frontend JavaScript
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 1 }}
         run: |
           node --check backend/web/app.js
           node --check backend/web/suite.js
           node --check desktop/main.cjs
+      - name: Verify renderer file partition
+        if: ${{ !cancelled() }}
+        run: node scripts/renderer-shards.cjs > "$RUNNER_TEMP/renderer-shards.json"
+      - name: Prove renderer shard and total guards
+        if: ${{ !cancelled() && matrix.shard == 1 }}
+        run: node scripts/renderer-shard-mutations.cjs "$RUNNER_TEMP/renderer-shard-mutations"
       - name: Calibrate runner speed before renderers
         id: cal_before
         if: ${{ !cancelled() }}
@@ -137,11 +143,11 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           R222_NODE_TIMING_OUTPUT: ${{ runner.temp }}/renderer-timings-linux.json
-        run: node scripts/test-renderers.cjs all
+        run: node scripts/test-renderers.cjs all --shard "${{ matrix.shard }}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: renderer-timings-linux
+          name: renderer-timings-linux-${{ matrix.shard }}
           path: ${{ runner.temp }}/renderer-timings-linux.json
       - name: Calibrate runner speed after renderers
         id: cal_after
@@ -153,20 +159,70 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: renderer-budget-gate-linux
+          name: renderer-budget-gate-linux-${{ matrix.shard }}
           if-no-files-found: ignore
           path: |
             ${{ runner.temp }}/runner-calibration-before.json
             ${{ runner.temp }}/runner-calibration-after.json
             ${{ runner.temp }}/renderer-budget-gate.json
       - name: Test Riot relay Worker
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 1 }}
         run: node --test relay/riot-worker/*.test.mjs
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && matrix.shard == 1 }}
         with:
           name: r287-quality-web-audits
           path: ${{ runner.temp }}/browser-cleanup-audit.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && matrix.shard == 1 }}
+        with:
+          name: renderer-shard-mutations
+          path: ${{ runner.temp }}/renderer-shard-mutations/**
+          if-no-files-found: error
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - 1
+          - 2
+  quality-web-total:
+    needs:
+      - quality-web
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          pattern: renderer-timings-linux-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/renderer-shards
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+      - uses: actions/download-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          pattern: renderer-budget-gate-linux-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/renderer-shards
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+      - name: Enforce complete renderer coverage and total reference cost
+        if: ${{ !cancelled() }}
+        run: node scripts/renderer-shard-total.cjs "$RUNNER_TEMP/renderer-shards" "$RUNNER_TEMP/renderer-total.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renderer-total-linux
+          path: ${{ runner.temp }}/renderer-total.json
           if-no-files-found: error
 
   quality-mutations:
@@ -880,7 +936,7 @@ jobs:
 
   triage-legacy:
     if: ${{ always() && !cancelled() }}
-    needs: [quality-go, quality-web, quality-mutations, windows-build, windows-tests, windows-upgrade, browser-main, mutations-1, r277-proof-linux-1, r277-proof-linux-2, r277-browser-matrix, r277-browser-mutations, mutations-3]
+    needs: [quality-go, quality-web, quality-web-total, quality-mutations, windows-build, windows-tests, windows-upgrade, browser-main, mutations-1, r277-proof-linux-1, r277-proof-linux-2, r277-browser-matrix, r277-browser-mutations, mutations-3]
     runs-on: ubuntu-24.04
     permissions:
       contents: read

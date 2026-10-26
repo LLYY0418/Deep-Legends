@@ -61,7 +61,7 @@ test("every triage step is failure-only, uses the facts-only tool, and sits befo
 
 test("triage-legacy digests the hash-pinned legacy jobs without touching them, and cannot fail the run", () => {
   const job = ci.jobs["triage-legacy"];
-  const legacy = ["quality-go", "quality-web", "quality-mutations", "windows-build", "windows-tests", "windows-upgrade", "browser-main", "mutations-1", "r277-proof-linux-1", "r277-proof-linux-2", "r277-browser-matrix", "r277-browser-mutations", "mutations-3"];
+  const legacy = ["quality-go", "quality-web", "quality-web-total", "quality-mutations", "windows-build", "windows-tests", "windows-upgrade", "browser-main", "mutations-1", "r277-proof-linux-1", "r277-proof-linux-2", "r277-browser-matrix", "r277-browser-mutations", "mutations-3"];
   assert.deepEqual([...job.needs].sort(), [...legacy].sort());
   assert.equal(job.if, "${{ always() && !cancelled() }}", "evidence aggregation runs even when all jobs are green");
   assert.match(job.if, /always\(\)/);

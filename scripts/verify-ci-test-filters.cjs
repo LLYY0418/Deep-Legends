@@ -110,6 +110,13 @@ function workflowFilters(source) {
 }
 
 function verifyWorkflow(source, project = root) {
+  // Full-CI filter validation also proves both renderer matrix selections and
+  // their mandatory aggregate. Individual synthetic filter lines stay valid.
+  if (/^jobs:\s*$/m.test(source)) {
+    const workflow = require('../desktop/node_modules/js-yaml').load(source);
+    if (workflow.jobs?.['quality-go'] || workflow.jobs?.['quality-web'] || workflow.jobs?.['quality-web-total'])
+      require('./renderer-shard-contract.cjs').verifyRendererJobs(workflow);
+  }
   if (source.includes("scripts/run-ci-tests.cjs go backend")) {
     const names = new Set(goTests("backend", project).map(test => test.name));
     for (const name of requiredWindowsBackendNames) if (!names.has(name)) throw new Error(`missing required Windows backend declaration: ${name}`);

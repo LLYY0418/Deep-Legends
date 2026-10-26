@@ -168,9 +168,11 @@ function verifyR117ChromiumWiring(workflow, runner, catalog) {
   require('../../scripts/lib/ci-contracts.cjs').verifyMutationRouting(workflow);
   const quality = workflow.jobs['quality-web'], browser = workflow.jobs['browser-main'];
   assert.ok(quality && browser, 'quality and browser-main must exist');
+  assert.deepEqual(quality.strategy, {'fail-fast': false, matrix: {shard: [1, 2]}}, 'only the approved two-shard renderer matrix may execute');
+  require('../../scripts/renderer-shard-contract.cjs').verifyRendererJobs(workflow);
   const allowedJobKeys = ['name','needs','runs-on','steps','permissions','environment','container','services','outputs'];
   for (const [name, job] of [['quality',quality],['browser-main',browser]]) {
-    assert.deepEqual(Object.keys(job).filter(k=>!allowedJobKeys.includes(k)), [], name+' has an unaudited control-flow field');
+    assert.deepEqual(Object.keys(job).filter(k=>!allowedJobKeys.includes(k) && !(name==='quality' && k==='strategy')), [], name+' has an unaudited control-flow field');
     assert.equal(job.needs, undefined, name+' must not depend on a skipped job');
     for (const step of job.steps) {
       assert.equal(step['continue-on-error'], undefined, name+' step must not swallow failure');
@@ -217,7 +219,7 @@ test('R117 real Chromium guards are wired into CI and cannot silently skip',()=>
   const runner=fs.readFileSync(path.join(base,'scripts/r276-browser-job.cjs'),'utf8');
   const catalog=require('../../scripts/r276-browser-catalog.cjs');
   verifyR117ChromiumWiring(workflow,runner,catalog);
-  for(const mutate of [w=>w.jobs['browser-main'].if='false',w=>w.jobs['browser-main']['continue-on-error']=true,w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').if='false',w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').run+=' || true',w=>w.on.push['paths']=['never'],w=>delete w.on.push.branches,w=>w.on.push.branches.push('!codex/release-*'),w=>{w.jobs['mutations-1'].if+=" || github.ref == 'refs/heads/codex/ci-hardening-r276'";}]){
+  for(const mutate of [w=>w.jobs['quality-web'].strategy.matrix.shard.pop(),w=>w.jobs['quality-web'].strategy['fail-fast']=true,w=>w.jobs['browser-main'].strategy={matrix:{shard:[1,2]}},w=>w.jobs['browser-main'].if='false',w=>w.jobs['browser-main']['continue-on-error']=true,w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').if='false',w=>w.jobs['browser-main'].steps.find(s=>s.name==='Run isolated offline browser guards').run+=' || true',w=>w.on.push['paths']=['never'],w=>delete w.on.push.branches,w=>w.on.push.branches.push('!codex/release-*'),w=>{w.jobs['mutations-1'].if+=" || github.ref == 'refs/heads/codex/ci-hardening-r276'";}]){
     const bad=structuredClone(workflow);mutate(bad);assert.throws(()=>verifyR117ChromiumWiring(bad,runner,catalog),assert.AssertionError,'unsafe workflow mutation must FAIL');
   }
   assert.throws(()=>verifyR117ChromiumWiring(workflow,runner.replace("assert.equal(result.code,0,name+' guard failed')","void result"),catalog),assert.AssertionError,'swallowed child failure must FAIL');

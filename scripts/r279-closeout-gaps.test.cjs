@@ -227,3 +227,9 @@ test('discovered renderer tests retain script fixture CI entry points with exact
  const broken=select(buildIndex({files:Object.keys(bad),read:f=>bad[f],guards:[]}),['scripts/unit.test.ps1']);
  assert.deepEqual(broken.scriptTests[0].workflows,[],'an unrelated runner must never authorize deferred coverage');
 });
+
+test('R309 matrix shard arguments retain full renderer fixture CI coverage',()=>{
+ const files={'backend/web/unit.test.cjs':"runFixture('pwsh',['scripts/unit.test.ps1'])",'scripts/unit.test.ps1':'','.github/workflows/full.yml':'run: node scripts/test-renderers.cjs all --shard "${{ matrix.shard }}"'};
+ const selected=select(buildIndex({files:Object.keys(files),read:f=>files[f],guards:[]}),['scripts/unit.test.ps1']);
+ assert.deepEqual(selected.scriptTests[0].workflows,['full.yml']);
+});

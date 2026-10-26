@@ -30,7 +30,8 @@ test('R276 Windows acceptance pushes and default-true dispatch really measure',(
  assert.match(ci,/measure_windows_renderers:[\s\S]*?default: true/);
 });
 test('R276 separate VMs preserve browser, mutation, upgrade and artifact gates',()=>{
- for(const name of ['quality-go','quality-web','quality-mutations','browser-main','mutations-1','r277-proof-linux-2','mutations-3','windows-build','windows-tests','windows-upgrade','triage-legacy'])assert(job(ci,name));
+ for(const name of ['quality-go','quality-web','quality-web-total','quality-mutations','browser-main','mutations-1','r277-proof-linux-2','mutations-3','windows-build','windows-tests','windows-upgrade','triage-legacy'])assert(job(ci,name));
+ require('./renderer-shard-contract.cjs').verifyRendererJobs(require('../desktop/node_modules/js-yaml').load(ci));
  const quality=['quality-go','quality-web','quality-mutations'].map(n=>job(ci,n)).join('\n');assert.match(quality,/scripts\/check-test-captures/);assert.match(quality,/scripts\/check-browser-cleanup\.cjs/);assert.match(quality,/scripts\/r276-cleanup-mutations\.cjs/);assert.match(quality,/r276-offline\.cjs -- go test -count=1 -race \.\/\.\.\./);
  const catalog=require('./r276-browser-catalog.cjs').guards.map(row=>row[0]);for(const name of ['r100','r117','r258','r264','r265','r266','r266-matrix','r267','r269-geometry','r269','r272'])assert(catalog.includes(name),name);
  const build=fs.readFileSync(path.join(root,'scripts/r276-public-fixture.cjs'),'utf8');assert.match(build,/verify-embedded-riot-key\.cjs/);assert.match(build,/--expect-fake/);assert.match(build,/--file=/);

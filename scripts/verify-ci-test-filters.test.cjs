@@ -39,6 +39,15 @@ test("R225 static expected counts also cover the unfiltered R82 PowerShell file"
   assert.throws(() => verifyWorkflow(workflow.replace(command, command.replace("=2", "=invalid"))), /cannot parse Node expected count/);
 });
 
+test('R309 CI filter validation requires both renderer shards and the total guard', () => {
+  const yaml = require('../desktop/node_modules/js-yaml');
+  for (const mutate of [ci => ci.jobs['quality-web'].strategy.matrix.shard.pop(), ci => ci.jobs['quality-web-total'].if = 'false']) {
+    const broken = yaml.load(workflow); mutate(broken);
+    assert.throws(() => verifyWorkflow(yaml.dump(broken)), /approved renderer sharding must preserve every CI guard/);
+  }
+  assert.equal(verifyWorkflow(workflow).length, 5);
+});
+
 test("R225 runtime Go evidence rejects empty, omitted and skipped required tests", () => {
   const expected = ["backend/TestUpdateApply", "backend/TestR204KeySaveAndClear"];
   const events = expected.map(name => ({ Action: "pass", Package: "backend", Test: name.split("/")[1] }));

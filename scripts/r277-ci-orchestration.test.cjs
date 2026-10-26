@@ -7,7 +7,7 @@ test('R287 approved CI snapshot pins every reassigned proof and preserves produc
  assert.equal(require('node:crypto').createHash('sha256').update(bytes).digest('hex'),require('./pinned-contracts-registry.json').legacyBaselineSha);
  const baseline=JSON.parse(bytes);assert.match(baseline.approval,/R287.*approved/);
  assert.equal(baseline.ci_cleanup_sha,'dfd6fc2a830ea999b36b7365f6ea75e12bb06624');
- assert.deepEqual(ci,baseline.workflow,'R287 approved exact CI job definitions must remain pinned');
+ assert.deepEqual(ci,require('./renderer-shard-contract.cjs').approvedWorkflow(baseline.workflow),'R287 approved exact CI job definitions plus the user-authorized R309 renderer-only delta must remain pinned');
  assert(!ciText.includes('codex/probe-0.12.85-'));
  require('./lib/ci-contracts.cjs').verifyMutationRouting(ci);
 });

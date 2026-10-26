@@ -8,8 +8,17 @@ const root = path.resolve(__dirname, "..");
 const scope = process.argv[2] || "all";
 if (!["all", "desktop"].includes(scope)) throw new Error("scope must be all or desktop");
 const directories = scope === "desktop" ? ["desktop"] : ["backend/web", "desktop", "scripts"];
-const files = directories.flatMap(directory => fs.readdirSync(path.join(root, directory))
+let files = directories.flatMap(directory => fs.readdirSync(path.join(root, directory))
   .filter(name => name.endsWith(".test.cjs")).sort().map(name => path.join(root, directory, name)));
+const args = process.argv.slice(3);
+let shard;
+if (args.length) {
+  if (scope !== 'all' || args.length !== 2 || args[0] !== '--shard' || !['1', '2'].includes(args[1])) throw Error('expected all --shard 1 or all --shard 2');
+  const sharding = require('./renderer-shards.cjs'), inventory = sharding.discover(root);
+  const selected = sharding.plan(inventory)[Number(args[1]) - 1];
+  shard = sharding.metadata(selected, inventory);
+  files = selected.files.map(file => path.join(root, file));
+}
 const fileNames = new Set(files);
 const timings = [], cases = [];
 const {fileBudget,suiteBudget,withinBudgets}=require("./renderer-budgets.cjs");
@@ -20,7 +29,7 @@ const concurrency = scope === "all" ? 5 : 4;
 // One bounded worker pool consumes all discovered files, longest first. The
 // previous reserved serial lane became the 203s bottleneck on Linux. Measured
 // costs only order execution; they never omit tests or change either budget.
-const costs = require("./renderer-costs.json");
+const costs = shard ? require('./renderer-shard-costs.json').costs_ms : require("./renderer-costs.json");
 const ordered = files.slice().sort((a,b) => {
   const relative = file => path.relative(root,file).replaceAll(path.sep,"/");
   return (costs[relative(b)] || 1000) - (costs[relative(a)] || 1000) || a.localeCompare(b);
@@ -59,7 +68,7 @@ const failures = [];
   for (const group of summaries) for (const [name, count] of Object.entries(group.summary?.counts || {})) counts[name] = (counts[name] || 0) + count;
   const summary = { success: summaries.length === groups.length && summaries.every(group => group.summary?.success), counts, duration_ms };
   if (!summary.success || !withinBudgets(process.platform,timings,summary.duration_ms) || timings.length !== files.length || new Set(timings.map(row => row.file)).size !== files.length) failed = true;
-  const result = { scope, platform: process.platform, runner: require("./lib/runner-diagnostics.cjs").runnerMetadata(), timingComparison: require("./lib/runner-diagnostics.cjs").timingComparison(timings,costs), concurrency, groups: summaries,
+  const result = { scope, ...(shard ? {shard} : {}), platform: process.platform, runner: require("./lib/runner-diagnostics.cjs").runnerMetadata(), timingComparison: require("./lib/runner-diagnostics.cjs").timingComparison(timings,costs), concurrency, groups: summaries,
     file_budget_ms, suite_budget_ms: suiteBudget, files: timings, cases, failures, summary, success: !failed };
   if (process.env.R222_NODE_TIMING_OUTPUT) fs.writeFileSync(process.env.R222_NODE_TIMING_OUTPUT, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));
