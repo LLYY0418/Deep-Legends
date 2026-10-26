@@ -49,6 +49,13 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Go installer failed: $($process.ExitCode)" }
           if (-not (Test-Path "$install/Deep Legends.exe")) { throw 'Installed application missing' }
           Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($install,[StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+      - name: Enable main-process inspection for native background audit only
+        shell: pwsh
+        run: |
+          npm ci --prefix desktop
+          if ($LASTEXITCODE -ne 0) { throw 'Diagnostic dependencies failed' }
+          node -e "const f=require('./desktop/node_modules/@electron/fuses');f.flipFuses(process.argv[1],{version:f.FuseVersion.V1,[f.FuseV1Options.EnableNodeCliInspectArguments]:true}).catch(e=>{console.error(e);process.exitCode=1})" "$env:RUNNER_TEMP/r312-app/Deep Legends.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Diagnostic inspect fuse failed' }
       - name: Measure baseline and individual resize candidates
         shell: pwsh
         run: |
