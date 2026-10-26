@@ -32,6 +32,7 @@ public class R312Capture {
   var screen=System.Windows.Forms.Screen.PrimaryScreen.Bounds;if(screen.Width<1560||screen.Height<900)throw new Exception("Desktop too small: "+screen);
   SetWindowPos(h,new IntPtr(-1),20,20,800,850,0x0040);Thread.Sleep(1000);
   using(var full=new Bitmap(800,850)){using(var g=Graphics.FromImage(full))g.CopyFromScreen(20,20,0,0,full.Size,CopyPixelOperation.SourceCopy);full.Save(Path.Combine(output,"desktop-before.png"),ImageFormat.Png);}
+  File.WriteAllText(Path.Combine(output,"ready.txt"),"ready");var readyClock=Stopwatch.StartNew();while(!File.Exists(Path.Combine(output,"go.txt"))){if(readyClock.Elapsed.TotalSeconds>20)throw new Exception("Capture start handshake timed out");Thread.Sleep(5);}
   Rect windowRect;GetWindowRect(h,out windowRect);int mouseX=windowRect.right-8,mouseY=(windowRect.top+windowRect.bottom)/2;
   bool hit=false;for(int offset=8;offset<=16;offset++){mouseX=windowRect.right-offset;var packed=new IntPtr((mouseY<<16)|(mouseX&65535));if(SendMessage(h,0x84,IntPtr.Zero,packed).ToInt64()==11&&GetAncestor(WindowFromPoint(new Point{x=mouseX,y=mouseY}),2)==h){hit=true;break;}}
   if(!hit)throw new Exception("Right resize border hit test must be HTRIGHT");

@@ -39,7 +39,8 @@ const run=(cmd,args)=>new Promise((resolve,reject)=>{const p=spawn(cmd,args,{std
    // CDP Browser window id is not a HWND. Enumerate native windows in PowerShell by PID tree/title.
    const pidFile=path.join(dir,'pid.txt');await run('powershell.exe',['-NoProfile','-Command',`Add-Type -AssemblyName System.Windows.Forms; Get-Process -Id ${child.pid} | Where-Object {$_.MainWindowHandle -ne 0} | Select-Object -First 1 -ExpandProperty MainWindowHandle | Set-Content '${pidFile.replaceAll("'","''")}'`]);
    const hwnd=fs.readFileSync(pidFile,'utf8').replace(/^\uFEFF/,'').trim();assert(BigInt(hwnd)>0n,'real HWND');
-   await run('powershell.exe',['-NoProfile','-File',path.join(__dirname,'r312-windows-capture.ps1'),'-Window',hwnd,'-Output',dir]);
+   const captureTask=run('powershell.exe',['-NoProfile','-File',path.join(__dirname,'r312-windows-capture.ps1'),'-Window',hwnd,'-Output',dir]);let captureError;captureTask.catch(error=>{captureError=error});
+   for(let i=0;i<2000&&!fs.existsSync(path.join(dir,'ready.txt'));i++){if(captureError)throw captureError;await sleep(10);}assert(fs.existsSync(path.join(dir,'ready.txt')),'capture ready handshake');await evaluate('__r312Long=[];__r312Trace=[]');fs.writeFileSync(path.join(dir,'go.txt'),'go');await captureTask;
    await sleep(500);const tasks=await evaluate('__r312Long'),trace=await evaluate('__r312Trace'),capture=JSON.parse(fs.readFileSync(path.join(dir,'capture.json'),'utf8').replace(/^\uFEFF/,''));
    
    const result={variant,trace,...capture,longtaskCount:tasks.length,longtaskMaxMs:Math.max(0,...tasks.map(t=>t.duration)),longtasks:tasks,page:await evaluate(`({url:location.href,title:document.title,hero:document.querySelector('.mayhem-detail-content')?.textContent.slice(0,160),background:getComputedStyle(document.documentElement).backgroundColor})`)};
