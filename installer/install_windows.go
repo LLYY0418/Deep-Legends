@@ -114,7 +114,6 @@ func (a *installerApp) install(message uiMessage) {
 	reportFailure := func(failure failureMessage) {
 		if a.options.Update {
 			failure.Message = upgradeFailureMessage
-			recoverUpdateApplication(a.options, a.meta.ExeName, a.parentExited, startApplication)
 		}
 		w.dispatch(func() { a.fail(failure) })
 	}

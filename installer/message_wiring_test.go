@@ -132,12 +132,13 @@ func TestWindowsInstallAutoUpdateUsesSharedDispatcher(t *testing.T) {
 		assertCompletionBlock(t, ready.Body.List, `
 w.startupTimer.Stop()
 a.pageReady = true
+w.starting = false
+w.webviewReady = true
+a.timing.mark("webview_ready")
 log.Print("installer page ready; WebView visible")
 if a.options.Update {
  if a.payloadError!=nil {a.fail(failureMessage{Message:upgradeFailureMessage});return}
- if a.options.ParentFirst {
-  if _,err:=fmt.Fprintln(os.Stdout,"DEEP_LEGENDS_UPDATE_STARTED");err!=nil {a.fail(failureMessage{Message:upgradeFailureMessage});return}
- } else {legacyUpdateWindows(a.options.ParentPID,false,!a.options.FreshInstall)}
+ if !a.options.ParentFirst {legacyUpdateWindows(a.options.ParentPID,false,!a.options.FreshInstall)}
     a.onMessage(`+"`{\"type\":\"install\"}`"+`)
 } else if a.payloadError != nil {
     a.fail(failureMessage{Message: "这个安装包不完整，请重新下载"})

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"runtime"
@@ -57,7 +59,34 @@ func main() {
 		}
 	}
 
+	w, err := createShellWindow()
+	if err != nil {
+		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
+		return
+	}
+	w.timing = timing
+	app := &installerApp{window: w, meta: meta, payloadError: payloadError, options: options, waitParent: waitParent, timing: timing}
+
+	if options.Update {
+		w.starting = true
+		w.show()
+		app.ackSent, err = acknowledgeUpdateShell(options, w.shown, func(line string) error { _, err := fmt.Fprintln(os.Stdout, line); return err }, timing.mark)
+		if err != nil {
+			w.starting = false
+			destroyWindow.Call(w.hwnd)
+			runMessageLoop()
+			webviewhost.ReportStartupFailure("DeepLegendsSetup", "升级", errors.New(upgradeFailureMessage))
+			return
+		}
+	}
 	if err := webviewhost.CheckRuntime(); err != nil {
+		w.starting = false
+		app.recoverFailedUpdate()
+		destroyWindow.Call(w.hwnd)
+		runMessageLoop()
+		if options.Update {
+			err = errors.New(upgradeFailureMessage)
+		}
 		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
 		return
 	}
@@ -68,17 +97,22 @@ func main() {
 	free, _ := diskFreeBytes(path)
 	html, err := renderInstallerUI(meta.Version, options)
 	if err != nil {
+		w.starting = false
+		app.recoverFailedUpdate()
+		destroyWindow.Call(w.hwnd)
+		runMessageLoop()
+		if options.Update {
+			err = errors.New(upgradeFailureMessage)
+		}
 		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
 		return
 	}
-	w, err := createShellWindow()
-	if err != nil {
-		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
-		return
-	}
-	w.timing = timing
-	app := &installerApp{window: w, meta: meta, payloadError: payloadError, options: options, waitParent: waitParent, timing: timing}
 	if err := app.embed(html, initMessage{Path: path, NeedBytes: requiredSpace(meta.InstalledBytes), FreeBytes: free, Version: meta.Version}); err != nil {
+		w.starting = false
+		app.recoverFailedUpdate()
+		if options.Update {
+			err = errors.New(upgradeFailureMessage)
+		}
 		destroyWindow.Call(w.hwnd)
 		runMessageLoop() // consume WM_QUIT before opening the error dialog
 		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)

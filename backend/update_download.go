@@ -239,6 +239,7 @@ func (u *updateManager) downloadAsset(ctx context.Context, asset updateAsset, mi
 			if err == nil {
 				err = os.Rename(part, filepath.Join(u.directory, asset.Name))
 				if err == nil {
+					u.rememberVerifiedUpdateFile(filepath.Join(u.directory, asset.Name), asset)
 					u.rememberUpdateSource(prefix)
 					duration := time.Since(start)
 					u.recordUpdateCheck(map[string]any{"event": "update_download_finished", "mirror_prefix": updateDiagnosticMirrorPrefix(prefix), "duration_ms": duration.Milliseconds(), "avg_kbps": float64(downloaded) / duration.Seconds() / 1024, "switches": switches, "resumed_bytes": resumed})
@@ -519,10 +520,15 @@ func (u *updateManager) apply(async bool, success func()) error {
 		}
 		return err
 	}
-	if err := verifyUpdateFile(u.ctx, path, asset); err != nil {
+	skipped, err := u.verifyReadyUpdateFile(u.ctx, path, asset)
+	if err != nil {
 		return fail(err)
 	}
-	u.markApplyTiming("verify_done")
+	if skipped {
+		u.markApplyTiming("verify_skipped")
+	} else {
+		u.markApplyTiming("verify_done")
+	}
 	if portable {
 		var err error
 		dest, err = u.portableDirectory()
