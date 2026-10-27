@@ -29,7 +29,7 @@ func verifiedUpdateFileInfo(path string) (os.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !sameVerifiedUpdateFile(entry, info) {
+	if !info.Mode().IsRegular() || entry.Size() != info.Size() || !entry.ModTime().Equal(info.ModTime()) {
 		return nil, errUpdateChecksum
 	}
 	return info, nil
