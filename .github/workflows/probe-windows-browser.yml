@@ -52,7 +52,7 @@ jobs:
         shell: pwsh
         run: |
           $env:R313_SETUP_FILE=(Get-ChildItem "$env:RUNNER_TEMP/r313/baseline/*.exe").FullName
-          go test ./backend -run TestR313RealPackageApplyEndpointTiming -count=1 -v | Tee-Object "$env:RUNNER_TEMP/r313/apply-timing.log"
+          go test ./backend -run '^TestR313' -count=1 -v | Tee-Object "$env:RUNNER_TEMP/r313/apply-timing.log"
           if ($LASTEXITCODE -ne 0) { throw 'apply endpoint timing failed' }
       - name: Three paired whole-upgrade measurements from installed 0.13.1
         if: ${{ !cancelled() }}
