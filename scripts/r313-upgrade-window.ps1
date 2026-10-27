@@ -41,7 +41,11 @@ try {
    $timing=$null;$file=Join-Path $trial 'update-install-timing.json'
    if($WaitForPage) {
     $pageDeadline=[DateTime]::UtcNow.AddSeconds(25)
-    do {Start-Sleep -Milliseconds 10;if(Test-Path $file){$timing=(Read-R313ProbeText $file)|ConvertFrom-Json}} while(-not $timing.webview_ready -and [DateTime]::UtcNow -lt $pageDeadline)
+    # Do not poll a file that the producer is atomically replacing: even a
+    # delete-sharing reader can briefly deny MoveFileEx replacement on Windows.
+    # The current PID's ready log is emitted after the timing write completes.
+    do {Start-Sleep -Milliseconds 10;$ready=Test-R313PageReady "$env:TEMP/DeepLegendsSetup-startup.log" $child.Id} while(-not $ready -and [DateTime]::UtcNow -lt $pageDeadline)
+    if($ready){$timing=(Read-R313ProbeText $file)|ConvertFrom-Json}
     if(-not $timing.webview_ready){throw "Candidate WebView did not finish initializing at trial $i"}
    } elseif(Test-Path $file){$timing=Get-Content $file -Raw|ConvertFrom-Json}
    $rows+=@{trial=$i;spawn_returned_ms=$spawnReturned;spawn_to_window_ms=$window;timing=$timing}
