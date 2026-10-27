@@ -51,9 +51,17 @@ jobs:
           $env:R313_SETUP_FILE=(Get-ChildItem "$env:RUNNER_TEMP/r313/baseline/*.exe").FullName
           go test ./backend -run TestR313RealPackageApplyEndpointTiming -count=1 -v | Tee-Object "$env:RUNNER_TEMP/r313/apply-timing.log"
           if ($LASTEXITCODE -ne 0) { throw 'apply endpoint timing failed' }
+      - name: Three paired whole-upgrade measurements from installed 0.13.1
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $version=node -p "require('./desktop/package.json').version"
+          ./scripts/r313-whole-upgrade.ps1 -Baseline (Get-ChildItem "$env:RUNNER_TEMP/r313/baseline/*.exe").FullName -Candidate "dist/desktop/Deep Legends Setup $version-public.exe" -Output "$env:RUNNER_TEMP/r313/whole"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: r313-upgrade-timing-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/r313/**
+          path: |
+            ${{ runner.temp }}/r313/**
+            !${{ runner.temp }}/r313/baseline/*.exe
           if-no-files-found: error
