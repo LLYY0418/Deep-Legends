@@ -4613,6 +4613,7 @@
 
   async function updateAction(action, fromToast = false) {
     if (updateUI.pending || updateUI.checkPending) return;
+    const applyClick = action === "apply" ? Date.now() : 0;
     updateUI.pending = true;
     renderManualUpdateCheck();
     renderUpdateDialog();
@@ -4627,7 +4628,7 @@
           if ((fromToast || !wasInGame) && ["InProgress", "ChampSelect"].includes(updateUI.phase)) { openUpdateDialog(); return; }
         } catch (_) { if (fromToast) { openUpdateDialog(); return; } }
       }
-      const result = await api(`/api/update/${action}`, { method: "POST" }, "update-action", 30000);
+      const result = await api(`/api/update/${action}`, { method: "POST", ...(applyClick ? { body: JSON.stringify({applyClick}) } : {}) }, "update-action", 30000);
       if (result) renderUpdateStatus(result);
     } catch (error) {
       renderUpdateStatus({ ...updateUI.status, state: "failed", error: error.message });

@@ -65,6 +65,7 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 	w.startup = webviewhost.New(w.surface, func() {
 		w.startupTimer.Stop()
 		a.pageReady = true
+		a.timing.mark("webview_ready")
 		log.Print("installer page ready; WebView visible")
 		if a.options.Update {
 			if a.payloadError != nil {
@@ -78,6 +79,7 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 					a.fail(failureMessage{Message: upgradeFailureMessage})
 					return
 				}
+				a.timing.mark("ack_sent")
 			} else {
 				// Compatibility with .63, whose portable backend waits for INSTALLED.
 				legacyUpdateWindows(a.options.ParentPID, false, !a.options.FreshInstall)

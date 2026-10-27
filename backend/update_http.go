@@ -34,6 +34,11 @@ func (a *app) handleUpdateAction(w http.ResponseWriter, r *http.Request) {
 	case "cancel":
 		err = a.updates.Cancel()
 	case "apply":
+		var body struct {
+			ApplyClick int64 `json:"applyClick"`
+		}
+		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body)
+		a.updates.beginApplyTiming(body.ApplyClick)
 		if a.updates.Status().Portable {
 			err = a.updates.ApplyAsync(func() { a.scheduleQuit(300*time.Millisecond, "update") })
 		} else {
@@ -93,6 +98,12 @@ func writeLiveEvent(w io.Writer, event string) error {
 func (a *app) scheduleQuit(delay time.Duration, reason string) {
 	a.quitOnce.Do(func() {
 		if reason == "update" {
+			u := a.updates
+			u.applyTimingMu.Lock()
+			if u.applyTiming != nil {
+				fmt.Fprintf(os.Stdout, "LOOT_UPDATE_TIMING %d\n", u.applyTiming.origin.UnixMilli())
+			}
+			u.applyTimingMu.Unlock()
 			fmt.Fprintln(os.Stdout, "LOOT_UPDATE_STARTED")
 		}
 		go func() {

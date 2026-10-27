@@ -16,6 +16,9 @@ func installedUpdateDirectory() (string, error) { return "", nil }
 func launchUpdateInstaller(string, string) error {
 	return errors.New("应用内升级仅支持 Windows")
 }
+func launchUpdateInstallerTimed(setup, dest string, mark func(string)) error {
+	return launchUpdateInstaller(setup, dest)
+}
 func updateDiskFreeBytes(directory string) (int64, error) {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(directory, &stat)

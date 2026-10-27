@@ -84,6 +84,8 @@ type shellWindow struct {
 	queueMu      sync.Mutex
 	queue        []func()
 	closed       bool
+	timing       *updateInstallTiming
+	shown        bool
 }
 
 func enableDPIAwareness() {
@@ -241,6 +243,10 @@ func (w *shellWindow) drag() {
 
 func (w *shellWindow) show() {
 	showWindow.Call(w.hwnd, SW_SHOW)
+	if !w.shown {
+		w.shown = true
+		w.timing.mark("shell_window_shown")
+	}
 	setForegroundWindow.Call(w.hwnd)
 	w.chromium.Focus()
 }

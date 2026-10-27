@@ -76,16 +76,19 @@ func installedUpdateDirectory() (string, error) {
 	return d.directory, err
 }
 func launchUpdateInstaller(setup, destination string) error {
+	return launchUpdateInstallerTimed(setup, destination, nil)
+}
+func launchUpdateInstallerTimed(setup, destination string, mark func(string)) error {
 	d, err := detectUpdateInstallation()
 	if err != nil {
 		return err
 	}
-	return launchDetectedUpdateInstaller(setup, destination, d)
+	return launchDetectedUpdateInstaller(setup, destination, d, mark)
 }
 
-func launchDetectedUpdateInstaller(setup, destination string, d updateInstallDetection) error {
+func launchDetectedUpdateInstaller(setup, destination string, d updateInstallDetection, timing ...func(string)) error {
 	if d.Result == "portable_env" {
-		return launchPortableUpdateInstaller(setup, destination)
+		return launchPortableUpdateInstaller(setup, destination, timing...)
 	}
 	if d.Result != "installed" || d.directory == "" {
 		return errors.New("安装位置无法确认，请下载完整安装包")
@@ -94,10 +97,10 @@ func launchDetectedUpdateInstaller(setup, destination string, d updateInstallDet
 	if !updateInstallationMatches(destination, "Deep Legends", installed, regularFile(filepath.Join(destination, "Uninstall Deep Legends.exe"))) {
 		return errors.New("安装位置已变化，请从发布页下载完整安装包")
 	}
-	return startUpdateInstaller(setup, updateRecoveryCommandLine(updateCommandLine(setup, destination), destination), os.Environ())
+	return startUpdateInstaller(setup, updateRecoveryCommandLine(updateCommandLine(setup, destination), destination), os.Environ(), timing...)
 }
 
-func launchPortableUpdateInstaller(setup, dest string) error {
+func launchPortableUpdateInstaller(setup, dest string, timing ...func(string)) error {
 	expected, err := defaultPortableInstallDirectory()
 	if err != nil {
 		return err
@@ -112,9 +115,14 @@ func launchPortableUpdateInstaller(setup, dest string) error {
 	if strings.EqualFold(filepath.Clean(dest), filepath.Clean(updateRootForExecutable(executable))) {
 		return errors.New("当前安装目录正在使用，请从发布页安装")
 	}
-	return startUpdateInstaller(setup, updateRecoveryCommandLine(portableUpdateCommandLine(setup, dest, updateParentPID()), dest), portableUpdateEnvironment(os.Environ()))
+	return startUpdateInstaller(setup, updateRecoveryCommandLine(portableUpdateCommandLine(setup, dest, updateParentPID()), dest), portableUpdateEnvironment(os.Environ()), timing...)
 }
-func startUpdateInstaller(setup, commandLine string, environment []string) error {
+func startUpdateInstaller(setup, commandLine string, environment []string, timing ...func(string)) error {
+	mark := func(stage string) {
+		if len(timing) > 0 && timing[0] != nil {
+			timing[0](stage)
+		}
+	}
 	cmd := exec.Command(setup)
 	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: commandLine, HideWindow: true}
 	cmd.Env = environment
@@ -122,15 +130,18 @@ func startUpdateInstaller(setup, commandLine string, environment []string) error
 	if err != nil {
 		return err
 	}
+	mark("spawn_begin")
 	if err = cmd.Start(); err != nil {
 		return err
 	}
+	mark("spawn_returned")
 	result := make(chan error, 1)
 	goSafe("update-installer-result", func() {
 		scanner := bufio.NewScanner(output)
 		scanner.Buffer(make([]byte, 256), 4096)
 		for scanner.Scan() {
 			if scanner.Text() == "DEEP_LEGENDS_UPDATE_STARTED" {
+				mark("ack_received")
 				result <- nil
 				_ = cmd.Wait()
 				return

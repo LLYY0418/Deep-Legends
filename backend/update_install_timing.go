@@ -17,6 +17,7 @@ func detailedInstallTimingStage(stage string) bool {
 // Consume once. Partial legacy files retain every available interval; missing
 // endpoints are null, never invented or subtracted across an unknown stage.
 func consumeUpdateInstallTiming(root string, record func(map[string]any)) {
+	consumeUpdateApplyTiming(root, record)
 	path := filepath.Join(root, "update-install-timing.json")
 	info, err := os.Lstat(path)
 	if os.IsNotExist(err) {
@@ -73,6 +74,11 @@ func consumeUpdateInstallTiming(root string, record func(map[string]any)) {
 	durations["parent_exited_to_uninstall_old_start"] = nil
 	if start, end := stages["parent_exited"], stages["uninstall_old_start"]; start > 0 && end >= start && end <= time.Now().UnixMilli()+60000 {
 		durations["parent_exited_to_uninstall_old_start"] = end - start
+	}
+	for _, stage := range []string{"shell_window_shown", "webview_ready", "ack_sent"} {
+		if start, end := stages["installer_start"], stages[stage]; start > 0 && end >= start {
+			durations["installer_start_to_"+stage] = end - start
+		}
 	}
 	event["stages_ms"] = durations
 	for name, pair := range map[string][2]string{"uninstall_old_ms": {"uninstall_old_start", "uninstall_old_done"}, "extract_ms": {"extract_start", "extract_done"}, "copy_ms": {"extract_done", "copy_done"}} {

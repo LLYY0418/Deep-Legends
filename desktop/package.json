@@ -54,6 +54,7 @@
       "diagnostics-export.cjs",
       "diagnostics-directory.cjs",
       "desktop-log.cjs",
+      "update-apply-timing.cjs",
       "backend-evidence.cjs",
       "process-metrics.cjs",
       "proxy-resolution.cjs",

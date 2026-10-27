@@ -76,6 +76,7 @@ func main() {
 		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
 		return
 	}
+	w.timing = timing
 	app := &installerApp{window: w, meta: meta, payloadError: payloadError, options: options, waitParent: waitParent, timing: timing}
 	if err := app.embed(html, initMessage{Path: path, NeedBytes: requiredSpace(meta.InstalledBytes), FreeBytes: free, Version: meta.Version}); err != nil {
 		destroyWindow.Call(w.hwnd)

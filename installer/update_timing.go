@@ -59,6 +59,11 @@ func (t *updateInstallTiming) writeLocked() {
 			stages[stage] = nil
 		}
 	}
+	for _, stage := range []string{"shell_window_shown", "webview_ready", "ack_sent"} {
+		if value := t.stages[stage]; value > 0 {
+			stages[stage] = value
+		}
+	}
 	data, err := json.Marshal(stages)
 	if err != nil {
 		return

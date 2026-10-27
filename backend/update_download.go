@@ -503,6 +503,7 @@ func (u *updateManager) apply(async bool, success func()) error {
 		return err
 	}
 
+	u.ensureApplyTiming()
 	u.status.State = "applying"
 	u.status.Error = ""
 	u.mu.Unlock()
@@ -521,6 +522,7 @@ func (u *updateManager) apply(async bool, success func()) error {
 	if err := verifyUpdateFile(u.ctx, path, asset); err != nil {
 		return fail(err)
 	}
+	u.markApplyTiming("verify_done")
 	if portable {
 		var err error
 		dest, err = u.portableDirectory()
@@ -543,6 +545,7 @@ func (u *updateManager) apply(async bool, success func()) error {
 				return fail(err)
 			}
 		}
+		u.markApplyTiming("migrate_done")
 		err := u.launch(path, dest)
 		if err = fail(err); err == nil && success != nil && u.ctx.Err() == nil {
 			success()

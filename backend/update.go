@@ -156,6 +156,8 @@ type updateSettings struct {
 }
 
 type updateManager struct {
+	applyTiming          *updateApplyTiming
+	applyTimingMu        sync.Mutex
 	trustKeys            map[string]ed25519.PublicKey
 	migrationDirectory   func() (string, error)
 	startSourceTimer     func(time.Duration, func()) func()
@@ -238,10 +240,11 @@ func newUpdateManagerWithTrust(current string, store *localStore, notify func(st
 	transport.ResponseHeaderTimeout = updateSourceTimeout
 	transport.TLSHandshakeTimeout = updateSourceTimeout
 	u := &updateManager{trustKeys: keys, store: store, mirrors: append([]string(nil), updateMirrors...), now: time.Now,
-		client: &http.Client{Transport: transport}, freeBytes: updateDiskFreeBytes, launch: launchUpdateInstaller,
+		client: &http.Client{Transport: transport}, freeBytes: updateDiskFreeBytes, launch: nil,
 		notify: notify, ctx: ctx, stop: cancel,
 		status: updateStatus{Current: current, State: "idle", Portable: true, ReleaseURL: updateReleasePage},
 	}
+	u.launch = func(setup, dest string) error { return launchUpdateInstallerTimed(setup, dest, u.markApplyTiming) }
 	// R236: staging never reads a release cache or follows the production Latest.
 	if !licenseOnlineUpdates {
 		u.status.ReleaseURL = ""

@@ -525,11 +525,13 @@ function setupBackendIPC() {
   });
 }
 
+let updateApplyOrigin = 0;
 function onBackendStdout(chunk) {
   stdoutBuffer += chunk;
   const lines = stdoutBuffer.split(/\r?\n/);
   stdoutBuffer = lines.pop() || "";
   for (const line of lines) {
+    if (backendReady && /^LOOT_UPDATE_TIMING \d+$/.test(line)) { updateApplyOrigin = Number(line.slice(19)); continue; }
     if (backendReady && line === "LOOT_UPDATE_STARTED") {
       // Hide immediately; backend performs its normal flush before LOOT_QUIT.
       quitting = true;
@@ -537,6 +539,7 @@ function onBackendStdout(chunk) {
       for (const window of BrowserWindow.getAllWindows()) {
         if (!window.isDestroyed()) window.hide();
       }
+      require("./update-apply-timing.cjs").markWindowsHidden(backendDataDirectory(), updateApplyOrigin);
       continue;
     }
     if (backendReady && (line === "LOOT_QUIT update" || line === "LOOT_QUIT user")) {
