@@ -40,7 +40,7 @@ func TestR313ShellAcknowledgementRequiresVisibleWindowAndPreservesProtocol(t *te
 	}
 }
 func TestR313EveryEarlyAcknowledgedFailureWaitsThenRecoversOriginalApplication(t *testing.T) {
-	for _, failure := range []string{"runtime", "webview-embed", "webview-timeout", "payloadError", "destination"} {
+	for _, failure := range []string{"runtime", "webview-embed", "webview-controller-timeout", "webview-timeout", "payloadError", "destination"} {
 		t.Run(failure, func(t *testing.T) {
 			root := t.TempDir()
 			exe := filepath.Join(root, "original.exe")
@@ -87,6 +87,13 @@ func TestR313NativeStartupAndFailureAdaptersKeepRecoveryWired(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(view)
+	watchdog, factory := strings.Index(s, "watchdog = newStartupWatchdog("), strings.Index(s, "embedded := chromium.Embed(")
+	if watchdog < 0 || factory <= watchdog || !strings.Contains(s[watchdog:factory], "recoverAcknowledgedUpdate(options, exeName, acknowledged, false, waitParent, startApplication)") || !strings.Contains(s[watchdog:factory], "time.AfterFunc(webviewhost.PageTimeout, fn)") || !strings.Contains(s[watchdog:factory], "os.Exit(1)") {
+		t.Fatal("controller creation must have an independent timeout that recovers before exiting")
+	}
+	if !strings.Contains(s[factory:], "if watchdog != nil && !watchdog.stop() {") || !strings.Contains(s[factory:], "<-watchdog.done") {
+		t.Fatal("expired controller factory must not continue while recovery is in progress")
+	}
 	start := strings.Index(s, "func (a *installerApp) fail(")
 	end := strings.Index(s, "func (a *installerApp) validatePath(")
 	if start < 0 || end < start {

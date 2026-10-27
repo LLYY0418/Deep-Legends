@@ -1,5 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$Setup,[Parameter(Mandatory=$true)][string]$Output,[int]$Count=15,[switch]$Enforce,[switch]$WaitForPage)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'r313-measurement-fixture.ps1')
 New-Item -ItemType Directory -Force $Output | Out-Null
 Add-Type @'
 using System;
@@ -22,6 +23,7 @@ try {
  for($i=1;$i -le $Count;$i++) {
   $trial=Join-Path $Output "trial-$i";New-Item -ItemType Directory -Force $trial | Out-Null
   $env:LOL_LOOT_DATA_DIR=$trial
+  $profile=Join-Path $trial 'webview-profile';$env:WEBVIEW2_USER_DATA_FOLDER=$profile
   $dest=Join-Path $trial 'installed';New-Item -ItemType Directory -Force $dest | Out-Null
   $parent=Start-Process pwsh -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 90' -PassThru -WindowStyle Hidden
   $child=$null
@@ -32,8 +34,8 @@ try {
    while(-not [R313Windows]::Visible($child.Id)) {if($watch.Elapsed.TotalSeconds -gt 30 -or $child.HasExited){throw "No visible installer at trial $i"};Start-Sleep -Milliseconds 10}
    $window=$watch.Elapsed.TotalMilliseconds
    $deadline=[DateTime]::UtcNow.AddSeconds(25)
-   do {Start-Sleep -Milliseconds 10;$stdout=Get-Content (Join-Path $trial 'stdout.txt') -Raw -ErrorAction SilentlyContinue} while($stdout -notmatch 'DEEP_LEGENDS_UPDATE_STARTED' -and [DateTime]::UtcNow -lt $deadline)
-   if($stdout -notmatch 'DEEP_LEGENDS_UPDATE_STARTED'){throw "Missing compatible ACK trial $i"}
+   do {Start-Sleep -Milliseconds 10;$acknowledged=Test-R313Acknowledged (Join-Path $trial 'stdout.txt')} while(-not $acknowledged -and [DateTime]::UtcNow -lt $deadline)
+   if(-not $acknowledged){throw "Missing compatible ACK trial $i"}
    $timing=$null;$file=Join-Path $trial 'update-install-timing.json'
    if($WaitForPage) {
     $pageDeadline=[DateTime]::UtcNow.AddSeconds(25)
@@ -45,10 +47,11 @@ try {
    if($child -and -not $child.HasExited){& taskkill /PID $child.Id /T /F 2>$null | Out-Null}
    if($child -and -not $child.WaitForExit(5000)){throw 'Owned installer did not exit after cleanup'}
    if(-not $parent.HasExited){Stop-Process -Id $parent.Id -Force};$parent.WaitForExit(5000)|Out-Null
+   Stop-R313WebViewProfile $profile
    if(Test-Path "$env:TEMP/DeepLegendsSetup-startup.log"){Get-Content "$env:TEMP/DeepLegendsSetup-startup.log" -Tail 100|Set-Content (Join-Path $trial 'startup.log')}
   }
  }
-} finally {[R313Windows]::timeEndPeriod(1)|Out-Null;Remove-Item Env:LOL_LOOT_DATA_DIR -ErrorAction SilentlyContinue}
+} finally {[R313Windows]::timeEndPeriod(1)|Out-Null;Remove-Item Env:LOL_LOOT_DATA_DIR -ErrorAction SilentlyContinue;Remove-Item Env:WEBVIEW2_USER_DATA_FOLDER -ErrorAction SilentlyContinue}
 $values=@($rows.spawn_to_window_ms|Sort-Object)
 $result=@{setup_bytes=(Get-Item $setupPath).Length;sha256=(Get-FileHash $setupPath -Algorithm SHA256).Hash.ToLowerInvariant();count=$rows.Count;median_ms=$values[[int][Math]::Floor($values.Count/2)];p95_ms=$values[[Math]::Ceiling($values.Count*.95)-1];rows=$rows}
 $result|ConvertTo-Json -Depth 12|Set-Content (Join-Path $Output 'result.json') -Encoding utf8

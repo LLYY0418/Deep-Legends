@@ -42,7 +42,27 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 	chromium.MessageCallback = func(raw string) { w.dispatch(func() { a.onMessage(raw) }) }
 	w.chromium = chromium
 	log.Print("WebView environment/controller initialization")
-	if !chromium.Embed(w.hwnd) {
+	// Embed has an internal message pump and may never return when the runtime
+	// cannot create its controller. Its timeout must not depend on that return.
+	var watchdog *startupWatchdog
+	if a.options.Update {
+		options, exeName, acknowledged, waitParent := a.options, a.meta.ExeName, a.ackSent, a.waitParent
+		watchdog = newStartupWatchdog(func(fn func()) func() bool {
+			return time.AfterFunc(webviewhost.PageTimeout, fn).Stop
+		}, func() {
+			log.Print("WebView environment/controller initialization timed out")
+			recoverAcknowledgedUpdate(options, exeName, acknowledged, false, waitParent, startApplication)
+			webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", errors.New(upgradeFailureMessage))
+			os.Exit(1)
+		})
+	}
+	embedded := chromium.Embed(w.hwnd)
+	if watchdog != nil && !watchdog.stop() {
+		a.recoveryAttempted = true
+		<-watchdog.done
+		return errors.New(upgradeFailureMessage)
+	}
+	if !embedded {
 		return errors.New("WebView environment/controller initialization failed")
 	}
 	w.surface = &webviewhost.WindowsSurface{Chromium: chromium, Window: w.hwnd, ShowWindow: w.show, DeferVisible: a.options.Update}
