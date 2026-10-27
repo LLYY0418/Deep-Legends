@@ -286,6 +286,7 @@ func (u *updateManager) downloadAssetQuick(ctx context.Context, asset updateAsse
 	if asset.Size >= 4<<20 {
 		if err := u.downloadSegments(ctx, asset, part, race); err == nil {
 			if err = os.Rename(part, filepath.Join(u.directory, asset.Name)); err == nil {
+				u.rememberVerifiedUpdateFile(filepath.Join(u.directory, asset.Name), asset)
 				u.rememberUpdateSource(race.first)
 				return nil
 			}
@@ -304,6 +305,7 @@ func (u *updateManager) downloadAssetQuick(ctx context.Context, asset updateAsse
 			last = u.downloadSource(ctx, asset, prefix+asset.URL, part, len(sources) > 1, &transfer)
 			if last == nil {
 				if last = os.Rename(part, filepath.Join(u.directory, asset.Name)); last == nil {
+					u.rememberVerifiedUpdateFile(filepath.Join(u.directory, asset.Name), asset)
 					u.rememberUpdateSource(prefix)
 					u.recordUpdateCheck(map[string]any{"event": "update_download_finished", "duration_ms": time.Since(started).Milliseconds(), "segments": 1, "predownload": u.predownloadActive()})
 					return nil

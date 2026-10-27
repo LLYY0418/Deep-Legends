@@ -141,3 +141,31 @@ func recoverUpdateApplication(options installerOptions, exeName string, parentEx
 	_, err = start(exe, filepath.Dir(exe))
 	return err == nil
 }
+
+// The protocol line remains identical for 0.13.1 parents. A visible native
+// shell, not WebView document readiness, is the new handoff boundary.
+func acknowledgeUpdateShell(options installerOptions, shown bool, report func(string) error, mark func(string)) (bool, error) {
+	if !options.Update || !options.ParentFirst {
+		return false, nil
+	}
+	if !shown {
+		return false, errors.New(upgradeFailureMessage)
+	}
+	if err := report("DEEP_LEGENDS_UPDATE_STARTED"); err != nil {
+		return false, err
+	}
+	if mark != nil {
+		mark("ack_sent")
+	}
+	return true, nil
+}
+
+func recoverAcknowledgedUpdate(options installerOptions, exeName string, acknowledged, parentExited bool, wait func() bool, start func(string, string) (uint32, error)) (bool, bool) {
+	if !options.Update {
+		return parentExited, false
+	}
+	if acknowledged && !parentExited && wait != nil {
+		parentExited = wait()
+	}
+	return parentExited, recoverUpdateApplication(options, exeName, parentExited, start)
+}

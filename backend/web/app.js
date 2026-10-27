@@ -4544,7 +4544,7 @@
     if(document.getElementById('announcements-dialog')?.open){window.addEventListener('deep-legends:modal-idle',openUpdateDialog,{once:true});return;}
     if (!el.updateDialog.open) el.updateDialog.showModal();
     renderUpdateStatus(updateUI.status);
-    void api("/api/gameplay/phase", {}, "update-gameflow", 2000).then((value) => { updateUI.phase = value.phase; renderUpdateDialog(); }).catch(() => {});
+    void api("/api/gameplay/phase", {}, "update-gameflow", 300).then((value) => { updateUI.phase = value.phase; renderUpdateDialog(); }).catch(() => {});
   }
 
   function renderUpdateDialog() {
@@ -4554,7 +4554,7 @@
     const ready = current.state === "ready" || current.state === "applying";
     const failed = current.state === "failed";
     el.updateNotes.parentElement.hidden = failed && !manual;
-    el.updateDialogTitle.textContent = manual ? "发现新版本" : current.state === "applying" ? "正在重启升级" : ready ? "准备就绪" : current.state === "verifying" ? "正在校验安装包" : busy ? "正在下载新版本" : failed ? "升级未完成" : "发现新版本";
+    el.updateDialogTitle.textContent = manual ? "发现新版本" : (current.state === "applying" || updateUI.startingInstaller) ? "正在启动升级程序…" : ready ? "准备就绪" : current.state === "verifying" ? "正在校验安装包" : busy ? "正在下载新版本" : failed ? "升级未完成" : "发现新版本";
     el.updateDialog.querySelector(".from").textContent = `当前 ${current.current || ""}`;
     el.updateDialog.querySelector(".to").textContent = current.latest || "";
     if (busy) {
@@ -4615,18 +4615,21 @@
     if (updateUI.pending || updateUI.checkPending) return;
     const applyClick = action === "apply" ? Date.now() : 0;
     updateUI.pending = true;
+    updateUI.startingInstaller = action === "apply";
     renderManualUpdateCheck();
     renderUpdateDialog();
     try {
       if (action === "apply") {
         const wasInGame = ["InProgress", "ChampSelect"].includes(updateUI.phase);
         try {
-          const phase = await api("/api/gameplay/phase", {}, "update-gameflow", 2000);
+          const phase = await api("/api/gameplay/phase", {}, "update-gameflow", 300);
           updateUI.phase = phase.phase;
           // If a game started since opening the dialog, expose the warning
           // before the user confirms again. The button remains enabled.
           if ((fromToast || !wasInGame) && ["InProgress", "ChampSelect"].includes(updateUI.phase)) { openUpdateDialog(); return; }
-        } catch (_) { if (fromToast) { openUpdateDialog(); return; } }
+        } catch (_) {
+          if ((fromToast || !wasInGame) && ["InProgress", "ChampSelect"].includes(updateUI.phase)) { openUpdateDialog(); return; }
+        }
       }
       const result = await api(`/api/update/${action}`, { method: "POST", ...(applyClick ? { body: JSON.stringify({applyClick}) } : {}) }, "update-action", 30000);
       if (result) renderUpdateStatus(result);
@@ -4634,6 +4637,7 @@
       renderUpdateStatus({ ...updateUI.status, state: "failed", error: error.message });
     } finally {
       updateUI.pending = false;
+      updateUI.startingInstaller = false;
       renderManualUpdateCheck();
       renderUpdateDialog();
     }

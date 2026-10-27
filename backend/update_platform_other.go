@@ -24,3 +24,5 @@ func updateDiskFreeBytes(directory string) (int64, error) {
 	err := syscall.Statfs(directory, &stat)
 	return int64(stat.Bavail) * int64(stat.Bsize), err
 }
+
+func updateFileBusy(error) bool { return false }

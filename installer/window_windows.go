@@ -22,6 +22,7 @@ const (
 	CS_HREDRAW       = 0x0002
 	CS_VREDRAW       = 0x0001
 	CS_DROPSHADOW    = 0x00020000
+	WM_PAINT         = 0x000F
 	WM_SIZE          = 0x0005
 	WM_CLOSE         = 0x0010
 	WM_DESTROY       = 0x0002
@@ -86,6 +87,8 @@ type shellWindow struct {
 	closed       bool
 	timing       *updateInstallTiming
 	shown        bool
+	starting     bool
+	webviewReady bool
 }
 
 func enableDPIAwareness() {
@@ -144,6 +147,8 @@ func createShellWindow() (*shellWindow, error) {
 	}
 	w.hwnd = hwnd
 	if proc := windows.NewLazySystemDLL("dwmapi.dll").NewProc("DwmSetWindowAttribute"); proc.Find() == nil {
+		dark := uint32(1)
+		proc.Call(hwnd, 20, uintptr(unsafe.Pointer(&dark)), 4)
 		preference := uint32(2)
 		proc.Call(hwnd, 33, uintptr(unsafe.Pointer(&preference)), 4)
 	}
@@ -155,6 +160,9 @@ func shellWndProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) 
 	w := activeWindow
 	if w != nil {
 		switch message {
+		case WM_PAINT:
+			w.paintStartup(hwnd)
+			return 0
 		case WM_SIZE:
 			if w.surface != nil {
 				if wParam == 1 {
@@ -187,7 +195,7 @@ func shellWndProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) 
 				_ = w.surface.Visible(wParam != 0)
 			}
 		case WM_CLOSE:
-			if !w.state.busy() && !w.browsing {
+			if !w.starting && !w.state.busy() && !w.browsing {
 				destroyWindow.Call(hwnd)
 			}
 			return 0
@@ -248,7 +256,10 @@ func (w *shellWindow) show() {
 		w.timing.mark("shell_window_shown")
 	}
 	setForegroundWindow.Call(w.hwnd)
-	w.chromium.Focus()
+	user32.NewProc("UpdateWindow").Call(w.hwnd)
+	if w.chromium != nil {
+		w.chromium.Focus()
+	}
 }
 
 func runMessageLoop() {
@@ -278,4 +289,30 @@ func acquireSingleInstance() (windows.Handle, bool, error) {
 		return 0, false, nil
 	}
 	return mutex, err == nil, err
+}
+
+func (w *shellWindow) paintStartup(hwnd uintptr) {
+	type paintStruct struct {
+		DC                 uintptr
+		Erase              int32
+		Rect               winRect
+		Restore, IncUpdate int32
+		Reserved           [32]byte
+	}
+	var paint paintStruct
+	dc, _, _ := user32.NewProc("BeginPaint").Call(hwnd, uintptr(unsafe.Pointer(&paint)))
+	defer user32.NewProc("EndPaint").Call(hwnd, uintptr(unsafe.Pointer(&paint)))
+	if dc == 0 || w.webviewReady {
+		return
+	}
+	var rect winRect
+	user32.NewProc("GetClientRect").Call(hwnd, uintptr(unsafe.Pointer(&rect)))
+	gdi := windows.NewLazySystemDLL("gdi32.dll")
+	gdi.NewProc("SetBkMode").Call(dc, 1)
+	gdi.NewProc("SetTextColor").Call(dc, 0x00F0EAE8)
+	font, _, _ := gdi.NewProc("GetStockObject").Call(17)
+	old, _, _ := gdi.NewProc("SelectObject").Call(dc, font)
+	defer gdi.NewProc("SelectObject").Call(dc, old)
+	text := windows.StringToUTF16Ptr("正在启动升级程序…")
+	user32.NewProc("DrawTextW").Call(dc, uintptr(unsafe.Pointer(text)), ^uintptr(0), uintptr(unsafe.Pointer(&rect)), 0x25)
 }

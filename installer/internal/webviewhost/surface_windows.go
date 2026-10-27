@@ -30,9 +30,10 @@ func comCall(object unsafe.Pointer, slot int, args ...uintptr) error {
 type rect struct{ Left, Top, Right, Bottom int32 }
 
 type WindowsSurface struct {
-	Chromium   *edge.Chromium
-	Window     uintptr
-	ShowWindow func()
+	Chromium     *edge.Chromium
+	Window       uintptr
+	ShowWindow   func()
+	DeferVisible bool
 }
 
 func (s *WindowsSurface) Resize() error {
@@ -56,7 +57,7 @@ func (s *WindowsSurface) Prepare() error {
 	if err := s.Resize(); err != nil {
 		return err
 	}
-	return s.Visible(true)
+	return s.Visible(!s.DeferVisible)
 }
 
 func coreFromController(controller unsafe.Pointer) (unsafe.Pointer, error) {
@@ -85,6 +86,7 @@ func (s *WindowsSurface) Navigate(html string) error {
 	return err
 }
 func (s *WindowsSurface) Show() error {
+	s.DeferVisible = false
 	s.ShowWindow()
 	// Creating the controller under a hidden parent and revealing only the
 	// parent is insufficient. Synchronize both its bounds and its visibility.

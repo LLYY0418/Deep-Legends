@@ -15,16 +15,18 @@ import (
 )
 
 type installerApp struct {
-	options      installerOptions
-	waitParent   func() bool
-	timing       *updateInstallTiming
-	parentExited bool
-	window       *shellWindow
-	meta         payload.Metadata
-	payloadError error
-	startupError error
-	pageReady    bool
-	startupWarm  *executionWarmup
+	options           installerOptions
+	waitParent        func() bool
+	timing            *updateInstallTiming
+	parentExited      bool
+	window            *shellWindow
+	meta              payload.Metadata
+	payloadError      error
+	startupError      error
+	pageReady         bool
+	ackSent           bool
+	recoveryAttempted bool
+	startupWarm       *executionWarmup
 }
 
 func (a *installerApp) embed(html string, initial initMessage) error {
@@ -34,6 +36,7 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 	if err != nil {
 		return fmt.Errorf("prepare installer document: %w", err)
 	}
+	_ = os.Setenv("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FF0B0E14")
 	chromium := edge.NewChromium()
 	chromium.DataPath = filepath.Join(os.Getenv("LOCALAPPDATA"), "Temp", "DeepLegendsSetup.WebView2")
 	chromium.MessageCallback = func(raw string) { w.dispatch(func() { a.onMessage(raw) }) }
@@ -42,7 +45,7 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 	if !chromium.Embed(w.hwnd) {
 		return errors.New("WebView environment/controller initialization failed")
 	}
-	w.surface = &webviewhost.WindowsSurface{Chromium: chromium, Window: w.hwnd, ShowWindow: w.show}
+	w.surface = &webviewhost.WindowsSurface{Chromium: chromium, Window: w.hwnd, ShowWindow: w.show, DeferVisible: a.options.Update}
 	log.Print("WebView controller created")
 	if err := w.surface.Configure(); err != nil {
 		return fmt.Errorf("configure WebView: %w", err)
@@ -65,6 +68,8 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 	w.startup = webviewhost.New(w.surface, func() {
 		w.startupTimer.Stop()
 		a.pageReady = true
+		w.starting = false
+		w.webviewReady = true
 		a.timing.mark("webview_ready")
 		log.Print("installer page ready; WebView visible")
 		if a.options.Update {
@@ -72,16 +77,8 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 				a.fail(failureMessage{Message: upgradeFailureMessage})
 				return
 			}
-			if a.options.ParentFirst {
-				// Acknowledge only after the native installer page is ready. The backend
-				// then hides its windows, flushes diagnostics and exits normally.
-				if _, err := fmt.Fprintln(os.Stdout, "DEEP_LEGENDS_UPDATE_STARTED"); err != nil {
-					a.fail(failureMessage{Message: upgradeFailureMessage})
-					return
-				}
-				a.timing.mark("ack_sent")
-			} else {
-				// Compatibility with .63, whose portable backend waits for INSTALLED.
+			if !a.options.ParentFirst {
+				// Older parents keep the original page-ready compatibility path.
 				legacyUpdateWindows(a.options.ParentPID, false, !a.options.FreshInstall)
 			}
 			a.onMessage(`{"type":"install"}`)
@@ -92,7 +89,12 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		}
 	}, func(err error) {
 		w.startupTimer.Stop()
+		w.starting = false
+		a.recoverFailedUpdate()
 		a.startupError = err
+		if a.options.Update {
+			a.startupError = errors.New(upgradeFailureMessage)
+		}
 		log.Print("installer UI startup failed: ", err)
 		postMessage.Call(w.hwnd, WM_CLOSE, 0, 0)
 	})
@@ -117,6 +119,7 @@ func (a *installerApp) emit(method string, value any) {
 
 func (a *installerApp) fail(failure failureMessage) {
 	if a.options.Update {
+		a.recoverFailedUpdate()
 		failure.Message = upgradeFailureMessage
 	}
 	a.window.state.phase = phaseFailed
@@ -218,4 +221,16 @@ func (a *installerApp) onMessage(raw string) {
 		}{message.Path})
 		go a.install(message)
 	}
+}
+
+// Every failure after the early shell ACK joins the parent's normal shutdown
+// before relaunching its original executable. Also used by pre-WebView failures.
+func (a *installerApp) recoverFailedUpdate() {
+	if !a.options.Update || a.recoveryAttempted {
+		return
+	}
+	var recovered bool
+	a.parentExited, recovered = recoverAcknowledgedUpdate(a.options, a.meta.ExeName, a.ackSent, a.parentExited, a.waitParent, startApplication)
+	a.recoveryAttempted = a.parentExited
+	log.Printf("update recovery attempted=%t recovered=%t", a.recoveryAttempted, recovered)
 }

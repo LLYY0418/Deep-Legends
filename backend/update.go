@@ -158,6 +158,7 @@ type updateSettings struct {
 type updateManager struct {
 	applyTiming          *updateApplyTiming
 	applyTimingMu        sync.Mutex
+	verifiedFile         *verifiedUpdateFile
 	trustKeys            map[string]ed25519.PublicKey
 	migrationDirectory   func() (string, error)
 	startSourceTimer     func(time.Duration, func()) func()
@@ -481,7 +482,8 @@ func (u *updateManager) Check(force bool) bool {
 		}
 		ready := false
 		if err == nil && u.ctx.Err() == nil && compareVersions(manifest.Version, u.status.Current) > 0 {
-			ready = verifyUpdateFile(u.ctx, filepath.Join(u.directory, manifest.Asset.Name), manifest.Asset) == nil
+			_, verifyErr := u.verifyReadyUpdateFile(u.ctx, filepath.Join(u.directory, manifest.Asset.Name), manifest.Asset)
+			ready = verifyErr == nil
 		}
 		u.mu.Lock()
 		u.status.Checking = false
@@ -530,7 +532,7 @@ func (u *updateManager) Check(force bool) bool {
 				u.recordUpdateCheck(map[string]any{
 					"event": "update_check_failed", "stage": "cleanup",
 					"mirror_prefix": "none", "http_status": 0,
-					"error_kind": diagnosticErrorKind(err), "error": "local-cleanup-failed",
+					"error_kind": "local_file", "error": "local-cleanup-failed",
 				})
 			}
 		}
@@ -618,6 +620,10 @@ func (u *updateManager) cleanDownloads(keep string) error {
 			continue
 		}
 		if err := os.RemoveAll(filepath.Join(u.directory, entry.Name())); err != nil {
+			if updateFileBusy(err) {
+				u.recordUpdateCheck(map[string]any{"event": "update_cleanup_deferred", "error_kind": "local_file"})
+				continue
+			}
 			return err
 		}
 	}
