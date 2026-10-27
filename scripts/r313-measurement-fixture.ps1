@@ -3,10 +3,10 @@ function Open-R313ProbeFile([string]$Path) {
  # probe waits for the producer's log event before opening its timing snapshot.
  return [IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
 }
-function Read-R313ProbeText([string]$Path) {
+function Read-R313ProbeText([string]$Path,[long]$After=0) {
  if(-not[IO.File]::Exists($Path)){return ''}
  $stream=$null;$reader=$null
- try{$stream=Open-R313ProbeFile $Path;$reader=[IO.StreamReader]::new($stream);return [string]$reader.ReadToEnd()}
+ try{$stream=Open-R313ProbeFile $Path;$null=$stream.Seek($After,[IO.SeekOrigin]::Begin);$reader=[IO.StreamReader]::new($stream);return [string]$reader.ReadToEnd()}
  catch [IO.FileNotFoundException]{return ''}
  finally{if($reader){$reader.Dispose()}elseif($stream){$stream.Dispose()}}
 }
@@ -14,8 +14,8 @@ function Test-R313Acknowledged([string]$Path) {
  $stdout=Read-R313ProbeText $Path
  return (($stdout -split '\r?\n') -contains 'DEEP_LEGENDS_UPDATE_STARTED')
 }
-function Test-R313PageReady([string]$LogPath,[int]$ChildID) {
- $log=Read-R313ProbeText $LogPath
+function Test-R313PageReady([string]$LogPath,[int]$ChildID,[long]$After=0) {
+ $log=Read-R313ProbeText $LogPath $After
  return ($log -match ('(?m)^\[pid='+$ChildID+'\].*installer page ready; WebView visible'))
 }
 function Wait-R313ParentReady([string]$Ready,$Parent) {

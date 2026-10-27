@@ -14,5 +14,9 @@ try {
  [IO.File]::WriteAllText($file,'[pid=123] installer page ready; WebView visible')
  if(Test-R313PageReady $file 456){throw 'Another installer acknowledged page readiness'}
  if(-not(Test-R313PageReady $file 123)){throw 'Current installer page readiness was not recognized'}
+ $offset=(Get-Item $file).Length
+ if(Test-R313PageReady $file 123 $offset){throw 'Reused PID accepted a previous process log'}
+ [IO.File]::AppendAllText($file,"`n[pid=123] installer page ready; WebView visible")
+ if(-not(Test-R313PageReady $file 123 $offset)){throw 'New process readiness after the log cursor was not recognized'}
  Write-Output 'R313 empty stdout and exact protocol regression PASS'
 }finally{Remove-Item $file -Force -ErrorAction SilentlyContinue}
