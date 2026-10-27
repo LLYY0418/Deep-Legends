@@ -43,7 +43,13 @@ jobs:
         shell: pwsh
         run: |
           $version=node -p "require('./desktop/package.json').version"
-          ./scripts/r313-upgrade-window.ps1 -Setup "dist/desktop/Deep Legends Setup $version-public.exe" -Output "$env:RUNNER_TEMP/r313/candidate"
+          ./scripts/r313-upgrade-window.ps1 -Setup "dist/desktop/Deep Legends Setup $version-public.exe" -Output "$env:RUNNER_TEMP/r313/candidate" -Enforce
+      - name: Real 112MB apply endpoint hash and cache timing
+        shell: pwsh
+        run: |
+          $env:R313_SETUP_FILE=(Get-ChildItem "$env:RUNNER_TEMP/r313/baseline/*.exe").FullName
+          go test ./backend -run TestR313RealPackageApplyEndpointTiming -count=1 -v | Tee-Object "$env:RUNNER_TEMP/r313/apply-timing.log"
+          if ($LASTEXITCODE -ne 0) { throw 'apply endpoint timing failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
