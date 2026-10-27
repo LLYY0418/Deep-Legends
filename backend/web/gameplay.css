@@ -260,7 +260,7 @@
 	.summoner-strip { grid-template-columns: auto minmax(0,1fr); }
 
 
-	.summoner-strip-highlights { grid-column: 1/-1; align-self: auto; justify-content: flex-start; gap: 4px 26px; padding: 9px 0 0; border-top: 1px solid color-mix(in oklab,var(--line) 72%,transparent); border-left: 0; }
+	.summoner-strip-highlights { grid-column: 1/-1; align-self: auto; justify-content: flex-start; padding: 9px 0 0; border-top: 1px solid color-mix(in oklab,var(--line) 72%,transparent); border-left: 0; }
 	.summoner-highlight { min-width: 0; }
 }
 
