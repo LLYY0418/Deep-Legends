@@ -2,6 +2,13 @@ function Test-R313Acknowledged([string]$Path) {
  $stdout=[string](Get-Content $Path -Raw -ErrorAction SilentlyContinue)
  return (($stdout -split '\r?\n') -contains 'DEEP_LEGENDS_UPDATE_STARTED')
 }
+function Wait-R313ParentReady([string]$Ready,$Parent) {
+ $deadline=[DateTime]::UtcNow.AddSeconds(30)
+ while(-not(Test-Path $Ready)) {
+  if($Parent.HasExited -or [DateTime]::UtcNow -ge $deadline){throw 'Mock parent did not become ready'}
+  Start-Sleep -Milliseconds 10
+ }
+}
 function Stop-R313WebViewProfile([string]$Profile) {
  $deadline=[DateTime]::UtcNow.AddSeconds(10)
  do {

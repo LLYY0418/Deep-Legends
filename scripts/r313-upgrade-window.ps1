@@ -25,9 +25,11 @@ try {
   $env:LOL_LOOT_DATA_DIR=$trial
   $profile=Join-Path $trial 'webview-profile';$env:WEBVIEW2_USER_DATA_FOLDER=$profile
   $dest=Join-Path $trial 'installed';New-Item -ItemType Directory -Force $dest | Out-Null
-  $parent=Start-Process pwsh -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 90' -PassThru -WindowStyle Hidden
+  $ready=Join-Path $trial 'parent-ready';$escaped=$ready.Replace("'","''");$code="[IO.File]::WriteAllText('$escaped','ready');Start-Sleep -Seconds 90";$encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
+  $parent=Start-Process pwsh -ArgumentList '-NoProfile','-EncodedCommand',$encoded -PassThru -WindowStyle Hidden
   $child=$null
   try {
+   Wait-R313ParentReady $ready $parent
    $watch=[Diagnostics.Stopwatch]::StartNew()
    $child=Start-Process -FilePath $setupPath -ArgumentList "--update --parent-first --parent-pid $($parent.Id) --dest `"$dest`"" -PassThru -RedirectStandardOutput (Join-Path $trial 'stdout.txt') -RedirectStandardError (Join-Path $trial 'stderr.txt')
    $spawnReturned=$watch.Elapsed.TotalMilliseconds
