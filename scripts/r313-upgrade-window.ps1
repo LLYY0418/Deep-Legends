@@ -30,6 +30,7 @@ try {
   $child=$null
   try {
    Wait-R313ParentReady $ready $parent
+   $startupLog=Join-Path $env:TEMP 'DeepLegendsSetup-startup.log';$logStart=if(Test-Path $startupLog){(Get-Item $startupLog).Length}else{0}
    $watch=[Diagnostics.Stopwatch]::StartNew()
    $child=Start-Process -FilePath $setupPath -ArgumentList "--update --parent-first --parent-pid $($parent.Id) --dest `"$dest`"" -PassThru -RedirectStandardOutput (Join-Path $trial 'stdout.txt') -RedirectStandardError (Join-Path $trial 'stderr.txt')
    $spawnReturned=$watch.Elapsed.TotalMilliseconds
@@ -44,7 +45,7 @@ try {
     # Do not poll a file that the producer is atomically replacing: even a
     # delete-sharing reader can briefly deny MoveFileEx replacement on Windows.
     # The current PID's ready log is emitted after the timing write completes.
-    do {Start-Sleep -Milliseconds 10;$ready=Test-R313PageReady "$env:TEMP/DeepLegendsSetup-startup.log" $child.Id} while(-not $ready -and [DateTime]::UtcNow -lt $pageDeadline)
+    do {Start-Sleep -Milliseconds 10;$ready=Test-R313PageReady $startupLog $child.Id $logStart} while(-not $ready -and [DateTime]::UtcNow -lt $pageDeadline)
     if($ready){$timing=(Read-R313ProbeText $file)|ConvertFrom-Json}
     if(-not $timing.webview_ready){throw "Candidate WebView did not finish initializing at trial $i"}
    } elseif(Test-Path $file){$timing=Get-Content $file -Raw|ConvertFrom-Json}
