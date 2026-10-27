@@ -28,6 +28,9 @@ jobs:
           New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/r313/baseline" | Out-Null
           gh release download v0.13.1 --pattern '*public.exe' --dir "$env:RUNNER_TEMP/r313/baseline"
           if ($LASTEXITCODE -ne 0) { throw 'baseline download failed' }
+      - name: Verify empty stdout never acknowledges a parent
+        shell: pwsh
+        run: ./scripts/r313-measurement-fixture.test.ps1
       - name: Published baseline fifteen real window samples
         shell: pwsh
         run: ./scripts/r313-upgrade-window.ps1 -Setup (Get-ChildItem "$env:RUNNER_TEMP/r313/baseline/*.exe").FullName -Output "$env:RUNNER_TEMP/r313/published"
@@ -65,3 +68,13 @@ jobs:
             ${{ runner.temp }}/r313/**
             !${{ runner.temp }}/r313/baseline/*.exe
           if-no-files-found: error
+
+  ubuntu-environment:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Record CI fonts and Chromium environment
+        run: |
+          fc-match system-ui
+          fc-match ':lang=zh-cn'
+          fc-match -f '%{family} %{file}\n' system-ui
+          google-chrome --version
