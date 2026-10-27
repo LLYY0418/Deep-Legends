@@ -15,6 +15,7 @@ public static class R313AppWindow {
 '@
 function Get-Owned([string]$Directory){return @(Get-CimInstance Win32_Process|Where-Object{$_.ExecutablePath -and $_.ExecutablePath.StartsWith($Directory.TrimEnd('\')+'\',[StringComparison]::OrdinalIgnoreCase)})}
 function Stop-Owned([string]$Directory){$deadline=[DateTime]::UtcNow.AddSeconds(10);do{$owned=Get-Owned $Directory;if($owned.Count -eq 0){return};foreach($p in $owned){Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue};Start-Sleep -Milliseconds 50}while([DateTime]::UtcNow -lt $deadline);throw 'Owned application cleanup did not finish'}
+function Remove-OwnedInstall([string]$Directory){$deadline=[DateTime]::UtcNow.AddSeconds(10);do{Stop-Owned $Directory;try{Remove-Item -Recurse -Force $Directory;return}catch{$code=$_.Exception.HResult -band 0xffff;if($code -notin @(32,33) -or [DateTime]::UtcNow -ge $deadline){throw};Start-Sleep -Milliseconds 50}}while($true)}
 function Wait-App([string]$Directory){$deadline=[DateTime]::UtcNow.AddSeconds(40);do{$owned=Get-Owned $Directory;$visible=@($owned|Where-Object{$_.Name -eq 'Deep Legends.exe' -and [R313AppWindow]::Visible($_.ProcessId)});$backend=@($owned|Where-Object{$_.Name -eq 'loot-service.exe'});if($visible.Count -gt 0 -and $backend.Count -gt 0){return};Start-Sleep -Milliseconds 50}while([DateTime]::UtcNow -lt $deadline);throw 'Installed application never became visible with its backend'}
 $rows=@()
 try {
@@ -37,7 +38,7 @@ try {
    if($version -ne $expected){throw "Installed version $version does not match $expected"}
    $rows+=@{pair=$pair;mode=$mode;ack_ms=$ackMs;spawn_to_app_ready_ms=$readyMs;version=$version;parent_flush_ms=300}
    $stages=Join-Path $data 'update-install-stages.txt';if(Test-Path $stages){Copy-Item $stages (Join-Path $trial 'stages.txt')}
-  }finally{if($child -and -not $child.HasExited){& taskkill /PID $child.Id /T /F 2>$null|Out-Null};if(-not $parent.HasExited){Stop-Process -Id $parent.Id -Force};Stop-Owned $install;Remove-Item -Recurse -Force $install}
+  }finally{if($child -and -not $child.HasExited){& taskkill /PID $child.Id /T /F 2>$null|Out-Null};if(-not $parent.HasExited){Stop-Process -Id $parent.Id -Force};Remove-OwnedInstall $install}
  }}
  $old=@($rows|Where-Object mode -eq baseline|ForEach-Object spawn_to_app_ready_ms|Sort-Object);$new=@($rows|Where-Object mode -eq candidate|ForEach-Object spawn_to_app_ready_ms|Sort-Object)
  $result=@{rows=$rows;baseline_median_ms=$old[[Math]::Floor($old.Count/2)];candidate_median_ms=$new[[Math]::Floor($new.Count/2)]}
