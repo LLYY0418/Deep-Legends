@@ -363,32 +363,11 @@
 .cs-master .cs-sep { width:1px; height:22px; background:var(--line); }
 
 @container ac-editor (max-width: 800px) {
-  .ac-stage { padding-inline:12px; }
-  .ac-tree { gap:16px; }
-  .ac-col { --ac-main-size:44px; }
-  .ac-paths { padding-left:44px; height:76px; padding-right:4px; }
-  .ac-path-main img, .ac-paths.is-secondary .ac-path-main img { width:30px; height:30px; }
-  .ac-path-btn { width:40px; height:40px; }
-  .ac-path-btn img { width:30px; height:30px; }
-  .ac-row.is-key .ac-rune, .ac-row.is-key.has-4 .ac-rune { width:42px; height:42px; }
-  .ac-row .ac-rune, .ac-row.is-sub .ac-rune { width:32px; height:32px; }
-  .ac-row.is-shard .ac-rune { width:36px; height:36px; }
   .ac-items { grid-template-columns:120px minmax(0,1fr); }
   .ac-build { grid-column:1 / -1; }
   .ac-build-blocks { grid-template-columns:1fr 1fr; }
 }
 @container ac-editor (max-width: 560px) {
-  .ac-tree { gap:12px; }
-  .ac-stage { padding-inline:8px; }
-  .ac-row { padding-left:28px; padding-right:0; }
-  .ac-paths { padding-left:32px; padding-right:0; }
-  .ac-col { --ac-main-size:32px; --ac-track-x:13px; }
-  .ac-path-main img, .ac-paths.is-secondary .ac-path-main img, .ac-path-btn img { width:22px; height:22px; }
-  .ac-path-btn { width:29px; height:29px; }
-  .ac-row.is-key .ac-rune, .ac-row.is-key.has-4 .ac-rune { width:26px; height:26px; }
-  .ac-row .ac-rune, .ac-row.is-sub .ac-rune { width:24px; height:24px; }
-  .ac-row.is-shard .ac-rune { width:30px; height:30px; }
-  .ac-shard-icon { width:18px; height:18px; }
   .ac-ed-head { flex-wrap:wrap; } .ac-spells { grid-template-columns:1fr; }
   .ac-items { grid-template-columns:minmax(0,1fr); } .ac-filter { flex-direction:row; flex-wrap:wrap; }
   .ac-build-blocks { grid-template-columns:1fr; }
@@ -473,3 +452,46 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 .ac-confirm-highlight { color:var(--primary-strong); }
 .ac-danger { color:var(--on-primary); background:var(--danger); border-color:var(--danger); }
 @container ac-editor (max-width:560px) { .ac-spell-slots { padding-right:0; border:0; } .ac-mode-actions { flex-basis:100%; justify-content:flex-end; } }
+
+/* R313 feedback belongs to its section; successes use the shared toast. */
+.ac-feedback[role="alert"], .ac-page-feedback { color:var(--danger); }
+.ac-page-feedback { display:flex; align-items:center; gap:10px; margin:10px 16px 0; font-size:12px; }
+.ac-page-feedback[hidden] { display:none; }
+
+/* R313: compact 1x geometry, enlarged with one dimensional scale. No CSS
+   transform: layout() reads the real scaled row/node offsets. */
+.ac-stage { --ac-rune-scale:1; flex:1; min-height:0; padding:28px; overflow:auto; gap:14px; }
+.ac-stage .ac-tree { grid-template-columns:calc(var(--ac-primary-width,304px)*var(--ac-rune-scale)) calc(var(--ac-secondary-width,284px)*var(--ac-rune-scale)); gap:calc(var(--ac-column-gap,26px)*var(--ac-rune-scale)); justify-content:center; flex:none; }
+.ac-stage .ac-col { --ac-track-x:calc(23px*var(--ac-rune-scale)); --ac-main-size:calc(60px*var(--ac-rune-scale)); }
+.ac-stage .ac-paths { height:calc(70px*var(--ac-rune-scale)); padding-left:calc(62px*var(--ac-rune-scale)); padding-right:calc(8px*var(--ac-rune-scale)); flex:none; }
+.ac-stage .ac-path-main img, .ac-stage .ac-paths.is-secondary .ac-path-main img { width:calc(42px*var(--ac-rune-scale)); height:calc(42px*var(--ac-rune-scale)); }
+.ac-stage .ac-path-btn { width:calc(44px*var(--ac-rune-scale)); height:calc(44px*var(--ac-rune-scale)); }
+.ac-stage .ac-path-btn img { width:calc(30px*var(--ac-rune-scale)); height:calc(30px*var(--ac-rune-scale)); }
+.ac-stage .ac-row { flex:none; padding-left:calc(58px*var(--ac-rune-scale)); padding-right:calc(8px*var(--ac-rune-scale)); }
+.ac-stage .ac-row.is-key { height:calc(88px*var(--ac-rune-scale) + var(--ac-key-extra,0px)); }
+.ac-stage .ac-row.is-minor { height:calc(69px*var(--ac-rune-scale) + var(--ac-minor-extra,0px)); }
+.ac-stage .ac-col.is-secondary > .ac-group[data-group="sub"] .ac-row { height:calc(60px*var(--ac-rune-scale) + var(--ac-sub-extra,0px)); }
+.ac-stage .ac-row.is-shard { height:calc(44px*var(--ac-rune-scale) + var(--ac-shard-extra,0px)); }
+.ac-stage .ac-col.is-secondary > .ac-group[data-group="shards"] { margin-bottom:0; }
+.ac-stage .ac-row .ac-rune { width:calc(46px*var(--ac-rune-scale)); height:calc(46px*var(--ac-rune-scale)); flex:none; }
+.ac-stage .ac-row.is-key .ac-rune, .ac-stage .ac-row.is-key.has-4 .ac-rune { width:calc(60px*var(--ac-rune-scale)); height:calc(60px*var(--ac-rune-scale)); }
+.ac-stage .ac-row.is-sub .ac-rune { width:calc(40px*var(--ac-rune-scale)); height:calc(40px*var(--ac-rune-scale)); }
+.ac-stage .ac-row.is-shard .ac-rune { width:calc(38px*var(--ac-rune-scale)); height:calc(38px*var(--ac-rune-scale)); }
+.ac-stage .ac-shard-icon { width:calc(20px*var(--ac-rune-scale)); height:calc(20px*var(--ac-rune-scale)); }
+.ac-stage .ac-node { width:calc(16px*var(--ac-rune-scale)); height:calc(16px*var(--ac-rune-scale)); margin-top:calc(-8px*var(--ac-rune-scale)); left:calc(var(--ac-track-x) - 8px*var(--ac-rune-scale)); }
+.ac-stage .ac-row.is-shard .ac-node { width:calc(14px*var(--ac-rune-scale)); height:calc(14px*var(--ac-rune-scale)); margin-top:calc(-7px*var(--ac-rune-scale)); left:calc(var(--ac-track-x) - 7px*var(--ac-rune-scale)); }
+.ac-stage .ac-track { width:calc(2px*var(--ac-rune-scale)); left:calc(var(--ac-track-x) - 1px*var(--ac-rune-scale)); }
+.ac-stage .ac-row::before { left:calc(58px*var(--ac-rune-scale)); right:calc(12px*var(--ac-rune-scale)); }
+.ac-stage .ac-row-label { left:calc(58px*var(--ac-rune-scale)); }
+.ac-stage .ac-rune .ring { border-width:calc(2px*var(--ac-rune-scale)); }
+@container suite-page (max-width:820px) { .ac-stage .ac-tree { grid-template-columns:minmax(calc(var(--ac-primary-width,304px)*var(--ac-rune-scale)),1fr) minmax(calc(var(--ac-secondary-width,284px)*var(--ac-rune-scale)),1fr); } }
+.ac-stage .ac-tree { min-width:calc((var(--ac-primary-width,304px) + var(--ac-secondary-width,284px) + var(--ac-column-gap,26px))*var(--ac-rune-scale)); }
+
+@container ac-editor (max-width:800px) { .ac-stage { padding-inline:12px; } }
+@container ac-editor (max-width:640px) { .ac-stage { padding-inline:8px; } }
+.ac-stage .ac-col.is-secondary::before { right:0; }
+.ac-stage .ac-node { border-width:calc(2px*var(--ac-rune-scale)); }
+.ac-stage .ac-row.is-picked .ac-node, .ac-stage .ac-node.is-picked { background:radial-gradient(circle,var(--ink) 0 calc(4px*var(--ac-rune-scale)),var(--surface) calc(4.5px*var(--ac-rune-scale))); }
+.ac-stage .ac-rune .ring { inset:calc(-4px*var(--ac-rune-scale)); }
+.ac-stage .ac-row.is-key .ac-rune .ring { inset:calc(-5px*var(--ac-rune-scale)); }
+.ac-stage .ac-row.is-shard .ac-rune .ring { inset:calc(2px*var(--ac-rune-scale)); border-width:calc(1.5px*var(--ac-rune-scale)); }

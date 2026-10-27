@@ -1230,3 +1230,5 @@ html[data-ui-preferences="pending"] #app-frame { visibility: hidden; }
 @media(prefers-reduced-motion:reduce){.update-icon-button .update-border-progress{transition:none;}}
 
 .appearance-boot *, .appearance-boot *::before, .appearance-boot *::after { transition:none !important; }
+
+.global-tooltip .tooltip-accent { display:block; color:var(--primary-strong); font-weight:700; }

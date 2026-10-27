@@ -59,9 +59,13 @@ func TestR313ApplyTimingConsumesOnlyElapsedAllowlistedFields(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "update-apply-timing.json")
 	os.WriteFile(path, []byte(`{"apply_click":0,"apply_received":15,"verify_skipped":16,"ack_received":20,"windows_hidden":21,"secret":123,"spawn_begin":-1}`), 0600)
-	var rows []map[string]any
+	sink := make(chan map[string]any, 2)
 	for i := 0; i < 2; i++ {
-		consumeUpdateApplyTiming(root, func(row map[string]any) { rows = append(rows, row) })
+		consumeUpdateApplyTiming(root, func(row map[string]any) { sink <- row })
+	}
+	var rows []map[string]any
+	for len(sink) > 0 {
+		rows = append(rows, <-sink)
 	}
 	if len(rows) != 1 || rows[0]["result"] != "ok" {
 		t.Fatal(rows)

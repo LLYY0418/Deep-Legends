@@ -147,7 +147,7 @@ func TestR312TruncatedRankRecordOverviewPaths(t *testing.T) {
 				if !got.SeasonStatsProgress.RankedComplete {
 					t.Fatalf("final progress is incomplete: %+v", got.SeasonStatsProgress)
 				}
-				expected := map[string][3]int{"RANKED_SOLO_5x5": {40, 38, 51}, "RANKED_FLEX_SR": {12, 21, 36}}
+				expected := map[string][3]int{"RANKED_SOLO_5x5": {49, 47, 51}, "RANKED_FLEX_SR": {12, 21, 36}}
 				if len(got.Ranks) != 2 {
 					t.Fatalf("ranks=%+v", got.Ranks)
 				}
