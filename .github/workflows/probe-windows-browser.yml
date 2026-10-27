@@ -1,80 +1,33 @@
-name: R313 Windows upgrade timing diagnostic
+name: R313 published old-client detection diagnostic
 on:
-  push:
-    branches: [codex/diagnostic-r279-r313-upgrade]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  windows-timing:
+  published-client-detection:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.13'
-          cache: true
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Download exact published baseline
+      - name: Download and verify exact published 0.13.1 client
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/r313/baseline" | Out-Null
-          gh release download v0.13.1 --pattern '*public.exe' --dir "$env:RUNNER_TEMP/r313/baseline"
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/r313-baseline" | Out-Null
+          gh release download v0.13.1 --pattern '*public.exe' --dir "$env:RUNNER_TEMP/r313-baseline"
           if ($LASTEXITCODE -ne 0) { throw 'baseline download failed' }
-      - name: Verify empty stdout never acknowledges a parent
+          $setup=(Get-ChildItem "$env:RUNNER_TEMP/r313-baseline/*.exe").FullName
+          if ((Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne '8fe9918103f2de7d15868bc7db724041033960b0f61bfbe88e6d2fac539681ca') { throw 'baseline digest mismatch' }
+      - name: Actual installed 0.13.1 detects published 0.13.2
         shell: pwsh
-        run: ./scripts/r313-measurement-fixture.test.ps1
-      - name: Published baseline fifteen real window samples
-        shell: pwsh
-        run: ./scripts/r313-upgrade-window.ps1 -Setup (Get-ChildItem "$env:RUNNER_TEMP/r313/baseline/*.exe").FullName -Output "$env:RUNNER_TEMP/r313/published"
-      - name: Build candidate with real embedded payload
-        shell: pwsh
-        run: |
-          $version = node -p "require('./desktop/package.json').version"
-          $cipher = (& go run ./backend -encrypt-riot-key 'RGAPI-00000000-0000-0000-0000-000000000000').Trim()
-          if ($LASTEXITCODE -ne 0 -or -not $cipher) { throw 'fake cipher failed' }
-          ./build-desktop-windows.ps1 -Version $version -KeyMode public -SkipTestsInCI -RiotAPIKeyCipher $cipher
-          if ($LASTEXITCODE -ne 0) { throw 'candidate build failed' }
-      - name: Candidate fifteen real window samples
-        shell: pwsh
-        run: |
-          $version=node -p "require('./desktop/package.json').version"
-          ./scripts/r313-upgrade-window.ps1 -Setup "dist/desktop/Deep Legends Setup $version-public.exe" -Output "$env:RUNNER_TEMP/r313/candidate" -Enforce -WaitForPage
-      - name: Real 112MB apply endpoint hash and cache timing
-        if: ${{ !cancelled() }}
-        shell: pwsh
-        run: |
-          $env:R313_SETUP_FILE=(Get-ChildItem "$env:RUNNER_TEMP/r313/baseline/*.exe").FullName
-          go test ./backend -run '^TestR313' -count=1 -v | Tee-Object "$env:RUNNER_TEMP/r313/apply-timing.log"
-          if ($LASTEXITCODE -ne 0) { throw 'apply endpoint timing failed' }
-      - name: Three paired whole-upgrade measurements from installed 0.13.1
-        if: ${{ !cancelled() }}
-        shell: pwsh
-        run: |
-          $version=node -p "require('./desktop/package.json').version"
-          ./scripts/r313-whole-upgrade.ps1 -Baseline (Get-ChildItem "$env:RUNNER_TEMP/r313/baseline/*.exe").FullName -Candidate "dist/desktop/Deep Legends Setup $version-public.exe" -Output "$env:RUNNER_TEMP/r313/whole"
+        run: ./scripts/r313-published-check.ps1 -Setup (Get-ChildItem "$env:RUNNER_TEMP/r313-baseline/*.exe").FullName -Output "$env:RUNNER_TEMP/r313-published-evidence"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r313-upgrade-timing-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/r313/**
-            !${{ runner.temp }}/r313/baseline/*.exe
+          name: r313-published-client-${{ github.run_id }}
+          path: ${{ runner.temp }}/r313-published-evidence/**
           if-no-files-found: error
-
-  ubuntu-environment:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Record CI fonts and Chromium environment
-        run: |
-          fc-match system-ui
-          fc-match ':lang=zh-cn'
-          fc-match -f '%{family} %{file}\n' system-ui
-          google-chrome --version
