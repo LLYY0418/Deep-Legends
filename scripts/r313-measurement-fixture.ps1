@@ -1,5 +1,6 @@
 function Open-R313ProbeFile([string]$Path) {
- # Observation must not block the installer's atomic timing-file replacement.
+ # Share all access and close each snapshot promptly. On Windows the readiness
+ # probe waits for the producer's log event before opening its timing snapshot.
  return [IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
 }
 function Read-R313ProbeText([string]$Path) {
@@ -12,6 +13,10 @@ function Read-R313ProbeText([string]$Path) {
 function Test-R313Acknowledged([string]$Path) {
  $stdout=Read-R313ProbeText $Path
  return (($stdout -split '\r?\n') -contains 'DEEP_LEGENDS_UPDATE_STARTED')
+}
+function Test-R313PageReady([string]$LogPath,[int]$ChildID) {
+ $log=Read-R313ProbeText $LogPath
+ return ($log -match ('(?m)^\[pid='+$ChildID+'\].*installer page ready; WebView visible'))
 }
 function Wait-R313ParentReady([string]$Ready,$Parent) {
  $deadline=[DateTime]::UtcNow.AddSeconds(30)
