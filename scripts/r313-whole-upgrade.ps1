@@ -26,10 +26,11 @@ try {
   $initial=Start-Process -FilePath $baselinePath -ArgumentList "--update --dest `"$install`"" -PassThru -RedirectStandardOutput (Join-Path $trial 'initial-stdout.log') -RedirectStandardError (Join-Path $trial 'initial-stderr.log')
   if(-not $initial.WaitForExit(180000)) {Stop-Process $initial.Id -Force;throw 'Baseline installation timed out'};$initial.WaitForExit();if($initial.ExitCode -ne 0){throw 'Baseline installation failed'};Wait-App $install;Stop-Owned $install
   Stop-R313WebViewProfile $initialProfile;$env:WEBVIEW2_USER_DATA_FOLDER=$profile
-  $signal=Join-Path $trial 'parent-exit.signal';$escaped=$signal.Replace("'","''");$code="while(-not(Test-Path '$escaped')){Start-Sleep -Milliseconds 10};Start-Sleep -Milliseconds 300";$encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
+  $signal=Join-Path $trial 'parent-exit.signal';$ready=Join-Path $trial 'parent-ready';$escaped=$signal.Replace("'","''");$escapedReady=$ready.Replace("'","''");$code="[IO.File]::WriteAllText('$escapedReady','ready');while(-not(Test-Path '$escaped')){Start-Sleep -Milliseconds 10};Start-Sleep -Milliseconds 300";$encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
   $parent=Start-Process pwsh -ArgumentList '-NoProfile','-EncodedCommand',$encoded -WindowStyle Hidden -PassThru
   $setup=if($mode -eq 'candidate'){$candidatePath}else{$baselinePath};$child=$null
   try {
+   Wait-R313ParentReady $ready $parent
    $watch=[Diagnostics.Stopwatch]::StartNew();$stdout=Join-Path $trial 'upgrade-stdout.log'
    $child=Start-Process -FilePath $setup -ArgumentList "--update --parent-first --parent-pid $($parent.Id) --dest `"$install`" --recovery-exe `"$install/Deep Legends.exe`"" -PassThru -RedirectStandardOutput $stdout -RedirectStandardError (Join-Path $trial 'upgrade-stderr.log')
    do {Start-Sleep -Milliseconds 10;$acknowledged=Test-R313Acknowledged $stdout;if($watch.Elapsed.TotalSeconds -gt 30 -or $child.HasExited){throw 'Installer did not acknowledge upgrade'}}while(-not $acknowledged)
@@ -37,7 +38,7 @@ try {
    if(-not $child.WaitForExit(180000)){throw 'Whole upgrade timed out'};$child.WaitForExit();if($child.ExitCode -ne 0){throw 'Upgrade installer failed'}
    Wait-App $install;$readyMs=$watch.Elapsed.TotalMilliseconds
    $version=(Get-Item (Join-Path $install 'Deep Legends.exe')).VersionInfo.FileVersion
-   $expected=if($mode -eq 'candidate'){(& node -p "require('./desktop/package.json').version").Trim()}else{'0.13.1'}
+   $expected=if($mode -eq 'candidate'){(& node -p "require(process.argv[1]).version" (Join-Path (Split-Path $PSScriptRoot -Parent) 'desktop/package.json')).Trim()}else{'0.13.1'}
    if($version -ne $expected){throw "Installed version $version does not match $expected"}
    $rows+=@{pair=$pair;mode=$mode;ack_ms=$ackMs;spawn_to_app_ready_ms=$readyMs;version=$version;parent_flush_ms=300}
    $rows|ConvertTo-Json -Depth 10|Set-Content (Join-Path $Output 'samples.json') -Encoding utf8
