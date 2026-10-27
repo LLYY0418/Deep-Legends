@@ -1,5 +1,16 @@
+function Open-R313ProbeFile([string]$Path) {
+ # Observation must not block the installer's atomic timing-file replacement.
+ return [IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+}
+function Read-R313ProbeText([string]$Path) {
+ if(-not[IO.File]::Exists($Path)){return ''}
+ $stream=$null;$reader=$null
+ try{$stream=Open-R313ProbeFile $Path;$reader=[IO.StreamReader]::new($stream);return [string]$reader.ReadToEnd()}
+ catch [IO.FileNotFoundException]{return ''}
+ finally{if($reader){$reader.Dispose()}elseif($stream){$stream.Dispose()}}
+}
 function Test-R313Acknowledged([string]$Path) {
- $stdout=[string](Get-Content $Path -Raw -ErrorAction SilentlyContinue)
+ $stdout=Read-R313ProbeText $Path
  return (($stdout -split '\r?\n') -contains 'DEEP_LEGENDS_UPDATE_STARTED')
 }
 function Wait-R313ParentReady([string]$Ready,$Parent) {

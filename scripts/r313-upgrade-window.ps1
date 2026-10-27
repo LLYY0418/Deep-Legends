@@ -41,7 +41,7 @@ try {
    $timing=$null;$file=Join-Path $trial 'update-install-timing.json'
    if($WaitForPage) {
     $pageDeadline=[DateTime]::UtcNow.AddSeconds(25)
-    do {Start-Sleep -Milliseconds 10;if(Test-Path $file){$timing=Get-Content $file -Raw|ConvertFrom-Json}} while(-not $timing.webview_ready -and [DateTime]::UtcNow -lt $pageDeadline)
+    do {Start-Sleep -Milliseconds 10;if(Test-Path $file){$timing=(Read-R313ProbeText $file)|ConvertFrom-Json}} while(-not $timing.webview_ready -and [DateTime]::UtcNow -lt $pageDeadline)
     if(-not $timing.webview_ready){throw "Candidate WebView did not finish initializing at trial $i"}
    } elseif(Test-Path $file){$timing=Get-Content $file -Raw|ConvertFrom-Json}
    $rows+=@{trial=$i;spawn_returned_ms=$spawnReturned;spawn_to_window_ms=$window;timing=$timing}
