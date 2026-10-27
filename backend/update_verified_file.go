@@ -10,8 +10,33 @@ type verifiedUpdateFile struct {
 	digest string
 }
 
+func verifiedUpdateFileInfo(path string) (os.FileInfo, error) {
+	entry, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !entry.Mode().IsRegular() {
+		return nil, errUpdateChecksum
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	// On Windows path Stat/Lstat loads its file ID lazily, potentially after
+	// replacement. File.Stat captures identity from this open handle now.
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !sameVerifiedUpdateFile(entry, info) {
+		return nil, errUpdateChecksum
+	}
+	return info, nil
+}
+
 func (u *updateManager) rememberVerifiedUpdateFile(path string, asset updateAsset) {
-	info, err := os.Lstat(path)
+	info, err := verifiedUpdateFileInfo(path)
 	if err != nil || !info.Mode().IsRegular() || info.Size() != asset.Size {
 		return
 	}
@@ -20,7 +45,7 @@ func (u *updateManager) rememberVerifiedUpdateFile(path string, asset updateAsse
 	u.mu.Unlock()
 }
 func (u *updateManager) verifyReadyUpdateFile(ctx context.Context, path string, asset updateAsset) (bool, error) {
-	info, err := os.Lstat(path)
+	info, err := verifiedUpdateFileInfo(path)
 	if err != nil {
 		return false, err
 	}
@@ -36,14 +61,16 @@ func (u *updateManager) verifyReadyUpdateFile(ctx context.Context, path string, 
 	if err = verifyUpdateFile(ctx, path, asset); err != nil {
 		return false, err
 	}
-	after, err := os.Lstat(path)
+	after, err := verifiedUpdateFileInfo(path)
 	if err != nil {
 		return false, err
 	}
 	if !sameVerifiedUpdateFile(info, after) {
 		return false, errUpdateChecksum
 	}
-	u.rememberVerifiedUpdateFile(path, asset)
+	u.mu.Lock()
+	u.verifiedFile = &verifiedUpdateFile{info: after, digest: asset.SHA256}
+	u.mu.Unlock()
 	return false, nil
 }
 func sameVerifiedUpdateFile(before, after os.FileInfo) bool {
