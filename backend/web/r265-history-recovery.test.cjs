@@ -79,16 +79,16 @@ test('R265 recovery runs only in the visible top overview, including player over
  state.destroyed=true;assert.equal(f.historyRecoveryActive(top),false);
 });
 test('R265 partial sample boundaries and all five dependent cards; complete samples remove labels',()=>{
- const f=compile(source,['historyStatsPending','careerSectionEntries','renderRecentPlayers','renderActivity'],{escapeHTML,number:String,riotRegion:()=>false,renderRanks:()=>'',renderChampionStats:()=>'',renderMasteries:()=>'',renderOverviewShareButton:()=>'',rankedQueueData:()=>({queueId:420,recentRanked:{games:6},ability:{},positions:[],queueGames:6}),rankedQueueSwitcher:()=>'',renderRecentRanked:s=>`<section><h3>近期排位</h3>${s.historyPending?'战绩未读全':'6'}</section>`,renderAbility:a=>`<section><h3>能力表现</h3>${a.historyPending?'战绩未读全':'样本'}</section>`,renderPositionStats:(_a,_b,_c,_d,n)=>`<section><h3>位置偏好</h3>${n<0?'战绩未读全':'位置'}</section>`,state:{settings:{maskNames:true}}});
+ const f=compile(source,['historyStatsPending','careerSectionEntries','renderRecentPlayers','renderActivity'],{escapeHTML,number:String,riotRegion:()=>false,renderRanks:()=>'',renderChampionStats:()=>'',renderMasteries:()=>'',renderOverviewShareButton:()=>'',rankedQueueData:()=>({queueId:420,recentRanked:{games:6},ability:{},abilitySampleGames:6,positions:[{games:6}],queueGames:6}),rankedQueueSwitcher:()=>'',renderRecentRanked:s=>`<section><h3>近期排位</h3>${s.historyPending?'战绩未读全':'6'}</section>`,renderAbility:a=>`<section><h3>能力表现</h3>${a.historyPending?'战绩未读全':'样本'}</section>`,renderPositionStats:(_a,_b,_c,_d,n)=>`<section><h3>位置偏好</h3>${n<0?'战绩未读全':'位置'}</section>`,state:{settings:{maskNames:true}}});
  for(const [n,k,partial,weak] of [[10,1,true,true],[10,3,true,true],[10,5,true,true],[10,6,true,false],[10,7,true,false],[20,6,true,true],[20,12,true,false],[5,3,true,true],[5,5,false,false],[3,1,true,true],[3,3,false,false],[10,10,false,false]]){
-  const data={matches:Array.from({length:k},(_,gameId)=>({gameId})),historyRequested:n,historyLoaded:k,pagination:{count:n,partial},activityHours:Array(24).fill(0)},tab={data};
+  const data={matches:Array.from({length:k},(_,gameId)=>({gameId})),historyRequested:n,historyLoaded:k,pagination:{count:n,partial},activityHours:[k,...Array(23).fill(0)],recentPlayersSampleGames:k},tab={data};
   assert.equal(f.historyStatsPending(data,tab),weak,`N=${n},k=${k}`);
   const cards=new Map(f.careerSectionEntries(data,tab));
   if(partial){data.pagination.partial=false;data.capabilities=[{name:'match-history',state:'failed'}];assert.deepEqual(new Map(f.careerSectionEntries(data,tab)),cards,'capability-only failure keeps partial titles and labels');}
   for(const key of ['recent-ranked','ability','positions','recent-players','activity']){
    const html=cards.get(key);
    if(weak){assert.match(html,/career-pending/);assert.doesNotMatch(html,/战绩未读全/);assert.doesNotMatch(require('./r188-harness.cjs').visibleCareerText(html),/暂无重复同场玩家|基于最近/);}
-   else if(partial && key!=='recent-ranked')assert.match(html,new RegExp(`基于最近 ${k} 场`));
+   else if(partial && key!=='recent-ranked')assert.match(html,new RegExp(`基于最近 ${['ability','positions'].includes(key)?6:k} 场`));
    else assert.doesNotMatch(html,/基于最近/);
   }
  }

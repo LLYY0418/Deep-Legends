@@ -1457,14 +1457,14 @@
     const ranks=(data.ranks || []).map(incoming=>{
       let rank={...incoming,officialWins:Number(incoming.officialWins ?? incoming.wins)};
       const old=oldRanks.find(r=>r.queueType===rank.queueType && ["season","season-cache"].includes(r.recordSource)) || saved.get(rank.queueType);
-      if(Number(rank.winRate)<0 && old && Number(old.winRate)>=0) {
+      if(Number(rank.winRate)<0 && !rank.recordLossUnknown && old && (Number(old.winRate)>=0 || old.recordLossUnknown)) {
         if(Number(incoming.officialWins ?? incoming.wins)===Number(old.officialWins)) {
-          rank={...rank,wins:old.wins,losses:old.losses,winRate:old.winRate,recordSource:old.recordSource,recordPending:false};
+          rank={...rank,wins:old.wins,losses:old.losses,winRate:old.winRate,recordEstimated:old.recordEstimated===true,recordLossUnknown:old.recordLossUnknown===true,recordSampleWins:old.recordSampleWins,recordSampleLosses:old.recordSampleLosses,recordSampleGames:old.recordSampleGames,recordSource:old.recordSource,recordPending:false};
           tab.rankRecordCause="retained";
           window.reportFlowDiagnostic?.("rank_record_downgrade_blocked","retained",{queue:rank.queueType==="RANKED_SOLO_5x5"?"solo":"flex",source:rank.recordSource,foreign:!tab.current});
-        }else {saved.delete(rank.queueType);rank.recordBaseline={officialWins:old.officialWins,wins:old.wins,losses:old.losses};rank.recordPending=true;}
+        }else {saved.delete(rank.queueType);rank.recordBaseline={...old};rank.recordPending=true;}
       }
-      if(Number(rank.winRate)>=0 && ["season","season-cache"].includes(rank.recordSource))saved.set(rank.queueType,{...rank});
+      if((Number(rank.winRate)>=0 || rank.recordLossUnknown) && ["season","season-cache"].includes(rank.recordSource))saved.set(rank.queueType,{...rank});
       else if(Number(rank.winRate)>=0)saved.delete(rank.queueType);
       return rank;
     });
@@ -1499,7 +1499,9 @@
     const server=tab.data?.player?.serverId || tab.serverId || "";
     if(!playerRef)return false;
     try {
-      const data=snapshot || await api(`/api/gameplay/season-summary?playerRef=${encodeURIComponent(playerRef)}`,{},`season-summary:${tab.key}`,5000);
+      const counts=(tab.data.ranks || []).filter(r=>['RANKED_SOLO_5x5','RANKED_FLEX_SR'].includes(r.queueType)).map(r=>`&${r.queueType==='RANKED_SOLO_5x5'?'soloWins':'flexWins'}=${Number(r.officialWins ?? r.wins)}`).join('');
+      const needsResolved=snapshot && !snapshot.ranks && (tab.data.ranks || []).some(r=>{const key=r.queueType==="RANKED_SOLO_5x5"?"420":"440",q=snapshot.seasonQueueStats?.[key];return r.recordEstimated || q && Number(r.officialWins ?? r.wins)>Number(q.wins)+1;});
+      const data=(needsResolved?null:snapshot) || await api(`/api/gameplay/season-summary?playerRef=${encodeURIComponent(playerRef)}${counts}`,{},`season-summary:${tab.key}`,5000);
       if(tab.closed || (tab.data?.player?.serverId || tab.serverId || "")!==server || (tab.data?.player?.playerRef || tab.playerRef)!==playerRef || data.seasonStatsProgress?.season && tab.data?.seasonStatsProgress?.season && data.seasonStatsProgress.season!==tab.data.seasonStatsProgress.season)return false;
       tab.data={...tab.data,seasonChampionStats:data.seasonChampionStats,seasonOverall:data.seasonOverall,seasonStatsProgress:data.seasonStatsProgress,seasonQueueStats:data.seasonQueueStats};
       tab.data.rankedQueues={...(tab.data.rankedQueues || {})};
@@ -1508,6 +1510,11 @@
         tab.seasonRanksFilled ||= new Set();
         tab.data.ranks=(tab.data.ranks || []).map(rank=>{
           const key=rank.queueType==="RANKED_SOLO_5x5" ? "420" : rank.queueType==="RANKED_FLEX_SR" ? "440" : "";
+          const resolved=data.ranks?.find(r=>r.queueType===rank.queueType);
+          if(resolved && ['season','season-cache'].includes(resolved.recordSource) && !resolved.recordPending) {const {recordBaseline,...known}=rank;return {...known,...resolved};}
+          // Legacy summaries can only fill an exact observed record. Estimated
+          // records are resolved by Go; never derive losses again in the browser.
+          if(rank.recordEstimated || rank.recordBaseline?.recordEstimated)return rank;
           const queue=data.seasonQueueStats?.[key];
           if(!queue || !(Number(rank.winRate)<0 || ["season","season-cache"].includes(rank.recordSource)))return rank;
           const baseline=rank.recordBaseline || (Number(rank.winRate)>=0?rank:null),official=Number(rank.officialWins ?? rank.wins);
@@ -2500,12 +2507,16 @@
   function careerSectionEntries(data, tab) {
     const seasonProgress = data.seasonStatsProgress;
     const pendingMatches=matchesPending(tab),pendingAggregates=Boolean(tab?.loading && (tab.initialPagePending || !data.matches?.length) && !tab.recentStatsReceived && !(Number(data?.historyRequested)>0)),pendingStats=!pendingMatches && !pendingAggregates && historyStatsPending(data,tab);
-    const partialHistory=Boolean(data.pagination?.partial || tab?.initialPagePending || tab?.initialPageError || tab?.loading || data.capabilities?.some(item=>item.name==="match-history" && item.state==="failed"));
+    const incomplete=Boolean(data.pagination?.partial || data.capabilities?.some(item=>item.name==="match-history" && item.state==="failed") || !data.matches?.length && (tab?.initialPagePending || tab?.loading));
     const recentHistoryCapability = (data.capabilities || []).find((item) => item.name === "seven-day-history");
     const casual = !pendingMatches && !pendingAggregates && !pendingStats ? casualOverview(data,tab) : null;
     const recentQueue = rankedQueueData(data, tab, "recent");
     const abilityQueue = rankedQueueData(data, tab, "ability");
     const positionQueue = rankedQueueData(data, tab, "position");
+    const samples={partial:incomplete,counts:{ability:Number(abilityQueue.abilitySampleGames || 0),positions:(positionQueue.positions || []).reduce((sum,p)=>sum+Number(p.games || 0),0),"recent-players":Number(data.recentPlayersSampleGames ?? data.matches?.length ?? 0),activity:(data.activityHours || []).reduce((sum,n)=>sum+Number(n || 0),0)}};
+    const labels=tab?.loading && tab.careerSampleLabels ? tab.careerSampleLabels : samples;
+    if(tab && !tab.loading)tab.careerSampleLabels=samples;
+    const partialHistory=labels.partial;
     const hasSeason = data.seasonStatsProgress && !data.seasonStatsProgress.unavailable;
     const opggSeason = riotRegion(data.player?.region) && !data.player?.privateHistory && tab?.opggSeason?.playerRef === data.player?.playerRef ? tab.opggSeason.data : null;
     const missingKRSeason = riotRegion(data.player?.region) && !opggSeason;
@@ -2543,7 +2554,7 @@
       if((historyServiceState(tab)?.kind==="official" || !(data.matches?.length) && (tab.initialPageError || tab.error) && !tab.loading) && titles[key])return [key,`<section data-career-key="${key}" class="career-section ${key}-section${key==='champions'?' champion-performance':''}"><header><h3>${titles[key]}</h3></header><div class="ability-unavailable"><strong>暂不可用</strong></div></section>`];
       if((pendingMatches || pendingAggregates || pendingStats || key==='champions' && championStatsPending(championRows,championOverall,championProgress,tab)) && titles[key])return [key,renderCareerPendingMarkup(markup.replace('<section',`<section data-career-key="${key}"`))];
       markup=markup.replace('<section',`<section data-career-key="${key}"`);
-      return [key,!pendingStats && partialHistory && ['ability','positions','recent-players','activity'].includes(key)?markup.replace('</h3>',`</h3><small class="history-sample-label">基于最近 ${Number(data.historyLoaded ?? data.matches?.length ?? 0)} 场</small>`):markup];
+      return [key,!pendingStats && partialHistory && ['ability','positions','recent-players','activity'].includes(key)?markup.replace('</h3>',`</h3><small class="history-sample-label">基于最近 ${labels.counts[key]} 场</small>`):markup];
     });
   }
 
@@ -2718,7 +2729,7 @@
     const paginationCopy = paginationCopyFor(tab);
     if (!container._careerObjectTokens) container._careerObjectTokens = new WeakMap();
     const careerSignature = [
-      Boolean(state.settings.maskNames),
+      Boolean(state.settings.maskNames), data.pagination?.partial===true, Number(data.recentPlayersSampleGames || 0),
       data.player, data.capabilities, data.ranks, data.historicalRanks, data.rankMilestones, data.seasonStatsProgress,
       data.seasonChampionStats, data.seasonOverall, data.championStats, data.overall,
       data.masteries, data.activityHours, data.recentPlayers, data.positions,
@@ -3121,12 +3132,13 @@
 	  const games = Number(stats?.games || 0);
 	  const isMayhem = isMayhemQueueId(queueId);
 	  const heading = isMayhem ? "近期海斗" : "近期排位";
-	const tools = `<small class="history-sample-label">近 ${number(Math.min(20,games))} 场</small>`+queueSwitcher;
+	const sample = `<small class="history-sample-label">近 ${number(Math.min(20,games))} 场</small>`;
+    const tools=queueSwitcher;
     if (!games) {
       const queueLabel = stats?.queueLabel || rankedQueueLabel(queueId);
 	  const title = stats?.historyPending ? "战绩未读全" : `当前样本未发现${queueLabel}对局`;
 
-	  return `<section class="career-section recent-ranked-section"><header><h3>${heading}</h3><div class="career-section-tools">${tools}</div></header><div class="ability-unavailable"><strong>${escapeHTML(title)}</strong></div></section>`;
+	  return `<section class="career-section recent-ranked-section"><header><h3>${heading}</h3>${sample}<div class="career-section-tools">${tools}</div></header><div class="ability-unavailable"><strong>${escapeHTML(title)}</strong></div></section>`;
     }
     const participationKnown = Number(stats.killParticipationGames || 0) > 0;
     const participation = participationKnown ? percent(stats.killParticipation) : "—";
@@ -3136,7 +3148,7 @@
       ? ""
       : `<div class="recent-ranked-positions"><span>位置胜率</span><div>${positions || "<small>位置数据不足</small>"}</div></div>`;
     return `<section class="career-section recent-ranked-section">
-	  <header><h3>${heading}</h3><div class="career-section-tools">${tools}</div></header>
+	  <header><h3>${heading}</h3>${sample}<div class="career-section-tools">${tools}</div></header>
       <div class="recent-ranked-content">
         <div class="recent-ranked-record"><div class="recent-ranked-ring" data-win-rate="${Number(stats.winRate) || 0}"><strong>${percent(stats.winRate)}</strong><span>胜率</span></div><small><b>${number(stats.wins)} 胜</b><i>${number(stats.losses)} 负</i></small></div>
         <dl class="recent-ranked-metrics">
@@ -3195,11 +3207,11 @@
     </div>`;
   }
 
-  function renderRankWindowNote(progress) {
+  function renderRankWindowNote(progress, ranks = []) {
     const oldest=Number(progress?.rankedOldestAt),date=new Date(oldest);
     const truncated=progress?.upstreamCapped && Number.isFinite(oldest) && oldest>Date.UTC(2026,0,8) && Number.isFinite(date.getTime());
     const copy="统计的是当前整个赛季的排位数据"+(truncated?`\n官方接口仅提供 ${date.getMonth()+1}月${date.getDate()}日 之后的对局，更早的场次暂时无法计入`:"");
-    return `<button type="button" class="season-data-note" aria-label="数据说明" data-tooltip="${escapeHTML(copy)}" data-tooltip-size="compact"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7v4M8 4.5v.5"/></svg></button>`;
+    return `<button type="button" class="season-data-note" aria-label="数据说明" data-tooltip="${escapeHTML(copy + (ranks.some(r=>r.recordEstimated) ? "\n负场与胜率按已读到的对局比例推算" : ""))}" data-tooltip-size="compact" ${ranks.some(r=>r.recordEstimated)?'data-tooltip-accent="负场与胜率按已读到的对局比例推算"':""}><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7v4M8 4.5v.5"/></svg></button>`;
   }
 
   function reportRankRecordState(tab, queue, state, source) {
@@ -3221,10 +3233,10 @@
     const rankedCapability = capabilities.find((item) => item.name === "ranked-stats");
     const mmr = renderRankMMRPopover(tab);
     if (!ranks.length && (['failed','error','canceled'].includes(rankedCapability?.state) || (tab?.initialPageError || tab?.error) && !tab?.loading)) {
-      return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress)}</h3></header><div class="rank-unavailable"><strong>暂不可用</strong><button type="button" data-gameplay-retry>重试</button></div></section>`;
+      return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress,ranks)}</h3></header><div class="rank-unavailable"><strong>暂不可用</strong><button type="button" data-gameplay-retry>重试</button></div></section>`;
     }
     if (rankedCapability?.state === "unsupported") {
-      return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress)}</h3><div class="rank-header-tools"><span>能力边界</span>${mmr}</div></header><div class="rank-unavailable"><strong>${escapeHTML(rankedCapability.detail || "跨服暂不支持排位")}</strong><small>当前客户端的排位接口只能读取登录服务器。</small></div></section>`;
+      return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress,ranks)}</h3><div class="rank-header-tools"><span>能力边界</span>${mmr}</div></header><div class="rank-unavailable"><strong>${escapeHTML(rankedCapability.detail || "跨服暂不支持排位")}</strong><small>当前客户端的排位接口只能读取登录服务器。</small></div></section>`;
     }
     if(tab && ranks.every(r=>Number(r.winRate)>=0 || !r.recordPending)){clearTimeout(tab.rankPendingTimer);tab.rankPendingTimer=0;delete tab.rankPendingAt;}
     const expected = ["RANKED_SOLO_5x5", "RANKED_FLEX_SR"];
@@ -3233,7 +3245,7 @@
       const label = queue === "RANKED_SOLO_5x5" ? "单排/双排" : "灵活组排";
       if ((!rank || !rank.tier) && !rankedCapability && tab?.loading) return `<div class="rank-row gameplay-skeleton"><span class="rank-crest"></span><div><span></span><span></span></div><div class="rank-record"><span></span><span></span></div></div>`;
       if (!rank || !rank.tier) return `<div class="rank-row"><span class="rank-crest is-unranked" aria-hidden="true">◇</span><div><strong>${label}</strong></div><b>未定级</b></div>`;
-      const recordKnown = Number(rank.winRate) >= 0;
+      const recordKnown = Number(rank.winRate) >= 0 || rank.recordLossUnknown === true;
       const paused = !recordKnown && seasonProgress?.paused === true;
       const collecting = !recordKnown && !paused && (seasonProgress?.collecting === true || rank.recordPending===true);
       const recordState = recordKnown ? "known" : paused ? "paused" : collecting ? "collecting" : "unavailable";
@@ -3245,11 +3257,11 @@
       }
       const skeleton=pending && Date.now()-Number(tab?.rankPendingAt || 0)<8000;
       if(skeleton)return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record gameplay-skeleton" aria-label="正在统计中"><span></span><span></span></div></div>`;
-      const record = recordKnown ? `${number(rank.wins)}胜 ${number(rank.losses)}负` : paused ? `${number(rank.wins)}胜 · 统计已暂停` : collecting ? `${number(rank.wins)}胜 · 正在统计中` : `${number(rank.wins)}胜 · 负场未提供`;
+      const record = recordKnown ? rank.recordLossUnknown ? `${number(rank.wins)}胜 —负` : `${number(rank.wins)}胜 ${rank.recordEstimated ? '<span class="rank-record-estimate">≈</span>' : ""}${number(rank.losses)}负` : paused ? `${number(rank.wins)}胜 · 统计已暂停` : collecting ? `${number(rank.wins)}胜 · 正在统计中` : `${number(rank.wins)}胜 · 负场未提供`;
 	  const unavailableDetail = paused ? "官方战绩服务暂时中断，恢复后自动继续统计" : collecting ? "正在统计中" : (rankedCapability?.detail || "上游未提供负场，无法计算胜率");
-	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown || collecting ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 <b class="win-rate-value">${percent(rank.winRate)}</b>` : collecting ? "" : "胜率暂不可用"}</span></div></div>`;
+	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown || collecting ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 ${rank.recordLossUnknown ? "—" : `<b class="win-rate-value">${percent(rank.winRate)}</b>`}` : collecting ? "" : "胜率暂不可用"}</span></div></div>`;
     }).join("");
-    return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress)}</h3><div class="rank-header-tools">${mmr}</div></header><div class="rank-list${rows.includes('gameplay-skeleton')?' career-pending':''}">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;
+    return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress,ranks)}</h3><div class="rank-header-tools">${mmr}</div></header><div class="rank-list${rows.includes('gameplay-skeleton')?' career-pending':''}">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;
   }
 
   async function loadMayhemRating(tab, quietStart = false) {

@@ -5,21 +5,30 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
+func r313Order(events chan string) []string {
+	var out []string
+	for len(events) > 0 {
+		out = append(out, <-events)
+	}
+	return out
+}
 func TestR313ShellAcknowledgementRequiresVisibleWindowAndPreservesProtocol(t *testing.T) {
 	opts := installerOptions{Update: true, ParentFirst: true}
-	var order []string
-	report := func(line string) error { order = append(order, line); return nil }
-	mark := func(s string) { order = append(order, s) }
+	order := make(chan string, 8)
+	report := func(line string) error { order <- line; return nil }
+	mark := func(s string) { order <- s }
 	if ok, err := acknowledgeUpdateShell(opts, false, report, mark); ok || err == nil || len(order) > 0 {
-		t.Fatal(ok, err, order)
+		t.Fatal(ok, err, len(order))
 	}
-	order = append(order, "shell_window_shown")
+	order <- "shell_window_shown"
 	ok, err := acknowledgeUpdateShell(opts, true, report, mark)
-	if !ok || err != nil || !reflect.DeepEqual(order, []string{"shell_window_shown", "DEEP_LEGENDS_UPDATE_STARTED", "ack_sent"}) {
-		t.Fatal(ok, err, order)
+	got := r313Order(order)
+	if !ok || err != nil || !reflect.DeepEqual(got, []string{"shell_window_shown", "DEEP_LEGENDS_UPDATE_STARTED", "ack_sent"}) {
+		t.Fatal(ok, err, got)
 	}
 	for _, legacy := range []installerOptions{{Update: true}, {}} {
 		if ok, err := acknowledgeUpdateShell(legacy, true, func(string) error { t.Fatal("legacy timing changed"); return nil }, mark); ok || err != nil {
@@ -37,16 +46,17 @@ func TestR313EveryEarlyAcknowledgedFailureWaitsThenRecoversOriginalApplication(t
 			exe := filepath.Join(root, "original.exe")
 			os.WriteFile(exe, []byte("old application"), 0600)
 			opts := installerOptions{Update: true, ParentFirst: true, Destination: root, RecoveryExe: exe}
-			var order []string
-			exited, recovered := recoverAcknowledgedUpdate(opts, "Deep Legends.exe", true, false, func() bool { order = append(order, "parent_exited"); return true }, func(got, dir string) (uint32, error) {
+			order := make(chan string, 8)
+			exited, recovered := recoverAcknowledgedUpdate(opts, "Deep Legends.exe", true, false, func() bool { order <- "parent_exited"; return true }, func(got, dir string) (uint32, error) {
 				if got != exe || dir != root {
 					t.Fatal(got, dir)
 				}
-				order = append(order, "recovered")
+				order <- "recovered"
 				return 1, nil
 			})
-			if !exited || !recovered || !reflect.DeepEqual(order, []string{"parent_exited", "recovered"}) {
-				t.Fatal(exited, recovered, order)
+			got := r313Order(order)
+			if !exited || !recovered || !reflect.DeepEqual(got, []string{"parent_exited", "recovered"}) {
+				t.Fatal(exited, recovered, got)
 			}
 			_, recovered = recoverAcknowledgedUpdate(opts, "Deep Legends.exe", false, false, func() bool { t.Fatal("unacknowledged parent must keep running"); return true }, func(string, string) (uint32, error) { t.Fatal("duplicate application"); return 1, nil })
 			if recovered {
@@ -57,5 +67,39 @@ func TestR313EveryEarlyAcknowledgedFailureWaitsThenRecoversOriginalApplication(t
 				t.Fatal("failed wait accepted")
 			}
 		})
+	}
+}
+func TestR313NativeStartupAndFailureAdaptersKeepRecoveryWired(t *testing.T) {
+	main, err := os.ReadFile("main_windows.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(main)
+	shown, ack, runtime, embed := strings.Index(source, "w.show()"), strings.Index(source, "acknowledgeUpdateShell("), strings.Index(source, "webviewhost.CheckRuntime()"), strings.Index(source, "app.embed(")
+	if shown < 0 || ack <= shown || runtime <= ack || embed <= runtime {
+		t.Fatal("native shell/ACK/runtime/WebView order changed")
+	}
+	if strings.Count(source, "app.recoverFailedUpdate()") != 3 {
+		t.Fatal("runtime/document/embed failure adapters must all recover")
+	}
+	view, err := os.ReadFile("webview_windows.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(view)
+	start := strings.Index(s, "func (a *installerApp) fail(")
+	end := strings.Index(s, "func (a *installerApp) validatePath(")
+	if start < 0 || end < start {
+		t.Fatal("failure adapter missing")
+	}
+	failure := s[start:end]
+	if strings.Index(failure, "a.recoverFailedUpdate()") < 0 || strings.Index(failure, "a.recoverFailedUpdate()") > strings.Index(failure, `a.emit("failed", failure)`) {
+		t.Fatal("payload and destination failures must recover before failure UI")
+	}
+	if !strings.Contains(s, "w.starting = false\n\t\ta.recoverFailedUpdate()\n\t\ta.startupError = err") {
+		t.Fatal("WebView startup failure must recover before closing shell")
+	}
+	if strings.Contains(s, "fmt.Fprintln(os.Stdout, \"DEEP_LEGENDS_UPDATE_STARTED\")") {
+		t.Fatal("ACK returned to page-ready callback")
 	}
 }

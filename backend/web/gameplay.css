@@ -2550,3 +2550,12 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 /* R312: grid-aligned rank placeholders must retain measurable width. */
 .rank-row .rank-record.gameplay-skeleton span { width: 76px; height: 12px; min-height: 12px; }
 .rank-row .rank-record.gameplay-skeleton span + span { width: 52px; height: 10px; min-height: 10px; }
+
+/* R313: estimated season losses keep the approximation sign subordinate. */
+.rank-record-estimate { color:var(--muted); font-weight:700; margin-right:1px; }
+
+/* R313: the sample stays beside its heading; mode controls wrap as a unit. */
+.recent-ranked-section > header { gap:8px; align-items:baseline; flex-wrap:wrap; }
+.recent-ranked-section > header > h3 { flex:none; }
+.recent-ranked-section > header > .history-sample-label { margin:0; white-space:nowrap; flex:none; }
+.recent-ranked-section > header > .career-section-tools { flex:1 0 auto; justify-content:flex-end; }

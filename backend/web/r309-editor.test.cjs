@@ -29,15 +29,15 @@ test('R309 all-clear cancels unchanged, sends one immediate DELETE, clears draft
  release();await tick();await tick();assert.equal(h.saved.champions[1].ranked,undefined);assert.equal(h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked'),null);
  assert.equal(d.querySelectorAll('.ac-state-dot').length,0);assert.equal(d.querySelector('.ac-tree'),null);assert(d.querySelector('[data-act="start-runes"]'));assert(d.querySelector('[data-act="clear-all"]').disabled);
  await h.click('[data-tab="kit"]');assert(d.querySelector('[data-act="start-spells"]'));assert(d.querySelector('[data-act="start-items"]'));assert.equal(d.querySelectorAll('[data-act="revert"]:not(:disabled)').length,0);
- assert.match(d.querySelector('.ac-feedback').textContent,/已清空/);
+ assert.match(h.toasts.at(-1)[0],/已清空/);
  }finally{h.close();}
 });
 test('R309 delete failure preserves displayed data and draft markers',async()=>{
- const h=await editor({legacySections:false,saved:config,saveFails:true});try{const d=h.w.document;await h.click('[data-col="sub"][data-row="3"]');h.w.deepLegendsAutoConfig.flushDraft();const before=h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked');await h.click('[data-act="clear-all"]');await h.click('[data-clear-confirm]');assert(d.querySelector('.ac-tree'));assert(d.querySelector('[data-pos=""] .is-unsaved'));assert.equal(h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked'),before);assert.match(d.querySelector('.ac-feedback').textContent,/清空失败/);assert.equal(d.querySelector('dialog[open]'),null);assert.deepEqual(h.saved,config);
+ const h=await editor({legacySections:false,saved:config,saveFails:true});try{const d=h.w.document;await h.click('[data-col="sub"][data-row="3"]');h.w.deepLegendsAutoConfig.flushDraft();const before=h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked');await h.click('[data-act="clear-all"]');await h.click('[data-clear-confirm]');assert(d.querySelector('.ac-tree'));assert(d.querySelector('[data-pos=""] .is-unsaved'));assert.equal(h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked'),before);assert.match(d.querySelector('[data-page-feedback]').textContent,/清空失败/);assert.equal(d.querySelector('dialog[open]'),null);assert.deepEqual(h.saved,config);
  }finally{h.close();}
 });
 test('R309 imports save automatically and keep recoverable drafts on save failure',async()=>{
  for(const saveFails of [false,true]){const h=await editor({legacySections:false,saveFails,runeIDs:[1,2,3,4,12,14,5008,5008,5001]});try{const d=h.w.document;await h.click('[data-act="import"]');assert.equal(h.calls.filter(c=>c.method==='PUT'&&c.url.startsWith('/api/auto-config/champions/')).length,1);
- if(saveFails){assert.match(d.querySelector('.ac-feedback').textContent,/推荐已导入，但保存失败/);assert(h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked'));assert.equal(d.querySelector('[data-act="save"]').disabled,false);}else{assert.match(d.querySelector('.ac-feedback').textContent,/推荐已导入并保存/);assert.equal(h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked'),null);assert.equal(d.querySelector('[data-act="save"]').disabled,true);}
+ if(saveFails){assert.match(d.querySelector('.ac-feedback').textContent,/推荐已导入，但保存失败/);assert(h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked'));assert.equal(d.querySelector('[data-act="save"]').disabled,false);}else{assert.deepEqual(h.toasts.at(-1),['推荐已导入并保存符文',1500]);assert.equal(h.w.localStorage.getItem('lol-loot-auto-config-draft-1-ranked'),null);assert.equal(d.querySelector('[data-act="save"]').disabled,true);}
  }finally{h.close();}}
 });

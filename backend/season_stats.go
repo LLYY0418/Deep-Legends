@@ -1650,5 +1650,19 @@ func (a *app) handleGameplaySeasonSummary(w http.ResponseWriter, r *http.Request
 		item.SeasonGames = queues[queueID].Games
 		rankedQueues[key] = item
 	}
-	respondJSON(w, map[string]any{"seasonChampionStats": rows, "seasonOverall": seasonStatsOverall(rows), "seasonStatsProgress": progress, "seasonQueueStats": queues, "rankedQueues": rankedQueues})
+	var ranks []gameplayRank
+	for _, q := range []struct {
+		id          int64
+		name, param string
+	}{{420, "RANKED_SOLO_5x5", "soloWins"}, {440, "RANKED_FLEX_SR", "flexWins"}} {
+		official, err := strconv.Atoi(r.URL.Query().Get(q.param))
+		if err != nil || official < 0 || official > 10000000 {
+			continue
+		}
+		ranks = append(ranks, gameplayRank{QueueType: q.name, Wins: official, WinRate: -1})
+	}
+	if len(ranks) > 0 {
+		ranks, _ = a.applySeasonRankWinRateFallback(ranks, EndpointCapability{}, seasonRankRecordSnapshot{player: reference.ServerID + "|" + reference.PlayerRef, progress: progress, byQueue: queues, ranked: ranked})
+	}
+	respondJSON(w, map[string]any{"ranks": ranks, "seasonChampionStats": rows, "seasonOverall": seasonStatsOverall(rows), "seasonStatsProgress": progress, "seasonQueueStats": queues, "rankedQueues": rankedQueues})
 }

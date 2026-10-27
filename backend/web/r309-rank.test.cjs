@@ -76,19 +76,19 @@ test('R309 P11 season summary cannot replace verified upstream records or cross 
 });
 
 test('R312 truncated season keeps aggregate 40/38 across eleven official 49-win loads and summary fills',async()=>{
- const truncated=(filled,official=49,wins=40)=>{const data=response(filled);data.ranks[0]={...data.ranks[0],wins:filled?wins:official,officialWins:official,losses:filled?38:0,winRate:filled?51:-1,recordPending:!filled};return data;};
+ const truncated=(filled,official=49,wins=40)=>{const data=response(filled);data.ranks[0]={...data.ranks[0],wins:filled?wins:official,officialWins:official,wins:filled?official:official,losses:filled?(wins===40?47:46):0,winRate:filled?51:-1,recordEstimated:filled,recordSampleWins:wins,recordSampleLosses:38,recordSampleGames:wins+38,recordPending:!filled};return data;};
  const f=fixture([]),tab={key:'truncated',playerRef:'opaque-player',serverId:'HN1'};
  tab.data=f.acceptRankRecords(tab,truncated(true),'initial');
  for(let i=0;i<11;i++){
   tab.data=f.acceptRankRecords(tab,truncated(false),'refresh');
   assert.equal(tab.data.ranks[0].recordPending,false,'load '+i);
-  assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/40胜 38负/,'load '+i);
+  assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/49胜 <span class="rank-record-estimate">≈<\/span>47负/,'load '+i);
  }
  const reopened={key:'reopened',playerRef:'opaque-player',serverId:'HN1'};
- assert.equal(f.acceptRankRecords(reopened,truncated(false),'cache').ranks[0].losses,38);
+ assert.equal(f.acceptRankRecords(reopened,truncated(false),'cache').ranks[0].losses,47);
  const pending=truncated(false,50);tab.data=f.acceptRankRecords(tab,pending,'refresh');assert.equal(tab.data.ranks[0].recordPending,true);
- await f.refreshSeasonSummary(tab,{seasonStatsProgress:pending.seasonStatsProgress,seasonQueueStats:{420:{games:79,wins:41,losses:38,winRate:52}}});
- assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/41胜 38负/);
+ await f.refreshSeasonSummary(tab,{seasonStatsProgress:pending.seasonStatsProgress,ranks:truncated(true,50,41).ranks,seasonQueueStats:{420:{games:79,wins:41,losses:38,winRate:52}}});
+ assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/50胜 <span class="rank-record-estimate">≈<\/span>46负/);
  assert.equal(tab.data.ranks[0].officialWins,50);assert.equal(tab.data.ranks[0].recordPending,false);
  tab.data=f.acceptRankRecords(tab,truncated(true,50,41),'refresh');assert.equal(tab.data.ranks[0].officialWins,50);
 });
@@ -101,8 +101,8 @@ test('R312 collecting rank record has an empty secondary line',()=>{
 });
 
 test('R312 stale summary cannot downgrade a known aggregate or fill changed official wins from an old snapshot',async()=>{
- const f=fixture([]),tab={key:'stale',playerRef:'opaque-player',serverId:'HN1'},known=response(true);known.ranks[0]={...known.ranks[0],officialWins:50,wins:41,losses:38,winRate:52};tab.data=f.acceptRankRecords(tab,known);
- const summary=wins=>({seasonStatsProgress:known.seasonStatsProgress,seasonQueueStats:{420:{games:wins+38,wins,losses:38,winRate:51}}});await f.refreshSeasonSummary(tab,summary(40));assert.equal(tab.data.ranks[0].wins,41);assert.equal(tab.data.ranks[0].losses,38);
+ const f=fixture([]),tab={key:'stale',playerRef:'opaque-player',serverId:'HN1'},known=response(true);known.ranks[0]={...known.ranks[0],officialWins:50,wins:50,losses:46,winRate:52,recordEstimated:true,recordSampleWins:41,recordSampleLosses:38,recordSampleGames:79};tab.data=f.acceptRankRecords(tab,known);
+ const summary=wins=>({seasonStatsProgress:known.seasonStatsProgress,seasonQueueStats:{420:{games:wins+38,wins,losses:38,winRate:51}}});await f.refreshSeasonSummary(tab,summary(40));assert.equal(tab.data.ranks[0].wins,50);assert.equal(tab.data.ranks[0].losses,46);
  const changed=response(false);changed.ranks[0].wins=51;changed.ranks[0].officialWins=51;tab.data=f.acceptRankRecords(tab,changed,'refresh');await f.refreshSeasonSummary(tab,summary(41));assert.equal(tab.data.ranks[0].recordPending,true);assert.equal(tab.data.ranks[0].winRate,-1);
- await f.refreshSeasonSummary(tab,summary(42));assert.equal(tab.data.ranks[0].wins,42);assert.equal(tab.data.ranks[0].losses,38);assert.equal(tab.data.ranks[0].officialWins,51);assert.equal(tab.data.ranks[0].recordPending,false);
+ await f.refreshSeasonSummary(tab,{...summary(42),ranks:[{...known.ranks[0],officialWins:51,wins:51,losses:46,winRate:53,recordSampleWins:42,recordSampleGames:80,recordPending:false}]});assert.equal(tab.data.ranks[0].wins,51);assert.equal(tab.data.ranks[0].losses,46);assert.equal(tab.data.ranks[0].officialWins,51);assert.equal(tab.data.ranks[0].recordPending,false);
 });

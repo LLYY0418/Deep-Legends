@@ -242,23 +242,24 @@ type gameplayOverview struct {
 	Ranks               []gameplayRank           `json:"ranks"`
 	HistoricalRanks     []gameplayHistoricalRank `json:"historicalRanks,omitempty"`
 	// 国服 SGP 只提供上赛季和历史最高，不等同于韩服的多赛段 HistoricalRanks。
-	RankMilestones       *gameplayRankMilestones             `json:"rankMilestones,omitempty"`
-	RecentRanked         gameplayRecentRankedSummary         `json:"recentRanked"`
-	Ability              *gameplayAbilityProfile             `json:"ability,omitempty"`
-	Overall              gameplayAggregate                   `json:"overall"`
-	ChampionStats        []gameplayChampionStat              `json:"championStats"`
-	SeasonChampionStats  []gameplaySeasonChampionStat        `json:"seasonChampionStats,omitempty"`
-	SeasonStatsProgress  seasonStatsProgress                 `json:"seasonStatsProgress,omitempty"`
-	SeasonOverall        gameplayAggregate                   `json:"seasonOverall,omitempty"`
-	Positions            []gameplayPositionStat              `json:"positions"`
-	RankedQueues         map[string]gameplayRankedQueueStats `json:"rankedQueues,omitempty"`
-	MasteryChampionCount *int                                `json:"masteryChampionCount,omitempty"`
-	Masteries            []gameplayMastery                   `json:"masteries"`
-	RecentPlayers        []gameplayRecentPlayer              `json:"recentPlayers"`
-	ActivityHours        []int                               `json:"activityHours"`
-	Matches              []gameplayMatch                     `json:"matches"`
-	Pagination           gameplayPagination                  `json:"pagination"`
-	Capabilities         []EndpointCapability                `json:"capabilities"`
+	RankMilestones           *gameplayRankMilestones             `json:"rankMilestones,omitempty"`
+	RecentRanked             gameplayRecentRankedSummary         `json:"recentRanked"`
+	Ability                  *gameplayAbilityProfile             `json:"ability,omitempty"`
+	Overall                  gameplayAggregate                   `json:"overall"`
+	ChampionStats            []gameplayChampionStat              `json:"championStats"`
+	SeasonChampionStats      []gameplaySeasonChampionStat        `json:"seasonChampionStats,omitempty"`
+	SeasonStatsProgress      seasonStatsProgress                 `json:"seasonStatsProgress,omitempty"`
+	SeasonOverall            gameplayAggregate                   `json:"seasonOverall,omitempty"`
+	Positions                []gameplayPositionStat              `json:"positions"`
+	RankedQueues             map[string]gameplayRankedQueueStats `json:"rankedQueues,omitempty"`
+	MasteryChampionCount     *int                                `json:"masteryChampionCount,omitempty"`
+	Masteries                []gameplayMastery                   `json:"masteries"`
+	RecentPlayersSampleGames int                                 `json:"recentPlayersSampleGames"`
+	RecentPlayers            []gameplayRecentPlayer              `json:"recentPlayers"`
+	ActivityHours            []int                               `json:"activityHours"`
+	Matches                  []gameplayMatch                     `json:"matches"`
+	Pagination               gameplayPagination                  `json:"pagination"`
+	Capabilities             []EndpointCapability                `json:"capabilities"`
 }
 
 type gameplayRankedQueueStats struct {
@@ -329,19 +330,24 @@ type gameplayReference struct {
 }
 
 type gameplayRank struct {
-	QueueType      string `json:"queueType"`
-	QueueLabel     string `json:"queueLabel"`
-	Tier           string `json:"tier,omitempty"`
-	Division       string `json:"division,omitempty"`
-	LeaguePoints   int    `json:"leaguePoints"`
-	Wins           int    `json:"wins"`
-	OfficialWins   int    `json:"officialWins"`
-	Losses         int    `json:"losses"`
-	WinRate        int    `json:"winRate"`
-	RecordSource   string `json:"recordSource"`
-	RecordPending  bool   `json:"recordPending"`
-	Provisional    bool   `json:"provisional"`
-	seasonFallback bool   // Internal provenance; never used as an LP baseline.
+	QueueType          string `json:"queueType"`
+	QueueLabel         string `json:"queueLabel"`
+	Tier               string `json:"tier,omitempty"`
+	Division           string `json:"division,omitempty"`
+	LeaguePoints       int    `json:"leaguePoints"`
+	Wins               int    `json:"wins"`
+	OfficialWins       int    `json:"officialWins"`
+	Losses             int    `json:"losses"`
+	WinRate            int    `json:"winRate"`
+	RecordSource       string `json:"recordSource"`
+	RecordPending      bool   `json:"recordPending"`
+	RecordEstimated    bool   `json:"recordEstimated"`
+	RecordLossUnknown  bool   `json:"recordLossUnknown"`
+	RecordSampleWins   int    `json:"recordSampleWins"`
+	RecordSampleLosses int    `json:"recordSampleLosses"`
+	RecordSampleGames  int    `json:"recordSampleGames"`
+	Provisional        bool   `json:"provisional"`
+	seasonFallback     bool   // Internal provenance; never used as an LP baseline.
 }
 
 type gameplayHistoricalRank struct {
@@ -1936,6 +1942,7 @@ func (a *app) loadGameplayOverview(ctx context.Context, client *LCUClient, curre
 			usableRecentMatches++
 		}
 	}
+	response.RecentPlayersSampleGames = usableRecentMatches
 	a.recordDiagnostic(map[string]any{
 		"event": "recent_players_resolved", "window_matches": len(windowMatches), "usable_matches": usableRecentMatches,
 		"players": len(response.RecentPlayers), "window_exhausted": windowExhausted, "window_reached_cutoff": windowReachedCutoff,

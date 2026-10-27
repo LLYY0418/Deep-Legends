@@ -4781,6 +4781,11 @@
         const bodyNode = document.createElement("span");
         bodyNode.className = "tooltip-body";
         bodyNode.textContent = body;
+        const accent=next.dataset.tooltipAccent;
+        if(accent && body.endsWith(accent)){
+          bodyNode.textContent=body.slice(0,-accent.length);
+          const line=document.createElement("span");line.className="tooltip-accent";line.textContent=accent;bodyNode.append(line);
+        }
         children.push(bodyNode);
       }
 	  let roster = null;

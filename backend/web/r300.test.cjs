@@ -17,7 +17,7 @@ async function editor(options={}) {
  catalog.statModSlots[0].perks[0].longDesc='获得9适应之力（5.4攻击力或9法术强度）。';
  catalog.items.push({...catalog.items[0],id:3002,name:'第二件装备'});
  Object.assign(catalog,options.catalog||{});
- const calls=[],writes=[];
+ const calls=[],writes=[],toasts=[];w.deepLegendsToast=(message,duration)=>toasts.push([message,duration]);
  w.deepLegendsRuntime={escapeHTML:v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;')};w.deepLegendsSections={register(){}};
  w.fetch=async(url,opts={})=>{
   calls.push({url,method:opts.method});let value={};
@@ -41,7 +41,7 @@ async function editor(options={}) {
  };
  w.eval(fs.readFileSync(process.env.R298_AUTO_CONFIG_SOURCE||path.join(__dirname,'auto-config.js'),'utf8'));await w.deepLegendsAutoConfig.load();
  const click=async selector=>{const node=w.document.querySelector(selector);assert(node,selector);node.click();await tick();await tick();if(options.legacySections!==false&&selector==='[data-tab="kit"]'){for(const act of ['start-spells','start-items'])w.document.querySelector(`[data-act="${act}"]`)?.click();await tick();await tick();}};
- return {w,click,calls,writes,catalog,get saved(){return clone(saved);},close:()=>w.close()};
+ return {w,click,calls,writes,toasts,catalog,get saved(){return clone(saved);},close:()=>w.close()};
 }
 test('R300 portraits honor catalog source; compact toolbar has a single import and save state',async()=>{
  const h=await editor();try{const d=h.w.document,portrait=d.querySelector('.ac-ed-head img');assert(portrait.src.includes('/api/champion-asset?source=gtimg'));assert(!portrait.src.includes('/api/image?'));assert.equal(d.querySelectorAll('.ac-ed-head [data-act="import"]').length,0);assert.equal(d.querySelectorAll('[data-act="import"]').length,1);assert.equal(d.querySelector('.ac-foot'),null);assert(d.querySelector('.ac-buildname [data-act="save"]'));assert(d.querySelector('.ac-tabs [data-save-state]'));assert(!d.querySelector('.ac-ed-head').textContent.includes('正在编辑'));portrait.dispatchEvent(new h.w.Event('error'));assert(portrait.src.endsWith('/image-unavailable.svg'));await h.click('[data-tab="kit"]');assert(d.querySelector('.ac-section-head [data-save-state]'));assert(d.querySelector('.ac-section-head [data-act="save"]'));}finally{h.close();}
@@ -74,7 +74,7 @@ test('R300 tags stay within name columns without adding grid cells; roster has m
 
 test('R300 recommendation import rejects excessive quantities and preserves unsupported-mode controls',async()=>{
  const h=await editor({catalog:{items:[{...starterPool()[0],priceTotal:0}]},detail:async()=>({ok:true,json:async()=>({build:{starterItems:[{assets:[{id:2003,count:90},{id:2003,count:20},{id:2003,count:-2},{id:2003,count:1.5}]}]}})})});
- try{await h.click('[data-tab="kit"]');await h.click('[data-act="import"][data-section="items"]');assert.equal(h.writes.length,1);await h.click('[data-act="save"]');assert.deepEqual(h.saved.champions['1'].ranked.items.starter,[{id:2003,count:90}]);for(const mode of ['aram','urf','event']){await h.click(`[data-mode="${mode}"]`);assert(h.w.document.querySelector('[data-act="import"]').disabled);assert.equal(h.saved.champions['1'][mode],undefined);}}finally{h.close();}
+ try{await h.click('[data-tab="kit"]');await h.click('[data-act="import"][data-section="items"]');assert.equal(h.writes.length,1);await h.click('[data-act="save"]');assert.deepEqual(h.saved.champions['1'].ranked.items.starter,[{id:2003,count:90}]);for(const mode of ['aram','urf','event']){await h.click(`[data-mode="${mode}"]`);assert.equal(h.w.document.querySelector('[data-act="import"]').disabled,false);assert.equal(h.saved.champions['1'][mode],undefined);}}finally{h.close();}
 });
 
 test('R300 settings backup preserves starter quantities and rejects invalid starter arrays',()=>{
