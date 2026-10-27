@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Setup,[Parameter(Mandatory=$true)][string]$Output,[int]$Count=15,[switch]$Enforce)
+param([Parameter(Mandatory=$true)][string]$Setup,[Parameter(Mandatory=$true)][string]$Output,[int]$Count=15,[switch]$Enforce,[switch]$WaitForPage)
 $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force $Output | Out-Null
 Add-Type @'
@@ -34,11 +34,18 @@ try {
    $deadline=[DateTime]::UtcNow.AddSeconds(25)
    do {Start-Sleep -Milliseconds 10;$stdout=Get-Content (Join-Path $trial 'stdout.txt') -Raw -ErrorAction SilentlyContinue} while($stdout -notmatch 'DEEP_LEGENDS_UPDATE_STARTED' -and [DateTime]::UtcNow -lt $deadline)
    if($stdout -notmatch 'DEEP_LEGENDS_UPDATE_STARTED'){throw "Missing compatible ACK trial $i"}
-   $timing=$null;$file=Join-Path $trial 'update-install-timing.json';if(Test-Path $file){$timing=Get-Content $file -Raw|ConvertFrom-Json}
+   $timing=$null;$file=Join-Path $trial 'update-install-timing.json'
+   if($WaitForPage) {
+    $pageDeadline=[DateTime]::UtcNow.AddSeconds(25)
+    do {Start-Sleep -Milliseconds 10;if(Test-Path $file){$timing=Get-Content $file -Raw|ConvertFrom-Json}} while(-not $timing.webview_ready -and [DateTime]::UtcNow -lt $pageDeadline)
+    if(-not $timing.webview_ready){throw "Candidate WebView did not finish initializing at trial $i"}
+   } elseif(Test-Path $file){$timing=Get-Content $file -Raw|ConvertFrom-Json}
    $rows+=@{trial=$i;spawn_returned_ms=$spawnReturned;spawn_to_window_ms=$window;timing=$timing}
   } finally {
    if($child -and -not $child.HasExited){& taskkill /PID $child.Id /T /F 2>$null | Out-Null}
-   if(-not $parent.HasExited){Stop-Process -Id $parent.Id -Force}
+   if($child -and -not $child.WaitForExit(5000)){throw 'Owned installer did not exit after cleanup'}
+   if(-not $parent.HasExited){Stop-Process -Id $parent.Id -Force};$parent.WaitForExit(5000)|Out-Null
+   if(Test-Path "$env:TEMP/DeepLegendsSetup-startup.log"){Get-Content "$env:TEMP/DeepLegendsSetup-startup.log" -Tail 100|Set-Content (Join-Path $trial 'startup.log')}
   }
  }
 } finally {[R313Windows]::timeEndPeriod(1)|Out-Null;Remove-Item Env:LOL_LOOT_DATA_DIR -ErrorAction SilentlyContinue}

@@ -43,8 +43,9 @@ jobs:
         shell: pwsh
         run: |
           $version=node -p "require('./desktop/package.json').version"
-          ./scripts/r313-upgrade-window.ps1 -Setup "dist/desktop/Deep Legends Setup $version-public.exe" -Output "$env:RUNNER_TEMP/r313/candidate" -Enforce
+          ./scripts/r313-upgrade-window.ps1 -Setup "dist/desktop/Deep Legends Setup $version-public.exe" -Output "$env:RUNNER_TEMP/r313/candidate" -Enforce -WaitForPage
       - name: Real 112MB apply endpoint hash and cache timing
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           $env:R313_SETUP_FILE=(Get-ChildItem "$env:RUNNER_TEMP/r313/baseline/*.exe").FullName
