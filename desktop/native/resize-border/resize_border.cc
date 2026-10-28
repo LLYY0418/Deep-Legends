@@ -35,6 +35,22 @@ static LRESULT ResizeHit(HWND hwnd, LPARAM lp) {
   return HTNOWHERE;
 }
 
+// DefWindowProc asks the parent to handle WM_SETCURSOR before using a child
+// class cursor. Own the strip at BOTH levels; otherwise Chromium's root can
+// accept the message with the last web-page hand/text cursor on inner pixels.
+static bool ApplyResizeCursor(HWND root) {
+  POINT point{};
+  if (!GetCursorPos(&point)) return false;
+  const LRESULT hit = ResizeHit(root, MAKELPARAM(point.x, point.y));
+  const WORD cursor = hit == HTLEFT || hit == HTRIGHT ? 32644 :
+                      hit == HTBOTTOM ? 32645 :
+                      hit == HTBOTTOMLEFT ? 32643 :
+                      hit == HTBOTTOMRIGHT ? 32642 : 0;
+  if (!cursor) return false;
+  SetCursor(LoadCursorW(nullptr, MAKEINTRESOURCEW(cursor)));
+  return true;
+}
+
 static LRESULT CALLBACK ChildResizeBorder(HWND hwnd, UINT message, WPARAM wp,
                                           LPARAM lp, UINT_PTR id, DWORD_PTR root) {
   if (message == WM_NCDESTROY) RemoveWindowSubclass(hwnd, ChildResizeBorder, id);
@@ -53,17 +69,7 @@ static LRESULT CALLBACK ChildResizeBorder(HWND hwnd, UINT message, WPARAM wp,
       return SendMessageW(parent, WM_NCLBUTTONDOWN, hit, lp);
     }
   }
-  if (message == WM_SETCURSOR) {
-    POINT point{};
-    if (GetCursorPos(&point)) {
-      const LRESULT hit = ResizeHit(parent, MAKELPARAM(point.x, point.y));
-      const WORD cursor = hit == HTLEFT || hit == HTRIGHT ? 32644 :
-                          hit == HTBOTTOM ? 32645 :
-                          hit == HTBOTTOMLEFT ? 32643 :
-                          hit == HTBOTTOMRIGHT ? 32642 : 0;
-      if (cursor) { SetCursor(LoadCursorW(nullptr, MAKEINTRESOURCEW(cursor))); return TRUE; }
-    }
-  }
+  if (message == WM_SETCURSOR && ApplyResizeCursor(parent)) return TRUE;
   return DefSubclassProc(hwnd, message, wp, lp);
 }
 
@@ -85,6 +91,7 @@ static LRESULT CALLBACK ResizeBorder(HWND hwnd, UINT message, WPARAM wp,
     const LRESULT hit = ResizeHit(hwnd, lp);
     if (hit) return DefWindowProcW(hwnd, message, hit, lp);
   }
+  if (message == WM_SETCURSOR && ApplyResizeCursor(hwnd)) return TRUE;
   const LRESULT original = DefSubclassProc(hwnd, message, wp, lp);
   if (message == WM_PARENTNOTIFY && LOWORD(wp) == WM_CREATE)
     EnumChildWindows(hwnd, InstallChild, reinterpret_cast<LPARAM>(hwnd));
