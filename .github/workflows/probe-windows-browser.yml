@@ -138,7 +138,13 @@ jobs:
         shell: pwsh
         run: |
           $env:RIOT_API_KEY='RGAPI-00000000-0000-0000-0000-000000000000'
-          node scripts/r314-windows-edges.cjs 'dist/desktop/win-unpacked/Deep Legends.exe' "$env:RUNNER_TEMP/r314-installer/edges" 0.13.3
+          $install="$env:RUNNER_TEMP/r314-installer/edge-installed";New-Item -ItemType Directory -Force $install|Out-Null
+          $env:LOL_LOOT_DATA_DIR="$env:RUNNER_TEMP/r314-installer/edge-install-data";$env:WEBVIEW2_USER_DATA_FOLDER="$env:RUNNER_TEMP/r314-installer/edge-install-profile"
+          $p=Start-Process 'dist/desktop/Deep Legends Setup 0.13.3-public.exe' -ArgumentList "--update --dest `"$install`"" -PassThru
+          if(-not $p.WaitForExit(180000)){Stop-Process -Id $p.Id -Force;throw 'candidate install timeout'};$p.WaitForExit();if($p.ExitCode -ne 0){throw 'candidate install failed'}
+          Get-CimInstance Win32_Process|Where-Object{$_.ExecutablePath -and $_.ExecutablePath.StartsWith($install,[StringComparison]::OrdinalIgnoreCase)}|ForEach-Object{if($_.ProcessId -gt 0){Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}}
+          Remove-Item Env:WEBVIEW2_USER_DATA_FOLDER -ErrorAction SilentlyContinue
+          node scripts/r314-windows-edges.cjs "$install/Deep Legends.exe" "$env:RUNNER_TEMP/r314-installer/edges" 0.13.3
           if($LASTEXITCODE -ne 0){throw 'candidate scan failed'}
       - uses: actions/upload-artifact@v4
         if: always()
@@ -147,6 +153,10 @@ jobs:
           path: |
             ${{ runner.temp }}/r314-installer/**
             !${{ runner.temp }}/r314-installer/**/*.exe
+            !${{ runner.temp }}/r314-installer/edge-installed/**
+            !${{ runner.temp }}/r314-installer/edge-install-data/**
+            !${{ runner.temp }}/r314-installer/edge-install-profile/**
+            !${{ runner.temp }}/r314-installer/**/data/**
             !${{ runner.temp }}/r314-installer/**/user-data/**
             !${{ runner.temp }}/r314-installer/**/webview-profile/**
           if-no-files-found: error
