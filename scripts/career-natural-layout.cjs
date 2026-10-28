@@ -5,10 +5,14 @@ const gaps=root=>`(()=>{const root=${root};return [...root.querySelectorAll('[da
 function requireNatural(rows){assert(rows.length>=5);for(const r of rows){assert(r.gap<=r.padding+1,JSON.stringify(r));assert.notEqual(r.overflow,'auto',JSON.stringify(r));assert(r.scroll<=1,JSON.stringify(r));}}
 async function run(){await withBrowser(async({page,results,errors})=>{
  const p=await page('dark');await p.until("document.querySelector('.match-entry')&&!__r278Game.activeTab().loading");
- await p.evaluate('window.__naturalOriginal=structuredClone(__r278Game.activeTab().data)');
+ // This fixture deliberately tests arbitrary CSS zoom (including 1.14, not a
+ // settings-menu step). Pin the production preference/internal scale to 1 so
+ // delayed automatic resize settling cannot overwrite those explicit vectors.
+ await p.evaluate("localStorage.setItem('lol-loot-ui-scale','1');__r278App.applyUiScale();window.__naturalOriginal=structuredClone(__r278Game.activeTab().data)");
+ assert.equal(await p.evaluate("localStorage.getItem('lol-loot-ui-scale')"),'1');
  for(const theme of ['dark','light'])for(const mode of ['solo-positions','solo-no-positions','mayhem'])for(const zoom of [1,1.14,1.5]){
   await p.call('Emulation.setDeviceMetricsOverride',{width:1920,height:1100,deviceScaleFactor:1,mobile:false});
-  await p.evaluate(`(()=>{const g=__r278Game,t=g.activeTab(),d=structuredClone(__naturalOriginal),queue='${mode}'==='mayhem'?'2300':'420',positions='${mode}'==='solo-positions'?[{position:'middle',label:'中单',games:20,wins:12,winRate:60,share:100}]:[],stats={games:20,wins:12,losses:8,winRate:60,kills:5,deaths:3,assists:8,kda:4.3,positions};d.historicalRanks=[];d.rankMilestones=null;d.rankedQueues={420:{recentRanked:stats,positions,ability:d.ability},2300:{recentRanked:stats,positions:[],ability:d.ability}};d.recentRanked=stats;d.positions=positions;t.rankedQueueRecent=queue;t.rankedQueuePosition='420';t.data=d;t.loading=true;t.initialPagePending=true;t.matchesReceived=false;t.recentStatsReceived=false;t.overviewCardLoad=null;document.documentElement.dataset.theme='${theme}';document.documentElement.dataset.uiScale='${zoom}';document.documentElement.style.setProperty('--ui-zoom','${zoom}');g.renderOverview();window.__naturalFrames=[];window.__naturalTimer=setInterval(()=>__naturalFrames.push({at:performance.now(),rows:${rectangles}}),50)})()`);
+  await p.evaluate(`(()=>{const g=__r278Game,t=g.activeTab(),d=structuredClone(__naturalOriginal),queue='${mode}'==='mayhem'?'2300':'420',positions='${mode}'==='solo-positions'?[{position:'middle',label:'中单',games:20,wins:12,winRate:60,share:100}]:[],stats={games:20,wins:12,losses:8,winRate:60,kills:5,deaths:3,assists:8,kda:4.3,positions};d.historicalRanks=[];d.rankMilestones=null;d.rankedQueues={420:{recentRanked:stats,positions,ability:d.ability},2300:{recentRanked:stats,positions:[],ability:d.ability}};d.recentRanked=stats;d.positions=positions;t.rankedQueueRecent=queue;t.rankedQueuePosition='420';t.data=d;t.loading=true;t.initialPagePending=true;t.matchesReceived=false;t.recentStatsReceived=false;t.overviewCardLoad=null;document.documentElement.dataset.theme='${theme}';document.documentElement.dataset.uiScale='${zoom}';document.documentElement.style.setProperty('--ui-zoom','${zoom}');g.renderOverview();window.__naturalFrames=[];window.__naturalTimer=setInterval(()=>__naturalFrames.push({at:performance.now(),zoom:Number(getComputedStyle(document.documentElement).getPropertyValue('--ui-zoom')),championPending:Boolean(document.querySelector('[data-career-key=champions] .champion-pending-rows')),rows:${rectangles}}),50)})()`);
   await new Promise(r=>setTimeout(r,180));
   const pending=await p.evaluate(rectangles);
   const heroPending=await p.evaluate("(()=>{const n=document.querySelector('[data-career-key=champions]'),r=n.getBoundingClientRect(),s=getComputedStyle(n);return {rows:n.querySelectorAll('.champion-pending-rows>.champion-skeleton-row').length,real:n.querySelectorAll('.champion-stat-row:not(.champion-skeleton-row)').length,gap:r.bottom-n.lastElementChild.getBoundingClientRect().bottom,padding:parseFloat(s.paddingBottom)+parseFloat(s.borderBottomWidth)}})()");
@@ -22,7 +26,11 @@ async function run(){await withBrowser(async({page,results,errors})=>{
   const switchAt=await p.evaluate('__naturalSwitchAt'),order=pending.map(r=>r.key),heroIndex=order.indexOf('champions'),
     pendingHero=pending[heroIndex],finalHero=final[heroIndex],delta=finalHero.height-pendingHero.height;
   assert(heroIndex>=0&&frames.some(f=>f.at<switchAt)&&frames.some(f=>f.at>=switchAt),'frames must cover both phases');
-  for(const frame of frames){const settled=frame.at>=switchAt;for(const before of pending){
+  assert(frames.some(f=>f.championPending)&&frames.some(f=>!f.championPending),'frames must cover actual pending and final DOM');
+  // The render request time is not the DOM commit. Classify sampled geometry by
+  // the real skeleton state; retain the 180ms window, 1px limit and one-way switch.
+  let seenFinal=false;
+  for(const frame of frames){assert.equal(frame.zoom,zoom,JSON.stringify({theme,mode,zoom,frame}));const settled=!frame.championPending;assert(!seenFinal||settled,'pending DOM must not return after final');seenFinal ||= settled;for(const before of pending){
     const after=frame.rows.find(r=>r.key===before.key);assert(after);
     const index=order.indexOf(before.key),
       expected={x:before.x,y:before.y+(settled&&index>heroIndex?delta:0),height:before.key==='champions'&&settled?finalHero.height:before.height};
