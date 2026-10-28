@@ -3,7 +3,8 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {browser}=require('./r297-browser-harness.cjs'),{waitForVisibleImages}=require('./screenshot-assets.cjs'),{extract}=require('../backend/web/r188-harness.cjs');
 const out=process.env.R314_EDITOR_OUT||'/private/tmp/r314-editor-browser',directory=process.env.R308_ASSET_DIR;
 const fixtureRoot=directory||path.join(__dirname,'../backend/testdata/r308');
-const catalog={...require(path.join(fixtureRoot,'editor-catalog.json')),clientConnected:true,spellsStatus:'ready',itemsStatus:'ready'};
+const loadedCatalog=require(path.join(fixtureRoot,'editor-catalog.json'));
+const catalog={...(loadedCatalog.catalog||loadedCatalog),clientConnected:true,spellsStatus:'ready',itemsStatus:'ready'};
 const manifest=directory?Object.assign({},...['manifest.json','editor-manifest.json','overview-manifest.json'].filter(n=>fs.existsSync(path.join(directory,n))).map(n=>JSON.parse(fs.readFileSync(path.join(directory,n))))):{};
 const runes={primaryStyleId:8100,subStyleId:8400,selectedPerkIds:[8112,8126,8137,8106,8446,8451,5008,5008,5001]};
 // Resolve defaults against the bundled real catalog so the screenshot never marks stale IDs.
@@ -44,7 +45,7 @@ const setup=`window.deepLegendsRuntime={escapeHTML:v=>String(v??'').replaceAll('
    if(!four){await b.evaluate(`document.querySelector('.app-scroll').scrollTop=99999`);await shot(`runes-${width}x${height}-${zoom*100}`);}
   }
   for(const zoom of [1,1.5,2])for(const theme of ['dark','light']){
-   await size(2560,1440,zoom);await b.evaluate(`document.documentElement.dataset.theme='${theme}';document.querySelector('[data-tab="kit"]').click();document.querySelector('[data-clear-spell="1"]').click()`);await frame();const centers=await b.evaluate(`(()=>{const head=document.querySelector('.ac-section-head'),nodes=[...head.children].filter(n=>!n.hidden);return nodes.map(n=>{const r=n.getBoundingClientRect();return {class:n.className,center:r.top+r.height/2}})})()`);report.geometry.push({title:true,zoom,theme,centers});assert(Math.max(...centers.map(r=>r.center))-Math.min(...centers.map(r=>r.center))<=1,JSON.stringify(centers));await b.evaluate(`document.querySelector('.ac-section-head').scrollIntoView({block:'center'})`);await shot(`title-${theme}-${zoom*100}`);
+   await size(2560,1440,zoom);await b.evaluate(`document.documentElement.dataset.theme='${theme}';document.querySelector('[data-tab="kit"]').click();document.querySelector('[data-clear-spell="1"]')?.click()`);await frame();const centers=await b.evaluate(`(()=>{const head=document.querySelector('.ac-section-head'),nodes=[...head.querySelectorAll('h4,.ac-save-state,.ac-section-hint,.ac-feedback:not([hidden]) > span,.ac-editor-actions button')].filter(n=>!n.hidden);return nodes.map(n=>{const r=n.getBoundingClientRect();return {class:n.className,center:r.top+r.height/2,lineHeight:getComputedStyle(n).lineHeight,text:n.textContent}})})()`);report.geometry.push({title:true,zoom,theme,centers});assert(centers.every(r=>r.lineHeight==='24px'),JSON.stringify(centers));assert(Math.max(...centers.map(r=>r.center))-Math.min(...centers.map(r=>r.center))<=1,JSON.stringify(centers));await b.evaluate(`document.querySelector('.ac-section-head').scrollIntoView({block:'center'})`);await shot(`title-${theme}-${zoom*100}`);
   }
   report.diagnostics=await b.evaluate('fitReports');assert(report.diagnostics.filter(r=>r.name==='rune_fit_layout').length<=10,'layout diagnostic throttle');assert.equal(b.errors.length,0,JSON.stringify(b.errors));
  }finally{fs.writeFileSync(path.join(out,'result.json'),JSON.stringify(report,null,2));await b.stop();}

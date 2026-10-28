@@ -304,7 +304,8 @@
       const height=Math.max(0,cardHeight-above-parseFloat(css.paddingTop)-23-(header?.offsetHeight||0)-parseFloat(css.rowGap||0));
       const fit=runeFitGeometry(width,height,!!tree.querySelector(".has-4"));
       for(const [name,value]of Object.entries({"--ac-rune-scale":String(fit.scale),"--ac-rune-f":String(fit.f),"--ac-tree-height":fit.treeHeight+"px","--ac-primary-width":fit.primaryWidth+"px","--ac-secondary-width":fit.secondaryWidth+"px","--ac-column-gap":fit.columnGap+"px","--ac-key-extra":fit.keyExtra+"px","--ac-minor-extra":fit.minorExtra+"px","--ac-sub-extra":fit.subExtra+"px","--ac-shard-extra":fit.shardExtra+"px","--ac-sub-shard-gap":fit.subShardGap+"px"}))if(stage.style.getPropertyValue(name)!==value)stage.style.setProperty(name,value);
-      const bottomGap=Math.max(24,height-fit.treeHeight+24),signature=JSON.stringify([width,height,fit.scale,fit.f,bottomGap]);
+      const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1;
+      const bottomGap=(card.getBoundingClientRect().bottom-tree.getBoundingClientRect().bottom)/zoom,signature=JSON.stringify([width,height,fit.scale,fit.f,bottomGap]);
       if(signature!==lastFitSignature){lastFitSignature=signature;const minute=Math.floor(Date.now()/60000);if(minute!==fitMinute){fitMinute=minute;fitCount=0;}if(fitCount<10){fitCount++;window.reportFlowDiagnostic?.("rune_fit_layout",layoutReason,{width,height,scale:fit.scale,f:fit.f,bottom_gap:bottomGap});}}
     }
     // CSS dimensions include the scale, so tracks follow actual row centers.

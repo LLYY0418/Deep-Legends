@@ -1,9 +1,16 @@
-param([long]$Window,[string]$Output,[string]$Label)
+param([long]$Window,[int]$ProcessID,[int]$Width,[int]$Height,[string]$Output,[string]$Label)
 $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force (Split-Path $Output)|Out-Null
 Add-Type @'
 using System;using System.Collections.Generic;using System.Runtime.InteropServices;
 public static class R314HitTest {
+ public delegate bool EnumProc(IntPtr h,IntPtr d);
+ [DllImport("user32.dll")]static extern bool EnumWindows(EnumProc cb,IntPtr d);
+ [DllImport("user32.dll")]static extern bool IsWindowVisible(IntPtr h);
+ [DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
+ [DllImport("user32.dll")]static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int height,uint flags);
+ public static long Find(int process,int width,int height){long found=0;EnumWindows((h,d)=>{uint p;GetWindowThreadProcessId(h,out p);if(p==process&&IsWindowVisible(h))found=h.ToInt64();return true;},IntPtr.Zero);if(found==0)throw new Exception("Visible window not found for exact process "+process);SetWindowPos(new IntPtr(found),IntPtr.Zero,40,40,width,height,0x0040);return found;}
+
  [StructLayout(LayoutKind.Sequential)]public struct Rect{public int left,top,right,bottom;}
  [DllImport("user32.dll")]static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
  [DllImport("user32.dll")]public static extern bool GetWindowRect(IntPtr h,out Rect r);
@@ -29,5 +36,6 @@ public static class R314HitTest {
  }
 }
 '@
+if($ProcessID){$Window=[R314HitTest]::Find($ProcessID,$Width,$Height);Start-Sleep -Milliseconds 300}
 $result=[R314HitTest]::Scan($Window);$result['label']=$Label
 $result|ConvertTo-Json -Depth 10|Set-Content -Encoding utf8 $Output
