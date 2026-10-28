@@ -16,6 +16,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Set real native test display size
+        shell: pwsh
+        run: ./scripts/r314-display-session.ps1 -Output "$env:RUNNER_TEMP/r314-baselines/display-session.json"
       - name: Real old versions edge pixel scans
         env:
           GH_TOKEN: ${{ github.token }}
@@ -83,6 +86,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Set real native test display size
+        shell: pwsh
+        run: ./scripts/r314-display-session.ps1 -Output "$env:RUNNER_TEMP/r314-installer/display-session.json"
       - name: Defender before and attempted realtime enable
         shell: pwsh
         run: |
