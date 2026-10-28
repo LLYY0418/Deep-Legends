@@ -7,31 +7,21 @@
 #include <node_api.h>
 #include <cstring>
 
-// Keep the Windows frame, DWM appearance, caption buttons, and default sizing
-// loop. Only the two client-side pixels adjoining its invisible resize frame
-// are reclassified. The renderer/scrollbar cannot consume this native strip.
-static LRESULT CALLBACK ResizeBorder(HWND hwnd, UINT message, WPARAM wp,
-                                     LPARAM lp, UINT_PTR id, DWORD_PTR) {
-  if (message == WM_NCDESTROY) {
-    RemoveWindowSubclass(hwnd, ResizeBorder, id);
-    return DefSubclassProc(hwnd, message, wp, lp);
-  }
-  const LRESULT original = DefSubclassProc(hwnd, message, wp, lp);
-  if (message != WM_NCHITTEST || IsZoomed(hwnd) || IsIconic(hwnd) ||
-      !(GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_THICKFRAME)) return original;
+// Preserve DWM and the normal Windows sizing loop. Screen-pixel hit testing is
+// shared by the root and its same-thread Chromium input child windows.
+static LRESULT ResizeHit(HWND hwnd, LPARAM lp) {
+  if (!IsWindow(hwnd) || IsZoomed(hwnd) || IsIconic(hwnd) ||
+      !(GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_THICKFRAME)) return HTNOWHERE;
   RECT visible{}, window{};
   if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS,
                                   &visible, sizeof(visible))) ||
-      !GetWindowRect(hwnd, &window)) return original;
-  // A borderless full-screen window must not acquire resize handles.
+      !GetWindowRect(hwnd, &window)) return HTNOWHERE;
   MONITORINFO monitor{sizeof(monitor)};
   if (GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &monitor) &&
       window.left <= monitor.rcMonitor.left && window.top <= monitor.rcMonitor.top &&
       window.right >= monitor.rcMonitor.right && window.bottom >= monitor.rcMonitor.bottom)
-    return original;
+    return HTNOWHERE;
   const int x = GET_X_LPARAM(lp), y = GET_Y_LPARAM(lp);
-  // Screen pixels, not DIP or CSS zoom. Retain at least this physical width at
-  // every monitor DPI, using the DWM visible edge as the measurement origin.
   const bool left = x >= visible.left - 6 && x <= visible.left + 2;
   const bool right = x >= visible.right - 3 && x <= visible.right + 5;
   const bool bottom = y >= visible.bottom - 3 && y <= visible.bottom + 5;
@@ -42,7 +32,40 @@ static LRESULT CALLBACK ResizeBorder(HWND hwnd, UINT message, WPARAM wp,
     if (left) return HTLEFT;
     if (right) return HTRIGHT;
   }
-  return original;
+  return HTNOWHERE;
+}
+
+static LRESULT CALLBACK ChildResizeBorder(HWND hwnd, UINT message, WPARAM wp,
+                                          LPARAM lp, UINT_PTR id, DWORD_PTR root) {
+  if (message == WM_NCDESTROY) RemoveWindowSubclass(hwnd, ChildResizeBorder, id);
+  // A child must NOT return HTLEFT: that sizes the child, not the app. Windows
+  // forwards HTTRANSPARENT to underlying windows on this same UI thread, so the
+  // root owns the non-client sizing loop even above the renderer/scrollbar.
+  if (message == WM_NCHITTEST && ResizeHit(reinterpret_cast<HWND>(root), lp))
+    return HTTRANSPARENT;
+  return DefSubclassProc(hwnd, message, wp, lp);
+}
+
+static BOOL CALLBACK InstallChild(HWND child, LPARAM root) {
+  DWORD owner = 0;
+  const DWORD thread = GetWindowThreadProcessId(child, &owner);
+  if (owner == GetCurrentProcessId() && thread == GetCurrentThreadId())
+    SetWindowSubclass(child, ChildResizeBorder, 314, static_cast<DWORD_PTR>(root));
+  return TRUE;
+}
+
+static LRESULT CALLBACK ResizeBorder(HWND hwnd, UINT message, WPARAM wp,
+                                     LPARAM lp, UINT_PTR id, DWORD_PTR) {
+  if (message == WM_NCDESTROY) {
+    RemoveWindowSubclass(hwnd, ResizeBorder, id);
+    return DefSubclassProc(hwnd, message, wp, lp);
+  }
+  const LRESULT original = DefSubclassProc(hwnd, message, wp, lp);
+  if (message == WM_PARENTNOTIFY && LOWORD(wp) == WM_CREATE)
+    EnumChildWindows(hwnd, InstallChild, reinterpret_cast<LPARAM>(hwnd));
+  if (message != WM_NCHITTEST) return original;
+  const LRESULT hit = ResizeHit(hwnd, lp);
+  return hit ? hit : original;
 }
 
 static napi_value Install(napi_env env, napi_callback_info info) {
@@ -63,6 +86,7 @@ static napi_value Install(napi_env env, napi_callback_info info) {
     napi_throw_error(env, nullptr, "Cannot install resize border on this UI-thread window");
     return nullptr;
   }
+  EnumChildWindows(hwnd, InstallChild, reinterpret_cast<LPARAM>(hwnd));
   napi_value result; napi_get_boolean(env, true, &result); return result;
 }
 static napi_value Init(napi_env env, napi_value exports) {
