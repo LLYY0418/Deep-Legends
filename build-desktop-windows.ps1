@@ -183,6 +183,8 @@ try {
 
     Push-Location $desktopRoot
     try {
+        & node (Join-Path $desktopRoot "build-resize-border.cjs")
+        if ($LASTEXITCODE -ne 0) { throw "Native resize border build failed" }
         # 文件名使用版本号；诊断与构建核验仍保留源码指纹。
         $env:DEEP_LEGENDS_FINGERPRINT = $sourceFingerprint
         $builderSignArgs = @()

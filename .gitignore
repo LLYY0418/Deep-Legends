@@ -67,3 +67,6 @@ riot_key.local.*
 /AGENTS.md
 
 /output/
+
+/desktop/native/*.node
+/desktop/native/resize-border/build/

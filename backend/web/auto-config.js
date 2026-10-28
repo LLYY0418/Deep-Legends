@@ -297,14 +297,15 @@
   function layout(){
     const cardHeight=fillBody(),tree=root.querySelector(".ac-tree"),stage=tree?.closest(".ac-stage");
     if(tree&&stage){
-      const css=getComputedStyle(stage),header=stage.querySelector(".ac-buildname"),card=stage.closest(".ac-editor");
-      const width=stage.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight);
+      const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1,css=getComputedStyle(stage),header=stage.querySelector(".ac-buildname"),card=stage.closest(".ac-editor");
+      // clientWidth rounds up at fractional CSS zoom; floor the physical box first
+      // so a subpixel overflow cannot introduce a horizontal scrollbar.
+      const width=Math.max(0,Math.floor(stage.getBoundingClientRect().width/zoom)-Math.max(0,stage.offsetWidth-stage.clientWidth)-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight));
       // Both offsets are document-layout coordinates, unaffected by scrolling.
       const above=layoutOffset(stage)-layoutOffset(card);
       const height=Math.max(0,cardHeight-above-parseFloat(css.paddingTop)-23-(header?.offsetHeight||0)-parseFloat(css.rowGap||0));
       const fit=runeFitGeometry(width,height,!!tree.querySelector(".has-4"));
       for(const [name,value]of Object.entries({"--ac-rune-scale":String(fit.scale),"--ac-rune-f":String(fit.f),"--ac-tree-height":fit.treeHeight+"px","--ac-primary-width":fit.primaryWidth+"px","--ac-secondary-width":fit.secondaryWidth+"px","--ac-column-gap":fit.columnGap+"px","--ac-key-extra":fit.keyExtra+"px","--ac-minor-extra":fit.minorExtra+"px","--ac-sub-extra":fit.subExtra+"px","--ac-shard-extra":fit.shardExtra+"px","--ac-sub-shard-gap":fit.subShardGap+"px"}))if(stage.style.getPropertyValue(name)!==value)stage.style.setProperty(name,value);
-      const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1;
       const bottomGap=(card.getBoundingClientRect().bottom-tree.getBoundingClientRect().bottom)/zoom,signature=JSON.stringify([width,height,fit.scale,fit.f,bottomGap]);
       if(signature!==lastFitSignature){lastFitSignature=signature;const minute=Math.floor(Date.now()/60000);if(minute!==fitMinute){fitMinute=minute;fitCount=0;}if(fitCount<10){fitCount++;window.reportFlowDiagnostic?.("rune_fit_layout",layoutReason,{width,height,scale:fit.scale,f:fit.f,bottom_gap:bottomGap});}}
     }
@@ -312,13 +313,14 @@
     const updates=[];
     for(const g of root.querySelectorAll(".ac-group")){
       const rows=[...g.querySelectorAll(":scope > .ac-row")];if(!rows.length)continue;
-      const centers=rows.map(n=>n.offsetTop+n.offsetHeight/2),paths=g.previousElementSibling,main=paths?.classList.contains("ac-paths")?paths.querySelector(".ac-path-main"):null;
+      const rowCenters=rows.map(n=>{const rune=n.querySelector(".ac-rune");return rune?rune.offsetTop+rune.offsetHeight/2:n.offsetHeight/2;}),centers=rows.map((n,i)=>n.offsetTop+rowCenters[i]),paths=g.previousElementSibling,main=paths?.classList.contains("ac-paths")?paths.querySelector(".ac-path-main"):null;
       const top=g.dataset.group==="shards"?centers[0]:main?paths.offsetTop+main.offsetTop+main.offsetHeight-g.offsetTop:-6;
       const count=Object.keys(S.subPicks).length,sub=g.dataset.group==="sub",selected=sub?(count?count===1?centers[0]:centers.at(-1):null):centers[rows.findLastIndex(n=>n.classList.contains("is-picked"))];
-      updates.push({g,top,height:centers.at(-1)-top,fill:selected==null?0:selected-top,centers,count,sub});
+      updates.push({g,top,height:centers.at(-1)-top,fill:selected==null?0:selected-top,centers,rowCenters,rows,count,sub});
     }
     for(const n of root.querySelectorAll(".ac-rune[data-i]"))if(n.style.getPropertyValue("--i")!==n.dataset.i)n.style.setProperty("--i",n.dataset.i);
-    for(const {g,top,height,fill,centers,count,sub}of updates){
+    for(const {g,top,height,fill,centers,rowCenters,rows,count,sub}of updates){
+      rows.forEach((row,i)=>{const node=row.querySelector(".ac-node");if(node&&node.style.top!==`${rowCenters[i]}px`)node.style.top=`${rowCenters[i]}px`;});
       const track=g.querySelector(".ac-track");if(track.style.top!==`${top}px`)track.style.top=`${top}px`;if(track.style.height!==`${height}px`)track.style.height=`${height}px`;
       if(sub)g.querySelectorAll("[data-sub-progress]").forEach((node,index)=>{node.style.top=`${index?centers.at(-1):centers[0]}px`;node.classList.toggle("is-picked",index<count);});
       const style=track.querySelector(".ac-track-fill").style;if(style.getPropertyValue("--fill")!==`${fill}px`)style.setProperty("--fill",`${fill}px`);

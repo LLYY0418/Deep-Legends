@@ -439,7 +439,7 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 
 .ac-state-dot.is-unsaved { background:var(--ac-unsaved-dot); box-shadow:0 0 0 2px color-mix(in srgb,var(--ac-unsaved-dot) 25%,transparent); }
 /* Keep resize layout/paint invalidation inside the editor's independent regions. */
-.ac-champs { contain:layout paint; height:var(--ac-body-min,auto); }
+.ac-champs { contain:layout paint; }
 
 /* R309 independent section controls. */
 .ac-mode-actions { margin-left:auto; display:flex; align-items:center; gap:8px; }
@@ -474,6 +474,11 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 .ac-stage .ac-row.is-minor { height:calc(64px*var(--ac-rune-scale) + var(--ac-minor-extra,0px)); }
 .ac-stage .ac-col.is-secondary > .ac-group[data-group="sub"] .ac-row { height:calc(54px*var(--ac-rune-scale) + var(--ac-sub-extra,0px)); }
 .ac-stage .ac-row.is-shard { height:calc(32px*var(--ac-rune-scale) + var(--ac-shard-extra,0px)); }
+/* End each column at the last circular base, not its trailing half-row box.
+   Padding retains the original center, so all center-to-center pitches stay fixed. */
+.ac-stage [data-group="primary"] > .ac-row:last-child { height:calc((32px*var(--ac-rune-f) + 21px)*var(--ac-rune-scale)); padding-top:calc((32px*var(--ac-rune-f) - 21px)*var(--ac-rune-scale)); align-items:flex-start; }
+.ac-stage [data-group="shards"] > .ac-row:last-child { height:calc(30px*var(--ac-rune-scale) + var(--ac-shard-extra,0px)/2); padding-top:calc(2px*var(--ac-rune-scale) + var(--ac-shard-extra,0px)/2); align-items:flex-start; }
+
 .ac-stage .ac-col.is-secondary > .ac-group[data-group="shards"] { margin-top:var(--ac-sub-shard-gap,3px); margin-bottom:0; }
 .ac-stage .ac-row .ac-rune { width:calc(42px*var(--ac-rune-scale)); height:calc(42px*var(--ac-rune-scale)); flex:none; }
 .ac-stage .ac-row.is-key .ac-rune, .ac-stage .ac-row.is-key.has-4 .ac-rune { width:calc(54px*var(--ac-rune-scale)); height:calc(54px*var(--ac-rune-scale)); }

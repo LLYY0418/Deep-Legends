@@ -33,6 +33,7 @@
       "onlyLoadAppFromAsar": true
     },
     "asarUnpack": [
+      "native/*.node",
       "backend/loot-service.exe"
     ],
     "directories": {
@@ -42,6 +43,8 @@
       "nsis": "1.2.1"
     },
     "files": [
+      "resize-border.cjs",
+      "native/resize-border.node",
       "main.cjs",
       "app-title.cjs",
       "backend-integrity.cjs",

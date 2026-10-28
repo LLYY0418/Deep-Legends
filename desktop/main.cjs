@@ -740,6 +740,7 @@ function createMainWindow() {
       ...(licenseEnabled ? { backgroundThrottling: false, additionalArguments: ["--deep-legends-license"] } : {}),
     },
   });
+  require("./resize-border.cjs").installResizeBorder(mainWindow);
   mainWindow.webContents.on("will-prevent-unload", event => event.preventDefault());
   mainWindow.setContentProtection(desktopPreferences.contentProtection);
   syncApplicationTray();
