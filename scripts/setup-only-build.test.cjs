@@ -80,6 +80,7 @@ function fixture(t) {
       }
       if (args[0] !== "run" || args[1] !== "pack:win-setup") throw new Error("Unexpected packaging target " + args[1]);
       if (!fs.existsSync(uninstall)) throw new Error("NSIS requires the uninstall shell");
+      if (fs.readFileSync(path.join(root, "desktop/native/resize-border.node"), "utf8") !== "synthetic native resize") throw new Error("NSIS requires the native resize module");
       record({stage: "nsis", args});
       // The actual beforePack hook must work without a portable template.
       await require(path.join(root, "desktop/verify-embedded-riot-key.cjs"))();
@@ -91,6 +92,12 @@ function fixture(t) {
       fs.writeFileSync(path.join(root, "dist/desktop/win-unpacked/resources/app.asar"), "synthetic runtime");
       fs.writeFileSync(artifact, "synthetic NSIS payload");
     })().catch(error => {console.error(error.message); process.exitCode = 1;});
+  `);
+  writeScript("desktop/build-resize-border.cjs", `
+    record("native-resize-border");
+    if (process.env.R82_FAIL_STAGE === "native") { process.exitCode = 24; return; }
+    fs.mkdirSync(path.join(root, "desktop/native"), {recursive:true});
+    fs.writeFileSync(path.join(root, "desktop/native/resize-border.node"), "synthetic native resize");
   `);
   writeScript("scripts/update-augment-descriptions.cjs", 'process.stdout.write("synthetic snapshot\\n");');
   writeScript("desktop/source-fingerprint.cjs", 'process.stdout.write("abcdef012345\\n");');
@@ -126,7 +133,7 @@ test("setup-only Bash build wraps one NSIS result, hashes final bytes and remove
   const result = run();
   assert.equal(result.status, 0, result.stdout + result.stderr);
   const events = calls();
-  assert.deepEqual(events.filter(value => typeof value === "string"), ["backend", "npm-ci", "uninstaller", "installer", "runtime-verified"]);
+  assert.deepEqual(events.filter(value => typeof value === "string"), ["backend", "npm-ci", "native-resize-border", "uninstaller", "installer", "runtime-verified"]);
   const nsis = events.filter(value => value.stage === "nsis");
   assert.equal(nsis.length, 1);
   assert.ok(nsis[0].args.includes('--config.nsis.artifactName=Deep Legends Setup ${version}-public.${ext}'));
@@ -201,4 +208,11 @@ test("setup-only Windows CI skip leaves NSIS, wrapper and receipt gates uncondit
   for (const token of ['npm run pack:win-setup', 'build-shell.cjs', 'verify-packaged-runtime.cjs',
     'verify-build-fingerprint.cjs', 'release-build.cjs', 'Get-FileHash -Algorithm SHA256']) assert.ok(packaging.includes(token), token);
   assert.match(source, /SkipTestsInCI requires GITHUB_ACTIONS=true/);
+});
+
+test("native resize build failure stops before NSIS and release receipt", {skip: process.platform === "win32"}, t => {
+  const {run,calls,directory}=fixture(t),result=run({R82_FAIL_STAGE:"native"});
+  assert.equal(result.status,24,result.stdout+result.stderr);
+  assert(calls().includes("native-resize-border"));assert(!calls().some(value=>value.stage==="nsis"));
+  assert(!calls().includes("installer"));assert.equal(fs.existsSync(path.join(directory,"release-build.json")),false);
 });
