@@ -7,12 +7,10 @@ const connect=async url=>{const ws=new WebSocket(url);await new Promise((r,j)=>{
  const port=await new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>r(p))})}),mainPort=port+1;
  const child=spawn(executable,['--inspect='+mainPort,'--remote-debugging-port='+port,'--user-data-dir='+path.join(out,'user-data')],{env:{...process.env,LOL_LOOT_DATA_DIR:path.join(out,'data')},stdio:['ignore','pipe','pipe']});const logs=[];child.stdout.on('data',c=>logs.push(String(c)));child.stderr.on('data',c=>logs.push(String(c)));let renderer,main;
  try{
-  let target,mainTarget;for(let i=0;i<600;i++){try{target=(await fetch(`http://127.0.0.1:${port}/json/list`).then(r=>r.json())).find(t=>t.type==='page'&&t.url.startsWith('http://127.0.0.1'));mainTarget=(await fetch(`http://127.0.0.1:${mainPort}/json/list`).then(r=>r.json()))[0];if(target&&mainTarget)break}catch{}await wait(100)}assert(target&&mainTarget,'real renderer/main inspector');
-  renderer=await connect(target.webSocketDebuggerUrl);main=await connect(mainTarget.webSocketDebuggerUrl);
+  let target,mainTarget;for(let i=0;i<600;i++){try{target=(await fetch(`http://127.0.0.1:${port}/json/list`).then(r=>r.json())).find(t=>t.type==='page'&&t.url.startsWith('http://127.0.0.1'));mainTarget=(await fetch(`http://127.0.0.1:${mainPort}/json/list`).then(r=>r.json()))[0];if(target)break}catch{}await wait(100)}assert(target,'real packaged renderer inspector');
+  renderer=await connect(target.webSocketDebuggerUrl);
   const evaluate=async(conn,expression)=>{const r=await conn.call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
-  const windowExpr=`process.mainModule.require('electron').BrowserWindow.getAllWindows().find(w=>!w.isDestroyed()&&w.webContents.getURL().startsWith('http://127.0.0.1'))`;
-  const hwnd=await evaluate(main,`${windowExpr}.getNativeWindowHandle().readBigUInt64LE().toString()`);
-  const catalog=require('../backend/testdata/r308/editor-catalog.json'),primary=catalog.styles.find(s=>s.id===8100),sub=catalog.styles.find(s=>s.id===8400),runes={primaryStyleId:8100,subStyleId:8400,selectedPerkIds:[...primary.slots.slice(0,4).map(s=>s.perks[0].id),sub.slots[1].perks[0].id,sub.slots[3].perks[0].id,...catalog.statModSlots.map(s=>s.perks[0].id)]};
+  const catalog=require('../backend/testdata/r308/editor-catalog.json').catalog,primary=catalog.styles.find(s=>s.id===8100),sub=catalog.styles.find(s=>s.id===8400),runes={primaryStyleId:8100,subStyleId:8400,selectedPerkIds:[...primary.slots.slice(0,4).map(s=>s.perks[0].id),sub.slots[1].perks[0].id,sub.slots[3].perks[0].id,...catalog.statModSlots.map(s=>s.perks[0].id)]};
   const value={runes},config={version:1,enabled:true,runes:true,spells:true,items:true,champions:{164:{ranked:value}}},champs={champions:[{id:164,key:'Camille',nameZh:'卡蜜尔',titleZh:'青钢影'}]};
   const setup=`localStorage.setItem('lol-loot-demo','1');(()=>{const routes=${JSON.stringify({'/api/auto-config/settings':config,'/api/auto-config/catalog':{...catalog,clientConnected:true,spellsStatus:'ready',itemsStatus:'ready'},'/api/champions/catalog':champs})};const wrap=delegate=>function(...args){const u=new URL(typeof args[0]==='string'?args[0]:args[0].url,location.href);return routes[u.pathname]?Promise.resolve(new Response(JSON.stringify(routes[u.pathname]))):Reflect.apply(delegate,window,args);};let current=wrap(window.fetch);Object.defineProperty(window,'fetch',{configurable:true,get:()=>current,set:d=>{current=wrap(d)}})})();`;
   await renderer.call('Page.addScriptToEvaluateOnNewDocument',{source:setup});
@@ -23,8 +21,8 @@ const connect=async url=>{const ws=new WebSocket(url);await new Promise((r,j)=>{
    if(page==='runes')await evaluate(renderer,`(async()=>{await deepLegendsSections.load('suite');document.querySelector('[data-section="suite"]')?.click();document.querySelector('[data-suite-tab="config"]').click();await deepLegendsAutoConfig.load()})()`);
    if(page==='runes'){let ready=false;for(let i=0;i<300;i++){if(await evaluate(renderer,'Boolean(document.querySelector(".ac-tree"))')){ready=true;break}await wait(100)}assert(ready,'rune page opened');}
    for(const [width,height]of [[914,911],[1561,913]]){
-    await evaluate(main,`(()=>{const w=${windowExpr};w.unmaximize();w.setBounds({x:50,y:50,width:${width},height:${height}});return w.getBounds()})()`);await wait(500);
-    const file=path.join(out,`${page}-${width}x${height}.json`);await run('powershell.exe',['-NoProfile','-File',path.join(__dirname,'r314-edge-scan.ps1'),'-Window',hwnd,'-Output',file,'-Label',`${label}/${page}/${width}x${height}`]);results.push(JSON.parse(fs.readFileSync(file)));
+
+    const file=path.join(out,`${page}-${width}x${height}.json`);await run('powershell.exe',['-NoProfile','-File',path.join(__dirname,'r314-edge-scan.ps1'),'-ProcessID',String(child.pid),'-Width',String(width),'-Height',String(height),'-Output',file,'-Label',`${label}/${page}/${width}x${height}`]);results.push(JSON.parse(fs.readFileSync(file)));
    }
   }
   fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({label,rows:results},null,2));
