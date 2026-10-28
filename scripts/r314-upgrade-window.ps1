@@ -44,6 +44,7 @@ try {
    $deadline=[DateTime]::UtcNow.AddSeconds(30)
    while(-not(Test-Path $receipt)){if($launcher.HasExited -or [DateTime]::UtcNow -gt $deadline){throw 'Go cmd.Start helper failed'};Start-Sleep -Milliseconds 5}
    $spawn=Get-Content $receipt -Raw|ConvertFrom-Json;$startUtc=[long]$spawn.start_utc_ms;$spawnReturned=$spawn.spawn_returned_ms
+   if(-not $spawn -or $spawn.pid -le 0){throw 'Complete cmd.Start receipt must contain a positive PID'}
    $child=Get-Process -Id $spawn.pid;$watch=[Diagnostics.Stopwatch]::StartNew()
 
    while(-not [R314Windows]::Visible($child.Id)) {if($watch.Elapsed.TotalSeconds -gt 30 -or $child.HasExited){throw "No visible installer at trial $i"};Start-Sleep -Milliseconds 10}
