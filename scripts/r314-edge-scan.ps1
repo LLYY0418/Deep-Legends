@@ -1,10 +1,12 @@
-param([long]$Window,[int]$ProcessID,[int]$Width,[int]$Height,[string]$Output,[string]$Label)
+param([long]$Window,[int]$ProcessID,[int]$Width,[int]$Height,[string]$Output,[string]$Label,[switch]$Explorer)
 $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force (Split-Path $Output)|Out-Null
 Add-Type @'
 using System;using System.Collections.Generic;using System.Runtime.InteropServices;
 public static class R314HitTest {
  public delegate bool EnumProc(IntPtr h,IntPtr d);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern IntPtr FindWindow(string cls,string title);
+ public static long FindExplorer(int width,int height){var h=FindWindow("CabinetWClass",null);if(h==IntPtr.Zero)return 0;SetWindowPos(h,IntPtr.Zero,40,40,width,height,0x0040);return h.ToInt64();}
  [DllImport("user32.dll")]static extern bool EnumWindows(EnumProc cb,IntPtr d);
  [DllImport("user32.dll")]static extern bool IsWindowVisible(IntPtr h);
  [DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
@@ -36,6 +38,7 @@ public static class R314HitTest {
  }
 }
 '@
+if($Explorer){Start-Process explorer.exe -ArgumentList 'C:\Windows';$deadline=[DateTime]::UtcNow.AddSeconds(20);do{$Window=[R314HitTest]::FindExplorer($Width,$Height);if($Window){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $deadline);if(-not $Window){throw 'Explorer window not created'}}
 if($ProcessID){$Window=[R314HitTest]::Find($ProcessID,$Width,$Height);Start-Sleep -Milliseconds 300}
 $result=[R314HitTest]::Scan($Window);$result['label']=$Label
 $result|ConvertTo-Json -Depth 10|Set-Content -Encoding utf8 $Output

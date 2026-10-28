@@ -29,7 +29,7 @@ try {
   $warmMs=$null
   if($Warmup){$warmWatch=[Diagnostics.Stopwatch]::StartNew();$warm=Start-Process -FilePath $trialSetup -ArgumentList '--warmup' -PassThru -WindowStyle Hidden;if(-not $warm.WaitForExit(30000)){Stop-Process -Id $warm.Id -Force;throw 'warmup timed out'};$warm.WaitForExit();if($warm.ExitCode -ne 0){throw 'warmup failed'};$warmMs=$warmWatch.Elapsed.TotalMilliseconds}
   $env:LOL_LOOT_DATA_DIR=$trial
-  $profile=Join-Path $trial 'webview-profile';$env:WEBVIEW2_USER_DATA_FOLDER=$profile
+  $profile=Join-Path $Output 'webview-profile';$env:WEBVIEW2_USER_DATA_FOLDER=$profile
   $dest=Join-Path $trial 'installed';New-Item -ItemType Directory -Force $dest | Out-Null
   $ready=Join-Path $trial 'parent-ready';$escaped=$ready.Replace("'","''");$code="[IO.File]::WriteAllText('$escaped','ready');Start-Sleep -Seconds 90";$encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
   $parent=Start-Process pwsh -ArgumentList '-NoProfile','-EncodedCommand',$encoded -PassThru -WindowStyle Hidden
@@ -71,14 +71,17 @@ try {
    if($child -and -not $child.WaitForExit(5000)){throw 'Owned installer did not exit after cleanup'}
    if(-not $parent.HasExited){Stop-Process -Id $parent.Id -Force};$parent.WaitForExit(5000)|Out-Null
    if($launcher -and -not $launcher.WaitForExit(5000)){Stop-Process -Id $launcher.Id -Force}
-   Stop-R313WebViewProfile $profile
+   # Match production's fixed WebView DataPath. Only Setup is newly written;
+   # an unrelated fresh browser profile per launch is not a first-execution test.
+   $profileDeadline=[DateTime]::UtcNow.AddSeconds(10)
+   do{$owned=@(Get-CimInstance Win32_Process|Where-Object{$_.Name -eq 'msedgewebview2.exe' -and $_.CommandLine -and $_.CommandLine.IndexOf($profile,[StringComparison]::OrdinalIgnoreCase) -ge 0});foreach($process in $owned){Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue};if($owned.Count -eq 0){break};if([DateTime]::UtcNow -ge $profileDeadline){throw 'WebView process cleanup timed out'};Start-Sleep -Milliseconds 30}while($true)
    Remove-Item $trialSetup -Force -ErrorAction SilentlyContinue
    if(Test-Path "$env:TEMP/DeepLegendsSetup-startup.log"){Get-Content "$env:TEMP/DeepLegendsSetup-startup.log" -Tail 100|Set-Content (Join-Path $trial 'startup.log')}
   }
  }
-} finally {[R314Windows]::timeEndPeriod(1)|Out-Null;Remove-Item Env:LOL_LOOT_DATA_DIR -ErrorAction SilentlyContinue;Remove-Item Env:WEBVIEW2_USER_DATA_FOLDER -ErrorAction SilentlyContinue}
+} finally {if($profile){Stop-R313WebViewProfile $profile};[R314Windows]::timeEndPeriod(1)|Out-Null;Remove-Item Env:LOL_LOOT_DATA_DIR -ErrorAction SilentlyContinue;Remove-Item Env:WEBVIEW2_USER_DATA_FOLDER -ErrorAction SilentlyContinue}
 $values=@($rows.spawn_to_window_ms|Sort-Object)
-$result=@{setup_bytes=(Get-Item $setupPath).Length;sha256=(Get-FileHash $setupPath -Algorithm SHA256).Hash.ToLowerInvariant();count=$rows.Count;median_ms=$values[[int][Math]::Floor($values.Count/2)];p95_ms=$values[[Math]::Ceiling($values.Count*.95)-1];rows=$rows}
+$result=@{profile_policy='one-production-style-profile-per-group; fresh-Setup-per-trial';setup_bytes=(Get-Item $setupPath).Length;sha256=(Get-FileHash $setupPath -Algorithm SHA256).Hash.ToLowerInvariant();count=$rows.Count;median_ms=$values[[int][Math]::Floor($values.Count/2)];p95_ms=$values[[Math]::Ceiling($values.Count*.95)-1];rows=$rows}
 $result|ConvertTo-Json -Depth 12|Set-Content (Join-Path $Output 'result.json') -Encoding utf8
 $result|ConvertTo-Json -Depth 3
 if($Enforce -and ($result.median_ms -gt 900 -or $result.p95_ms -gt 1500)){throw 'R314 progress page budget exceeded (median<=900ms, p95<=1500ms)'}
