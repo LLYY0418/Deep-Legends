@@ -1,0 +1,981 @@
+name: R314 development CI-equivalent
+
+on:
+  push:
+    branches: [codex/diagnostic-r279-r314-device]
+  workflow_dispatch:
+    inputs:
+      measure_windows_renderers:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# R279: a newer push to a codex/probe-* branch cancels the run it supersedes. Every other ref (main, release
+# branches, pull requests, dispatches elsewhere) gets a group unique to the run, so nothing else is ever cancelled or queued.
+concurrency:
+  group: ${{ startsWith(github.ref, 'refs/heads/codex/probe-') && format('probe-{0}', github.ref) || format('run-{0}-{1}', github.run_id, github.run_attempt) }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/heads/codex/probe-') }}
+
+jobs:
+  quality-go:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install quality fixture Node dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Verify local notes and assistant instructions are not tracked
+        if: ${{ !cancelled() }}
+        run: node scripts/verify-no-docs-tracked.cjs
+      - name: Check release notes and package identity
+        if: ${{ !cancelled() }}
+        run: node scripts/make-release.cjs --check-notes
+      - name: Prepare verified published update compatibility input
+        if: ${{ !cancelled() }}
+        run: node scripts/prepare-r238-update-fixture.cjs
+      - name: Prepare Go dependencies before offline tests
+        if: ${{ !cancelled() }}
+        run: go mod download
+      - name: Check formatting
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          unformatted="$(find . -type d \( -name '.*' ! -name . -o -name node_modules -o -name vendor -o -name dist \) -prune -o -type f -name '*.go' -print0 | xargs -0 gofmt -l)"
+          test -z "$unformatted"
+      - name: Audit captured writes in test callbacks
+        if: ${{ !cancelled() }}
+        run: go run ./scripts/check-test-captures --json="$RUNNER_TEMP/test-capture-audit.json"
+      - name: Vet
+        if: ${{ !cancelled() }}
+        run: go vet ./...
+      - name: Verify release license isolation
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags= -buildvcs=false -o "$RUNNER_TEMP/r233-release-public.exe" ./backend
+          node desktop/verify-license-release.cjs "$RUNNER_TEMP/r233-release-public.exe"
+      - name: R252 compile shelved license code and verify corrected fixtures
+        if: ${{ !cancelled() }}
+        run: node scripts/r252-license-check.cjs
+      - name: R265 actual license embedded asset inventory guard
+        if: ${{ !cancelled() }}
+        run: go test ./backend -tags=license -run '^TestR265AllReleaseEmbeddedAssets$' -count=1
+      - name: R272 synthetic overview wire budget guard
+        if: ${{ !cancelled() }}
+        run: go test ./backend -run '^TestR272SyntheticOverviewWireBudget$' -count=1
+      - name: Verify CI test filters
+        if: ${{ !cancelled() }}
+        run: node scripts/verify-ci-test-filters.cjs
+      - name: Test with race detector
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-offline.cjs -- go test -count=1 -race ./...
+      - name: Test installer module
+        if: ${{ !cancelled() }}
+        working-directory: installer
+        run: go test ./...
+      - name: Vet installer module
+        if: ${{ !cancelled() }}
+        working-directory: installer
+        run: go vet ./...
+
+  # R277 proofs have their own VMs/steps, outside all existing calibrated shards.
+  # No retired special-branch acceptance condition is reintroduced.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r287-quality-go-audits
+          path: |
+            ${{ runner.temp }}/test-capture-audit.json
+            ${{ runner.temp }}/r287-go-timing-*.jsonl
+          if-no-files-found: error
+
+  quality-web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.24.13
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install quality fixture Node dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Audit browser process and directory cleanup
+        if: ${{ !cancelled() && matrix.shard == 1 }}
+        run: node scripts/check-browser-cleanup.cjs --json="$RUNNER_TEMP/browser-cleanup-audit.json"
+      - name: Validate frontend JavaScript
+        if: ${{ !cancelled() && matrix.shard == 1 }}
+        run: |
+          node --check backend/web/app.js
+          node --check backend/web/suite.js
+          node --check desktop/main.cjs
+      - name: Verify renderer file partition
+        if: ${{ !cancelled() }}
+        run: node scripts/renderer-shards.cjs > "$RUNNER_TEMP/renderer-shards.json"
+      - name: Prove renderer shard and total guards
+        if: ${{ !cancelled() && matrix.shard == 1 }}
+        run: node scripts/renderer-shard-mutations.cjs "$RUNNER_TEMP/renderer-shard-mutations"
+      - name: Calibrate runner speed before renderers
+        id: cal_before
+        if: ${{ !cancelled() }}
+        run: node scripts/runner-calibration.cjs "$RUNNER_TEMP/runner-calibration-before.json"
+      - name: Test frontend and desktop renderers
+        id: renderers
+        if: ${{ !cancelled() }}
+        env:
+          R222_NODE_TIMING_OUTPUT: ${{ runner.temp }}/renderer-timings-linux.json
+        run: node scripts/test-renderers.cjs all --shard "${{ matrix.shard }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renderer-timings-linux-${{ matrix.shard }}
+          path: ${{ runner.temp }}/renderer-timings-linux.json
+      - name: Calibrate runner speed after renderers
+        id: cal_after
+        if: ${{ !cancelled() }}
+        run: node scripts/runner-calibration.cjs "$RUNNER_TEMP/runner-calibration-after.json"
+      - name: Enforce R252 renderer budget margin
+        if: ${{ !cancelled() && steps.cal_before.outcome == 'success' && steps.renderers.outcome == 'success' && steps.cal_after.outcome == 'success' }}
+        run: node scripts/renderer-budget-gate.cjs "$RUNNER_TEMP/renderer-timings-linux.json" "$RUNNER_TEMP/runner-calibration-before.json" "$RUNNER_TEMP/runner-calibration-after.json" "$RUNNER_TEMP/renderer-budget-gate.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renderer-budget-gate-linux-${{ matrix.shard }}
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/runner-calibration-before.json
+            ${{ runner.temp }}/runner-calibration-after.json
+            ${{ runner.temp }}/renderer-budget-gate.json
+      - name: Test Riot relay Worker
+        if: ${{ !cancelled() && matrix.shard == 1 }}
+        run: node --test relay/riot-worker/*.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && matrix.shard == 1 }}
+        with:
+          name: r287-quality-web-audits
+          path: ${{ runner.temp }}/browser-cleanup-audit.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && matrix.shard == 1 }}
+        with:
+          name: renderer-shard-mutations
+          path: ${{ runner.temp }}/renderer-shard-mutations/**
+          if-no-files-found: error
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - 1
+          - 2
+  quality-web-total:
+    needs:
+      - quality-web
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          pattern: renderer-timings-linux-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/renderer-shards
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+      - uses: actions/download-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          pattern: renderer-budget-gate-linux-*
+          merge-multiple: false
+          path: ${{ runner.temp }}/renderer-shards
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+      - name: Enforce complete renderer coverage and total reference cost
+        if: ${{ !cancelled() }}
+        run: node scripts/renderer-shard-total.cjs "$RUNNER_TEMP/renderer-shards" "$RUNNER_TEMP/renderer-total.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renderer-total-linux
+          path: ${{ runner.temp }}/renderer-total.json
+          if-no-files-found: error
+
+  quality-mutations:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install quality fixture Node dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Prepare Go dependencies before offline tests
+        if: ${{ !cancelled() }}
+        run: go mod download
+      - name: R276 deterministic fixture and audit mutations
+        if: ${{ !cancelled() }}
+        run: python3 scripts/r276-fixture-mutations.py --out "$RUNNER_TEMP/r276-fixture-mutations"
+      - name: R276 exact published legacy installer retry regression and mutations
+        if: ${{ !cancelled() }}
+        run: python3 scripts/r276-legacy-installer-retry-mutations.py --out "$RUNNER_TEMP/r276-legacy-installer-retry-mutations"
+      - name: R276 native installed port-owner regression and mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-port-owner-mutations.cjs "$RUNNER_TEMP/r276-port-owner-mutations"
+      - name: R276 bounded offline PowerShell fixture diagnostics
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-powershell-fixture-mutations.cjs "$RUNNER_TEMP/r276-powershell-fixture-mutations"
+      - name: R276 fresh renderer fixture isolation regression and mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-fresh-chrome-mutations.cjs "$RUNNER_TEMP/r276-fresh-chrome-mutations"
+      - name: R276 recovery scope fixture regression and mutation
+        if: ${{ !cancelled() }}
+        run: python3 scripts/r276-recovery-scope-mutations.py --out "$RUNNER_TEMP/r276-recovery-scope-mutations"
+      - name: R276 translation timeout fixture regression and mutation
+        if: ${{ !cancelled() }}
+        run: python3 scripts/r276-translation-fixture-mutations.py --out "$RUNNER_TEMP/r276-translation-fixture-mutations"
+      - name: R276 installed demo startup navigation regression and mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-installed-demo-mutations.cjs "$RUNNER_TEMP/r276-installed-demo-mutations"
+      - name: R276 deterministic cleanup regression and mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-cleanup-mutations.cjs "$RUNNER_TEMP/r276-cleanup-mutations"
+      - name: R276 precise API fault policy regression and mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-api-policy-mutations.cjs "$RUNNER_TEMP/r276-api-policy-mutations"
+      - name: R276 filter geometry fixture regression and mutation
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-filter-geometry-mutations.cjs "$RUNNER_TEMP/r276-filter-geometry-mutations"
+      - name: R276 canceled update-probe fixture regression and mutation
+        if: ${{ !cancelled() }}
+        run: python3 scripts/r276-update-probe-mutations.py --out "$RUNNER_TEMP/r276-update-probe-mutations"
+      - name: R276 clean quality dependency regression and mutation
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-quality-dependency-mutations.cjs "$RUNNER_TEMP/r276-quality-dependency-mutations"
+      - name: Verify sweep evidence rejects missing samples
+        if: ${{ !cancelled() }}
+        run: python3 scripts/r276-sweep-summary.test.py
+      - name: R276 default-timeout stress partition regression and mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r307-aramkit-stress-mutations.cjs "$RUNNER_TEMP/r307-aramkit-stress-mutations"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r276-test-capture-and-fixture-proof
+          path: |
+            ${{ runner.temp }}/r276-cleanup-mutations/**
+            ${{ runner.temp }}/r276-api-policy-mutations/**
+            ${{ runner.temp }}/r276-fixture-mutations/**
+            ${{ runner.temp }}/r276-legacy-installer-retry-mutations/**
+            ${{ runner.temp }}/r276-port-owner-mutations/**
+            ${{ runner.temp }}/r276-powershell-fixture-mutations/**
+            ${{ runner.temp }}/r276-fresh-chrome-mutations/**
+            ${{ runner.temp }}/r276-installed-demo-mutations/**
+            ${{ runner.temp }}/r276-recovery-scope-mutations/**
+            ${{ runner.temp }}/r276-translation-fixture-mutations/**
+            ${{ runner.temp }}/r307-aramkit-stress-mutations/**
+            ${{ runner.temp }}/r276-filter-geometry-mutations/**
+            ${{ runner.temp }}/r276-update-probe-mutations/**
+            ${{ runner.temp }}/r276-quality-dependency-mutations/**
+          if-no-files-found: error
+      - name: Require real Chromium
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+          test -n "$chrome"
+          echo "CHROME_BIN=$chrome" >> "$GITHUB_ENV"
+      - name: Run isolated offline browser guards
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-browser-job.cjs r265 "$RUNNER_TEMP/r276-browser-r265"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux-shard-r265
+          path: ${{ runner.temp }}/r276-browser-r265/**
+          if-no-files-found: error
+
+  r277-proof-linux-1:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent R277 test dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Prepare R277 backend Go dependencies
+        if: ${{ !cancelled() }}
+        run: go mod download
+      - name: Verify R277 orchestration and unchanged legacy budgets
+        run: node --test scripts/r277-ci-orchestration.test.cjs
+      - name: R277 CI branch-condition actual mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r277-ci-branch-mutations.cjs docs/history/reports/r277/ci-integration/linux-1/branch-mutations
+      - name: R277 P1 fixed and actual mutations
+        if: ${{ !cancelled() }}
+        run: python scripts/r277-client-mutations.py --out docs/history/reports/r277/ci-integration/linux-1/p1
+      - name: R277 P9 P10 fixed and actual mutations
+        if: ${{ !cancelled() }}
+        run: python scripts/r277-wire-diagnostic-mutations.py --out docs/history/reports/r277/ci-integration/linux-1/p9-p10
+      - name: R277 credential scope actual mutations
+        if: ${{ !cancelled() }}
+        run: python scripts/r277-riot-scope-proof.py --out docs/history/reports/r277/ci-integration/linux-1/riot-scope
+      - name: R277 frontend and release contracts
+        if: ${{ !cancelled() }}
+        run: node scripts/r277-ci-orchestrate.cjs contracts --out docs/history/reports/r277/ci-integration/linux-1/frontend
+      - name: R277 initial asset budget and actual deferred asset mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r277-ci-orchestrate.cjs deferred-unit --out docs/history/reports/r277/ci-integration/linux-1/deferred-assets
+      - name: R279 failure triage (facts only, never changes the result)
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-proof-linux-1 --base release-base --evidence "docs/history/reports/r277/ci-integration/linux-1" --out "docs/history/reports/r277/ci-integration/linux-1/triage.json" --annotate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r277-independent-linux-proof-1
+          path: docs/history/reports/r277/ci-integration/linux-1/**
+          if-no-files-found: error
+      # Requested P13 Linux measurement is evidence only, not a new release gate.
+
+  r277-proof-linux-2:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent R277 test dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Prepare R277 backend Go dependencies
+        if: ${{ !cancelled() }}
+        run: go mod download
+      - name: Verify R277 orchestration and unchanged legacy budgets
+        run: node --test scripts/r277-ci-orchestration.test.cjs
+      - name: R277 real HTTP reread actual mutation
+        if: ${{ !cancelled() }}
+        run: python scripts/r277-http-refresh-proof.py --out docs/history/reports/r277/ci-integration/linux-2/http-reread
+      - name: R277 Riot fixed and actual mutations
+        if: ${{ !cancelled() }}
+        run: python scripts/r277-riot-proof.py --out docs/history/reports/r277/ci-integration/linux-2/riot
+      - name: R277 CN score actual backend and frontend mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r277-ci-cn-score.cjs mutants --out docs/history/reports/r277/ci-integration/linux-2/cn-score
+      - name: R277 frontend actual unit mutations
+        if: ${{ !cancelled() }}
+        run: node scripts/r277-ci-orchestrate.cjs frontend-mutants --out docs/history/reports/r277/ci-integration/linux-2/frontend
+      - name: R280 Linux stream measurement (record only)
+        if: ${{ !cancelled() }}
+        run: node scripts/r280-ci-measurements.cjs "${{ runner.temp }}/r280"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r280-regression-measurements-linux
+          path: ${{ runner.temp }}/r280/**
+          if-no-files-found: warn
+      - name: Run isolated mutation shard
+        if: ${{ !cancelled() }}
+        run: node scripts/r276-mutation-job.cjs 2 "$RUNNER_TEMP/r276-mutations-2"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux-shard-mutations-2
+          path: ${{ runner.temp }}/r276-mutations-2/**
+          if-no-files-found: error
+      - name: R279 failure triage (facts only, never changes the result)
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-proof-linux-2 --base release-base --evidence "docs/history/reports/r277/ci-integration/linux-2" --out "docs/history/reports/r277/ci-integration/linux-2/triage.json" --annotate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r277-independent-linux-proof-2
+          path: docs/history/reports/r277/ci-integration/linux-2/**
+          if-no-files-found: error
+      # Requested P13 Linux measurement is evidence only, not a new release gate.
+
+  r277-browser-matrix:
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-24.04' || matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      R277_MEASURE_ONLY: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install independent R277 browser dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Prepare independent R277 browser backend
+        id: fixture_build
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs build-browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
+      - name: R277 strict real-browser geometry and 400-match matrix
+        if: ${{ !cancelled() && steps.fixture_build.outcome == 'success' }}
+        id: r277_strict
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
+      - name: R277 actual deferred asset loading CSP cache and 503 recovery
+        if: ${{ !cancelled() && steps.fixture_build.outcome == 'success' }}
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs deferred-browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/deferred-assets"
+      - name: R277 actual CN score browser to Go HTTP transport
+        if: ${{ !cancelled() && steps.fixture_build.outcome == 'success' }}
+        shell: bash
+        run: node scripts/r277-ci-cn-score.cjs browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/cn-score"
+      # R279: mutations only mean something when the base strict step passed; otherwise a base failure would be
+      # reported a second time as a "wrong failure" of every mutant. Skipped (not red) when the base step failed.
+      - name: R277 Windows same-400-match before-after long-task measurement
+        if: ${{ !cancelled() && steps.fixture_build.outcome == 'success' && matrix.os == 'windows-latest' }}
+        shell: bash
+        run: node scripts/r277-perf-compare.cjs --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/p9-before-after"
+      - name: Clean only R277 browser generated executable and dedicated Go cache
+        if: always()
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs cleanup-browser --backend "$RUNNER_TEMP/r277-browser-public.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}"
+      - name: R279 failure triage (facts only, never changes the result)
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-browser-matrix-${{ matrix.os }} --base release-base --evidence "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/triage.json" --annotate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r277-browser-proof-${{ matrix.os }}
+          path: docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}/**
+          if-no-files-found: error
+
+  r277-browser-mutations:
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-24.04' || matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        shard: [1, 2, 3]
+    env:
+      R277_MEASURE_ONLY: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install independent R277 browser dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Prepare independent R277 browser backend
+        id: fixture_build
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs build-browser --backend "$RUNNER_TEMP/r277-browser-mutants-${{ matrix.shard }}.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}-mutations-${{ matrix.shard }}"
+      - name: R277 strict real-browser geometry and 400-match matrix
+        if: ${{ !cancelled() && steps.fixture_build.outcome == 'success' }}
+        id: r277_strict
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs browser --backend "$RUNNER_TEMP/r277-browser-mutants-${{ matrix.shard }}.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}-mutations-${{ matrix.shard }}"
+      - name: R277 actual browser mutations
+        if: ${{ !cancelled() && steps.r277_strict.outcome == 'success' }}
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs browser-mutants --shard ${{ matrix.shard }} --backend "$RUNNER_TEMP/r277-browser-mutants-${{ matrix.shard }}.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}-mutations-${{ matrix.shard }}"
+      - name: Clean only R277 browser generated executable and dedicated Go cache
+        if: always()
+        shell: bash
+        run: node scripts/r277-ci-orchestrate.cjs cleanup-browser --backend "$RUNNER_TEMP/r277-browser-mutants-${{ matrix.shard }}.exe" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}-mutations-${{ matrix.shard }}"
+      - name: R279 failure triage (facts only, never changes the result)
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-browser-mutations-${{ matrix.os }}-${{ matrix.shard }} --base release-base --evidence "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}-mutations-${{ matrix.shard }}" --out "docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}-mutations-${{ matrix.shard }}/triage.json" --annotate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r277-browser-mutations-${{ matrix.os }}-${{ matrix.shard }}
+          path: docs/history/reports/r277/ci-integration/browser-${{ matrix.os }}-mutations-${{ matrix.shard }}/**
+          if-no-files-found: error
+
+  windows-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # R265 verifies the exact published 079 tag resource in memory.
+      - name: R261 normal-close window bounds regression and assertion mutation
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: ./scripts/r261-window-bounds.test.ps1
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Verify local notes and assistant instructions are not tracked
+        if: ${{ !cancelled() }}
+        run: node scripts/verify-no-docs-tracked.cjs
+      - name: Prepare verified published update compatibility input
+        if: ${{ !cancelled() }}
+        run: node scripts/prepare-r238-update-fixture.cjs
+      - name: Install Windows test dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      # Audit unchanged production source on the fresh native runtime, before
+      # Go/build fixtures create processes and replace npm dependencies.
+      - name: Real default Electron first-frame license absence audit
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          R248_ELECTRON_OUTPUT: ${{ runner.temp }}/deep-legends-r238-default-electron
+        run: |
+          node -e "require('./scripts/r248-electron.cjs').probe({phase:'after',state:'DISABLED',frontendAssetDirectory:'default',storedBounds:{x:40,y:40,width:1050,height:750,maximized:false}}).then(r=>console.log(JSON.stringify(r.shows))).catch(e=>{console.error(e);process.exitCode=1})"
+          if ($LASTEXITCODE -ne 0) { throw "Default first-frame audit failed" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r238-default-electron-windows
+          path: ${{ runner.temp }}/deep-legends-r238-default-electron/**
+      - name: Build desktop client and checksums
+        id: desktop_build
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $version = node -p "require('./desktop/package.json').version"
+          if ($LASTEXITCODE -ne 0) { throw "Unable to read desktop package version" }
+          $fakeCipher = (& go run ./backend -encrypt-riot-key 'RGAPI-00000000-0000-0000-0000-000000000000').Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $fakeCipher) { throw "Fake key encryption failed" }
+          ./build-desktop-windows.ps1 -Version $version -KeyMode public -SkipTestsInCI -RiotAPIKeyCipher $fakeCipher
+          if ($LASTEXITCODE -ne 0) { throw "Desktop build failed" }
+          $env:DEEP_LEGENDS_KEY_MODE='public'
+          node desktop/verify-embedded-riot-key.cjs --expect-fake
+          if ($LASTEXITCODE -ne 0) { throw "Fake embedded key verification failed" }
+      - name: Verify checksums
+        id: checksums
+        if: ${{ !cancelled() && steps.desktop_build.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          Get-Content dist/desktop/SHA256SUMS-public.txt | ForEach-Object {
+            $parts = $_ -split '  ', 2
+            $actual = (Get-FileHash -Algorithm SHA256 (Join-Path dist/desktop $parts[1])).Hash.ToLowerInvariant()
+            if ($actual -ne $parts[0]) { throw "Checksum mismatch: $($parts[1])" }
+          }
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.desktop_build.outcome == 'success' && steps.checksums.outcome == 'success' }}
+        with:
+          name: deep-legends-windows-x64
+          path: |
+            dist/desktop/*.exe
+            dist/desktop/*.zip
+            dist/desktop/SHA256SUMS-public.txt
+          if-no-files-found: error
+      - name: R279 native upgrade stage collection and dependency proofs
+        env:
+          GODEBUG: invalidptr=1
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: ./scripts/r279-upgrade-stages.test.ps1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require native Windows race compiler
+        env:
+          GODEBUG: invalidptr=1
+        shell: pwsh
+        run: |
+          if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
+            $compiler = @('C:\mingw64\bin', 'C:\msys64\mingw64\bin') | Where-Object { Test-Path (Join-Path $_ 'gcc.exe') } | Select-Object -First 1
+            if (-not $compiler) { throw 'Windows race compiler is unavailable' }
+            $compiler | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+      - name: Prepare native R277 Go dependencies
+        if: ${{ !cancelled() }}
+        env:
+          GODEBUG: invalidptr=1
+        shell: pwsh
+        run: |
+          go mod download
+          if ($LASTEXITCODE -ne 0) { throw 'R277 backend dependencies failed' }
+          Push-Location installer
+          try {
+            go mod download
+            if ($LASTEXITCODE -ne 0) { throw 'R277 installer dependencies failed' }
+          } finally { Pop-Location }
+      - name: Measure every native R277 Go test including reopen and L5
+        env:
+          GODEBUG: invalidptr=1
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          python scripts/r277-ci-proof.py --out docs/history/reports/r277/ci-integration/native-windows/go-measurements
+          if ($LASTEXITCODE -ne 0) { throw 'Native R277 Go measurement or pass inventory failed' }
+      - name: R277 P11 native fixed PASS and both old-pointer fatal mutations
+        env:
+          GODEBUG: invalidptr=1
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          python scripts/r277-installer-callbacks.py --native --out docs/history/reports/r277/ci-integration/native-windows/p11
+          if ($LASTEXITCODE -ne 0) { throw 'P11 native callback race/GC regression or fatal mutation proof failed' }
+      - name: R279 failure triage (facts only, never changes the result)
+        env:
+          GODEBUG: invalidptr=1
+        if: failure()
+        shell: bash
+        run: node scripts/ci-failure-triage.cjs --job r277-native-windows --base release-base --evidence "docs/history/reports/r277/ci-integration/native-windows" --out "docs/history/reports/r277/ci-integration/native-windows/triage.json" --annotate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r277-native-windows-proof
+          path: docs/history/reports/r277/ci-integration/native-windows/**
+          if-no-files-found: error
+
+  windows-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install desktop test dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Prepare verified published update compatibility input
+        if: ${{ !cancelled() }}
+        run: node scripts/prepare-r238-update-fixture.cjs
+      # R225: restore all Windows-compiled shared paths, not only Linux skips.
+      # Includes TestUpdate*, TestR204KeySaveAndClear, TestR204KeyRuntime401AndPrivacy
+      # and TestSplitRegistryPathSupportsNativeTencentKeys. JSON proves actual passes.
+      - name: Prepare backend Go dependencies before offline tests
+        if: ${{ !cancelled() }}
+        run: go mod download
+      - name: Prepare installer Go dependencies before offline tests
+        if: ${{ !cancelled() }}
+        working-directory: installer
+        run: go mod download
+      - name: Test full Windows backend suite
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $env:R276_OFFLINE_OUTPUT="$env:RUNNER_TEMP/r276-backend-offline.json"
+          node scripts/r276-offline.cjs -- node scripts/run-ci-tests.cjs go backend
+          if ($LASTEXITCODE -ne 0) { throw "Windows backend tests or pass inventory failed" }
+      - name: Test full Windows installer suite
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $env:R276_OFFLINE_OUTPUT="$env:RUNNER_TEMP/r276-installer-offline.json"
+          node scripts/r276-offline.cjs -- node scripts/run-ci-tests.cjs go installer
+          if ($LASTEXITCODE -ne 0) { throw "Windows installer tests or pass inventory failed" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r276-windows-offline-proof
+          path: |
+            ${{ runner.temp }}/r276-*-offline.json
+            ${{ runner.temp }}/r287-go-timing-*.jsonl
+            ${{ runner.temp }}/r287-timing-*.jsonl
+          if-no-files-found: error
+      - name: R252 thirty independent R104 cold-start timelines
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          go test -c -o "$env:RUNNER_TEMP/r252-r104.test.exe" ./backend
+          if ($LASTEXITCODE -ne 0) { throw "R104 soak compilation failed" }
+          python scripts/r252-r104-soak.py --binary "$env:RUNNER_TEMP/r252-r104.test.exe" --output "$env:RUNNER_TEMP/r252-r104-windows" --iterations 30
+          if ($LASTEXITCODE -ne 0) { throw "R104 soak failure; original timelines retained" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r252-r104-windows
+          path: ${{ runner.temp }}/r252-r104-windows/**
+      - name: R252 native diagnostic timestamp regression and assertion mutation
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: ./scripts/r252-diagnostic-time.test.ps1
+      # Filtered platform gates must match their exact counts with zero skips.
+      - name: Test Windows-only release and PowerShell guards
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          R82_POWERSHELL: powershell.exe
+        run: |
+          node scripts/run-ci-tests.cjs node --expected-tests=2 --test-name-pattern="R86 Windows release|R222 Windows" desktop/release-quality-gates.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw "Windows release gates failed" }
+          node scripts/run-ci-tests.cjs node --expected-tests=1 --test-name-pattern="setup-only Windows CI skip" scripts/setup-only-build.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw "Windows setup-only guards failed" }
+          node scripts/run-ci-tests.cjs node --expected-tests=2 scripts/r82-startup-ab-script.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw "PowerShell script guards failed" }
+      # Release branch pushes measure Windows;
+      # dispatch retains its explicit, default-true input.
+      - name: Measure full desktop renderer tests on Windows
+        if: ${{ !cancelled() && ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/diagnostic-r279-r314-')) || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers)) }}
+        shell: pwsh
+        env:
+          R222_NODE_TIMING_OUTPUT: ${{ runner.temp }}/renderer-timings-windows.json
+        run: |
+          node scripts/test-renderers.cjs desktop
+          if ($LASTEXITCODE -ne 0) { throw "Windows renderer test or time budget failed" }
+      - uses: actions/upload-artifact@v4
+        if: always() && ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/diagnostic-r279-r314-')) || (github.event_name == 'workflow_dispatch' && inputs.measure_windows_renderers))
+        with:
+          name: renderer-timings-windows
+          path: ${{ runner.temp }}/renderer-timings-windows.json
+
+  windows-upgrade:
+    needs: windows-build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install desktop test dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - uses: actions/download-artifact@v4
+        with:
+          name: deep-legends-windows-x64
+          path: dist/desktop
+      - name: Real 0.12.65/0.12.68/0.12.76 installation and candidate upgrade
+        shell: pwsh
+        run: |
+          $version = node -p "require('./desktop/package.json').version"
+          ./scripts/r206-real-upgrade-windows.ps1 -Setup "dist/desktop/Deep Legends Setup $version-public.exe"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r206-real-upgrade-evidence
+          path: ${{ runner.temp }}/deep-legends-r206-real-upgrade/evidence/*
+          if-no-files-found: warn
+
+  browser-main:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install desktop test dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Require real Chromium
+        shell: bash
+        run: |
+          chrome="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+          test -n "$chrome"
+          echo "CHROME_BIN=$chrome" >> "$GITHUB_ENV"
+      - name: Run isolated offline browser guards
+        run: node scripts/r276-browser-job.cjs main "$RUNNER_TEMP/r276-browser-main"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux-shard-main
+          path: ${{ runner.temp }}/r276-browser-main/**
+          if-no-files-found: error
+
+  mutations-1:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install desktop test dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Prepare Go dependencies before offline mutations
+        if: ${{ !cancelled() }}
+        run: go mod download
+      - name: Run isolated mutation shard
+        run: node scripts/r276-mutation-job.cjs 1 "$RUNNER_TEMP/r276-mutations-1"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux-shard-mutations-1
+          path: ${{ runner.temp }}/r276-mutations-1/**
+          if-no-files-found: error
+
+  mutations-3:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install desktop test dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix desktop
+      - name: Prepare Go dependencies before offline mutations
+        if: ${{ !cancelled() }}
+        run: go mod download
+      - name: Run isolated mutation shard
+        run: node scripts/r276-mutation-job.cjs 3 "$RUNNER_TEMP/r276-mutations-3"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium-guards-linux-shard-mutations-3
+          path: ${{ runner.temp }}/r276-mutations-3/**
+          if-no-files-found: error
+
+  triage-legacy:
+    if: ${{ always() && !cancelled() }}
+    needs: [quality-go, quality-web, quality-web-total, quality-mutations, windows-build, windows-tests, windows-upgrade, browser-main, mutations-1, r277-proof-linux-1, r277-proof-linux-2, r277-browser-matrix, r277-browser-mutations, mutations-3]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: R279 failed-step digest (facts only, never changes the result)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          dir="$RUNNER_TEMP/triage"; mkdir -p "$dir"; : > "$dir/failed.log"
+          api="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs"
+          gh api "$api" --paginate --jq '.jobs[] | select(.conclusion=="failure") | .id' > "$dir/jobs.txt" 2> "$dir/gh-error.txt"
+          gh api "$api" --paginate --jq '.jobs[] | select(.conclusion=="failure") | .name as $j | .steps[] | select(.conclusion=="failure") | "\($j) / \(.name)"' 2>> "$dir/gh-error.txt" | head -20 | sed 's/^/::notice title=failed step::/'
+          for id in $(cat "$dir/jobs.txt"); do
+            curl -sSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/jobs/$id/logs" 2>> "$dir/gh-error.txt" | sed -E 's/^[^0-9]*[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z //' >> "$dir/failed.log"
+          done
+          node scripts/ci-failure-triage.cjs --job legacy --base release-base --log "$dir/failed.log" --out "$dir/triage-legacy.json" --annotate
+          echo "::notice title=digest input::failed jobs=$(wc -l < "$dir/jobs.txt") log bytes=$(wc -c < "$dir/failed.log") log lines=$(wc -l < "$dir/failed.log") first api error=$(head -c 160 "$dir/gh-error.txt" | tr '\n' ' ')"
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: triage-legacy
+          if-no-files-found: ignore
+          path: ${{ runner.temp }}/triage/**
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: chromium-guards-linux-shard-*
+          merge-multiple: true
+          path: evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chromium-guards-linux
+          path: evidence/**
+          if-no-files-found: error
