@@ -79,6 +79,9 @@ const context = vm.createContext({ __dirname: desktop, URL, Buffer, console,
       child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
       child.stdout.setEncoding = child.stderr.setEncoding = () => {}; child.kill = () => {}; return child;
     } };
+    if (name === "./resize-border.cjs") return { installResizeBorder(window) {
+      assert.ok(window instanceof Window); window.nativeResizeBound = true; return true;
+    } };
     if (name === "./share-export.cjs") return { createShareExportController: () => ({ clear() {}, getSaveDirectory: () => ({ directory }) }) };
     if (name === "./window-bounds-store.cjs") return { readWindowBounds: () => null, writeWindowBounds() {} };
     if (name === "./proxy-resolution.cjs") return { resolveSystemProxy: async () => "" };
@@ -137,6 +140,7 @@ async function run() {
   now = 1200; splash.webContents.emit("did-finish-load");
   now = 1400; child.stdout.emit("data", `LOOT_READY ${JSON.stringify({ baseUrl, bootstrapUrl: `${baseUrl}/?bootstrap=${token}`, token })}\n`);
   const main = windows[1]; assert.ok(main); assert.equal(main.options.show, false); assert.equal(main.contentProtection, false);
+  assert.equal(main.nativeResizeBound, true, "synthetic Windows shell must bind its own native resize adapter");
   const expected = ["backend_ready", "main_window_created"];
   let events = await checkSnapshot(expected);
   assert.equal(main.visible, false); assert.equal(splash.visible, true);
