@@ -70,7 +70,11 @@ static LRESULT CALLBACK ChildResizeBorder(HWND hwnd, UINT message, WPARAM wp,
     }
   }
   if (message == WM_SETCURSOR && ApplyResizeCursor(parent)) return TRUE;
-  return DefSubclassProc(hwnd, message, wp, lp);
+  const LRESULT original = DefSubclassProc(hwnd, message, wp, lp);
+  // Chromium also chooses a web cursor while processing non-client movement.
+  // Preserve that default dispatch, then restore strip ownership on this event.
+  if (message == WM_NCMOUSEMOVE) ApplyResizeCursor(parent);
+  return original;
 }
 
 static BOOL CALLBACK InstallChild(HWND child, LPARAM root) {
@@ -93,6 +97,7 @@ static LRESULT CALLBACK ResizeBorder(HWND hwnd, UINT message, WPARAM wp,
   }
   if (message == WM_SETCURSOR && ApplyResizeCursor(hwnd)) return TRUE;
   const LRESULT original = DefSubclassProc(hwnd, message, wp, lp);
+  if (message == WM_NCMOUSEMOVE) ApplyResizeCursor(hwnd);
   if (message == WM_PARENTNOTIFY && LOWORD(wp) == WM_CREATE)
     EnumChildWindows(hwnd, InstallChild, reinterpret_cast<LPARAM>(hwnd));
   if (message != WM_NCHITTEST) return original;
