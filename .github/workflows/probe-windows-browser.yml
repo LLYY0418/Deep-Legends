@@ -96,6 +96,15 @@ jobs:
           Get-MpComputerStatus|ConvertTo-Json -Depth 6|Set-Content "$out/defender-before.json"
           if(-not (Get-MpComputerStatus).RealTimeProtectionEnabled){try{Set-MpPreference -DisableRealtimeMonitoring $false}catch{$_|Out-String|Set-Content "$out/defender-enable-error.txt"}}
           Get-MpComputerStatus|ConvertTo-Json -Depth 6|Set-Content "$out/defender-after.json"
+      - name: Fresh checkout dependencies for real Electron probe
+        run: npm ci --prefix desktop
+      - name: Real default first-frame before packaging
+        shell: pwsh
+        env:
+          R248_ELECTRON_OUTPUT: ${{ runner.temp }}/r314-installer/first-frame
+        run: |
+          node -e "require('./scripts/r248-electron.cjs').probe({phase:'after',state:'DISABLED',frontendAssetDirectory:'default',storedBounds:{x:40,y:40,width:1050,height:750,maximized:false}}).then(r=>console.log(JSON.stringify(r.shows))).catch(e=>{console.error(e);process.exitCode=1})"
+          if($LASTEXITCODE -ne 0){throw 'fresh native first-frame probe failed'}
       - name: Build real candidate payload
         shell: pwsh
         run: |
