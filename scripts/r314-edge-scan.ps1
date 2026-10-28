@@ -17,15 +17,28 @@ public static class R314HitTest {
  [DllImport("user32.dll")]static extern bool GetCursorPos(out Point point);
  [DllImport("user32.dll")]static extern IntPtr WindowFromPoint(Point point);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern int GetClassName(IntPtr h,StringBuilder name,int count);
- [DllImport("user32.dll")]static extern bool SetCursorPos(int x,int y);
+ [StructLayout(LayoutKind.Sequential)]public struct MouseInput{public int dx,dy;public uint mouseData,flags,time;public UIntPtr extra;}
+ [StructLayout(LayoutKind.Sequential)]public struct Input{public uint type;public MouseInput mouse;}
+ [DllImport("user32.dll",SetLastError=true)]static extern uint SendInput(uint count,Input[] inputs,int size);
+ [DllImport("user32.dll")]static extern int GetSystemMetrics(int index);
+ // SetCursorPos only warps coordinates: it does not restore a cursor suppressed
+ // by touch/pen input on a hosted desktop. Inject genuine mouse MOVE input;
+ // never SetCursor/ShowCursor from the probe or relax CURSOR_SHOWING below.
+ public static void MovePointer(int x,int y){
+  int left=GetSystemMetrics(76),top=GetSystemMetrics(77),width=GetSystemMetrics(78),height=GetSystemMetrics(79);
+  if(width<=0||height<=0)throw new Exception("Invalid virtual desktop size");
+  var input=new Input{type=0,mouse=new MouseInput{dx=(int)(((long)(x-left)*65536+32768)/width),dy=(int)(((long)(y-top)*65536+32768)/height),flags=0xC001}};
+  if(SendInput(1,new[]{input},Marshal.SizeOf(typeof(Input)))!=1)throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),"Real mouse MOVE injection failed");
+  System.Threading.Thread.Sleep(30);Point point;GetCursorPos(out point);if(point.x!=x||point.y!=y)throw new Exception("Mouse MOVE did not reach the exact physical pixel");
+ }
  [DllImport("user32.dll")]static extern void mouse_event(uint flags,uint x,uint y,uint data,UIntPtr extra);
  [DllImport("user32.dll")]static extern bool SetForegroundWindow(IntPtr h);
  public static object[] Drags(long handle){var h=new IntPtr(handle);Rect original;GetWindowRect(h,out original);var results=new List<object>();foreach(var edge in new[]{"left","right","bottom","bottomleft","bottomright"})foreach(int offset in new[]{-6,2}){
   SetWindowPos(h,new IntPtr(-1),original.left,original.top,original.right-original.left,original.bottom-original.top,0x0040);SetForegroundWindow(h);System.Threading.Thread.Sleep(80);
   Rect r;DwmGetWindowAttribute(h,9,out r,Marshal.SizeOf(typeof(Rect)));int x=(r.left+r.right)/2,y=(r.top+r.bottom)/2,dx=0,dy=0;
   if(edge=="left"||edge=="bottomleft"){x=r.left+offset;dx=-24;}if(edge=="right"||edge=="bottomright"){x=r.right-1-offset;dx=24;}if(edge.StartsWith("bottom")){y=r.bottom-1-offset;dy=24;}
-  Rect before;GetWindowRect(h,out before);SetCursorPos(x,y);System.Threading.Thread.Sleep(30);Point cursorBefore;GetCursorPos(out cursorBefore);var input=WindowFromPoint(cursorBefore);var inputClass=new StringBuilder(256);GetClassName(input,inputClass,256);long inputHit=SendMessage(input,0x84,IntPtr.Zero,new IntPtr((y<<16)|(x&65535))).ToInt64();int cursorID=edge=="left"||edge=="right"?32644:edge=="bottom"?32645:edge=="bottomleft"?32643:32642;var expectedCursor=LoadCursor(IntPtr.Zero,new IntPtr(cursorID));var info=new CursorInfo{size=Marshal.SizeOf(typeof(CursorInfo))};bool cursorMatches=false;for(int retry=0;retry<20;retry++){if(GetCursorInfo(ref info)&&expectedCursor!=IntPtr.Zero&&(info.flags&1)!=0&&info.cursor==expectedCursor){cursorMatches=true;break;}System.Threading.Thread.Sleep(10);}mouse_event(2,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(60);SetCursorPos(x+dx,y+dy);System.Threading.Thread.Sleep(120);mouse_event(4,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(60);Point cursorAfter;GetCursorPos(out cursorAfter);Rect after;GetWindowRect(h,out after);
-  bool changed=(dx==0||Math.Abs((after.right-after.left)-(before.right-before.left))>=12)&&(dy==0||Math.Abs((after.bottom-after.top)-(before.bottom-before.top))>=12);results.Add(new{edge,offset,x,y,changed,before,after,cursorBefore,cursorAfter,inputWindow=input.ToInt64(),inputClass=inputClass.ToString(),inputHit,cursorMatches,cursorID,cursorFlags=info.flags,actualCursor=info.cursor.ToInt64(),expectedCursor=expectedCursor.ToInt64()});
+  Rect before;GetWindowRect(h,out before);var cursorInitial=new CursorInfo{size=Marshal.SizeOf(typeof(CursorInfo))};GetCursorInfo(ref cursorInitial);MovePointer(x,y);System.Threading.Thread.Sleep(30);Point cursorBefore;GetCursorPos(out cursorBefore);var input=WindowFromPoint(cursorBefore);var inputClass=new StringBuilder(256);GetClassName(input,inputClass,256);long inputHit=SendMessage(input,0x84,IntPtr.Zero,new IntPtr((y<<16)|(x&65535))).ToInt64();int cursorID=edge=="left"||edge=="right"?32644:edge=="bottom"?32645:edge=="bottomleft"?32643:32642;var expectedCursor=LoadCursor(IntPtr.Zero,new IntPtr(cursorID));var info=new CursorInfo{size=Marshal.SizeOf(typeof(CursorInfo))};bool cursorMatches=false;for(int retry=0;retry<20;retry++){if(GetCursorInfo(ref info)&&expectedCursor!=IntPtr.Zero&&(info.flags&1)!=0&&info.cursor==expectedCursor){cursorMatches=true;break;}System.Threading.Thread.Sleep(10);}mouse_event(2,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(60);MovePointer(x+dx,y+dy);System.Threading.Thread.Sleep(120);mouse_event(4,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(60);Point cursorAfter;GetCursorPos(out cursorAfter);Rect after;GetWindowRect(h,out after);
+  bool changed=(dx==0||Math.Abs((after.right-after.left)-(before.right-before.left))>=12)&&(dy==0||Math.Abs((after.bottom-after.top)-(before.bottom-before.top))>=12);results.Add(new{edge,offset,x,y,changed,before,after,cursorBefore,cursorAfter,inputWindow=input.ToInt64(),inputClass=inputClass.ToString(),inputHit,cursorMatches,cursorID,cursorInitialFlags=cursorInitial.flags,cursorFlags=info.flags,actualCursor=info.cursor.ToInt64(),expectedCursor=expectedCursor.ToInt64()});
  }SetWindowPos(h,IntPtr.Zero,original.left,original.top,original.right-original.left,original.bottom-original.top,0x0040);return results.ToArray();}
  [DllImport("user32.dll")]static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int height,uint flags);
  [DllImport("user32.dll",EntryPoint="GetWindowLongPtrW")]static extern IntPtr GetWindowLongPtr(IntPtr h,int index);
