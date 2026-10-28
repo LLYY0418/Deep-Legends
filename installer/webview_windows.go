@@ -93,6 +93,12 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		a.timing.mark("webview_ready")
 		log.Print("installer page ready; WebView visible")
 		if a.options.Update {
+			var err error
+			a.ackSent, err = acknowledgeUpdateShell(a.options, w.shown && a.pageReady, func(line string) error { _, err := fmt.Fprintln(os.Stdout, line); return err }, a.timing.mark)
+			if err != nil {
+				a.fail(failureMessage{Message: upgradeFailureMessage})
+				return
+			}
 			if a.payloadError != nil {
 				a.fail(failureMessage{Message: upgradeFailureMessage})
 				return

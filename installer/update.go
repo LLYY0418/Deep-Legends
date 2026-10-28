@@ -142,8 +142,7 @@ func recoverUpdateApplication(options installerOptions, exeName string, parentEx
 	return err == nil
 }
 
-// The protocol line remains identical for 0.13.1 parents. A visible native
-// shell, not WebView document readiness, is the new handoff boundary.
+// Preserve the parent protocol; only a visible, ready progress page may ACK.
 func acknowledgeUpdateShell(options installerOptions, shown bool, report func(string) error, mark func(string)) (bool, error) {
 	if !options.Update || !options.ParentFirst {
 		return false, nil

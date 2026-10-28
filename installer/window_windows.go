@@ -160,9 +160,6 @@ func shellWndProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) 
 	w := activeWindow
 	if w != nil {
 		switch message {
-		case WM_PAINT:
-			w.paintStartup(hwnd)
-			return 0
 		case WM_SIZE:
 			if w.surface != nil {
 				if wParam == 1 {
@@ -251,12 +248,13 @@ func (w *shellWindow) drag() {
 
 func (w *shellWindow) show() {
 	showWindow.Call(w.hwnd, SW_SHOW)
-	if !w.shown {
-		w.shown = true
-		w.timing.mark("shell_window_shown")
-	}
+	first := !w.shown
+	w.shown = true
 	setForegroundWindow.Call(w.hwnd)
 	user32.NewProc("UpdateWindow").Call(w.hwnd)
+	if first {
+		w.timing.mark("page_visible")
+	}
 	if w.chromium != nil {
 		w.chromium.Focus()
 	}
@@ -289,30 +287,4 @@ func acquireSingleInstance() (windows.Handle, bool, error) {
 		return 0, false, nil
 	}
 	return mutex, err == nil, err
-}
-
-func (w *shellWindow) paintStartup(hwnd uintptr) {
-	type paintStruct struct {
-		DC                 uintptr
-		Erase              int32
-		Rect               winRect
-		Restore, IncUpdate int32
-		Reserved           [32]byte
-	}
-	var paint paintStruct
-	dc, _, _ := user32.NewProc("BeginPaint").Call(hwnd, uintptr(unsafe.Pointer(&paint)))
-	defer user32.NewProc("EndPaint").Call(hwnd, uintptr(unsafe.Pointer(&paint)))
-	if dc == 0 || w.webviewReady {
-		return
-	}
-	var rect winRect
-	user32.NewProc("GetClientRect").Call(hwnd, uintptr(unsafe.Pointer(&rect)))
-	gdi := windows.NewLazySystemDLL("gdi32.dll")
-	gdi.NewProc("SetBkMode").Call(dc, 1)
-	gdi.NewProc("SetTextColor").Call(dc, 0x00F0EAE8)
-	font, _, _ := gdi.NewProc("GetStockObject").Call(17)
-	old, _, _ := gdi.NewProc("SelectObject").Call(dc, font)
-	defer gdi.NewProc("SelectObject").Call(dc, old)
-	text := windows.StringToUTF16Ptr("正在启动升级程序…")
-	user32.NewProc("DrawTextW").Call(dc, uintptr(unsafe.Pointer(text)), ^uintptr(0), uintptr(unsafe.Pointer(&rect)), 0x25)
 }

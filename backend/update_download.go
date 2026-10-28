@@ -166,6 +166,9 @@ func (u *updateManager) download(background bool) error {
 			u.status.Progress = updateProgress{ReceivedBytes: manifest.Asset.Size, TotalBytes: manifest.Asset.Size}
 		}
 		u.mu.Unlock()
+		if err == nil && ctx.Err() == nil {
+			u.warmReadyInstaller(manifest)
+		}
 		u.publish()
 	}()
 	return nil

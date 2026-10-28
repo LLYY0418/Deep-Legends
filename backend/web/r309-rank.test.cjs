@@ -76,19 +76,19 @@ test('R309 P11 season summary cannot replace verified upstream records or cross 
 });
 
 test('R312 truncated season keeps aggregate 40/38 across eleven official 49-win loads and summary fills',async()=>{
- const truncated=(filled,official=49,wins=40)=>{const data=response(filled);data.ranks[0]={...data.ranks[0],wins:filled?wins:official,officialWins:official,wins:filled?official:official,losses:filled?(wins===40?47:46):0,winRate:filled?51:-1,recordEstimated:filled,recordSampleWins:wins,recordSampleLosses:38,recordSampleGames:wins+38,recordPending:!filled};return data;};
+ const truncated=(filled,official=49,wins=40)=>{const data=response(filled);data.ranks[0]={...data.ranks[0],wins:filled?wins:official,officialWins:official,wins:filled?official:official,losses:filled?(47):0,winRate:filled?51:-1,recordEstimated:filled,recordSampleWins:wins,recordSampleLosses:38,recordSampleGames:wins+38,recordPending:!filled};return data;};
  const f=fixture([]),tab={key:'truncated',playerRef:'opaque-player',serverId:'HN1'};
  tab.data=f.acceptRankRecords(tab,truncated(true),'initial');
  for(let i=0;i<11;i++){
   tab.data=f.acceptRankRecords(tab,truncated(false),'refresh');
   assert.equal(tab.data.ranks[0].recordPending,false,'load '+i);
-  assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/49胜 <span class="rank-record-estimate">≈<\/span>47负/,'load '+i);
+  assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/49胜 47负/,'load '+i);
  }
  const reopened={key:'reopened',playerRef:'opaque-player',serverId:'HN1'};
  assert.equal(f.acceptRankRecords(reopened,truncated(false),'cache').ranks[0].losses,47);
  const pending=truncated(false,50);tab.data=f.acceptRankRecords(tab,pending,'refresh');assert.equal(tab.data.ranks[0].recordPending,true);
  await f.refreshSeasonSummary(tab,{seasonStatsProgress:pending.seasonStatsProgress,ranks:truncated(true,50,41).ranks,seasonQueueStats:{420:{games:79,wins:41,losses:38,winRate:52}}});
- assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/50胜 <span class="rank-record-estimate">≈<\/span>46负/);
+ assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/50胜 47负/);
  assert.equal(tab.data.ranks[0].officialWins,50);assert.equal(tab.data.ranks[0].recordPending,false);
  tab.data=f.acceptRankRecords(tab,truncated(true,50,41),'refresh');assert.equal(tab.data.ranks[0].officialWins,50);
 });

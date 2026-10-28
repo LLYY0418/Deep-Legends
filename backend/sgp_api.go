@@ -1183,6 +1183,7 @@ func (p *sgpProvider) rankedStatsOn(ctx context.Context, client *LCUClient, serv
 		return sgpRankedStats{}, err
 	}
 	p.rankedShapeOnce.Do(func() {
+		p.recordObservation(diagnosticRankedSeasonsShape(raw, "sgp"))
 		p.recordObservation(map[string]any{
 			"event": "sgp_ranked_stats_shape", "is_self": isSelf,
 			"privacy": diagnosticPrivacy(privacy), "body_bytes": len(raw), "queue_count": len(payload.Queues),

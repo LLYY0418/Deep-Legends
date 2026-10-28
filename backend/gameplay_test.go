@@ -1809,7 +1809,7 @@ func TestSeasonRankWinRateFallbackFillsOnlyIncompleteSGPRanks(t *testing.T) {
 			420: {QueueID: 420, Games: 50, Wins: 30, Losses: 20, WinRate: 60},
 			440: {QueueID: 440, Games: 20, Wins: 5, Losses: 15, WinRate: 25},
 		}})
-	if ranks[0].Wins != 107 || ranks[0].Losses != 71 || ranks[0].WinRate != 60 || ranks[1].Wins != 12 || ranks[1].Losses != 36 || ranks[1].WinRate != 25 {
+	if ranks[0].Wins != 107 || ranks[0].Losses != 97 || ranks[0].WinRate != 52 || ranks[1].Wins != 12 || ranks[1].Losses != 22 || ranks[1].WinRate != 35 {
 		t.Fatalf("season fallback ranks = %#v", ranks)
 	}
 	if ranks[0].Wins == 35 || ranks[1].Wins == 35 {
@@ -1822,7 +1822,7 @@ func TestSeasonRankWinRateFallbackFillsOnlyIncompleteSGPRanks(t *testing.T) {
 	lcuFilled, lcuCapability := a.applySeasonRankWinRateFallback(
 		[]gameplayRank{{QueueType: "RANKED_SOLO_5x5", Wins: 107, Losses: 0, WinRate: -1}},
 		EndpointCapability{Path: "/lol-ranked/v1/ranked-stats/{player}"}, seasonRankRecordSnapshot{progress: seasonStatsProgress{Complete: true, RankedComplete: true}, byQueue: map[int64]gameplayAggregate{420: {Games: 100, Wins: 57, Losses: 43, WinRate: 57}}})
-	if lcuFilled[0].Wins != 107 || lcuFilled[0].Losses != 81 || lcuFilled[0].WinRate != 57 || lcuCapability.Detail != "上游未返回排位负场，已按赛季战绩聚合补全胜率" {
+	if lcuFilled[0].Wins != 107 || lcuFilled[0].Losses != 93 || lcuFilled[0].WinRate != 54 || lcuCapability.Detail != "上游未返回排位负场，已按赛季战绩聚合补全胜率" {
 		t.Fatalf("LCU season fallback = ranks:%#v capability=%#v", lcuFilled, lcuCapability)
 	}
 }

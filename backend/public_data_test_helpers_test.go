@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -18,6 +19,12 @@ func newPublicDataTestProvider(t *testing.T, root string, transport http.RoundTr
 	p := newChampionProvider()
 	p.cache = newChampionDataCache(store)
 	p.client = &http.Client{Transport: transport}
+	// Registered after store cleanup: stop and drain the provider-owned queue first.
+	t.Cleanup(func() {
+		if err := p.cache.closeDisk(context.Background()); err != nil {
+			t.Error(err)
+		}
+	})
 	return p
 }
 func publicDataResponse(request *http.Request, data []byte) *http.Response {

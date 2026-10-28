@@ -87,7 +87,6 @@ func (s *WindowsSurface) Navigate(html string) error {
 }
 func (s *WindowsSurface) Show() error {
 	s.DeferVisible = false
-	s.ShowWindow()
 	// Creating the controller under a hidden parent and revealing only the
 	// parent is insufficient. Synchronize both its bounds and its visibility.
 	if err := s.Prepare(); err != nil {
@@ -100,6 +99,7 @@ func (s *WindowsSurface) Show() error {
 	if visible == 0 {
 		return errors.New("WebView controller remained hidden")
 	}
+	s.ShowWindow()
 	return nil
 }
 func (s *WindowsSurface) Close() {

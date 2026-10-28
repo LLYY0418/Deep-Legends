@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"runtime"
@@ -13,6 +12,10 @@ import (
 )
 
 func main() {
+	if installerWarmup(os.Args[1:]) {
+		return
+	}
+	processCreatedToMain := processCreatedToMainMillis()
 	defer webviewhost.StartupLog("DeepLegendsSetup")()
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -35,6 +38,7 @@ func main() {
 	if options.Update {
 		timing = newUpdateInstallTiming()
 		timing.mark("installer_start")
+		timing.duration("process_created_to_main_ms", processCreatedToMain)
 		if options.Error != nil {
 			return
 		}
@@ -69,15 +73,6 @@ func main() {
 
 	if options.Update {
 		w.starting = true
-		w.show()
-		app.ackSent, err = acknowledgeUpdateShell(options, w.shown, func(line string) error { _, err := fmt.Fprintln(os.Stdout, line); return err }, timing.mark)
-		if err != nil {
-			w.starting = false
-			destroyWindow.Call(w.hwnd)
-			runMessageLoop()
-			webviewhost.ReportStartupFailure("DeepLegendsSetup", "升级", errors.New(upgradeFailureMessage))
-			return
-		}
 	}
 	if err := webviewhost.CheckRuntime(); err != nil {
 		w.starting = false

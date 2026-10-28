@@ -65,3 +65,5 @@ riot_key.local.*
 /docs/
 /CLAUDE.md
 /AGENTS.md
+
+/output/

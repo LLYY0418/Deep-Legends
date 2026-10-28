@@ -36,13 +36,13 @@ func estimateSeasonRankRecord(official int, aggregate gameplayAggregate, scanned
 	}
 	v.wins = official
 	v.estimated = true
-	if aggregate.Games < 10 || aggregate.Wins == 0 {
+	if aggregate.Games < 10 {
 		v.losses = 0
 		v.winRate = -1
 		v.lossUnknown = true
 		return v
 	}
-	v.losses = int(math.Round(float64(official) * float64(aggregate.Losses) / float64(aggregate.Wins)))
+	v.losses = aggregate.Losses + (official - aggregate.Wins)
 	v.winRate = int(math.Round(float64(v.wins) * 100 / float64(v.wins+v.losses)))
 	return v
 }

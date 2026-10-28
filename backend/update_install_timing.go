@@ -75,10 +75,13 @@ func consumeUpdateInstallTiming(root string, record func(map[string]any)) {
 	if start, end := stages["parent_exited"], stages["uninstall_old_start"]; start > 0 && end >= start && end <= time.Now().UnixMilli()+60000 {
 		durations["parent_exited_to_uninstall_old_start"] = end - start
 	}
-	for _, stage := range []string{"shell_window_shown", "webview_ready", "ack_sent"} {
+	for _, stage := range []string{"page_visible", "webview_ready", "ack_sent"} {
 		if start, end := stages["installer_start"], stages[stage]; start > 0 && end >= start {
 			durations["installer_start_to_"+stage] = end - start
 		}
+	}
+	if ms, ok := stages["process_created_to_main_ms"]; ok && ms >= 0 && ms <= int64(time.Hour/time.Millisecond) {
+		durations["process_created_to_main_ms"] = ms
 	}
 	event["stages_ms"] = durations
 	for name, pair := range map[string][2]string{"uninstall_old_ms": {"uninstall_old_start", "uninstall_old_done"}, "extract_ms": {"extract_start", "extract_done"}, "copy_ms": {"extract_done", "copy_done"}} {

@@ -47,6 +47,17 @@ func (t *updateInstallTiming) mark(stage string) {
 	t.stages[stage] = time.Now().UnixMilli()
 	t.writeLocked()
 }
+
+// duration stores only a relative interval, never a process creation timestamp.
+func (t *updateInstallTiming) duration(name string, ms int64) {
+	if t == nil || ms < 0 {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.stages[name] = ms
+	t.writeLocked()
+}
 func (t *updateInstallTiming) writeLocked() {
 	if os.MkdirAll(filepath.Dir(t.path), 0700) != nil {
 		return
@@ -59,8 +70,8 @@ func (t *updateInstallTiming) writeLocked() {
 			stages[stage] = nil
 		}
 	}
-	for _, stage := range []string{"shell_window_shown", "webview_ready", "ack_sent"} {
-		if value := t.stages[stage]; value > 0 {
+	for _, stage := range []string{"page_visible", "webview_ready", "ack_sent", "process_created_to_main_ms"} {
+		if value, ok := t.stages[stage]; ok {
 			stages[stage] = value
 		}
 	}

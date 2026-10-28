@@ -156,6 +156,8 @@ type updateSettings struct {
 }
 
 type updateManager struct {
+	warmedInstaller      *warmedUpdateInstaller
+	warmInstaller        func(context.Context, string) error
 	applyTiming          *updateApplyTiming
 	applyTimingMu        sync.Mutex
 	verifiedFile         *verifiedUpdateFile
@@ -516,6 +518,9 @@ func (u *updateManager) Check(force bool) bool {
 		resultState := u.status.State
 		predownload := u.autoPredownload && !u.autoDownloadDisabled && resultState == "available" && !u.status.ManualOnly && !u.status.InstallTargetBlocked
 		u.mu.Unlock()
+		if ready && resultState == "ready" {
+			u.warmReadyInstaller(manifest)
+		}
 		if err == nil && u.ctx.Err() == nil {
 			u.recordUpdateCheck(map[string]any{
 				"event": "update_check_succeeded", "latest_version": manifest.Version,

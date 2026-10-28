@@ -67,6 +67,9 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 			if event == "champion_detail_restore" {
 				body = `{"event":"champion_detail_restore","reason":"open","championRestore":{"source":"user","mode":"ranked","championId":13}}`
 			}
+			if event == "rune_fit_layout" {
+				body = `{"event":"rune_fit_layout","reason":"` + reason + `","runeFit":{"width":997,"height":514,"scale":1.2,"f":1.4,"bottom_gap":24}}`
+			}
 			if event == "window_resize_trace" {
 				body = `{"event":"window_resize_trace","reason":"` + reason + `","resizeTrace":{"drag":1,"sample":1,"zoom":1,"innerWidth":858}}`
 			}

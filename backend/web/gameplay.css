@@ -2552,7 +2552,6 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .rank-row .rank-record.gameplay-skeleton span + span { width: 52px; height: 10px; min-height: 10px; }
 
 /* R313: estimated season losses keep the approximation sign subordinate. */
-.rank-record-estimate { color:var(--muted); font-weight:700; margin-right:1px; }
 
 /* R313: the sample stays beside its heading; mode controls wrap as a unit. */
 .recent-ranked-section > header { gap:8px; align-items:baseline; flex-wrap:wrap; }

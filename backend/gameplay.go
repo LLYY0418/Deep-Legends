@@ -3762,6 +3762,7 @@ func (a *app) loadGameplayRanksContext(ctx context.Context, client *LCUClient, p
 	}
 	queueEntries := rankedQueueEntries(raw)
 	a.rankedLCUShapeOnce.Do(func() {
+		a.recordDiagnostic(diagnosticRankedSeasonsShape(raw, "lcu"))
 		a.recordDiagnostic(map[string]any{
 			"event": "lcu_ranked_stats_shape", "is_current": current, "body_bytes": len(raw),
 			"queue_count": len(queueEntries), "top_level_keys": diagnosticKeySet(raw),

@@ -21,11 +21,11 @@ func TestR312TruncatedRankRecordSurvivesElevenLoads(t *testing.T) {
 			load(50, 50, 47, "season-cache")
 			snapshot.byQueue[420] = gameplayAggregate{Games: 79, Wins: 41, Losses: 38, WinRate: 52}
 			snapshot.progress.Scanned++
-			load(50, 50, 46, "season")
+			load(50, 50, 47, "season")
 			snapshot.progress.RankedComplete = false
 			snapshot.progress.Paused = true
 			snapshot.byQueue = nil
-			load(51, 51, 46, "season-cache")
+			load(51, 51, 47, "season-cache")
 		})
 	}
 }
@@ -46,7 +46,7 @@ func TestR312CachedRecordRejectsOlderSnapshotAndKeepsOfficialWinsOnReentry(t *te
 	snapshot.progress.Paused = true
 	snapshot.byQueue = nil
 	reentered, _ := a.applySeasonRankWinRateFallback(filled, EndpointCapability{}, snapshot)
-	if reentered[0].Wins != 50 || reentered[0].Losses != 46 || reentered[0].OfficialWins != 50 || reentered[0].RecordPending || reentered[0].RecordSource != "season-cache" {
+	if reentered[0].Wins != 50 || reentered[0].Losses != 47 || reentered[0].OfficialWins != 50 || reentered[0].RecordPending || reentered[0].RecordSource != "season-cache" {
 		t.Fatal(reentered)
 	}
 }

@@ -48,11 +48,13 @@
     return !!(r||pair||items)||Object.keys(value).every(k=>k==="updatedAt");
   }
   function runeFitGeometry(width,height,hasFour=false){
-    const compact=width<614,primaryWidth=compact?(hasFour?306:284):(hasFour?346:304),secondaryWidth=compact?244:284,columnGap=compact?18:26,treeWidth=primaryWidth+secondaryWidth+columnGap,treeHeight=382;
-    const scale=Math.max(1,Math.min(width/treeWidth,height/treeHeight,1.5));
-    const primaryExtra=scale>=1.5?Math.max(0,(height-365*scale)/4):0;
-    const secondaryExtra=scale>=1.5?Math.max(0,(height-382*scale)/6):0;
-    return {scale,primaryWidth,secondaryWidth,columnGap,keyExtra:Math.min(primaryExtra,14*scale),minorExtra:Math.min(primaryExtra,9.2*scale),subExtra:Math.min(secondaryExtra,8*scale),shardExtra:Math.min(secondaryExtra,20.6*scale)};
+    const compact=width<614,primaryWidth=(compact?(hasFour?306:284):(hasFour?346:304))*.9,columnGap=(compact?18:26)*.9,secondaryWidth=compact?Math.max(167.4,Math.min(244*.9,width-primaryWidth-columnGap)):284*.9,treeWidth=primaryWidth+secondaryWidth+columnGap;
+    const scale=Math.max(1,Math.min(width/treeWidth,height/315,1.2));
+    const f=Math.max(1,Math.min(1.4,(height/scale-56-21)/238));
+    const bottom=238*f+21;
+    let shardPitch=32*f,gap=bottom-(162*f+2.5*shardPitch+14);
+    if(gap<2){gap=2;shardPitch=(bottom-162*f-gap-14)/2.5;}
+    return {scale,f,primaryWidth,secondaryWidth,columnGap,keyExtra:78*scale*(f-1),minorExtra:64*scale*(f-1),subExtra:54*scale*(f-1),shardExtra:scale*(shardPitch-32),subShardGap:gap*scale,treeHeight:(56+bottom)*scale};
   }
   if(typeof module==="object"&&module.exports){module.exports={spellAllowed,itemAllowed,starterAllowed,starterBudget,championImageURL,selectSecondary,validEditorDraft,draftContent,normalizeStarterTrinkets,runeFitGeometry};return;}
   const root=document.getElementById("suite-config-root");if(!root)return;
@@ -251,7 +253,7 @@
   function observeRuneLayout(){
     const tree=root.querySelector(".ac-tree")||root;if(tree===observedRuneTree)return;
     runeLayoutObserver?.disconnect();observedRuneTree=tree;
-    if(tree){runeLayoutObserver?.observe(tree);for(const n of [tree.closest(".ac-stage"),tree.closest(".ac-editor"),tree.closest(".ac-body")])if(n)runeLayoutObserver?.observe(n);tree.querySelectorAll(".ac-paths,.ac-group").forEach(node=>runeLayoutObserver?.observe(node));}
+    if(tree){runeLayoutObserver?.observe(root);const scroll=root.closest(".app-scroll");if(scroll)runeLayoutObserver?.observe(scroll);runeLayoutObserver?.observe(tree);for(const n of [tree.closest(".ac-stage"),tree.closest(".ac-editor"),tree.closest(".ac-body")])if(n)runeLayoutObserver?.observe(n);tree.querySelectorAll(".ac-paths,.ac-group").forEach(node=>runeLayoutObserver?.observe(node));}
   }
   function render(){
     hideTip();if(!S.settings||!S.catalog)return;
@@ -290,19 +292,22 @@
   root.addEventListener("error",e=>{if(e.target.matches?.(".ac-portrait img")&&e.target.getAttribute("src")!=="/image-unavailable.svg")e.target.src="/image-unavailable.svg";},true);
   root.addEventListener("load",e=>{if(e.target.matches?.("[data-shard-art]"))normalizeShardImage(e.target);},true);
   let layoutFrame=0;
-  function scheduleLayout(){if(!layoutFrame)layoutFrame=requestAnimationFrame(()=>{layoutFrame=0;layout();});}
+  let layoutReason="render",lastFitSignature="",fitMinute=0,fitCount=0;
+  function scheduleLayout(reason="observer"){layoutReason=typeof reason==="string"?reason:"observer";if(!layoutFrame)layoutFrame=requestAnimationFrame(()=>{layoutFrame=0;layout();});}
   function layout(){
-    const tree=root.querySelector(".ac-tree"),stage=tree?.closest(".ac-stage");
+    const cardHeight=fillBody(),tree=root.querySelector(".ac-tree"),stage=tree?.closest(".ac-stage");
     if(tree&&stage){
-      const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1,css=getComputedStyle(stage),r=stage.getBoundingClientRect(),header=stage.querySelector(".ac-buildname");
-      const width=stage.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight),height=Math.max(0,(innerHeight-r.top-24)/zoom-parseFloat(css.paddingTop)-parseFloat(css.paddingBottom)-(header?.getBoundingClientRect().height||0)/zoom-parseFloat(css.rowGap||0));
+      const css=getComputedStyle(stage),header=stage.querySelector(".ac-buildname"),card=stage.closest(".ac-editor");
+      const width=stage.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight);
+      // Both offsets are document-layout coordinates, unaffected by scrolling.
+      const above=layoutOffset(stage)-layoutOffset(card);
+      const height=Math.max(0,cardHeight-above-parseFloat(css.paddingTop)-23-(header?.offsetHeight||0)-parseFloat(css.rowGap||0));
       const fit=runeFitGeometry(width,height,!!tree.querySelector(".has-4"));
-      for(const [name,value]of Object.entries({"--ac-rune-scale":String(fit.scale),"--ac-primary-width":fit.primaryWidth+"px","--ac-secondary-width":fit.secondaryWidth+"px","--ac-column-gap":fit.columnGap+"px","--ac-key-extra":fit.keyExtra+"px","--ac-minor-extra":fit.minorExtra+"px","--ac-sub-extra":fit.subExtra+"px","--ac-shard-extra":fit.shardExtra+"px"}))if(stage.style.getPropertyValue(name)!==value)stage.style.setProperty(name,value);
+      for(const [name,value]of Object.entries({"--ac-rune-scale":String(fit.scale),"--ac-rune-f":String(fit.f),"--ac-tree-height":fit.treeHeight+"px","--ac-primary-width":fit.primaryWidth+"px","--ac-secondary-width":fit.secondaryWidth+"px","--ac-column-gap":fit.columnGap+"px","--ac-key-extra":fit.keyExtra+"px","--ac-minor-extra":fit.minorExtra+"px","--ac-sub-extra":fit.subExtra+"px","--ac-shard-extra":fit.shardExtra+"px","--ac-sub-shard-gap":fit.subShardGap+"px"}))if(stage.style.getPropertyValue(name)!==value)stage.style.setProperty(name,value);
+      const bottomGap=Math.max(24,height-fit.treeHeight+24),signature=JSON.stringify([width,height,fit.scale,fit.f,bottomGap]);
+      if(signature!==lastFitSignature){lastFitSignature=signature;const minute=Math.floor(Date.now()/60000);if(minute!==fitMinute){fitMinute=minute;fitCount=0;}if(fitCount<10){fitCount++;window.reportFlowDiagnostic?.("rune_fit_layout",layoutReason,{width,height,scale:fit.scale,f:fit.f,bottom_gap:bottomGap});}}
     }
-    // CSS dimensions, rather than a transform, make offsetTop/offsetHeight
-    // include the scale. Track geometry therefore follows the visible nodes.
-    const body=root.querySelector(".ac-body"),zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1;
-    const bodyValue=body&&!root.closest("[hidden]")?`${Math.max(0,(innerHeight-body.getBoundingClientRect().top-24)/zoom)}px`:null;
+    // CSS dimensions include the scale, so tracks follow actual row centers.
     const updates=[];
     for(const g of root.querySelectorAll(".ac-group")){
       const rows=[...g.querySelectorAll(":scope > .ac-row")];if(!rows.length)continue;
@@ -311,7 +316,6 @@
       const count=Object.keys(S.subPicks).length,sub=g.dataset.group==="sub",selected=sub?(count?count===1?centers[0]:centers.at(-1):null):centers[rows.findLastIndex(n=>n.classList.contains("is-picked"))];
       updates.push({g,top,height:centers.at(-1)-top,fill:selected==null?0:selected-top,centers,count,sub});
     }
-    if(bodyValue!==null&&body.style.getPropertyValue("--ac-body-min")!==bodyValue)body.style.setProperty("--ac-body-min",bodyValue);
     for(const n of root.querySelectorAll(".ac-rune[data-i]"))if(n.style.getPropertyValue("--i")!==n.dataset.i)n.style.setProperty("--i",n.dataset.i);
     for(const {g,top,height,fill,centers,count,sub}of updates){
       const track=g.querySelector(".ac-track");if(track.style.top!==`${top}px`)track.style.top=`${top}px`;if(track.style.height!==`${height}px`)track.style.height=`${height}px`;
@@ -482,7 +486,14 @@
   async function load(force=false){await window.deepLegendsPreferenceStorage?.ready;if(S.settings&&!force){locatePending=true;await refreshCatalog();return;}try{const [settings,catalog,champions,runtime,keys,watch]=await Promise.all([api("/api/auto-config/settings"),api("/api/auto-config/catalog"),api("/api/champions/catalog"),api("/api/auto-config/state").catch(()=>({})),api("/api/settings/summoner-keys").catch(()=>({keys:["",""]})),api("/api/watch/rules").catch(()=>({}))]);S.settings=settings;S.catalog=normalizeCatalog(catalog);S.champions=champions.champions.sort((a,b)=>title(a).localeCompare(title(b),"zh-CN"));S.runtime=runtime;S.keys=keys;S.watch=watch;S.champ||=S.champions[0]?.id;loadDraft();render();metrics();void refreshMastery();}catch(error){root.innerHTML=`<p role="alert">${esc(error.message)} <button data-act="retry">重新读取</button></p>`;}}
   let masteryFlight=null,locateAfterMastery=true;
   async function refreshMastery(){if(masteryFlight)return masteryFlight;masteryFlight=(async()=>{let points={};try{const data=await api("/api/gameplay/masteries");if(data.available)points=Object.fromEntries((data.items||[]).map(row=>[row.championId,row.championPoints]));}catch(_){}if(!window.document)return;S.mastery=points;if(S.settings&&S.catalog){if(locateAfterMastery){locatePending=true;locateAfterMastery=false;}render();}})().finally(()=>masteryFlight=null);return masteryFlight;}
-  function fillBody(){const body=root.querySelector(".ac-body");if(!body||root.closest("[hidden]"))return;const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1;const value=`${Math.max(0,(innerHeight-body.getBoundingClientRect().top-24)/zoom)}px`;if(body.style.getPropertyValue("--ac-body-min")!==value)body.style.setProperty("--ac-body-min",value);}
+  function layoutOffset(node){let top=0;for(let n=node;n;n=n.offsetParent)top+=n.offsetTop;return top;}
+  function fillBody(){
+    const body=root.querySelector(".ac-body");if(!body||root.closest("[hidden]"))return 0;
+    const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1,scroll=root.closest(".app-scroll"),css=scroll?getComputedStyle(scroll):null;
+    const height=Math.max(0,(scroll?.clientHeight||innerHeight/zoom)-(parseFloat(css?.paddingTop)||24)-(parseFloat(css?.paddingBottom)||24));
+    const value=`${height}px`;if(body.style.getPropertyValue("--ac-body-min")!==value)body.style.setProperty("--ac-body-min",value);
+    return height;
+  }
   function metrics(){fillBody();const n=document.getElementById("suite-config-configured"),a=document.getElementById("suite-config-applied");if(n)n.textContent=String(Object.keys(S.settings?.champions||{}).filter(hasConfig).length);if(a)a.textContent=`${Object.values(S.runtime.results||{}).filter(v=>v==="applied").length}/3`;}
   let tooltip=null,tipAnchor=null;
   function hideTip(){if(tipAnchor)tipAnchor.removeAttribute("aria-describedby");tipAnchor=null;tooltip?.remove();tooltip=null;}
@@ -500,7 +511,7 @@
   window.addEventListener("deep-legends:client-state-changed",()=>{locatePending=true;if(S.catalog)void refreshCatalog().catch(reportError);void refreshMastery();});
   window.addEventListener("focus",()=>{if(S.catalog&&!root.closest("[hidden]"))void refreshCatalog().catch(reportError);});
   let lastLayoutHeight=innerHeight;
-  window.addEventListener("resize",()=>{lastLayoutHeight=innerHeight;scheduleLayout();});
+  window.addEventListener("resize",()=>{lastLayoutHeight=innerHeight;scheduleLayout("resize");});
   window.addEventListener("deep-legends:section",e=>{flushDraft();if(e.detail?.name==="suite"){locatePending=true;locateChampion();}fillBody();});
   window.addEventListener("deep-legends:dispose",()=>{cancelAnimationFrame(layoutFrame);runeLayoutObserver?.disconnect();observedRuneTree=null;},{once:true});
   window.addEventListener("pagehide",()=>{flushDraft();void window.deepLegendsPreferenceStorage?.flush(true);});

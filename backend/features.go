@@ -74,39 +74,48 @@ type rendererPerfGroup struct {
 	TotalMS float64 `json:"totalMs"`
 	MaxMS   float64 `json:"maxMs"`
 }
+type runeFitDiagnostic struct {
+	Width     float64 `json:"width"`
+	Height    float64 `json:"height"`
+	Scale     float64 `json:"scale"`
+	F         float64 `json:"f"`
+	BottomGap float64 `json:"bottom_gap"`
+}
+
 type clientDiagnosticRequest struct {
-	LayoutShiftTotal      float64         `json:"layoutShiftTotal,omitempty"`
-	LayoutShiftMax        float64         `json:"layoutShiftMax,omitempty"`
-	LayoutShiftCount      int             `json:"layoutShiftCount,omitempty"`
-	RankRecordCause       string          `json:"cause,omitempty"`
-	RankRecordComplete    bool            `json:"ranked_complete,omitempty"`
-	RankRecordSeq         int             `json:"render_seq,omitempty"`
-	RankRecordForeign     bool            `json:"foreign,omitempty"`
-	RankRecordResult      string          `json:"result,omitempty"`
-	RankRecordBranch      string          `json:"branch,omitempty"`
-	RankRecordUpstream    bool            `json:"upstream_complete,omitempty"`
-	RankRecordFilledBy    string          `json:"filled_by,omitempty"`
-	RankRecordProgress    bool            `json:"progress_complete,omitempty"`
-	RankRecordCacheReused bool            `json:"cache_reused,omitempty"`
-	RankRecordWinsDelta   int             `json:"wins_delta,omitempty"`
-	RankRecordPending     bool            `json:"pending,omitempty"`
-	RankRecordQueue       string          `json:"queue,omitempty"`
-	OverviewPage          string          `json:"page,omitempty"`
-	OverviewFrom          string          `json:"from,omitempty"`
-	ChampionRestore       json.RawMessage `json:"championRestore,omitempty"`
-	ResizeTrace           json.RawMessage `json:"resizeTrace,omitempty"`
-	R278                  json.RawMessage `json:"r278,omitempty"`
-	Lost                  int             `json:"lost,omitempty"`
-	LPImagesRecreated     int             `json:"images_recreated,omitempty"`
-	OverviewRequests      int             `json:"overview_requests,omitempty"`
-	CanceledRequests      int             `json:"canceled_requests,omitempty"`
-	BusyMS                int             `json:"busy_ms,omitempty"`
-	RefreshStage          string          `json:"stage,omitempty"`
-	LabelChanges          int             `json:"label_changes,omitempty"`
-	LatestGameID          int64           `json:"latest_game_id,omitempty"`
-	LatestEndedAt         int64           `json:"latest_ended_at,omitempty"`
-	AllListCount          int             `json:"all_list_count,omitempty"`
-	MissingCount          int             `json:"missing_count,omitempty"`
+	RuneFit               *runeFitDiagnostic `json:"runeFit,omitempty"`
+	LayoutShiftTotal      float64            `json:"layoutShiftTotal,omitempty"`
+	LayoutShiftMax        float64            `json:"layoutShiftMax,omitempty"`
+	LayoutShiftCount      int                `json:"layoutShiftCount,omitempty"`
+	RankRecordCause       string             `json:"cause,omitempty"`
+	RankRecordComplete    bool               `json:"ranked_complete,omitempty"`
+	RankRecordSeq         int                `json:"render_seq,omitempty"`
+	RankRecordForeign     bool               `json:"foreign,omitempty"`
+	RankRecordResult      string             `json:"result,omitempty"`
+	RankRecordBranch      string             `json:"branch,omitempty"`
+	RankRecordUpstream    bool               `json:"upstream_complete,omitempty"`
+	RankRecordFilledBy    string             `json:"filled_by,omitempty"`
+	RankRecordProgress    bool               `json:"progress_complete,omitempty"`
+	RankRecordCacheReused bool               `json:"cache_reused,omitempty"`
+	RankRecordWinsDelta   int                `json:"wins_delta,omitempty"`
+	RankRecordPending     bool               `json:"pending,omitempty"`
+	RankRecordQueue       string             `json:"queue,omitempty"`
+	OverviewPage          string             `json:"page,omitempty"`
+	OverviewFrom          string             `json:"from,omitempty"`
+	ChampionRestore       json.RawMessage    `json:"championRestore,omitempty"`
+	ResizeTrace           json.RawMessage    `json:"resizeTrace,omitempty"`
+	R278                  json.RawMessage    `json:"r278,omitempty"`
+	Lost                  int                `json:"lost,omitempty"`
+	LPImagesRecreated     int                `json:"images_recreated,omitempty"`
+	OverviewRequests      int                `json:"overview_requests,omitempty"`
+	CanceledRequests      int                `json:"canceled_requests,omitempty"`
+	BusyMS                int                `json:"busy_ms,omitempty"`
+	RefreshStage          string             `json:"stage,omitempty"`
+	LabelChanges          int                `json:"label_changes,omitempty"`
+	LatestGameID          int64              `json:"latest_game_id,omitempty"`
+	LatestEndedAt         int64              `json:"latest_ended_at,omitempty"`
+	AllListCount          int                `json:"all_list_count,omitempty"`
+	MissingCount          int                `json:"missing_count,omitempty"`
 
 	RankedMatches   int `json:"ranked_matches,omitempty"`
 	WithDelta       int `json:"with_delta,omitempty"`
@@ -319,6 +328,7 @@ var clientDiagnosticEvents = map[string]map[string]bool{
 	"filter_action_client":           {"clear": true, "remove": true, "stop": true, "change": true},
 	"mayhem_augment_detail_client":   {"read": true},
 	"champion_detail_restore":        {"open": true},
+	"rune_fit_layout":                {"render": true, "resize": true, "observer": true},
 	"window_resize_trace":            {"will-resize": true, "resize": true, "summary": true},
 	"rank_record_state":              {"known": true, "collecting": true, "paused": true, "unavailable": true},
 	"rank_record_final_state":        {"known": true, "collecting": true, "paused": true, "unavailable": true},
@@ -450,6 +460,16 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 	}
 	if request.Event == "champion_detail_restore" {
 		a.recordChampionDetailRestore(w, request)
+		return
+	}
+	if request.Event == "rune_fit_layout" {
+		f := request.RuneFit
+		if f == nil || f.Width < 0 || f.Width > 100000 || f.Height < 0 || f.Height > 100000 || f.Scale < 1 || f.Scale > 1.2 || f.F < 1 || f.F > 1.4 || f.BottomGap < 0 || f.BottomGap > 100000 {
+			http.Error(w, "invalid rune layout", http.StatusBadRequest)
+			return
+		}
+		a.recordDiagnostic(map[string]any{"event": request.Event, "reason": request.Reason, "width": f.Width, "height": f.Height, "scale": f.Scale, "f": f.F, "bottom_gap": f.BottomGap})
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	if request.Event == "window_resize_trace" {

@@ -3210,8 +3210,10 @@
   function renderRankWindowNote(progress, ranks = []) {
     const oldest=Number(progress?.rankedOldestAt),date=new Date(oldest);
     const truncated=progress?.upstreamCapped && Number.isFinite(oldest) && oldest>Date.UTC(2026,0,8) && Number.isFinite(date.getTime());
-    const copy="统计的是当前整个赛季的排位数据"+(truncated?`\n官方接口仅提供 ${date.getMonth()+1}月${date.getDate()}日 之后的对局，更早的场次暂时无法计入`:"");
-    return `<button type="button" class="season-data-note" aria-label="数据说明" data-tooltip="${escapeHTML(copy + (ranks.some(r=>r.recordEstimated) ? "\n负场与胜率按已读到的对局比例推算" : ""))}" data-tooltip-size="compact" ${ranks.some(r=>r.recordEstimated)?'data-tooltip-accent="负场与胜率按已读到的对局比例推算"':""}><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7v4M8 4.5v.5"/></svg></button>`;
+    const from=`${date.getMonth()+1}月${date.getDate()}日`;
+    const copy="统计的是当前整个赛季的排位数据"+(truncated?`\n官方接口仅提供 ${from} 之后的对局，更早的场次暂时无法计入`:"");
+    const fill=ranks.some(r=>r.recordEstimated&&!r.recordLossUnknown)&&truncated?`早于 ${from} 的对局只提供胜场，负场按胜负各半计入`:"";
+    return `<button type="button" class="season-data-note" aria-label="数据说明" data-tooltip="${escapeHTML(copy+(fill?"\n"+fill:""))}" data-tooltip-size="compact" ${fill?`data-tooltip-accent="${escapeHTML(fill)}"`:""}><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7v4M8 4.5v.5"/></svg></button>`;
   }
 
   function reportRankRecordState(tab, queue, state, source) {
@@ -3257,7 +3259,7 @@
       }
       const skeleton=pending && Date.now()-Number(tab?.rankPendingAt || 0)<8000;
       if(skeleton)return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record gameplay-skeleton" aria-label="正在统计中"><span></span><span></span></div></div>`;
-      const record = recordKnown ? rank.recordLossUnknown ? `${number(rank.wins)}胜 —负` : `${number(rank.wins)}胜 ${rank.recordEstimated ? '<span class="rank-record-estimate">≈</span>' : ""}${number(rank.losses)}负` : paused ? `${number(rank.wins)}胜 · 统计已暂停` : collecting ? `${number(rank.wins)}胜 · 正在统计中` : `${number(rank.wins)}胜 · 负场未提供`;
+      const record = recordKnown ? rank.recordLossUnknown ? `${number(rank.wins)}胜 —负` : `${number(rank.wins)}胜 ${number(rank.losses)}负` : paused ? `${number(rank.wins)}胜 · 统计已暂停` : collecting ? `${number(rank.wins)}胜 · 正在统计中` : `${number(rank.wins)}胜 · 负场未提供`;
 	  const unavailableDetail = paused ? "官方战绩服务暂时中断，恢复后自动继续统计" : collecting ? "正在统计中" : (rankedCapability?.detail || "上游未提供负场，无法计算胜率");
 	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown || collecting ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 ${rank.recordLossUnknown ? "—" : `<b class="win-rate-value">${percent(rank.winRate)}</b>`}` : collecting ? "" : "胜率暂不可用"}</span></div></div>`;
     }).join("");

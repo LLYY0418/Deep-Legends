@@ -267,6 +267,11 @@
       const body={event,reason,r278:{augment_id:fields.augment_id,source:fields.source,ms:fields.ms,result:fields.result}},encoded=JSON.stringify(body);
       if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
     }
+    if(event==="rune_fit_layout"){
+      if(!["render","resize","observer"].includes(reason))return false;
+      const runeFit={};for(const key of ["width","height","scale","f","bottom_gap"]){const n=Number(fields[key]);if(!Number.isFinite(n)||n<0||n>100000)return false;runeFit[key]=n;}
+      const body={event,reason,runeFit},encoded=JSON.stringify(body);if(flowPending.size>=32)return false;flowPending.add(encoded);return sendFlowDiagnostic(body,encoded,0);
+    }
     if(event==="window_resize_trace"){
       if(!["will-resize","resize","summary"].includes(reason))return;
       const body={event,reason,resizeTrace:fields},encoded=JSON.stringify(body);

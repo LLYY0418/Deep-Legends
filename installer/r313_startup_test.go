@@ -24,10 +24,10 @@ func TestR313ShellAcknowledgementRequiresVisibleWindowAndPreservesProtocol(t *te
 	if ok, err := acknowledgeUpdateShell(opts, false, report, mark); ok || err == nil || len(order) > 0 {
 		t.Fatal(ok, err, len(order))
 	}
-	order <- "shell_window_shown"
+	order <- "page_visible"
 	ok, err := acknowledgeUpdateShell(opts, true, report, mark)
 	got := r313Order(order)
-	if !ok || err != nil || !reflect.DeepEqual(got, []string{"shell_window_shown", "DEEP_LEGENDS_UPDATE_STARTED", "ack_sent"}) {
+	if !ok || err != nil || !reflect.DeepEqual(got, []string{"page_visible", "DEEP_LEGENDS_UPDATE_STARTED", "ack_sent"}) {
 		t.Fatal(ok, err, got)
 	}
 	for _, legacy := range []installerOptions{{Update: true}, {}} {
@@ -75,10 +75,13 @@ func TestR313NativeStartupAndFailureAdaptersKeepRecoveryWired(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := string(main)
-	shown, ack, runtime, embed := strings.Index(source, "w.show()"), strings.Index(source, "acknowledgeUpdateShell("), strings.Index(source, "webviewhost.CheckRuntime()"), strings.Index(source, "app.embed(")
-	if shown < 0 || ack <= shown || runtime <= ack || embed <= runtime {
-		t.Fatal("native shell/ACK/runtime/WebView order changed")
+	if strings.Contains(source, "w.show()") || strings.Contains(source, "acknowledgeUpdateShell(") {
+		t.Fatal("main must not reveal an unpainted progress page or ACK")
 	}
+	if strings.Index(source, "webviewhost.CheckRuntime()") > strings.Index(source, "app.embed(") {
+		t.Fatal("runtime must be checked before embed")
+	}
+
 	if strings.Count(source, "app.recoverFailedUpdate()") != 3 {
 		t.Fatal("runtime/document/embed failure adapters must all recover")
 	}
@@ -106,6 +109,11 @@ func TestR313NativeStartupAndFailureAdaptersKeepRecoveryWired(t *testing.T) {
 	if !strings.Contains(s, "w.starting = false\n\t\ta.recoverFailedUpdate()\n\t\ta.startupError = err") {
 		t.Fatal("WebView startup failure must recover before closing shell")
 	}
+	ready, ack := strings.Index(s, "a.pageReady = true"), strings.Index(s, "a.ackSent, err = acknowledgeUpdateShell(")
+	if ready < 0 || ack < ready || !strings.Contains(s[ack:], "w.shown && a.pageReady") {
+		t.Fatal("ACK must require the visible ready progress page")
+	}
+
 	if strings.Contains(s, "fmt.Fprintln(os.Stdout, \"DEEP_LEGENDS_UPDATE_STARTED\")") {
 		t.Fatal("ACK returned to page-ready callback")
 	}
