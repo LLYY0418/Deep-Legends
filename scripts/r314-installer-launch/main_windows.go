@@ -33,7 +33,14 @@ func main() {
 		panic(err)
 	}
 	raw, _ := json.Marshal(map[string]any{"pid": cmd.Process.Pid, "start_utc_ms": started.UnixMilli(), "spawn_returned_ms": returned})
-	if err := os.WriteFile(os.Args[2], raw, 0600); err != nil {
+	// Publish a complete receipt atomically. Test-Path must never observe an
+	// empty/partial JSON file and lose the PID needed to clean up this child.
+	receipt := os.Args[2] + ".tmp"
+	if err := os.WriteFile(receipt, raw, 0600); err != nil {
+		cmd.Process.Kill()
+		panic(err)
+	}
+	if err := os.Rename(receipt, os.Args[2]); err != nil {
 		cmd.Process.Kill()
 		panic(err)
 	}
