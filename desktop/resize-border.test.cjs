@@ -29,3 +29,11 @@ test('R314 fresh Windows real-Electron probe builds and copies the native module
  const build=probe.indexOf('require(path.join(sourceRoot, "desktop/build-resize-border.cjs")).build()'),copy=probe.indexOf('fs.copyFileSync(path.join(sourceRoot, "desktop/native/resize-border.node")'),launch=probe.indexOf('child = spawn(require(');
  assert(build>0&&copy>build&&launch>copy);assert(probe.includes('process.platform === "win32"'));
 });
+
+test('R314 parent and Chromium input HWND both own the resize cursor before default dispatch',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'native/resize-border/resize_border.cc'),'utf8');
+ const root=source.slice(source.indexOf('static LRESULT CALLBACK ResizeBorder('));
+ assert(root.indexOf('message == WM_SETCURSOR')>=0);
+ assert(root.indexOf('ApplyResizeCursor(hwnd)')<root.indexOf('const LRESULT original = DefSubclassProc'));
+ assert(source.includes('ApplyResizeCursor(parent)'));
+});
