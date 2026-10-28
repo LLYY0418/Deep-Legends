@@ -18,7 +18,7 @@ test('R314 native resize preserves hidden titlebar, original dispatch, fullscree
 test('R314 Chromium child input forwards only resize strip hits to the same UI-thread root',()=>{
  const source=fs.readFileSync(path.join(__dirname,'native/resize-border/resize_border.cc'),'utf8');
  assert(source.includes('EnumChildWindows(hwnd, InstallChild'));assert(source.includes('WM_PARENTNOTIFY'));
- assert(source.includes('ResizeHit(reinterpret_cast<HWND>(root), lp)'));assert(source.includes('return HTTRANSPARENT;'));
+ assert(source.includes('ResizeHit(parent, lp)'));assert(source.includes('return SendMessageW(parent, WM_NCLBUTTONDOWN, hit, lp)'));assert(source.includes('DefWindowProcW(hwnd, message, hit, lp)'));assert(source.includes('SetCursor(LoadCursorW('));
  assert(source.includes('owner == GetCurrentProcessId() && thread == GetCurrentThreadId()'));
  assert(source.includes('RemoveWindowSubclass(hwnd, ChildResizeBorder, id)'));
  const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');assert(main.includes('mainWindow.webContents.on("did-finish-load", () => {\n    require("./resize-border.cjs").installResizeBorder(mainWindow);'));
