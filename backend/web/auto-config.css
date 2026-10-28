@@ -462,8 +462,8 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 
 /* R313: compact 1x geometry, enlarged with one dimensional scale. No CSS
    transform: layout() reads the real scaled row/node offsets. */
-.ac-stage { --ac-rune-scale:1; --ac-rune-f:1; --ac-tree-height:315px; --ac-sub-shard-gap:3px; --ac-primary-width:273.6px; --ac-secondary-width:255.6px; --ac-column-gap:23.4px; --ac-key-extra:0px; --ac-minor-extra:0px; --ac-sub-extra:0px; --ac-shard-extra:0px; flex:1; min-height:0; padding:28px 28px 23px; overflow:auto; gap:14px; }
-.ac-stage .ac-tree { height:var(--ac-tree-height,315px); grid-template-columns:calc(var(--ac-primary-width,273.6px)*var(--ac-rune-scale)) calc(var(--ac-secondary-width,255.6px)*var(--ac-rune-scale)); gap:calc(var(--ac-column-gap,23.4px)*var(--ac-rune-scale)); justify-content:center; flex:none; }
+.ac-stage { --ac-rune-scale:1; --ac-rune-f:1; --ac-tree-height:315px; --ac-sub-shard-gap:3px; --ac-primary-width:273.6px; --ac-secondary-width:255.6px; --ac-column-gap:26px; --ac-key-extra:0px; --ac-minor-extra:0px; --ac-sub-extra:0px; --ac-shard-extra:0px; flex:1; min-height:0; padding:28px; padding-bottom:23px; overflow:auto; gap:14px; }
+.ac-stage .ac-tree { height:var(--ac-tree-height,315px); grid-template-columns:calc(var(--ac-primary-width,273.6px)*var(--ac-rune-scale)) calc(var(--ac-secondary-width,255.6px)*var(--ac-rune-scale)); gap:calc(var(--ac-column-gap,26px)*.9*var(--ac-rune-scale)); justify-content:center; flex:none; }
 .ac-stage .ac-col { --ac-track-x:calc(23px*var(--ac-rune-scale)); --ac-main-size:calc(44px*var(--ac-rune-scale)); }
 .ac-stage .ac-paths { height:calc(56px*var(--ac-rune-scale)); padding-left:calc(55.8px*var(--ac-rune-scale)); padding-right:calc(7.2px*var(--ac-rune-scale)); flex:none; }
 .ac-stage .ac-path-main img, .ac-stage .ac-paths.is-secondary .ac-path-main img { width:calc(30.8px*var(--ac-rune-scale)); height:calc(30.8px*var(--ac-rune-scale)); }
@@ -492,7 +492,7 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 .ac-stage .ac-row-label { left:calc(58px*var(--ac-rune-scale)); }
 .ac-stage .ac-rune .ring { border-width:calc(2px*var(--ac-rune-scale)); }
 @container suite-page (max-width:820px) { .ac-stage .ac-tree { grid-template-columns:minmax(calc(var(--ac-primary-width,273.6px)*var(--ac-rune-scale)),1fr) minmax(calc(var(--ac-secondary-width,255.6px)*var(--ac-rune-scale)),1fr); } }
-.ac-stage .ac-tree { min-width:calc((var(--ac-primary-width,273.6px) + var(--ac-secondary-width,255.6px) + var(--ac-column-gap,23.4px))*var(--ac-rune-scale)); }
+.ac-stage .ac-tree { min-width:calc((var(--ac-primary-width,273.6px) + var(--ac-secondary-width,255.6px) + var(--ac-column-gap,26px)*.9)*var(--ac-rune-scale)); }
 
 @container ac-editor (max-width:800px) { .ac-stage { padding-inline:12px; } }
 @container ac-editor (max-width:640px) { .ac-stage { padding-inline:8px; } }

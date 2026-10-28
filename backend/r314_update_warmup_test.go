@@ -76,3 +76,50 @@ func TestR314WarmupFailureIsPrivateAndDoesNotAffectReadyState(t *testing.T) {
 		t.Fatal(event, u.status)
 	}
 }
+
+func TestR314ApplyNeverWaitsForWarmupProcess(t *testing.T) {
+	data := []byte("verified setup fixture")
+	u := updateTestManager(t, data)
+	file := filepath.Join(u.directory, u.manifest.Asset.Name)
+	if err := os.WriteFile(file, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	started, release, reported := make(chan struct{}), make(chan struct{}), make(chan map[string]any, 1)
+	u.warmInstaller = func(context.Context, string) error { close(started); <-release; return nil }
+	u.diagnostic = func(event map[string]any) {
+		if event["event"] == "update_warmup" {
+			reported <- event
+		}
+	}
+	manifest := *u.manifest
+	manifest.Version = "0.13.3"
+	u.warmReadyInstaller(manifest)
+	<-started
+	defer func() { close(release); <-reported }()
+	u.status.State = "ready"
+	u.launch = func(string, string) error { return nil }
+	done := make(chan error, 1)
+	go func() { done <- u.Apply() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("apply waited for blocked warmup")
+	}
+}
+
+func TestR314WarmupDeadlineReportsTimeout(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "Setup.exe"), []byte("setup"), 0600)
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	done := make(chan map[string]any, 1)
+	u := &updateManager{directory: dir, ctx: ctx, warmInstaller: func(ctx context.Context, _ string) error { return ctx.Err() }, diagnostic: func(event map[string]any) { done <- event }}
+	u.warmReadyInstaller(updateManifest{Version: "0.13.3", Asset: updateAsset{Name: "Setup.exe", Size: 5}})
+	event := <-done
+	if event["result"] != "timeout" || len(event) != 3 {
+		t.Fatal(event)
+	}
+}

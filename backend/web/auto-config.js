@@ -256,6 +256,7 @@
     if(tree){runeLayoutObserver?.observe(root);const scroll=root.closest(".app-scroll");if(scroll)runeLayoutObserver?.observe(scroll);runeLayoutObserver?.observe(tree);for(const n of [tree.closest(".ac-stage"),tree.closest(".ac-editor"),tree.closest(".ac-body")])if(n)runeLayoutObserver?.observe(n);tree.querySelectorAll(".ac-paths,.ac-group").forEach(node=>runeLayoutObserver?.observe(node));}
   }
   function render(){
+    layoutReason="render";
     hideTip();if(!S.settings||!S.catalog)return;
     if(!root.querySelector(".ac-body")){root.className="ac-root";root.innerHTML='<div data-ac-master></div><div class="ac-body"><div data-ac-champs></div><div data-ac-editor></div></div>';renderedMaster=renderedChampions=renderedEditor="";}
     const focus=document.activeElement,field=focus?.hasAttribute("data-champ-search")?"data-champ-search":focus?.hasAttribute("data-item-search")?"data-item-search":null,pos=focus?.selectionStart;
@@ -305,7 +306,7 @@
       const above=layoutOffset(stage)-layoutOffset(card);
       const height=Math.max(0,cardHeight-above-parseFloat(css.paddingTop)-23-(header?.offsetHeight||0)-parseFloat(css.rowGap||0));
       const fit=runeFitGeometry(width,height,!!tree.querySelector(".has-4"));
-      for(const [name,value]of Object.entries({"--ac-rune-scale":String(fit.scale),"--ac-rune-f":String(fit.f),"--ac-tree-height":fit.treeHeight+"px","--ac-primary-width":fit.primaryWidth+"px","--ac-secondary-width":fit.secondaryWidth+"px","--ac-column-gap":fit.columnGap+"px","--ac-key-extra":fit.keyExtra+"px","--ac-minor-extra":fit.minorExtra+"px","--ac-sub-extra":fit.subExtra+"px","--ac-shard-extra":fit.shardExtra+"px","--ac-sub-shard-gap":fit.subShardGap+"px"}))if(stage.style.getPropertyValue(name)!==value)stage.style.setProperty(name,value);
+      for(const [name,value]of Object.entries({"--ac-rune-scale":String(fit.scale),"--ac-rune-f":String(fit.f),"--ac-tree-height":fit.treeHeight+"px","--ac-primary-width":fit.primaryWidth+"px","--ac-secondary-width":fit.secondaryWidth+"px","--ac-column-gap":(fit.columnGap/.9)+"px","--ac-key-extra":fit.keyExtra+"px","--ac-minor-extra":fit.minorExtra+"px","--ac-sub-extra":fit.subExtra+"px","--ac-shard-extra":fit.shardExtra+"px","--ac-sub-shard-gap":fit.subShardGap+"px"}))if(stage.style.getPropertyValue(name)!==value)stage.style.setProperty(name,value);
       const bottomGap=(card.getBoundingClientRect().bottom-tree.getBoundingClientRect().bottom)/zoom,signature=JSON.stringify([width,height,fit.scale,fit.f,bottomGap]);
       if(signature!==lastFitSignature){lastFitSignature=signature;const minute=Math.floor(Date.now()/60000);if(minute!==fitMinute){fitMinute=minute;fitCount=0;}if(fitCount<10){fitCount++;window.reportFlowDiagnostic?.("rune_fit_layout",layoutReason,{width,height,scale:fit.scale,f:fit.f,bottom_gap:bottomGap});}}
     }

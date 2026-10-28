@@ -124,6 +124,7 @@ function harness({source=mainSource, stored, storedAppearance, platform="win32",
   };
   const context=vm.createContext({
     require(name){
+      if(name==="./resize-border.cjs")return {installResizeBorder(window){assert.ok(window instanceof BrowserWindow);window.nativeResizeBound=true;return true;}};
       if(name==="electron")return electron;
       if(name==="node:fs")return fakeFs;
       if(name==="node:http")return {...require("node:http"),request(){const request=new EventEmitter();request.end=()=>{};return request;}};
@@ -153,6 +154,7 @@ function harness({source=mainSource, stored, storedAppearance, platform="win32",
 
 test("titlebar, minimum size, reload, resize and display events run through the real main module", () => {
   const h=harness();
+  assert.equal(h.window.nativeResizeBound,true,"real main binds native resizing to its own window");
   assert.equal(h.probe.titleBarOverlay("dark",false,2).height, 56);
   assert.equal(h.probe.titleBarOverlay("dark",false,1.25).height, 56);
   assert.equal(h.probe.titleBarOverlay("light",true,2).height, 56);
