@@ -17,3 +17,6 @@ foreach($version in @('0.13.0','0.13.2')){
  node ./scripts/r314-windows-edges.cjs "$install/Deep Legends.exe" "$dir/edges" $version
  if($LASTEXITCODE -ne 0){throw 'baseline edge scan failed'}
 }
+
+foreach($width in @(914,1561)){$height=if($width -eq 914){911}else{913};./scripts/r314-edge-scan.ps1 -Explorer -Width $width -Height $height -Output "$Output/explorer-$width.json" -Label "Explorer/$width"}
+@{high_dpi='not changed: hosted session uses one 96-DPI monitor; changing LogPixels would require a new interactive sign-in, invalidating the running UI session';measured_dpi='see each raw scan'}|ConvertTo-Json|Set-Content "$Output/dpi-session.json"
