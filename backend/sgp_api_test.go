@@ -726,11 +726,15 @@ func TestSGPRankedAndSummonerRoutesReportSessionToken(t *testing.T) {
 	if _, err := provider.summonerByPUUIDOn(context.Background(), client, "HN1", puuid); err != nil {
 		t.Fatal(err)
 	}
-	if len(*observed) != 3 {
+	if len(*observed) != 4 {
 		t.Fatalf("observations = %#v", *observed)
 	}
 	assertSGPRequestObservation(t, (*observed)[0], "RANKED", http.StatusOK)
-	shape := (*observed)[1]
+	seasons := (*observed)[1]
+	if seasons["event"] != "ranked_seasons_shape" || seasons["source"] != "sgp" {
+		t.Fatalf("seasons shape observation = %#v", seasons)
+	}
+	shape := (*observed)[2]
 	bodyBytes, bodyBytesOK := shape["body_bytes"].(int)
 	if shape["event"] != "sgp_ranked_stats_shape" || shape["is_self"] != true || shape["privacy"] != "PUBLIC" || shape["queue_count"] != 2 || !bodyBytesOK || bodyBytes <= 0 {
 		t.Fatalf("ranked shape observation = %#v", shape)
@@ -761,8 +765,8 @@ func TestSGPRankedAndSummonerRoutesReportSessionToken(t *testing.T) {
 	if !ok || queueSample["wins"] != float64(12) || queueSample["losses"] != float64(8) || queueSample["tier"] != "DIAMOND" {
 		t.Fatalf("ranked queue sample = %#v", samples)
 	}
-	assertSGPRequestObservation(t, (*observed)[2], "SUMMONER", http.StatusOK)
-	if (*observed)[0]["token_kind"] != "session" || (*observed)[2]["token_kind"] != "session" {
+	assertSGPRequestObservation(t, (*observed)[3], "SUMMONER", http.StatusOK)
+	if (*observed)[0]["token_kind"] != "session" || (*observed)[3]["token_kind"] != "session" {
 		t.Fatalf("token kinds = %#v", *observed)
 	}
 	encoded, _ := json.Marshal(observed)

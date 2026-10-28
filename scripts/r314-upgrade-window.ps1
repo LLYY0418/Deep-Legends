@@ -18,6 +18,8 @@ public static class R314Windows {
 }
 '@
 $rows=@();$setupPath=(Resolve-Path $Setup).Path
+go build -o (Join-Path $Output 'r314-launch.exe') ./scripts/r314-installer-launch
+if($LASTEXITCODE -ne 0){throw 'cmd.Start helper build failed'}
 [R314Windows]::timeBeginPeriod(1) | Out-Null
 try {
  for($i=1;$i -le $Count;$i++) {
@@ -31,15 +33,21 @@ try {
   $dest=Join-Path $trial 'installed';New-Item -ItemType Directory -Force $dest | Out-Null
   $ready=Join-Path $trial 'parent-ready';$escaped=$ready.Replace("'","''");$code="[IO.File]::WriteAllText('$escaped','ready');Start-Sleep -Seconds 90";$encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
   $parent=Start-Process pwsh -ArgumentList '-NoProfile','-EncodedCommand',$encoded -PassThru -WindowStyle Hidden
-  $child=$null
+  $child=$null;$launcher=$null
   try {
    Wait-R313ParentReady $ready $parent
    $startupLog=Join-Path $env:TEMP 'DeepLegendsSetup-startup.log';$logStart=if(Test-Path $startupLog){(Get-Item $startupLog).Length}else{0}
-   $startUtc=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$watch=[Diagnostics.Stopwatch]::StartNew()
-   $child=Start-Process -FilePath $trialSetup -ArgumentList "--update --parent-first --parent-pid $($parent.Id) --dest `"$dest`"" -PassThru -RedirectStandardOutput (Join-Path $trial 'stdout.txt') -RedirectStandardError (Join-Path $trial 'stderr.txt')
-   $spawnReturned=$watch.Elapsed.TotalMilliseconds
+   $receipt=Join-Path $trial 'spawn-receipt.json'
+   $helper=Join-Path $Output 'r314-launch.exe'
+   if(-not(Test-Path $helper)){throw 'actual cmd.Start measurement helper missing'}
+   $launcher=Start-Process -FilePath $helper -ArgumentList "`"$trialSetup`" `"$receipt`" `"$(Join-Path $trial 'stdout.txt')`" `"$(Join-Path $trial 'stderr.txt')`" --update --parent-first --parent-pid $($parent.Id) --dest `"$dest`"" -PassThru -WindowStyle Hidden
+   $deadline=[DateTime]::UtcNow.AddSeconds(30)
+   while(-not(Test-Path $receipt)){if($launcher.HasExited -or [DateTime]::UtcNow -gt $deadline){throw 'Go cmd.Start helper failed'};Start-Sleep -Milliseconds 5}
+   $spawn=Get-Content $receipt -Raw|ConvertFrom-Json;$startUtc=[long]$spawn.start_utc_ms;$spawnReturned=$spawn.spawn_returned_ms
+   $child=Get-Process -Id $spawn.pid;$watch=[Diagnostics.Stopwatch]::StartNew()
+
    while(-not [R314Windows]::Visible($child.Id)) {if($watch.Elapsed.TotalSeconds -gt 30 -or $child.HasExited){throw "No visible installer at trial $i"};Start-Sleep -Milliseconds 10}
-   $window=$watch.Elapsed.TotalMilliseconds
+   $window=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()-$startUtc
    $deadline=[DateTime]::UtcNow.AddSeconds(25)
    do {Start-Sleep -Milliseconds 10;$acknowledged=Test-R313Acknowledged (Join-Path $trial 'stdout.txt')} while(-not $acknowledged -and [DateTime]::UtcNow -lt $deadline)
    if(-not $acknowledged){throw "Missing compatible ACK trial $i"}
@@ -62,6 +70,7 @@ try {
    if($child -and -not $child.HasExited){& taskkill /PID $child.Id /T /F 2>$null | Out-Null}
    if($child -and -not $child.WaitForExit(5000)){throw 'Owned installer did not exit after cleanup'}
    if(-not $parent.HasExited){Stop-Process -Id $parent.Id -Force};$parent.WaitForExit(5000)|Out-Null
+   if($launcher -and -not $launcher.WaitForExit(5000)){Stop-Process -Id $launcher.Id -Force}
    Stop-R313WebViewProfile $profile
    Remove-Item $trialSetup -Force -ErrorAction SilentlyContinue
    if(Test-Path "$env:TEMP/DeepLegendsSetup-startup.log"){Get-Content "$env:TEMP/DeepLegendsSetup-startup.log" -Tail 100|Set-Content (Join-Path $trial 'startup.log')}
