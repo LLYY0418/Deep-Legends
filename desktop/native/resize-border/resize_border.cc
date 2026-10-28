@@ -38,11 +38,32 @@ static LRESULT ResizeHit(HWND hwnd, LPARAM lp) {
 static LRESULT CALLBACK ChildResizeBorder(HWND hwnd, UINT message, WPARAM wp,
                                           LPARAM lp, UINT_PTR id, DWORD_PTR root) {
   if (message == WM_NCDESTROY) RemoveWindowSubclass(hwnd, ChildResizeBorder, id);
-  // A child must NOT return HTLEFT: that sizes the child, not the app. Windows
-  // forwards HTTRANSPARENT to underlying windows on this same UI thread, so the
-  // root owns the non-client sizing loop even above the renderer/scrollbar.
-  if (message == WM_NCHITTEST && ResizeHit(reinterpret_cast<HWND>(root), lp))
-    return HTTRANSPARENT;
+  const HWND parent = reinterpret_cast<HWND>(root);
+  if (message == WM_NCHITTEST) {
+    const LRESULT hit = ResizeHit(parent, lp);
+    if (hit) return hit;
+  }
+  // Chromium owns a child input HWND over the client-side 2px. Merely returning
+  // HTTRANSPARENT does not forward its sizing gesture to the parent. Handle the
+  // child's non-client press explicitly on the SAME thread's root HWND.
+  if (message == WM_NCLBUTTONDOWN) {
+    const LRESULT hit = ResizeHit(parent, lp);
+    if (hit) {
+      ReleaseCapture();
+      return SendMessageW(parent, WM_NCLBUTTONDOWN, hit, lp);
+    }
+  }
+  if (message == WM_SETCURSOR) {
+    POINT point{};
+    if (GetCursorPos(&point)) {
+      const LRESULT hit = ResizeHit(parent, MAKELPARAM(point.x, point.y));
+      const WORD cursor = hit == HTLEFT || hit == HTRIGHT ? 32644 :
+                          hit == HTBOTTOM ? 32645 :
+                          hit == HTBOTTOMLEFT ? 32643 :
+                          hit == HTBOTTOMRIGHT ? 32642 : 0;
+      if (cursor) { SetCursor(LoadCursorW(nullptr, MAKEINTRESOURCEW(cursor))); return TRUE; }
+    }
+  }
   return DefSubclassProc(hwnd, message, wp, lp);
 }
 
@@ -59,6 +80,10 @@ static LRESULT CALLBACK ResizeBorder(HWND hwnd, UINT message, WPARAM wp,
   if (message == WM_NCDESTROY) {
     RemoveWindowSubclass(hwnd, ResizeBorder, id);
     return DefSubclassProc(hwnd, message, wp, lp);
+  }
+  if (message == WM_NCLBUTTONDOWN) {
+    const LRESULT hit = ResizeHit(hwnd, lp);
+    if (hit) return DefWindowProcW(hwnd, message, hit, lp);
   }
   const LRESULT original = DefSubclassProc(hwnd, message, wp, lp);
   if (message == WM_PARENTNOTIFY && LOWORD(wp) == WM_CREATE)
