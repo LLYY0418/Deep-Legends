@@ -78,7 +78,8 @@ func TestR313NativeStartupAndFailureAdaptersKeepRecoveryWired(t *testing.T) {
 	if strings.Contains(source, "w.show()") || strings.Contains(source, "acknowledgeUpdateShell(") {
 		t.Fatal("main must not reveal an unpainted progress page or ACK")
 	}
-	if strings.Index(source, "webviewhost.CheckRuntime()") > strings.Index(source, "app.embed(") {
+	runtime, embed := strings.Index(source, "webviewhost.CheckRuntime()"), strings.Index(source, "app.embed(")
+	if runtime < 0 || embed <= runtime {
 		t.Fatal("runtime must be checked before embed")
 	}
 
