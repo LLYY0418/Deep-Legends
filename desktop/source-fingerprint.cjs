@@ -32,6 +32,7 @@ function sourceFingerprint(projectRoot = root) {
   const buildInputs = [
     "go.mod", "go.sum", "backend/prestige_chromas.json", "backend/announcements/announcements.json", "desktop/package.json", "desktop/package-lock.json",
     "build-desktop.sh", "build-desktop-windows.ps1", "build-windows.ps1", "scripts/build-stage.cjs", "scripts/normalize-source-line-endings.cjs", "scripts/go-test-shards.cjs",
+    "desktop/build-resize-border.cjs", "desktop/native/resize-border/binding.gyp", "desktop/native/resize-border/resize_border.cc",
     "desktop/source-fingerprint.cjs", "desktop/apply-portable-template.cjs", "desktop/apply-update-timing-template.cjs",
     "desktop/verify-embedded-riot-key.cjs", "desktop/verify-build-fingerprint.cjs", "desktop/release-build.cjs",
     "desktop/verify-packaged-runtime.cjs", "desktop/nsis/portable.nsi", "desktop/nsis/installer.nsh",

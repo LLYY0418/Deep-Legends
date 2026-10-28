@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),net=require('node:net'),{spawn}=require('node:child_process'),assert=require('node:assert/strict');
-const executable=path.resolve(process.argv[2]),out=path.resolve(process.argv[3]),label=process.argv[4];fs.mkdirSync(out,{recursive:true});
+const executable=path.resolve(process.argv[2]),out=path.resolve(process.argv[3]),label=process.argv[4];fs.mkdirSync(out,{recursive:true});assert(fs.existsSync(executable),'real packaged executable exists: '+executable);
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),run=(cmd,args)=>new Promise((r,j)=>{const p=spawn(cmd,args,{stdio:'inherit'});p.once('error',j);p.once('exit',c=>c===0?r():j(Error(cmd+' exit '+c)));});
 const connect=async url=>{const ws=new WebSocket(url);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j});let seq=0;const pending=new Map();ws.onmessage=e=>{const m=JSON.parse(e.data),p=pending.get(m.id);if(p){pending.delete(m.id);m.error?p[1](Error(JSON.stringify(m.error))):p[0](m.result)}};return{ws,call:(method,params={})=>new Promise((r,j)=>{const id=++seq;pending.set(id,[r,j]);ws.send(JSON.stringify({id,method,params}))})};};
 (async()=>{
@@ -8,7 +8,7 @@ const connect=async url=>{const ws=new WebSocket(url);await new Promise((r,j)=>{
  const child=spawn(executable,['--inspect='+mainPort,'--remote-debugging-port='+port,'--user-data-dir='+path.join(out,'user-data')],{env:{...process.env,LOL_LOOT_DATA_DIR:path.join(out,'data')},stdio:['ignore','pipe','pipe']});const logs=[];child.stdout.on('data',c=>logs.push(String(c)));child.stderr.on('data',c=>logs.push(String(c)));let renderer,main;
  try{
   let target,mainTarget;for(let i=0;i<600;i++){try{target=(await fetch(`http://127.0.0.1:${port}/json/list`).then(r=>r.json())).find(t=>t.type==='page'&&t.url.startsWith('http://127.0.0.1'));if(target)break}catch{}await wait(100)}assert(target,'real packaged renderer inspector');
-  renderer=await connect(target.webSocketDebuggerUrl);
+  renderer=await connect(target.webSocketDebuggerUrl);await renderer.call('Page.enable');
   const evaluate=async(conn,expression)=>{const r=await conn.call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
   const catalog=require('./r314-editor-fixture.cjs').completeRuneCatalog(require('../backend/testdata/r308/editor-catalog.json')),primary=catalog.styles.find(s=>s.id===8100),sub=catalog.styles.find(s=>s.id===8400),runes={primaryStyleId:8100,subStyleId:8400,selectedPerkIds:[...primary.slots.slice(0,4).map(s=>s.perks[0].id),sub.slots[1].perks[0].id,sub.slots[3].perks[0].id,...catalog.statModSlots.map(s=>s.perks[0].id)]};
   const value={runes},config={version:1,enabled:true,runes:true,spells:true,items:true,champions:{164:{ranked:value}}},champs={champions:[{id:164,key:'Camille',nameZh:'卡蜜尔',titleZh:'青钢影'}]};
@@ -18,7 +18,7 @@ const connect=async url=>{const ws=new WebSocket(url);await new Promise((r,j)=>{
   for(const page of ['overview','runes']){
    await renderer.call('Page.navigate',{url:origin+'/?demo'});
    for(let i=0;i<300;i++){try{if(await evaluate(renderer,'Boolean(window.deepLegendsSections&&document.querySelector("#suite-config-root"))'))break}catch{}await wait(100)}
-   if(page==='runes')await evaluate(renderer,`(async()=>{await deepLegendsSections.activate('suite');window.dispatchEvent(new CustomEvent('deep-legends:status',{detail:{connected:true,gameflow:{phase:'Lobby'}}}));window.dispatchEvent(new CustomEvent('deep-legends:navigate',{detail:{section:'suite',tab:'config'}}));await deepLegendsAutoConfig.load()})()`);
+   if(page==='runes'){await evaluate(renderer,setup);await evaluate(renderer,`(async()=>{await deepLegendsSections.activate('suite');window.dispatchEvent(new CustomEvent('deep-legends:status',{detail:{connected:true,gameflow:{phase:'Lobby'}}}));window.dispatchEvent(new CustomEvent('deep-legends:navigate',{detail:{section:'suite',tab:'config'}}));await deepLegendsAutoConfig.load(true)})()`);}
    if(page==='runes'){let ready=false;for(let i=0;i<300;i++){if(await evaluate(renderer,'Boolean(document.querySelector(".ac-tree")&&!document.querySelector(".ac-tree").closest("[hidden]"))')){ready=true;break}await wait(100)}if(!ready){const s=await renderer.call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'rune-page-failed.png'),Buffer.from(s.data,'base64'));fs.writeFileSync(path.join(out,'rune-page-failed.json'),JSON.stringify(await evaluate(renderer,`({text:document.body.innerText.slice(0,4000),tree:!!document.querySelector('.ac-tree'),hidden:[...document.querySelectorAll('[hidden]')].filter(n=>n.querySelector('.ac-tree')).map(n=>({id:n.id,cls:n.className})),scripts:[...document.scripts].map(s=>s.src)})`),null,2));}assert(ready,'rune page opened');}
    for(const [width,height]of [[914,911],[1561,913]]){
 
