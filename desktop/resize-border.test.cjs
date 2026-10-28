@@ -23,3 +23,9 @@ test('R314 Chromium child input forwards only resize strip hits to the same UI-t
  assert(source.includes('RemoveWindowSubclass(hwnd, ChildResizeBorder, id)'));
  const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');assert(main.includes('mainWindow.webContents.on("did-finish-load", () => {\n    require("./resize-border.cjs").installResizeBorder(mainWindow);'));
 });
+
+test('R314 fresh Windows real-Electron probe builds and copies the native module before launch',()=>{
+ const probe=fs.readFileSync(path.join(__dirname,'../scripts/r248-electron.cjs'),'utf8');
+ const build=probe.indexOf('require(path.join(sourceRoot, "desktop/build-resize-border.cjs")).build()'),copy=probe.indexOf('fs.copyFileSync(path.join(sourceRoot, "desktop/native/resize-border.node")'),launch=probe.indexOf('child = spawn(require(');
+ assert(build>0&&copy>build&&launch>copy);assert(probe.includes('process.platform === "win32"'));
+});

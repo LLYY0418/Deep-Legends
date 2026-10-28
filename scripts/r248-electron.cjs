@@ -60,6 +60,14 @@ async function probe({ phase, state = "ACTIVE", sourceRoot = root, transition = 
       if (name.endsWith(".cjs") && fs.existsSync(source)) fs.copyFileSync(source, path.join(shell, name));
       else if (["assets", "node_modules"].includes(name)) fs.symlinkSync(path.join(root, "desktop", name), path.join(shell, name), process.platform === "win32" ? "junction" : "dir");
     }
+    // A fresh checkout has native source but no generated .node yet. Keep this
+    // real production-main probe strict: compile it before launching Electron,
+    // and explicitly copy it into the isolated shell rather than mocking it.
+    if (process.platform === "win32" && fs.existsSync(path.join(sourceRoot, "desktop/resize-border.cjs"))) {
+      require(path.join(sourceRoot, "desktop/build-resize-border.cjs")).build();
+      fs.mkdirSync(path.join(shell, "native"));
+      fs.copyFileSync(path.join(sourceRoot, "desktop/native/resize-border.node"), path.join(shell, "native/resize-border.node"));
+    }
     const launcher = path.join(temp, "synthetic-backend");
     fs.writeFileSync(launcher, "synthetic fixture marker");
     const wrapper = `const {app,BrowserWindow}=require('electron'),fs=require('node:fs');
