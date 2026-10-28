@@ -164,6 +164,14 @@ test("failed NSIS stops before wrapping or issuing a receipt and cleans the unin
     assert.equal(fs.existsSync(path.join(directory, name)), false, name);
   }
   assert.equal(fs.existsSync(path.join(root, "desktop/uninstall-shell.exe")), false);
+  // Cover the new stage inside the existing Bash failure scenario: keep the
+  // original platform eligibility exactly unchanged, with no additional skip.
+  const native = fixture(t), nativeResult = native.run({R82_FAIL_STAGE: "native"});
+  assert.equal(nativeResult.status, 24, nativeResult.stdout + nativeResult.stderr);
+  assert(native.calls().includes("native-resize-border"));
+  assert(!native.calls().some(value => value.stage === "nsis"));
+  assert(!native.calls().includes("installer"));
+  assert.equal(fs.existsSync(path.join(native.directory, "release-build.json")), false);
 });
 
 test("compression overrides are explicit and invalid levels fail before packaging", () => {
@@ -208,11 +216,4 @@ test("setup-only Windows CI skip leaves NSIS, wrapper and receipt gates uncondit
   for (const token of ['npm run pack:win-setup', 'build-shell.cjs', 'verify-packaged-runtime.cjs',
     'verify-build-fingerprint.cjs', 'release-build.cjs', 'Get-FileHash -Algorithm SHA256']) assert.ok(packaging.includes(token), token);
   assert.match(source, /SkipTestsInCI requires GITHUB_ACTIONS=true/);
-});
-
-test("native resize build failure stops before NSIS and release receipt", {skip: process.platform === "win32"}, t => {
-  const {run,calls,directory}=fixture(t),result=run({R82_FAIL_STAGE:"native"});
-  assert.equal(result.status,24,result.stdout+result.stderr);
-  assert(calls().includes("native-resize-border"));assert(!calls().some(value=>value.stage==="nsis"));
-  assert(!calls().includes("installer"));assert.equal(fs.existsSync(path.join(directory,"release-build.json")),false);
 });
