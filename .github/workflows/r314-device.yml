@@ -56,6 +56,12 @@ jobs:
           $env:R314_EDITOR_OUT="$env:RUNNER_TEMP/r314-browser/candidate"
           node scripts/r314-editor-browser.cjs
           if($LASTEXITCODE -ne 0){throw 'candidate browser failed'}
+      - name: Existing natural card layout with stable explicit zoom vectors
+        shell: pwsh
+        run: |
+          $env:R280_BROWSER_OUT="$env:RUNNER_TEMP/r314-browser/natural-layout"
+          node scripts/career-natural-layout.cjs
+          if($LASTEXITCODE -ne 0){throw 'natural card layout regression failed'}
       - name: Baseline video sequence red
         if: ${{ !cancelled() }}
         shell: pwsh
