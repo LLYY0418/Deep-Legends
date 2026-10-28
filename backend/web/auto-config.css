@@ -499,6 +499,6 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 .ac-stage .ac-col.is-secondary::before { right:0; }
 .ac-stage .ac-node { border-width:calc(2px*var(--ac-rune-scale)); }
 .ac-stage .ac-row.is-picked .ac-node, .ac-stage .ac-node.is-picked { background:radial-gradient(circle,var(--ink) 0 calc(4px*var(--ac-rune-scale)),var(--surface) calc(4.5px*var(--ac-rune-scale))); }
-.ac-stage .ac-rune .ring { inset:calc(-4px*var(--ac-rune-scale)); }
-.ac-stage .ac-row.is-key .ac-rune .ring { inset:calc(-5px*var(--ac-rune-scale)); }
-.ac-stage .ac-row.is-shard .ac-rune .ring { inset:calc(2px*var(--ac-rune-scale)); border-width:calc(1.5px*var(--ac-rune-scale)); }
+.ac-stage .ac-rune .ring { inset:0; }
+.ac-stage .ac-row.is-key .ac-rune .ring { inset:0; }
+.ac-stage .ac-row.is-shard .ac-rune .ring { inset:0; border-width:calc(1.5px*var(--ac-rune-scale)); }
