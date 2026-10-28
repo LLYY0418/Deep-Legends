@@ -37,3 +37,13 @@ test('R314 parent and Chromium input HWND both own the resize cursor before defa
  assert(root.indexOf('ApplyResizeCursor(hwnd)')<root.indexOf('const LRESULT original = DefSubclassProc'));
  assert(source.includes('ApplyResizeCursor(parent)'));
 });
+
+test('R314 owns non-client move cursors after Chromium default processing without swallowing native messages',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'native/resize-border/resize_border.cc'),'utf8');
+ const child=source.slice(source.indexOf('static LRESULT CALLBACK ChildResizeBorder('),source.indexOf('static BOOL CALLBACK InstallChild('));
+ const root=source.slice(source.indexOf('static LRESULT CALLBACK ResizeBorder('));
+ assert(child.includes('if (message == WM_NCMOUSEMOVE) ApplyResizeCursor(parent);'));
+ assert(child.indexOf('if (message == WM_NCMOUSEMOVE)')>child.indexOf('const LRESULT original = DefSubclassProc'));
+ assert(root.includes('if (message == WM_NCMOUSEMOVE) ApplyResizeCursor(hwnd);'));
+ assert(root.indexOf('if (message == WM_NCMOUSEMOVE)')>root.indexOf('const LRESULT original = DefSubclassProc'));
+});
