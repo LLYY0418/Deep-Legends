@@ -313,7 +313,7 @@
     const updates=[];
     for(const g of root.querySelectorAll(".ac-group")){
       const rows=[...g.querySelectorAll(":scope > .ac-row")];if(!rows.length)continue;
-      const rowCenters=rows.map(n=>{const rune=n.querySelector(".ac-rune");return rune?rune.offsetTop+rune.offsetHeight/2:n.offsetHeight/2;}),centers=rows.map((n,i)=>n.offsetTop+rowCenters[i]),paths=g.previousElementSibling,main=paths?.classList.contains("ac-paths")?paths.querySelector(".ac-path-main"):null;
+      const rowCenters=rows.map(n=>{const css=getComputedStyle(n),padding=parseFloat(css.paddingTop)||0,rune=n.querySelector(".ac-rune");return padding&&rune?padding+parseFloat(getComputedStyle(rune).height)/2:parseFloat(css.height)/2;}),groupTop=g.getBoundingClientRect().top,zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1,centers=rows.map((n,i)=>(n.getBoundingClientRect().top-groupTop)/zoom+rowCenters[i]),paths=g.previousElementSibling,main=paths?.classList.contains("ac-paths")?paths.querySelector(".ac-path-main"):null;
       const top=g.dataset.group==="shards"?centers[0]:main?paths.offsetTop+main.offsetTop+main.offsetHeight-g.offsetTop:-6;
       const count=Object.keys(S.subPicks).length,sub=g.dataset.group==="sub",selected=sub?(count?count===1?centers[0]:centers.at(-1):null):centers[rows.findLastIndex(n=>n.classList.contains("is-picked"))];
       updates.push({g,top,height:centers.at(-1)-top,fill:selected==null?0:selected-top,centers,rowCenters,rows,count,sub});
