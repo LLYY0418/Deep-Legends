@@ -807,6 +807,7 @@ function createMainWindow() {
   };
   void refreshLicenseWindow();
   mainWindow.webContents.on("did-finish-load", () => {
+    require("./resize-border.cjs").installResizeBorder(mainWindow);
     for (const waiter of licenseRenderWaiters.values()) waiter.send();
     reportStartupStage("main_window_did_finish_load");
     applyUiScale(mainWindow, uiScaleState().value, true);

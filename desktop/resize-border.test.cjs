@@ -14,3 +14,12 @@ test('R314 native resize preserves hidden titlebar, original dispatch, fullscree
  const fingerprint=fs.readFileSync(path.join(__dirname,"source-fingerprint.cjs"),"utf8");for(const file of ["desktop/build-resize-border.cjs","desktop/native/resize-border/binding.gyp","desktop/native/resize-border/resize_border.cc"])assert(fingerprint.includes(file),file+" is a fingerprinted build input");
  const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');assert(main.includes('titleBarStyle: "hidden"'));assert(main.includes('installResizeBorder(mainWindow)'));
 });
+
+test('R314 Chromium child input forwards only resize strip hits to the same UI-thread root',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'native/resize-border/resize_border.cc'),'utf8');
+ assert(source.includes('EnumChildWindows(hwnd, InstallChild'));assert(source.includes('WM_PARENTNOTIFY'));
+ assert(source.includes('ResizeHit(reinterpret_cast<HWND>(root), lp)'));assert(source.includes('return HTTRANSPARENT;'));
+ assert(source.includes('owner == GetCurrentProcessId() && thread == GetCurrentThreadId()'));
+ assert(source.includes('RemoveWindowSubclass(hwnd, ChildResizeBorder, id)'));
+ const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');assert(main.includes('mainWindow.webContents.on("did-finish-load", () => {\n    require("./resize-border.cjs").installResizeBorder(mainWindow);'));
+});
