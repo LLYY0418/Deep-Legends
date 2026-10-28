@@ -7,6 +7,14 @@
 #include <node_api.h>
 #include <cstring>
 
+#include <cstdio>
+static void CursorTrace(const char*where,HWND hwnd,UINT message){
+ if(message!=WM_SETCURSOR&&message!=WM_MOUSEMOVE&&message!=WM_NCMOUSEMOVE)return;
+ static FILE*file=nullptr;static bool checked=false;if(!checked){checked=true;wchar_t path[32768]{};if(GetEnvironmentVariableW(L"R314_RESIZE_TRACE_FILE",path,32768))file=_wfopen(path,L"a");}if(!file)return;
+ CURSORINFO info{sizeof(info)};GetCursorInfo(&info);POINT point{};GetCursorPos(&point);
+ fprintf(file,"{\"where\":\"%s\",\"hwnd\":%llu,\"message\":%u,\"x\":%ld,\"y\":%ld,\"cursor\":%llu,\"flags\":%lu,\"tick\":%llu}\n",where,(unsigned long long)hwnd,message,point.x,point.y,(unsigned long long)info.hCursor,info.flags,(unsigned long long)GetTickCount64());fflush(file);
+}
+
 // Preserve DWM and the normal Windows sizing loop. Screen-pixel hit testing is
 // shared by the root and its same-thread Chromium input child windows.
 static LRESULT ResizeHit(HWND hwnd, LPARAM lp) {
@@ -55,6 +63,7 @@ static LRESULT CALLBACK ChildResizeBorder(HWND hwnd, UINT message, WPARAM wp,
                                           LPARAM lp, UINT_PTR id, DWORD_PTR root) {
   if (message == WM_NCDESTROY) RemoveWindowSubclass(hwnd, ChildResizeBorder, id);
   const HWND parent = reinterpret_cast<HWND>(root);
+  CursorTrace("child-before",hwnd,message);
   if (message == WM_NCHITTEST) {
     const LRESULT hit = ResizeHit(parent, lp);
     if (hit) return hit;
@@ -69,7 +78,7 @@ static LRESULT CALLBACK ChildResizeBorder(HWND hwnd, UINT message, WPARAM wp,
       return SendMessageW(parent, WM_NCLBUTTONDOWN, hit, lp);
     }
   }
-  if (message == WM_SETCURSOR && ApplyResizeCursor(parent)) return TRUE;
+  if (message == WM_SETCURSOR && ApplyResizeCursor(parent)) {CursorTrace("child-owned",hwnd,message);return TRUE;}
   return DefSubclassProc(hwnd, message, wp, lp);
 }
 
@@ -91,8 +100,10 @@ static LRESULT CALLBACK ResizeBorder(HWND hwnd, UINT message, WPARAM wp,
     const LRESULT hit = ResizeHit(hwnd, lp);
     if (hit) return DefWindowProcW(hwnd, message, hit, lp);
   }
-  if (message == WM_SETCURSOR && ApplyResizeCursor(hwnd)) return TRUE;
+  CursorTrace("root-before",hwnd,message);
+  if (message == WM_SETCURSOR && ApplyResizeCursor(hwnd)) {CursorTrace("root-owned",hwnd,message);return TRUE;}
   const LRESULT original = DefSubclassProc(hwnd, message, wp, lp);
+  CursorTrace("root-after-default",hwnd,message);
   if (message == WM_PARENTNOTIFY && LOWORD(wp) == WM_CREATE)
     EnumChildWindows(hwnd, InstallChild, reinterpret_cast<LPARAM>(hwnd));
   if (message != WM_NCHITTEST) return original;
