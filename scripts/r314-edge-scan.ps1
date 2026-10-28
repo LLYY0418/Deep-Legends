@@ -1,4 +1,4 @@
-param([long]$Window,[int]$ProcessID,[int]$Width,[int]$Height,[string]$Output,[string]$Label,[switch]$Explorer)
+param([long]$Window,[int]$ProcessID,[int]$Width,[int]$Height,[string]$Output,[string]$Label,[switch]$Explorer,[switch]$VerifyDrag)
 $ErrorActionPreference='Stop'
 New-Item -ItemType Directory -Force (Split-Path $Output)|Out-Null
 Add-Type @'
@@ -10,6 +10,16 @@ public static class R314HitTest {
  [DllImport("user32.dll")]static extern bool EnumWindows(EnumProc cb,IntPtr d);
  [DllImport("user32.dll")]static extern bool IsWindowVisible(IntPtr h);
  [DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
+ [DllImport("user32.dll")]static extern bool SetCursorPos(int x,int y);
+ [DllImport("user32.dll")]static extern void mouse_event(uint flags,uint x,uint y,uint data,UIntPtr extra);
+ [DllImport("user32.dll")]static extern bool SetForegroundWindow(IntPtr h);
+ public static object[] Drags(long handle){var h=new IntPtr(handle);Rect original;GetWindowRect(h,out original);var results=new List<object>();foreach(var edge in new[]{"left","right","bottom","bottomleft","bottomright"})foreach(int offset in new[]{-6,2}){
+  SetWindowPos(h,new IntPtr(-1),original.left,original.top,original.right-original.left,original.bottom-original.top,0x0040);SetForegroundWindow(h);System.Threading.Thread.Sleep(80);
+  Rect r;DwmGetWindowAttribute(h,9,out r,Marshal.SizeOf(typeof(Rect)));int x=(r.left+r.right)/2,y=(r.top+r.bottom)/2,dx=0,dy=0;
+  if(edge=="left"||edge=="bottomleft"){x=r.left+offset;dx=-24;}if(edge=="right"||edge=="bottomright"){x=r.right-1-offset;dx=24;}if(edge.StartsWith("bottom")){y=r.bottom-1-offset;dy=24;}
+  Rect before;GetWindowRect(h,out before);SetCursorPos(x,y);System.Threading.Thread.Sleep(30);mouse_event(2,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(60);SetCursorPos(x+dx,y+dy);System.Threading.Thread.Sleep(120);mouse_event(4,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(60);Rect after;GetWindowRect(h,out after);
+  bool changed=(dx==0||Math.Abs((after.right-after.left)-(before.right-before.left))>=12)&&(dy==0||Math.Abs((after.bottom-after.top)-(before.bottom-before.top))>=12);results.Add(new{edge,offset,x,y,changed,before,after});
+ }SetWindowPos(h,IntPtr.Zero,original.left,original.top,original.right-original.left,original.bottom-original.top,0x0040);return results.ToArray();}
  [DllImport("user32.dll")]static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int height,uint flags);
  public static long Find(int process,int width,int height){long found=0;EnumWindows((h,d)=>{uint p;GetWindowThreadProcessId(h,out p);if(p==process&&IsWindowVisible(h))found=h.ToInt64();return true;},IntPtr.Zero);if(found==0)throw new Exception("Visible window not found for exact process "+process);SetWindowPos(new IntPtr(found),IntPtr.Zero,40,40,width,height,0x0040);return found;}
 
@@ -41,4 +51,11 @@ public static class R314HitTest {
 if($Explorer){Start-Process explorer.exe -ArgumentList 'C:\Windows';$deadline=[DateTime]::UtcNow.AddSeconds(20);do{$Window=[R314HitTest]::FindExplorer($Width,$Height);if($Window){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $deadline);if(-not $Window){throw 'Explorer window not created'}}
 if($ProcessID){$Window=[R314HitTest]::Find($ProcessID,$Width,$Height);Start-Sleep -Milliseconds 300}
 $result=[R314HitTest]::Scan($Window);$result['label']=$Label
+if($VerifyDrag){$result['drags']=[R314HitTest]::Drags($Window)}
 $result|ConvertTo-Json -Depth 10|Set-Content -Encoding utf8 $Output
+
+if($VerifyDrag){
+ $bad=@($result.rows|Where-Object{$_.frame -eq 'visible' -and $_.offset -ge -6 -and $_.offset -le 2 -and $_.code -notin @(10,11,12,13,14,15,16,17)})
+ if($bad.Count -gt 0){throw 'Native resize zone does not cover every required pixel'}
+ if(@($result.drags|Where-Object{-not $_.changed}).Count -gt 0){throw 'Real pointer drag failed at a required border pixel'}
+}
