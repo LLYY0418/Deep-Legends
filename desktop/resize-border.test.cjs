@@ -11,5 +11,6 @@ test('R314 native resize preserves hidden titlebar, original dispatch, fullscree
  const s=fs.readFileSync(path.join(__dirname,'native/resize-border/resize_border.cc'),'utf8');
  for(const expected of ['WM_NCHITTEST','DefSubclassProc(hwnd, message, wp, lp)','IsZoomed(hwnd)','WS_THICKFRAME','DWMWA_EXTENDED_FRAME_BOUNDS','GET_X_LPARAM(lp)','GET_Y_LPARAM(lp)','HTBOTTOMLEFT','HTBOTTOMRIGHT','HTLEFT','HTRIGHT','HTBOTTOM','GetCurrentThreadId()','GetCurrentProcessId()','WM_NCDESTROY','RemoveWindowSubclass'])assert(s.includes(expected),expected);
  const pkg=require('./package.json');assert(pkg.build.files.includes('native/resize-border.node'));assert(pkg.build.asarUnpack.includes('native/*.node'));
+ const fingerprint=fs.readFileSync(path.join(__dirname,"source-fingerprint.cjs"),"utf8");for(const file of ["desktop/build-resize-border.cjs","desktop/native/resize-border/binding.gyp","desktop/native/resize-border/resize_border.cc"])assert(fingerprint.includes(file),file+" is a fingerprinted build input");
  const main=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');assert(main.includes('titleBarStyle: "hidden"'));assert(main.includes('installResizeBorder(mainWindow)'));
 });

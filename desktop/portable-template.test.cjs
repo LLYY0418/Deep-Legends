@@ -78,7 +78,8 @@ test("定制便携版模板存在且保留缓存秒开的关键行为", () => {
 
 test("打包配置与模板配套：asarUnpack 后端、不再使用解压期启动图", () => {
   const config = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
-  assert.deepEqual(config.build.asarUnpack, ["backend/loot-service.exe"]);
+  assert.deepEqual(config.build.asarUnpack, ["native/*.node", "backend/loot-service.exe"]);
+  assert.ok(config.build.files.includes("native/resize-border.node"));
   assert.ok(!("splashImage" in (config.build.portable || {})));
   assert.ok(config.build.files.includes("backend/loot-service.exe"));
   assert.ok(config.build.files.includes("window-bounds-store.cjs"));
@@ -106,6 +107,8 @@ test("所有桌面运行时本地模块都进入 app.asar 和源码指纹", () =
 
   const required = runtimeVerifier.requiredRuntimeEntries();
   assert.ok(required.includes("window-bounds-store.cjs"));
+  assert.ok(required.includes("native/resize-border.node"));
+  assert.throws(() => runtimeVerifier.verifyArchiveEntries(required.filter(name => !name.endsWith(".node"))), /native\/resize-border\.node/);
   assert.doesNotThrow(() => runtimeVerifier.verifyArchiveEntries(required.map((name) => `/${name}`)));
   assert.throws(
     () => runtimeVerifier.verifyArchiveEntries(required.filter((name) => name !== "window-bounds-store.cjs")),

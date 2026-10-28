@@ -6,7 +6,7 @@ const asar = require("@electron/asar");
 
 function requiredRuntimeEntries() {
   const config = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
-  return config.build.files.filter((name) => name.endsWith(".cjs")).sort();
+  return config.build.files.filter((name) => name.endsWith(".cjs") || name.endsWith(".node")).sort();
 }
 
 function normalizeArchiveEntry(entry) {

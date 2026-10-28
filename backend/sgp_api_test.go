@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -27,8 +28,13 @@ func (fn sgpRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, err
 }
 
 func captureSGPObservations(provider *sgpProvider) *[]map[string]any {
+	var callbacksMu sync.Mutex
+
 	events := make([]map[string]any, 0, 4)
 	provider.observe = func(event map[string]any) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		copy := make(map[string]any, len(event))
 		for key, value := range event {
 			copy[key] = value
@@ -39,8 +45,13 @@ func captureSGPObservations(provider *sgpProvider) *[]map[string]any {
 }
 
 func captureSGPRequestObservations(provider *sgpProvider) *[]map[string]any {
+	var callbacksMu sync.Mutex
+
 	events := make([]map[string]any, 0, 4)
 	provider.observe = func(event map[string]any) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		if event["event"] == "sgp_request" {
 			events = append(events, event)
 		}
@@ -99,6 +110,8 @@ func TestDiagnosticKeySetIsSortedAndValueFree(t *testing.T) {
 }
 
 func TestSGPConnectionErrorsHaveStableKinds(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	for _, test := range []struct {
 		name string
 		err  error
@@ -113,7 +126,12 @@ func TestSGPConnectionErrorsHaveStableKinds(t *testing.T) {
 			client := &LCUClient{}
 			provider := newSGPProvider()
 			var waits []time.Duration
-			provider.retryWait = func(ctx context.Context, d time.Duration) error { waits = append(waits, d); return ctx.Err() }
+			provider.retryWait = func(ctx context.Context, d time.Duration) error {
+				callbacksMu.Lock()
+				defer callbacksMu.Unlock()
+				waits = append(waits, d)
+				return ctx.Err()
+			}
 			provider.http = &http.Client{Transport: sgpRoundTripFunc(func(*http.Request) (*http.Response, error) {
 				return nil, test.err
 			})}
@@ -184,9 +202,14 @@ func TestEntitlementsTokenErrorsDistinguishStatusAndEmptyField(t *testing.T) {
 }
 
 func TestMatchHistoryReturnsPartialErrorWhenLaterPageFails(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	requests := 0
 	puuid := strings.Repeat("p", 48)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		requests++
 		if r.URL.Path != "/match-history-query/v1/products/lol/player/"+puuid+"/SUMMARY" {
 			t.Fatalf("path = %q, want player history route", r.URL.Path)
@@ -272,10 +295,15 @@ func TestMatchHistoryParsesFullRosterFromPlayerRoute(t *testing.T) {
 }
 
 func TestMatchHistoryCacheAvoidsDuplicateSummaryAndReportsHit(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	requests := 0
 	puuid := strings.Repeat("h", 48)
 	responseBody := `{"games":[{"json":{"gameId":91,"queueId":420,"participants":[{"participantId":1,"puuid":"` + puuid + `"}]}}]}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		requests++
 		_, _ = w.Write([]byte(responseBody))
 	}))
@@ -302,8 +330,13 @@ func TestMatchHistoryCacheAvoidsDuplicateSummaryAndReportsHit(t *testing.T) {
 }
 
 func TestSGPRetriesTransient503TwiceThenSucceeds(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		requests++
 		if requests < 3 {
 			http.Error(w, "temporary", http.StatusServiceUnavailable)
@@ -337,14 +370,22 @@ func TestSGPRetriesTransient503TwiceThenSucceeds(t *testing.T) {
 }
 
 func TestSGPRetryBudgetDoesNotConsumeAuthRefresh(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	tokenRequests := 0
 	lcuServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		tokenRequests++
 		_, _ = io.WriteString(w, `{"accessToken":"refreshed-entitlements"}`)
 	}))
 	defer lcuServer.Close()
 	requests := 0
 	sgpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		requests++
 		switch requests {
 		case 1, 2:
@@ -371,10 +412,15 @@ func TestSGPRetryBudgetDoesNotConsumeAuthRefresh(t *testing.T) {
 }
 
 func TestSGPRetriesReadFailureTwiceThenSucceeds(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	requests := 0
 	client := &LCUClient{}
 	provider := newSGPProvider()
 	provider.http = &http.Client{Transport: sgpRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		requests++
 		body := io.ReadCloser(io.NopCloser(strings.NewReader(`{"ok":true}`)))
 		if requests < 3 {
@@ -394,9 +440,14 @@ func TestSGPRetriesReadFailureTwiceThenSucceeds(t *testing.T) {
 }
 
 func TestMatchHistoryPhysicalPageCacheReusesTwentyBeforeFifty(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	requests := make([]string, 0, 3)
 	puuid := strings.Repeat("c", 48)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		start, _ := strconv.Atoi(r.URL.Query().Get("startIndex"))
 		count, _ := strconv.Atoi(r.URL.Query().Get("count"))
 		requests = append(requests, fmt.Sprintf("%d:%d", start, count))
@@ -446,9 +497,14 @@ func TestMatchHistoryPhysicalPageCacheSeparatesPageSizesAtSameStart(t *testing.T
 }
 
 func TestMatchHistoryColdFiftyUsesOneUpstreamRequestAndOneShapeSample(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	requests := 0
 	puuid := strings.Repeat("f", 48)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		requests++
 		if r.URL.Query().Get("startIndex") != "0" || r.URL.Query().Get("count") != "50" {
 			t.Fatalf("query = %q", r.URL.RawQuery)
@@ -524,9 +580,14 @@ func TestMatchHistoryCacheEvictsLeastRecentlyUsed(t *testing.T) {
 }
 
 func TestMatchHistoryFilteredOnSendsRepeatedTagsWithOR(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	requests := 0
 	puuid := strings.Repeat("m", 48)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		requests++
 		if r.URL.Path != "/match-history-query/v1/products/lol/player/"+puuid+"/SUMMARY" {
 			t.Fatalf("path = %q", r.URL.Path)
@@ -553,9 +614,14 @@ func TestMatchHistoryFilteredOnSendsRepeatedTagsWithOR(t *testing.T) {
 }
 
 func TestMatchHistoryFilteredOnDoesNotRefillMalformedTaggedPage(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	requests := 0
 	puuid := strings.Repeat("v", 48)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		requests++
 		if r.URL.Query().Get("startIndex") != "0" || r.URL.Query().Get("count") != "20" {
 			t.Fatalf("query = %q", r.URL.RawQuery)
@@ -610,6 +676,8 @@ func TestMatchHistoryKeepsEmptyRosterForDiagnostics(t *testing.T) {
 }
 
 func TestSGPRequestObservationTracksRetryAndSafeParseShape(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	lcuServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/entitlements/v1/token" {
 			http.NotFound(w, r)
@@ -620,6 +688,9 @@ func TestSGPRequestObservationTracksRetryAndSafeParseShape(t *testing.T) {
 	defer lcuServer.Close()
 	requests := 0
 	sgpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		requests++
 		if requests == 1 {
 			http.Error(w, "expired secret", http.StatusUnauthorized)
@@ -867,8 +938,13 @@ func TestSGPRankedStatsOnParsesObservedHistoricalShapes(t *testing.T) {
 }
 
 func TestSGPSummonerSuccessIsCached(t *testing.T) {
+	var callbacksMu sync.Mutex
+
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callbacksMu.Lock()
+		defer callbacksMu.Unlock()
+
 		requests++
 		_, _ = w.Write([]byte(`[{"puuid":"cached","name":"public"}]`))
 	}))

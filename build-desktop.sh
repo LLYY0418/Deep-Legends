@@ -179,6 +179,7 @@ report_electron_dist() {
 
 (
   cd desktop
+  run_stage native-resize-border node build-resize-border.cjs
   export DEEP_LEGENDS_FINGERPRINT="$source_fingerprint"
   builder_common_args=(--config.win.signExecutable=false)
   echo "electron-cache: checking for a reusable Windows Electron archive"
