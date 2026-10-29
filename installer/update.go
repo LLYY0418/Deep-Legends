@@ -11,6 +11,9 @@ import (
 const upgradeFailureMessage = "升级失败，请从发布页下载完整安装包重新安装"
 
 type installerOptions struct {
+	Standby      bool
+	StandbyToken string
+	OwnerPID     uint32
 	Update       bool
 	FreshInstall bool
 	ParentPID    uint32
@@ -24,6 +27,27 @@ func parseInstallerOptions(args []string) installerOptions {
 	var options installerOptions
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--standby":
+			options.Standby = true
+		case "--standby-token":
+			if i+1 >= len(args) {
+				options.Error = errors.New(upgradeFailureMessage)
+				continue
+			}
+			i++
+			options.StandbyToken = args[i]
+		case "--owner-pid":
+			if i+1 >= len(args) {
+				options.Error = errors.New(upgradeFailureMessage)
+				continue
+			}
+			i++
+			value, err := strconv.ParseUint(args[i], 10, 32)
+			if err != nil || value == 0 {
+				options.Error = errors.New(upgradeFailureMessage)
+			} else {
+				options.OwnerPID = uint32(value)
+			}
 		case "--update":
 			options.Update = true
 		case "--fresh-install":
@@ -62,6 +86,9 @@ func parseInstallerOptions(args []string) installerOptions {
 		options.Error = errors.New(upgradeFailureMessage)
 	}
 	if (options.FreshInstall || options.ParentFirst) && (!options.Update || options.ParentPID == 0) {
+		options.Error = errors.New(upgradeFailureMessage)
+	}
+	if options.Standby && (!options.Update || !options.ParentFirst || options.OwnerPID == 0 || !validStandbyToken(options.StandbyToken)) {
 		options.Error = errors.New(upgradeFailureMessage)
 	}
 	return options
@@ -167,4 +194,16 @@ func recoverAcknowledgedUpdate(options installerOptions, exeName string, acknowl
 		parentExited = wait()
 	}
 	return parentExited, recoverUpdateApplication(options, exeName, parentExited, start)
+}
+
+func validStandbyToken(token string) bool {
+	if len(token) != 64 {
+		return false
+	}
+	for _, c := range token {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
 }

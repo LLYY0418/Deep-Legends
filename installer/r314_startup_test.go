@@ -13,8 +13,8 @@ func TestR314WarmupBeforeEveryInstallerSideEffect(t *testing.T) {
 	raw, _ := os.ReadFile("main_windows.go")
 	s := string(raw)
 	start := strings.Index(s, "func main() {")
-	if !strings.HasPrefix(strings.TrimSpace(s[start+len("func main() {"):]), "if installerWarmup(os.Args[1:]) {\n\t\treturn\n\t}") {
-		t.Fatal("warmup must exit before logging, mutex, payload, or windows")
+	if !strings.HasPrefix(strings.TrimSpace(s[start+len("func main() {"):]), "if installerWarmup(os.Args[1:]) {\n\t\twarmInstallerWebView()\n\t\treturn\n\t}") {
+		t.Fatal("warmup must use isolated hidden WebView path before normal logging, mutex, or payload")
 	}
 	raw, _ = os.ReadFile("window_windows.go")
 	if strings.Contains(string(raw), "DrawTextW") || strings.Contains(string(raw), "正在启动升级程序") {

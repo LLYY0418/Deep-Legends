@@ -349,6 +349,7 @@ function uiScaleState(window = mainWindow) {
   return { mode: uiScalePreference === "auto" ? "auto" : "fixed", value: uiScalePreference === "auto" ? auto : uiScalePreference, auto };
 }
 
+const windowScaleFits = new WeakMap();
 function applyUiScale(window, scale, force = false) {
   // The renderer performs the actual zoom (CSS `zoom` on .app-frame) so that the
   // browser preview scales as well; the shell must NOT call setZoomFactor here or
@@ -362,10 +363,37 @@ function applyUiScale(window, scale, force = false) {
     window.setMinimumSize(0, 0);
     return;
   }
-  if (!force && currentUiScale === scale) return;
+  const { screen } = require("electron");
+  const workArea = screen.getDisplayMatching(window.getBounds()).workArea;
+  let fit = windowScaleFits.get(window);
+  if (!fit) {
+    fit = { area: "", restore: null };
+    windowScaleFits.set(window, fit);
+    // Electron emits these only for manual actions, never setBounds/setSize.
+    const manual = () => { fit.restore = null; };
+    window.on("will-resize", manual);
+    window.on("will-move", manual);
+    window.on("maximize", manual);
+  }
+  const area = JSON.stringify(workArea);
+  if (!force && currentUiScale === scale && fit.area === area) return;
+  const fromScale = currentUiScale, before = window.getBounds();
+  const minimum = [Math.min(Math.round(780 * scale), workArea.width), Math.min(Math.round(600 * scale), workArea.height)];
+  const normal = !window.isMaximized() && !window.isFullScreen();
+  const restored = normal && scale < fromScale && !!fit.restore;
+  const target = restored ? fit.restore.bounds : before;
+  const width = Math.min(workArea.width, Math.max(minimum[0], target.width));
+  const height = Math.min(workArea.height, Math.max(minimum[1], target.height));
+  const after = { x: Math.max(workArea.x, Math.min(target.x, workArea.x + workArea.width - width)), y: Math.max(workArea.y, Math.min(target.y, workArea.y + workArea.height - height)), width, height };
+  const changed = Object.keys(after).some(key => after[key] !== before[key]);
+  if (restored) fit.restore = null;
+  else if (normal && scale > fromScale && changed && !fit.restore) fit.restore = { bounds: before, scale: fromScale };
+  fit.area = area;
   currentUiScale = scale;
   syncTitleBar(scale);
-  window.setMinimumSize(Math.round(780 * scale), Math.round(600 * scale));
+  window.setMinimumSize(...minimum);
+  if (changed && normal) window.setBounds(after);
+  appendDesktopLog("window_scale_fit " + JSON.stringify({ event: "window_scale_fit", from_scale: fromScale, to_scale: scale, before_bounds: before, after_bounds: window.getBounds(), work_area: workArea, minimum, restored, clamped: Object.keys(after).some(key => after[key] !== target[key]) }));
 }
 
 function appendDesktopLog(message) {

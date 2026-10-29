@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"time"
 
 	"deeplegends/installer/internal/webviewhost"
 	"deeplegends/installer/payload"
@@ -13,15 +14,34 @@ import (
 
 func main() {
 	if installerWarmup(os.Args[1:]) {
+		warmInstallerWebView()
 		return
 	}
+	mainEntered := time.Now()
 	processCreatedToMain := processCreatedToMainMillis()
 	defer webviewhost.StartupLog("DeepLegendsSetup")()
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	enableDPIAwareness()
 	options := parseInstallerOptions(os.Args[1:])
-	mutex, first, err := acquireSingleInstance()
+	var standbySignal *installerStandbySignal
+	if options.Standby {
+		if options.Error != nil {
+			return
+		}
+		var err error
+		standbySignal, err = openInstallerStandby(options)
+		if err != nil {
+			return
+		}
+		defer standbySignal.close()
+	}
+	var mutex windows.Handle
+	first := true
+	var err error
+	if !options.Standby {
+		mutex, first, err = acquireSingleInstance()
+	}
 	if err != nil {
 		log.Print(err)
 		return
@@ -30,8 +50,15 @@ func main() {
 		log.Print("another installer instance is already running")
 		return
 	}
-	defer windows.CloseHandle(mutex)
+	defer func() {
+		if mutex != 0 {
+			windows.CloseHandle(mutex)
+		}
+	}()
 	meta, payloadError := payload.LoadMetadata()
+	if options.Standby && payloadError != nil {
+		return
+	}
 	log.Printf("installer version=%s fingerprint=%s", meta.Version, meta.Fingerprint)
 	var timing *updateInstallTiming
 	var waitParent func() bool
@@ -39,6 +66,7 @@ func main() {
 		timing = newUpdateInstallTiming()
 		timing.mark("installer_start")
 		timing.duration("process_created_to_main_ms", processCreatedToMain)
+		timing.duration("go_initialization_ms", time.Since(mainEntered).Milliseconds())
 		if options.Error != nil {
 			return
 		}
@@ -63,13 +91,22 @@ func main() {
 		}
 	}
 
+	shellStarted := time.Now()
 	w, err := createShellWindow()
 	if err != nil {
-		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
+		if !options.Standby {
+			webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
+		}
 		return
 	}
+	timing.duration("shell_create_ms", time.Since(shellStarted).Milliseconds())
 	w.timing = timing
-	app := &installerApp{window: w, meta: meta, payloadError: payloadError, options: options, waitParent: waitParent, timing: timing}
+	app := &installerApp{window: w, meta: meta, payloadError: payloadError, options: options, waitParent: waitParent, timing: timing, standbySignal: standbySignal}
+	defer func() {
+		if app.standbyMutex != 0 {
+			windows.CloseHandle(app.standbyMutex)
+		}
+	}()
 
 	if options.Update {
 		w.starting = true
@@ -77,29 +114,33 @@ func main() {
 	if err := webviewhost.CheckRuntime(); err != nil {
 		w.starting = false
 		app.recoverFailedUpdate()
-		destroyWindow.Call(w.hwnd)
-		runMessageLoop()
+		closeInstallerWindow(w)
 		if options.Update {
 			err = errors.New(upgradeFailureMessage)
 		}
-		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
+		if !options.Standby {
+			webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
+		}
 		return
 	}
-	path := initialInstallDir()
-	if options.Update {
-		path = options.Destination
+	path := options.Destination
+	var free int64
+	if !options.Update {
+		path = initialInstallDir()
+		free, _ = diskFreeBytes(path)
 	}
-	free, _ := diskFreeBytes(path)
+	// Update validates destination and space again in install(), after visibility.
 	html, err := renderInstallerUI(meta.Version, options)
 	if err != nil {
 		w.starting = false
 		app.recoverFailedUpdate()
-		destroyWindow.Call(w.hwnd)
-		runMessageLoop()
+		closeInstallerWindow(w)
 		if options.Update {
 			err = errors.New(upgradeFailureMessage)
 		}
-		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
+		if !options.Standby {
+			webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
+		}
 		return
 	}
 	if err := app.embed(html, initMessage{Path: path, NeedBytes: requiredSpace(meta.InstalledBytes), FreeBytes: free, Version: meta.Version}); err != nil {
@@ -108,13 +149,14 @@ func main() {
 		if options.Update {
 			err = errors.New(upgradeFailureMessage)
 		}
-		destroyWindow.Call(w.hwnd)
-		runMessageLoop() // consume WM_QUIT before opening the error dialog
-		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
+		closeInstallerWindow(w) // consume WM_QUIT before opening the error dialog
+		if !options.Standby {
+			webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
+		}
 		return
 	}
 	runMessageLoop()
-	if app.startupError != nil {
+	if app.startupError != nil && !options.Standby {
 		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", app.startupError)
 	}
 }

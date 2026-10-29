@@ -3169,10 +3169,7 @@
 
   function renderRankWindowNote(progress, ranks = [], foreign = false) {
     const rank=ranks.find(r=>r.recordSplitStart) || {};
-    const start=Number(rank.recordSplitStart || 1785351600000),date=new Date(start+8*3600000);
-    const from=`${date.getUTCMonth()+1}月${date.getUTCDate()}日`;
-    const split=date.getUTCMonth()<3?"第一":date.getUTCMonth()<6?"第二":"第三";
-    const copy=foreign?"统计的是当前整个赛季的排位数据":(rank.recordSplitSource==="season"?"":`数据范围：${date.getUTCFullYear()} 赛季${split}赛段\n`)+`统计自 ${from} 起`;
+    const copy=foreign?"统计的是当前整个赛季的排位数据":`数据范围：${rank.recordSplitLabel || "当前赛段"}\n统计自 ${rank.recordSplitFrom || "—"} 起`;
     return `<button type="button" class="season-data-note" aria-label="数据说明" data-tooltip="${escapeHTML(copy)}" data-tooltip-size="compact"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7v4M8 4.5v.5"/></svg></button>`;
   }
 
@@ -5939,7 +5936,7 @@
   function syncRecentHeadingTypography(container) {
     for(const header of container.querySelectorAll('.recent-casual-header')) {
       const title=header.querySelector('h3'),mode=header.querySelector('.recent-casual-mode');
-      if(title&&mode){const css=getComputedStyle(title);for(const key of ['fontFamily','fontSize','fontWeight','lineHeight'])mode.style[key]=css[key];}
+      if(title&&mode){const css=getComputedStyle(title);for(const key of ['fontFamily','fontWeight','lineHeight'])mode.style[key]=css[key];mode.style.fontSize=`${Math.max(12,Math.round(parseFloat(css.fontSize)*.8))}px`;}
     }
   }
 

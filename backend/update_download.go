@@ -174,6 +174,7 @@ func (u *updateManager) download(background bool) error {
 	return nil
 }
 func (u *updateManager) Cancel() error {
+	u.stopStandby()
 	u.mu.Lock()
 	cancel, done := u.downloadCancel, u.downloadDone
 	u.mu.Unlock()
@@ -404,7 +405,7 @@ func (u *updateManager) downloadSource(parent context.Context, asset updateAsset
 				return
 			}
 			eta := int64(0)
-			if speed > 0 {
+			if speed >= 1024 && now.Sub(started) >= time.Second {
 				eta = int64(math.Ceil(float64(asset.Size-current) / speed))
 			}
 			progress := updateProgress{ReceivedBytes: current, TotalBytes: asset.Size, BytesPerSecond: speed, ETASeconds: eta}
@@ -555,7 +556,10 @@ func (u *updateManager) apply(async bool, success func()) error {
 			}
 		}
 		u.markApplyTiming("migrate_done")
-		err := u.launch(path, dest)
+		used, err := u.activateStandby(path, dest, asset)
+		if !used {
+			err = u.launch(path, dest)
+		}
 		if err = fail(err); err == nil && success != nil && u.ctx.Err() == nil {
 			success()
 		}

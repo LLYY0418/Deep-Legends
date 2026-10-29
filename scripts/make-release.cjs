@@ -40,7 +40,7 @@ function makeRelease({ root = path.resolve(__dirname, ".."), fingerprint, publis
   for (const asset of assets) if (!asset.bytes.length) throw new Error(`发布资产为空：${asset.name}`);
   verifyPublicReleaseBuild(root, fingerprint, assets);
   const setup = assets[0];
-  const manifest = { schema:1, version, fingerprint, publishedAt, minSupported, notes, asset:{ name:setup.name, size:setup.bytes.length, sha256:sha256(setup.bytes), url:`https://github.com/${repo}/releases/download/v${version}/${setup.name}` } };
+  const manifest = { schema:1, version, capabilities:["standby-v1"], fingerprint, publishedAt, minSupported, notes, asset:{ name:setup.name, size:setup.bytes.length, sha256:sha256(setup.bytes), url:`https://github.com/${repo}/releases/download/v${version}/${setup.name}` } };
   assets.push({ name:"latest.json", bytes:Buffer.from(JSON.stringify(manifest,null,2)+"\n") });
   const sums = assets.map(({name,bytes})=>`${sha256(bytes)}  ${name}`).join("\n")+"\n";
   const {verifyNoPlaintext}=require("../desktop/verify-embedded-riot-key.cjs");

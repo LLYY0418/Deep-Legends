@@ -70,7 +70,7 @@ test("scale mutants turn the corresponding geometry guards red", () => {
   assert.throws(()=>assert.equal(noQuantize.autoScaleFor({width:3840,height:1600}),1.78));
 });
 
-function harness({source=mainSource, stored, storedAppearance, platform="win32", width=1920, height=1080}={}) {
+function harness({source=mainSource, stored, storedAppearance, platform="win32", width=1920, height=1080, workArea={x:0,y:0,width:1920,height:1080}, realisticBounds=false}={}) {
   const files = new Map(stored === undefined ? [] : [[storedScalePath, stored]]);
   if(storedAppearance!==undefined)files.set(path.join("/user-data","appearance-theme.json"),storedAppearance);
   const writes=[], windows=[], zoom=[], minimum=[], overlays=[], timers=new Map();
@@ -83,7 +83,7 @@ function harness({source=mainSource, stored, storedAppearance, platform="win32",
   const screen=new EventEmitter();
   screen.getAllDisplays=()=>[];
   screen.getPrimaryDisplay=()=>({workAreaSize:{width:1920,height:1080}});
-  screen.getDisplayMatching=()=>({workArea:{x:0,y:0,width:1920,height:1080}});
+  screen.getDisplayMatching=()=>({workArea});
   const app=new EventEmitter();
   Object.assign(app,{setAppUserModelId(){},requestSingleInstanceLock:()=>true,whenReady:()=>({then(){}}),getPath:()=>"/user-data",quit(){},isPackaged:true});
   class BrowserWindow extends EventEmitter {
@@ -107,7 +107,7 @@ function harness({source=mainSource, stored, storedAppearance, platform="win32",
     setResizable(){}
     setOpacity(){}
     setMaximizable(){}
-    setBounds(){}
+    setBounds(bounds){if(realisticBounds)this.bounds={...bounds,width:bounds.width-30,height:bounds.height-60};}
     setContentBounds(){}
     isFullScreen(){return false;}
     setTitleBarOverlay(overlay){overlays.push(overlay);}
@@ -167,7 +167,7 @@ test("titlebar, minimum size, reload, resize and display events run through the 
   h.tick(1);assert.deepEqual(h.scales(),[]);
   h.window.bounds={width:3840,height:2160};h.window.emit("resize");
   h.tick(149);assert.deepEqual(h.scales(),[]);h.tick(1);
-  assert.deepEqual(h.scales(),[2]);assert.deepEqual(h.minimum.at(-1),[1560,1200]);assert.equal(h.overlays.at(-1).height, 56);
+  assert.deepEqual(h.scales(),[2]);assert.deepEqual(h.minimum.at(-1),[1560,1080]);assert.equal(h.overlays.at(-1).height, 56);
   h.window.webContents.emit("did-finish-load");h.window.webContents.emit("did-finish-load");
   assert.deepEqual(h.scales(),[2,2,2],"reload must reapply even at the same step");
   h.window.bounds={width:2560,height:1440};h.screen.emit("display-metrics-changed");
@@ -223,7 +223,7 @@ test("IPC restores independent preferences, normalizes fixed values and rejects 
 
 test("main behavior guards reject titlebar, minimum size, trust, reload, debounce and export mutants", () => {
   function titleGuard(source){const h=harness({source});assert.equal(h.probe.titleBarOverlay("dark",false,2).height, 56);}
-  function minimumGuard(source){const h=harness({source});h.set("fixed",2);assert.deepEqual(h.minimum.at(-1),[1560,1200]);}
+  function minimumGuard(source){const h=harness({source});h.set("fixed",2);assert.deepEqual(h.minimum.at(-1),[1560,1080]);}
   function trustGuard(source){const h=harness({source});const writes=h.writes.length;h.window.url="https://untrusted.invalid/";h.set("fixed",2);h.window.url="http://127.0.0.1:8787/";assert.equal(h.get().mode,"auto");assert.equal(h.writes.length,writes);}
   function reloadGuard(source){const h=harness({source});h.window.webContents.emit("did-finish-load");h.window.webContents.emit("did-finish-load");assert.deepEqual(h.scales(),[1,1]);}
   function resizeGuard(source){const h=harness({source});h.window.webContents.emit("did-finish-load");h.resetScales();for(let i=0;i<20;i++)h.window.emit("resize");h.tick(300);assert.equal(h.scales().length,0);}
@@ -233,10 +233,10 @@ test("main behavior guards reject titlebar, minimum size, trust, reload, debounc
   assert.throws(()=>appliedGuard(mainSource.replace('ipcMain.on("desktop-scale-applied", (event, scale) => {\n    if (!isTrustedRenderer(event.sender) || event.sender !== mainWindow?.webContents) return;','ipcMain.on("desktop-scale-applied", (event, scale) => {')));
   assert.throws(()=>noPageZoomGuard(mainSource.replace("  currentUiScale = scale;\n  syncTitleBar(scale);","  currentUiScale = scale;\n  window.webContents.setZoomFactor(scale);\n  syncTitleBar(scale);")));
   assert.throws(()=>titleGuard(mainSource.replace("const height = 56;","const height = Math.round(56 * scale);")));
-  assert.throws(()=>minimumGuard(mainSource.replace("window.setMinimumSize(Math.round(780 * scale), Math.round(600 * scale));","")));
+  assert.throws(()=>minimumGuard(mainSource.replace("window.setMinimumSize(...minimum);","")));
   assert.throws(()=>trustGuard(mainSource.replace('ipcMain.on("desktop-scale-set", (event, mode, value) => {\n    if (!isTrustedRenderer(event.sender)) return;', 'ipcMain.on("desktop-scale-set", (event, mode, value) => {')));
   assert.throws(()=>reloadGuard(mainSource.replace('mainWindow.webContents.on("did-finish-load",', 'mainWindow.webContents.once("did-finish-load",')));
-  assert.throws(()=>resizeGuard(mainSource.replace("if (!force && currentUiScale === scale) return;", "")));
+  assert.throws(()=>resizeGuard(mainSource.replace("if (!force && currentUiScale === scale && fit.area === area) return;", "")));
   const h=harness();const exportWindow={isDestroyed:()=>false,setMinimumSize(){assert.fail("export window was scaled");},webContents:{setZoomFactor(){assert.fail("export window was scaled");}}};
   h.probe.applyUiScale(exportWindow,2,true);
 });
@@ -275,4 +275,30 @@ test("R238 missing, corrupt and oversized scale files migrate to marked auto", (
     assert.deepEqual(JSON.parse(h.files.get(storedScalePath)),{mode:"auto",defaultAuto:1});
     assert.equal(h.writes.length,1);
   }
+});
+
+
+test("R316 scaled bounds fit the current display and restore unless manually changed",()=>{
+ for(const manual of [false,true]){
+  const h=harness({width:1540,height:919,realisticBounds:true,workArea:{x:0,y:0,width:1646,height:981}});
+  h.set("fixed",1);const before=h.window.getBounds();assert.equal(before.width,1570);assert.equal(before.height,979);
+  h.set("fixed",1.75);assert.deepEqual(h.minimum.at(-1),[1365,981]);
+  const high=h.window.getBounds();assert.ok(high.y+high.height<=981);
+  if(manual){h.window.emit("will-resize");h.window.setBounds({x:10,y:5,width:1500,height:970});}
+  h.set("fixed",1);const after=h.window.getBounds();assert.ok(after.y+after.height<=981);
+  if(manual)assert.deepEqual(after,{x:10,y:5,width:1500,height:970});else assert.deepEqual(after,before);
+ }
+ const h=harness({realisticBounds:true});h.set("fixed",2);assert.deepEqual(h.minimum.at(-1),[1560,1080]);
+ h.screen.getDisplayMatching=()=>({workArea:{x:1920,y:40,width:1280,height:800}});
+ h.screen.emit("display-metrics-changed");assert.deepEqual(h.minimum.at(-1),[1280,800]);
+ const b=h.window.getBounds();assert.ok(b.x>=1920&&b.y>=40&&b.x+b.width<=3200&&b.y+b.height<=840);
+});
+
+test("R316 scaling while maximized does not record maximized bounds for later restoration",()=>{
+ const h=harness({width:1540,height:919,realisticBounds:true,workArea:{x:0,y:0,width:1646,height:981}});
+ h.set("fixed",1);
+ h.window.isMaximized=()=>true;h.window.emit("maximize");
+ h.window.setBounds({x:0,y:0,width:1646,height:1029});h.set("fixed",1.75);
+ h.window.isMaximized=()=>false;h.window.setBounds({x:10,y:5,width:1500,height:970});
+ h.set("fixed",1);assert.deepEqual(h.window.getBounds(),{x:10,y:5,width:1500,height:970});
 });

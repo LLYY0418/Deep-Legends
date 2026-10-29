@@ -12,6 +12,7 @@ import (
 	"deeplegends/installer/internal/webviewhost"
 	"deeplegends/installer/payload"
 	"github.com/jchv/go-webview2/pkg/edge"
+	"golang.org/x/sys/windows"
 )
 
 type installerApp struct {
@@ -27,6 +28,8 @@ type installerApp struct {
 	ackSent           bool
 	recoveryAttempted bool
 	startupWarm       *executionWarmup
+	standbySignal     *installerStandbySignal
+	standbyMutex      windows.Handle
 }
 
 func (a *installerApp) embed(html string, initial initMessage) error {
@@ -36,9 +39,7 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 	if err != nil {
 		return fmt.Errorf("prepare installer document: %w", err)
 	}
-	_ = os.Setenv("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FF0B0E14")
-	chromium := edge.NewChromium()
-	chromium.DataPath = filepath.Join(os.Getenv("LOCALAPPDATA"), "Temp", "DeepLegendsSetup.WebView2")
+	chromium := newInstallerChromium()
 	chromium.MessageCallback = func(raw string) { w.dispatch(func() { a.onMessage(raw) }) }
 	w.chromium = chromium
 	log.Print("WebView environment/controller initialization")
@@ -51,12 +52,19 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 			return time.AfterFunc(webviewhost.PageTimeout, fn).Stop
 		}, func() {
 			log.Print("WebView environment/controller initialization timed out")
+			if options.Standby {
+				w.dispatch(func() { destroyWindow.Call(w.hwnd) })
+				return
+			}
 			recoverAcknowledgedUpdate(options, exeName, acknowledged, false, waitParent, startApplication)
 			webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", errors.New(upgradeFailureMessage))
 			os.Exit(1)
 		})
 	}
+	environmentStarted := time.Now()
+	a.timing.mark("environment_started")
 	embedded := chromium.Embed(w.hwnd)
+	a.timing.duration("environment_controller_ms", time.Since(environmentStarted).Milliseconds())
 	if watchdog != nil && !watchdog.stop() {
 		a.recoveryAttempted = true
 		<-watchdog.done
@@ -66,6 +74,9 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		return errors.New("WebView environment/controller initialization failed")
 	}
 	w.surface = &webviewhost.WindowsSurface{Chromium: chromium, Window: w.hwnd, ShowWindow: w.show, DeferVisible: a.options.Update}
+	if a.options.Standby {
+		w.surface.ShowWindow = func() {}
+	}
 	log.Print("WebView controller created")
 	if err := w.surface.Configure(); err != nil {
 		return fmt.Errorf("configure WebView: %w", err)
@@ -90,6 +101,11 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		a.pageReady = true
 		w.starting = false
 		w.webviewReady = true
+		if a.options.Standby {
+			a.awaitStandby()
+			return
+		}
+		a.timing.mark("first_frame")
 		a.timing.mark("webview_ready")
 		log.Print("installer page ready; WebView visible")
 		if a.options.Update {
@@ -125,11 +141,13 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		postMessage.Call(w.hwnd, WM_CLOSE, 0, 0)
 	})
 	chromium.NavigationCompletedCallback = func(_ *edge.ICoreWebView2, args *edge.ICoreWebView2NavigationCompletedEventArgs) {
+		a.timing.mark("navigation_completed")
 		err := webviewhost.NavigationResult(args)
 		w.dispatch(func() { w.startup.NavigationCompleted(err) })
 	}
 	w.startupTimer = time.AfterFunc(webviewhost.PageTimeout, func() { w.dispatch(w.startup.Timeout) })
 	log.Print("loading installer document")
+	a.timing.mark("navigation_started")
 	w.startup.Start(html)
 	return nil
 }
@@ -184,7 +202,7 @@ func (a *installerApp) onMessage(raw string) {
 	if a.window.startup != nil && a.window.startup.Message(raw) {
 		return
 	}
-	if !a.pageReady {
+	if !a.pageReady || a.options.Standby {
 		return
 	}
 	if len(raw) > 4096 {
@@ -259,4 +277,15 @@ func (a *installerApp) recoverFailedUpdate() {
 	a.parentExited, recovered = recoverAcknowledgedUpdate(a.options, a.meta.ExeName, a.ackSent, a.parentExited, a.waitParent, startApplication)
 	a.recoveryAttempted = a.parentExited
 	log.Printf("update recovery attempted=%t recovered=%t", a.recoveryAttempted, recovered)
+}
+
+// Warmup and update share the exact profile and environment configuration.
+func newInstallerChromium() *edge.Chromium {
+	_ = os.Setenv("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FF0B0E14")
+	chromium := edge.NewChromium()
+	chromium.DataPath = os.Getenv("WEBVIEW2_USER_DATA_FOLDER")
+	if chromium.DataPath == "" {
+		chromium.DataPath = filepath.Join(os.Getenv("LOCALAPPDATA"), "Temp", "DeepLegendsSetup.WebView2")
+	}
+	return chromium
 }

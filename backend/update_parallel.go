@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -123,105 +122,9 @@ func (u *updateManager) yieldPredownload(ctx context.Context) error {
 	return waitContext(ctx, 100*time.Millisecond)
 }
 
-// Each worker owns disjoint offsets. A failed segment resumes at its last verified byte on another route.
+// Fixed-size shared work gives fast workers more chunks and permits tail races.
 func (u *updateManager) downloadSegments(ctx context.Context, asset updateAsset, part string, race *updateSourceRace) error {
-	file, err := os.OpenFile(part, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	if err = file.Truncate(asset.Size); err != nil {
-		return err
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	var received atomic.Int64
-	var switches atomic.Int64
-	var wg sync.WaitGroup
-	fail := make(chan error, 4)
-	started := time.Now()
-	piece := (asset.Size + 3) / 4
-	for index := 0; index < 4; index++ {
-		start := int64(index) * piece
-		end := min(asset.Size-1, start+piece-1)
-		if start > end {
-			continue
-		}
-		wg.Add(1)
-		goSafe("update-range-segment", func() {
-			defer wg.Done()
-			position := start
-			sourceIndex := 0
-			previous := ""
-			for position <= end {
-				if ctx.Err() != nil {
-					return
-				}
-				sources := race.ordered()
-				if len(sources) == 0 {
-					fail <- errors.New("no download source")
-					cancel()
-					return
-				}
-				routeIndex := sourceIndex % len(sources)
-				if sourceIndex == 0 && len(sources) > 1 && race.resultsReady() {
-					routeIndex = index % min(2, len(sources))
-				}
-				prefix := sources[routeIndex]
-				if sourceIndex > 0 && prefix == previous && len(sources) > 1 {
-					prefix = sources[(routeIndex+1)%len(sources)]
-				}
-				if previous != "" && previous != prefix {
-					switches.Add(1)
-				}
-				previous = prefix
-				err := u.downloadSegment(ctx, file, asset, prefix, position, min(end, position+(4<<20)-1), func(n int64) {
-					position += n
-					total := received.Add(n)
-					u.mu.Lock()
-					elapsed := time.Since(started).Seconds()
-					speed := float64(total) / max(.001, elapsed)
-					u.status.Progress = updateProgress{ReceivedBytes: total, TotalBytes: asset.Size, BytesPerSecond: speed, ETASeconds: int64(float64(asset.Size-total) / max(1, speed))}
-					u.mu.Unlock()
-				})
-				if err == nil {
-					u.recordUpdateCheck(map[string]any{"event": "update_download_segment", "segment": index, "avg_kbps": float64(position-start) / max(.001, time.Since(started).Seconds()) / 1024, "switches": switches.Load(), "predownload": u.predownloadActive()})
-					if position <= end {
-						sourceIndex = 0
-						continue
-					}
-					return
-				}
-				sourceIndex++
-				if sourceIndex >= len(sources)*2 {
-					fail <- err
-					cancel()
-					return
-				}
-			}
-		})
-	}
-	ticks := time.NewTicker(250 * time.Millisecond)
-	defer ticks.Stop()
-	done := make(chan struct{})
-	goSafe("update-segment-join", func() { wg.Wait(); close(done) })
-	for {
-		select {
-		case <-ticks.C:
-			u.publish()
-		case <-done:
-			select {
-			case err := <-fail:
-				return err
-			default:
-			}
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			u.recordUpdateCheck(map[string]any{"event": "update_download_segments_finished", "segments": 4, "switches": switches.Load(), "predownload": u.predownloadActive()})
-			return verifyUpdateFile(ctx, part, asset)
-		}
-	}
+	return u.downloadSharedChunks(ctx, asset, part, race)
 }
 func (u *updateManager) downloadSegment(parent context.Context, file *os.File, asset updateAsset, prefix string, start, end int64, progress func(int64)) error {
 	ctx, cancel := context.WithCancel(parent)

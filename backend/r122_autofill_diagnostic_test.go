@@ -320,7 +320,7 @@ func TestR122SGPSummaryHistoryEventCarriesAutofillCounts(t *testing.T) {
 	// 回补在测试结束后继续写入即将清理的临时存储。
 	season, _ := currentRankedSeason(time.Now())
 	a.seasonBackfillMu.Lock()
-	a.cacheSeasonQuerySnapshotLocked(seasonQuerySnapshotKey("HN1", playerRef, season), time.Now())
+	a.cacheSeasonQuerySnapshotLocked(seasonQuerySnapshotKey("HN1", playerRef, season)+"|"+a.rankSplitScope("HN1|"+playerRef, time.Now()), time.Now())
 	a.seasonBackfillMu.Unlock()
 
 	result := make(chan gameplayOverview, 1)

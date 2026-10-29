@@ -27,7 +27,7 @@ func TestWindowsInstallMessageCannotBypassCompletion(t *testing.T) {
 	assertCompletionBlock(t, prefix, `
 if a.window.closed { return }
 if a.window.startup != nil && a.window.startup.Message(raw) { return }
-if !a.pageReady { return }
+if !a.pageReady || a.options.Standby { return }
 if len(raw) > 4096 { return }
 var message uiMessage
 if json.Unmarshal([]byte(raw), &message) != nil { return }
@@ -134,6 +134,8 @@ w.startupTimer.Stop()
 a.pageReady = true
 w.starting = false
 w.webviewReady = true
+if a.options.Standby {a.awaitStandby();return}
+a.timing.mark("first_frame")
 a.timing.mark("webview_ready")
 log.Print("installer page ready; WebView visible")
 if a.options.Update {

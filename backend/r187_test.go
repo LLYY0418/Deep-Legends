@@ -274,7 +274,7 @@ func TestR187ForceOverviewReadsAndRepopulatesRankCache(t *testing.T) {
 	if f.reads.Load() != 2 {
 		t.Fatal("manual refresh reused ranks", f.reads.Load())
 	}
-	entry, ok := f.a.rankScores.get(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", f.a.summoner.PUUID, ""))
+	entry, ok := f.a.rankScores.get(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", f.a.summoner.PUUID, "|"+f.a.rankSplitScope("HN1|"+f.a.summoner.PUUID, time.Now())))
 	if !ok || len(entry.ranks) != 1 || entry.ranks[0].LeaguePoints != 67 {
 		t.Fatal("fresh ranks not cached", entry)
 	}

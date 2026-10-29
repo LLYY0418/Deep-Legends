@@ -81,7 +81,7 @@ func TestR214FreshSeasonHeadBypassesRecentGate(t *testing.T) {
 	}
 	// Both persisted complete snapshot and the query dedup timestamp are fresh.
 	season, _ := currentRankedSeason(time.Now())
-	key := seasonQuerySnapshotKey("HN1", ref, season)
+	key := seasonQuerySnapshotKey("HN1", ref, season) + "|" + a.rankSplitScope("HN1|"+ref, time.Now())
 	a.seasonBackfillMu.Lock()
 	a.cacheSeasonQuerySnapshotLocked(key, time.Now())
 	a.seasonBackfillMu.Unlock()

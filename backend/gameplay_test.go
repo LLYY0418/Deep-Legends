@@ -1530,8 +1530,8 @@ func TestPlayerRankScoreCachesSGPFallbackUnderPreferredLCUKey(t *testing.T) {
 	if lcuCalls != 1 || sgpCalls != 1 {
 		t.Fatalf("cached fallback repeated upstream requests: lcu=%d sgp=%d", lcuCalls, sgpCalls)
 	}
-	preferred, preferredOK := a.rankScores.get(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", playerRef, ""))
-	actual, actualOK := a.rankScores.get(rankScoreCacheKeyScoped(dataSourceSGP, "HN1", playerRef, ""))
+	preferred, preferredOK := a.rankScores.get(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", playerRef, "|"+a.rankSplitScope("HN1|"+playerRef, time.Now())))
+	actual, actualOK := a.rankScores.get(rankScoreCacheKeyScoped(dataSourceSGP, "HN1", playerRef, "|"+a.rankSplitScope("HN1|"+playerRef, time.Now())))
 	if !preferredOK || !actualOK || preferred.source != dataSourceSGP || actual.source != dataSourceSGP {
 		t.Fatalf("fallback cache provenance = preferred:%#v/%v actual:%#v/%v", preferred, preferredOK, actual, actualOK)
 	}
@@ -1834,7 +1834,7 @@ func TestSeasonRankWinRateFallbackDoesNotFillIncompleteScan(t *testing.T) {
 	ranks, got := a.applySeasonRankWinRateFallback([]gameplayRank{original}, capability, seasonRankRecordSnapshot{progress: seasonStatsProgress{Collecting: true}, byQueue: map[int64]gameplayAggregate{
 		420: {Games: 50, Wins: 30, Losses: 20, WinRate: 60},
 	}})
-	expected := gameplayRank{QueueType: original.QueueType, WinRate: -1, RecordSource: "none", RecordPending: true, OfficialWins: original.Wins, seasonFallback: true, RecordSplitStart: rankSplitStart, RecordSplitSource: "constant"}
+	expected := gameplayRank{QueueType: original.QueueType, WinRate: -1, RecordSource: "none", RecordPending: true, OfficialWins: original.Wins, seasonFallback: true, RecordSplitStart: rankSplitStart, RecordSplitSource: "constant", RecordSplitID: 23, RecordSplitLabel: "2026 赛季第三赛段", RecordSplitFrom: "7月30日"}
 	// Incomplete CN history exposes no numeric record.
 	if len(ranks) != 1 || ranks[0] != expected {
 		t.Fatalf("incomplete scan changed rank: %#v", ranks)

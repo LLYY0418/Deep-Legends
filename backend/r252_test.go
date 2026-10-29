@@ -43,7 +43,7 @@ func TestR252ManualSeasonHeadBypassesRecentGateAndStillProbes(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.seasonBackfillMu.Lock()
-	a.cacheSeasonQuerySnapshotLocked(seasonQuerySnapshotKey("HN1", ref, season), time.Now())
+	a.cacheSeasonQuerySnapshotLocked(seasonQuerySnapshotKey("HN1", ref, season)+"|"+a.rankSplitScope("HN1|"+ref, time.Now()), time.Now())
 	a.seasonBackfillMu.Unlock()
 	before := calls.Load()
 	a.startSeasonStatsRefresh(client, reference, player, ref, nil, false)

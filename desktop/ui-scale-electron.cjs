@@ -38,7 +38,8 @@ app.whenReady().then(async()=>{
   ipcMain.emit("desktop-scale-set",mainSender,"fixed",2);
   await eventually(async()=>Number(await main.webContents.executeJavaScript("getComputedStyle(document.querySelector('.app-frame')).zoom"))===2);
   assert.equal(main.webContents.getZoomFactor(),1,"CSS scaling must not be multiplied by native zoom");
-  assert.deepEqual(main.getMinimumSize(),[1560,1200]);
+  const workArea=electron.screen.getDisplayMatching(main.getBounds()).workArea;
+  assert.deepEqual(main.getMinimumSize(),[Math.min(1560,workArea.width),Math.min(1200,workArea.height)]);
   assert.equal(await main.webContents.executeJavaScript('document.querySelector("#setting-ui-scale").value'),"2");
   main.webContents.reload();await once(main.webContents,"did-finish-load");
   await eventually(async()=>Number(await main.webContents.executeJavaScript("getComputedStyle(document.querySelector('.app-frame')).zoom"))===2);
