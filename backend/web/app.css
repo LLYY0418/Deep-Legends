@@ -1223,12 +1223,10 @@ html[data-ui-preferences="pending"] #app-frame { visibility: hidden; }
 .update-icon-button .update-border { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; fill:none; }
 .update-icon-button .update-border rect { x:.5px; y:.5px; width:calc(100% - 1px); height:calc(100% - 1px); rx:9.5px; stroke-width:1; }
 .update-icon-button .update-border-track { stroke:var(--line); }
-.update-icon-button .update-border .update-border-progress { x:1.25px; y:1.25px; width:calc(100% - 2.5px); height:calc(100% - 2.5px); rx:8.75px; stroke-width:2.5; display:none; stroke:var(--primary); stroke-dasharray:100; stroke-linecap:butt; transition:stroke-dashoffset .3s ease; }
+.update-icon-button .update-border .update-border-progress { x:2px; y:2px; width:calc(100% - 4px); height:calc(100% - 4px); rx:8px; stroke-width:4; display:none; stroke:var(--primary); stroke-dasharray:100; stroke-linecap:butt; transition:stroke-dashoffset .3s ease; }
 .update-icon-button.busy .update-border-progress { display:block; }
 .update-icon-button .dot { display:none; top:0; right:0; }
 .update-icon-button.ready .dot { display:block; }
 @media(prefers-reduced-motion:reduce){.update-icon-button .update-border-progress{transition:none;}}
 
 .appearance-boot *, .appearance-boot *::before, .appearance-boot *::after { transition:none !important; }
-
-.global-tooltip .tooltip-accent { display:block; color:var(--primary-strong); font-weight:700; }

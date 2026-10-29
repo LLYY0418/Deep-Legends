@@ -1,3 +1,46 @@
+function createFloatingLayerLifecycle(win = window) {
+  const doc=win.document, active=new Set();
+  const visible=node=>node?.isConnected && !node.closest('[hidden],[inert]') && (typeof node.checkVisibility!=='function' || node.checkVisibility({visibilityProperty:true,opacityProperty:true,contentVisibilityAuto:true}));
+  const closeAll=()=>{for(const entry of [...active])entry.close();};
+  function watch(anchor,panel,close) {
+    let running=true,frame=0,pointerPath=null;
+    const keyboard=anchor.matches(':focus-visible') && anchor.contains(doc.activeElement);
+    const inside=(path,node)=>path?.some(target=>target===node || target instanceof win.Node && node.contains(target));
+    const stop=()=>{if(!running)return;running=false;win.cancelAnimationFrame(frame);observer.disconnect();active.delete(entry);};
+    const entry={close:()=>{if(!running)return;stop();close();},move:event=>{pointerPath=event.composedPath();},outside:event=>{const path=event.composedPath();if(!inside(path,anchor)&&!inside(path,panel))entry.close();}};
+    const check=()=>{
+      if(!running)return;
+      if(!visible(anchor) || !panel.isConnected || keyboard && !anchor.contains(doc.activeElement) && !panel.contains(doc.activeElement) || !keyboard && pointerPath && !inside(pointerPath,anchor) && !inside(pointerPath,panel)){entry.close();return;}
+      frame=win.requestAnimationFrame(check);
+    };
+    const observer=new win.MutationObserver(()=>{if(!visible(anchor))entry.close();});
+    observer.observe(doc.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','class','style','inert','open']});
+    active.add(entry);frame=win.requestAnimationFrame(check);return stop;
+  }
+  doc.addEventListener('pointermove',event=>{for(const entry of active)entry.move(event);},{passive:true,capture:true});
+  doc.addEventListener('pointerdown',event=>{for(const entry of [...active])entry.outside(event);},true);
+  doc.addEventListener('click',event=>{for(const entry of [...active])entry.outside(event);},true);
+  doc.addEventListener('pointerout',event=>{if(event.relatedTarget==null)closeAll();},true);
+  doc.addEventListener('keydown',event=>{if(event.key==='Escape')closeAll();},true);
+  doc.addEventListener('visibilitychange',()=>{if(doc.visibilityState==='hidden')closeAll();});
+  win.addEventListener('blur',closeAll);
+  for(const name of ['deep-legends:section','deep-legends:navigate','deep-legends:overview-tab','deep-legends:privacy-changed','deep-legends:tooltip-hide'])win.addEventListener(name,closeAll);
+  doc.addEventListener('click',event=>{if(event.target.closest?.('[role="tab"],[data-suite-tab],[data-favorites-page],[data-settings-page],[data-champion-mode],[data-tab]'))closeAll();},true);
+  let mmr=null,mmrSequence=0;
+  const showMMR=button=>{
+    const control=button.closest('.rank-mmr-control'),panel=control?.querySelector('.rank-mmr-popover');if(!panel||mmr?.button===button)return;
+    mmr?.close();panel.id ||= `rank-mmr-popover-${++mmrSequence}`;
+    control.classList.add('is-open');button.setAttribute('aria-expanded','true');button.setAttribute('aria-describedby',panel.id);
+    let stop;const close=()=>{stop?.();control.classList.remove('is-open');button.setAttribute('aria-expanded','false');button.removeAttribute('aria-describedby');mmr=null;};
+    mmr={button,close};stop=watch(button,panel,close);
+  };
+  doc.addEventListener('pointerover',event=>{const button=event.target.closest?.('.rank-mmr-trigger');if(button)showMMR(button);});
+  doc.addEventListener('focusin',event=>{const button=event.target.closest?.('.rank-mmr-trigger');if(button?.matches(':focus-visible'))showMMR(button);});
+  doc.addEventListener('pointerout',event=>{if(mmr && !mmr.button.contains(event.relatedTarget) && !mmr.button.closest('.rank-mmr-control').querySelector('.rank-mmr-popover').contains(event.relatedTarget))mmr.close();});
+  return {watch,closeAll};
+}
+window.deepLegendsFloatingLayers=createFloatingLayerLifecycle();
+
 (async () => {
   "use strict";
   if (window.deepLegendsPreferenceStorage?.ready) await window.deepLegendsPreferenceStorage.ready;
@@ -4687,6 +4730,7 @@
     document.body.append(tooltip);
     let anchor = null;
     let frame = 0;
+    let stopLifecycle=null;
     let pointerSuppressedAnchor = null;
     let pointerSuppressedPoint = null;
 
@@ -4715,6 +4759,7 @@
       return target && (target.scrollWidth > target.clientWidth + 1 || target.scrollHeight > target.clientHeight + 1) ? next : null;
     };
     const hide = () => {
+      stopLifecycle?.();stopLifecycle=null;
       if (frame) cancelAnimationFrame(frame);
       frame = 0;
       if (anchor?.getAttribute("aria-describedby") === tooltip.id) anchor.removeAttribute("aria-describedby");
@@ -4781,11 +4826,6 @@
         const bodyNode = document.createElement("span");
         bodyNode.className = "tooltip-body";
         bodyNode.textContent = body;
-        const accent=next.dataset.tooltipAccent;
-        if(accent && body.endsWith(accent)){
-          bodyNode.textContent=body.slice(0,-accent.length);
-          const line=document.createElement("span");line.className="tooltip-accent";line.textContent=accent;bodyNode.append(line);
-        }
         children.push(bodyNode);
       }
 	  let roster = null;
@@ -4859,6 +4899,7 @@
       tooltip.style.top = "0px";
       if (frame) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(position);
+      stopLifecycle?.();stopLifecycle=window.deepLegendsFloatingLayers?.watch(next,tooltip,hide);
     };
 
     window.addEventListener('deep-legends:score-parts',event=>{if(anchor && event.detail?.target===anchor)show(anchor);});
@@ -4885,6 +4926,7 @@
       const current = rawTargetOf(event.target);
       if (!current || (event.relatedTarget instanceof Node && current.contains(event.relatedTarget))) return;
       if (pointerSuppressedAnchor === current && current.isConnected) clearPointerSuppression();
+      if (tooltip.contains(event.relatedTarget)) return;
       if (current !== anchor || (document.activeElement === current && current.matches(":focus-visible"))) return;
       hide();
     });

@@ -80,6 +80,7 @@ type runeFitDiagnostic struct {
 	Scale     float64 `json:"scale"`
 	F         float64 `json:"f"`
 	BottomGap float64 `json:"bottom_gap"`
+	TopGap    float64 `json:"top_gap"`
 }
 
 type clientDiagnosticRequest struct {
@@ -464,11 +465,11 @@ func (a *app) handleClientDiagnostic(w http.ResponseWriter, r *http.Request) {
 	}
 	if request.Event == "rune_fit_layout" {
 		f := request.RuneFit
-		if f == nil || f.Width < 0 || f.Width > 100000 || f.Height < 0 || f.Height > 100000 || f.Scale < 1 || f.Scale > 1.2 || f.F < 1 || f.F > 1.4 || f.BottomGap < 0 || f.BottomGap > 100000 {
+		if f == nil || f.Width < 0 || f.Width > 100000 || f.Height < 0 || f.Height > 100000 || f.Scale < 1 || f.Scale > 1.3 || f.F < 1 || f.F > 1.6 || f.BottomGap < 0 || f.BottomGap > 100000 || f.TopGap < 0 || f.TopGap > 100000 {
 			http.Error(w, "invalid rune layout", http.StatusBadRequest)
 			return
 		}
-		a.recordDiagnostic(map[string]any{"event": request.Event, "reason": request.Reason, "width": f.Width, "height": f.Height, "scale": f.Scale, "f": f.F, "bottom_gap": f.BottomGap})
+		a.recordDiagnostic(map[string]any{"event": request.Event, "reason": request.Reason, "width": f.Width, "height": f.Height, "scale": f.Scale, "f": f.F, "bottom_gap": f.BottomGap, "top_gap": f.TopGap})
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}

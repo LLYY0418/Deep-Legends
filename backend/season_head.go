@@ -119,6 +119,7 @@ func (a *app) seasonScanHeadConcurrent(ctx context.Context, client *LCUClient, s
 					boundary = true
 					break
 				}
+				seasonRecordRankResult(&scan.cache, info, playerRef)
 				if scan.seen[info.GameID] {
 					hit = true
 					continue

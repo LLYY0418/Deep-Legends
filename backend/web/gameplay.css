@@ -302,11 +302,11 @@
 .career-section-tools { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 8px; }
 .rank-header-tools { display: flex; align-items: center; gap: 8px; }
 .rank-mmr-control { position: relative; display: inline-flex; }
-.rank-mmr-trigger { display: grid; width: 27px; height: 27px; padding: 0; place-items: center; color: var(--primary-strong); background: color-mix(in oklab,var(--primary) 12%,var(--surface-strong)); border: 1px solid color-mix(in oklab,var(--primary) 42%,var(--line)); border-radius: 50%; }
+.rank-mmr-trigger { display: grid; width: var(--rank-mmr-size,27px); height: var(--rank-mmr-size,27px); padding: 0; place-items: center; color: var(--primary-strong); background: color-mix(in oklab,var(--primary) 12%,var(--surface-strong)); border: 1px solid color-mix(in oklab,var(--primary) 42%,var(--line)); border-radius: 50%; }
 .rank-mmr-trigger:hover, .rank-mmr-trigger:focus-visible, .rank-mmr-trigger[aria-expanded="true"] { color: var(--ink); background: color-mix(in oklab,var(--primary) 22%,var(--surface)); border-color: var(--primary); }
 .rank-mmr-trigger svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
-.rank-mmr-popover { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: min(320px,calc(100vw - 32px)); padding: 11px; visibility: hidden; opacity: 0; pointer-events: none; transform: translateY(-4px); background: color-mix(in oklab,var(--surface) 94%,var(--bg)); border: 1px solid color-mix(in oklab,var(--primary) 30%,var(--line)); border-radius: 10px; box-shadow: 0 14px 36px rgb(0 0 0 / .42); transition: opacity 160ms ease, transform 160ms ease, visibility 160ms; }
-.rank-mmr-control:hover .rank-mmr-popover, .rank-mmr-control:focus-within .rank-mmr-popover { visibility: visible; opacity: 1; pointer-events: auto; transform: translateY(0); }
+.rank-mmr-popover { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: min(320px,calc(100vw - 32px)); padding: 11px; visibility: hidden; opacity: 0; pointer-events: none; transform: translateY(-4px); background: color-mix(in oklab,var(--surface) 94%,var(--bg)); border: 1px solid color-mix(in oklab,var(--primary) 30%,var(--line)); border-radius: 10px; box-shadow: 0 14px 36px rgb(0 0 0 / .42); }
+.rank-mmr-control.is-open .rank-mmr-popover { visibility: visible; opacity: 1; pointer-events: auto; transform: translateY(0); transition:opacity 160ms ease,transform 160ms ease; }
 .rank-mmr-popover > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .rank-mmr-popover > header strong { color: var(--ink); font-size: 12px; }
 .rank-mmr-popover > header span { color: var(--muted); font-size: 9px; }
@@ -2541,7 +2541,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 
 .live-combo-names>strong { color:var(--ink); font-size:12px; font-weight:700; }
 .live-combo-plus { color:var(--muted); font-weight:600; }
-.recent-ranked-section .recent-casual-mode { color:var(--ink); font-size:16px; font-weight:700; }
+.recent-ranked-section .recent-casual-mode { color:var(--ink); }
 .recent-ranked-section>header { justify-content:flex-start; }
 .recent-ranked-section>header>.career-section-tools { margin-left:auto; }
 .custom-config-card .sg-starters+.sg-items { margin-left:22px; padding-left:22px; border-left:1px solid var(--line); }
@@ -2551,10 +2551,14 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .rank-row .rank-record.gameplay-skeleton span { width: 76px; height: 12px; min-height: 12px; }
 .rank-row .rank-record.gameplay-skeleton span + span { width: 52px; height: 10px; min-height: 10px; }
 
-/* R313: estimated season losses keep the approximation sign subordinate. */
-
 /* R313: the sample stays beside its heading; mode controls wrap as a unit. */
 .recent-ranked-section > header { gap:8px; align-items:baseline; flex-wrap:wrap; }
 .recent-ranked-section > header > h3 { flex:none; }
 .recent-ranked-section > header > .history-sample-label { margin:0; white-space:nowrap; flex:none; }
 .recent-ranked-section > header > .career-section-tools { flex:1 0 auto; justify-content:flex-end; }
+
+.recent-ranked-section > .recent-casual-header { align-items:center; }
+.recent-casual-heading { --rank-mmr-size:27px; display:flex; align-items:baseline; gap:8px; }
+.recent-casual-heading > h3 { line-height:var(--rank-mmr-size); }
+.recent-casual-heading > .rank-mmr-control { align-self:center; }
+.recent-casual-header > .career-section-tools { align-self:center; }

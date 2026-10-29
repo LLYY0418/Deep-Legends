@@ -9,98 +9,60 @@ import (
 )
 
 func r309RecordSnapshot(player string) seasonRankRecordSnapshot {
-	return seasonRankRecordSnapshot{player: player, progress: seasonStatsProgress{Season: "S26", RankedComplete: true, Scanned: 363}, byQueue: map[int64]gameplayAggregate{420: {Games: 330, Wins: 162, Losses: 168, WinRate: 49}, 440: {Games: 33, Wins: 12, Losses: 21, WinRate: 36}}}
+	s := seasonRankRecordSnapshot{player: player, progress: seasonStatsProgress{Season: "S26", RankedComplete: true, Scanned: 363}, byQueue: map[int64]gameplayAggregate{420: {Games: 330, Wins: 162, Losses: 168, WinRate: 49}, 440: {Games: 33, Wins: 12, Losses: 21, WinRate: 36}}}
+	for _, q := range []int64{420, 440} {
+		v := s.byQueue[q]
+		for i := 0; i < v.Games; i++ {
+			s.ranked = append(s.ranked, seasonRankedMatch{GameID: int64(len(s.ranked) + 1), CreatedAt: rankSplitStart, QueueID: q, Win: i < v.Wins})
+		}
+	}
+	return s
 }
 func r309UnknownRanks() []gameplayRank {
 	return []gameplayRank{{QueueType: "RANKED_SOLO_5x5", Tier: "GOLD", Wins: 162, WinRate: -1}, {QueueType: "RANKED_FLEX_SR", Tier: "GOLD", Wins: 12, WinRate: -1}}
 }
 func TestR309RankRecordCacheAndPending(t *testing.T) {
 	a := &app{}
-	snapshot := r309RecordSnapshot("HN1|player")
-	filled, _ := a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	if filled[0].RecordSource != "season" || filled[0].RecordPending || !filled[0].seasonFallback {
-		t.Fatal(filled)
+	s := r309RecordSnapshot("HN1|player")
+	out, _ := a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, s)
+	if r := out[0]; r.Wins != 162 || r.Losses != 168 || r.RecordSource != "season" || r.RecordPending || !r.seasonFallback {
+		t.Fatal(out)
 	}
-	snapshot.progress.Paused = true
-	paused, _ := a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	if paused[0].RecordSource != "season-cache" || paused[0].RecordPending {
-		t.Fatal(paused)
+	for _, paused := range []bool{false, true} {
+		s.progress.Paused = paused
+		s.progress.RankedComplete = false
+		out, _ = a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, s)
+		if !out[0].RecordPending || out[0].Wins != 0 || out[0].WinRate != -1 {
+			t.Fatal(out)
+		}
 	}
-	snapshot.progress.RankedComplete = false
-	snapshot.progress.Paused = true
-	snapshot.byQueue = nil
-	cached, _ := a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	if cached[0].Wins != 162 || cached[0].Losses != 168 || cached[0].RecordSource != "season-cache" || cached[0].RecordPending || !cached[0].seasonFallback {
-		t.Fatal(cached)
-	}
-	changed := r309UnknownRanks()
-	changed[0].Wins++
-	pending, _ := a.applySeasonRankWinRateFallback(changed, EndpointCapability{}, snapshot)
-	if pending[0].Wins != 162 || pending[0].Losses != 168 || pending[0].RecordPending || pending[0].RecordSource != "season-cache" || pending[1].RecordSource != "season-cache" {
-		t.Fatal(pending)
-	}
-	snapshot.progress.Season = "S27"
-	switched, _ := a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	if switched[1].WinRate != -1 || !switched[1].RecordPending {
-		t.Fatal(switched)
-	}
-	snapshot = r309RecordSnapshot("HN1|player")
-	a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	verified := r309UnknownRanks()
-	for i := range verified {
-		verified[i].Losses = 20
-		verified[i].WinRate = 70
-	}
-	upstream, _ := a.applySeasonRankWinRateFallback(verified, EndpointCapability{}, snapshot)
-	if upstream[0].Losses != 20 || upstream[0].RecordSource != "upstream" || upstream[0].RecordPending {
-		t.Fatal(upstream)
-	}
-	snapshot.progress.RankedComplete = false
-	snapshot.byQueue = nil
-	invalidated, _ := a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	if invalidated[0].WinRate != -1 {
-		t.Fatal(invalidated)
-	}
-	snapshot = r309RecordSnapshot("HN1|empty")
-	snapshot.byQueue = map[int64]gameplayAggregate{}
-	empty, _ := a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	if empty[0].RecordPending || empty[0].WinRate != -1 {
-		t.Fatal(empty)
-	}
-	snapshot.byQueue = nil
-	missing, _ := a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	if !missing[0].RecordPending {
-		t.Fatal(missing)
+	s.progress.RankedComplete = true
+	s.progress.Paused = false
+	s.ranked = nil
+	out, _ = a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, s)
+	if out[0].RecordPending || out[0].Wins != 0 || out[0].Losses != 0 || out[0].WinRate != -1 || out[0].RecordSource != "season" {
+		t.Fatal(out)
 	}
 }
 func TestR309RankRecordCacheLRU64Players(t *testing.T) {
 	a := &app{}
-	for i := 0; i < 64; i++ {
-		a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, r309RecordSnapshot(fmt.Sprint(i)))
+	for i := 0; i < 65; i++ {
+		a.rememberRankSplits(fmt.Sprint(i), map[string]sgpRankedSeason{"RANKED_SOLO_5x5": {CurrentSeasonStart: rankSplitStart}})
 	}
-	snapshot := r309RecordSnapshot("0")
-	snapshot.progress.RankedComplete = false
-	snapshot.byQueue = nil
-	a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, r309RecordSnapshot("64"))
-	if len(a.rankRecordCache) != 64 || a.rankRecordCache["0"] == nil || a.rankRecordCache["1"] != nil || a.rankRecordCache["64"] == nil {
-		t.Fatal(a.rankRecordCache)
+	if len(a.rankSplitWindows) != 64 || a.rankSplitWindows["64"] == nil {
+		t.Fatal(a.rankSplitWindows)
 	}
 }
 func TestR309CachedSeasonRecordNeverWritesLPBaseline(t *testing.T) {
 	tracker, ref, queue, baseline, _ := r182Start(t)
 	hash := tracker.accountHash(ref)
 	a := &app{}
-	snapshot := r309RecordSnapshot(ref)
-	a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	snapshot.progress.RankedComplete = false
-	snapshot.byQueue = nil
-	cached, _ := a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
-	tracker.observe(ref, cached)
-	if cached[0].RecordSource != "season-cache" || !cached[0].seasonFallback || tracker.history.Baselines[hash][queue] != baseline {
-		t.Fatal(cached, tracker.history)
+	out, _ := a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, r309RecordSnapshot(ref))
+	tracker.observe(ref, out)
+	if !out[0].seasonFallback || tracker.history.Baselines[hash][queue] != baseline {
+		t.Fatal(out, tracker.history)
 	}
-	a.rememberOfficialRankWins(nil, ref, "HN1", cached)
+	a.rememberOfficialRankWins(nil, ref, "HN1", out)
 	if len(a.milestoneCache.wins) != 0 {
 		t.Fatal("derived wins entered rank window baseline")
 	}
@@ -162,23 +124,18 @@ func TestR309RankRecordResolvedAggregatesByMinuteAndDimensions(t *testing.T) {
 }
 func TestR309ChangedWinsCannotReviveTheOldCompletedAggregate(t *testing.T) {
 	a := &app{}
-	snapshot := r309RecordSnapshot("player")
-	a.applySeasonRankWinRateFallback(r309UnknownRanks(), EndpointCapability{}, snapshot)
+	s := r309RecordSnapshot("HN1|player")
 	changed := r309UnknownRanks()
 	changed[0].Wins++
 	for range 6 {
-		ranks, _ := a.applySeasonRankWinRateFallback(changed, EndpointCapability{}, snapshot)
-		if ranks[0].Wins != 162 || ranks[0].Losses != 168 || ranks[0].RecordPending || ranks[0].RecordSource != "season-cache" || ranks[1].WinRate != 36 {
-			t.Fatal(ranks)
+		out, _ := a.applySeasonRankWinRateFallback(changed, EndpointCapability{}, s)
+		if out[0].Wins != 162 || out[0].Losses != 168 || out[0].RecordPending || out[1].WinRate != 36 {
+			t.Fatal(out)
 		}
 	}
-	aggregate := snapshot.byQueue[420]
-	aggregate.Games++
-	aggregate.Wins++
-	snapshot.byQueue[420] = aggregate
-	snapshot.progress.Scanned++
-	ranks, _ := a.applySeasonRankWinRateFallback(changed, EndpointCapability{}, snapshot)
-	if ranks[0].Wins != 163 || ranks[0].Losses != 168 || ranks[0].RecordSource != "season" || ranks[0].RecordPending {
-		t.Fatal(ranks)
+	s.ranked = append(s.ranked, seasonRankedMatch{GameID: 999, CreatedAt: rankSplitStart, QueueID: 420, Win: true})
+	out, _ := a.applySeasonRankWinRateFallback(changed, EndpointCapability{}, s)
+	if out[0].Wins != 163 || out[0].Losses != 168 || out[0].RecordPending {
+		t.Fatal(out)
 	}
 }

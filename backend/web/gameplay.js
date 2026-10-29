@@ -1446,32 +1446,7 @@
   function acceptRankRecords(tab, data, cause = "initial") {
     if(!data)return data;
     tab.rankRecordCause=cause;
-    const previous=tab.data,player=data.player?.playerRef || previous?.player?.playerRef || tab.playerRef;
-    const season=data.seasonStatsProgress?.season || previous?.seasonStatsProgress?.season || "";
-    const server=data.player?.serverId || tab.serverId || "";
-    const key=[server,player,season].join("|");
-    state.rankRecords ||= new Map();
-    const saved=state.rankRecords.get(key) || new Map();
-    const samePlayer=server===(previous?.player?.serverId || tab.serverId || "") && player===(previous?.player?.playerRef || tab.playerRef) && season===(previous?.seasonStatsProgress?.season || season);
-    const oldRanks=samePlayer ? previous?.ranks || [] : [];
-    const ranks=(data.ranks || []).map(incoming=>{
-      let rank={...incoming,officialWins:Number(incoming.officialWins ?? incoming.wins)};
-      const old=oldRanks.find(r=>r.queueType===rank.queueType && ["season","season-cache"].includes(r.recordSource)) || saved.get(rank.queueType);
-      if(Number(rank.winRate)<0 && !rank.recordLossUnknown && old && (Number(old.winRate)>=0 || old.recordLossUnknown)) {
-        if(Number(incoming.officialWins ?? incoming.wins)===Number(old.officialWins)) {
-          rank={...rank,wins:old.wins,losses:old.losses,winRate:old.winRate,recordEstimated:old.recordEstimated===true,recordLossUnknown:old.recordLossUnknown===true,recordSampleWins:old.recordSampleWins,recordSampleLosses:old.recordSampleLosses,recordSampleGames:old.recordSampleGames,recordSource:old.recordSource,recordPending:false};
-          tab.rankRecordCause="retained";
-          window.reportFlowDiagnostic?.("rank_record_downgrade_blocked","retained",{queue:rank.queueType==="RANKED_SOLO_5x5"?"solo":"flex",source:rank.recordSource,foreign:!tab.current});
-        }else {saved.delete(rank.queueType);rank.recordBaseline={...old};rank.recordPending=true;}
-      }
-      if((Number(rank.winRate)>=0 || rank.recordLossUnknown) && ["season","season-cache"].includes(rank.recordSource))saved.set(rank.queueType,{...rank});
-      else if(Number(rank.winRate)>=0)saved.delete(rank.queueType);
-      return rank;
-    });
-    if(state.rankRecords.has(key))state.rankRecords.delete(key);
-    state.rankRecords.set(key,saved);
-    if(state.rankRecords.size>64)state.rankRecords.delete(state.rankRecords.keys().next().value);
-    return {...data,ranks};
+    return {...data,ranks:(data.ranks || []).map(rank=>({...rank}))};
   }
 
   function ensureRankRecordFill(tab) {
@@ -1500,28 +1475,13 @@
     if(!playerRef)return false;
     try {
       const counts=(tab.data.ranks || []).filter(r=>['RANKED_SOLO_5x5','RANKED_FLEX_SR'].includes(r.queueType)).map(r=>`&${r.queueType==='RANKED_SOLO_5x5'?'soloWins':'flexWins'}=${Number(r.officialWins ?? r.wins)}`).join('');
-      const needsResolved=snapshot && !snapshot.ranks && (tab.data.ranks || []).some(r=>{const key=r.queueType==="RANKED_SOLO_5x5"?"420":"440",q=snapshot.seasonQueueStats?.[key];return r.recordEstimated || q && Number(r.officialWins ?? r.wins)>Number(q.wins)+1;});
+      const needsResolved=snapshot && !snapshot.ranks && !riotTab(tab);
       const data=(needsResolved?null:snapshot) || await api(`/api/gameplay/season-summary?playerRef=${encodeURIComponent(playerRef)}${counts}`,{},`season-summary:${tab.key}`,5000);
       if(tab.closed || (tab.data?.player?.serverId || tab.serverId || "")!==server || (tab.data?.player?.playerRef || tab.playerRef)!==playerRef || data.seasonStatsProgress?.season && tab.data?.seasonStatsProgress?.season && data.seasonStatsProgress.season!==tab.data.seasonStatsProgress.season)return false;
       tab.data={...tab.data,seasonChampionStats:data.seasonChampionStats,seasonOverall:data.seasonOverall,seasonStatsProgress:data.seasonStatsProgress,seasonQueueStats:data.seasonQueueStats};
       tab.data.rankedQueues={...(tab.data.rankedQueues || {})};
       for(const [key,queue] of Object.entries(data.rankedQueues || {}))tab.data.rankedQueues[key]={...tab.data.rankedQueues[key],seasonGames:queue.seasonGames};
-      if(data.seasonStatsProgress?.rankedComplete) {
-        tab.seasonRanksFilled ||= new Set();
-        tab.data.ranks=(tab.data.ranks || []).map(rank=>{
-          const key=rank.queueType==="RANKED_SOLO_5x5" ? "420" : rank.queueType==="RANKED_FLEX_SR" ? "440" : "";
-          const resolved=data.ranks?.find(r=>r.queueType===rank.queueType);
-          if(resolved && ['season','season-cache'].includes(resolved.recordSource) && !resolved.recordPending) {const {recordBaseline,...known}=rank;return {...known,...resolved};}
-          // Legacy summaries can only fill an exact observed record. Estimated
-          // records are resolved by Go; never derive losses again in the browser.
-          if(rank.recordEstimated || rank.recordBaseline?.recordEstimated)return rank;
-          const queue=data.seasonQueueStats?.[key];
-          if(!queue || !(Number(rank.winRate)<0 || ["season","season-cache"].includes(rank.recordSource)))return rank;
-          const baseline=rank.recordBaseline || (Number(rank.winRate)>=0?rank:null),official=Number(rank.officialWins ?? rank.wins);
-          if(baseline){const games=Number(baseline.wins)+Number(baseline.losses),delta=official-Number(baseline.officialWins);if(Number(queue.games)<games || delta!==0 && !(Number(queue.games)>games || Number(queue.wins)-Number(baseline.wins)===delta))return rank;}
-          tab.seasonRanksFilled.add(key);const {recordBaseline,...known}=rank;return {...known,officialWins:Number(rank.officialWins ?? rank.wins),wins:queue.wins,losses:queue.losses,winRate:queue.winRate,recordSource:"season",recordPending:false};
-        });
-      }
+      if(data.ranks && !riotTab(tab))tab.data.ranks=(tab.data.ranks || []).map(rank=>({...rank,...data.ranks.find(r=>r.queueType===rank.queueType)}));
       tab.data=acceptRankRecords(tab,tab.data,"season-fill");
       const container=overviewContainer(tab),root=container?._overviewSubpageStash || container;
       updateCareerCards(tab,"season_summary");
@@ -2543,7 +2503,7 @@
         }
         if(key==='recent-ranked'){
           const tools=casual.modes.length>1?`<div class="ranked-queue-switcher" role="group" aria-label="对局模式">${casual.modes.map(m=>`<button type="button" class="ranked-queue-button${m.key===tab.casualMode?' is-active':''}" data-casual-mode="${m.key}" aria-pressed="${m.key===tab.casualMode}">${escapeHTML(m.label)}</button>`).join('')}</div>`:`<strong class="recent-casual-mode">${escapeHTML(label)}</strong>`;
-          markup=renderRecentRanked(casual.stats,2300,tools,partialHistory).replaceAll('近期海斗','近期对局').replace('</h3>',`</h3>${renderRankMMRPopover(tab)}`);
+          markup=renderRecentRanked(casual.stats,2300,tools,partialHistory).replaceAll('近期海斗','近期对局').replace('<header>','<header class="recent-casual-header"><div class="recent-casual-heading">').replace(/(<small class="history-sample-label">[\s\S]*?<\/small>)/,'$1</div>').replace('</h3>',`</h3>${renderRankMMRPopover(tab)}`);
         }
         if(key==='champions')markup=renderChampionStats(casual.champions,casual.overall,{message:label});
       }
@@ -3207,13 +3167,13 @@
     </div>`;
   }
 
-  function renderRankWindowNote(progress, ranks = []) {
-    const oldest=Number(progress?.rankedOldestAt),date=new Date(oldest);
-    const truncated=progress?.upstreamCapped && Number.isFinite(oldest) && oldest>Date.UTC(2026,0,8) && Number.isFinite(date.getTime());
-    const from=`${date.getMonth()+1}月${date.getDate()}日`;
-    const copy="统计的是当前整个赛季的排位数据"+(truncated?`\n官方接口仅提供 ${from} 之后的对局，更早的场次暂时无法计入`:"");
-    const fill=ranks.some(r=>r.recordEstimated&&!r.recordLossUnknown)&&truncated?`早于 ${from} 的对局只提供胜场，负场按胜负各半计入`:"";
-    return `<button type="button" class="season-data-note" aria-label="数据说明" data-tooltip="${escapeHTML(copy+(fill?"\n"+fill:""))}" data-tooltip-size="compact" ${fill?`data-tooltip-accent="${escapeHTML(fill)}"`:""}><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7v4M8 4.5v.5"/></svg></button>`;
+  function renderRankWindowNote(progress, ranks = [], foreign = false) {
+    const rank=ranks.find(r=>r.recordSplitStart) || {};
+    const start=Number(rank.recordSplitStart || 1785351600000),date=new Date(start+8*3600000);
+    const from=`${date.getUTCMonth()+1}月${date.getUTCDate()}日`;
+    const split=date.getUTCMonth()<3?"第一":date.getUTCMonth()<6?"第二":"第三";
+    const copy=foreign?"统计的是当前整个赛季的排位数据":(rank.recordSplitSource==="season"?"":`数据范围：${date.getUTCFullYear()} 赛季${split}赛段\n`)+`统计自 ${from} 起`;
+    return `<button type="button" class="season-data-note" aria-label="数据说明" data-tooltip="${escapeHTML(copy)}" data-tooltip-size="compact"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7v4M8 4.5v.5"/></svg></button>`;
   }
 
   function reportRankRecordState(tab, queue, state, source) {
@@ -3235,10 +3195,10 @@
     const rankedCapability = capabilities.find((item) => item.name === "ranked-stats");
     const mmr = renderRankMMRPopover(tab);
     if (!ranks.length && (['failed','error','canceled'].includes(rankedCapability?.state) || (tab?.initialPageError || tab?.error) && !tab?.loading)) {
-      return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress,ranks)}</h3></header><div class="rank-unavailable"><strong>暂不可用</strong><button type="button" data-gameplay-retry>重试</button></div></section>`;
+      return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress,ranks,riotTab(tab))}</h3></header><div class="rank-unavailable"><strong>暂不可用</strong><button type="button" data-gameplay-retry>重试</button></div></section>`;
     }
     if (rankedCapability?.state === "unsupported") {
-      return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress,ranks)}</h3><div class="rank-header-tools"><span>能力边界</span>${mmr}</div></header><div class="rank-unavailable"><strong>${escapeHTML(rankedCapability.detail || "跨服暂不支持排位")}</strong><small>当前客户端的排位接口只能读取登录服务器。</small></div></section>`;
+      return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress,ranks,riotTab(tab))}</h3><div class="rank-header-tools"><span>能力边界</span>${mmr}</div></header><div class="rank-unavailable"><strong>${escapeHTML(rankedCapability.detail || "跨服暂不支持排位")}</strong><small>当前客户端的排位接口只能读取登录服务器。</small></div></section>`;
     }
     if(tab && ranks.every(r=>Number(r.winRate)>=0 || !r.recordPending)){clearTimeout(tab.rankPendingTimer);tab.rankPendingTimer=0;delete tab.rankPendingAt;}
     const expected = ["RANKED_SOLO_5x5", "RANKED_FLEX_SR"];
@@ -3247,7 +3207,7 @@
       const label = queue === "RANKED_SOLO_5x5" ? "单排/双排" : "灵活组排";
       if ((!rank || !rank.tier) && !rankedCapability && tab?.loading) return `<div class="rank-row gameplay-skeleton"><span class="rank-crest"></span><div><span></span><span></span></div><div class="rank-record"><span></span><span></span></div></div>`;
       if (!rank || !rank.tier) return `<div class="rank-row"><span class="rank-crest is-unranked" aria-hidden="true">◇</span><div><strong>${label}</strong></div><b>未定级</b></div>`;
-      const recordKnown = Number(rank.winRate) >= 0 || rank.recordLossUnknown === true;
+      const recordKnown = !rank.recordPending && (Number(rank.winRate) >= 0 || rank.recordSource === "season");
       const paused = !recordKnown && seasonProgress?.paused === true;
       const collecting = !recordKnown && !paused && (seasonProgress?.collecting === true || rank.recordPending===true);
       const recordState = recordKnown ? "known" : paused ? "paused" : collecting ? "collecting" : "unavailable";
@@ -3259,11 +3219,11 @@
       }
       const skeleton=pending && Date.now()-Number(tab?.rankPendingAt || 0)<8000;
       if(skeleton)return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record gameplay-skeleton" aria-label="正在统计中"><span></span><span></span></div></div>`;
-      const record = recordKnown ? rank.recordLossUnknown ? `${number(rank.wins)}胜 —负` : `${number(rank.wins)}胜 ${number(rank.losses)}负` : paused ? `${number(rank.wins)}胜 · 统计已暂停` : collecting ? `${number(rank.wins)}胜 · 正在统计中` : `${number(rank.wins)}胜 · 负场未提供`;
+      const record = recordKnown ? `${number(rank.wins)}胜 ${number(rank.losses)}负` : paused ? rank.recordSplitSource ? "统计已暂停" : `${number(rank.wins)}胜 · 统计已暂停` : collecting ? rank.recordSplitSource ? "正在统计中" : `${number(rank.wins)}胜 · 正在统计中` : `${number(rank.wins)}胜 · 负场未提供`;
 	  const unavailableDetail = paused ? "官方战绩服务暂时中断，恢复后自动继续统计" : collecting ? "正在统计中" : (rankedCapability?.detail || "上游未提供负场，无法计算胜率");
-	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown || collecting ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 ${rank.recordLossUnknown ? "—" : `<b class="win-rate-value">${percent(rank.winRate)}</b>`}` : collecting ? "" : "胜率暂不可用"}</span></div></div>`;
+	  return `<div class="rank-row"><span class="rank-crest" aria-hidden="true">${rankCrestIcon(rank.tier)}</span><div><strong>${label}</strong><small>${escapeHTML(rankTitle(rank))} · ${number(rank.leaguePoints)} LP</small></div><div class="rank-record"><b>${record}</b><span${recordKnown || collecting ? "" : ` data-tooltip="${escapeHTML(unavailableDetail)}" data-tooltip-size="compact"`}>${recordKnown ? `胜率 ${Number(rank.winRate)<0 ? "—" : `<b class="win-rate-value">${percent(rank.winRate)}</b>`}` : collecting ? "" : "胜率暂不可用"}</span></div></div>`;
     }).join("");
-    return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress,ranks)}</h3><div class="rank-header-tools">${mmr}</div></header><div class="rank-list${rows.includes('gameplay-skeleton')?' career-pending':''}">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;
+    return `<section class="career-section rank-career-section"><header><h3>排位${renderRankWindowNote(seasonProgress,ranks,riotTab(tab))}</h3><div class="rank-header-tools">${mmr}</div></header><div class="rank-list${rows.includes('gameplay-skeleton')?' career-pending':''}">${rows}</div>${riotTab(tab)?renderRankHistory(historicalRanks,null):renderRankMilestones(rankMilestones)}</section>`;
   }
 
   async function loadMayhemRating(tab, quietStart = false) {
@@ -3357,9 +3317,9 @@
     if (doc._seasonDataNotes) return;
     const panel=doc.createElement("div");panel.className="match-tags-popover season-data-note-popover";panel.id="season-data-note-popover";
     panel.setAttribute("role","tooltip");panel.hidden=true;panel.style.margin="0";panel.style.inset="auto";if(typeof panel.showPopover==="function")panel.setAttribute("popover","manual");doc.body.append(panel);
-    let anchor=null,touchUntil=0;
+    let anchor=null,touchUntil=0,stopLifecycle=null;
     const observer=new win.MutationObserver(()=>{if(anchor && !anchor.isConnected)close();});
-    const close=()=>{observer.disconnect();if(anchor){anchor.setAttribute("aria-expanded","false");anchor.removeAttribute("aria-describedby");}anchor=null;if(typeof panel.hidePopover==="function"&&panel.matches(":popover-open"))panel.hidePopover();panel.hidden=true;panel.replaceChildren();panel.style.zoom="";if(panel.parentElement!==doc.body)doc.body.append(panel);};
+    const close=()=>{stopLifecycle?.();stopLifecycle=null;observer.disconnect();if(anchor){anchor.setAttribute("aria-expanded","false");anchor.removeAttribute("aria-describedby");}anchor=null;if(typeof panel.hidePopover==="function"&&panel.matches(":popover-open"))panel.hidePopover();panel.hidden=true;panel.replaceChildren();panel.style.zoom="";if(panel.parentElement!==doc.body)doc.body.append(panel);};
     const show=button=>{
       close();anchor=button;const host=button.closest("dialog[open]")||doc.body;host.append(panel);panel.style.zoom=host===doc.body?"":"1";
       const lines=JSON.parse(button.dataset.seasonDataNote);
@@ -3374,11 +3334,12 @@
       panel.style.left=`${left/scale}px`;panel.style.top=`${Math.max(padding,above ? rect.top-height-gap : Math.min(rect.bottom+gap,win.innerHeight-height-padding))/scale}px`;
       panel.style.setProperty("--tag-arrow-left",`${Math.max(8,Math.min(width-8,rect.left+rect.width/2-left))/scale}px`);
       observer.observe(doc.body,{childList:true,subtree:true});
+      stopLifecycle=win.deepLegendsFloatingLayers?.watch(button,panel,close);
     };
     const buttonOf=node=>node?.closest?.("[data-season-data-note]");
     doc.addEventListener("pointerdown",event=>{if(event.pointerType==="touch")touchUntil=Date.now()+800;});
     doc.addEventListener("pointerover",event=>{const button=buttonOf(event.target);if(button && Date.now()>touchUntil)show(button);});
-    doc.addEventListener("pointerout",event=>{if(anchor?.contains(event.target) && !anchor.contains(event.relatedTarget))close();});
+    doc.addEventListener("pointerout",event=>{if(anchor?.contains(event.target) && !anchor.contains(event.relatedTarget) && !panel.contains(event.relatedTarget))close();});
     doc.addEventListener("focusin",event=>{const button=buttonOf(event.target);if(button && Date.now()>touchUntil)show(button);});
     doc.addEventListener("focusout",event=>{if(anchor?.contains(event.target))close();});
     doc.addEventListener("click",event=>{const button=buttonOf(event.target);if(button){event.stopPropagation();anchor===button ? close() : show(button);}else if(anchor && !panel.contains(event.target))close();},true);
@@ -3478,21 +3439,23 @@
   }
 
   function bindMasteryDetails(container, data) {
+    const doc=container.ownerDocument,win=doc.defaultView;
     for (const image of container.querySelectorAll(".mastery-details-crest")) image.addEventListener("error",()=>{image.hidden=true;image.parentElement.classList.add("is-crest-missing");});
     for (const card of container.querySelectorAll("[data-mastery-detail]")) {
       const item = (data.items || []).find(item=>String(item.championId)===card.dataset.masteryDetail);
-      let popover;
-      const close = () => {popover?.remove();popover=null;};
-      const open = () => {
-        close(); if (!item) return;
-        popover=document.createElement("div");popover.className="mastery-details-popover";popover.setAttribute("role","tooltip");popover.innerHTML=masteryTooltipContent(item);document.body.append(popover);
-        for (const image of popover.querySelectorAll(".mastery-details-crest")) image.addEventListener("error",()=>{image.hidden=true;image.parentElement.classList.add("is-crest-missing");});
+      const close=()=>doc._masteryDetails?.close();
+      const open=()=>{
+        close();if(!item)return;
+        const popover=doc.createElement("div");popover.id="mastery-details-popover";popover.className="mastery-details-popover";popover.setAttribute("role","tooltip");popover.innerHTML=masteryTooltipContent(item);doc.body.append(popover);card.setAttribute("aria-describedby",popover.id);
+        for(const image of popover.querySelectorAll(".mastery-details-crest"))image.addEventListener("error",()=>{image.hidden=true;image.parentElement.classList.add("is-crest-missing");});
         prepareImages(popover);
         const anchor=card.getBoundingClientRect(),box=popover.getBoundingClientRect();
         popover.style.left=`${Math.max(8,Math.min(window.innerWidth-box.width-8,anchor.left))}px`;
         popover.style.top=`${anchor.bottom+box.height+8<=window.innerHeight ? anchor.bottom+8 : Math.max(8,anchor.top-box.height-8)}px`;
+        let stop;const dismiss=()=>{stop?.();card.removeAttribute("aria-describedby");popover.remove();doc._masteryDetails=null;};
+        doc._masteryDetails={close:dismiss};stop=win.deepLegendsFloatingLayers?.watch(card,popover,dismiss);
       };
-      card.addEventListener("mouseenter",open);card.addEventListener("mouseleave",close);card.addEventListener("focus",open);card.addEventListener("blur",close);
+      card.addEventListener("mouseenter",open);card.addEventListener("mouseleave",event=>{if(!doc.querySelector('#mastery-details-popover')?.contains(event.relatedTarget))close();});card.addEventListener("focus",open);card.addEventListener("blur",close);
     }
   }
 
@@ -4402,10 +4365,10 @@
     if(!doc._matchTagsPopover) {
       const panel=doc.createElement("div");panel.className="match-tags-popover";panel.id="match-tags-popover";
       panel.setAttribute("role","tooltip");panel.hidden=true;doc.body.append(panel);
-      let anchor=null,leaveTimer=0,touchUntil=0;
+      let anchor=null,leaveTimer=0,touchUntil=0,stopLifecycle=null;
       const observer=new win.MutationObserver(()=>{if(anchor && !anchor.isConnected)close();});
       const cancelLeave=()=>{win.clearTimeout(leaveTimer);leaveTimer=0;};
-      const close=()=>{observer.disconnect();cancelLeave();if(anchor){anchor.setAttribute("aria-expanded","false");anchor.removeAttribute("aria-describedby");}anchor=null;panel.hidden=true;panel.replaceChildren();};
+      const close=()=>{stopLifecycle?.();stopLifecycle=null;observer.disconnect();cancelLeave();if(anchor){anchor.setAttribute("aria-expanded","false");anchor.removeAttribute("aria-describedby");}anchor=null;panel.hidden=true;panel.replaceChildren();};
       const show=button=>{
         const hidden=[...button.parentElement.querySelectorAll("[data-match-tag]")].filter(item=>item.hidden);
         if(!hidden.length)return close();
@@ -4422,6 +4385,7 @@
         panel.style.left=`${left/scale}px`;panel.style.top=`${Math.max(padding,above ? rect.top-height-gap : Math.min(win.innerHeight-height-padding,rect.bottom+gap))/scale}px`;
         panel.style.setProperty("--tag-arrow-left",`${Math.max(8,Math.min(width-8,rect.left+rect.width/2-left))/scale}px`);
         observer.observe(doc.body,{childList:true,subtree:true});
+        stopLifecycle=win.deepLegendsFloatingLayers?.watch(button,panel,close);
       };
       const buttonOf=node=>node?.closest?.("[data-match-tags-more]");
       doc.addEventListener("pointerdown",event=>{if(event.pointerType==="touch")touchUntil=Date.now()+800;});
@@ -5971,7 +5935,15 @@
     }
   }
 
+  function syncRecentHeadingTypography(container) {
+    for(const header of container.querySelectorAll('.recent-casual-header')) {
+      const title=header.querySelector('h3'),mode=header.querySelector('.recent-casual-mode');
+      if(title&&mode){const css=getComputedStyle(title);for(const key of ['fontFamily','fontSize','fontWeight','lineHeight'])mode.style[key]=css[key];}
+    }
+  }
+
   function bindOverviewContent(container, tab, overview = container) {
+    syncRecentHeadingTypography(container);
     if(container.querySelector("[data-season-data-note]"))bindSeasonDataNotes(container);
     bindScoreDetails(container,tab);
     requestAnimationFrame(()=>{if(container.isConnected)fitMatchTags(container,true);});

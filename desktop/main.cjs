@@ -616,6 +616,8 @@ function refreshLicenseWindow() {
   return licenseWindowRead;
 }
 
+require("./resize-border.cjs").setResizeBorderReporter(event=>appendDesktopLog("原生边缘 " + JSON.stringify(event)));
+
 function reportLicenseWindowState(value) {
   appendDesktopLog("license_window_state " + JSON.stringify(value));
   if (!backendReady) return;

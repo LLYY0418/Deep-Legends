@@ -1406,7 +1406,7 @@ func TestRankedStatsPreferCompleteLCUWithoutCallingSGP(t *testing.T) {
 	provider.sessionToken, provider.sessionAt, provider.sessionOwner = "league-session", time.Now(), client
 	a := &app{sgp: provider}
 	ranks, milestones, capability := a.loadRanksWithFallback(context.Background(), client, playerRef, false, "HN1", "PUBLIC")
-	if lcuCalls != 1 || sgpCalls != 0 || len(ranks) != 1 || ranks[0].Tier != "EMERALD" || ranks[0].Losses != 203 {
+	if lcuCalls != 1 || sgpCalls != 1 || len(ranks) != 1 || ranks[0].Tier != "EMERALD" || ranks[0].Losses != 203 {
 		t.Fatalf("LCU-first result: calls=%d/%d ranks=%#v", lcuCalls, sgpCalls, ranks)
 	}
 	if capabilitySource(capability) != dataSourceLCU || len(capability.Attempts) != 1 || capability.Attempts[0].Source != dataSourceLCU {
@@ -1805,24 +1805,24 @@ func TestSeasonRankWinRateFallbackFillsOnlyIncompleteSGPRanks(t *testing.T) {
 			{QueueType: "RANKED_SOLO_5x5", Wins: 107, Losses: 0, WinRate: -1},
 			{QueueType: "RANKED_FLEX_SR", Wins: 12, Losses: 0, WinRate: -1},
 		},
-		EndpointCapability{Path: "sgp: /leagues-ledge/v2/rankedStats", Detail: "SGP 未返回排位负场，胜率暂不展示"}, seasonRankRecordSnapshot{progress: seasonStatsProgress{Complete: true, RankedComplete: true}, byQueue: map[int64]gameplayAggregate{
+		EndpointCapability{Path: "sgp: /leagues-ledge/v2/rankedStats", Detail: "SGP 未返回排位负场，胜率暂不展示"}, seasonRankRecordSnapshot{ranked: append(r315Matches(30, 20, 420), r315Matches(5, 15, 440)...), progress: seasonStatsProgress{Complete: true, RankedComplete: true}, byQueue: map[int64]gameplayAggregate{
 			420: {QueueID: 420, Games: 50, Wins: 30, Losses: 20, WinRate: 60},
 			440: {QueueID: 440, Games: 20, Wins: 5, Losses: 15, WinRate: 25},
 		}})
-	if ranks[0].Wins != 107 || ranks[0].Losses != 97 || ranks[0].WinRate != 52 || ranks[1].Wins != 12 || ranks[1].Losses != 22 || ranks[1].WinRate != 35 {
+	if ranks[0].Wins != 30 || ranks[0].Losses != 20 || ranks[0].WinRate != 60 || ranks[1].Wins != 5 || ranks[1].Losses != 15 || ranks[1].WinRate != 25 {
 		t.Fatalf("season fallback ranks = %#v", ranks)
 	}
 	if ranks[0].Wins == 35 || ranks[1].Wins == 35 {
 		t.Fatalf("queue ranks were filled from a merged season total: %#v", ranks)
 	}
-	if capability.Detail != "上游未返回排位负场，已按赛季战绩聚合补全胜率" {
+	if capability.Detail != "国服排位显示当前赛段已读取的胜负" {
 		t.Fatalf("season fallback capability = %#v", capability)
 	}
 
 	lcuFilled, lcuCapability := a.applySeasonRankWinRateFallback(
 		[]gameplayRank{{QueueType: "RANKED_SOLO_5x5", Wins: 107, Losses: 0, WinRate: -1}},
-		EndpointCapability{Path: "/lol-ranked/v1/ranked-stats/{player}"}, seasonRankRecordSnapshot{progress: seasonStatsProgress{Complete: true, RankedComplete: true}, byQueue: map[int64]gameplayAggregate{420: {Games: 100, Wins: 57, Losses: 43, WinRate: 57}}})
-	if lcuFilled[0].Wins != 107 || lcuFilled[0].Losses != 93 || lcuFilled[0].WinRate != 54 || lcuCapability.Detail != "上游未返回排位负场，已按赛季战绩聚合补全胜率" {
+		EndpointCapability{Path: "/lol-ranked/v1/ranked-stats/{player}"}, seasonRankRecordSnapshot{ranked: r315Matches(57, 43, 420), progress: seasonStatsProgress{Complete: true, RankedComplete: true}, byQueue: map[int64]gameplayAggregate{420: {Games: 100, Wins: 57, Losses: 43, WinRate: 57}}})
+	if lcuFilled[0].Wins != 57 || lcuFilled[0].Losses != 43 || lcuFilled[0].WinRate != 57 || lcuCapability.Detail != "国服排位显示当前赛段已读取的胜负" {
 		t.Fatalf("LCU season fallback = ranks:%#v capability=%#v", lcuFilled, lcuCapability)
 	}
 }
@@ -1834,8 +1834,8 @@ func TestSeasonRankWinRateFallbackDoesNotFillIncompleteScan(t *testing.T) {
 	ranks, got := a.applySeasonRankWinRateFallback([]gameplayRank{original}, capability, seasonRankRecordSnapshot{progress: seasonStatsProgress{Collecting: true}, byQueue: map[int64]gameplayAggregate{
 		420: {Games: 50, Wins: 30, Losses: 20, WinRate: 60},
 	}})
-	expected := original
-	expected.RecordSource, expected.RecordPending, expected.OfficialWins = "none", true, original.Wins
+	expected := gameplayRank{QueueType: original.QueueType, WinRate: -1, RecordSource: "none", RecordPending: true, OfficialWins: original.Wins, seasonFallback: true, RecordSplitStart: rankSplitStart, RecordSplitSource: "constant"}
+	// Incomplete CN history exposes no numeric record.
 	if len(ranks) != 1 || ranks[0] != expected {
 		t.Fatalf("incomplete scan changed rank: %#v", ranks)
 	}
@@ -1870,7 +1870,7 @@ func TestSeasonRankFallbackAppearsAfterRefreshSnapshotCompletes(t *testing.T) {
 	}
 	_, refreshedProgress, _, refreshedQueues := a.loadSeasonChampionStatsSnapshot(reference, player, playerRef)
 	refreshedRanks, refreshedCapability := a.applySeasonRankWinRateFallback(append([]gameplayRank(nil), incomplete...), capability, seasonRankRecordSnapshot{progress: refreshedProgress, byQueue: refreshedQueues})
-	if refreshedRanks[0].Wins != 107 || refreshedRanks[0].Losses != 0 || refreshedRanks[0].WinRate != -1 || !refreshedRanks[0].RecordEstimated || !refreshedRanks[0].RecordLossUnknown || !refreshedProgress.Complete || refreshedCapability.Detail != "上游未返回排位负场，已按赛季战绩聚合补全胜率" {
+	if refreshedRanks[0].Wins != 0 || refreshedRanks[0].Losses != 0 || refreshedRanks[0].WinRate != -1 || !refreshedProgress.Complete || refreshedCapability.Detail != "国服排位显示当前赛段已读取的胜负" {
 		t.Fatalf("refreshed fallback state = ranks:%#v progress:%#v capability:%#v", refreshedRanks, refreshedProgress, refreshedCapability)
 	}
 }
@@ -1944,7 +1944,7 @@ func TestGameplayOverviewAppliesSeasonFallbackToIncompleteSGPRanks(t *testing.T)
 		t.Fatalf("ranks = %#v", overview.Ranks)
 	}
 	rank := overview.Ranks[0]
-	if rank.Wins != 107 || rank.Losses != 0 || rank.WinRate != -1 || !rank.RecordEstimated || !rank.RecordLossUnknown {
+	if rank.Wins != 0 || rank.Losses != 0 || rank.WinRate != -1 {
 		t.Fatalf("rank was not filled from season aggregate: %#v", rank)
 	}
 	var capability EndpointCapability
@@ -1954,7 +1954,7 @@ func TestGameplayOverviewAppliesSeasonFallbackToIncompleteSGPRanks(t *testing.T)
 			break
 		}
 	}
-	if capability.Detail != "上游未返回排位负场，已按赛季战绩聚合补全胜率" {
+	if capability.Detail != "国服排位显示当前赛段已读取的胜负" {
 		t.Fatalf("ranked capability = %#v", capability)
 	}
 }

@@ -462,7 +462,7 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 
 /* R313: compact 1x geometry, enlarged with one dimensional scale. No CSS
    transform: layout() reads the real scaled row/node offsets. */
-.ac-stage { --ac-rune-scale:1; --ac-rune-f:1; --ac-tree-height:315px; --ac-sub-shard-gap:3px; --ac-primary-width:273.6px; --ac-secondary-width:255.6px; --ac-column-gap:26px; --ac-key-extra:0px; --ac-minor-extra:0px; --ac-sub-extra:0px; --ac-shard-extra:0px; flex:1; min-height:0; padding:28px; padding-bottom:23px; overflow:auto; gap:14px; }
+.ac-stage { --ac-rune-scale:1; --ac-rune-f:1; --ac-tree-height:315px; --ac-sub-shard-gap:3px; --ac-primary-width:273.6px; --ac-secondary-width:255.6px; --ac-column-gap:26px; --ac-key-extra:0px; --ac-minor-extra:0px; --ac-sub-extra:0px; --ac-shard-extra:0px; flex:1; min-height:0; padding:28px; padding-bottom:24px; overflow:auto; gap:14px; }
 .ac-stage .ac-tree { height:var(--ac-tree-height,315px); grid-template-columns:calc(var(--ac-primary-width,273.6px)*var(--ac-rune-scale)) calc(var(--ac-secondary-width,255.6px)*var(--ac-rune-scale)); gap:calc(var(--ac-column-gap,26px)*.9*var(--ac-rune-scale)); justify-content:center; flex:none; }
 .ac-stage .ac-col { --ac-track-x:calc(23px*var(--ac-rune-scale)); --ac-main-size:calc(44px*var(--ac-rune-scale)); }
 .ac-stage .ac-paths { height:calc(56px*var(--ac-rune-scale)); padding-left:calc(55.8px*var(--ac-rune-scale)); padding-right:calc(7.2px*var(--ac-rune-scale)); flex:none; }

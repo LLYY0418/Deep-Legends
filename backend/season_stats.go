@@ -31,7 +31,7 @@ var seasonStartS26 = time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC)
 // 11 R216: Go v2 scores and champion/opponent table totals.
 // 12 R216 P4: adopted v2.1 scores; reject all persisted v2 table aggregates.
 // 13 R230: discard caches marked complete by malformed SGP history in 0.12.73.
-const seasonStatsCacheSchemaVersion = 15
+const seasonStatsCacheSchemaVersion = 16
 
 const seasonStatsSource = dataSourceSGP
 
@@ -298,6 +298,7 @@ type gameplaySeasonChampionStat struct {
 }
 
 type seasonStatsProgress struct {
+	rankRecords    []seasonRankedMatch
 	RankedComplete bool   `json:"rankedComplete"`
 	Paused         bool   `json:"paused"`
 	UpstreamCapped bool   `json:"upstreamCapped,omitempty"`
@@ -323,6 +324,10 @@ type seasonStatsProgress struct {
 func (p *seasonStatsProgress) applyUpstreamBoundary(cache seasonStatsCache) {
 	solo, flex, mayhem := cache.Streams["ranked"], cache.Streams["flex"], cache.Streams["mayhem"]
 	p.RankedComplete = solo.Complete && flex.Complete || cache.Complete
+	p.rankRecords = make([]seasonRankedMatch, 0, len(cache.RankRecords))
+	for _, r := range cache.RankRecords {
+		p.rankRecords = append(p.rankRecords, seasonRankedMatch{GameID: r.GameID, QueueID: r.QueueID, CreatedAt: r.CreatedAt, Win: r.Win})
+	}
 	p.Paused = cache.Paused
 	p.Collecting = p.Collecting && !p.Paused
 	p.SoloCapped, p.FlexCapped, p.MayhemCapped = seasonModeCapped(cache, "ranked"), seasonModeCapped(cache, "flex"), mayhem.CappedByUpstream
@@ -364,7 +369,15 @@ func seasonWriteLock(key string) *sync.Mutex {
 	return lock.(*sync.Mutex)
 }
 
+type seasonRankedRecord struct {
+	GameID    int64 `json:"id"`
+	QueueID   int64 `json:"q"`
+	CreatedAt int64 `json:"at"`
+	Win       bool  `json:"w"`
+}
 type seasonStatsCache struct {
+	RankRecords []seasonRankedRecord `json:"rankRecords,omitempty"`
+
 	OfficialTotals     map[int64]int                 `json:"official_totals,omitempty"`
 	Paused             bool                          `json:"paused,omitempty"`
 	EmptyHistory       map[string]seasonEmptyHistory `json:"emptyHistory,omitempty"`
@@ -428,6 +441,12 @@ func (s *localStore) loadSeasonStats(source, accountHash, season string) (season
 		delete(cache.Streams, "flex")
 		cache.Complete = false
 	}
+	if cache.SchemaVersion < 16 {
+		delete(cache.Streams, "ranked")
+		delete(cache.Streams, "flex")
+		cache.Complete = false
+		cache.HeadCheckedAt = time.Time{}
+	}
 	cache.SchemaVersion = seasonStatsCacheSchemaVersion
 	return cache, nil
 }
@@ -453,6 +472,7 @@ func (s *localStore) saveSeasonStatsReported(cache seasonStatsCache) (seasonStat
 				cache.OfficialTotals[q] = n
 			}
 		}
+		cache.RankRecords = mergeSeasonRankRecords(disk.RankRecords, cache.RankRecords)
 		if cache.EmptyHistory == nil {
 			cache.EmptyHistory = map[string]seasonEmptyHistory{}
 		}
@@ -511,6 +531,7 @@ func (s *localStore) saveSeasonStatsReported(cache seasonStatsCache) (seasonStat
 			cache.ChampionTable = disk.ChampionTable
 			cache.RankedMatches = disk.RankedMatches
 			cache.AugmentSamples = disk.AugmentSamples
+			cache.RankRecords = mergeSeasonRankRecords(disk.RankRecords, cache.RankRecords)
 		}
 		if cache.Streams == nil {
 			cache.Streams = map[string]seasonStatsStream{}
@@ -613,6 +634,7 @@ func seasonRecordRankedMatch(cache *seasonStatsCache, info *riotMatchInfo, playe
 		if participant.PUUID != playerRef {
 			continue
 		}
+		seasonRecordRankResult(cache, info, playerRef)
 		teamKills := 0
 		for _, mate := range info.Participants {
 			if mate.TeamID == participant.TeamID {
@@ -1184,6 +1206,7 @@ func (a *app) seasonScanPagesWithHistoryCache(ctx context.Context, client *LCUCl
 					boundary = true
 					break
 				}
+				seasonRecordRankResult(&scan.cache, info, playerRef)
 				if scan.seen[info.GameID] {
 					hit = true
 					continue
@@ -1665,4 +1688,35 @@ func (a *app) handleGameplaySeasonSummary(w http.ResponseWriter, r *http.Request
 		ranks, _ = a.applySeasonRankWinRateFallback(ranks, EndpointCapability{}, seasonRankRecordSnapshot{player: reference.ServerID + "|" + reference.PlayerRef, progress: progress, byQueue: queues, ranked: ranked})
 	}
 	respondJSON(w, map[string]any{"ranks": ranks, "seasonChampionStats": rows, "seasonOverall": seasonStatsOverall(rows), "seasonStatsProgress": progress, "seasonQueueStats": queues, "rankedQueues": rankedQueues})
+}
+
+// Compact exact results are never capped with recent performance snapshots.
+func mergeSeasonRankRecords(a, b []seasonRankedRecord) []seasonRankedRecord {
+	out := make([]seasonRankedRecord, 0, len(a)+len(b))
+	seen := map[int64]bool{}
+	for _, rows := range [][]seasonRankedRecord{a, b} {
+		for _, r := range rows {
+			if !seen[r.GameID] {
+				seen[r.GameID] = true
+				out = append(out, r)
+			}
+		}
+	}
+	return out
+}
+func seasonRecordRankResult(cache *seasonStatsCache, info *riotMatchInfo, playerRef string) {
+	if info == nil || (info.QueueID != 420 && info.QueueID != 440) || riotMatchInfoIsRemake(info) || normalizeEpochMillis(info.GameCreation) <= 0 {
+		return
+	}
+	for _, r := range cache.RankRecords {
+		if r.GameID == info.GameID {
+			return
+		}
+	}
+	for _, p := range info.Participants {
+		if p.PUUID == playerRef {
+			cache.RankRecords = append(cache.RankRecords, seasonRankedRecord{GameID: info.GameID, QueueID: info.QueueID, CreatedAt: normalizeEpochMillis(info.GameCreation), Win: p.Win})
+			return
+		}
+	}
 }

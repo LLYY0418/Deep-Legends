@@ -7,6 +7,7 @@ const {extract} = require('./r188-harness.cjs');
 const source = fs.readFileSync(__dirname + '/gameplay.js', 'utf8');
 
 function functions(names, dependencies) {
+  if(names.includes('bindOverviewContent'))names=[...names,'syncRecentHeadingTypography'];
   if (source.includes('function cancelOverviewProgress(')) names = [...names, 'cancelOverviewProgress'];
   return Function(...Object.keys(dependencies), names.map(name => extract(source, name)).join('\n') + `\nreturn {${names.join(',')}}`)(...Object.values(dependencies));
 }

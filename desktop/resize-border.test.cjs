@@ -5,7 +5,10 @@ test('R314 native resize border is Windows-only and binds the exact window handl
  const handle=Buffer.alloc(8);let calls=0;const window={getNativeWindowHandle:()=>handle},load=()=>({install:h=>{assert.equal(h,handle);calls++;return true;}});
  assert.equal(installResizeBorder(window,{platform:'darwin',load}),false);assert.equal(calls,0);
  assert.equal(installResizeBorder(window,{platform:'win32',load}),true);assert.equal(calls,1);
- assert.throws(()=>installResizeBorder(window,{platform:'win32',load:()=>{throw Error('missing native module')}}),/missing native module/);
+ const events=[];const report=e=>events.push(e);
+ assert.equal(installResizeBorder(window,{platform:'win32',report,load:()=>{throw Error('private/path/module')}}),false);
+ assert.equal(installResizeBorder(window,{platform:'win32',report,load:()=>{throw TypeError('private/path/install')}}),false);
+ assert.deepEqual(events,[{event:'resize_border_unavailable',error_type:'Error'}]);
 });
 test('R314 native resize preserves hidden titlebar, original dispatch, fullscreen/maximize and UI-thread ownership',()=>{
  const s=fs.readFileSync(path.join(__dirname,'native/resize-border/resize_border.cc'),'utf8');
@@ -46,4 +49,12 @@ test('R314 owns non-client move cursors after Chromium default processing withou
  assert(child.indexOf('if (message == WM_NCMOUSEMOVE)')>child.indexOf('const LRESULT original = DefSubclassProc'));
  assert(root.includes('if (message == WM_NCMOUSEMOVE) ApplyResizeCursor(hwnd);'));
  assert(root.indexOf('if (message == WM_NCMOUSEMOVE)')>root.indexOf('const LRESULT original = DefSubclassProc'));
+});
+
+test('R315 native resize release uses the static C runtime',()=>{const g=JSON.parse(fs.readFileSync(path.join(__dirname,'native/resize-border/binding.gyp'),'utf8'));assert.equal(g.targets[0].configurations.Release.msvs_settings.VCCLCompilerTool.RuntimeLibrary,0);});
+
+test('R315 dependency inspection rejects dynamic VC runtimes and records dumpbin DLLs',()=>{
+ const {verifyRuntimeDependencies}=require('./build-resize-border.cjs');
+ assert.deepEqual(verifyRuntimeDependencies('test.node',{executable:'dumpbin',run:()=>({status:0,stdout:'    KERNEL32.dll\n    USER32.dll\n'})}),['KERNEL32.dll','USER32.dll']);
+ for(const name of ['VCRUNTIME140.dll','VCRUNTIME140_1.dll','MSVCP140.dll'])assert.throws(()=>verifyRuntimeDependencies('test.node',{executable:'dumpbin',run:()=>({status:0,stdout:'    '+name+'\n'})}),/VC\+\+ runtime/);
 });

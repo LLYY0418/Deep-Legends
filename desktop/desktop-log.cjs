@@ -80,6 +80,9 @@ function desktopLogForExport(directory, now = Date.now()) {
       if(message.startsWith("进程指标 ")) {
         try {const {normalizeProcessMetrics}=require("./process-metrics.cjs");rows.push(JSON.stringify({...normalizeProcessMetrics(JSON.parse(message.slice(5))),time}));continue;}catch{}
       }
+      if(message.startsWith("原生边缘 ")) {
+        try {const e=JSON.parse(message.slice(5));if(e.event==='resize_border_unavailable'&&['Error','TypeError','RangeError','SyntaxError','ReferenceError'].includes(e.error_type)){rows.push(JSON.stringify({event:e.event,error_type:e.error_type,time}));continue;}}catch{}
+      }
       if(message.startsWith("后端证据 ")) {
         try {
           const { normalizeBackendEvidence } = require("./backend-evidence.cjs");

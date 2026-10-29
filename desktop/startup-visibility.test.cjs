@@ -44,6 +44,7 @@ function harness(text = source) {
       if (name === "./backend-integrity.cjs") return {verifyBackend(){}};
       if (name === "./backend-digest.cjs") return "0".repeat(64);
       if (name === "./app-title.cjs") return "Deep Legends";
+      if (name === "./resize-border.cjs") return {setResizeBorderReporter(){},installResizeBorder(){return false;}};
       if (name.startsWith("./")) return { attachDiagnosticsExport() {} };
       return require(name);
     },

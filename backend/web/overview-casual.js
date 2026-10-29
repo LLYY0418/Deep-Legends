@@ -9,7 +9,7 @@
     if (conflict) { tab.rankedHistorySeen=true; delete tab.nonRankedConfirmed; return null; }
     if(tab.rankedHistorySeen)return null;
     const ranks = data.ranks;
-    const ready = !tab.loading && !tab.initialPagePending && !tab.initialPageError && !tab.error && !data.capabilities?.some(c=>c.name==="match-history" && c.state==="failed") && data.capabilities?.some(c => c.name === "ranked-stats" && c.state === "available") && Array.isArray(ranks) && ranks.filter(r => ["RANKED_SOLO_5X5", "RANKED_FLEX_SR"].includes(String(r.queueType).toUpperCase())).every(r => r.wins === 0 && r.losses === 0 && Number(r.winRate) >= 0);
+    const ready = !tab.loading && !tab.initialPagePending && !tab.initialPageError && !tab.error && !data.capabilities?.some(c=>c.name==="match-history" && c.state==="failed") && data.capabilities?.some(c => c.name === "ranked-stats" && c.state === "available") && Array.isArray(ranks) && ranks.filter(r => ["RANKED_SOLO_5X5", "RANKED_FLEX_SR"].includes(String(r.queueType).toUpperCase())).every(r => r.wins === 0 && r.losses === 0 && (Number(r.winRate) >= 0 || r.recordSource === "season" && !r.recordPending));
     if (!ready) return null;
     tab.nonRankedConfirmed = true;
     const seen=new Set();

@@ -27,7 +27,7 @@ func TestR312TruncatedRankRecordOverviewPaths(t *testing.T) {
 			}
 			subject := strings.Repeat("o", 48)
 			season, _ := currentRankedSeason(time.Now())
-			cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: season, AccountHash: a.storage.accountHash(Summoner{PUUID: subject}), Complete: branch != "budget-newer-snapshot", HeadCheckedAt: time.Now(), HeadGameID: 420, UpdatedAt: time.Now(), Stats: []gameplaySeasonChampionStat{{ChampionID: 103, Games: 363, Wins: 174}}, QueueStats: map[int64]gameplayAggregate{420: {QueueID: 420, Games: 78, Wins: 40, Losses: 38, WinRate: 51}, 440: {QueueID: 440, Games: 33, Wins: 12, Losses: 21, WinRate: 36}}}
+			cache := r315SeedRankCache(seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: season, AccountHash: a.storage.accountHash(Summoner{PUUID: subject}), Complete: branch != "budget-newer-snapshot", HeadCheckedAt: time.Now(), HeadGameID: 420, UpdatedAt: time.Now(), Stats: []gameplaySeasonChampionStat{{ChampionID: 103, Games: 363, Wins: 174}}, QueueStats: map[int64]gameplayAggregate{420: {QueueID: 420, Games: 78, Wins: 40, Losses: 38, WinRate: 51}, 440: {QueueID: 440, Games: 33, Wins: 12, Losses: 21, WinRate: 36}}})
 			if branch == "budget-newer-snapshot" {
 				cache.Stats = nil
 				cache.QueueStats = nil
@@ -147,7 +147,7 @@ func TestR312TruncatedRankRecordOverviewPaths(t *testing.T) {
 				if !got.SeasonStatsProgress.RankedComplete {
 					t.Fatalf("final progress is incomplete: %+v", got.SeasonStatsProgress)
 				}
-				expected := map[string][3]int{"RANKED_SOLO_5x5": {49, 47, 51}, "RANKED_FLEX_SR": {12, 21, 36}}
+				expected := map[string][3]int{"RANKED_SOLO_5x5": {40, 38, 51}, "RANKED_FLEX_SR": {12, 21, 36}}
 				if len(got.Ranks) != 2 {
 					t.Fatalf("ranks=%+v", got.Ranks)
 				}

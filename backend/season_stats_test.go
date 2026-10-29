@@ -493,8 +493,8 @@ func TestSeasonRecordRankedMatchMirrorsMayhemCriteriaAndRecordsAugmentSample(t *
 // 工单原文要求 7→8；并行 R117 会话已经占用了 8（K/D/A 改逐场均值），
 // 所以本轮实际是 8→9，用户已裁决顺延。
 func TestSeasonStatsSchemaVersionIsFifteenAndPreservesEveryOlderFile(t *testing.T) {
-	if seasonStatsCacheSchemaVersion != 15 {
-		t.Fatalf("seasonStatsCacheSchemaVersion = %d, want 15", seasonStatsCacheSchemaVersion)
+	if seasonStatsCacheSchemaVersion != 16 {
+		t.Fatalf("seasonStatsCacheSchemaVersion = %d, want 16", seasonStatsCacheSchemaVersion)
 	}
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	for _, old := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14} {

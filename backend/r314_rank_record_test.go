@@ -2,18 +2,16 @@ package main
 
 import "testing"
 
+// R315 replaces the superseded even-fill policy with observed split results.
 func TestR314MissingSeasonLossesUseEvenFill(t *testing.T) {
-	for _, c := range []struct {
-		official, w, l, wantW, wantL, rate int
-		unknown                            bool
-	}{
-		{49, 20, 31, 49, 60, 45, false}, {154, 85, 98, 154, 167, 48, false},
-		{178, 177, 180, 177, 180, 50, false}, {11, 11, 15, 11, 15, 42, false},
-		{49, 3, 2, 49, 0, -1, true}, {49, 0, 12, 49, 61, 45, false},
-	} {
-		v := estimateSeasonRankRecord(c.official, gameplayAggregate{Games: c.w + c.l, Wins: c.w, Losses: c.l, WinRate: c.rate}, c.w+c.l)
-		if v.wins != c.wantW || v.losses != c.wantL || v.winRate != c.rate || v.lossUnknown != c.unknown {
-			t.Errorf("%+v: got %+v", c, v)
+	for _, c := range []struct{ official, w, l, rate int }{{49, 11, 18, 38}, {154, 35, 45, 44}, {49, 3, 2, 60}, {49, 0, 12, 0}, {49, 0, 0, -1}} {
+		snapshot := seasonRankRecordSnapshot{progress: seasonStatsProgress{RankedComplete: true}}
+		for i := 0; i < c.w+c.l; i++ {
+			snapshot.ranked = append(snapshot.ranked, seasonRankedMatch{CreatedAt: rankSplitStart, QueueID: 420, Win: i < c.w})
+		}
+		out, _ := (&app{}).applySeasonRankWinRateFallback([]gameplayRank{{QueueType: "RANKED_SOLO_5x5", Wins: c.official, WinRate: -1}}, EndpointCapability{}, snapshot)
+		if r := out[0]; r.Wins != c.w || r.Losses != c.l || r.WinRate != c.rate || r.RecordPending {
+			t.Fatalf("%+v: %+v", c, r)
 		}
 	}
 }

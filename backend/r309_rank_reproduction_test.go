@@ -27,7 +27,7 @@ func TestR309RankRecordOverviewPaths(t *testing.T) {
 			}
 			subject := strings.Repeat("o", 48)
 			season, _ := currentRankedSeason(time.Now())
-			cache := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: season, AccountHash: a.storage.accountHash(Summoner{PUUID: subject}), Complete: branch != "budget-newer-snapshot", HeadCheckedAt: time.Now(), HeadGameID: 420, UpdatedAt: time.Now(), Stats: []gameplaySeasonChampionStat{{ChampionID: 103, Games: 363, Wins: 174}}, QueueStats: map[int64]gameplayAggregate{420: {QueueID: 420, Games: 330, Wins: 162, Losses: 168, WinRate: 49}, 440: {QueueID: 440, Games: 33, Wins: 12, Losses: 21, WinRate: 36}}}
+			cache := r315SeedRankCache(seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: season, AccountHash: a.storage.accountHash(Summoner{PUUID: subject}), Complete: branch != "budget-newer-snapshot", HeadCheckedAt: time.Now(), HeadGameID: 420, UpdatedAt: time.Now(), Stats: []gameplaySeasonChampionStat{{ChampionID: 103, Games: 363, Wins: 174}}, QueueStats: map[int64]gameplayAggregate{420: {QueueID: 420, Games: 330, Wins: 162, Losses: 168, WinRate: 49}, 440: {QueueID: 440, Games: 33, Wins: 12, Losses: 21, WinRate: 36}}})
 			if branch == "budget-newer-snapshot" {
 				cache.Stats = nil
 				cache.QueueStats = nil

@@ -8,7 +8,7 @@ test('R286 paused rank is explicit, then ranked completion fills without mayhem 
  const render=()=>f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab);
  for(let i=0;i<3;i++){const html=render();assert(html.includes('7胜 · 统计已暂停'));assert(!html.includes('正在统计中'));assert(html.includes('胜率暂不可用'));assert(html.includes('官方战绩服务暂时中断，恢复后自动继续统计'));}
  assert.equal(reports.length,1);assert.equal(reports[0].queue,'solo');assert.equal(reports[0].state,'paused');
- await f.refreshSeasonSummary(tab,{seasonStatsProgress:{season:'S26',complete:false,rankedComplete:true,collecting:true},seasonQueueStats:{420:{games:10,wins:7,losses:3,winRate:70}}});
+ await f.refreshSeasonSummary(tab,{ranks:[{...rank,wins:7,losses:3,winRate:70,recordSource:'season',recordPending:false}],seasonStatsProgress:{season:'S26',complete:false,rankedComplete:true,collecting:true},seasonQueueStats:{420:{games:10,wins:7,losses:3,winRate:70}}});
  assert(render().includes('7胜 3负'));assert.equal(reports.length,2);assert.equal(reports[1].state,'known');
 });
 test('R286 recovery refreshes every paused Tencent tab including hidden tabs without changing history cursor',()=>{

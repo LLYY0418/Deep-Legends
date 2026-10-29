@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -20,51 +21,41 @@ func (s seasonRankRecordSnapshot) withBranch(branch string) seasonRankRecordSnap
 	return s
 }
 
-type seasonRankRecordValue struct {
-	awaitingAbsorption                                  bool
-	wins, losses, winRate, games, scanned, upstreamWins int
-	sampleWins, sampleLosses                            int
-	estimated, lossUnknown                              bool
+type sgpRankedSeason struct {
+	CurrentSeasonID    int   `json:"currentSeasonId"`
+	CurrentSeasonStart int64 `json:"currentSeasonStart"`
+	CurrentSeasonEnd   int64 `json:"currentSeasonEnd"`
+	NextSeasonStart    int64 `json:"nextSeasonStart"`
 }
 
-// One-win upstream lag is treated as a complete scan (178 vs 177/180).
-// Larger gaps use official season wins and the immutable observed sample.
-func estimateSeasonRankRecord(official int, aggregate gameplayAggregate, scanned int) seasonRankRecordValue {
-	v := seasonRankRecordValue{wins: aggregate.Wins, losses: aggregate.Losses, winRate: aggregate.WinRate, games: aggregate.Games, scanned: scanned, upstreamWins: official, sampleWins: aggregate.Wins, sampleLosses: aggregate.Losses}
-	if official <= aggregate.Wins || official == aggregate.Wins+1 && aggregate.Wins > 0 && aggregate.Games >= 10 {
-		return v
+const rankSplitStart int64 = 1785351600000
+const rankSplitEnd int64 = 1799247600000
+
+func resolveRankSplit(season sgpRankedSeason, now time.Time) (int64, string) {
+	if season.CurrentSeasonStart > 0 {
+		return season.CurrentSeasonStart, "sgp"
 	}
-	v.wins = official
-	v.estimated = true
-	if aggregate.Games < 10 {
-		v.losses = 0
-		v.winRate = -1
-		v.lossUnknown = true
-		return v
+	if now.UnixMilli() < rankSplitEnd {
+		return rankSplitStart, "constant"
 	}
-	v.losses = aggregate.Losses + (official - aggregate.Wins)
-	v.winRate = int(math.Round(float64(v.wins) * 100 / float64(v.wins+v.losses)))
-	return v
+	_, start := currentRankedSeason(now)
+	return start.UnixMilli(), "season"
 }
-func advanceSeasonRankRecord(v seasonRankRecordValue, official int) seasonRankRecordValue {
-	delta := official - v.upstreamWins
-	// Only a genuinely truncated record uses the official increment. Exact
-	// records retain the prior sample until the aggregate absorbs the new game.
-	if v.estimated && delta > 0 {
-		v.wins += delta
-		if !v.lossUnknown {
-			v.winRate = int(math.Round(float64(v.wins) * 100 / float64(v.wins+v.losses)))
+func (a *app) rememberRankSplits(player string, seasons map[string]sgpRankedSeason) {
+	a.rankRecordMu.Lock()
+	defer a.rankRecordMu.Unlock()
+	if a.rankSplitWindows == nil {
+		a.rankSplitWindows = map[string]map[string]sgpRankedSeason{}
+	}
+	if _, exists := a.rankSplitWindows[player]; !exists && len(a.rankSplitWindows) >= 64 {
+		for key := range a.rankSplitWindows {
+			delete(a.rankSplitWindows, key)
+			break
 		}
 	}
-	v.upstreamWins = official
-	return v
+	a.rankSplitWindows[player] = seasons
 }
 
-type seasonRankRecordPlayer struct {
-	season  string
-	touched uint64
-	queues  map[int64]seasonRankRecordValue
-}
 type rankedRecordBucket struct {
 	event  map[string]any
 	minute time.Time
@@ -81,155 +72,74 @@ func rankRecordQueue(queue string) (int64, string) {
 	return 0, ""
 }
 
-// applySeasonRankWinRateFallback is the sole record resolver. A cached derived
-// record is reusable only while upstream wins and the season still agree.
+// The backend alone resolves CN records from complete, timestamped history.
+// Upstream annual wins never participate in the current split's counts.
 func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability EndpointCapability, snapshot seasonRankRecordSnapshot) ([]gameplayRank, EndpointCapability) {
 	ranks = append([]gameplayRank(nil), ranks...)
 	a.rankRecordMu.Lock()
-	if a.rankRecordCache == nil {
-		a.rankRecordCache = make(map[string]*seasonRankRecordPlayer)
+	seasons := a.rankSplitWindows[snapshot.player]
+	a.rankRecordMu.Unlock()
+	records := snapshot.ranked
+	if snapshot.progress.rankRecords != nil {
+		records = snapshot.progress.rankRecords
 	}
-	var cached *seasonRankRecordPlayer
-	if snapshot.player != "" {
-		cached = a.rankRecordCache[snapshot.player]
-		if cached != nil && cached.season != snapshot.progress.Season {
-			delete(a.rankRecordCache, snapshot.player)
-			cached = nil
-		}
-		allUpstream := true
-		for _, rank := range ranks {
-			if rank.WinRate < 0 || rank.seasonFallback {
-				allUpstream = false
-				break
-			}
-		}
-		if allUpstream {
-			delete(a.rankRecordCache, snapshot.player)
-			cached = nil
-		} else {
-			if cached == nil {
-				if len(a.rankRecordCache) >= 64 {
-					oldest := ""
-					var touched uint64
-					for key, value := range a.rankRecordCache {
-						if oldest == "" || value.touched < touched {
-							oldest, touched = key, value.touched
-						}
-					}
-					delete(a.rankRecordCache, oldest)
-				}
-				cached = &seasonRankRecordPlayer{season: snapshot.progress.Season, queues: make(map[int64]seasonRankRecordValue)}
-				a.rankRecordCache[snapshot.player] = cached
-			}
-			a.rankRecordClock++
-			cached.touched = a.rankRecordClock
-		}
-	}
-	filled, games, wins, losses := 0, 0, 0, 0
-	diagnostics := []map[string]any{}
 	for i := range ranks {
 		rank := &ranks[i]
 		queue, label := rankRecordQueue(rank.QueueType)
 		if queue == 0 {
 			continue
 		}
-		officialWins := rank.Wins
-		if rank.seasonFallback {
-			officialWins = rank.OfficialWins
-		}
-		rank.OfficialWins = officialWins
-		winsDelta := 0
-		upstreamComplete := rank.WinRate >= 0 && !rank.seasonFallback
+		cn := rank.countryRank || strings.Contains(snapshot.player, "|") && tencentServerName(strings.SplitN(snapshot.player, "|", 2)[0]) != ""
+		upstreamComplete := rank.WinRate >= 0 && !rank.seasonFallback && !cn
 		rank.RecordSource = "upstream"
 		rank.RecordPending = false
-		rank.RecordEstimated, rank.RecordLossUnknown = false, false
 		if upstreamComplete {
-			if cached != nil {
-				delete(cached.queues, queue)
-			}
-		} else {
-			rank.RecordSource = "none"
-			aggregate, exists := snapshot.byQueue[queue]
-			rank.RecordPending = !snapshot.progress.RankedComplete || snapshot.progress.Paused || snapshot.byQueue == nil && snapshot.progress.Scanned > 0
-			var value seasonRankRecordValue
-			source := ""
-			previous, known := seasonRankRecordCached(cached, queue)
-			if known {
-				// An older upstream response must not lower the increment
-				// baseline and then count the same official win a second time.
-				if officialWins < previous.upstreamWins && aggregate.Games <= previous.games {
-					officialWins = previous.upstreamWins
-					rank.OfficialWins = officialWins
+			continue
+		}
+		start, source := resolveRankSplit(seasons[rank.QueueType], time.Now())
+		rank.RecordSplitStart, rank.RecordSplitSource = start, source
+		if !rank.seasonFallback {
+			rank.OfficialWins = rank.Wins
+		}
+		rank.Wins, rank.Losses, rank.WinRate = 0, 0, -1
+		rank.RecordSource = "none"
+		rank.seasonFallback = true
+		rank.RecordPending = !snapshot.progress.RankedComplete || snapshot.progress.Paused
+		games := 0
+		if !rank.RecordPending {
+			seen := map[int64]bool{}
+			for _, match := range records {
+				if match.QueueID != queue || match.CreatedAt < start {
+					continue
 				}
-				winsDelta = officialWins - previous.upstreamWins
-			}
-			absorbed := known && (aggregate.Games > previous.games || winsDelta != 0 && aggregate.Wins-previous.sampleWins == winsDelta)
-			if known && (snapshot.progress.Paused || !snapshot.progress.RankedComplete || !exists || aggregate.Games < previous.games || previous.awaitingAbsorption && aggregate.Games == previous.games && aggregate.Wins == previous.sampleWins && aggregate.Losses == previous.sampleLosses || winsDelta != 0 && !absorbed) {
-				value, source = advanceSeasonRankRecord(previous, officialWins), "season-cache"
-				if winsDelta != 0 && !absorbed {
-					value.awaitingAbsorption = true
+				if match.GameID > 0 && seen[match.GameID] {
+					continue
 				}
-			} else if snapshot.progress.RankedComplete && exists && aggregate.Games > 0 {
-				// The same sample is idempotent even after official wins advance.
-				if known && aggregate.Games == previous.games && aggregate.Wins == previous.sampleWins && aggregate.Losses == previous.sampleLosses {
-					value = advanceSeasonRankRecord(previous, officialWins)
+				seen[match.GameID] = true
+				games++
+				if match.Win {
+					rank.Wins++
 				} else {
-					value = estimateSeasonRankRecord(officialWins, aggregate, snapshot.progress.Scanned)
+					rank.Losses++
 				}
-				source = "season"
-				if cached != nil {
-					cached.queues[queue] = value
-				}
-			} else if known {
-				value, source = previous, "season-cache"
 			}
-			if source != "" {
-				if cached != nil {
-					cached.queues[queue] = value
-				}
-				rank.RecordEstimated, rank.RecordLossUnknown = value.estimated, value.lossUnknown
-				rank.RecordSampleWins, rank.RecordSampleLosses, rank.RecordSampleGames = value.sampleWins, value.sampleLosses, value.games
-				rank.Wins, rank.Losses, rank.WinRate = value.wins, value.losses, value.winRate
-				rank.seasonFallback = true
-				rank.RecordSource = source
-				rank.RecordPending = false
-				filled++
-				games += value.games
-				wins += value.wins
-				losses += value.losses
+			rank.RecordSource = "season"
+			if games > 0 {
+				rank.WinRate = int(math.Round(float64(rank.Wins) * 100 / float64(games)))
 			}
+			capability.Detail = "国服排位显示当前赛段已读取的胜负"
 		}
 		branch := snapshot.branch
 		if branch == "" {
 			branch = "normal"
 		}
-		filledBy := rank.RecordSource
-		if filledBy == "upstream" {
-			filledBy = "none"
-		}
-		diagnostics = append(diagnostics, map[string]any{"event": "ranked_record_resolved", "branch": branch, "queue": label, "upstream_complete": upstreamComplete, "filled_by": filledBy, "progress_complete": snapshot.progress.RankedComplete, "pending": rank.RecordPending, "estimated": rank.RecordEstimated, "cache_reused": rank.RecordSource == "season-cache", "wins_delta": winsDelta})
-	}
-	a.rankRecordMu.Unlock()
-	for _, event := range diagnostics {
-		a.recordDiagnostic(event)
-	}
-	if filled > 0 {
-		capability.Detail = "上游未返回排位负场，已按赛季战绩聚合补全胜率"
-		a.recordDiagnostic(map[string]any{"event": "sgp_ranked_stats_season_fallback", "ranks_filled": filled, "games": games, "wins": wins, "losses": losses})
+		a.recordDiagnostic(map[string]any{"event": "ranked_record_resolved", "branch": branch, "queue": label, "upstream_complete": false, "filled_by": rank.RecordSource, "progress_complete": snapshot.progress.RankedComplete, "pending": rank.RecordPending, "split_start": time.UnixMilli(start).UTC().Format(time.RFC3339), "split_source": source, "split_games": games})
 	}
 	return ranks, capability
 }
 
-func seasonRankRecordCached(player *seasonRankRecordPlayer, queue int64) (seasonRankRecordValue, bool) {
-	if player == nil {
-		return seasonRankRecordValue{}, false
-	}
-	value, ok := player.queues[queue]
-	return value, ok
-}
-
 func (a *app) aggregateRankedRecordDiagnostic(event map[string]any, now time.Time) {
-	key := fmt.Sprint(event["branch"], "|", event["queue"], "|", event["upstream_complete"], "|", event["filled_by"], "|", event["progress_complete"], "|", event["pending"], "|", event["cache_reused"], "|", event["wins_delta"], "|", event["estimated"])
+	key := fmt.Sprint(event["branch"], "|", event["queue"], "|", event["upstream_complete"], "|", event["filled_by"], "|", event["progress_complete"], "|", event["pending"], "|", event["cache_reused"], "|", event["wins_delta"], "|", event["split_source"], "|", event["split_start"], "|", event["split_games"])
 	minute := now.UTC().Truncate(time.Minute)
 	var previous map[string]any
 	a.rankRecordMu.Lock()

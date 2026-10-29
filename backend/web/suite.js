@@ -40,9 +40,10 @@
   const phaseOrder = ["Lobby", "Matchmaking", "ReadyCheck", "ChampSelect", "InProgress", "EndOfGame"];
   const phaseNames = { Lobby: "房间", Matchmaking: "匹配中", ReadyCheck: "确认对局", ChampSelect: "英雄选择", InProgress: "游戏中", Reconnect: "重连", EndOfGame: "结算" };
   const sourceNames = { grant: "奖励账本", mission: "任务", event: "事件中心" };
+  for(const key of ["suite-tab","suite-scroll"]){try{localStorage.removeItem(`lol-loot-${key}`);}catch(_){}}
   const state = {
-    tab: readPreference("suite-tab", "watch"),
-    scroll: readJSONPreference("suite-scroll", {}),
+    tab: "watch",
+    scroll: {},
     connected: null,
     eventStream: null,
     active: false,
@@ -82,19 +83,6 @@
     champSelectPositionIDs: null,
     champSelectPositionCache: new Map(),
   };
-
-  function readPreference(key, fallback) {
-    try { return localStorage.getItem(`lol-loot-${key}`) || fallback; } catch (_) { return fallback; }
-  }
-
-  function writePreference(key, value) {
-    try { localStorage.setItem(`lol-loot-${key}`, String(value)); } catch (_) {}
-  }
-
-  function readJSONPreference(key, fallback) {
-    try { return JSON.parse(localStorage.getItem(`lol-loot-${key}`) || "null") || fallback; } catch (_) { return fallback; }
-  }
-
 
   function toast(message) {
     if (typeof window.deepLegendsToast === "function") window.deepLegendsToast(message);
@@ -247,11 +235,9 @@
     if (state.tab !== name) {
       if(state.tab === "config")window.deepLegendsAutoConfig?.flushDraft();
       state.scroll[state.tab] = Number(appScroll?.scrollTop || 0);
-      state.scroll[name] = 0;
-      writePreference("suite-scroll", JSON.stringify(state.scroll));
+      state.scroll[name] ??= 0;
     }
     state.tab = name;
-    writePreference("suite-tab", name);
     for (const tab of tabs) {
       const active = tab.dataset.suiteTab === name;
       tab.classList.toggle("is-active", active);
@@ -2183,7 +2169,6 @@
   window.addEventListener("beforeunload", () => {
     disposeSuite();
     state.scroll[state.tab] = Number(appScroll?.scrollTop || 0);
-    writePreference("suite-scroll", JSON.stringify(state.scroll));
   });
 
   setupTabs();

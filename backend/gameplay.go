@@ -330,24 +330,22 @@ type gameplayReference struct {
 }
 
 type gameplayRank struct {
-	QueueType          string `json:"queueType"`
-	QueueLabel         string `json:"queueLabel"`
-	Tier               string `json:"tier,omitempty"`
-	Division           string `json:"division,omitempty"`
-	LeaguePoints       int    `json:"leaguePoints"`
-	Wins               int    `json:"wins"`
-	OfficialWins       int    `json:"officialWins"`
-	Losses             int    `json:"losses"`
-	WinRate            int    `json:"winRate"`
-	RecordSource       string `json:"recordSource"`
-	RecordPending      bool   `json:"recordPending"`
-	RecordEstimated    bool   `json:"recordEstimated"`
-	RecordLossUnknown  bool   `json:"recordLossUnknown"`
-	RecordSampleWins   int    `json:"recordSampleWins"`
-	RecordSampleLosses int    `json:"recordSampleLosses"`
-	RecordSampleGames  int    `json:"recordSampleGames"`
-	Provisional        bool   `json:"provisional"`
-	seasonFallback     bool   // Internal provenance; never used as an LP baseline.
+	QueueType         string `json:"queueType"`
+	QueueLabel        string `json:"queueLabel"`
+	Tier              string `json:"tier,omitempty"`
+	Division          string `json:"division,omitempty"`
+	LeaguePoints      int    `json:"leaguePoints"`
+	Wins              int    `json:"wins"`
+	OfficialWins      int    `json:"officialWins"`
+	Losses            int    `json:"losses"`
+	WinRate           int    `json:"winRate"`
+	RecordSource      string `json:"recordSource"`
+	RecordPending     bool   `json:"recordPending"`
+	RecordSplitStart  int64  `json:"recordSplitStart,omitempty"`
+	RecordSplitSource string `json:"recordSplitSource,omitempty"`
+	countryRank       bool
+	Provisional       bool `json:"provisional"`
+	seasonFallback    bool // Internal provenance; never used as an LP baseline.
 }
 
 type gameplayHistoricalRank struct {
@@ -3461,6 +3459,9 @@ func (a *app) loadRanksWithFallbackRaw(ctx context.Context, client *LCUClient, p
 			}
 			lcuRanks, lcuMilestones, lcuCapability = ranks, milestones, capability
 			if !ranksHaveUnverifiedWinRate(ranks) {
+				if clientRegion == "TENCENT" && !tierScope && a.sgp != nil {
+					_, _, _, _ = a.loadSGPRanks(ctx, client, serverID, playerRef, isCurrent, privacy)
+				}
 				attempts = append(attempts, DataSourceAttempt{Source: source, Outcome: dataSourceSuccess})
 				capability.Attempts = attempts
 				a.recordRankDataSourceDecision(decision, capability, attempts)
@@ -3642,6 +3643,7 @@ func (a *app) loadSGPRanks(ctx context.Context, client *LCUClient, serverID, pla
 		}
 		return nil, nil, capability, err
 	}
+	a.rememberRankSplits(serverID+"|"+playerRef, stats.Seasons)
 	milestones := gameplayRankMilestonesFromSGP(stats)
 	ranks := make([]gameplayRank, 0, 2)
 	incompleteRecord := false
@@ -3663,7 +3665,7 @@ func (a *app) loadSGPRanks(ctx context.Context, client *LCUClient, serverID, pla
 		ranks = append(ranks, gameplayRank{
 			QueueType: entry.QueueType, QueueLabel: label, Tier: entry.Tier, Division: entry.Rank,
 			LeaguePoints: entry.LeaguePoints, Wins: entry.Wins, Losses: entry.Losses, WinRate: winRate,
-			Provisional: entry.ProvisionalGamesRemaining > 0,
+			Provisional: entry.ProvisionalGamesRemaining > 0, countryRank: true,
 		})
 	}
 	sortGameplayRanks(ranks)
@@ -3795,7 +3797,7 @@ func (a *app) loadGameplayRanksContext(ctx context.Context, client *LCUClient, p
 		if entry.QueueType == "RANKED_FLEX_SR" {
 			label = "灵活组排"
 		}
-		ranks = append(ranks, gameplayRank{QueueType: entry.QueueType, QueueLabel: label, Tier: entry.Tier, Division: entry.Division, LeaguePoints: entry.LeaguePoints, Wins: entry.Wins, Losses: entry.Losses, WinRate: winRate, Provisional: entry.IsProvisional})
+		ranks = append(ranks, gameplayRank{QueueType: entry.QueueType, QueueLabel: label, Tier: entry.Tier, Division: entry.Division, LeaguePoints: entry.LeaguePoints, Wins: entry.Wins, Losses: entry.Losses, WinRate: winRate, countryRank: isTencentClient(client), Provisional: entry.IsProvisional})
 	}
 	sortGameplayRanks(ranks)
 	capability.State = capabilityAvailable

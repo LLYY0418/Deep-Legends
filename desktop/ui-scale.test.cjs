@@ -124,7 +124,7 @@ function harness({source=mainSource, stored, storedAppearance, platform="win32",
   };
   const context=vm.createContext({
     require(name){
-      if(name==="./resize-border.cjs")return {installResizeBorder(window){assert.ok(window instanceof BrowserWindow);window.nativeResizeBound=true;return true;}};
+      if(name==="./resize-border.cjs")return {setResizeBorderReporter(){},installResizeBorder(window){assert.ok(window instanceof BrowserWindow);window.nativeResizeBound=true;return true;}};
       if(name==="electron")return electron;
       if(name==="node:fs")return fakeFs;
       if(name==="node:http")return {...require("node:http"),request(){const request=new EventEmitter();request.end=()=>{};return request;}};

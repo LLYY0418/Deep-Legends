@@ -44,6 +44,7 @@ func (a *app) refreshSeasonHead(ctx context.Context, client *LCUClient, referenc
 			}
 		}
 	}
+	known = known && (cache.Complete || cache.Streams["ranked"].Complete && cache.Streams["flex"].Complete)
 	if known {
 		cache.Paused, progress.Paused = false, false
 		progress.Collecting = !cache.Complete

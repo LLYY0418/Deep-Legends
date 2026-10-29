@@ -238,7 +238,7 @@ func newR187OverviewFixture(t *testing.T) *r187OverviewFixture {
 }
 func assertR187OverviewRank(t *testing.T, response gameplayOverview, wins, lp int) {
 	t.Helper()
-	if len(response.Ranks) != 1 || response.Ranks[0].Wins != wins || response.Ranks[0].LeaguePoints != lp {
+	if len(response.Ranks) != 1 || response.Ranks[0].OfficialWins != wins || response.Ranks[0].Wins != 0 || !response.Ranks[0].RecordPending || response.Ranks[0].LeaguePoints != lp {
 		t.Fatal(response.Ranks)
 	}
 }

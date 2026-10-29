@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {compile,escapeHTML}=require('./r188-harness.cjs');
 const source=fs.readFileSync(process.env.R309_RANK_GAMEPLAY_SOURCE||__dirname+'/gameplay.js','utf8');
 const queues=[['RANKED_SOLO_5x5',162,168,49],['RANKED_FLEX_SR',12,21,36]];
-const response=filled=>({player:{playerRef:'opaque-player',region:'cn',serverId:'HN1',gameName:'Fixture',isCurrent:false},ranks:queues.map(([queueType,wins,losses,winRate])=>({queueType,tier:'GOLD',wins,losses:filled?losses:0,winRate:filled?winRate:-1,...(filled?{recordSource:'season'}:{})})),seasonStatsProgress:{season:'S26',scanned:363,rankedComplete:true,complete:true},matches:[],pagination:{begIndex:0,count:20,hasMore:false}});
+const response=filled=>({player:{playerRef:'opaque-player',region:'cn',serverId:'HN1',gameName:'Fixture',isCurrent:false},ranks:queues.map(([queueType,wins,losses,winRate])=>({queueType,tier:'GOLD',wins,losses:filled?losses:0,winRate:filled?winRate:-1,...(filled?{recordSource:'season',recordPending:false}:{recordSource:'none',recordPending:true})})),seasonStatsProgress:{season:'S26',scanned:363,rankedComplete:true,complete:true},matches:[],pagination:{begIndex:0,count:20,hasMore:false}});
 function fixture(payloads,overrides={}){
  const state={controllers:new Map(),settings:{matchCount:20},tabs:[],overlay:[]},reports=[];
  const noop=()=>{};
@@ -16,7 +16,7 @@ function fixture(payloads,overrides={}){
  return {...f,state,reports};
 }
 test('R309 P11 completed season rank record survives initial fill and six wins-only refreshes',async()=>{
- const f=fixture([response(true),...Array.from({length:6},()=>response(false))]),tab={key:'friend',playerRef:'opaque-player',region:'cn',serverId:'HN1'};f.state.tabs=[tab];
+ const f=fixture([response(true),...Array.from({length:6},()=>response(true))]),tab={key:'friend',playerRef:'opaque-player',region:'cn',serverId:'HN1'};f.state.tabs=[tab];
  for(let i=0;i<7;i++){
   assert.equal(await f.loadOverview(tab,true,false,true),true,'overview '+i);
   const html=f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab);
@@ -26,14 +26,10 @@ test('R309 P11 completed season rank record survives initial fill and six wins-o
 
 test('R309 P11 retained records are isolated by player/season; changed wins await a fresh aggregate',()=>{
  const f=fixture([]),tab={key:'one',playerRef:'opaque-player',serverId:'HN1',data:response(true)};
- tab.data=f.acceptRankRecords(tab,tab.data,'season-fill');
- const same=f.acceptRankRecords(tab,response(false),'refresh');assert.equal(same.ranks[0].losses,168);assert.equal(f.reports[0].event,'rank_record_downgrade_blocked');
- const reopened={key:'reopened',playerRef:'opaque-player',serverId:'HN1'};assert.equal(f.acceptRankRecords(reopened,response(false),'cache').ranks[0].losses,168);
- const changed=response(false);changed.ranks[0].wins++;const next=f.acceptRankRecords(tab,changed,'refresh');assert.equal(next.ranks[0].winRate,-1);assert.equal(next.ranks[0].recordPending,true);
- const season=response(false);season.seasonStatsProgress.season='S27';assert.equal(f.acceptRankRecords(tab,season).ranks[1].winRate,-1);
- const player=response(false);player.player.playerRef='another';assert.equal(f.acceptRankRecords(tab,player).ranks[1].winRate,-1);
- const server=response(false);server.player.serverId='HN2';assert.equal(f.acceptRankRecords(tab,server).ranks[1].winRate,-1,'another server cannot inherit the previous response');
- const upstream=response(true);upstream.ranks.forEach(r=>r.recordSource='upstream');tab.data=f.acceptRankRecords(tab,upstream,'refresh');assert.equal(tab.rankRecordCause,'refresh');assert.equal(f.acceptRankRecords({serverId:'HN1'},response(false)).ranks[1].winRate,-1);
+ const pending=response(false);const result=f.acceptRankRecords(tab,pending,'refresh');assert.equal(result.ranks[0].recordPending,true);assert.equal(result.ranks[0].winRate,-1);assert.equal(result.ranks[0].losses,0);
+ for(const [field,value]of [['playerRef','another'],['serverId','HN2']]) {const other=response(false);other.player[field]=value;assert.equal(f.acceptRankRecords(tab,other).ranks[1].winRate,-1);}
+ const other=response(false);other.seasonStatsProgress.season='S27';assert.equal(f.acceptRankRecords(tab,other).ranks[1].winRate,-1);
+ result.ranks[0].wins=999;assert.equal(pending.ranks[0].wins,162,'responses are copied');
 });
 test('R309 P11 season summary ignores an in-flight response after switching server',async()=>{
  let release;const f=fixture([],{api:()=>new Promise(resolve=>{release=resolve})}),tab={key:'friend',playerRef:'opaque-player',serverId:'HN1',data:response(false)};
@@ -53,7 +49,7 @@ test('R309 P11 summary fallback deduplicates each player/season/scanned and retr
  tab.closed=true;const job=timers.values().next().value;timers.clear();job.fn();await flush();assert.equal(calls,4,'closed tabs do not retry');
 });
 test('R309 P11 summary fallback fills once without needing a completion transition',async()=>{
- let calls=0;const f=fixture([],{api:async()=>{calls++;return {seasonStatsProgress:{season:'S26',scanned:363,rankedComplete:true},seasonQueueStats:{420:{games:330,wins:162,losses:168,winRate:49},440:{games:33,wins:12,losses:21,winRate:36}}}}});
+ let calls=0;const f=fixture([],{api:async()=>{calls++;return {ranks:response(true).ranks,seasonStatsProgress:{season:'S26',scanned:363,rankedComplete:true},seasonQueueStats:{420:{games:330,wins:162,losses:168,winRate:49},440:{games:33,wins:12,losses:21,winRate:36}}}}});
  const tab={key:'one',playerRef:'opaque-player',serverId:'HN1',data:response(false)};f.ensureRankRecordFill(tab);await new Promise(setImmediate);for(let i=0;i<6;i++)f.ensureRankRecordFill(tab);assert.equal(calls,1);assert.deepEqual(tab.data.ranks.map(r=>[r.wins,r.losses,r.recordSource]),[[162,168,'season'],[12,21,'season']]);
 });
 test('R309 P11 pending record skeleton leaves tier and LP visible, expires at eight seconds, and genuine empty/current records stay explicit',t=>{
@@ -70,27 +66,15 @@ test('R309 P11 failed diagnostic delivery does not suppress the final rank trans
  const render=()=>f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab);render();render();assert.equal(reports.length,4);accepted=true;render();render();assert.equal(reports.length,6);assert(reports.every(r=>r.state==='known'&&r.source==='season'&&r.ranked_complete&&r.foreign));assert(reports.every(r=>Number.isInteger(r.render_seq)));
 });
 test('R309 P11 season summary cannot replace verified upstream records or cross a season response',async()=>{
- const f=fixture([]),tab={key:'own',playerRef:'opaque-player',data:response(true)};tab.data.ranks.forEach(r=>r.recordSource='upstream');tab.seasonRanksFilled=new Set(['420','440']);
+ const f=fixture([],{riotTab:()=>true}),tab={key:'own',playerRef:'opaque-player',data:response(true)};tab.data.ranks.forEach(r=>r.recordSource='upstream');tab.seasonRanksFilled=new Set(['420','440']);
  await f.refreshSeasonSummary(tab,{seasonStatsProgress:{season:'S26',rankedComplete:true},seasonQueueStats:{420:{games:1,wins:1,losses:0,winRate:100}}});assert.equal(tab.data.ranks[0].wins,162);assert.equal(tab.data.ranks[0].losses,168);assert.equal(tab.data.ranks[0].recordSource,'upstream');
  assert.equal(await f.refreshSeasonSummary(tab,{seasonStatsProgress:{season:'S25',rankedComplete:true},seasonQueueStats:{420:{games:1,wins:1,losses:0,winRate:100}}}),false);assert.equal(tab.data.seasonStatsProgress.season,'S26');
 });
 
 test('R312 truncated season keeps aggregate 40/38 across eleven official 49-win loads and summary fills',async()=>{
- const truncated=(filled,official=49,wins=40)=>{const data=response(filled);data.ranks[0]={...data.ranks[0],wins:filled?wins:official,officialWins:official,wins:filled?official:official,losses:filled?(47):0,winRate:filled?51:-1,recordEstimated:filled,recordSampleWins:wins,recordSampleLosses:38,recordSampleGames:wins+38,recordPending:!filled};return data;};
- const f=fixture([]),tab={key:'truncated',playerRef:'opaque-player',serverId:'HN1'};
- tab.data=f.acceptRankRecords(tab,truncated(true),'initial');
- for(let i=0;i<11;i++){
-  tab.data=f.acceptRankRecords(tab,truncated(false),'refresh');
-  assert.equal(tab.data.ranks[0].recordPending,false,'load '+i);
-  assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/49胜 47负/,'load '+i);
- }
- const reopened={key:'reopened',playerRef:'opaque-player',serverId:'HN1'};
- assert.equal(f.acceptRankRecords(reopened,truncated(false),'cache').ranks[0].losses,47);
- const pending=truncated(false,50);tab.data=f.acceptRankRecords(tab,pending,'refresh');assert.equal(tab.data.ranks[0].recordPending,true);
- await f.refreshSeasonSummary(tab,{seasonStatsProgress:pending.seasonStatsProgress,ranks:truncated(true,50,41).ranks,seasonQueueStats:{420:{games:79,wins:41,losses:38,winRate:52}}});
- assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/50胜 47负/);
- assert.equal(tab.data.ranks[0].officialWins,50);assert.equal(tab.data.ranks[0].recordPending,false);
- tab.data=f.acceptRankRecords(tab,truncated(true,50,41),'refresh');assert.equal(tab.data.ranks[0].officialWins,50);
+ const f=fixture([]),tab={key:'split',playerRef:'opaque-player',serverId:'HN1'};
+ for(let i=0;i<11;i++){const known=response(true);known.ranks[0]={...known.ranks[0],officialWins:49+i%2,wins:11,losses:18,winRate:38};tab.data=f.acceptRankRecords(tab,known,'refresh');assert.match(f.renderRanks(tab.data.ranks,[],[],[],tab.data.seasonStatsProgress,tab),/11胜 18负/);}
+ const next=response(true);next.ranks[0]={...next.ranks[0],officialWins:50,wins:12,losses:18,winRate:40};await f.refreshSeasonSummary(tab,next);assert.deepEqual([tab.data.ranks[0].wins,tab.data.ranks[0].losses],[12,18]);
 });
 
 test('R312 collecting rank record has an empty secondary line',()=>{
@@ -101,8 +85,7 @@ test('R312 collecting rank record has an empty secondary line',()=>{
 });
 
 test('R312 stale summary cannot downgrade a known aggregate or fill changed official wins from an old snapshot',async()=>{
- const f=fixture([]),tab={key:'stale',playerRef:'opaque-player',serverId:'HN1'},known=response(true);known.ranks[0]={...known.ranks[0],officialWins:50,wins:50,losses:46,winRate:52,recordEstimated:true,recordSampleWins:41,recordSampleLosses:38,recordSampleGames:79};tab.data=f.acceptRankRecords(tab,known);
- const summary=wins=>({seasonStatsProgress:known.seasonStatsProgress,seasonQueueStats:{420:{games:wins+38,wins,losses:38,winRate:51}}});await f.refreshSeasonSummary(tab,summary(40));assert.equal(tab.data.ranks[0].wins,50);assert.equal(tab.data.ranks[0].losses,46);
- const changed=response(false);changed.ranks[0].wins=51;changed.ranks[0].officialWins=51;tab.data=f.acceptRankRecords(tab,changed,'refresh');await f.refreshSeasonSummary(tab,summary(41));assert.equal(tab.data.ranks[0].recordPending,true);assert.equal(tab.data.ranks[0].winRate,-1);
- await f.refreshSeasonSummary(tab,{...summary(42),ranks:[{...known.ranks[0],officialWins:51,wins:51,losses:46,winRate:53,recordSampleWins:42,recordSampleGames:80,recordPending:false}]});assert.equal(tab.data.ranks[0].wins,51);assert.equal(tab.data.ranks[0].losses,46);assert.equal(tab.data.ranks[0].officialWins,51);assert.equal(tab.data.ranks[0].recordPending,false);
+ const f=fixture([]),tab={key:'stale',playerRef:'opaque-player',serverId:'HN1',data:response(true)};
+ const summary={ranks:[],seasonStatsProgress:tab.data.seasonStatsProgress,seasonQueueStats:{420:{games:1,wins:1,losses:0,winRate:100}}};await f.refreshSeasonSummary(tab,summary);assert.equal(tab.data.ranks[0].wins,162);assert.equal(tab.data.ranks[0].losses,168);
+ const resolved=response(true);resolved.ranks[0]={...resolved.ranks[0],wins:11,losses:18,winRate:38};await f.refreshSeasonSummary(tab,resolved);assert.equal(tab.data.ranks[0].wins,11);assert.equal(tab.data.ranks[0].losses,18);
 });

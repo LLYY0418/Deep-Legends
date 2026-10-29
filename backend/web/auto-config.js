@@ -49,8 +49,8 @@
   }
   function runeFitGeometry(width,height,hasFour=false){
     const compact=width<614,primaryWidth=(compact?(hasFour?306:284):(hasFour?346:304))*.9,columnGap=(compact?18:26)*.9,secondaryWidth=compact?Math.max(167.4,Math.min(244*.9,width-primaryWidth-columnGap)):284*.9,treeWidth=primaryWidth+secondaryWidth+columnGap;
-    const scale=Math.max(1,Math.min(width/treeWidth,height/315,1.2));
-    const f=Math.max(1,Math.min(1.4,(height/scale-56-21)/238));
+    const scale=Math.max(1,Math.min(width/treeWidth,height/315,1.3));
+    const f=Math.max(1,Math.min(1.6,(height/scale-56-21)/238));
     const bottom=238*f+21;
     let shardPitch=32*f,gap=bottom-(162*f+2.5*shardPitch+14);
     if(gap<2){gap=2;shardPitch=(bottom-162*f-gap-14)/2.5;}
@@ -304,11 +304,14 @@
       const width=Math.max(0,Math.floor(stage.getBoundingClientRect().width/zoom)-Math.max(0,stage.offsetWidth-stage.clientWidth)-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight));
       // Both offsets are document-layout coordinates, unaffected by scrolling.
       const above=layoutOffset(stage)-layoutOffset(card);
-      const height=Math.max(0,cardHeight-above-parseFloat(css.paddingTop)-23-(header?.offsetHeight||0)-parseFloat(css.rowGap||0));
+      const availableHeight=Math.max(0,cardHeight-above-parseFloat(css.paddingTop)-(header?.offsetHeight||0)-1);
+      const height=Math.max(0,availableHeight-48);
       const fit=runeFitGeometry(width,height,!!tree.querySelector(".has-4"));
       for(const [name,value]of Object.entries({"--ac-rune-scale":String(fit.scale),"--ac-rune-f":String(fit.f),"--ac-tree-height":fit.treeHeight+"px","--ac-primary-width":fit.primaryWidth+"px","--ac-secondary-width":fit.secondaryWidth+"px","--ac-column-gap":(fit.columnGap/.9)+"px","--ac-key-extra":fit.keyExtra+"px","--ac-minor-extra":fit.minorExtra+"px","--ac-sub-extra":fit.subExtra+"px","--ac-shard-extra":fit.shardExtra+"px","--ac-sub-shard-gap":fit.subShardGap+"px"}))if(stage.style.getPropertyValue(name)!==value)stage.style.setProperty(name,value);
-      const bottomGap=(card.getBoundingClientRect().bottom-tree.getBoundingClientRect().bottom)/zoom,signature=JSON.stringify([width,height,fit.scale,fit.f,bottomGap]);
-      if(signature!==lastFitSignature){lastFitSignature=signature;const minute=Math.floor(Date.now()/60000);if(minute!==fitMinute){fitMinute=minute;fitCount=0;}if(fitCount<10){fitCount++;window.reportFlowDiagnostic?.("rune_fit_layout",layoutReason,{width,height,scale:fit.scale,f:fit.f,bottom_gap:bottomGap});}}
+      const gap=Math.max(24,(availableHeight-fit.treeHeight)/2);
+      tree.style.marginTop=`${gap-parseFloat(css.rowGap||0)}px`;
+      const topGap=(tree.getBoundingClientRect().top-header.getBoundingClientRect().bottom)/zoom,bottomGap=(card.getBoundingClientRect().bottom-1*zoom-tree.getBoundingClientRect().bottom)/zoom,signature=JSON.stringify([width,height,fit.scale,fit.f,bottomGap]);
+      if(signature!==lastFitSignature){lastFitSignature=signature;const minute=Math.floor(Date.now()/60000);if(minute!==fitMinute){fitMinute=minute;fitCount=0;}if(fitCount<10){fitCount++;window.reportFlowDiagnostic?.("rune_fit_layout",layoutReason,{width,height,scale:fit.scale,f:fit.f,top_gap:topGap,bottom_gap:bottomGap});}}
     }
     // CSS dimensions include the scale, so tracks follow actual row centers.
     const updates=[];
@@ -499,11 +502,11 @@
     return height;
   }
   function metrics(){fillBody();const n=document.getElementById("suite-config-configured"),a=document.getElementById("suite-config-applied");if(n)n.textContent=String(Object.keys(S.settings?.champions||{}).filter(hasConfig).length);if(a)a.textContent=`${Object.values(S.runtime.results||{}).filter(v=>v==="applied").length}/3`;}
-  let tooltip=null,tipAnchor=null;
-  function hideTip(){if(tipAnchor)tipAnchor.removeAttribute("aria-describedby");tipAnchor=null;tooltip?.remove();tooltip=null;}
-  function showTip(node){if(!node?.dataset.acTooltip)return;hideTip();tipAnchor=node;tooltip=document.createElement("div");tooltip.id="auto-config-tooltip";tooltip.className="ac-tip is-on";tooltip.setAttribute("role","tooltip");const [name,...body]=node.dataset.acTooltip.split("\n");const image=node.querySelector("img")?.getAttribute("src");const row=node.closest(".ac-row"),col=node.closest(".ac-col");const path=col?.dataset.path;const pathName=Object.keys(PATH).find(id=>PATH[id]===path);const shard=row?.classList.contains("is-shard"),where=shard?"属性碎片":row?`${style(+pathName)?.name||""} · ${row.classList.contains("is-key")?"基石":"小符文"}`:"";tooltip.innerHTML=`<div class="ac-tip-head">${image?`<img class="ac-tip-ic" src="${esc(image)}" alt="">`:""}<div><strong>${esc(name)}</strong><small>${esc(where)}</small></div></div><p>${esc(body.join("\n")).replace(/(\d+(?:\.\d+)?%?)/g,'<b class="n">$1</b>').replaceAll("\n","<br>")}</p>`;if(col)tooltip.style.setProperty("--path",getComputedStyle(shard?row.closest(".ac-group"):col).getPropertyValue("--path"));document.body.append(tooltip);node.setAttribute("aria-describedby",tooltip.id);const r=node.getBoundingClientRect(),t=tooltip.getBoundingClientRect();tooltip.style.left=`${Math.max(8,Math.min(innerWidth-t.width-8,r.x+r.width/2-t.width/2))}px`;tooltip.style.top=`${Math.max(8,r.top>t.height+12?r.top-t.height-8:Math.min(innerHeight-t.height-8,r.bottom+8))}px`;}
+  let tooltip=null,tipAnchor=null,stopTip=null;
+  function hideTip(){stopTip?.();stopTip=null;if(tipAnchor)tipAnchor.removeAttribute("aria-describedby");tipAnchor=null;tooltip?.remove();tooltip=null;}
+  function showTip(node){if(!node?.dataset.acTooltip)return;hideTip();tipAnchor=node;tooltip=document.createElement("div");tooltip.id="auto-config-tooltip";tooltip.className="ac-tip is-on";tooltip.setAttribute("role","tooltip");const [name,...body]=node.dataset.acTooltip.split("\n");const image=node.querySelector("img")?.getAttribute("src");const row=node.closest(".ac-row"),col=node.closest(".ac-col");const path=col?.dataset.path;const pathName=Object.keys(PATH).find(id=>PATH[id]===path);const shard=row?.classList.contains("is-shard"),where=shard?"属性碎片":row?`${style(+pathName)?.name||""} · ${row.classList.contains("is-key")?"基石":"小符文"}`:"";tooltip.innerHTML=`<div class="ac-tip-head">${image?`<img class="ac-tip-ic" src="${esc(image)}" alt="">`:""}<div><strong>${esc(name)}</strong><small>${esc(where)}</small></div></div><p>${esc(body.join("\n")).replace(/(\d+(?:\.\d+)?%?)/g,'<b class="n">$1</b>').replaceAll("\n","<br>")}</p>`;if(col)tooltip.style.setProperty("--path",getComputedStyle(shard?row.closest(".ac-group"):col).getPropertyValue("--path"));document.body.append(tooltip);node.setAttribute("aria-describedby",tooltip.id);const r=node.getBoundingClientRect(),t=tooltip.getBoundingClientRect();tooltip.style.left=`${Math.max(8,Math.min(innerWidth-t.width-8,r.x+r.width/2-t.width/2))}px`;tooltip.style.top=`${Math.max(8,r.top>t.height+12?r.top-t.height-8:Math.min(innerHeight-t.height-8,r.bottom+8))}px`;stopTip=window.deepLegendsFloatingLayers?.watch(node,tooltip,hideTip);}
   root.addEventListener("mouseover",e=>{const n=e.target.closest("[data-ac-tooltip]");if(n!==tipAnchor)showTip(n);});
-  root.addEventListener("mouseout",e=>{if(!tipAnchor?.contains(e.relatedTarget))hideTip();});
+  root.addEventListener("mouseout",e=>{if(!tipAnchor?.contains(e.relatedTarget)&&!tooltip?.contains(e.relatedTarget))hideTip();});
   root.addEventListener("focusin",e=>showTip(e.target.closest("[data-ac-tooltip]")));
   root.addEventListener("focusout",hideTip);root.addEventListener("keydown",e=>{if(e.key==="Escape")hideTip();});
   window.addEventListener("scroll",hideTip,true);

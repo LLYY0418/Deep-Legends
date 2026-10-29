@@ -79,7 +79,7 @@ const context = vm.createContext({ __dirname: desktop, URL, Buffer, console,
       child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
       child.stdout.setEncoding = child.stderr.setEncoding = () => {}; child.kill = () => {}; return child;
     } };
-    if (name === "./resize-border.cjs") return { installResizeBorder(window) {
+    if (name === "./resize-border.cjs") return { setResizeBorderReporter(){}, installResizeBorder(window) {
       assert.ok(window instanceof Window); window.nativeResizeBound = true; return true;
     } };
     if (name === "./share-export.cjs") return { createShareExportController: () => ({ clear() {}, getSaveDirectory: () => ({ directory }) }) };

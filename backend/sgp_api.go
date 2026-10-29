@@ -1149,11 +1149,12 @@ type sgpRankedQueue struct {
 }
 
 type sgpRankedStats struct {
-	Queues                            []sgpRankedQueue `json:"queues"`
-	HighestPreviousSeasonEndTier      string           `json:"highestPreviousSeasonEndTier"`
-	HighestPreviousSeasonEndRank      string           `json:"highestPreviousSeasonEndRank"`
-	HighestPreviousSeasonAchievedTier string           `json:"highestPreviousSeasonAchievedTier"`
-	HighestPreviousSeasonAchievedRank string           `json:"highestPreviousSeasonAchievedRank"`
+	Seasons                           map[string]sgpRankedSeason `json:"seasons"`
+	Queues                            []sgpRankedQueue           `json:"queues"`
+	HighestPreviousSeasonEndTier      string                     `json:"highestPreviousSeasonEndTier"`
+	HighestPreviousSeasonEndRank      string                     `json:"highestPreviousSeasonEndRank"`
+	HighestPreviousSeasonAchievedTier string                     `json:"highestPreviousSeasonAchievedTier"`
+	HighestPreviousSeasonAchievedRank string                     `json:"highestPreviousSeasonAchievedRank"`
 	// cherryRaw keeps the raw CHERRY entry for the R263 shape diagnostic.
 	cherryRaw   json.RawMessage
 	fameScanRaw json.RawMessage
@@ -1173,11 +1174,12 @@ func (p *sgpProvider) rankedStatsOn(ctx context.Context, client *LCUClient, serv
 		return sgpRankedStats{}, err
 	}
 	var payload struct {
-		Queues                            []json.RawMessage `json:"queues"`
-		HighestPreviousSeasonEndTier      string            `json:"highestPreviousSeasonEndTier"`
-		HighestPreviousSeasonEndRank      string            `json:"highestPreviousSeasonEndRank"`
-		HighestPreviousSeasonAchievedTier string            `json:"highestPreviousSeasonAchievedTier"`
-		HighestPreviousSeasonAchievedRank string            `json:"highestPreviousSeasonAchievedRank"`
+		Seasons                           map[string]sgpRankedSeason `json:"seasons"`
+		Queues                            []json.RawMessage          `json:"queues"`
+		HighestPreviousSeasonEndTier      string                     `json:"highestPreviousSeasonEndTier"`
+		HighestPreviousSeasonEndRank      string                     `json:"highestPreviousSeasonEndRank"`
+		HighestPreviousSeasonAchievedTier string                     `json:"highestPreviousSeasonAchievedTier"`
+		HighestPreviousSeasonAchievedRank string                     `json:"highestPreviousSeasonAchievedRank"`
 	}
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return sgpRankedStats{}, err
@@ -1192,6 +1194,7 @@ func (p *sgpProvider) rankedStatsOn(ctx context.Context, client *LCUClient, serv
 		})
 	})
 	stats := sgpRankedStats{
+		Seasons:                           payload.Seasons,
 		Queues:                            make([]sgpRankedQueue, 0, len(payload.Queues)),
 		fameScanRaw:                       append(json.RawMessage(nil), raw...),
 		HighestPreviousSeasonEndTier:      payload.HighestPreviousSeasonEndTier,

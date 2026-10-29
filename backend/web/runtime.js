@@ -270,6 +270,7 @@
     if(event==="rune_fit_layout"){
       if(!["render","resize","observer"].includes(reason))return false;
       const runeFit={};for(const key of ["width","height","scale","f","bottom_gap"]){const n=Number(fields[key]);if(!Number.isFinite(n)||n<0||n>100000)return false;runeFit[key]=n;}
+      runeFit.top_gap=Number(fields.top_gap ?? 0);if(!Number.isFinite(runeFit.top_gap)||runeFit.top_gap<0||runeFit.top_gap>100000)return false;
       const body={event,reason,runeFit},encoded=JSON.stringify(body);if(flowPending.size>=32)return false;flowPending.add(encoded);return sendFlowDiagnostic(body,encoded,0);
     }
     if(event==="window_resize_trace"){
