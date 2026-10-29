@@ -3422,8 +3422,6 @@
   }
 
   function masteryTooltipContent(item) {
-    const order = ["S+","S","S-","A+","A","A-","B+","B","B-","C+","C","C-","D+","D","D-"];
-    const grade = [...(item.milestoneGrades || [])].filter(g=>order.includes(g)).sort((a,b)=>order.indexOf(a)-order.indexOf(b))[0] || "—";
     const since = item.championPointsSinceLastLevel, until = item.championPointsUntilNextLevel;
     const required = since != null && until != null ? Math.max(0, Number(since)+Number(until)) : null;
     const date = Number(item.lastPlayTime)>0 ? new Date(Number(item.lastPlayTime)).toLocaleDateString("sv-SE") : "—";
@@ -3440,23 +3438,26 @@
 
   function bindMasteryDetails(container, data) {
     const doc=container.ownerDocument,win=doc.defaultView;
-    for (const image of container.querySelectorAll(".mastery-details-crest")) image.addEventListener("error",()=>{image.hidden=true;image.parentElement.classList.add("is-crest-missing");});
-    for (const card of container.querySelectorAll("[data-mastery-detail]")) {
-      const item = (data.items || []).find(item=>String(item.championId)===card.dataset.masteryDetail);
-      const close=()=>doc._masteryDetails?.close();
-      const open=()=>{
-        close();if(!item)return;
-        const popover=doc.createElement("div");popover.id="mastery-details-popover";popover.className="mastery-details-popover";popover.setAttribute("role","tooltip");popover.innerHTML=masteryTooltipContent(item);doc.body.append(popover);card.setAttribute("aria-describedby",popover.id);
-        for(const image of popover.querySelectorAll(".mastery-details-crest"))image.addEventListener("error",()=>{image.hidden=true;image.parentElement.classList.add("is-crest-missing");});
-        prepareImages(popover);
-        const anchor=card.getBoundingClientRect(),box=popover.getBoundingClientRect();
-        popover.style.left=`${Math.max(8,Math.min(window.innerWidth-box.width-8,anchor.left))}px`;
-        popover.style.top=`${anchor.bottom+box.height+8<=window.innerHeight ? anchor.bottom+8 : Math.max(8,anchor.top-box.height-8)}px`;
-        let stop;const dismiss=()=>{stop?.();card.removeAttribute("aria-describedby");popover.remove();doc._masteryDetails=null;};
-        doc._masteryDetails={close:dismiss};stop=win.deepLegendsFloatingLayers?.watch(card,popover,dismiss);
+    if(!doc._masteryDetails){
+      const items=new WeakMap();let anchor=null,popover=null,stop=null;
+      const close=()=>{stop?.();stop=null;anchor?.removeAttribute("aria-describedby");anchor=null;popover?.remove();popover=null;};
+      const open=card=>{
+        if(card===anchor)return;close();const item=items.get(card);if(!item)return;
+        anchor=card;popover=doc.createElement("div");popover.id="mastery-details-popover";popover.className="mastery-details-popover";popover.setAttribute("role","tooltip");popover.innerHTML=masteryTooltipContent(item);doc.body.append(popover);card.setAttribute("aria-describedby",popover.id);prepareImages(popover);
+        const rect=card.getBoundingClientRect(),box=popover.getBoundingClientRect();
+        popover.style.left=`${Math.max(8,Math.min(window.innerWidth-box.width-8,rect.left))}px`;
+        popover.style.top=`${rect.bottom+box.height+8<=window.innerHeight ? rect.bottom+8 : Math.max(8,rect.top-box.height-8)}px`;
+        stop=win.deepLegendsFloatingLayers?.watch(card,popover,close);
       };
-      card.addEventListener("mouseenter",open);card.addEventListener("mouseleave",event=>{if(!doc.querySelector('#mastery-details-popover')?.contains(event.relatedTarget))close();});card.addEventListener("focus",open);card.addEventListener("blur",close);
+      const cardOf=node=>node?.closest?.("[data-mastery-detail]");
+      doc.addEventListener("mouseenter",event=>{const card=cardOf(event.target);if(card)open(card);},true);
+      doc.addEventListener("mouseleave",event=>{if(anchor?.contains(event.target)&&!anchor.contains(event.relatedTarget)&&!popover?.contains(event.relatedTarget))close();},true);
+      doc.addEventListener("focusin",event=>{const card=cardOf(event.target);if(card?.matches(":focus-visible"))open(card);});
+      doc.addEventListener("focusout",event=>{if(anchor?.contains(event.target)&&!popover?.contains(event.relatedTarget))close();});
+      doc.addEventListener("error",event=>{const image=event.target;if(image.matches?.(".mastery-details-crest")){image.hidden=true;image.parentElement.classList.add("is-crest-missing");}},true);
+      doc._masteryDetails={items,close};
     }
+    for(const card of container.querySelectorAll("[data-mastery-detail]"))doc._masteryDetails.items.set(card,(data.items||[]).find(item=>String(item.championId)===card.dataset.masteryDetail));
   }
 
   function championTableNumber(value, digits = 1) {

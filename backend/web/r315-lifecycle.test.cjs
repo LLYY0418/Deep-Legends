@@ -36,3 +36,9 @@ test('R315 shared lifecycle keeps an interactive layer under the pointer and a k
  a.focus();assert(a.matches(':focus-visible'));w.layers.watch(a,p,()=>closed++);d.querySelector('#outside').dispatchEvent(new w.MouseEvent('pointermove',{bubbles:true}));frame();assert.equal(closed,0);d.querySelector('#outside').focus();frame();assert.equal(closed,1);
  }finally{w.layers?.closeAll();w.close();}
 });
+test('R315 mastery rebinds share one document controller and never retain an earlier card layer',()=>{
+ const dom=new JSDOM('<main><button data-mastery-detail="1">A</button><button data-mastery-detail="2">B</button></main>',{url:'http://localhost',pretendToBeVisual:true,runScripts:'outside-only'}),w=dom.window,d=w.document;
+ try{w.masteryTooltipContent=item=>`<strong>${item.championId}</strong>`;w.prepareImages=()=>{};w.eval(extract(read('gameplay.js'),'bindMasteryDetails')+';window.bind=bindMasteryDetails;');w.bind(d.querySelector('main'),{items:[{championId:1},{championId:2}]});const controller=d._masteryDetails;w.bind(d.querySelector('main'),{items:[{championId:1},{championId:2}]});assert.equal(d._masteryDetails,controller);
+ const [a,b]=d.querySelectorAll('button');a.dispatchEvent(new w.Event('mouseenter'));b.dispatchEvent(new w.Event('mouseenter'));assert.equal(d.querySelectorAll('.mastery-details-popover').length,1);assert.equal(d.querySelector('.mastery-details-popover').textContent,'2');assert(!a.hasAttribute('aria-describedby'));a.dispatchEvent(new w.Event('mouseleave'));assert.equal(d.querySelectorAll('.mastery-details-popover').length,1);b.dispatchEvent(new w.Event('mouseleave'));assert.equal(d.querySelector('.mastery-details-popover'),null);assert(!b.hasAttribute('aria-describedby'));
+ }finally{d._masteryDetails?.close();w.close();}
+});
