@@ -1,57 +1,45 @@
-name: R315 published old-client proof
+name: R315 Windows native development proof
 on:
   workflow_dispatch:
     inputs:
-      expected_fingerprint:
-        description: "Frozen 0.13.4 source fingerprint"
+      candidate_ref:
+        description: Frozen candidate source ref
         type: string
         required: true
 permissions:
   contents: read
 jobs:
-  old-client:
+  native:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_ref }}
+          path: candidate
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify and install actual published 0.13.3
-        env:
-          GH_TOKEN: ${{ github.token }}
+          cache: npm
+          cache-dependency-path: candidate/desktop/package-lock.json
+      - name: Install candidate dependencies
+        working-directory: candidate
+        run: npm ci --prefix desktop
+      - name: Build static runtime native module and inspect dumpbin dependencies
+        working-directory: candidate
+        run: node desktop/build-resize-border.cjs
+      - name: Native fallback unit contracts
+        working-directory: candidate
+        run: node --test desktop/resize-border.test.cjs
+      - name: Real Electron load, idempotence and fallback renderer
         shell: pwsh
         run: |
-          $out="$env:RUNNER_TEMP/r315-published";New-Item -ItemType Directory -Force $out|Out-Null
-          gh release download v0.13.3 --pattern '*public.exe' --pattern latest.json --dir $out
-          if($LASTEXITCODE -ne 0){throw 'actual old release download failed'}
-          $manifest=Get-Content "$out/latest.json" -Raw|ConvertFrom-Json
-          $setup=(Get-ChildItem "$out/*.exe").FullName
-          @{version=$manifest.version;sha256=(Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant();size=(Get-Item $setup).Length}|ConvertTo-Json|Set-Content "$out/old-setup-integrity.json"
-          if($manifest.version -ne '0.13.3' -or $manifest.asset.sha256 -ne 'e91f81b399fa3a790c3781fdb685d8de99c775391e67b6bb98c933b3a4ece3b6' -or (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.asset.sha256){throw 'published old Setup integrity mismatch'}
-          $install="$out/installed";New-Item -ItemType Directory -Force $install|Out-Null
-          $env:LOL_LOOT_DATA_DIR="$out/initial-data";$env:WEBVIEW2_USER_DATA_FOLDER="$out/initial-profile"
-          New-Item -ItemType Directory -Force $env:LOL_LOOT_DATA_DIR|Out-Null
-          @{automatic=$false;autoDownload=$false;mirrors=@('');preferredSource=''}|ConvertTo-Json|Set-Content "$env:LOL_LOOT_DATA_DIR/update-settings.json" -Encoding utf8
-          $p=Start-Process $setup -ArgumentList "--update --dest `"$install`"" -PassThru
-          if(-not $p.WaitForExit(180000)){Stop-Process -Id $p.Id -Force;throw 'old install timeout'};$p.WaitForExit();if($p.ExitCode -ne 0){throw 'old install failed'}
-          Get-CimInstance Win32_Process|Where-Object{$_.ExecutablePath -and $_.ExecutablePath.StartsWith($install,[StringComparison]::OrdinalIgnoreCase)}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}
-          if((Get-Item "$install/Deep Legends.exe").VersionInfo.FileVersion -ne '0.13.3'){throw 'wrong installed old client'}
-      - name: Real old UI detects public 0.13.4 without intercepted responses
-        env:
-          R315_EXPECTED_FINGERPRINT: ${{ inputs.expected_fingerprint }}
-        shell: pwsh
-        run: |
-          node scripts/r315-published-detect.cjs "$env:RUNNER_TEMP/r315-published/installed/Deep Legends.exe" "$env:RUNNER_TEMP/r315-published/proof"
-          if($LASTEXITCODE -ne 0){throw 'actual old UI did not detect public 0.13.4; do not retry'}
-          $newPayloads=@(Get-ChildItem "$env:RUNNER_TEMP/r315-published/initial-data","$env:RUNNER_TEMP/r315-published/proof/data" -Recurse -File|Where-Object{$_.Name -match '\.(exe|part)$'})
-          if($newPayloads.Count -ne 0){throw 'unexpected new installer payload; stop'}
+          node scripts/r315-native-probe.cjs "$pwd/candidate" "$env:RUNNER_TEMP/r315-native"
+          if ($LASTEXITCODE -ne 0) { throw 'native development proof failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r315-published-proof-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/r315-published/old-setup-integrity.json
-            ${{ runner.temp }}/r315-published/proof/*.json
-            ${{ runner.temp }}/r315-published/proof/*.png
+          name: r315-native-development-${{ github.run_id }}
+          path: ${{ runner.temp }}/r315-native/*.json
           if-no-files-found: error
