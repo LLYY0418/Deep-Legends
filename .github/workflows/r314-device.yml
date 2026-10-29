@@ -1,183 +1,50 @@
-name: R314 Windows real-device diagnostics
+name: R314 published old-client proof
 on:
-  push:
-    branches: [codex/diagnostic-r279-r314-device]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  baselines:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Set real native test display size
-        shell: pwsh
-        run: ./scripts/r314-display-session.ps1 -Output "$env:RUNNER_TEMP/r314-baselines/display-session.json"
-      - name: Real old versions edge pixel scans
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: pwsh
-        run: ./scripts/r314-windows-baselines.ps1 -Output "$env:RUNNER_TEMP/r314-baselines"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: r314-baselines-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/r314-baselines/**
-            !${{ runner.temp }}/r314-baselines/**/*.exe
-            !${{ runner.temp }}/r314-baselines/**/installed/**
-            !${{ runner.temp }}/r314-baselines/**/user-data/**
-            !${{ runner.temp }}/r314-baselines/**/webview-profile/**
-          if-no-files-found: error
-  browser:
+  old-client:
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Resolve real Chrome
-        shell: pwsh
-        run: |
-          $chrome=node -e "process.stdout.write(require('./scripts/r277-ci-orchestrate.cjs').chrome(process.env))"
-          "CHROME_BIN=$chrome"|Out-File $env:GITHUB_ENV -Append -Encoding utf8
-      - name: Six real browser paths and geometry
-        shell: pwsh
-        run: |
-          $env:R314_EDITOR_OUT="$env:RUNNER_TEMP/r314-browser/candidate"
-          node scripts/r314-editor-browser.cjs
-          if($LASTEXITCODE -ne 0){throw 'candidate browser failed'}
-      - name: Existing natural card layout with stable explicit zoom vectors
-        shell: pwsh
-        run: |
-          $env:R280_BROWSER_OUT="$env:RUNNER_TEMP/r314-browser/natural-layout"
-          node scripts/career-natural-layout.cjs
-          if($LASTEXITCODE -ne 0){throw 'natural card layout regression failed'}
-      - name: Baseline video sequence red
-        if: ${{ !cancelled() }}
-        shell: pwsh
-        run: |
-          $old="$env:RUNNER_TEMP/r314-browser/old-source";New-Item -ItemType Directory -Force $old|Out-Null
-          git show 74e20245:backend/web/auto-config.js|Set-Content -Encoding utf8 "$old/auto-config.js"
-          git show 74e20245:backend/web/auto-config.css|Set-Content -Encoding utf8 "$old/auto-config.css"
-          $env:R314_BASELINE_SOURCE=$old;$env:R314_EDITOR_OUT="$env:RUNNER_TEMP/r314-browser/baseline"
-          node scripts/r314-editor-browser.cjs
-          if($LASTEXITCODE -ne 0){throw 'baseline red not reproduced'}
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: r314-browser-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/r314-browser/**
-          if-no-files-found: error
-  installer:
-    runs-on: windows-latest
-    timeout-minutes: 35
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.13'
-          cache: true
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Set real native test display size
-        shell: pwsh
-        run: ./scripts/r314-display-session.ps1 -Output "$env:RUNNER_TEMP/r314-installer/display-session.json"
-      - name: Defender before and attempted realtime enable
-        shell: pwsh
-        run: |
-          $out="$env:RUNNER_TEMP/r314-installer";New-Item -ItemType Directory -Force $out|Out-Null
-          Get-MpComputerStatus|ConvertTo-Json -Depth 6|Set-Content "$out/defender-before.json"
-          if(-not (Get-MpComputerStatus).RealTimeProtectionEnabled){try{Set-MpPreference -DisableRealtimeMonitoring $false}catch{$_|Out-String|Set-Content "$out/defender-enable-error.txt"}}
-          Get-MpComputerStatus|ConvertTo-Json -Depth 6|Set-Content "$out/defender-after.json"
-      - name: Fresh checkout dependencies for real Electron probe
-        run: npm ci --prefix desktop
-      - name: Real default first-frame before packaging
-        shell: pwsh
-        env:
-          R248_ELECTRON_OUTPUT: ${{ runner.temp }}/r314-installer/first-frame
-        run: |
-          node -e "require('./scripts/r248-electron.cjs').probe({phase:'after',state:'DISABLED',frontendAssetDirectory:'default',storedBounds:{x:40,y:40,width:1050,height:750,maximized:false}}).then(r=>console.log(JSON.stringify(r.shows))).catch(e=>{console.error(e);process.exitCode=1})"
-          if($LASTEXITCODE -ne 0){throw 'fresh native first-frame probe failed'}
-      - name: Build real candidate payload
-        shell: pwsh
-        run: |
-          $cipher=(& go run ./backend -encrypt-riot-key 'RGAPI-00000000-0000-0000-0000-000000000000').Trim()
-          if($LASTEXITCODE -ne 0 -or -not $cipher){throw 'fixture cipher failed'}
-          ./build-desktop-windows.ps1 -Version 0.13.3 -KeyMode public -SkipTestsInCI -RiotAPIKeyCipher $cipher
-          if($LASTEXITCODE -ne 0){throw 'candidate build failed'}
-      - name: Native focused regressions
-        if: ${{ !cancelled() }}
-        shell: pwsh
-        run: |
-          go test ./backend -run '^TestR314' -count=1 -v|Tee-Object "$env:RUNNER_TEMP/r314-installer/backend-tests.log"
-          if($LASTEXITCODE -ne 0){throw 'native backend regression failed'}
-          Push-Location installer;try{go test ./...|Tee-Object "$env:RUNNER_TEMP/r314-installer/installer-tests.log";if($LASTEXITCODE -ne 0){throw 'native installer regression failed'}}finally{Pop-Location}
-      - name: Warmup no files and no startup log
-        shell: pwsh
-        run: |
-          $out="$env:RUNNER_TEMP/r314-installer/warmup-empty";New-Item -ItemType Directory -Force $out|Out-Null;$env:LOL_LOOT_DATA_DIR=$out
-          $log="$env:TEMP/DeepLegendsSetup-startup.log";$before=if(Test-Path $log){(Get-Item $log).Length}else{0}
-          $p=Start-Process 'dist/desktop/Deep Legends Setup 0.13.3-public.exe' -ArgumentList '--warmup' -PassThru
-          if(-not $p.WaitForExit(30000)){Stop-Process -Id $p.Id -Force;throw 'warmup timeout'};$p.WaitForExit()
-          $after=if(Test-Path $log){(Get-Item $log).Length}else{0}
-          $files=@(Get-ChildItem $out -Recurse);@{exit=$p.ExitCode;file_count=$files.Count;log_before=$before;log_after=$after}|ConvertTo-Json|Set-Content "$env:RUNNER_TEMP/r314-installer/warmup-no-effects.json"
-          if($p.ExitCode -ne 0 -or $files.Count -ne 0 -or $before -ne $after){throw 'warmup side effects'}
-          Remove-Item Env:LOL_LOOT_DATA_DIR
-      - name: A ten new files without warmup
-        if: ${{ !cancelled() }}
-        shell: pwsh
-        run: ./scripts/r314-upgrade-window.ps1 -Setup 'dist/desktop/Deep Legends Setup 0.13.3-public.exe' -Output "$env:RUNNER_TEMP/r314-installer/A" -Count 10 -WaitForPage
-      - name: B ten new files warmup then launch
-        if: ${{ !cancelled() }}
-        shell: pwsh
-        run: ./scripts/r314-upgrade-window.ps1 -Setup 'dist/desktop/Deep Legends Setup 0.13.3-public.exe' -Output "$env:RUNNER_TEMP/r314-installer/B" -Count 10 -Warmup -WaitForPage -Enforce
-      - name: C ten new published 0.13.2 files
-        if: ${{ !cancelled() }}
+      - name: Verify and install actual published 0.13.2
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $dir="$env:RUNNER_TEMP/r314-published";New-Item -ItemType Directory -Force $dir|Out-Null
-          gh release download v0.13.2 --pattern '*public.exe' --dir $dir
-          if($LASTEXITCODE -ne 0){throw 'baseline download failed'}
-          ./scripts/r314-upgrade-window.ps1 -Setup (Get-ChildItem "$dir/*.exe").FullName -Output "$env:RUNNER_TEMP/r314-installer/C" -Count 10 -WaitForPage
-      - name: Candidate pixel edge scan
-        if: ${{ !cancelled() }}
+          $out="$env:RUNNER_TEMP/r314-published";New-Item -ItemType Directory -Force $out|Out-Null
+          gh release download v0.13.2 --pattern '*public.exe' --pattern latest.json --dir $out
+          if($LASTEXITCODE -ne 0){throw 'actual old release download failed'}
+          $manifest=Get-Content "$out/latest.json" -Raw|ConvertFrom-Json
+          $setup=(Get-ChildItem "$out/*.exe").FullName
+          @{version=$manifest.version;sha256=(Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant();size=(Get-Item $setup).Length}|ConvertTo-Json|Set-Content "$out/old-setup-integrity.json"
+          if($manifest.version -ne '0.13.2' -or $manifest.asset.sha256 -ne '26cd82b1b6ee8f904f67231244d3d64c5900df463e4da9e8cdcc4cf59e45713e' -or (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.asset.sha256){throw 'published old Setup integrity mismatch'}
+          $install="$out/installed";New-Item -ItemType Directory -Force $install|Out-Null
+          $env:LOL_LOOT_DATA_DIR="$out/initial-data";$env:WEBVIEW2_USER_DATA_FOLDER="$out/initial-profile"
+          New-Item -ItemType Directory -Force $env:LOL_LOOT_DATA_DIR|Out-Null
+          @{automatic=$false;autoDownload=$false;mirrors=@('');preferredSource=''}|ConvertTo-Json|Set-Content "$env:LOL_LOOT_DATA_DIR/update-settings.json" -Encoding utf8
+          $p=Start-Process $setup -ArgumentList "--update --dest `"$install`"" -PassThru
+          if(-not $p.WaitForExit(180000)){Stop-Process -Id $p.Id -Force;throw 'old install timeout'};$p.WaitForExit();if($p.ExitCode -ne 0){throw 'old install failed'}
+          Get-CimInstance Win32_Process|Where-Object{$_.ExecutablePath -and $_.ExecutablePath.StartsWith($install,[StringComparison]::OrdinalIgnoreCase)}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}
+          if((Get-Item "$install/Deep Legends.exe").VersionInfo.FileVersion -ne '0.13.2'){throw 'wrong installed old client'}
+      - name: Real old UI detects public 0.13.3 without intercepted responses
         shell: pwsh
         run: |
-          $env:RIOT_API_KEY='RGAPI-00000000-0000-0000-0000-000000000000'
-          $install="$env:RUNNER_TEMP/r314-installer/edge-installed";New-Item -ItemType Directory -Force $install|Out-Null
-          $env:LOL_LOOT_DATA_DIR="$env:RUNNER_TEMP/r314-installer/edge-install-data";$env:WEBVIEW2_USER_DATA_FOLDER="$env:RUNNER_TEMP/r314-installer/edge-install-profile"
-          $p=Start-Process 'dist/desktop/Deep Legends Setup 0.13.3-public.exe' -ArgumentList "--update --dest `"$install`"" -PassThru
-          if(-not $p.WaitForExit(180000)){Stop-Process -Id $p.Id -Force;throw 'candidate install timeout'};$p.WaitForExit();if($p.ExitCode -ne 0){throw 'candidate install failed'}
-          Get-CimInstance Win32_Process|Where-Object{$_.ExecutablePath -and $_.ExecutablePath.StartsWith($install,[StringComparison]::OrdinalIgnoreCase)}|ForEach-Object{if($_.ProcessId -gt 0){Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}}
-          Remove-Item Env:WEBVIEW2_USER_DATA_FOLDER -ErrorAction SilentlyContinue
-          node scripts/r314-windows-edges.cjs "$install/Deep Legends.exe" "$env:RUNNER_TEMP/r314-installer/edges" 0.13.3
-          if($LASTEXITCODE -ne 0){throw 'candidate scan failed'}
+          node scripts/r314-published-detect.cjs "$env:RUNNER_TEMP/r314-published/installed/Deep Legends.exe" "$env:RUNNER_TEMP/r314-published/proof"
+          if($LASTEXITCODE -ne 0){throw 'actual old UI did not detect public 0.13.3; do not retry'}
+          $newPayloads=@(Get-ChildItem "$env:RUNNER_TEMP/r314-published/initial-data","$env:RUNNER_TEMP/r314-published/proof/data" -Recurse -File|Where-Object{$_.Name -match '\.(exe|part)$'})
+          if($newPayloads.Count -ne 0){throw 'unexpected new installer payload; stop'}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r314-installer-${{ github.run_id }}-${{ github.run_attempt }}
+          name: r314-published-proof-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/r314-installer/**
-            !${{ runner.temp }}/r314-installer/**/*.exe
-            !${{ runner.temp }}/r314-installer/edge-installed/**
-            !${{ runner.temp }}/r314-installer/edge-install-data/**
-            !${{ runner.temp }}/r314-installer/edge-install-profile/**
-            !${{ runner.temp }}/r314-installer/**/data/**
-            !${{ runner.temp }}/r314-installer/**/user-data/**
-            !${{ runner.temp }}/r314-installer/**/webview-profile/**
+            ${{ runner.temp }}/r314-published/old-setup-integrity.json
+            ${{ runner.temp }}/r314-published/proof/*.json
+            ${{ runner.temp }}/r314-published/proof/*.png
           if-no-files-found: error
