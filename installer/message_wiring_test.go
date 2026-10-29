@@ -134,6 +134,7 @@ w.startupTimer.Stop()
 a.pageReady = true
 w.starting = false
 w.webviewReady = true
+a.timing.mark("first_frame")
 a.timing.mark("webview_ready")
 log.Print("installer page ready; WebView visible")
 if a.options.Update {

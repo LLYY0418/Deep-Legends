@@ -36,9 +36,7 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 	if err != nil {
 		return fmt.Errorf("prepare installer document: %w", err)
 	}
-	_ = os.Setenv("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FF0B0E14")
-	chromium := edge.NewChromium()
-	chromium.DataPath = filepath.Join(os.Getenv("LOCALAPPDATA"), "Temp", "DeepLegendsSetup.WebView2")
+	chromium := newInstallerChromium()
 	chromium.MessageCallback = func(raw string) { w.dispatch(func() { a.onMessage(raw) }) }
 	w.chromium = chromium
 	log.Print("WebView environment/controller initialization")
@@ -265,4 +263,15 @@ func (a *installerApp) recoverFailedUpdate() {
 	a.parentExited, recovered = recoverAcknowledgedUpdate(a.options, a.meta.ExeName, a.ackSent, a.parentExited, a.waitParent, startApplication)
 	a.recoveryAttempted = a.parentExited
 	log.Printf("update recovery attempted=%t recovered=%t", a.recoveryAttempted, recovered)
+}
+
+// Warmup and update share the exact profile and environment configuration.
+func newInstallerChromium() *edge.Chromium {
+	_ = os.Setenv("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FF0B0E14")
+	chromium := edge.NewChromium()
+	chromium.DataPath = os.Getenv("WEBVIEW2_USER_DATA_FOLDER")
+	if chromium.DataPath == "" {
+		chromium.DataPath = filepath.Join(os.Getenv("LOCALAPPDATA"), "Temp", "DeepLegendsSetup.WebView2")
+	}
+	return chromium
 }

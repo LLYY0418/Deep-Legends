@@ -26,10 +26,10 @@ try {
   $trial=Join-Path $Output "trial-$i";New-Item -ItemType Directory -Force $trial | Out-Null
   # A distinct newly written file for every sample, never reused across trials.
   $trialSetup=Join-Path $trial ('Setup-'+[Guid]::NewGuid().ToString('N')+'.exe');Copy-Item $setupPath $trialSetup
-  $warmMs=$null
-  if($Warmup){$warmWatch=[Diagnostics.Stopwatch]::StartNew();$warm=Start-Process -FilePath $trialSetup -ArgumentList '--warmup' -PassThru -WindowStyle Hidden;if(-not $warm.WaitForExit(30000)){Stop-Process -Id $warm.Id -Force;throw 'warmup timed out'};$warm.WaitForExit();if($warm.ExitCode -ne 0){throw 'warmup failed'};$warmMs=$warmWatch.Elapsed.TotalMilliseconds}
   $env:LOL_LOOT_DATA_DIR=$trial
   $profile=Join-Path $Output 'webview-profile';$env:WEBVIEW2_USER_DATA_FOLDER=$profile
+  $warmMs=$null
+  if($Warmup){$warmWatch=[Diagnostics.Stopwatch]::StartNew();$warm=Start-Process -FilePath $trialSetup -ArgumentList '--warmup' -PassThru -WindowStyle Hidden;if(-not $warm.WaitForExit(30000)){Stop-Process -Id $warm.Id -Force;throw 'warmup timed out'};$warm.WaitForExit();if($warm.ExitCode -ne 0){throw 'warmup failed'};$warmMs=$warmWatch.Elapsed.TotalMilliseconds}
   $dest=Join-Path $trial 'installed';New-Item -ItemType Directory -Force $dest | Out-Null
   $ready=Join-Path $trial 'parent-ready';$escaped=$ready.Replace("'","''");$code="[IO.File]::WriteAllText('$escaped','ready');Start-Sleep -Seconds 90";$encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
   $parent=Start-Process pwsh -ArgumentList '-NoProfile','-EncodedCommand',$encoded -PassThru -WindowStyle Hidden

@@ -14,6 +14,7 @@ import (
 
 func main() {
 	if installerWarmup(os.Args[1:]) {
+		warmInstallerWebView()
 		return
 	}
 	mainEntered := time.Now()
