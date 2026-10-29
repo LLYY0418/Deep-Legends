@@ -91,11 +91,13 @@ func main() {
 		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
 		return
 	}
-	path := initialInstallDir()
-	if options.Update {
-		path = options.Destination
+	path := options.Destination
+	var free int64
+	if !options.Update {
+		path = initialInstallDir()
+		free, _ = diskFreeBytes(path)
 	}
-	free, _ := diskFreeBytes(path)
+	// Update validates destination and space again in install(), after visibility.
 	html, err := renderInstallerUI(meta.Version, options)
 	if err != nil {
 		w.starting = false
