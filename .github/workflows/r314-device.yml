@@ -22,22 +22,20 @@ jobs:
           $fakeCipher=(& go run ./backend -encrypt-riot-key 'RGAPI-00000000-0000-0000-0000-000000000000').Trim()
           ./build-desktop-windows.ps1 -Version $version -KeyMode public -SkipTestsInCI -RiotAPIKeyCipher $fakeCipher
           if($LASTEXITCODE -ne 0){throw 'build failed'}
-      - name: Instrumented update ten samples after existing warmup
+      - name: Windows installer unit and integration contracts
+        working-directory: installer
+        run: go test ./...
+      - name: Real hidden standby ten signal-to-ACK samples and exit paths
         shell: pwsh
         run: |
-          ./scripts/r314-upgrade-window.ps1 -Setup (Get-ChildItem 'dist/desktop/*Setup*-public.exe').FullName -Output "$env:RUNNER_TEMP/r316-timing/candidate" -Count 10 -Warmup -WaitForPage
-          if($LASTEXITCODE -ne 0){throw 'measurement failed'}
-      - name: Actual published 0.13.4 ten control samples
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: pwsh
-        run: |
-          $old="$env:RUNNER_TEMP/r316-old";New-Item -ItemType Directory -Force $old|Out-Null
-          gh release download v0.13.4 --pattern '*public.exe' --dir $old
-          $setup=(Get-ChildItem "$old/*.exe").FullName
-          if((Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'a90f629b6d033c2ddb380f520dd9c6fd9f20cb49f44febe277034aca3472e243'){throw 'control integrity'}
-          ./scripts/r314-upgrade-window.ps1 -Setup $setup -Output "$env:RUNNER_TEMP/r316-timing/control" -Count 10 -Warmup -WaitForPage
-          if($LASTEXITCODE -ne 0){throw 'control failed'}
+          $profile="$env:RUNNER_TEMP/r316-timing/standby-profile";$env:WEBVIEW2_USER_DATA_FOLDER=$profile
+          go build -o "$env:RUNNER_TEMP/r316-standby-probe.exe" ./scripts/r316-standby-probe
+          if($LASTEXITCODE -ne 0){throw 'probe build'}
+          & "$env:RUNNER_TEMP/r316-standby-probe.exe" (Get-ChildItem 'dist/desktop/*Setup*-public.exe').FullName "$env:RUNNER_TEMP/r316-timing/standby"
+          if($LASTEXITCODE -ne 0){throw 'standby actual 400ms/exit-path contract failed'}
+          $deadline=[DateTime]::UtcNow.AddSeconds(10)
+          do { $owned=@(Get-CimInstance Win32_Process|Where-Object{$_.Name -eq 'msedgewebview2.exe' -and $_.CommandLine -and $_.CommandLine.Contains($profile)});if($owned.Count -eq 0){break};Start-Sleep -Milliseconds 100 } while([DateTime]::UtcNow -lt $deadline)
+          if($owned.Count -ne 0){$owned|ConvertTo-Json|Set-Content "$env:RUNNER_TEMP/r316-timing/standby/orphans.json";throw 'standby left WebView processes'}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

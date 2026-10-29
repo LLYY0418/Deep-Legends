@@ -12,6 +12,7 @@ import (
 	"deeplegends/installer/internal/webviewhost"
 	"deeplegends/installer/payload"
 	"github.com/jchv/go-webview2/pkg/edge"
+	"golang.org/x/sys/windows"
 )
 
 type installerApp struct {
@@ -27,6 +28,8 @@ type installerApp struct {
 	ackSent           bool
 	recoveryAttempted bool
 	startupWarm       *executionWarmup
+	standbySignal     *installerStandbySignal
+	standbyMutex      windows.Handle
 }
 
 func (a *installerApp) embed(html string, initial initMessage) error {
@@ -49,6 +52,9 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 			return time.AfterFunc(webviewhost.PageTimeout, fn).Stop
 		}, func() {
 			log.Print("WebView environment/controller initialization timed out")
+			if options.Standby {
+				os.Exit(1)
+			}
 			recoverAcknowledgedUpdate(options, exeName, acknowledged, false, waitParent, startApplication)
 			webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", errors.New(upgradeFailureMessage))
 			os.Exit(1)
@@ -67,6 +73,9 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		return errors.New("WebView environment/controller initialization failed")
 	}
 	w.surface = &webviewhost.WindowsSurface{Chromium: chromium, Window: w.hwnd, ShowWindow: w.show, DeferVisible: a.options.Update}
+	if a.options.Standby {
+		w.surface.ShowWindow = func() {}
+	}
 	log.Print("WebView controller created")
 	if err := w.surface.Configure(); err != nil {
 		return fmt.Errorf("configure WebView: %w", err)
@@ -91,6 +100,10 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		a.pageReady = true
 		w.starting = false
 		w.webviewReady = true
+		if a.options.Standby {
+			a.awaitStandby()
+			return
+		}
 		a.timing.mark("first_frame")
 		a.timing.mark("webview_ready")
 		log.Print("installer page ready; WebView visible")
@@ -188,7 +201,7 @@ func (a *installerApp) onMessage(raw string) {
 	if a.window.startup != nil && a.window.startup.Message(raw) {
 		return
 	}
-	if !a.pageReady {
+	if !a.pageReady || a.options.Standby {
 		return
 	}
 	if len(raw) > 4096 {
