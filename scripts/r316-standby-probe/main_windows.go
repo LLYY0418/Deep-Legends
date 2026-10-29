@@ -21,20 +21,27 @@ import (
 var user32 = windows.NewLazySystemDLL("user32.dll")
 
 func visible(pid uint32) bool {
-	found := false
-	callback := syscall.NewCallback(func(hwnd, unused uintptr) uintptr {
+	// Inspect stable pre/post-ACK windows without registering another native
+	// callback. Bound the walk: Z-order mutation or destroyed handles must fail
+	// the probe rather than loop or silently claim that a window is hidden.
+	hwnd, _, _ := user32.NewProc("GetTopWindow").Call(0)
+	seen := map[uintptr]bool{}
+	for hwnd != 0 {
+		if seen[hwnd] || len(seen) >= 10000 {
+			panic("window Z-order changed during visibility probe")
+		}
+		seen[hwnd] = true
 		var owner uint32
 		user32.NewProc("GetWindowThreadProcessId").Call(hwnd, uintptr(unsafe.Pointer(&owner)))
 		if owner == pid {
 			shown, _, _ := user32.NewProc("IsWindowVisible").Call(hwnd)
 			if shown != 0 {
-				found = true
+				return true
 			}
 		}
-		return 1
-	})
-	user32.NewProc("EnumWindows").Call(callback, 0)
-	return found
+		hwnd, _, _ = user32.NewProc("GetWindow").Call(hwnd, 2) // GW_HWNDNEXT
+	}
+	return false
 }
 
 type probe struct {
