@@ -46,9 +46,10 @@ func TestR316SplitPersistenceChangeAndConservativeLabels(t *testing.T) {
 	}
 	now := time.UnixMilli(1799262000001)
 	before := a.rankSplitScope("HN1|test", time.UnixMilli(rankSplitStart))
+	cachedKey := rankScoreCacheKeyScoped(dataSourceSGP, "HN1", "test", "|"+before)
 	cache := a.ensureRankScores()
 	cache.mu.Lock()
-	cache.putLocked("sgp|HN1|test", rankScoreEntry{at: time.Now()})
+	cache.putLocked(cachedKey, rankScoreEntry{at: time.Now()})
 	cache.mu.Unlock()
 	next := sgpRankedSeason{CurrentSeasonID: 24, CurrentSeasonStart: 1799262000000}
 	for i := 0; i < 3; i++ {
@@ -57,7 +58,7 @@ func TestR316SplitPersistenceChangeAndConservativeLabels(t *testing.T) {
 	if a.rankSplitScope("HN1|test", now) == before {
 		t.Fatal("window missing from rank cache scope")
 	}
-	if _, ok := cache.get("sgp|HN1|test"); ok {
+	if _, ok := cache.get(cachedKey); ok {
 		t.Fatal("old rank aggregate retained")
 	}
 	// There is no proof for SGP ids21/22 in available history. Even a matching
@@ -169,5 +170,46 @@ func TestR316PartialQueueResponseAndServerPersistenceIsolation(t *testing.T) {
 	restarted := &app{storage: store}
 	if windows, _ := restarted.rankSplitSnapshot("HN2|two"); len(windows) != 0 {
 		t.Fatal("cross-server persisted schedule used")
+	}
+}
+
+func TestR316NewServerSplitSupersedesOtherPlayersStaleMemoryAndCache(t *testing.T) {
+	a := &app{}
+	queue := "RANKED_SOLO_5x5"
+	old := sgpRankedSeason{CurrentSeasonID: 23, CurrentSeasonStart: rankSplitStart, CurrentSeasonEnd: rankSplitEnd}
+	next := sgpRankedSeason{CurrentSeasonID: 24, CurrentSeasonStart: 1799262000000}
+	now := time.UnixMilli(next.CurrentSeasonStart + 1)
+	a.rememberRankSplits("HN1|B", map[string]sgpRankedSeason{queue: old})
+	cache := a.ensureRankScores()
+	oldScope := a.rankSplitScope("HN1|B", now)
+	oldKey := rankScoreCacheKeyScoped(dataSourceSGP, "HN1", "B", "|"+oldScope)
+	tierKey := rankScoreCacheKeyScoped(dataSourceSGP, "HN1", "B", rankScoreTierOnlyScope)
+	otherKey := rankScoreCacheKeyScoped(dataSourceSGP, "HN2", "C", "|split=old")
+	cache.mu.Lock()
+	for _, key := range []string{oldKey, tierKey, otherKey} {
+		cache.putLocked(key, rankScoreEntry{at: time.Now()})
+	}
+	cache.mu.Unlock()
+	a.rememberRankSplits("HN1|A", map[string]sgpRankedSeason{queue: next})
+	// No further SGP response for B: the already known server schedule is enough.
+	windows, persisted := a.rankSplitSnapshot("HN1|B")
+	if windows[queue] != next || !persisted {
+		t.Fatalf("stale player replaced newer shared split: %v persisted=%v", windows, persisted)
+	}
+	if a.rankSplitScope("HN1|B", now) == oldScope {
+		t.Fatal("old cache scope reused")
+	}
+	if _, ok := cache.get(oldKey); ok {
+		t.Fatal("other player's old split aggregate retained")
+	}
+	for _, key := range []string{tierKey, otherKey} {
+		if _, ok := cache.get(key); !ok {
+			t.Fatal("unrelated tier/server cache evicted", key)
+		}
+	}
+	snapshot := seasonRankRecordSnapshot{player: "HN1|B", progress: seasonStatsProgress{RankedComplete: true}, ranked: []seasonRankedMatch{{GameID: 1, QueueID: 420, CreatedAt: next.CurrentSeasonStart - 1, Win: true}, {GameID: 2, QueueID: 420, CreatedAt: next.CurrentSeasonStart, Win: false}}}
+	ranks, _ := a.applySeasonRankWinRateFallback([]gameplayRank{{QueueType: queue, WinRate: -1}}, EndpointCapability{}, snapshot)
+	if ranks[0].Wins != 0 || ranks[0].Losses != 1 || ranks[0].RecordSplitStart != next.CurrentSeasonStart || ranks[0].RecordSplitSource != "persisted" {
+		t.Fatalf("old split game leaked into B's card: %+v", ranks[0])
 	}
 }

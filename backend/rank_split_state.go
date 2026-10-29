@@ -83,6 +83,12 @@ func (a *app) rankSplitSnapshot(player string) (map[string]sgpRankedSeason, bool
 	windows := a.rankSplitWindows[player]
 	persisted := len(windows) == 0
 	for q, v := range windows {
+		// Another player may already have advanced this server's schedule.
+		// A stale per-player snapshot must never overwrite that shared knowledge.
+		if current := out[q]; current.CurrentSeasonStart > 0 && v != current && v.CurrentSeasonStart <= current.CurrentSeasonStart {
+			persisted = true
+			continue
+		}
 		out[q] = v
 	}
 	return out, persisted
@@ -133,15 +139,13 @@ func (a *app) rememberRankSplits(player string, seasons map[string]sgpRankedSeas
 	for _, event := range events {
 		if event["event"] == "rank_split_changed" {
 			// In-flight reads retain their old start in their key, so they cannot
-			// repopulate the new window. Remove every cached old player result.
-			rawPlayer := player
-			if parts := strings.SplitN(player, "|", 2); len(parts) == 2 {
-				rawPlayer = parts[1]
-			}
+			// repopulate the new window. Remove this server's old split aggregates;
+			// tier-only and other-server entries do not depend on this window.
+			server := strings.SplitN(rankSplitQueueKey(player, ""), "|", 2)[0]
 			cache := a.ensureRankScores()
 			cache.mu.Lock()
 			for key, element := range cache.entries {
-				if strings.HasSuffix(key, "|"+rawPlayer) {
+				if strings.Contains(key, "|split=") && strings.Contains(key, ":"+server+"|") {
 					cache.removeElement(element)
 				}
 			}
