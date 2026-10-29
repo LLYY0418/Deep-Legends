@@ -1,6 +1,11 @@
-name: R314 published old-client proof
+name: R315 published old-client proof
 on:
   workflow_dispatch:
+    inputs:
+      expected_fingerprint:
+        description: "Frozen 0.13.4 source fingerprint"
+        type: string
+        required: true
 permissions:
   contents: read
 jobs:
@@ -12,18 +17,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify and install actual published 0.13.2
+      - name: Verify and install actual published 0.13.3
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $out="$env:RUNNER_TEMP/r314-published";New-Item -ItemType Directory -Force $out|Out-Null
-          gh release download v0.13.2 --pattern '*public.exe' --pattern latest.json --dir $out
+          $out="$env:RUNNER_TEMP/r315-published";New-Item -ItemType Directory -Force $out|Out-Null
+          gh release download v0.13.3 --pattern '*public.exe' --pattern latest.json --dir $out
           if($LASTEXITCODE -ne 0){throw 'actual old release download failed'}
           $manifest=Get-Content "$out/latest.json" -Raw|ConvertFrom-Json
           $setup=(Get-ChildItem "$out/*.exe").FullName
           @{version=$manifest.version;sha256=(Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant();size=(Get-Item $setup).Length}|ConvertTo-Json|Set-Content "$out/old-setup-integrity.json"
-          if($manifest.version -ne '0.13.2' -or $manifest.asset.sha256 -ne '26cd82b1b6ee8f904f67231244d3d64c5900df463e4da9e8cdcc4cf59e45713e' -or (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.asset.sha256){throw 'published old Setup integrity mismatch'}
+          if($manifest.version -ne '0.13.3' -or $manifest.asset.sha256 -ne 'e91f81b399fa3a790c3781fdb685d8de99c775391e67b6bb98c933b3a4ece3b6' -or (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.asset.sha256){throw 'published old Setup integrity mismatch'}
           $install="$out/installed";New-Item -ItemType Directory -Force $install|Out-Null
           $env:LOL_LOOT_DATA_DIR="$out/initial-data";$env:WEBVIEW2_USER_DATA_FOLDER="$out/initial-profile"
           New-Item -ItemType Directory -Force $env:LOL_LOOT_DATA_DIR|Out-Null
@@ -31,20 +36,22 @@ jobs:
           $p=Start-Process $setup -ArgumentList "--update --dest `"$install`"" -PassThru
           if(-not $p.WaitForExit(180000)){Stop-Process -Id $p.Id -Force;throw 'old install timeout'};$p.WaitForExit();if($p.ExitCode -ne 0){throw 'old install failed'}
           Get-CimInstance Win32_Process|Where-Object{$_.ExecutablePath -and $_.ExecutablePath.StartsWith($install,[StringComparison]::OrdinalIgnoreCase)}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}
-          if((Get-Item "$install/Deep Legends.exe").VersionInfo.FileVersion -ne '0.13.2'){throw 'wrong installed old client'}
-      - name: Real old UI detects public 0.13.3 without intercepted responses
+          if((Get-Item "$install/Deep Legends.exe").VersionInfo.FileVersion -ne '0.13.3'){throw 'wrong installed old client'}
+      - name: Real old UI detects public 0.13.4 without intercepted responses
+        env:
+          R315_EXPECTED_FINGERPRINT: ${{ inputs.expected_fingerprint }}
         shell: pwsh
         run: |
-          node scripts/r314-published-detect.cjs "$env:RUNNER_TEMP/r314-published/installed/Deep Legends.exe" "$env:RUNNER_TEMP/r314-published/proof"
-          if($LASTEXITCODE -ne 0){throw 'actual old UI did not detect public 0.13.3; do not retry'}
-          $newPayloads=@(Get-ChildItem "$env:RUNNER_TEMP/r314-published/initial-data","$env:RUNNER_TEMP/r314-published/proof/data" -Recurse -File|Where-Object{$_.Name -match '\.(exe|part)$'})
+          node scripts/r315-published-detect.cjs "$env:RUNNER_TEMP/r315-published/installed/Deep Legends.exe" "$env:RUNNER_TEMP/r315-published/proof"
+          if($LASTEXITCODE -ne 0){throw 'actual old UI did not detect public 0.13.4; do not retry'}
+          $newPayloads=@(Get-ChildItem "$env:RUNNER_TEMP/r315-published/initial-data","$env:RUNNER_TEMP/r315-published/proof/data" -Recurse -File|Where-Object{$_.Name -match '\.(exe|part)$'})
           if($newPayloads.Count -ne 0){throw 'unexpected new installer payload; stop'}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r314-published-proof-${{ github.run_id }}
+          name: r315-published-proof-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/r314-published/old-setup-integrity.json
-            ${{ runner.temp }}/r314-published/proof/*.json
-            ${{ runner.temp }}/r314-published/proof/*.png
+            ${{ runner.temp }}/r315-published/old-setup-integrity.json
+            ${{ runner.temp }}/r315-published/proof/*.json
+            ${{ runner.temp }}/r315-published/proof/*.png
           if-no-files-found: error
