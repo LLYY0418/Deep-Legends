@@ -25,7 +25,7 @@ jobs:
       - name: Instrumented update ten samples after existing warmup
         shell: pwsh
         run: |
-          ./scripts/r314-upgrade-window.ps1 -Setup (Get-ChildItem dist/desktop/Deep-Legends-Setup-*-public.exe).FullName -Output "$env:RUNNER_TEMP/r316-timing/candidate" -Count 10 -Warmup -WaitForPage
+          ./scripts/r314-upgrade-window.ps1 -Setup (Get-ChildItem 'dist/desktop/*Setup*-public.exe').FullName -Output "$env:RUNNER_TEMP/r316-timing/candidate" -Count 10 -Warmup -WaitForPage
           if($LASTEXITCODE -ne 0){throw 'measurement failed'}
       - name: Actual published 0.13.4 ten control samples
         env:
