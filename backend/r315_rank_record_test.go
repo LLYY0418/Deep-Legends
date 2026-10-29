@@ -40,6 +40,8 @@ func TestR315SplitSourceAndFutureSeason(t *testing.T) {
 		{`{"seasons":{"RANKED_SOLO_5x5":{"currentSeasonId":23,"currentSeasonStart":1785351600000,"currentSeasonEnd":1799247600000}}}`, before, rankSplitStart, "sgp"},
 		{`{}`, before, rankSplitStart, "constant"},
 		{`{}`, after, func() int64 { _, v := currentRankedSeason(after); return v.UnixMilli() }(), "season"},
+		{`{"seasons":{"RANKED_SOLO_5x5":{"currentSeasonStart":1785351600000,"currentSeasonEnd":1799247600000}}}`, after, func() int64 { _, v := currentRankedSeason(after); return v.UnixMilli() }(), "season"},
+		{`{"seasons":{"RANKED_SOLO_5x5":{"currentSeasonStart":1785351600000}}}`, after, func() int64 { _, v := currentRankedSeason(after); return v.UnixMilli() }(), "season"},
 		{`{"seasons":{"RANKED_SOLO_5x5":{"currentSeasonId":24,"currentSeasonStart":1799262000000}}}`, after, 1799262000000, "sgp"},
 	} {
 		var stats sgpRankedStats

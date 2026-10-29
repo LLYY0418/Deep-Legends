@@ -33,7 +33,16 @@ const rankSplitEnd int64 = 1799247600000
 
 func resolveRankSplit(season sgpRankedSeason, now time.Time) (int64, string) {
 	if season.CurrentSeasonStart > 0 {
-		return season.CurrentSeasonStart, "sgp"
+		end := season.CurrentSeasonEnd
+		if end <= season.CurrentSeasonStart {
+			end = 0
+		}
+		if end == 0 && season.CurrentSeasonStart < rankSplitEnd {
+			end = rankSplitEnd
+		}
+		if end == 0 || now.UnixMilli() < end {
+			return season.CurrentSeasonStart, "sgp"
+		}
 	}
 	if now.UnixMilli() < rankSplitEnd {
 		return rankSplitStart, "constant"
