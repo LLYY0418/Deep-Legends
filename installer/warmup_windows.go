@@ -22,28 +22,25 @@ func warmInstallerWebView() {
 	w.starting = true
 	chromium := newInstallerChromium()
 	w.chromium = chromium
+	w.surface = &webviewhost.WindowsSurface{Chromium: chromium, Window: w.hwnd}
 	if !chromium.Embed(w.hwnd) {
-		destroyWindow.Call(w.hwnd)
-		runMessageLoop()
+		closeInstallerWindow(w)
 		return
 	}
 	surface := &webviewhost.WindowsSurface{Chromium: chromium, Window: w.hwnd, ShowWindow: func() {}, DeferVisible: true}
 	w.surface = surface
 	if surface.Configure() != nil {
-		destroyWindow.Call(w.hwnd)
-		runMessageLoop()
+		closeInstallerWindow(w)
 		return
 	}
 	html, err := renderInstallerUI("", installerOptions{Update: true})
 	if err != nil {
-		destroyWindow.Call(w.hwnd)
-		runMessageLoop()
+		closeInstallerWindow(w)
 		return
 	}
 	html, err = webviewhost.Document(html, initMessage{})
 	if err != nil {
-		destroyWindow.Call(w.hwnd)
-		runMessageLoop()
+		closeInstallerWindow(w)
 		return
 	}
 	closeWarm := func() { destroyWindow.Call(w.hwnd) }

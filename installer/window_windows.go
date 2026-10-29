@@ -288,3 +288,13 @@ func acquireSingleInstance() (windows.Handle, bool, error) {
 	}
 	return mutex, err == nil, err
 }
+
+// Embed owns an inner message pump. If its watchdog already consumed WM_QUIT,
+// another unconditional outer pump would wait forever after window destruction.
+func closeInstallerWindow(w *shellWindow) {
+	if w.closed {
+		return
+	}
+	destroyWindow.Call(w.hwnd)
+	runMessageLoop()
+}

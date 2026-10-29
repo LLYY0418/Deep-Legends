@@ -5,10 +5,15 @@ import (
 	"fmt"
 	"golang.org/x/sys/windows"
 	"os"
+	"sync"
 	"time"
 )
 
 type installerStandbySignal struct {
+	cancel               windows.Handle
+	mu                   sync.Mutex
+	closed               bool
+	waiters              sync.WaitGroup
 	event, parent, owner windows.Handle
 	started              time.Time
 }
@@ -33,20 +38,45 @@ func openInstallerStandby(options installerOptions) (*installerStandbySignal, er
 		windows.CloseHandle(parent)
 		return nil, err
 	}
-	return &installerStandbySignal{event: event, parent: parent, owner: owner, started: time.Now()}, nil
+	cancel, err := windows.CreateEvent(nil, 1, 0, nil)
+	if err != nil {
+		windows.CloseHandle(event)
+		windows.CloseHandle(parent)
+		windows.CloseHandle(owner)
+		return nil, err
+	}
+	return &installerStandbySignal{event: event, parent: parent, owner: owner, cancel: cancel, started: time.Now()}, nil
 }
 func (s *installerStandbySignal) close() {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return
+	}
+	s.closed = true
+	_ = windows.SetEvent(s.cancel)
+	s.mu.Unlock()
+	s.waiters.Wait()
 	windows.CloseHandle(s.event)
 	windows.CloseHandle(s.parent)
 	windows.CloseHandle(s.owner)
+	windows.CloseHandle(s.cancel)
 }
 func (s *installerStandbySignal) wait() bool {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return false
+	}
+	s.waiters.Add(1)
+	s.mu.Unlock()
+	defer s.waiters.Done()
 	remain := 10*time.Minute - time.Since(s.started)
 	if remain <= 0 {
 		return false
 	}
-	result, err := windows.WaitForMultipleObjects([]windows.Handle{s.parent, s.owner, s.event}, false, uint32(remain/time.Millisecond))
-	return err == nil && result == windows.WAIT_OBJECT_0+2
+	result, err := windows.WaitForMultipleObjects([]windows.Handle{s.parent, s.owner, s.cancel, s.event}, false, uint32(remain/time.Millisecond))
+	return err == nil && result == windows.WAIT_OBJECT_0+3
 }
 func (a *installerApp) awaitStandby() {
 	a.timing.mark("standby_ready")

@@ -35,7 +35,7 @@ func TestR316StandbyCannotInstallBeforeSignalOrRevealBlankWindow(t *testing.T) {
 	if show < 0 || ack < show || install < ack {
 		t.Fatal("activation order must be page visible, ACK, install")
 	}
-	if !strings.Contains(s, "[]windows.Handle{s.parent, s.owner, s.event}") || !strings.Contains(s, "10*time.Minute-time.Since") && !strings.Contains(s, "10*time.Minute - time.Since") {
+	if !strings.Contains(s, "[]windows.Handle{s.parent, s.owner, s.cancel, s.event}") || !strings.Contains(s, "10*time.Minute-time.Since") && !strings.Contains(s, "10*time.Minute - time.Since") {
 		t.Fatal("standby must expire on parent/owner exit or ten minutes")
 	}
 }

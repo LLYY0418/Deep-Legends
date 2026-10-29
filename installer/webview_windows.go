@@ -53,7 +53,8 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		}, func() {
 			log.Print("WebView environment/controller initialization timed out")
 			if options.Standby {
-				os.Exit(1)
+				w.dispatch(func() { destroyWindow.Call(w.hwnd) })
+				return
 			}
 			recoverAcknowledgedUpdate(options, exeName, acknowledged, false, waitParent, startApplication)
 			webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", errors.New(upgradeFailureMessage))

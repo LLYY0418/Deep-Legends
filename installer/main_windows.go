@@ -114,8 +114,7 @@ func main() {
 	if err := webviewhost.CheckRuntime(); err != nil {
 		w.starting = false
 		app.recoverFailedUpdate()
-		destroyWindow.Call(w.hwnd)
-		runMessageLoop()
+		closeInstallerWindow(w)
 		if options.Update {
 			err = errors.New(upgradeFailureMessage)
 		}
@@ -135,8 +134,7 @@ func main() {
 	if err != nil {
 		w.starting = false
 		app.recoverFailedUpdate()
-		destroyWindow.Call(w.hwnd)
-		runMessageLoop()
+		closeInstallerWindow(w)
 		if options.Update {
 			err = errors.New(upgradeFailureMessage)
 		}
@@ -151,8 +149,7 @@ func main() {
 		if options.Update {
 			err = errors.New(upgradeFailureMessage)
 		}
-		destroyWindow.Call(w.hwnd)
-		runMessageLoop() // consume WM_QUIT before opening the error dialog
+		closeInstallerWindow(w) // consume WM_QUIT before opening the error dialog
 		if !options.Standby {
 			webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
 		}
