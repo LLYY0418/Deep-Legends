@@ -5,8 +5,13 @@ const root=path.resolve(__dirname,'..'),base=f=>cp.execFileSync('git',['show','v
 async function run(){
  const current=fs.readFileSync(path.join(root,'backend/web/gameplay.js'),'utf8'),old=base('backend/web/gameplay.js'),css=fs.readFileSync(path.join(root,'backend/web/gameplay.css'),'utf8'),oldCSS=base('backend/web/gameplay.css');
  assert.equal(extract(current,'renderMultiKillTag'),extract(old,'renderMultiKillTag'));
- // R283 P7 changes only portal zoom coordinates; preserve the R282 interaction contract.
- const unscaledPopover=extract(current,'bindMatchTagsPopover').replace(/^        const scale=Number\(win\.getComputedStyle\(panel\)\.zoom\)\|\|1;\n/m,'').replace('panel.offsetWidth*scale,height=panel.offsetHeight*scale','panel.offsetWidth,height=panel.offsetHeight').replaceAll('/scale}','}');
+ // R315 P3 adds the shared close lifecycle; its own tests cover those calls.
+ // Remove only those exact additions before preserving the R282 interaction contract.
+ let popover=extract(current,'bindMatchTagsPopover');
+ for(const addition of ['touchUntil=0,stopLifecycle=null;','stopLifecycle?.();stopLifecycle=null;','        stopLifecycle=win.deepLegendsFloatingLayers?.watch(button,panel,close);\n'])assert(popover.includes(addition),addition);
+ popover=popover.replace('touchUntil=0,stopLifecycle=null;','touchUntil=0;').replace('stopLifecycle?.();stopLifecycle=null;','').replace('        stopLifecycle=win.deepLegendsFloatingLayers?.watch(button,panel,close);\n','');
+ // R283 P7 changes only portal zoom coordinates.
+ const unscaledPopover=popover.replace(/^        const scale=Number\(win\.getComputedStyle\(panel\)\.zoom\)\|\|1;\n/m,'').replace('panel.offsetWidth*scale,height=panel.offsetHeight*scale','panel.offsetWidth,height=panel.offsetHeight').replaceAll('/scale}','}');
  assert.equal(unscaledPopover,extract(old,'bindMatchTagsPopover'));
  const blocks=s=>s.slice(s.indexOf('.multikill-tag {'),s.indexOf('.match-tags-popover',s.indexOf('.multikill-tag {')));
  assert.equal(blocks(css),blocks(oldCSS));assert(!fs.readFileSync(path.join(root,'backend/web/icons.svg'),'utf8').includes('dl-icon-multikill-'));
