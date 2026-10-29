@@ -132,7 +132,6 @@
 .ac-node { position:absolute; left:16px; top:50%; width:14px; height:14px; margin-top:-7px; border-radius:50%; border:2px solid color-mix(in oklab,var(--muted) 40%,transparent); background:var(--surface); transition:border-color 260ms, background 260ms, box-shadow 260ms, transform 260ms; z-index:1; }
 .ac-row.is-picked .ac-node, .ac-node.is-picked { border-color:var(--path); background:radial-gradient(circle, color-mix(in oklab,var(--path) 85%,white) 0 3px, var(--surface) 3.5px); box-shadow:0 0 0 3px color-mix(in oklab,var(--path) 20%,transparent), 0 0 12px color-mix(in oklab,var(--path) 70%,transparent); }
 .ac-row.is-shard .ac-node { width:10px; height:10px; margin-top:-5px; left:18px; }
-.ac-row-label { position:absolute; left:46px; top:6px; color:color-mix(in oklab,var(--path) 75%,var(--muted)); font-size:10px; letter-spacing:.08em; }
 
 /* 符文图标按钮 */
 .ac-rune { position:relative; display:grid; place-items:center; width:46px; height:46px; padding:0; border:0; border-radius:50%; background:transparent; cursor:pointer; outline-offset:3px; transition:filter 220ms ease-out, opacity 220ms ease-out, transform 160ms ease-out; }
@@ -489,7 +488,6 @@ button.ac-flow-step:hover { color:var(--primary-strong); background:var(--primar
 .ac-stage .ac-row.is-shard .ac-node { width:calc(14px*var(--ac-rune-scale)); height:calc(14px*var(--ac-rune-scale)); margin-top:calc(-7px*var(--ac-rune-scale)); left:calc(var(--ac-track-x) - 7px*var(--ac-rune-scale)); }
 .ac-stage .ac-track { width:calc(2px*var(--ac-rune-scale)); left:calc(var(--ac-track-x) - 1px*var(--ac-rune-scale)); }
 .ac-stage .ac-row::before { left:calc(58px*var(--ac-rune-scale)); right:calc(12px*var(--ac-rune-scale)); }
-.ac-stage .ac-row-label { left:calc(58px*var(--ac-rune-scale)); }
 .ac-stage .ac-rune .ring { border-width:calc(2px*var(--ac-rune-scale)); }
 @container suite-page (max-width:820px) { .ac-stage .ac-tree { grid-template-columns:minmax(calc(var(--ac-primary-width,273.6px)*var(--ac-rune-scale)),1fr) minmax(calc(var(--ac-secondary-width,255.6px)*var(--ac-rune-scale)),1fr); } }
 .ac-stage .ac-tree { min-width:calc((var(--ac-primary-width,273.6px) + var(--ac-secondary-width,255.6px) + var(--ac-column-gap,26px)*.9)*var(--ac-rune-scale)); }
