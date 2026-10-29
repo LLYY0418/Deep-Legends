@@ -295,24 +295,39 @@
   let layoutFrame=0;
   let layoutReason="render",lastFitSignature="",fitMinute=0,fitCount=0;
   function scheduleLayout(reason="observer"){layoutReason=typeof reason==="string"?reason:"observer";if(!layoutFrame)layoutFrame=requestAnimationFrame(()=>{layoutFrame=0;layout();});}
+  function runeBottomGap(availableHeight,treeHeight){return Math.max(24,(availableHeight-treeHeight)/2);}
+  function runePanelFit(cardHeight,stage,card,header,above=layoutOffset(stage)-layoutOffset(card)){
+    const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1,css=getComputedStyle(stage);
+    const width=Math.max(0,Math.floor(stage.getBoundingClientRect().width/zoom)-Math.max(0,stage.offsetWidth-stage.clientWidth)-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight));
+    const availableHeight=Math.max(0,cardHeight-above-parseFloat(css.paddingTop)-(header?.offsetHeight||0)-1),height=Math.max(0,availableHeight-48);
+    const fit=runeFitGeometry(width,height,(style(S.draft?.runes?.primaryStyleId)?.slots[0]?.perks.length||0)>3);
+    return {zoom,css,width,height,availableHeight,fit,gap:runeBottomGap(availableHeight,fit.treeHeight)};
+  }
+  let equipmentFitSignature="",equipmentFitMinute=0,equipmentFitCount=0;
+  function layoutEquipment(cardHeight){
+    const items=root.querySelector(".ac-items"),card=items?.closest(".ac-editor"),tabs=card?.querySelector(".ac-tabs");if(!items||!card||!tabs)return;
+    // Measure the very same rune header at this card width, including wrapping.
+    // The inert probe is removed before observers or delegated handlers run.
+    const template=document.createElement("template");template.innerHTML=runeStage();
+    const probe=template.content.querySelector(".ac-stage");let gap=24;
+    if(probe){probe.querySelector(".ac-tree")?.remove();probe.setAttribute("aria-hidden","true");probe.inert=true;probe.style.cssText=`position:absolute;visibility:hidden;pointer-events:none;width:${card.clientWidth}px`;card.append(probe);
+      gap=runePanelFit(cardHeight,probe,card,probe.querySelector(".ac-buildname"),layoutOffset(tabs)+tabs.offsetHeight-layoutOffset(card)).gap;probe.remove();}
+    const height=Math.max(398,cardHeight-(layoutOffset(items)-layoutOffset(card))-gap-1),value=`${height}px`;
+    if(items.style.getPropertyValue("--ac-shop-height")!==value)items.style.setProperty("--ac-shop-height",value);
+    items.closest(".ac-kit").style.paddingBottom=`${gap}px`;
+    const signature=JSON.stringify([height,gap]);if(signature!==equipmentFitSignature){equipmentFitSignature=signature;const minute=Math.floor(Date.now()/60000);if(minute!==equipmentFitMinute){equipmentFitMinute=minute;equipmentFitCount=0;}if(equipmentFitCount<10){equipmentFitCount++;window.reportFlowDiagnostic?.("equipment_fit_layout",layoutReason,{shop_height:height,bottom_gap:gap});}}
+  }
   function layout(){
     const cardHeight=fillBody(),tree=root.querySelector(".ac-tree"),stage=tree?.closest(".ac-stage");
     if(tree&&stage){
-      const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1,css=getComputedStyle(stage),header=stage.querySelector(".ac-buildname"),card=stage.closest(".ac-editor");
-      // clientWidth rounds up at fractional CSS zoom; floor the physical box first
-      // so a subpixel overflow cannot introduce a horizontal scrollbar.
-      const width=Math.max(0,Math.floor(stage.getBoundingClientRect().width/zoom)-Math.max(0,stage.offsetWidth-stage.clientWidth)-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight));
-      // Both offsets are document-layout coordinates, unaffected by scrolling.
-      const above=layoutOffset(stage)-layoutOffset(card);
-      const availableHeight=Math.max(0,cardHeight-above-parseFloat(css.paddingTop)-(header?.offsetHeight||0)-1);
-      const height=Math.max(0,availableHeight-48);
-      const fit=runeFitGeometry(width,height,!!tree.querySelector(".has-4"));
+      const card=stage.closest(".ac-editor"),header=stage.querySelector(".ac-buildname");
+      const {zoom,css,width,height,availableHeight,fit,gap}=runePanelFit(cardHeight,stage,card,header);
       for(const [name,value]of Object.entries({"--ac-rune-scale":String(fit.scale),"--ac-rune-f":String(fit.f),"--ac-tree-height":fit.treeHeight+"px","--ac-primary-width":fit.primaryWidth+"px","--ac-secondary-width":fit.secondaryWidth+"px","--ac-column-gap":(fit.columnGap/.9)+"px","--ac-key-extra":fit.keyExtra+"px","--ac-minor-extra":fit.minorExtra+"px","--ac-sub-extra":fit.subExtra+"px","--ac-shard-extra":fit.shardExtra+"px","--ac-sub-shard-gap":fit.subShardGap+"px"}))if(stage.style.getPropertyValue(name)!==value)stage.style.setProperty(name,value);
-      const gap=Math.max(24,(availableHeight-fit.treeHeight)/2);
       tree.style.marginTop=`${gap-parseFloat(css.rowGap||0)}px`;
       const topGap=(tree.getBoundingClientRect().top-header.getBoundingClientRect().bottom)/zoom,bottomGap=(card.getBoundingClientRect().bottom-1*zoom-tree.getBoundingClientRect().bottom)/zoom,signature=JSON.stringify([width,height,fit.scale,fit.f,bottomGap]);
       if(signature!==lastFitSignature){lastFitSignature=signature;const minute=Math.floor(Date.now()/60000);if(minute!==fitMinute){fitMinute=minute;fitCount=0;}if(fitCount<10){fitCount++;window.reportFlowDiagnostic?.("rune_fit_layout",layoutReason,{width,height,scale:fit.scale,f:fit.f,top_gap:topGap,bottom_gap:bottomGap});}}
     }
+    layoutEquipment(cardHeight);
     // CSS dimensions include the scale, so tracks follow actual row centers.
     const updates=[];
     for(const g of root.querySelectorAll(".ac-group")){
@@ -519,7 +534,7 @@
   window.addEventListener("focus",()=>{if(S.catalog&&!root.closest("[hidden]"))void refreshCatalog().catch(reportError);});
   let lastLayoutHeight=innerHeight;
   window.addEventListener("resize",()=>{lastLayoutHeight=innerHeight;scheduleLayout("resize");});
-  window.addEventListener("deep-legends:section",e=>{flushDraft();if(e.detail?.name==="suite"){locatePending=true;locateChampion();}fillBody();});
+  window.addEventListener("deep-legends:section",e=>{flushDraft();if(e.detail?.name==="suite"){locatePending=true;locateChampion();}fillBody();scheduleLayout("section");});
   window.addEventListener("deep-legends:dispose",()=>{cancelAnimationFrame(layoutFrame);runeLayoutObserver?.disconnect();observedRuneTree=null;},{once:true});
   window.addEventListener("pagehide",()=>{flushDraft();void window.deepLegendsPreferenceStorage?.flush(true);});
   window.deepLegendsSections.register("auto-config",()=>{});

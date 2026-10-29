@@ -111,6 +111,7 @@ type updateAsset struct {
 	URL    string `json:"url"`
 }
 type updateManifest struct {
+	Capabilities   []string               `json:"capabilities,omitempty"`
 	SignedManifest *signedLicenseEnvelope `json:"signed_manifest,omitempty"`
 	Schema         int                    `json:"schema"`
 	Version        string                 `json:"version"`
@@ -157,6 +158,8 @@ type updateSettings struct {
 
 type updateManager struct {
 	warmedInstaller      *warmedUpdateInstaller
+	standby              updateStandbyState
+	startStandby         func(context.Context, string, string) (updateStandbyProcess, error)
 	warmInstaller        func(context.Context, string) error
 	applyTiming          *updateApplyTiming
 	applyTimingMu        sync.Mutex
@@ -332,6 +335,7 @@ func (u *updateManager) Start() {
 
 func (u *updateManager) Close() {
 	if u != nil {
+		u.stopStandby()
 		u.stop()
 	}
 }
@@ -487,6 +491,7 @@ func (u *updateManager) Check(force bool) bool {
 			_, verifyErr := u.verifyReadyUpdateFile(u.ctx, filepath.Join(u.directory, manifest.Asset.Name), manifest.Asset)
 			ready = verifyErr == nil
 		}
+		invalidateStandby := false
 		u.mu.Lock()
 		u.status.Checking = false
 		if err != nil || u.ctx.Err() != nil {
@@ -498,6 +503,7 @@ func (u *updateManager) Check(force bool) bool {
 				u.status.Error = "无法检查更新：" + err.Error()
 			}
 		} else {
+			invalidateStandby = u.manifest != nil && updateManifestIdentity(*u.manifest) != updateManifestIdentity(manifest)
 			u.manifest = &manifest
 			u.status.Latest, u.status.Notes, u.status.SizeBytes, u.status.PublishedAt = manifest.Version, manifest.Notes, manifest.Asset.Size, manifest.PublishedAt
 			u.status.ManualOnly = manifest.MinSupported != "" && compareVersions(u.status.Current, manifest.MinSupported) < 0
@@ -518,6 +524,9 @@ func (u *updateManager) Check(force bool) bool {
 		resultState := u.status.State
 		predownload := u.autoPredownload && !u.autoDownloadDisabled && resultState == "available" && !u.status.ManualOnly && !u.status.InstallTargetBlocked
 		u.mu.Unlock()
+		if invalidateStandby {
+			u.stopStandby()
+		}
 		if ready && resultState == "ready" {
 			u.warmReadyInstaller(manifest)
 		}

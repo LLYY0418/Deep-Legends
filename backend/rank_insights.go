@@ -273,6 +273,10 @@ func (a *app) playerRankScoreWithCacheStatus(ctx context.Context, client *LCUCli
 			preferredSource = sources[0]
 		}
 	}
+	if !useRiot && !tierScope && isTencentClient(client) {
+		a.refreshExpiredRankSplit(ctx, client, serverID, playerRef, isCurrent, privacy, time.Now())
+		cacheScope += "|" + a.rankSplitScope(serverID+"|"+playerRef, time.Now())
+	}
 	cacheKey := rankScoreCacheKeyScoped(preferredSource, serverID, playerRef, cacheScope)
 	for ctx.Err() == nil {
 		if !force {

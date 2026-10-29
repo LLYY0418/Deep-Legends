@@ -15,6 +15,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Native R316 backend race scenarios at original timing limits
+        shell: pwsh
+        run: |
+          if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
+            $compiler = @('C:\mingw64\bin', 'C:\msys64\mingw64\bin') | Where-Object { Test-Path (Join-Path $_ 'gcc.exe') } | Select-Object -First 1
+            if (-not $compiler) { throw 'Windows race compiler is unavailable' }
+            $env:PATH="$compiler;$env:PATH"
+          }
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/r316-timing" | Out-Null
+          go test -race -count=1 -v ./backend -run '^TestR316' 2>&1 | Tee-Object "$env:RUNNER_TEMP/r316-timing/backend-race.log"
+          if($LASTEXITCODE -ne 0){throw 'native R316 backend race/timing failure'}
       - name: Build production-shaped instrumented candidate
         shell: pwsh
         run: |

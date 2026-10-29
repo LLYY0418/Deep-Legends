@@ -569,9 +569,11 @@ button.suite-chip.is-gold { color: var(--primary-strong); border-color: var(--he
 
 @container suite-page (max-width: 900px) {
   .cs-body { grid-template-columns: minmax(0, 1fr); }
-  .cs-mode-list { flex-direction: row; gap: 6px; overflow-x: auto; }
+  .cs-mode-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(168px,1fr)); gap: 6px; }
   .cs-mode-title { display: none; }
-  .cs-mode-item { min-width: 168px; flex: 0 0 auto; }
+  .cs-mode-item { width: auto; min-width: 0; }
+  .cs-rail-slot { min-width: 76px; flex: 0 1 96px; }
+  .cs-rail-tail { min-width: 0; flex: 1 1 120px; }
   .cs-dialog-body { grid-template-columns: minmax(0, 1fr); }
   .cs-dialog-left { border-right: 0; border-bottom: 1px solid var(--line); }
   .cs-seq-head { align-items: flex-start; }

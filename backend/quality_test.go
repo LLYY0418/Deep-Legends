@@ -675,7 +675,6 @@ var privacyMkdirCallPins = map[string]int{
 	"storage.go":                     2, // 启动期目录清单 + writeLocalStoreFile 的隐式父目录
 	"update.go":                      1, // updates 目录兜底
 }
-
 var privacyStoreWriteCallPins = map[string]int{
 	"arena_fame_events.go":       1, // arena-fame-events.json: declared salted account/server binding, own event counters/milestones and previous-event delta; at most 64 accounts, local only.
 	"arena_fame_progression.go":  1, // arena-progression-before.json: declared filtered numeric snapshot, salted account/platform/game binding and 30m expiry.
@@ -694,6 +693,7 @@ var privacyStoreWriteCallPins = map[string]int{
 	"match_tags.go":              1, // match-tags/source/server/gameId: sanitized checkpoints and tags; stores explicitly declares 5000-entry LRU.
 	"riot_key_settings.go":       1, // 用户明确保存/清除及升级迁移的本机 Key；stores 明确声明。
 	"game_camera_mode.go":        1, // 根级 game-settings-sync.json：stores 的镜头模式偏好；沿用旧文件名以保留升级前的选择。
+	"rank_split_state.go":        1, // R316: root rank-split-windows.json; only server/queue and public season id/start/end/next, no account data.
 	"season_stats.go":            1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
 	"update.go":                  3, // 根级 update-settings.json ×1、update-manifest.json ×2
 	"update_sources.go":          1, // 根级 update-settings.json 的成功线路偏好；既有 stores 自动更新设置，不含账号数据。

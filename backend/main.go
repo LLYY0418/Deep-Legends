@@ -335,6 +335,7 @@ type app struct {
 	proIdentityDiagnosticOrder          [][32]byte
 	rankRecordMu                        sync.Mutex
 	rankSplitWindows                    map[string]map[string]sgpRankedSeason
+	rankSplitState                      rankSplitPersistence
 	rankedRecordBuckets                 map[string]*rankedRecordBucket
 	rankedWinrateDiagnosticMu           sync.Mutex
 	rankedWinrateDiagnosticBuckets      map[string]*rankedWinrateDiagnosticBucket

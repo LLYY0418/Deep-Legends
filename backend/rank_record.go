@@ -32,37 +32,26 @@ const rankSplitStart int64 = 1785351600000
 const rankSplitEnd int64 = 1799247600000
 
 func resolveRankSplit(season sgpRankedSeason, now time.Time) (int64, string) {
-	if season.CurrentSeasonStart > 0 {
-		end := season.CurrentSeasonEnd
-		if end <= season.CurrentSeasonStart {
-			end = 0
+	if season.CurrentSeasonStart <= 0 {
+		if now.UnixMilli() < rankSplitEnd {
+			return rankSplitStart, "constant"
 		}
-		if end == 0 && season.CurrentSeasonStart < rankSplitEnd {
-			end = rankSplitEnd
-		}
-		if end == 0 || now.UnixMilli() < end {
-			return season.CurrentSeasonStart, "sgp"
-		}
+		return rankSplitEnd, "sgp-end"
 	}
-	if now.UnixMilli() < rankSplitEnd {
-		return rankSplitStart, "constant"
+	end := season.CurrentSeasonEnd
+	if end <= season.CurrentSeasonStart {
+		end = 0
 	}
-	_, start := currentRankedSeason(now)
-	return start.UnixMilli(), "season"
-}
-func (a *app) rememberRankSplits(player string, seasons map[string]sgpRankedSeason) {
-	a.rankRecordMu.Lock()
-	defer a.rankRecordMu.Unlock()
-	if a.rankSplitWindows == nil {
-		a.rankSplitWindows = map[string]map[string]sgpRankedSeason{}
+	if end == 0 && season.CurrentSeasonStart < rankSplitEnd {
+		end = rankSplitEnd
 	}
-	if _, exists := a.rankSplitWindows[player]; !exists && len(a.rankSplitWindows) >= 64 {
-		for key := range a.rankSplitWindows {
-			delete(a.rankSplitWindows, key)
-			break
-		}
+	if end == 0 || now.UnixMilli() < end {
+		return season.CurrentSeasonStart, "sgp"
 	}
-	a.rankSplitWindows[player] = seasons
+	if season.NextSeasonStart >= end && season.NextSeasonStart <= now.UnixMilli() {
+		return season.NextSeasonStart, "sgp-next"
+	}
+	return end, "sgp-end"
 }
 
 type rankedRecordBucket struct {
@@ -85,9 +74,7 @@ func rankRecordQueue(queue string) (int64, string) {
 // Upstream annual wins never participate in the current split's counts.
 func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability EndpointCapability, snapshot seasonRankRecordSnapshot) ([]gameplayRank, EndpointCapability) {
 	ranks = append([]gameplayRank(nil), ranks...)
-	a.rankRecordMu.Lock()
-	seasons := a.rankSplitWindows[snapshot.player]
-	a.rankRecordMu.Unlock()
+	seasons, persisted := a.rankSplitSnapshot(snapshot.player)
 	records := snapshot.ranked
 	if snapshot.progress.rankRecords != nil {
 		records = snapshot.progress.rankRecords
@@ -106,7 +93,28 @@ func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability En
 			continue
 		}
 		start, source := resolveRankSplit(seasons[rank.QueueType], time.Now())
+		split := seasons[rank.QueueType]
+		id := split.CurrentSeasonID
+		if source == "sgp-next" {
+			id++
+		}
+		if source == "constant" {
+			id = 23
+		}
+		splitLabel, idResult, dateResult := rankSplitLabel(id, start)
+		if source == "sgp-end" {
+			splitLabel = ""
+		}
+		if persisted && source == "sgp" {
+			source = "persisted"
+		}
+		if splitLabel == "" {
+			a.recordDiagnostic(map[string]any{"event": "rank_split_label_uncertain", "id": id, "start": time.UnixMilli(start).UTC().Format(time.RFC3339), "id_result": idResult, "date_result": dateResult})
+		}
 		rank.RecordSplitStart, rank.RecordSplitSource = start, source
+		rank.RecordSplitID, rank.RecordSplitLabel = id, splitLabel
+		date := time.UnixMilli(start).In(time.FixedZone("CST", 8*3600))
+		rank.RecordSplitFrom = fmt.Sprintf("%d月%d日", date.Month(), date.Day())
 		if !rank.seasonFallback {
 			rank.OfficialWins = rank.Wins
 		}
@@ -142,7 +150,7 @@ func (a *app) applySeasonRankWinRateFallback(ranks []gameplayRank, capability En
 		if branch == "" {
 			branch = "normal"
 		}
-		a.recordDiagnostic(map[string]any{"event": "ranked_record_resolved", "branch": branch, "queue": label, "upstream_complete": false, "filled_by": rank.RecordSource, "progress_complete": snapshot.progress.RankedComplete, "pending": rank.RecordPending, "split_start": time.UnixMilli(start).UTC().Format(time.RFC3339), "split_source": source, "split_games": games})
+		a.recordDiagnostic(map[string]any{"event": "ranked_record_resolved", "branch": branch, "queue": label, "upstream_complete": false, "filled_by": rank.RecordSource, "progress_complete": snapshot.progress.RankedComplete, "pending": rank.RecordPending, "split_start": time.UnixMilli(start).UTC().Format(time.RFC3339), "split_source": source, "split_id": id, "split_label": splitLabel, "split_games": games})
 	}
 	return ranks, capability
 }

@@ -123,7 +123,7 @@ func TestR109CNMatchTimeoutKeepsReadyRankAndMastery(t *testing.T) {
 	subject := strings.Repeat("o", 48)
 	a.rankScores = newRankScoreCache()
 	a.rankScores.mu.Lock()
-	a.rankScores.putLocked(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", subject, ""), rankScoreEntry{
+	a.rankScores.putLocked(rankScoreCacheKeyScoped(dataSourceLCU, "HN1", subject, "|"+a.rankSplitScope("HN1|"+subject, time.Now())), rankScoreEntry{
 		at: time.Now(), ranks: []gameplayRank{{QueueType: "RANKED_SOLO_5x5", Tier: "MASTER"}},
 		capability: EndpointCapability{Name: "ranked-stats", State: capabilityAvailable},
 	})

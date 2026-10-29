@@ -343,6 +343,9 @@ type gameplayRank struct {
 	RecordPending     bool   `json:"recordPending"`
 	RecordSplitStart  int64  `json:"recordSplitStart,omitempty"`
 	RecordSplitSource string `json:"recordSplitSource,omitempty"`
+	RecordSplitID     int    `json:"recordSplitId,omitempty"`
+	RecordSplitLabel  string `json:"recordSplitLabel,omitempty"`
+	RecordSplitFrom   string `json:"recordSplitFrom,omitempty"`
 	countryRank       bool
 	Provisional       bool `json:"provisional"`
 	seasonFallback    bool // Internal provenance; never used as an LP baseline.

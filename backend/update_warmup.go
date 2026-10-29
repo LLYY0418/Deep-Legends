@@ -8,8 +8,9 @@ import (
 )
 
 type warmedUpdateInstaller struct {
-	path string
-	info os.FileInfo
+	path     string
+	info     os.FileInfo
+	identity string
 }
 
 // Called only after verification. Reserve the immutable file before dispatch so
@@ -24,11 +25,11 @@ func (u *updateManager) warmReadyInstaller(manifest updateManifest) {
 		return
 	}
 	u.mu.Lock()
-	if old := u.warmedInstaller; old != nil && old.path == path && old.info.Size() == info.Size() && old.info.ModTime().Equal(info.ModTime()) && os.SameFile(old.info, info) {
+	if old := u.warmedInstaller; old != nil && old.identity == updateManifestIdentity(manifest) && old.path == path && old.info.Size() == info.Size() && old.info.ModTime().Equal(info.ModTime()) && os.SameFile(old.info, info) {
 		u.mu.Unlock()
 		return
 	}
-	u.warmedInstaller = &warmedUpdateInstaller{path: path, info: info}
+	u.warmedInstaller = &warmedUpdateInstaller{path: path, info: info, identity: updateManifestIdentity(manifest)}
 	run, parent := u.warmInstaller, u.ctx
 	u.mu.Unlock()
 	if run == nil {
@@ -37,6 +38,9 @@ func (u *updateManager) warmReadyInstaller(manifest updateManifest) {
 	if parent == nil {
 		parent = context.Background()
 	}
+	u.standby.mu.Lock()
+	generation := u.standby.generation
+	u.standby.mu.Unlock()
 	goSafe("update-installer-warmup", func() {
 		ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 		defer cancel()
@@ -50,6 +54,9 @@ func (u *updateManager) warmReadyInstaller(manifest updateManifest) {
 		}
 		if u.diagnostic != nil {
 			u.diagnostic(map[string]any{"event": "update_warmup", "result": result, "ms": time.Since(started).Milliseconds()})
+		}
+		if err == nil && ctx.Err() == nil {
+			u.prepareStandby(parent, manifest, path, generation)
 		}
 	})
 }

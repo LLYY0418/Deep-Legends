@@ -972,7 +972,7 @@ func (a *app) startSeasonStatsRefresh(client *LCUClient, reference gameplayRefer
 			return
 		}
 	}
-	key := seasonQuerySnapshotKey(serverID, playerRef, season)
+	key := seasonQuerySnapshotKey(serverID, playerRef, season) + "|" + a.rankSplitScope(serverID+"|"+playerRef, time.Now())
 	now := time.Now()
 	a.seasonBackfillMu.Lock()
 	if previous := a.seasonQuerySnapshotLocked(key, now); !fresh && !previous.IsZero() && now.Sub(previous) < seasonQueryDedupTTL {
@@ -1666,6 +1666,10 @@ func (a *app) handleGameplaySeasonSummary(w http.ResponseWriter, r *http.Request
 		return
 	}
 	player := Summoner{PUUID: reference.PlayerRef}
+	a.mu.RLock()
+	client := a.lcu
+	a.mu.RUnlock()
+	a.refreshExpiredRankSplit(r.Context(), client, reference.ServerID, reference.PlayerRef, false, reference.Privacy, time.Now())
 	rows, progress, ranked, queues := a.loadSeasonChampionStatsSnapshot(reference, player, reference.PlayerRef)
 	rankedQueues := buildGameplayRankedQueues(gameplayRankedQueueTabs(nil, ranked), reference.PlayerRef, nil, reference.Region)
 	for key, item := range rankedQueues {
