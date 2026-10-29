@@ -129,6 +129,15 @@
   .topcard-copy h3 { font-size: 15px; }
   .topcard-copy p { margin-bottom: 2px; }
 }
+
+/* CSS zoom can make the card narrower than the physical viewport. */
+@container champion-list (max-width: 719px) {
+  .champion-table { min-width: 0; }
+  .champion-table th, .champion-table td { padding-inline: 8px; }
+  .champion-table th:first-child { width: 42px; }
+  .champion-table th:nth-child(2) { width: 30%; }
+  .champion-table th:nth-child(3) { width: 56px; }
+}
 .champion-topcard { position: relative; overflow: hidden; height: 128px; background: var(--surface-strong); border: 1px solid var(--line); border-radius: var(--radius-md); cursor: pointer; }
 .champion-topcard.is-first { border-color: color-mix(in oklab,var(--primary) 55%,var(--line)); }
 .champion-topcard:hover, .champion-topcard:focus-visible { border-color: color-mix(in oklab,var(--primary) 70%,var(--line)); }
@@ -838,6 +847,7 @@
 .arena-match-empty span, .arena-pane-empty span { max-width: 520px; font-size: 10px; line-height: 1.45; }
 
 @container arena-pane (max-width: 820px) {
+  .arena-slim-grid { grid-template-columns: repeat(auto-fit,minmax(min(190px,100%),1fr)); }
 	.arena-option-grid, .arena-augment-section .arena-option-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 	.arena-option-main { align-items: center; }
 	.arena-synergy-grid { grid-template-columns: 1fr; }
