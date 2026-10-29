@@ -70,7 +70,7 @@ func (t *updateInstallTiming) writeLocked() {
 			stages[stage] = nil
 		}
 	}
-	for _, stage := range []string{"page_visible", "webview_ready", "ack_sent", "process_created_to_main_ms"} {
+	for _, stage := range []string{"page_visible", "webview_ready", "ack_sent", "process_created_to_main_ms", "go_initialization_ms", "shell_create_ms", "environment_started", "environment_controller_ms", "navigation_started", "navigation_completed", "first_frame"} {
 		if value, ok := t.stages[stage]; ok {
 			stages[stage] = value
 		}

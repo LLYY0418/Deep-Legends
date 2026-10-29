@@ -1,0 +1,49 @@
+name: R316 installer staged development measurement
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build production-shaped instrumented candidate
+        shell: pwsh
+        run: |
+          $version=node -p "require('./desktop/package.json').version"
+          $fakeCipher=(& go run ./backend -encrypt-riot-key 'RGAPI-00000000-0000-0000-0000-000000000000').Trim()
+          ./build-desktop-windows.ps1 -Version $version -KeyMode public -SkipTestsInCI -RiotAPIKeyCipher $fakeCipher
+          if($LASTEXITCODE -ne 0){throw 'build failed'}
+      - name: Instrumented update ten samples after existing warmup
+        shell: pwsh
+        run: |
+          ./scripts/r314-upgrade-window.ps1 -Setup (Get-ChildItem dist/desktop/Deep-Legends-Setup-*-public.exe).FullName -Output "$env:RUNNER_TEMP/r316-timing/candidate" -Count 10 -Warmup -WaitForPage
+          if($LASTEXITCODE -ne 0){throw 'measurement failed'}
+      - name: Actual published 0.13.4 ten control samples
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $old="$env:RUNNER_TEMP/r316-old";New-Item -ItemType Directory -Force $old|Out-Null
+          gh release download v0.13.4 --pattern '*public.exe' --dir $old
+          $setup=(Get-ChildItem "$old/*.exe").FullName
+          if((Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'a90f629b6d033c2ddb380f520dd9c6fd9f20cb49f44febe277034aca3472e243'){throw 'control integrity'}
+          ./scripts/r314-upgrade-window.ps1 -Setup $setup -Output "$env:RUNNER_TEMP/r316-timing/control" -Count 10 -Warmup -WaitForPage
+          if($LASTEXITCODE -ne 0){throw 'control failed'}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r316-installer-timing-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/r316-timing/**/*.json
+            ${{ runner.temp }}/r316-timing/**/*.log
+            ${{ runner.temp }}/r316-timing/**/*.txt
+          if-no-files-found: error

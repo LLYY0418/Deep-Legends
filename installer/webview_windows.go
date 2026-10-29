@@ -56,7 +56,10 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 			os.Exit(1)
 		})
 	}
+	environmentStarted := time.Now()
+	a.timing.mark("environment_started")
 	embedded := chromium.Embed(w.hwnd)
+	a.timing.duration("environment_controller_ms", time.Since(environmentStarted).Milliseconds())
 	if watchdog != nil && !watchdog.stop() {
 		a.recoveryAttempted = true
 		<-watchdog.done
@@ -90,6 +93,7 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		a.pageReady = true
 		w.starting = false
 		w.webviewReady = true
+		a.timing.mark("first_frame")
 		a.timing.mark("webview_ready")
 		log.Print("installer page ready; WebView visible")
 		if a.options.Update {
@@ -125,11 +129,13 @@ func (a *installerApp) embed(html string, initial initMessage) error {
 		postMessage.Call(w.hwnd, WM_CLOSE, 0, 0)
 	})
 	chromium.NavigationCompletedCallback = func(_ *edge.ICoreWebView2, args *edge.ICoreWebView2NavigationCompletedEventArgs) {
+		a.timing.mark("navigation_completed")
 		err := webviewhost.NavigationResult(args)
 		w.dispatch(func() { w.startup.NavigationCompleted(err) })
 	}
 	w.startupTimer = time.AfterFunc(webviewhost.PageTimeout, func() { w.dispatch(w.startup.Timeout) })
 	log.Print("loading installer document")
+	a.timing.mark("navigation_started")
 	w.startup.Start(html)
 	return nil
 }

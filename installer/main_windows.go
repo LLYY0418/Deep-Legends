@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"time"
 
 	"deeplegends/installer/internal/webviewhost"
 	"deeplegends/installer/payload"
@@ -15,6 +16,7 @@ func main() {
 	if installerWarmup(os.Args[1:]) {
 		return
 	}
+	mainEntered := time.Now()
 	processCreatedToMain := processCreatedToMainMillis()
 	defer webviewhost.StartupLog("DeepLegendsSetup")()
 	runtime.LockOSThread()
@@ -39,6 +41,7 @@ func main() {
 		timing = newUpdateInstallTiming()
 		timing.mark("installer_start")
 		timing.duration("process_created_to_main_ms", processCreatedToMain)
+		timing.duration("go_initialization_ms", time.Since(mainEntered).Milliseconds())
 		if options.Error != nil {
 			return
 		}
@@ -63,11 +66,13 @@ func main() {
 		}
 	}
 
+	shellStarted := time.Now()
 	w, err := createShellWindow()
 	if err != nil {
 		webviewhost.ReportStartupFailure("DeepLegendsSetup", "安装", err)
 		return
 	}
+	timing.duration("shell_create_ms", time.Since(shellStarted).Milliseconds())
 	w.timing = timing
 	app := &installerApp{window: w, meta: meta, payloadError: payloadError, options: options, waitParent: waitParent, timing: timing}
 
