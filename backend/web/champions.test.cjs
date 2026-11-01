@@ -3461,10 +3461,11 @@ test("disconnected collection, account, live and pool pages hide filters", () =>
 test("account page removes the duplicate title and sizes facts to unwrapped content", () => {
 	assert.doesNotMatch(html, /<h2>账户与物品<\/h2>/);
 	assert.match(html, /id="account-live-state"/);
-	assert.match(appStyles, /\.account-hero\s*\{[^}]*grid-template-columns:\s*72px minmax\(180px,1fr\) max-content/s);
-	assert.match(appStyles, /\.account-facts\s*\{[^}]*width:\s*max-content[^}]*grid-template-columns:\s*repeat\(2,max-content\)/s);
-	assert.match(appStyles, /\.account-facts dd\s*\{[^}]*white-space:\s*nowrap/s);
-	assert.doesNotMatch(appStyles, /\.account-facts\s*\{[^}]*grid-template-columns:\s*1fr/s);
+	const accountStyles = appStyles + fs.readFileSync(path.join(__dirname, "collection.css"), "utf8");
+	assert.match(accountStyles, /\.account-hero\s*\{[^}]*grid-template-columns:\s*72px minmax\(180px,1fr\) max-content/s);
+	assert.match(accountStyles, /\.account-facts\s*\{[^}]*width:\s*max-content[^}]*grid-template-columns:\s*repeat\(2,max-content\)/s);
+	assert.match(accountStyles, /\.account-facts dd\s*\{[^}]*white-space:\s*nowrap/s);
+	assert.doesNotMatch(accountStyles, /\.account-facts\s*\{[^}]*grid-template-columns:\s*1fr/s);
 });
 
 test("optional themes keep a neutral background and accent-only primary", () => {

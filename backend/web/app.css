@@ -589,12 +589,7 @@ body.is-fatal main.shell > :not(#notice) { display: none !important; }
 .state-chip.unsupported { color: var(--warning); background: var(--warning-soft); }
 .state-chip.failed, .state-chip.invalid { color: var(--danger); background: var(--danger-soft); }
 .skeleton-line { height: 42px; border-radius: var(--radius-sm); background: linear-gradient(100deg,var(--surface) 30%,var(--surface-strong) 46%,var(--surface) 62%); background-size: 220% 100%; animation: skeleton 1.2s ease-in-out infinite; }
-.account-hero { position: relative; display: grid; grid-template-columns: 72px minmax(180px,1fr) max-content; align-items: center; gap: 12px; padding: 22px; overflow: hidden; background: var(--surface); border: 1px solid var(--hex-line); border-radius: 8px; }
 .eyebrow { margin: 0 0 3px; color: var(--primary-strong); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
-.account-facts { position: relative; z-index: 1; display: grid; width: max-content; max-width: 100%; grid-template-columns: repeat(2,max-content); gap: 1px; margin: 0; overflow-x: auto; background: var(--hex-line); border: 1px solid var(--hex-line); border-radius: 8px; }
-.account-facts div { min-width: max-content; padding: 10px 12px; background: color-mix(in oklab,var(--surface) 94%,transparent); }
-.account-facts dt { color: var(--muted); font-size: 11px; white-space: nowrap; }
-.account-facts dd { margin: 3px 0 0; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .section-copy { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-bottom: 9px; }
 .section-copy h3, .audit-tables h3 { margin: 0; font-size: 16px; }
 .section-copy p { max-width: 68ch; margin: 0; color: var(--muted); font-size: 12px; text-align: right; text-wrap: pretty; }

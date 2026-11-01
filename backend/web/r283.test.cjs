@@ -52,7 +52,7 @@ test('R283 P11 rift dual queues and ARAM solo only',()=>{
    const html=arena.identityLine(player,'rift','上单 · 旧段位');assert(html.includes('单双 '));assert(html.includes('组排 '));assert(html.includes('data-tooltip-overflow="self"'));
   }
   const aram=arena.identityLine({soloRank:solo,flexRank:flex},'aram','');assert(aram.includes('platinum.png'));assert(!aram.includes('diamond.png'));
-  assert.equal(arena.identityLine({},'arena',''),'');
+  const unknown=arena.identityLine({},'arena','');assert(unknown.includes('单双 未定级'));assert(unknown.includes('组排 未定级'));assert(!unknown.includes('rank-crests/'));
  }finally{delete globalThis.deepLegendsMatchCards}
 });
 test('R283 P13 career identity and explicit selection',()=>{
