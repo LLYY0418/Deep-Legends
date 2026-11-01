@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -54,7 +55,10 @@ func (p *championProvider) loadLiveArenaDetail(ctx context.Context, id int, tier
 		}
 		entry = &liveArenaDetailEntry{ready: make(chan struct{}), pending: true}
 		p.liveArenaDetails[key] = entry
-		go p.fillLiveArenaDetail(id, tier, entry)
+		go func() {
+			defer recoverPanic("arena.recommendation-start")
+			p.fillLiveArenaDetail(id, tier, entry)
+		}()
 	}
 	ready := entry.ready
 	p.mu.Unlock()
@@ -74,6 +78,22 @@ func (p *championProvider) loadLiveArenaDetail(ctx context.Context, id int, tier
 }
 func (p *championProvider) fillLiveArenaDetail(id int, tier string, entry *liveArenaDetailEntry) {
 	defer recoverPanic("arena.recommendation-race")
+	defer func() {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		if entry.pending {
+			entry.pending = false
+			entry.until = time.Now().Add(5 * time.Second)
+			if len(entry.detail.ArenaAugments) == 0 {
+				entry.err = errors.New("arena recommendation interrupted")
+			}
+			select {
+			case <-entry.ready:
+			default:
+				close(entry.ready)
+			}
+		}
+	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	flag := &atomic.Bool{}
@@ -127,24 +147,7 @@ func (p *championProvider) fillLiveArenaDetail(id int, tier string, entry *liveA
 			// Prefer a larger complete row set; enrich missing build and synergy data.
 			next := result.detail
 			if published {
-				old := entry.detail
-				if len(next.ArenaAugments) < len(old.ArenaAugments) {
-					next.ArenaAugments = old.ArenaAugments
-					next.ArenaAugmentGroups = old.ArenaAugmentGroups
-					next.Source = old.Source
-				}
-				if len(next.Build.CoreItems) == 0 {
-					next.Build.CoreItems = old.Build.CoreItems
-				}
-				if len(next.Build.PrismItems) == 0 {
-					next.Build.PrismItems = old.Build.PrismItems
-				}
-				if len(next.Build.Boots) == 0 {
-					next.Build.Boots = old.Build.Boots
-				}
-				if len(next.TeamCompositions) == 0 {
-					next.TeamCompositions = old.TeamCompositions
-				}
+				next = mergeLiveArenaDetail(entry.detail, next)
 			}
 			entry.detail = next
 			entry.until = time.Now().Add(3 * time.Minute)
@@ -232,4 +235,26 @@ func decorateLiveArenaItems(d *championDetailResponse) {
 			}
 		}
 	}
+}
+
+func mergeLiveArenaDetail(old, next championDetailResponse) championDetailResponse {
+	oldYour, nextYour := strings.Contains(old.Source, "YOUR.GG"), strings.Contains(next.Source, "YOUR.GG")
+	if len(next.ArenaAugments) < len(old.ArenaAugments) || len(next.ArenaAugments) == len(old.ArenaAugments) && oldYour && !nextYour {
+		next.ArenaAugments = old.ArenaAugments
+		next.ArenaAugmentGroups = old.ArenaAugmentGroups
+		next.Source = old.Source
+	}
+	if len(next.Build.CoreItems) == 0 || oldYour && !nextYour && len(old.Build.CoreItems) > 0 {
+		next.Build.CoreItems = old.Build.CoreItems
+	}
+	if len(next.Build.PrismItems) == 0 || oldYour && !nextYour && len(old.Build.PrismItems) > 0 {
+		next.Build.PrismItems = old.Build.PrismItems
+	}
+	if len(next.Build.Boots) == 0 {
+		next.Build.Boots = old.Build.Boots
+	}
+	if len(next.TeamCompositions) == 0 {
+		next.TeamCompositions = old.TeamCompositions
+	}
+	return next
 }

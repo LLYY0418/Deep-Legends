@@ -76,7 +76,7 @@ var (
 )
 
 type championProvider struct {
- liveArenaDetails map[string]*liveArenaDetailEntry
+	liveArenaDetails    map[string]*liveArenaDetailEntry
 	augmentDescriptions augmentDescriptionFlights
 	// Set before use; zero keeps the production translation budget.
 	lootTranslationTimeout time.Duration
@@ -459,10 +459,10 @@ type championPositionOption struct {
 }
 
 type championDetailResponse struct {
- ArenaRanking *championRankingRow `json:"-"`
- ArenaCacheHit bool `json:"-"`
- ArenaHedged bool `json:"-"`
- ArenaPending bool `json:"arenaPending,omitempty"`
+	ArenaRanking        *championRankingRow      `json:"-"`
+	ArenaCacheHit       bool                     `json:"-"`
+	ArenaHedged         bool                     `json:"-"`
+	ArenaPending        bool                     `json:"arenaPending,omitempty"`
 	ARAMKit             *aramkitChampionView     `json:"aramkit,omitempty"`
 	AugmentCombinations []championMetricRow      `json:"augmentCombinations,omitempty"`
 	DataNotice          string                   `json:"dataNotice,omitempty"`

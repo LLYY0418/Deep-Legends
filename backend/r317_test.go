@@ -311,6 +311,8 @@ func r317YourBody() []byte {
 }
 func TestR317ArenaFastSourceThenRicherCacheWithoutHistory(t *testing.T) {
 	release := make(chan struct{})
+	timer := time.AfterFunc(4*time.Second, func() { close(release) })
+	defer timer.Stop()
 	p := r317ArenaProvider(t, func(r *http.Request, _ int) (*http.Response, error) {
 		select {
 		case <-r.Context().Done():
@@ -330,8 +332,7 @@ func TestR317ArenaFastSourceThenRicherCacheWithoutHistory(t *testing.T) {
 	if !first.ArenaPending || len(first.ArenaAugments) != 3 || first.ArenaCacheHit {
 		t.Fatalf("first %+v", first)
 	}
-	close(release)
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(6 * time.Second)
 	for {
 		next, err := p.loadLiveArenaDetail(context.Background(), 67, "")
 		if err != nil {
@@ -435,5 +436,16 @@ func TestR317ArenaAllPlayersUseSoloAndFlexPipeline(t *testing.T) {
 				t.Fatalf("rank reads=%d", calls.Load())
 			}
 		})
+	}
+}
+
+func TestR317ArenaLateFallbackCannotDowngradeRicherMetrics(t *testing.T) {
+	old := championDetailResponse{Source: "YOUR.GG aggregate", ArenaAugments: []championMetricRow{{Score: 90}}}
+	old.Build.CoreItems = []championMetricRow{{Score: 80}}
+	next := championDetailResponse{Source: "OP.GG JSON", ArenaAugments: []championMetricRow{{Score: 0}}}
+	next.Build.CoreItems = []championMetricRow{{Score: 0}}
+	merged := mergeLiveArenaDetail(old, next)
+	if merged.ArenaAugments[0].Score != 90 || merged.Build.CoreItems[0].Score != 80 {
+		t.Fatal("late fallback stripped authoritative scores", merged)
 	}
 }

@@ -6540,15 +6540,15 @@
         ? Number(data.currentChampionId)
         : Number(data?.resolvedChampionId) > 0 ? Number(data.resolvedChampionId) : 0;
     if (championId <= 0) return null;
-    const clientPosition = self?.position || "other";
     const augmentSource = liveAugmentRecommendationSource(data);
+    const clientPosition = augmentSource==="arena"?"other":self?.position || "other";
     const queueId = Number(data?.queueId) || 0;
-    const gameMode = String(data?.gameMode || "").trim().toUpperCase();
-    const mapId = Number(data?.mapId) || 0;
+    const gameMode = augmentSource==="arena"?"CHERRY":String(data?.gameMode || "").trim().toUpperCase();
+    const mapId = augmentSource==="arena"?30:Number(data?.mapId) || 0;
     const tier = liveRecommendationTier();
     const baseKey = `${championId}:${gameMode}:${mapId}`;
     const positionOverride = state.livePositionOverride.get(baseKey) || "";
-    const position = positionOverride || clientPosition;
+    const position = augmentSource==="arena"?"other":positionOverride || clientPosition;
     const gameId = Number(data?.gameId) || 0;
     const scopeGameId = gameId > 0 ? gameId : Number(state.liveRecommendationScopeGameId || 0);
     if (gameId > 0) {

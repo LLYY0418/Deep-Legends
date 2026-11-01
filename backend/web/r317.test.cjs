@@ -14,6 +14,6 @@ test('R317 InProgress recommendation starts within 200ms while roster/history is
 test('R317 CHERRY recommendation key ignores summoner spell changes across entry',()=>{
  const state={livePositionOverride:new Map(),liveRecommendationSpells:new Map()};
  const f=compile(source,['liveRecommendationTarget','liveRecommendationChampionId'],{state,USE_CHAMPION_PICK_INTENT_FOR_RECOMMENDATIONS:true,liveAugmentRecommendationSource:()=> 'arena',liveRecommendationTier:()=>'',});
- const data={phase:'ChampSelect',queueId:1750,gameMode:'CHERRY',mapId:30,players:[{isCurrent:true,championId:154,championLocked:true,position:'other',spell1Id:4,spell2Id:14}]};
+ const data={phase:'ChampSelect',queueId:1750,gameMode:'',mapId:0,players:[{isCurrent:true,championId:154,championLocked:true,position:'bottom',spell1Id:4,spell2Id:14}]};
  const a=f.liveRecommendationTarget(data);data.phase='InProgress';data.players[0].spell1Id=0;data.players[0].spell2Id=0;const b=f.liveRecommendationTarget(data);assert.equal(a.key,b.key);assert.match(a.key,/:other:CHERRY:30:.*:none$/);
 });

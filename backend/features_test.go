@@ -16,6 +16,9 @@ func TestClientDiagnosticAcceptsMultipleEventWhitelists(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			body := `{"event":"` + event + `","reason":"` + reason + `","key":"13:middle:CLASSIC:11:4-12","championId":13,"queueId":420,"position":"MID"}`
 
+			if event == "arena_recommendation_timing" {
+				body = `{"event":"arena_recommendation_timing","reason":"rendered","arenaTiming":{"locked_at":-5000,"prewarm_started_at":-5000,"prewarm_ready_at":-3000,"in_progress_at":0,"rendered_at":150,"source":"YOUR.GG aggregate","cache_hit":true,"hedged":false}}`
+			}
 			if event == "rank_record_state" || event == "rank_record_final_state" {
 				body = `{"event":"` + event + `","reason":"` + reason + `","queue":"solo","state":"` + reason + `","source":"season","cause":"initial","render_seq":1}`
 			}

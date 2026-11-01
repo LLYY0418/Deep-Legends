@@ -7676,6 +7676,9 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 		return response
 	}
 	response.Available = true
+	if phase == "ChampSelect" && isArenaQueue(response.QueueID, response.GameMode) {
+		a.prewarmLockedArena(champSelect, response.QueueID, response.GameMode)
+	}
 	rawPlayers = a.supplementLiveGSMRoster(ctx, client, current, &response, rawPlayers)
 	arenaMode := isArenaQueue(response.QueueID, response.GameMode)
 	tagSource := "live"
