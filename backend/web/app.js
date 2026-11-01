@@ -49,13 +49,6 @@ function createFloatingLayerLifecycle(win = window) {
   return {watch,closeAll};
 }
 window.deepLegendsFloatingLayers=createFloatingLayerLifecycle();
-function setupFavoritesSticky() {
- const header=document.querySelector('.favorites-header');if(!header)return;
- const pool=document.querySelector('.pool-workspace-head');
- const measure=()=>{if(header.hidden)return;const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue('--ui-zoom'))||1;document.documentElement.style.setProperty('--favorites-header-height',`${header.getBoundingClientRect().height/zoom}px`);if(pool)document.documentElement.style.setProperty('--favorites-pool-head-height',`${pool.getBoundingClientRect().height/zoom}px`);};
- const observer=new ResizeObserver(measure);observer.observe(header);if(pool)observer.observe(pool);measure();
-}
-if(typeof ResizeObserver==='function')setupFavoritesSticky();
 
 
 (async () => {

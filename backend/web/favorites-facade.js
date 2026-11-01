@@ -1,3 +1,12 @@
+function setupFavoritesSticky() {
+ const header=document.querySelector('.favorites-header');if(!header)return;
+ const pool=document.querySelector('.pool-workspace-head');
+ const measure=()=>{if(header.hidden)return;const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue('--ui-zoom'))||1;document.documentElement.style.setProperty('--favorites-header-height',`${header.getBoundingClientRect().height/zoom}px`);if(pool)document.documentElement.style.setProperty('--favorites-pool-head-height',`${pool.getBoundingClientRect().height/zoom}px`);};
+ const observer=new ResizeObserver(measure);observer.observe(header);if(pool)observer.observe(pool);measure();
+}
+if(typeof ResizeObserver==='function')setupFavoritesSticky();
+
+
 // R123：收藏页「头像与旗帜」只读浏览子页。
 // 数据源为现成的只读目录接口 /api/facade/icons 与 /api/facade/banners；
 // 视觉与交互复用皮肤收藏的组件族（view-tabs / filters / skin-grid / skin-card-template / list-meta），

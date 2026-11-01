@@ -76,7 +76,7 @@ test('R282 P17 collection tracks and skeletons do not depend on card count',()=>
  for(const cls of ['chroma-prestige-grid','chroma-stack-cards','chroma-mini-card'])assert(skeleton.includes(cls));
  assert(!extract(app,'configureSparseGrid').includes('count * 640'));
 });
-test('R282 P18 ARAM and Rift preferred ranks have crests; Arena does not show ranked tiers',()=>{
+test('R282 P18 ARAM and Rift ranks have crests; Arena shares solo and flex ranks',()=>{
  const arena=require('./live-arena.js');globalThis.deepLegendsMatchCards={live:{rankTitle:r=>r.tier+' '+(r.division||'')}};
  try{const solo={tier:'DIAMOND',division:'II'},flex={tier:'MASTER',leaguePoints:132,queueType:'RANKED_FLEX_SR'};
  for(const kind of ['aram']){
@@ -84,7 +84,7 @@ test('R282 P18 ARAM and Rift preferred ranks have crests; Arena does not show ra
   const html=arena.identityLine({soloRank:{tier:'UNRANKED'},flexRank:flex},kind,'中路');assert.match(html,/未定级/);assert(!html.includes('rank-crests/'));
   assert(!arena.identityLine({},kind,'中路').includes('rank-crests/'));assert.equal(arena.identityLine({hidden:true},kind,''),'');assert.match(arena.identityLine({hidden:true,soloRank:solo},kind,''),/diamond.png/);
  }
- assert(!arena.identityLine({soloRank:solo},'arena','').includes('rank-crests/'));
+ const both=arena.identityLine({soloRank:solo,flexRank:flex},'arena','');assert.match(both,/rank-crests\/diamond.png/);assert.match(both,/rank-crests\/master.png/);assert.match(both,/单双.*组排/);
  }finally{delete globalThis.deepLegendsMatchCards}
 });
 

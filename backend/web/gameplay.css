@@ -1609,17 +1609,6 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .live-ranking-icon .item-option-button, .live-ranking-icon .game-icon { width: 42px; height: 42px; }
 .skill-plan > .option-stats { margin-top: 8px; }
 
-.favorites-layout { min-width: 0; }
-.favorites-nav { display: flex; flex: 0 1 auto; gap: 5px; min-width: 0; padding: 5px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
-.favorites-nav-item { display: grid; flex: 0 1 160px; width: 160px; grid-template-columns: 28px minmax(0,1fr); align-items: center; gap: 8px; min-height: 58px; padding: 8px 9px; color: var(--muted); background: transparent; border: 0; border-radius: 9px; text-align: left; }
-.favorites-nav-item:hover, .favorites-nav-item.is-active { color: var(--ink); background: var(--surface-strong); }
-.favorites-nav-item > span:first-child { display: grid; width: 27px; height: 27px; place-items: center; color: var(--primary-strong); background: var(--primary-soft); border-radius: 7px; }
-.favorites-nav-item > span:last-child { display: grid; min-width: 0; }
-.favorites-nav-item small { color: var(--muted); font-size: 10px; }
-.favorites-content { min-width: 0; }
-.favorites-subpanel { min-width: 0; }
-.favorites-subpanel:focus { outline: 0; }
-
 .settings-capabilities { padding: 8px 0 20px; border-top: 1px solid var(--line); }
 .gameplay-capabilities { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 7px; }
 .gameplay-capabilities > div { display: grid; grid-template-columns: 10px minmax(0,1fr) auto; align-items: center; gap: 9px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
