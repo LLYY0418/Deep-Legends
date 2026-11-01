@@ -6545,7 +6545,7 @@
     const queueId = Number(data?.queueId) || 0;
     const gameMode = augmentSource==="arena"?"CHERRY":String(data?.gameMode || "").trim().toUpperCase();
     const mapId = augmentSource==="arena"?30:Number(data?.mapId) || 0;
-    const tier = liveRecommendationTier();
+    const tier = augmentSource==="arena"?"":liveRecommendationTier();
     const baseKey = `${championId}:${gameMode}:${mapId}`;
     const positionOverride = state.livePositionOverride.get(baseKey) || "";
     const position = augmentSource==="arena"?"other":positionOverride || clientPosition;
