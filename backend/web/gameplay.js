@@ -3265,7 +3265,7 @@
     const fresh=template.content.querySelector(".rank-mmr-popover");
     for(const control of document.querySelectorAll(".rank-mmr-control")) {
       if(control.dataset.ratingTab!==tab.key || !fresh)continue;
-      (control._mmrPanel || control.querySelector(".rank-mmr-popover")).innerHTML=fresh.innerHTML;
+      (control._mmrPanel || control.querySelector(".rank-mmr-popover")).innerHTML=fresh.innerHTML;control._mmrPosition?.();
       (control._mmrPanel || control).querySelector("[data-mayhem-rating-retry]")?.addEventListener("click",()=>{tab.mayhemRatingManual=true;tab.mayhemRating={...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
     }
   }

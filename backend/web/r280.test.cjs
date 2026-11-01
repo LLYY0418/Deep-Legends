@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
-const {JSDOM}=require('../../desktop/node_modules/jsdom'),{compile,escapeHTML}=require('./r188-harness.cjs');
+const {JSDOM}=require('../../desktop/node_modules/jsdom'),{compile,escapeHTML,extract}=require('./r188-harness.cjs');
 const game=fs.readFileSync(__dirname+'/gameplay.js','utf8'),app=fs.readFileSync(__dirname+'/app.js','utf8');
 test('R280 P4 unchanged owned catalog repaints after subpage and section navigation',async()=>{
  const extract=require('./r188-harness.cjs').extract;
@@ -19,10 +19,17 @@ test('R280 P4 unchanged owned catalog repaints after subpage and section navigat
   assert.equal(el.poolListMeta.textContent,'已拥有 2 款');assert.equal(el.poolSkinGrid.querySelectorAll('.skin-card').length,2);dom.window.close();
  }
 });
-test('R280 P5 hover bridge, delayed leave, pin and outside close keep retry accessible',async()=>{
- const dom=new JSDOM('<div class="rank-mmr-control"><button data-rank-mmr-trigger aria-expanded="false"></button><div class="rank-mmr-popover"><button data-mayhem-rating-retry>重试</button></div></div>');const doc=dom.window.document,c=doc.querySelector('div'),trigger=doc.querySelector('button'),tab={key:'fixture'};let calls=0,next=0;const timers=new Map();
+test('R280 P5 shared body layer keeps hover retry interactive and closes outside',async()=>{
+ const dom=new JSDOM('<div class="rank-mmr-control"><button class="rank-mmr-trigger" data-rank-mmr-trigger aria-expanded="false"></button><div class="rank-mmr-popover"><button data-mayhem-rating-retry>重试</button></div></div>',{pretendToBeVisual:true,runScripts:'outside-only'}),w=dom.window,doc=w.document,c=doc.querySelector('div'),trigger=doc.querySelector('button'),panel=doc.querySelector('.rank-mmr-popover'),retry=panel.querySelector('button'),tab={key:'fixture'};let calls=0,next=0;const timers=new Map(),frames=new Map();
+ w.requestAnimationFrame=fn=>{frames.set(++next,fn);return next};w.cancelAnimationFrame=id=>frames.delete(id);const frame=()=>{const jobs=[...frames.values()];frames.clear();jobs.forEach(fn=>fn())};
+ try{
+ w.eval(extract(app,'createFloatingLayerLifecycle')+';window.layers=createFloatingLayerLifecycle();');
  const f=compile(game,['bindMayhemRatingControls'],{document:doc,mayhemRatingStatus:()=>({status:'error'}),loadMayhemRating:async()=>calls++,setTimeout:fn=>{timers.set(++next,fn);return next},clearTimeout:id=>timers.delete(id)});
- f.bindMayhemRatingControls(doc,tab);c.dispatchEvent(new dom.window.Event('mouseenter'));c.dispatchEvent(new dom.window.Event('mouseleave'));assert.equal(trigger.getAttribute('aria-expanded'),'true');c.dispatchEvent(new dom.window.Event('mouseenter'));assert.equal(timers.size,0);doc.querySelector('[data-mayhem-rating-retry]').click();assert(calls>=2);trigger.click();c.dispatchEvent(new dom.window.Event('mouseleave'));assert.equal(timers.size,0);doc.body.dispatchEvent(new dom.window.Event('pointerdown',{bubbles:true}));assert.equal(trigger.getAttribute('aria-expanded'),'false');assert.match(fs.readFileSync(__dirname+'/gameplay.css','utf8'),/\.rank-mmr-popover::before/);dom.window.close();
+ f.bindMayhemRatingControls(doc,tab);trigger.dispatchEvent(new w.MouseEvent('pointerover',{bubbles:true}));c.dispatchEvent(new w.Event('mouseenter'));c.dispatchEvent(new w.Event('mouseleave'));assert.equal(trigger.getAttribute('aria-expanded'),'true');assert.equal(panel.parentElement,doc.body);
+ retry.dispatchEvent(new w.MouseEvent('pointermove',{bubbles:true}));frame();assert.equal(trigger.getAttribute('aria-expanded'),'true');c.dispatchEvent(new w.Event('mouseenter'));assert.equal(timers.size,0);retry.click();assert(calls>=2);trigger.click();c.dispatchEvent(new w.Event('mouseleave'));assert.equal(timers.size,0);
+ doc.body.dispatchEvent(new w.MouseEvent('pointermove',{bubbles:true}));frame();assert.equal(trigger.getAttribute('aria-expanded'),'false');assert.equal(panel.parentElement,c);
+ trigger.dispatchEvent(new w.MouseEvent('pointerover',{bubbles:true}));assert.equal(trigger.getAttribute('aria-expanded'),'true');doc.body.dispatchEvent(new w.Event('pointerdown',{bubbles:true}));assert.equal(trigger.getAttribute('aria-expanded'),'false');assert.match(fs.readFileSync(__dirname+'/gameplay.css','utf8'),/\.rank-mmr-popover::before/);
+ }finally{w.layers?.closeAll();w.close()}
 });
 test('R280 P5 network failure retries next hover, not-found remains cached',async()=>{
  for(const missing of [false,true]){
