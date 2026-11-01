@@ -2516,8 +2516,8 @@ test("current champion endpoint keeps live recommendations usable without a rost
   assert.equal(target?.championId, 64);
   assert.equal(target?.position, "other");
   assert.equal(target?.self, undefined);
-  assert.equal(target?.tier, "diamond");
-  assert.equal(target?.key, "64:other:CHERRY:30:diamond:none");
+  assert.equal(target?.tier, "");
+  assert.equal(target?.key, "64:other:CHERRY:30::none");
   assert.equal(liveRecommendationTarget({ players: [], currentChampionId: 0 }), null);
 });
 
@@ -4753,11 +4753,10 @@ test("hextech augments retain tier ordering and the top three of each rarity", (
 	    assets: [{ id: index + 1, name: `推荐${index + 1}` }],
 	  }));
 	  let renderedRows = rows;
-	  const { renderLiveAugmentRecommendations } = compileFunctions(gameplayScript, ["augmentTooltipText", "renderLiveAugmentRecommendations"], {
+	  const { renderLiveAugmentRecommendations } = compileFunctions(gameplayScript, ["normalizeAugmentRarity", "augmentTooltipText", "renderLiveAugmentRecommendations"], {
 	    state,
 	    escapeHTML: (value) => String(value ?? ""),
 	    liveChampionAugmentRows: () => renderedRows,
-    normalizeAugmentRarity: (value) => ({ silver: { key: "silver", label: "白银" }, gold: { key: "gold", label: "黄金" }, prismatic: { key: "prismatic", label: "棱彩" } }[String(value)] || { key: "unknown", label: "海克斯" }),
     plainText: (value) => String(value || ""),
     renderLiveAugmentIcon: (row) => `<span data-augment="${row.assets?.[0]?.id || 0}"></span>`,
     liveRecommendationTarget: () => null,

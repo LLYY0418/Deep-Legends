@@ -5058,7 +5058,7 @@
       const description = entry?.status === "ok" ? plainText(entry.description) : "";
       const loading = !entry || entry.status === "loading";
       const tooltip = [augment.name, description].filter(Boolean).join("\n");
-      return `<article class="aug is-${rarity.key}${!loading && !description ? " is-bare" : ""}" data-augment-id="${Number(id)}" data-tooltip="${escapeHTML(tooltip)}" tabindex="0"><div class="aug-icon">${augmentIconFigure(id, "large")}<span class="aug-order">${index + 1}</span></div><div class="aug-body"><div class="aug-title"><strong>${escapeHTML(augment.name)}</strong><span class="rar">${escapeHTML(rarity.label)}</span></div>${description ? `<p>${escapeHTML(description)}</p>` : loading ? '<div aria-hidden="true"><div class="skel"></div><div class="skel"></div></div>' : ""}</div></article>`;
+      return `<article class="aug ${rarity.className}${!loading && !description ? " is-bare" : ""}" data-augment-id="${Number(id)}" data-tooltip="${escapeHTML(tooltip)}" tabindex="0"><div class="aug-icon">${augmentIconFigure(id, "large")}<span class="aug-order">${index + 1}</span></div><div class="aug-body"><div class="aug-title"><strong>${escapeHTML(augment.name)}</strong><span class="rar">${escapeHTML(rarity.label)}</span></div>${description ? `<p>${escapeHTML(description)}</p>` : loading ? '<div aria-hidden="true"><div class="skel"></div><div class="skel"></div></div>' : ""}</div></article>`;
     }).join("")}</div>`;
   }
 
@@ -7822,14 +7822,15 @@
   }
 
   function normalizeAugmentRarity(value) {
-    const key = String(value || "").trim();
+    const input = String(value || "").trim().replace(/^k/, "").toLowerCase();
+    const key = input === "eventchoice" ? "event" : input;
     return ({
-      kBronze: { key: "bronze", label: "青铜" }, bronze: { key: "bronze", label: "青铜" },
-      kSilver: { key: "silver", label: "白银" }, silver: { key: "silver", label: "白银" },
-      kGold: { key: "gold", label: "黄金" }, gold: { key: "gold", label: "黄金" },
-      kPrismatic: { key: "prismatic", label: "棱彩" }, prismatic: { key: "prismatic", label: "棱彩" },
-      kEventChoice: { key: "event", label: "活动" }, event: { key: "event", label: "活动" },
-    })[key] || { key: "unknown", label: "海克斯" };
+      bronze: { key: "bronze", label: "青铜", className: "is-bronze" },
+      silver: { key: "silver", label: "白银", className: "is-silver" },
+      gold: { key: "gold", label: "黄金", className: "is-gold" },
+      prismatic: { key: "prismatic", label: "棱彩", className: "is-prismatic" },
+      event: { key: "event", label: "活动", className: "is-event" },
+    })[key] || { key: "unknown", label: "海克斯", className: "is-unknown" };
   }
 
   function augmentTooltipText(augment, fallbackID = 0) {
@@ -7841,7 +7842,7 @@
   function wrapAugmentIcon(icon, augment, fallbackID = 0) {
     const rarity = normalizeAugmentRarity(augment?.rarity);
     const tooltip = augmentTooltipText(augment, fallbackID);
-    return `<span class="arena-augment-icon is-${rarity.key}" tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}">${icon}</span>`;
+    return `<span class="arena-augment-icon ${rarity.className}" tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}">${icon}</span>`;
   }
 
   function renderLiveAugmentIcon(row, source) {
@@ -7891,7 +7892,7 @@
       }).join("");
       const badge = gradeBadge(row.grade, "live-augment-grade");
       const statsMarkup = stats ? `<small class="live-augment-stats">${stats}</small>` : "";
-      return `<article class="live-augment-option is-${rarity.key}" tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}">${renderLiveAugmentIcon(row, source)}<span><span class="live-augment-title">${badge}<strong>${escapeHTML(asset.name || `海克斯 ${asset.id || row.id}`)}</strong></span>${statsMarkup}</span></article>`;
+      return `<article class="live-augment-option ${rarity.className}" tabindex="0" data-tooltip="${escapeHTML(tooltip)}" aria-label="${escapeHTML(tooltip.replace(/\n/g, "，"))}">${renderLiveAugmentIcon(row, source)}<span><span class="live-augment-title">${badge}<strong>${escapeHTML(asset.name || `海克斯 ${asset.id || row.id}`)}</strong></span>${statsMarkup}</span></article>`;
     };
     const definitions = [["silver", "白银"], ["gold", "黄金"], ["prismatic", "棱彩"]];
     const hasUnknown = rows.some((row) => !definitions.some(([key]) => normalizeAugmentRarity(row.rarity || row.assets?.[0]?.rarity).key === key));

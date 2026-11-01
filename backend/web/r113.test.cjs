@@ -95,7 +95,7 @@ test('R113 ARAM live cards omit ranks and keep their three verified metrics',()=
 
 test('R113 silver source rows survive nine earlier gold rows in both recommendation views',()=>{
   const rows=Array.from({length:12},(_,i)=>({rarity:i<9?'gold':'silver',score:100-i,grade:'S',assets:[{id:i+1,name:`海克斯${i+1}`}]}));
-  const live=compile('gameplay.js',['renderLiveAugmentRecommendations'],{liveChampionAugmentRows:()=>rows,normalizeAugmentRarity:r=>({key:r}),escapeHTML,
+  const live=compile('gameplay.js',['normalizeAugmentRarity','renderLiveAugmentRecommendations'],{liveChampionAugmentRows:()=>rows,escapeHTML,
     augmentTooltipText:()=>'',renderLiveAugmentIcon:()=>'',percent:String,number:String});
   const html=live.renderLiveAugmentRecommendations({},'hextech');
   assert.match(html,/is-silver/);for(const id of [10,11,12])assert.match(html,new RegExp(`海克斯${id}`));

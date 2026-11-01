@@ -85,7 +85,7 @@ test('R207 Classic spell changes retain original exact request and query; specia
   const h=harness();try{
    const data=snapshot();Object.assign(data,{gameMode:mode,mapId:mode==='CLASSIC'?11:mode==='CHERRY'?30:12,queueId:mode==='CLASSIC'?420:mode==='CHERRY'?1700:2400});
    h.state.live=data;await h.ensureLiveRecommendations(data);const old=h.liveRecommendationTarget(data).key;
-   data.players[0].spell2Id=11;const select=h.liveRecommendationTarget(data).key;assert.notEqual(select,old);
+   data.players[0].spell2Id=11;const select=h.liveRecommendationTarget(data).key;if(mode==='CHERRY'){assert.equal(select,old);assert.match(select,/:none$/)}else assert.notEqual(select,old);
    data.phase='InProgress';data.players[0].spell2Id=12;const next=h.liveRecommendationTarget(data);await h.ensureLiveRecommendations(data);
    if(mode==='CLASSIC'){assert.match(next.key,/:4-12$/);const q=new URL(h.calls.at(-1),'http://fixture').searchParams;assert.equal(q.get('spell2Id'),'12')}
    else assert.equal(next.key,select);

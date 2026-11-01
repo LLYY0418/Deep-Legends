@@ -51,8 +51,8 @@ test('R311 real hero DOM switches both lists, retains expansion, normalizes old 
 
 test('R311 live Arena shows four per rarity ordered by games and always win plus games; hextech remains three by tier',()=>{
  const rt=runtime(),rows=dataRows(),comboSources=[];
- const deps={window:{deepLegendsRuntime:rt},gradeRank:rt.gradeRank,gradeBadge:rt.gradeBadge,state:{liveRecommendationFailures:new Map()},renderLiveARAMKitCombos:(_data,source)=>{comboSources.push(source);return source==='hextech'?'<section data-r311-combos>海克斯组合</section>':'';},escapeHTML:String,liveChampionAugmentRows:()=>rows,normalizeAugmentRarity:v=>({key:v}),augmentTooltipText:a=>a.name,renderLiveAugmentIcon:r=>`<i data-id="${r.id}"></i>`,percent:n=>`${n}%`,number:String};
- const render=Function(...Object.keys(deps),extract(read('gameplay.js'),'renderLiveAugmentRecommendations')+';return renderLiveAugmentRecommendations;')(...Object.values(deps));
+ const deps={window:{deepLegendsRuntime:rt},gradeRank:rt.gradeRank,gradeBadge:rt.gradeBadge,state:{liveRecommendationFailures:new Map()},renderLiveARAMKitCombos:(_data,source)=>{comboSources.push(source);return source==='hextech'?'<section data-r311-combos>海克斯组合</section>':'';},escapeHTML:String,liveChampionAugmentRows:()=>rows,augmentTooltipText:a=>a.name,renderLiveAugmentIcon:r=>`<i data-id="${r.id}"></i>`,percent:n=>`${n}%`,number:String};
+ const render=Function(...Object.keys(deps),extract(read('gameplay.js'),'normalizeAugmentRarity')+extract(read('gameplay.js'),'renderLiveAugmentRecommendations')+';return renderLiveAugmentRecommendations;')(...Object.values(deps));
  for(const source of ['arena','hextech']){
   const dom=new JSDOM(render({},source));const doc=dom.window.document;
   assert.equal(comboSources.at(-1),source);assert.equal(!!doc.querySelector('[data-r311-combos]'),source==='hextech','Arena omits combos; Hextech keeps them');
