@@ -3251,17 +3251,11 @@
     for (const control of container.querySelectorAll(".rank-mmr-control")) {
       control.dataset.ratingTab=tab.key;
       const trigger = control.querySelector("[data-rank-mmr-trigger]");
-      const setExpanded = (expanded) => {trigger?.setAttribute("aria-expanded", String(expanded)); if(expanded && mayhemRatingStatus(tab).status !== "loading") void loadMayhemRating(tab);};
-      control.querySelector("[data-mayhem-rating-retry]")?.addEventListener("click", () => {tab.mayhemRatingManual=true;tab.mayhemRating = {...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
-      let hideTimer=0,pinned=false;
-      const cancelHide=()=>clearTimeout(hideTimer);
-      trigger?.addEventListener('click',event=>{event.stopPropagation();pinned=!pinned;cancelHide();setExpanded(pinned);});
-      control.addEventListener("mouseenter", () => {cancelHide();setExpanded(true);});
-      control.addEventListener("mouseleave", () => {cancelHide();if(!pinned)hideTimer=setTimeout(()=>setExpanded(false),150);});
-      const outside=event=>{if(!control.isConnected){document.removeEventListener('pointerdown',outside);return;}if(!control.contains(event.target)){pinned=false;cancelHide();setExpanded(false);}};
-      document.addEventListener('pointerdown',outside);
-      control.addEventListener("focusin", () => setExpanded(true));
-      control.addEventListener("focusout", (event) => { if (!pinned && !control.contains(event.relatedTarget)) setExpanded(false); });
+      const request=()=>{if(mayhemRatingStatus(tab).status!=="loading")void loadMayhemRating(tab);};
+      (control._mmrPanel || control.querySelector(".rank-mmr-popover"))?.querySelector("[data-mayhem-rating-retry]")?.addEventListener("click",()=>{tab.mayhemRatingManual=true;tab.mayhemRating={...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
+      trigger?.addEventListener("click",request);
+      control.addEventListener("mouseenter",request);
+      control.addEventListener("focusin",request);
     }
   }
 
@@ -3271,8 +3265,8 @@
     const fresh=template.content.querySelector(".rank-mmr-popover");
     for(const control of document.querySelectorAll(".rank-mmr-control")) {
       if(control.dataset.ratingTab!==tab.key || !fresh)continue;
-      control.querySelector(".rank-mmr-popover").innerHTML=fresh.innerHTML;
-      control.querySelector("[data-mayhem-rating-retry]")?.addEventListener("click",()=>{tab.mayhemRatingManual=true;tab.mayhemRating={...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
+      (control._mmrPanel || control.querySelector(".rank-mmr-popover")).innerHTML=fresh.innerHTML;
+      (control._mmrPanel || control).querySelector("[data-mayhem-rating-retry]")?.addEventListener("click",()=>{tab.mayhemRatingManual=true;tab.mayhemRating={...mayhemRatingStatus(tab),status:"idle"};void loadMayhemRating(tab);});
     }
   }
 
@@ -6147,6 +6141,7 @@
     if (!connected()) { renderLive(state.liveLoadSource); return; }
     invalidateLiveForNewGame(state.live?.phase, state.beacon.phase, state.liveExpectedGameId, source);
     if (state.liveLoading && !force) return;
+    if(state.live && ["InProgress","Reconnect"].includes(state.beacon.phase))void ensureLiveRecommendations({...state.live,phase:state.beacon.phase});
     state.liveLoadSource = liveRenderTriggerLabel(source);
     if (state.liveLoading) state.controllers.get("live")?.abort();
     state.liveRefreshQueued = false;
@@ -6569,6 +6564,7 @@
       if (data?.phase === "ChampSelect" && Number(self?.spell1Id) > 0 && Number(self?.spell2Id) > 0) spells.set(scopeKey, spellKey);
       if (data?.phase !== "ChampSelect") spellKey = spells.get(scopeKey) || "none";
     }
+    if(augmentSource==="arena")spellKey="none";
 	return { self, championId, position, clientPosition, positionOverride, augmentSource, queueId, gameMode, mapId, tier, gameId, scopeGameId, baseKey, spellKey, key: `${championId}:${position}:${gameMode}:${mapId}:${tier}:${spellKey}` };
   }
 
@@ -6671,13 +6667,14 @@
   }
 
   async function ensureLiveRecommendations(data) {
+    const refresh=arguments[1]===true;
     const target = liveRecommendationTarget(data);
     if (!target) { recordLiveRecommendationSkip("no-target", null, data); return; }
     const targetKey = target.key;
     const roster = liveRecommendationRoster(data);
     const rosterSignature = String(roster?.signature || "");
     if (data?.recommendations) { if (hasUsableLiveRecommendations(data.recommendations)) noteChampSelectReady("build_ready", liveRecommendationTarget(state.live)?.key === targetKey); recordLiveRecommendationSkip("has-payload", target, data); return; }
-    if (state.liveRecommendations.has(targetKey) && (!rosterSignature || state.liveRecommendationRosters?.get?.(targetKey) === rosterSignature)) { noteChampSelectReady("build_ready", liveRecommendationTarget(state.live)?.key === targetKey); recordLiveRecommendationSkip("cached", target, data); return; }
+    if (!refresh && state.liveRecommendations.has(targetKey) && (!rosterSignature || state.liveRecommendationRosters?.get?.(targetKey) === rosterSignature)) { noteChampSelectReady("build_ready", liveRecommendationTarget(state.live)?.key === targetKey); recordLiveRecommendationSkip("cached", target, data); return; }
     if (liveRecommendationFlightActive(targetKey)) { recordLiveRecommendationSkip("in-flight", target, data); return; }
     const failedAt = Number(state.liveRecommendationFailures.get(targetKey) || 0);
     if (failedAt > 0 && Date.now() - failedAt < 60_000) { recordLiveRecommendationSkip("backoff", target, data); return; }
@@ -6705,6 +6702,7 @@
       if (gameGeneration !== Number(state.liveGameGeneration || 0)) return;
       if (!hasUsableLiveRecommendations(response?.recommendations)) throw new Error("推荐数据不完整");
       const recommendations = response.recommendations;
+      if(recommendations.arenaPending)setTimeout(()=>{if(gameGeneration===Number(state.liveGameGeneration||0)&&liveRecommendationTarget(state.live)?.key===targetKey)void ensureLiveRecommendations(state.live,true);},1000);
       recommendations.traceId = recommendations.traceId || traceId;
       recommendations.recommendationKey = recommendations.recommendationKey || targetKey;
       state.liveRecommendations.set(targetKey, recommendations);
@@ -6726,6 +6724,7 @@
 	  ensureSpecialistRunes(state.live);
       if (liveRecommendationTarget(state.live)?.key === targetKey) {
         renderLive("recommendation");
+        if(recommendations.arenaTiming)window.reportFlowDiagnostic?.("arena_recommendation_timing","rendered",{...recommendations.arenaTiming,rendered_at:recommendations.arenaTimingOriginMs?Math.max(0,Date.now()-recommendations.arenaTimingOriginMs):recommendations.arenaTiming.rendered_at});
         recordItemSetClientDiagnostic("live_recommendations_client", "rendered", {
           ...target, traceId: recommendations.traceId, recommendationKey: recommendations.recommendationKey,
           requestedPosition: recommendations.requestedPosition || target.position, resolvedPosition: recommendations.resolvedPosition,

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -27,6 +28,10 @@ func (p *championProvider) fetchArenaWithMetadata(ctx context.Context, host, pat
 	ctx = context.WithValue(ctx, arenaRetryContextKey{}, true)
 	attempted := false
 	data, at, err := p.fetchWithMetadataCacheKeyLoader(ctx, host, path, query, championJSONMax, "application/json", key, func(parent context.Context) ([]byte, error) {
+		if host == yourGGArenaHost {
+			attempted = true
+			return p.fetchArenaHedged(parent, host, path, query)
+		}
 		var data []byte
 		var err error
 		for attempt := 1; attempt <= 2; attempt++ {
@@ -127,3 +132,70 @@ func (p *championProvider) loadArenaDetailBlock(ctx context.Context, champion, b
 	}
 	return response, nil
 }
+
+// Hedge inside the cache loader, so the duplicate request shares admission and
+// cannot join the same singleflight. Only one validated response is cached.
+func (p *championProvider) fetchArenaHedged(parent context.Context, host, path string, query url.Values) ([]byte, error) {
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+	type result struct {
+		data []byte
+		err  error
+	}
+	ready := make(chan result, 2)
+	launch := func(attempt int) {
+		go func() {
+			defer recoverPanic("arena.fetch-hedge")
+			budget := 3 * time.Second
+			if attempt == 2 {
+				budget = 5 * time.Second
+			}
+			attemptCtx, stop := context.WithTimeout(ctx, budget)
+			defer stop()
+			started := time.Now()
+			data, err := p.fetchDirect(attemptCtx, host, path, query, championJSONMax, "application/json")
+			if p.diag != nil {
+				p.diag(map[string]any{"event": "champion_upstream", "host": host, "status": championUpstreamHTTPStatus(err), "duration_ms": time.Since(started).Milliseconds(), "bytes": len(data), "cache": "miss", "attempt": attempt})
+			}
+			ready <- result{data, err}
+		}()
+	}
+	launch(1)
+	timer := time.NewTimer(2500 * time.Millisecond)
+	defer timer.Stop()
+	launched, finished := 1, 0
+	var last error
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-timer.C:
+			if launched == 1 {
+				launched = 2
+				if flag, ok := parent.Value(arenaHedgeFlagKey{}).(*atomic.Bool); ok {
+					flag.Store(true)
+				}
+				launch(2)
+			}
+		case value := <-ready:
+			finished++
+			if value.err == nil {
+				return value.data, nil
+			}
+			last = value.err
+			if launched == 1 {
+				if !arenaRetryable(last) {
+					return nil, last
+				}
+				timer.Stop()
+				launched = 2
+				launch(2)
+			}
+			if finished == 2 {
+				return nil, last
+			}
+		}
+	}
+}
+
+type arenaHedgeFlagKey struct{}

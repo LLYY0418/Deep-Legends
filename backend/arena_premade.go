@@ -220,7 +220,6 @@ type arenaPremadeLabelState struct {
 type liveR263State struct {
 	mu      sync.Mutex
 	premade arenaPremadeLabelState
-	fame    arenaFameCache
 	extend  arenaHistoryExtensionCache
 	matches liveMatchIndex
 }

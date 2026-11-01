@@ -257,32 +257,82 @@
     if (state.error && !state.friends.length) { renderEmpty("empty", escapeHTML(state.error), true); updateSummary(); return; }
     if (state.loading && !state.friends.length) { renderSkeleton(); return; }
     const sections = buildSections();
-    const parts = state.stale && state.friends.length ? [`<div class="friends-stale-notice" role="alert"><strong>好友列表可能已过期</strong><span>${escapeHTML(state.error || "上次读取结果仍可查看，正在等待更新")}</span><button id="friends-retry" class="text-button" type="button">重试</button></div>`] : [];
-    let visibleTotal = 0;
+    if (!state.friends.length) { renderEmpty("empty", "客户端好友列表为空"); updateSummary(); return; }
+    if (!el.list.querySelector("[data-friends-group]")) el.list.replaceChildren();
+    const rows = new Map();
+    for(const row of el.list.querySelectorAll(".friend-row")){const key=row.dataset.playerRef||"";if(!rows.has(key))rows.set(key,[]);rows.get(key).push(row);}
+    const groups = new Map([...el.list.querySelectorAll("[data-friends-group]")].map(group => [group.dataset.friendsGroup, group]));
+    const retained = new Set();
     for (const section of sections) {
-      const members = section.members.filter(matchesFilter);
-      if (state.filter && !members.length) continue;
       if (!section.total && section.offline) continue;
-      visibleTotal += members.length;
+      let group = groups.get(section.key);
+      if (!group) {
+        group = document.createElement("section"); group.dataset.friendsGroup = section.key;
+        group.innerHTML = `<button class="friends-group-head" type="button" data-group-key="${section.key}"><span class="friends-group-arrow" aria-hidden="true"></span><span class="friends-group-name"></span><span class="friends-group-count"></span></button><div class="friends-group-members" role="list"></div>`;
+      }
+      retained.add(group);
+      const head = group.firstElementChild, members = group.lastElementChild;
       const collapsed = isCollapsed(section);
-      const count = section.offline
-        ? `${section.total}`
-        : `<b>${section.online}</b> / ${section.total}`;
-      parts.push(`<button class="friends-group-head${section.offline ? " is-offline-group" : ""}" type="button" data-group-key="${section.key}" aria-expanded="${String(!collapsed)}">
-        <span class="friends-group-arrow" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>
-        <span>${escapeHTML(section.name)}</span>
-        <span class="friends-group-count">${count}</span>
-      </button>`);
-      if (!collapsed) parts.push(members.map((friend) => renderFriendRow(friend, section.offline)).join(""));
+      head.classList.toggle("is-offline-group", section.offline);
+      head.setAttribute("aria-expanded", String(!collapsed));
+      setText(head.querySelector(".friends-group-arrow"), collapsed ? "▸" : "▾");
+      setText(head.querySelector(".friends-group-name"), section.name);
+      const count = section.offline ? `${section.total}` : `<b>${section.online}</b> / ${section.total}`;
+      if (head.querySelector(".friends-group-count").innerHTML !== count) head.querySelector(".friends-group-count").innerHTML = count;
+      members.hidden = collapsed;
+      let matching = 0;
+      for (const [index, friend] of section.members.entries()) {
+        const key = friend.playerRef;
+        const template = document.createElement("template"); template.innerHTML = renderFriendRow(friend, section.offline);
+        let row = rows.get(key||"")?.shift();
+        if (!row) row = template.content.firstElementChild;
+        else patchFriendNode(row, template.content.firstElementChild);
+        row.hidden = !matchesFilter(friend); if (!row.hidden) matching++;
+        if (members.children[index] !== row) members.insertBefore(row, members.children[index] || null);
+        retained.add(row);
+      }
+      group.hidden = Boolean(state.filter && !matching);
+      const position = sections.slice(0, sections.indexOf(section)).filter(value => value.total || !value.offline).length;
+      if (el.list.children[position] !== group) el.list.insertBefore(group, el.list.children[position] || null);
     }
+    for (const row of el.list.querySelectorAll(".friend-row")) if (!retained.has(row)) row.remove();
+    for (const group of groups.values()) if (!retained.has(group)) group.remove();
+    let notice = el.list.querySelector(".friends-stale-notice");
+    if (state.stale) {
+      if (!notice) { notice = document.createElement("div"); notice.className = "friends-stale-notice"; notice.setAttribute("role", "alert"); el.list.prepend(notice); }
+      const markup = `<strong>好友列表可能已过期</strong><span>${escapeHTML(state.error || "上次读取结果仍可查看，正在等待更新")}</span><button id="friends-retry" class="text-button" type="button">重试</button>`;
+      if (notice.innerHTML !== markup) notice.innerHTML = markup;
+    } else notice?.remove();
     el.list.setAttribute("aria-busy", "false");
-    if (!parts.length) {
-      if (state.filter) renderEmpty("search", `没有匹配“${escapeHTML(state.filter)}”的好友<br>支持名称、Riot ID 与备注搜索`);
-      else renderEmpty("empty", "客户端好友列表为空");
-    } else {
-      el.list.innerHTML = parts.join("");
-    }
     updateSummary();
+  }
+
+  function setText(node, value) { if (node.textContent !== value) node.textContent = value; }
+
+  // Patch only changed fields. Images with the same URL keep their decoded node;
+  // changed images replace it only once their replacement has loaded.
+  function patchFriendNode(node, fresh) {
+    if (node.nodeType === 3) { if (node.data !== fresh.data) node.data = fresh.data; return; }
+    if (node.tagName === "IMG") {
+      const url = fresh.getAttribute("data-queued-src");
+      if(url===(node.getAttribute("data-queued-src")||node.getAttribute("src"))){node._friendImageURL=null;return;}
+      if(node._friendImageURL===url)return;
+      node._friendImageURL=url;
+      const replacement = new Image();
+      replacement.className = fresh.className; replacement.alt = "";
+      replacement.onload = () => { if (node.isConnected && node._friendImageURL === url) node.replaceWith(replacement); };
+      replacement.src = url;
+      return;
+    }
+    for (const attr of [...node.attributes]) if (!fresh.hasAttribute(attr.name) && attr.name !== "hidden") node.removeAttribute(attr.name);
+    for (const attr of fresh.attributes) if (node.getAttribute(attr.name) !== attr.value) node.setAttribute(attr.name, attr.value);
+    for (let i = 0; i < fresh.childNodes.length; i++) {
+      const next = fresh.childNodes[i], old = node.childNodes[i];
+      if (!old) node.append(next.cloneNode(true));
+      else if (old.nodeType !== next.nodeType || old.nodeName !== next.nodeName) node.replaceChild(next.cloneNode(true), old);
+      else patchFriendNode(old, next);
+    }
+    while (node.childNodes.length > fresh.childNodes.length) node.lastChild.remove();
   }
 
   function updateSummary() {
@@ -347,7 +397,10 @@
       const section = sections.find((item) => item.key === key);
       state.collapsed[key] = section ? !isCollapsed(section) : true;
       saveCollapsed();
-      render();
+      const collapsed = state.collapsed[key];
+      groupHead.setAttribute("aria-expanded", String(!collapsed));
+      setText(groupHead.querySelector(".friends-group-arrow"), collapsed ? "▸" : "▾");
+      groupHead.nextElementSibling.hidden = collapsed;
       return;
     }
     const row = event.target.closest(".friend-row");

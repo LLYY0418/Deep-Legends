@@ -179,6 +179,7 @@ func (a *app) publishChampSelectLite(ctx context.Context, client *LCUClient, arr
 	raw, _ := json.Marshal(lite)
 	a.broadcastEvent(string(raw))
 	a.noteChampSelectLatency("event_to_sse", time.Since(arrived).Milliseconds())
+	a.prewarmArenaSession(ctx, client, session)
 }
 func (a *app) noteChampSelectLatency(stage string, ms int64) {
 	s := &a.champLite

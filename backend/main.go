@@ -229,6 +229,7 @@ type app struct {
 	itemSetPrices                   map[int64]int64
 	itemSetPricesAt                 time.Time
 	champions                       *championProvider
+	arenaRecommendationTimeline     arenaRecommendationTimeline
 	liveRecommendationPrewarmer     *liveRecommendationPrewarmer
 	riot                            *riotProvider
 	sgp                             *sgpProvider
@@ -580,6 +581,7 @@ func main() {
 	}
 	a.sgp.requestBytes = a.recordColdSGPBytes
 	a.liveRecommendationPrewarmer = newLiveRecommendationPrewarmer(championProvider, a.recordDiagnostic)
+	a.liveRecommendationPrewarmer.onReady = a.arenaRecommendationReady
 	a.sgp.gatewayAccount = func(client *LCUClient) string {
 		a.mu.RLock()
 		defer a.mu.RUnlock()
@@ -1513,7 +1515,6 @@ func (a *app) refreshIdentityWithClient(client *LCUClient) bool {
 	a.bindHistoryGameCache(client)
 	a.bindColdRequestCounters(client)
 	client.setDiagnosticObserver(a.recordDiagnostic)
-	a.bindArenaFameEvents(client)
 	client.mu.RLock()
 	seed := client.discoverySummoner
 	client.mu.RUnlock()
@@ -1661,7 +1662,6 @@ func (a *app) queueCollectionRefresh(source string) {
 func (a *app) refreshWithClient(client *LCUClient) bool {
 	a.bindHistoryGameCache(client)
 	client.setDiagnosticObserver(a.recordDiagnostic)
-	a.bindArenaFameEvents(client)
 	a.mu.RLock()
 	queuedEvent := a.collectionRefreshPending
 	a.mu.RUnlock()
@@ -1846,7 +1846,6 @@ func (a *app) refreshWithClient(client *LCUClient) bool {
 
 func (a *app) refreshAccountWithClient(client *LCUClient) {
 	client.setDiagnosticObserver(a.recordDiagnostic)
-	a.bindArenaFameEvents(client)
 	a.mu.Lock()
 	if a.syncing || !a.clientSessionConnectedLocked() || a.lcu != client {
 		a.mu.Unlock()

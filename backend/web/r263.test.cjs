@@ -1,5 +1,5 @@
 'use strict';
-// R263：对局页深度优化——名称下方按模式（峡谷单双 + 灵活、斗魂等级名望、娱乐模式无段位）、
+// R263：对局页深度优化——名称下方按模式（峡谷单双 + 灵活、斗魂单双 + 灵活、娱乐模式无段位）、
 // 斗魂 30 局胜率 / 吃鸡率与名次小卡、斗魂按预组队出卡片、战绩小卡点击弹窗。
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -67,11 +67,11 @@ test('R263 before the lazy module loads the live page renders exactly as before'
   removeModule();
   try {
     const base = { name: '甲', playerRef: 'p1', position: 'jungle', historyState: 'ok', rank: solo, soloRank: solo, flexRank: flex, mySquad: true,
-      arenaFame: { level: 12, fame: 87510, tier: 'GLADIATOR' }, arenaRecord: { games: 30, topHalf: 17, top1: 6 },
+      arenaRecord: { games: 30, topHalf: 17, top1: 6 },
       recentGames: [{ gameId: 1, placement: 1, win: true, kills: 5, deaths: 2, assists: 7 }] };
     assert.equal(identity(f.renderLivePlayer(base, 0, false, 0, [], '', false, false, 'InProgress', '', 'rift')).line.textContent, '打野 · 翡翠 IV');
     const arena = new JSDOM(f.renderLivePlayer(base, 0, true, 0, [], '', false, false, 'InProgress', '', 'arena')).window.document;
-    assert.equal(arena.querySelector('.arena-fame'), null);
+
     assert.ok(arena.querySelector('.live-kda-value'));
     assert.ok(arena.querySelector('.my-squad-chip'));
     const chips = new JSDOM(f.renderInsightMatches(base)).window.document;
@@ -90,34 +90,18 @@ test('R263 P3 entertainment modes show no rank under the name', () => {
   assert.doesNotMatch(copy.textContent, /翡翠|LP|未定级/);
 });
 
-test('R263 P2 Arena shows level and fame instead of rank, and 30-game win and top-1 rates instead of KDA', () => {
-  const f = playerRenderer();
-  const html = f.renderLivePlayer({ name: '丙', playerRef: 'p3', historyState: 'ok', mySquad: true, rank: solo, soloRank: solo,
-    arenaFame: { level: 12, fame: 87510, tier: 'GLADIATOR' }, arenaRecord: { games: 30, topHalf: 17, top1: 6 },
-    recentGames: [{ gameId: 1, placement: 1, win: true, kills: 5, deaths: 2, assists: 7 }] }, 0, true, 0, [], '', false, false, 'InProgress', '', 'arena');
-  const dom = new JSDOM(html);
-  const document = dom.window.document;
-  const fame = document.querySelector('.arena-fame');
-  assert.ok(fame.classList.contains('is-gladiator'));
-  assert.equal(fame.textContent, '12级·87,510 名望');
-  assert.equal(fame.dataset.tooltip, '斗魂等级 12 · 名望 87,510');
-  assert.ok(fame.querySelector('svg.arena-fame-icon'));
-  assert.doesNotMatch(document.querySelector('.live-player-copy').textContent, /翡翠|LP/);
-  assert.equal(document.querySelector('.my-squad-chip'), null, 'the squad card title already says 我的小队');
-  const labels = [...document.querySelectorAll('dl.is-arena-stats dt')].map((node) => node.textContent);
-  assert.deepEqual(labels, ['近 30 局', '胜率', '吃鸡率']);
-  const values = [...document.querySelectorAll('dl.is-arena-stats dd')].map((node) => node.textContent);
-  assert.deepEqual(values, ['17胜 13负', '57%', '20%']);
-  assert.equal(document.querySelector('.live-kda-value'), null);
+test('R263 P2 Arena shares solo and flex ranks and preserves current-mode records', () => {
+ const f=playerRenderer();
+ const html=f.renderLivePlayer({name:'丙',playerRef:'p3',historyState:'ok',mySquad:true,rank:solo,soloRank:solo,flexRank:flex,arenaRecord:{games:30,topHalf:17,top1:6},recentGames:[]},0,true,0,[],'',false,false,'InProgress','','arena');
+ const document=new JSDOM(html).window.document;
+ const rank=document.querySelector('.live-player-rank');assert.match(rank.textContent,/单双.*翡翠.*组排/);assert.equal(rank.querySelectorAll('.live-rank-crest').length,2);
+ assert.deepEqual([...document.querySelectorAll('dl.is-arena-stats dt')].map(n=>n.textContent),['近 30 局','胜率','吃鸡率']);
+ assert.deepEqual([...document.querySelectorAll('dl.is-arena-stats dd')].map(n=>n.textContent),['17胜 13负','57%','20%']);
+ assert.equal(document.querySelector('.my-squad-chip'),null);assert.equal(document.querySelector('.live-kda-value'),null);
 });
-
-test('R263 P2 Arena without fame data renders nothing under the name and no placeholder text', () => {
-  const f = playerRenderer();
-  const html = f.renderLivePlayer({ name: '丁', playerRef: 'p4', historyState: 'ok', recentGames: [] }, 0, true, 0, [], '', false, false, 'InProgress', '', 'arena');
-  const { line } = identity(html);
-  assert.equal(line, undefined);
-  assert.doesNotMatch(html, /未提供|暂无名望/);
-  assert.match(html, /<dt>吃鸡率<\/dt>/);
+test('R263 P2 Arena unranked players use shared rank state',()=>{
+ const f=playerRenderer();const html=f.renderLivePlayer({name:'丁',playerRef:'p4',historyState:'ok',recentGames:[]},0,true,0,[],'',false,false,'InProgress','','arena');
+ assert.match(new JSDOM(html).window.document.querySelector('.live-player-rank').textContent,/单双 未定级.*组排 未定级/);assert.match(html,/<dt>吃鸡率<\/dt>/);
 });
 
 test('R263 P2.3/P4 Arena chips show placement; every chip is a button that opens the match', () => {
@@ -218,15 +202,6 @@ test('R263 P1 CSS: two squads per row with subgrid alignment, single column only
   // The 1080px rule that collapses older Arena layouts must not win over the squads grid.
   const wide = gameplayCSS.slice(gameplayCSS.indexOf('@container recommendation-area (max-width: 1080px)'));
   assert.doesNotMatch(wide.slice(0, 400), /is-squads/);
-});
-
-test('R263 P2 fame tokens: light and dark values defined once, tier classes are literal', () => {
-  for (const tier of ['wood', 'bronze', 'silver', 'gold', 'gladiator']) {
-    assert.match(css, new RegExp(`--arena-tier-${tier}: #[0-9a-f]{6};`));
-    assert.match(css, new RegExp(`--arena-tier-${tier}-dark: #[0-9a-f]{6};`));
-    assert.match(css, new RegExp(`\\.arena-fame\\.is-${tier}\\s*\\{\\s*--arena-tier: var\\(--arena-tier-${tier}\\)`));
-    assert.match(moduleSource, new RegExp(`' is-${tier}'`));
-  }
 });
 
 function dialogHarness({ api }) {

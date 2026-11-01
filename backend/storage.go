@@ -146,6 +146,7 @@ func openLocalStore() (*localStore, error) {
 		salt = decoded
 	}
 	store := &localStore{root: root, salt: salt}
+	removeRetiredArenaCache(store)
 	store.mu.Lock()
 	store.deduplicateSnapshotsLocked()
 	_ = store.prunePrestigeArtworkLocked(time.Now())

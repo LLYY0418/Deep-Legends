@@ -22,6 +22,8 @@ function createFloatingLayerLifecycle(win = window) {
   doc.addEventListener('click',event=>{for(const entry of [...active])entry.outside(event);},true);
   doc.addEventListener('pointerout',event=>{if(event.relatedTarget==null)closeAll();},true);
   doc.addEventListener('keydown',event=>{if(event.key==='Escape')closeAll();},true);
+  doc.addEventListener('scroll',closeAll,{capture:true,passive:true});
+  win.addEventListener('resize',closeAll);
   doc.addEventListener('visibilitychange',()=>{if(doc.visibilityState==='hidden')closeAll();});
   win.addEventListener('blur',closeAll);
   for(const name of ['deep-legends:section','deep-legends:navigate','deep-legends:overview-tab','deep-legends:privacy-changed','deep-legends:tooltip-hide'])win.addEventListener(name,closeAll);
@@ -30,16 +32,31 @@ function createFloatingLayerLifecycle(win = window) {
   const showMMR=button=>{
     const control=button.closest('.rank-mmr-control'),panel=control?.querySelector('.rank-mmr-popover');if(!panel||mmr?.button===button)return;
     mmr?.close();panel.id ||= `rank-mmr-popover-${++mmrSequence}`;
+    control._mmrPanel=panel;doc.body.append(panel);panel.classList.add('is-open');
+    const zoom=Number(win.getComputedStyle(doc.documentElement).getPropertyValue('--ui-zoom'))||1,rect=button.getBoundingClientRect();
+    panel.style.maxWidth=`${(win.innerWidth-16)/zoom}px`;
+    const bounds=panel.getBoundingClientRect(),width=bounds.width,height=bounds.height;
+    let left=rect.right-width;if(left<8)left=rect.left;left=Math.max(8,Math.min(left,win.innerWidth-width-8));
+    let top=rect.bottom+8;if(top+height>win.innerHeight-8)top=rect.top-height-8;top=Math.max(8,Math.min(top,win.innerHeight-height-8));
+    panel.style.left=`${left/zoom}px`;panel.style.top=`${top/zoom}px`;
     control.classList.add('is-open');button.setAttribute('aria-expanded','true');button.setAttribute('aria-describedby',panel.id);
-    let stop;const close=()=>{stop?.();control.classList.remove('is-open');button.setAttribute('aria-expanded','false');button.removeAttribute('aria-describedby');mmr=null;};
-    mmr={button,close};stop=watch(button,panel,close);
+    let stop;const close=()=>{stop?.();control.classList.remove('is-open');button.setAttribute('aria-expanded','false');button.removeAttribute('aria-describedby');panel.classList.remove('is-open');control.append(panel);mmr=null;};
+    mmr={button,panel,close};stop=watch(button,panel,close);
   };
   doc.addEventListener('pointerover',event=>{const button=event.target.closest?.('.rank-mmr-trigger');if(button)showMMR(button);});
   doc.addEventListener('focusin',event=>{const button=event.target.closest?.('.rank-mmr-trigger');if(button?.matches(':focus-visible'))showMMR(button);});
-  doc.addEventListener('pointerout',event=>{if(mmr && !mmr.button.contains(event.relatedTarget) && !mmr.button.closest('.rank-mmr-control').querySelector('.rank-mmr-popover').contains(event.relatedTarget))mmr.close();});
+  doc.addEventListener('pointerout',event=>{if(mmr && !mmr.button.contains(event.relatedTarget) && !mmr.panel.contains(event.relatedTarget))mmr.close();});
   return {watch,closeAll};
 }
 window.deepLegendsFloatingLayers=createFloatingLayerLifecycle();
+function setupFavoritesSticky() {
+ const header=document.querySelector('.favorites-header');if(!header)return;
+ const pool=document.querySelector('.pool-workspace-head');
+ const measure=()=>{if(header.hidden)return;const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue('--ui-zoom'))||1;document.documentElement.style.setProperty('--favorites-header-height',`${header.getBoundingClientRect().height/zoom}px`);if(pool)document.documentElement.style.setProperty('--favorites-pool-head-height',`${pool.getBoundingClientRect().height/zoom}px`);};
+ const observer=new ResizeObserver(measure);observer.observe(header);if(pool)observer.observe(pool);measure();
+}
+if(typeof ResizeObserver==='function')setupFavoritesSticky();
+
 
 (async () => {
   "use strict";

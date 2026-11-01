@@ -26,8 +26,6 @@ const go=[
  ['P12','backend/pro_runes.go','TestR282WorldsOutsideRosterAndCrossLaneRows','return proNumericID(e.Match.Teams[0].ID) && proNumericID(e.Match.Teams[1].ID)','return (proRuneTeams[e.Match.Teams[0].ID] != "" || proRuneTeams[e.Match.Teams[1].ID] != "") && proNumericID(e.Match.Teams[0].ID) && proNumericID(e.Match.Teams[1].ID)'],
  ['P18-cache','backend/rank_insights.go','TestR282LiveRankOneLookupPerGameBeyondNormalCacheTTL','strings.ToUpper(serverID) + "|" + playerRef','strings.ToUpper(serverID) + ":" + playerRef'],
  ['P18','backend/gameplay.go','TestR282LiveRankSoloFirstAndFlexFallback','[]*gameplayRank{solo, flex}','[]*gameplayRank{flex, solo}'],
- ['P15-privacy','backend/arena_fame_discovery.go','TestR282ArenaDiscoveryReadOnlyOnceAndPrivate','arenaDiscoveryPrivate.MatchString(k)','false'],
- ['P15-once','backend/arena_fame_discovery.go','TestR282ArenaDiscoveryReadOnlyOnceAndPrivate','if s.started {','if false {'],
 ];
 function source(file,from,to){const original=fs.readFileSync(path.join(root,file),'utf8');if(from===null)return original+to;assert(original.includes(from),'mutation target missing '+file+' '+from);return original.replace(from,to)}
 function record(id,args,options){const run=cp.spawnSync(args[0],args.slice(1),{cwd:root,encoding:'utf8',maxBuffer:2*1024*1024,...options}),log=(run.stdout||'')+(run.stderr||'');fs.writeFileSync(path.join(out,id+'.log'),log);const killed=run.status!==0 && /AssertionError|ERR_ASSERTION|--- FAIL:|✖/.test(log) && !/\[build failed\]|ReferenceError:|SyntaxError:|is not defined/.test(log);results.push({id,killed,status:run.status,command:args[0]+' '+args.slice(1).join(' '),log:id+'.log'});assert(killed,'mutant not killed by assertion: '+id+'\n'+log.slice(-1500));}

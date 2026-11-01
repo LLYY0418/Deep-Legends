@@ -31,6 +31,7 @@ type autoConfigStarterItem struct {
 }
 type autoConfigItems struct {
 	Starter     []autoConfigStarterItem `json:"starter,omitempty"`
+	Boots       []int64                 `json:"boots,omitempty"`
 	Core        []int64                 `json:"core"`
 	Situational []int64                 `json:"situational"`
 }
@@ -141,6 +142,16 @@ func validateAutoConfigEntry(mode string, e autoConfigEntry) error {
 		if len(e.Items.Core) > 6 || len(e.Items.Situational) > 6 || len(e.Items.Starter) > 6 {
 			return errors.New("每组最多6件装备")
 		}
+		if len(e.Items.Boots) > 3 {
+			return errors.New("鞋子最多3件")
+		}
+		bootsSeen := map[int64]bool{}
+		for _, id := range e.Items.Boots {
+			if id <= 0 || id > 1000000 || bootsSeen[id] {
+				return errors.New("鞋子编号无效或重复")
+			}
+			bootsSeen[id] = true
+		}
 		starterSeen := map[int64]bool{}
 		for _, item := range e.Items.Starter {
 			if item.ID <= 0 || item.ID > 1000000 || item.Count < 1 || item.Count > 99 || starterSeen[item.ID] {
@@ -148,7 +159,7 @@ func validateAutoConfigEntry(mode string, e autoConfigEntry) error {
 			}
 			starterSeen[item.ID] = true
 		}
-		seen := map[int64]bool{}
+		seen := bootsSeen
 		for _, ids := range [][]int64{e.Items.Core, e.Items.Situational} {
 			for _, id := range ids {
 				if id <= 0 || id > 1000000 || seen[id] {

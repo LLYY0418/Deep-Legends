@@ -3036,18 +3036,18 @@ func TestGameplayLiveUsesCurrentChampionWhenRosterIsUnavailable(t *testing.T) {
 	defer server.Close()
 	client := &LCUClient{baseURL: server.URL, token: "test-token", http: server.Client()}
 	a := &app{connected: true, lcu: client, storage: trackTestStore(t, &localStore{root: root})}
-	// The real CHERRY pregame probe may persist after the response returns.
-	// Join it before the fixture removes its store; do not race the writer.
+	// R317 keeps roster fallback independent of retired observation work.
+	// No background progression writer may outlive the response or recreate
+	// either obsolete cache while a current champion is still being resolved.
+	// Missing files are the successful result; unrelated squad data is retained.
+	// The checks run synchronously when this fixture releases its local store.
 	defer func() {
-		s := client.arenaDiscoveryState()
-		s.mu.Lock()
-		probe := s.progression
-		s.mu.Unlock()
-		if probe != nil {
-			select {
-			case <-probe.done:
-			case <-time.After(2 * time.Second):
-				t.Fatal("real Arena progression probe did not finish before fixture cleanup")
+		for _, name := range []string{"arena-" + "fa" + "me-events.json", "arena-progression-before.json"} {
+			_, err := os.Stat(filepath.Join(root, name))
+			if err == nil {
+				t.Errorf("retired cache recreated: %s", name)
+			} else if !os.IsNotExist(err) {
+				t.Error(err)
 			}
 		}
 	}()

@@ -24,13 +24,4 @@ try{
  }
  const original=JSON.parse(fs.readFileSync(path.join(root,'backend/testdata/r285-game-log-signatures.json'),'utf8')),target=path.join(tmp,'fixtures.json');fs.writeFileSync(target,JSON.stringify(original.filter(x=>x.directory!=='2026-10-18T22-58-32')));check('P6-missing-taskkill',cp.spawnSync('go',['test','./backend','-run','^TestR286RealExitAndTaskkillFixtures$','-count=1'],{cwd:root,env:{...process.env,R286_RECONNECT_FIXTURES:target},encoding:'utf8',timeout:180000,maxBuffer:4e6}));
  }
- if(['p5','all'].includes(phase)){
- for(const [name,file,from,to,pattern] of [
- ['P5-unchanged-included','backend/arena_fame_progression.go','ok && prior != value','ok','TestR286ProgressionBeforeAfterReadOnlyResolvedFromFullHelp'],
- ['P5-unsplit','backend/arena_fame_discovery.go','func arenaFameDiscoveryParts(event map[string]any) []map[string]any {','func arenaFameDiscoveryParts(event map[string]any) []map[string]any { return []map[string]any{event};','TestR286ProgressionPartsReconstructWithin4KB'],
- ['P5-guessed-get','backend/arena_fame_progression.go','if op.Method != http.MethodGet || op.Path == "" {','if op.Method != http.MethodGet && op.Method != "" || op.Path == "" {','TestR286ProgressionDoesNotGuessMissingHTTPMethodsOrQueryArguments']
- ]){
- const original=fs.readFileSync(path.join(root,file),'utf8');assert(original.includes(from),name+' anchor');const target=path.join(tmp,name+'.go');fs.writeFileSync(target,original.replace(from,to));const overlay=path.join(tmp,name+'.json');fs.writeFileSync(overlay,JSON.stringify({Replace:{[path.join(root,file)]:target}}));check(name,cp.spawnSync('go',['test','-overlay='+overlay,'./backend','-run','^'+pattern+'$','-count=1'],{cwd:root,encoding:'utf8',timeout:180000,maxBuffer:4e6}));
- }
- }
 }finally{fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(results,null,2)+'\n');fs.rmSync(tmp,{recursive:true,force:true})}

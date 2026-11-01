@@ -8,7 +8,7 @@ try{
   ['P5-guard-http','backend/features.go','"match_autoload_client":          {"bound": true, "requested": true, "blocked": true, "started": true, "guard": true}','"match_autoload_client":          {"bound": true, "requested": true, "blocked": true, "started": true}','TestR285AutoloadGuardDiagnosticSurvivesStorage'],
   ['P2-cancel-inflight','backend/watch_reconnect.go','postCtx, postCancel := context.WithTimeout(parent, 8*time.Second)','postCtx, postCancel := context.WithTimeout(ctx, 8*time.Second)','TestR285ReconnectHTTPAndPhaseConfirmation/sse-before-http'],
   ['P3-zero-minimum','backend/watch_reconnect.go','reconnectSettlementDelayMS = 5000','reconnectSettlementDelayMS = 0','TestR285ReconnectDelayChoicesAndSettlement'],
-  ['P7-unsplit','backend/arena_fame_discovery.go','for _, part := range arenaFameDiscoveryParts(event) {\n\t\ta.recordDiagnostic(part)\n\t}','a.recordDiagnostic(event)','TestR285ArenaDiscoveryPartsRoundTrip']]){
+ ]){
    const original=fs.readFileSync(path.join(root,file),'utf8');assert(original.includes(from));const target=path.join(tmp,name+'.go');fs.writeFileSync(target,original.replace(from,to));const overlay=path.join(tmp,name+'.json');fs.writeFileSync(overlay,JSON.stringify({Replace:{[path.join(root,file)]:target}}));check(name,cp.spawnSync('go',['test','-overlay='+overlay,'./backend','-run','^'+pattern+'$','-count=1'],{cwd:root,encoding:'utf8',timeout:180000,maxBuffer:4e6}));
  }
  for(const [name,from,to,testFile] of [

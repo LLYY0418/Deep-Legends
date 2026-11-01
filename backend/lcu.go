@@ -67,7 +67,6 @@ type LCUDiscoveryStatus struct {
 }
 
 type LCUClient struct {
-	arenaDiscovery        *arenaFameDiscoveryState
 	historyGames          *historyGameCache
 	discoverySummoner     *Summoner
 	license               *licenseManager
@@ -112,7 +111,6 @@ type LCUClient struct {
 	queueLabelsLoading  bool
 	diagnosticMu        sync.Mutex
 	diagnosticObserve   func(map[string]any)
-	arenaFameObserve    func(LCUEvent)
 	requestStarted      func(time.Time)
 	requestDiagnostics  map[string]*lcuRequestDiagnosticBucket
 }

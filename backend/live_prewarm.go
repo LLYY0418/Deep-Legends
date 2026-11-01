@@ -28,6 +28,7 @@ type liveRecommendationPrewarmer struct {
 	entries map[string]livePrewarmEntry
 	load    func(context.Context, liveRecommendationSeed) error
 	report  func(map[string]any)
+	onReady func(liveRecommendationSeed)
 }
 
 func newLiveRecommendationPrewarmer(p *championProvider, report func(map[string]any)) *liveRecommendationPrewarmer {
@@ -36,6 +37,10 @@ func newLiveRecommendationPrewarmer(p *championProvider, report func(map[string]
 		spec := opggModeSpecs[resolution.InternalMode]
 		tier, err := gameplayRecommendationTier(spec, "")
 		if err != nil {
+			return err
+		}
+		if resolution.InternalMode == "arena" {
+			_, err = p.loadLiveArenaDetail(ctx, int(seed.ChampionID), tier)
 			return err
 		}
 		meta, err := p.championMetadataByID(ctx, int(seed.ChampionID))
@@ -94,6 +99,9 @@ func (p *liveRecommendationPrewarmer) warm(seed liveRecommendationSeed) bool {
 		start := time.Now()
 		err := p.load(ctx, seed)
 		ttl, status := 3*time.Minute, "ready"
+		if err == nil && p.onReady != nil {
+			p.onReady(seed)
+		}
 		if err != nil {
 			ttl, status = 30*time.Second, "failed"
 		}

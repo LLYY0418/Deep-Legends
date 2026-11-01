@@ -111,7 +111,7 @@ func arenaRiotIDKey(name, tag string) string {
 }
 
 // Recover identities before enrichment so restored players receive the same
-// history, fame and progress updates as gameflow players. No roster-order or
+// history, ranks and progress updates as gameflow players. No roster-order or
 // champion matching is used to assign an identity to an anonymous row.
 func (a *app) recoverArenaPlayerList(ctx context.Context, client *LCUClient, response *gameplayLiveResponse, raw []liveRosterEntry, snapshot liveClientSnapshot, names map[int64]string) []liveRosterEntry {
 	limit := liveGSMRosterSize(response.QueueID)

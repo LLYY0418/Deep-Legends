@@ -202,7 +202,7 @@ func TestR300StarterValidationAndBackupCompatibility(t *testing.T) {
 		mode  string
 		items []autoConfigStarterItem
 		valid bool
-	}{{"normal", []autoConfigStarterItem{{2003, 10}}, true}, {"normal", []autoConfigStarterItem{{2003, 11}}, false}, {"aram", []autoConfigStarterItem{{2003, 28}}, true}, {"normal", []autoConfigStarterItem{{1055, 2}}, false}, {"aram", []autoConfigStarterItem{{1055, 1}}, false}, {"urf", []autoConfigStarterItem{{2003, 10}}, true}} {
+	}{{"normal", []autoConfigStarterItem{{2003, 10}}, true}, {"normal", []autoConfigStarterItem{{2003, 11}}, true}, {"aram", []autoConfigStarterItem{{2003, 28}}, true}, {"normal", []autoConfigStarterItem{{1055, 2}}, false}, {"aram", []autoConfigStarterItem{{1055, 1}}, false}, {"urf", []autoConfigStarterItem{{2003, 10}}, true}} {
 		e := autoConfigEntry{Items: &autoConfigItems{Starter: tc.items}}
 		err := a.validateAutoConfigCatalog(context.Background(), tc.mode, e, false)
 		if (err == nil) != tc.valid {

@@ -79,20 +79,6 @@ func TestR272ArenaKnownTrioSurvivesMissingMember(t *testing.T) {
 		})
 	}
 }
-func TestR272ArenaFameRankedSourceRemainsUnverifiedForSelfAndOther(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"queues":[{"queueType":"CHERRY","ratedTier":"SILVER","ratedRating":12600.4}]}`)
-	}))
-	defer server.Close()
-	client := &LCUClient{token: "fixture", http: server.Client(), baseURL: server.URL, region: "TENCENT", rsoPlatform: "HN1", platformProbe: true}
-	for _, self := range []bool{true, false} {
-		a := &app{sgp: newSGPProvider()}
-		value := a.loadLiveArenaFame(context.Background(), client, gameplayReference{ServerID: "HN1"}, strings.Repeat("a", 48), self, "")
-		if value != nil {
-			t.Fatal("unverified ranked Fame must remain hidden", self, value)
-		}
-	}
-}
 func TestR272MayhemContinuousAndIdleBody(t *testing.T) {
 	for _, spec := range []struct {
 		name        string

@@ -4653,29 +4653,32 @@ type gameplayRecommendationsResponse struct {
 }
 
 type gameplayRecommendationBundle struct {
-	AugmentCombinations []championMetricRow     `json:"augmentCombinations,omitempty"`
-	TraceID             string                  `json:"traceId,omitempty"`
-	RecommendationKey   string                  `json:"recommendationKey,omitempty"`
-	RequestedPosition   string                  `json:"requestedPosition,omitempty"`
-	QueueID             int64                   `json:"queueId,omitempty"`
-	MapID               int64                   `json:"mapId,omitempty"`
-	GameID              int64                   `json:"gameId,omitempty"`
-	GameMode            string                  `json:"gameMode,omitempty"`
-	Tier                string                  `json:"tier,omitempty"`
-	Source              string                  `json:"source"`
-	ResolvedMode        string                  `json:"resolvedMode"`
-	ResolvedRegion      string                  `json:"resolvedRegion"`
-	DataVersion         string                  `json:"dataVersion,omitempty"`
-	CurrentVersion      string                  `json:"currentVersion,omitempty"`
-	IsFallback          bool                    `json:"isFallback"`
-	IsStale             bool                    `json:"isStale"`
-	HasRunes            bool                    `json:"hasRunes"`
-	HasAugments         bool                    `json:"hasAugments"`
-	HasCounters         bool                    `json:"hasCounters"`
-	HasBanRate          bool                    `json:"hasBanRate"`
-	HasTopPlayers       bool                    `json:"hasTopPlayers"`
-	HasItemDepths       bool                    `json:"hasItemDepths"`
-	Citation            *championSourceCitation `json:"citation,omitempty"`
+	ArenaTimingOriginMS int64                      `json:"arenaTimingOriginMs,omitempty"`
+	ArenaPending        bool                       `json:"arenaPending,omitempty"`
+	ArenaTiming         *arenaRecommendationTiming `json:"arenaTiming,omitempty"`
+	AugmentCombinations []championMetricRow        `json:"augmentCombinations,omitempty"`
+	TraceID             string                     `json:"traceId,omitempty"`
+	RecommendationKey   string                     `json:"recommendationKey,omitempty"`
+	RequestedPosition   string                     `json:"requestedPosition,omitempty"`
+	QueueID             int64                      `json:"queueId,omitempty"`
+	MapID               int64                      `json:"mapId,omitempty"`
+	GameID              int64                      `json:"gameId,omitempty"`
+	GameMode            string                     `json:"gameMode,omitempty"`
+	Tier                string                     `json:"tier,omitempty"`
+	Source              string                     `json:"source"`
+	ResolvedMode        string                     `json:"resolvedMode"`
+	ResolvedRegion      string                     `json:"resolvedRegion"`
+	DataVersion         string                     `json:"dataVersion,omitempty"`
+	CurrentVersion      string                     `json:"currentVersion,omitempty"`
+	IsFallback          bool                       `json:"isFallback"`
+	IsStale             bool                       `json:"isStale"`
+	HasRunes            bool                       `json:"hasRunes"`
+	HasAugments         bool                       `json:"hasAugments"`
+	HasCounters         bool                       `json:"hasCounters"`
+	HasBanRate          bool                       `json:"hasBanRate"`
+	HasTopPlayers       bool                       `json:"hasTopPlayers"`
+	HasItemDepths       bool                       `json:"hasItemDepths"`
+	Citation            *championSourceCitation    `json:"citation,omitempty"`
 	// R128 §2.3：口径说明不再进 UI，前端一律不消费；字段保留供诊断与既有后端测试使用。
 	MeasurementTechnique string                      `json:"measurementTechnique,omitempty"`
 	Positions            []championPositionOption    `json:"positions,omitempty"`
@@ -5176,7 +5179,10 @@ func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Reque
 	provider := a.championDataProvider()
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	metadata, err := provider.championMetadataByID(ctx, int(championID))
+	metadata := championMetadata{}
+	if resolution.InternalMode != "arena" {
+		metadata, err = provider.championMetadataByID(ctx, int(championID))
+	}
 	if err != nil {
 		http.Error(w, "暂时无法识别当前英雄", http.StatusNotFound)
 		return
@@ -5202,7 +5208,11 @@ func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Reque
 		}
 	} else {
 		positionSource = "requested"
-		detail, err = provider.loadDetail(ctx, resolution.InternalMode, metadata.Slug, position, tier)
+		if resolution.InternalMode == "arena" {
+			detail, err = provider.loadLiveArenaDetail(ctx, int(championID), tier)
+		} else {
+			detail, err = provider.loadDetail(ctx, resolution.InternalMode, metadata.Slug, position, tier)
+		}
 	}
 	if err != nil {
 		http.Error(w, "推荐数据暂不可用", http.StatusBadGateway)
@@ -5219,17 +5229,11 @@ func (a *app) handleGameplayRecommendations(w http.ResponseWriter, r *http.Reque
 		detail.TopPlayers = nil
 	}
 	bundle := gameplayRecommendationsFromResolvedDetail(championID, strings.ToLower(position), detail, resolution)
+	bundle.ArenaPending = detail.ArenaPending
 	if resolution.InternalMode == "arena" {
-		var listRow *championRankingRow
-		if rankings, rankingErr := provider.loadArenaRankings(ctx); rankingErr == nil {
-			for index := range rankings.Rows {
-				if rankings.Rows[index].ChampionID == int(championID) {
-					listRow = &rankings.Rows[index]
-					break
-				}
-			}
-		}
-		applyArenaRankingToRecommendation(&bundle, listRow)
+		applyArenaRankingToRecommendation(&bundle, detail.ArenaRanking)
+		bundle.ArenaTiming = a.arenaRecommendationTimingFor(championID, detail)
+		bundle.ArenaTimingOriginMS = a.arenaRecommendationOrigin()
 	}
 	bundle.TraceID = traceID
 	bundle.RecommendationKey = recommendationKey
@@ -7508,6 +7512,9 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current Summoner, phase string) gameplayLiveResponse {
 	liveLoadStarted := time.Now()
+	if phase == "InProgress" {
+		a.noteArenaRecommendationInProgress()
+	}
 	response := gameplayLiveResponse{Phase: phase, Capabilities: []EndpointCapability{{Name: "gameflow", Path: "/lol-gameflow/v1/gameflow-phase", State: capabilityAvailable, Count: 1}}}
 	if phase != "ChampSelect" && phase != "InProgress" && phase != "GameStart" && phase != "Reconnect" {
 		a.stopMayhemSamplerForClient("gameflow-left", client)
@@ -7675,9 +7682,6 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 	if arenaMode {
 		tagSource = "arena"
 	}
-	if arenaMode && (phase == "ChampSelect" || phase == "GameStart") {
-		a.startArenaProgressionDiscovery(client, phase, response.GameID)
-	}
 	aramMode := isARAMFamilyGameMode(response.GameMode)
 	switch queueModeGroupFor(response.QueueID, response.GameMode, response.MapID) {
 	case "aram", "hextech-aram", "hextech-classic":
@@ -7698,7 +7702,11 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			break
 		}
 	}
-	a.liveRecommendationPrewarmer.warm(seed)
+	if arenaMode && phase == "ChampSelect" {
+		a.prewarmLockedArena(champSelect, response.QueueID, response.GameMode)
+	} else {
+		a.liveRecommendationPrewarmer.warm(seed)
+	}
 	if arenaMode {
 		a.noteArenaPhaseRoster(client, &response)
 	}
@@ -7847,7 +7855,6 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			}
 			isAlly := isCurrent || (arenaMode && (phase == "ChampSelect" || a.isRememberedArenaAlly(raw.player)))
 			var ranks []gameplayRank
-			var arenaFame *gameplayArenaFame
 			var matches []gameplayMatch
 			historyResult := livePlayerMatchesResult{}
 			if validRef {
@@ -7859,12 +7866,6 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 					defer a.recoverPanic("gameplay.loadGameplayLive.2")
 
 					defer enrichment.Done()
-					if arenaMode {
-						// R263 P2.1：斗魂不展示召唤师峡谷段位，改读斗魂等级与名望。
-						arenaFame = a.loadLiveArenaFame(ctx, client, reference, playerRef, isCurrent, summoner.Privacy)
-						ranksFinishedAt[index] = time.Now()
-						return
-					}
 					ranks = append([]gameplayRank(nil), a.livePlayerRankScore(ctx, client, response.GameID, playerRef, isCurrent, reference.ServerID, summoner.Privacy).ranks...)
 					ranksFinishedAt[index] = time.Now()
 				}()
@@ -7932,7 +7933,6 @@ func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current S
 			response.Players[index] = gameplayLivePlayer{CellID: raw.player.CellID, gameplayPlayer: gameplayPlayer{PlayerRef: playerRef, DisplayName: gameplayDisplayName(summoner), GameName: summoner.GameName, TagLine: summoner.TagLine, ProfileIconID: summoner.ProfileIconID, SummonerLevel: summoner.SummonerLevel, Hidden: hidden, PrivateHistory: strings.EqualFold(strings.TrimSpace(summoner.Privacy), "PRIVATE"), Autofill: raw.player.IsAutofilled, IsCurrent: isCurrent, reference: reference}, IdentityUnresolved: identityUnresolved, TeamID: raw.team, IsAlly: isAlly, Bravery: arenaMode && phase == "ChampSelect" && (isCurrent || isAlly) && (raw.player.ChampionID == -3 || raw.player.ChampionPickIntent == -3 || raw.player.Bravery), ChampionID: raw.player.ChampionID, ChampionPickIntent: positiveChampionPickIntent(raw.player.ChampionPickIntent), ChampionPickPending: raw.player.ChampionPickPending || raw.player.ChampionPickIntent < 0, ChampionLocked: locked, ChampionName: championName(names, displayChampionID), Position: normalizeGameflowPosition(raw.player.SelectedPosition, raw.player.SelectedRole), Spell1ID: raw.player.Spell1ID, Spell2ID: raw.player.Spell2ID, Rank: rank, ModeStats: modeStats, HistoryState: liveHistoryState(validRef, historyResult), RecentGames: recentGames, RecentRankedRecord: rankedRecord, RecentPositions: liveRecentPositions(matches, playerRef, response.QueueID)}
 			response.Players[index].SoloRank, response.Players[index].FlexRank = soloRank, flexRank
 			if arenaMode {
-				response.Players[index].ArenaFame = arenaFame
 				response.Players[index].ArenaRecord = liveArenaRecord(matches, playerRef, response.QueueID)
 			}
 			a.rememberLiveMatches(response.GameID, playerRef, matches)

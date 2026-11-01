@@ -305,8 +305,8 @@
 .rank-mmr-trigger { display: grid; width: var(--rank-mmr-size,27px); height: var(--rank-mmr-size,27px); padding: 0; place-items: center; color: var(--primary-strong); background: color-mix(in oklab,var(--primary) 12%,var(--surface-strong)); border: 1px solid color-mix(in oklab,var(--primary) 42%,var(--line)); border-radius: 50%; }
 .rank-mmr-trigger:hover, .rank-mmr-trigger:focus-visible, .rank-mmr-trigger[aria-expanded="true"] { color: var(--ink); background: color-mix(in oklab,var(--primary) 22%,var(--surface)); border-color: var(--primary); }
 .rank-mmr-trigger svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
-.rank-mmr-popover { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: min(320px,calc(100vw - 32px)); padding: 11px; visibility: hidden; opacity: 0; pointer-events: none; transform: translateY(-4px); background: color-mix(in oklab,var(--surface) 94%,var(--bg)); border: 1px solid color-mix(in oklab,var(--primary) 30%,var(--line)); border-radius: 10px; box-shadow: 0 14px 36px rgb(0 0 0 / .42); }
-.rank-mmr-control.is-open .rank-mmr-popover { visibility: visible; opacity: 1; pointer-events: auto; transform: translateY(0); transition:opacity 160ms ease,transform 160ms ease; }
+.rank-mmr-popover { zoom:var(--ui-zoom,1); position: fixed; top: 0; left: 0; z-index: 1200; width: min(320px,calc(100vw - 32px)); padding: 11px; visibility: hidden; opacity: 0; pointer-events: none; transform: translateY(-4px); background: color-mix(in oklab,var(--surface) 94%,var(--bg)); border: 1px solid color-mix(in oklab,var(--primary) 30%,var(--line)); border-radius: 10px; box-shadow: 0 14px 36px rgb(0 0 0 / .42); }
+.rank-mmr-popover.is-open { visibility: visible; opacity: 1; pointer-events: auto; transform: translateY(0); transition:opacity 160ms ease,transform 160ms ease; }
 .rank-mmr-popover > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .rank-mmr-popover > header strong { color: var(--ink); font-size: 12px; }
 .rank-mmr-popover > header span { color: var(--muted); font-size: 9px; }
@@ -856,7 +856,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .arena-match-detail > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 2px 4px 6px; }
 .arena-match-detail > header strong { font-size: 13px; }
 .arena-match-detail > header span { color: var(--muted); font-size: 10px; }
-.arena-detail-columns { display: grid; grid-template-columns: minmax(140px,.9fr) 104px 96px 100px 116px 200px; align-items: center; justify-items: center; column-gap: 12px; padding: 7px 10px; color: var(--faint); background: color-mix(in oklab,var(--surface-strong) 44%,transparent); border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; font-size: 10.5px; text-align: center; }
+.arena-detail-columns { display: grid; grid-template-columns: minmax(140px,.9fr) var(--arena-augment-width,104px) 96px 100px 116px 200px; align-items: center; justify-items: center; column-gap: 12px; padding: 7px 10px; color: var(--faint); background: color-mix(in oklab,var(--surface-strong) 44%,transparent); border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; font-size: 10.5px; text-align: center; }
 .arena-detail-team { overflow: hidden; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 8px; }
 .arena-detail-columns + .arena-detail-team { border-radius: 0; }
 .arena-detail-team + .arena-detail-team { margin-top: -1px; border-radius: 0; }
@@ -868,7 +868,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .arena-detail-team > header > strong { font-size: 12px; }
 .arena-detail-team > header > span:last-child { color: var(--muted); font-size: 10px; }
 .arena-detail-player-list { display: grid; }
-.arena-detail-player { display: grid; min-height: 52px; grid-template-columns: minmax(140px,.9fr) 104px 96px 100px 116px 200px; align-items: center; justify-items: center; column-gap: 12px; padding: 6px 10px; border-top: 1px solid var(--line); text-align: center; }
+.arena-detail-player { display: grid; min-height: 52px; grid-template-columns: minmax(140px,.9fr) var(--arena-augment-width,104px) 96px 100px 116px 200px; align-items: center; justify-items: center; column-gap: 12px; padding: 6px 10px; border-top: 1px solid var(--line); text-align: center; }
 .arena-detail-player:first-child { border-top: 0; }
 .arena-detail-columns > :first-child { justify-self: start; text-align: left; }
 .arena-detail-player > .participant-link { width: auto; justify-self: start; justify-content: flex-start; }
@@ -877,14 +877,14 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .arena-detail-damage i { color: var(--muted); font-style: normal; }
 .arena-detail-kda b, .arena-detail-damage b { font-size: 10.5px; }
 .arena-detail-kda small { color: var(--muted); font-size: 9px; }
-.arena-detail-augments { display: grid; min-width: 0; grid-template-columns: repeat(3,30px); justify-content: center; gap: 3px; }
+.arena-detail-augments { display: grid; min-width: 0; grid-auto-flow:column; grid-auto-columns:30px; justify-content: center; gap: 3px; }
 .arena-detail-items { display: flex; min-width: 0; justify-self: stretch; justify-content: flex-start; flex-wrap: nowrap; gap: 3px; }
 .arena-detail-player .match-score-cell, .match-table .match-score-cell { width: 86px; grid-template-columns: 34px 48px; justify-content: center; justify-items: center; gap: 4px; }
 .arena-detail-player .match-score-value, .arena-detail-player .match-score-badge, .match-table .match-score-value, .match-table .match-score-badge { justify-items: center; }
 .arena-detail-player .match-score-badge:empty, .match-table .match-score-badge:empty { display: none; }
 @container matches-column (max-width: 720px) {
 	.arena-match-detail { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-gutter: stable; }
-	.arena-detail-columns, .arena-detail-team { min-width: 860px; }
+	.arena-detail-columns, .arena-detail-team { min-width: 0; }
 }
 .team-overview { overflow: hidden; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 10px; }
 .team-overview.is-blue > header strong { color: var(--accent); }
@@ -2459,7 +2459,7 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .rank-career-section > header > h3 { display:flex; align-items:center; gap:4px; }
 
 /* The existing sixth arena cell forms the equipment subline below the name. */
-.arena-detail-columns, .arena-detail-player { grid-template-columns:minmax(140px,1fr) 104px 96px 100px 116px; }
+.arena-detail-columns, .arena-detail-player { grid-template-columns:minmax(140px,1fr) var(--arena-augment-width,104px) 96px 100px 116px; }
 .arena-detail-columns .arena-column-items, .arena-detail-player > .arena-detail-items { grid-column:1 / -1; justify-self:stretch; justify-content:flex-start; }
 .arena-detail-player > .arena-detail-items { margin-top:5px; flex-wrap:wrap; }
 .arena-detail-columns .arena-column-items { text-align:left; }
@@ -2562,3 +2562,17 @@ body.overview-share-document::-webkit-scrollbar { display: none; }
 .recent-casual-heading > h3 { line-height:var(--rank-mmr-size); }
 .recent-casual-heading > .rank-mmr-control { align-self:center; }
 .recent-casual-header > .career-section-tools { align-self:center; }
+
+.arena-match-detail[data-augment-count="1"] { --arena-augment-width:30px; }
+.arena-match-detail[data-augment-count="2"] { --arena-augment-width:63px; }
+.arena-match-detail[data-augment-count="3"] { --arena-augment-width:96px; }
+.arena-match-detail[data-augment-count="4"] { --arena-augment-width:129px; }
+.arena-match-detail[data-augment-count="5"] { --arena-augment-width:162px; }
+.arena-match-detail[data-augment-count="6"] { --arena-augment-width:195px; }
+@container matches-column (max-width:720px) {
+ .arena-detail-columns, .arena-detail-team { min-width:0; }
+ .arena-detail-columns, .arena-detail-player { grid-template-columns:minmax(110px,1fr) minmax(63px,var(--arena-augment-width,104px)) 72px; column-gap:8px; }
+ .arena-detail-columns > :nth-child(4), .arena-detail-player > .arena-detail-kda { grid-row:2; grid-column:1; }
+ .arena-detail-columns > .arena-column-damage, .arena-detail-player > .arena-detail-damage { grid-row:2; grid-column:2 / -1; }
+ .arena-detail-augments { width:100%; grid-auto-flow:row; grid-auto-columns:auto; grid-template-columns:repeat(auto-fit,30px); }
+}

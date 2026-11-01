@@ -11,7 +11,7 @@
   if(!m||!state.autoConfigSettings?.enabled)return null;
   const key=resolveModeKey(all,m,position),saved=all?.[key],settings=state.autoConfigSettings;
   const entry=saved?{...saved,runes:settings.runes?saved.runes:null,spells:settings.spells?saved.spells:null,items:settings.items?saved.items:null}:null;
-  if(!entry||!entry.runes&&!entry.spells&&!entry.items?.starter?.length&&!entry.items?.core?.length&&!entry.items?.situational?.length)return null;
+  if(!entry||!entry.runes&&!entry.spells&&!entry.items?.boots?.length&&!entry.items?.starter?.length&&!entry.items?.core?.length&&!entry.items?.situational?.length)return null;
   return {key:"custom",sourceLabel:"自配置",championId:id,modeKey:key,modeLabel:(labels[key.startsWith("ranked")?"ranked":key]||"")+(key.startsWith("ranked")?" · "+(positions[key.slice(7)]||"通用"):""),entry,...entry.runes,...entry.spells,selectedComplete:entry.runes?.selectedPerkIds?.length===9};
  }
  function prepare(data) {const c=selection(data),self=data?.players?.find(p=>p.isCurrent),key=`${data?.gameId}:${Number(self?.championId)||Number(self?.championPickIntent)||0}:${mode(data)}:${c?.modeKey||""}:${!!c}`;if(key!==state.autoConfigViewKey){state.autoConfigViewKey=key;state.runeSourceTab=c?"custom":"opgg";state.selectedRecommendation=c?"custom":"opgg";}return c;}
@@ -30,9 +30,9 @@
   function renderCustomConfiguration(config) {
     const settings=state.autoConfigSettings;if(!settings?.enabled)return "";
     const entry={...config.entry,runes:settings.runes?config.entry.runes:null,spells:settings.spells?config.entry.spells:null,items:settings.items?config.entry.items:null},auto=state.autoConfig?.championId===config.championId?state.autoConfig:null;
-    if(!entry.runes&&!entry.spells&&!["starter","core","situational"].some(k=>entry.items?.[k]?.length))return "";
+    if(!entry.runes&&!entry.spells&&!["starter","boots","core","situational"].some(k=>entry.items?.[k]?.length))return "";
     const status=auto?.yielded?.runes||auto?.yielded?.spells?"已手动应用其他推荐，本局不自动应用":Object.values(auto?.results||{}).includes("applied")?"已应用到客户端":"锁定后自动应用";
-    const groups=[["出门装",entry.items?.starter||[]],["最终装备",(entry.items?.core||[]).map(id=>({id,count:1}))]].filter(([,items])=>items.length);
+    const groups=[["出门装",entry.items?.starter||[]],["鞋子",(entry.items?.boots||[]).map(id=>({id,count:1}))],["最终装备",(entry.items?.core||[]).map(id=>({id,count:1}))]].filter(([,items])=>items.length);
     const items=groups.map(([label,ids])=>`<div class="sg-items${label==="出门装"?" sg-starters":""}"><span class="sg-label">${label}</span><div class="sg-icons">${ids.map(item=>`<span class="custom-config-item">${renderItemIcon(item.id)}${item.count>1?`<b>×${item.count}</b>`:""}</span>`).join("")}</div></div>`).join("");
     const spells=entry.spells?renderRuneSpellIcons(entry.spells):"";
     return `<article class="specialist-game-row custom-config-card is-selected" data-custom-config><header class="custom-config-header"><strong>${escapeHTML(entry.runes?runeConfigurationTitle(config):"自配置")}</strong><span class="cs-live-pill">${escapeHTML(config.modeLabel)}</span><small role="status">${status}</small></header>${entry.runes?renderUnifiedRuneBoard(config,spells):spells?`<div class="sg-spells"><span data-card-spells>${spells}</span></div>`:""}${items?`<div class="specialist-game-footer">${items}</div>`:""}</article>`;

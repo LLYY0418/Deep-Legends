@@ -267,15 +267,20 @@
       const body={event,reason,r278:{augment_id:fields.augment_id,source:fields.source,ms:fields.ms,result:fields.result}},encoded=JSON.stringify(body);
       if(flowPending.size>=32)return;flowPending.add(encoded);void sendFlowDiagnostic(body,encoded,0);return;
     }
+    if(event==="arena_recommendation_timing"){
+      const body={event,reason,arenaTiming:fields},encoded=JSON.stringify(body);if(flowPending.size>=32)return false;flowPending.add(encoded);return sendFlowDiagnostic(body,encoded,0);
+    }
     if(event==="equipment_fit_layout"){
       if(!["render","resize","observer","section"].includes(reason))return false;
       const equipmentFit={};for(const key of ["shop_height","bottom_gap"]){const n=Number(fields[key]);if(!Number.isFinite(n)||n<0||n>100000)return false;equipmentFit[key]=n;}
+      equipmentFit.layout_mode=fields.layout_mode;
       const body={event,reason,equipmentFit},encoded=JSON.stringify(body);if(flowPending.size>=32)return false;flowPending.add(encoded);return sendFlowDiagnostic(body,encoded,0);
     }
     if(event==="rune_fit_layout"){
       if(!["render","resize","observer","section"].includes(reason))return false;
       const runeFit={};for(const key of ["width","height","scale","f","bottom_gap"]){const n=Number(fields[key]);if(!Number.isFinite(n)||n<0||n>100000)return false;runeFit[key]=n;}
       runeFit.top_gap=Number(fields.top_gap ?? 0);if(!Number.isFinite(runeFit.top_gap)||runeFit.top_gap<0||runeFit.top_gap>100000)return false;
+      runeFit.panel_bottom_gap=Number(fields.panel_bottom_gap??0);runeFit.header_gap=Number(fields.header_gap??0);runeFit.layout_mode=fields.layout_mode;
       const body={event,reason,runeFit},encoded=JSON.stringify(body);if(flowPending.size>=32)return false;flowPending.add(encoded);return sendFlowDiagnostic(body,encoded,0);
     }
     if(event==="window_resize_trace"){

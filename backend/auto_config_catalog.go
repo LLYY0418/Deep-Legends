@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -154,15 +153,6 @@ func autoConfigSpellAllowed(s autoConfigSpell, mode string, currentMode ...strin
 	return false
 }
 
-// No current official mode-specific starting-gold rule was verifiable on 2026-10-24.
-// R300 fallback: Summoner's Rift 500, Howling Abyss 1400, including URF/event.
-// Official mode references checked: https://www.leagueoflegends.com/en-us/news/game-updates/patch-26-21-notes/
-func autoConfigStarterBudget(mode string) int64 {
-	if mode == "aram" || mode == "hextech" {
-		return 1400
-	}
-	return 500
-}
 func autoConfigStarterAllowed(i autoConfigItem, mode string) bool {
 	mapID := "11"
 	if mode == "aram" || mode == "hextech" {
@@ -174,7 +164,7 @@ func autoConfigStarterAllowed(i autoConfigItem, mode string) bool {
 			return false
 		}
 	}
-	return i.ID > 0 && i.InStore && i.DisplayInItemSets && i.RequiredChampion == "" && i.RequiredAlly == "" && i.Maps[mapID] && i.Price >= 0 && i.Price <= autoConfigStarterBudget(mode)
+	return i.ID > 0 && i.InStore && i.DisplayInItemSets && i.RequiredChampion == "" && i.RequiredAlly == "" && i.Maps[mapID] && i.Price >= 0
 }
 func autoConfigConsumable(i autoConfigItem) bool {
 	for _, c := range i.Categories {
@@ -297,7 +287,6 @@ func (a *app) validateAutoConfigCatalog(ctx context.Context, mode string, e auto
 		for _, item := range c.Items {
 			starterCatalog[item.ID] = item
 		}
-		total := int64(0)
 		trinkets := 0
 		for _, item := range e.Items.Starter {
 			meta, ok := starterCatalog[item.ID]
@@ -312,10 +301,12 @@ func (a *app) validateAutoConfigCatalog(ctx context.Context, mode string, e auto
 					}
 				}
 			}
-			total += meta.Price * item.Count
 		}
-		if total > autoConfigStarterBudget(mode) {
-			return errors.New("超出出门预算")
+		for _, id := range e.Items.Boots {
+			meta, ok := starterCatalog[id]
+			if !ok || !autoConfigBootsAllowed(meta, mode) {
+				return autoConfigError("鞋子")
+			}
 		}
 		valid := map[int64]bool{}
 		for _, i := range c.Items {
@@ -350,4 +341,16 @@ func (a *app) currentAutoConfigGameMode(ctx context.Context) string {
 		return mode
 	}
 	return ""
+}
+
+func autoConfigBootsAllowed(i autoConfigItem, mode string) bool {
+	if !autoConfigStarterAllowed(i, mode) {
+		return false
+	}
+	for _, category := range i.Categories {
+		if category == "Boots" {
+			return true
+		}
+	}
+	return false
 }

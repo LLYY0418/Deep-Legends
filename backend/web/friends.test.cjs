@@ -124,3 +124,27 @@ test("friend banner matches opaque aliases, escapes labels and rejects stale or 
   state.friendPresence.set(friend.playerRef,{...friend,queueLabel:'<img src=x onerror="alert(1)">',gameStartedAt:NaN});
   assert.match(render(tab),/&lt;img/);assert.doesNotMatch(render(tab),/<img|<time/);
 });
+
+test('R317 group toggles, identical refresh, status changes, moves and search preserve decoded images',async()=>{
+ const dom=new JSDOM('<button id="friends-toggle"><span id="friends-count"></span></button><aside id="friends-dock"><button id="friends-close"></button><input id="friends-search-input"><span id="friends-summary"></span><div id="friends-list"></div></aside>',{url:'http://localhost',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,d=w.document;
+ const timers=new Map();let seq=0;w.setTimeout=(fn,ms)=>{timers.set(++seq,{fn,ms});return seq};w.clearTimeout=id=>timers.delete(id);
+ let friends=[{playerRef:'a',gameName:'甲',groupId:1,icon:1,availability:'dnd',gameStatus:'inGame',championId:64},{playerRef:'b',gameName:'乙',groupId:2,icon:2,availability:'chat',gameStatus:'outOfGame'},{playerRef:'c',gameName:'丙',groupId:1,icon:3,availability:'offline'}];
+ w.deepLegendsRuntime={escapeHTML};w.fetch=async()=>({ok:true,json:async()=>({groups:[{id:1,name:'默认'},{id:2,name:'自定义'}],friends:structuredClone(friends)})});
+ const flush=async()=>{await new Promise(setImmediate);await new Promise(setImmediate)};
+ const refresh=async()=>{w.dispatchEvent(new w.Event('deep-legends:friends-updated'));for(const [id,job]of [...timers])if(job.ms===300){timers.delete(id);job.fn()}await flush()};
+ try{
+  w.eval(source);w.dispatchEvent(new w.CustomEvent('deep-legends:status',{detail:{connected:true}}));await flush();d.querySelector('#friends-toggle').click();await flush();
+  const rows=new Map([...d.querySelectorAll('.friend-row')].map(n=>[n.dataset.playerRef,n])),images=[...d.querySelectorAll('.friend-row img')];
+  let mutations=[];const observer=new w.MutationObserver(records=>mutations.push(...records));observer.observe(d.querySelector('#friends-list'),{subtree:true,attributes:true,attributeFilter:['src','data-queued-src'],characterData:true,childList:true});
+  for(const head of d.querySelectorAll('.friends-group-head')){head.focus();for(let i=0;i<6;i++)head.click();assert.equal(d.activeElement,head)}
+  await flush();assert.equal(mutations.filter(m=>m.target.parentElement?.closest('.friend-row')||m.target.matches?.('.friend-row')).length,0,'toggle changes no image attribute or friend text node');
+  await refresh();for(const [key,row]of rows)assert.equal(d.querySelector(`[data-player-ref="${key}"]`),row);for(const img of images)assert.equal(img.isConnected,true);
+  assert.equal(mutations.filter(m=>m.type==='attributes').length,0);mutations=[];
+  friends[1].availability='away';await refresh();assert.match(rows.get('b').querySelector('.friend-status').textContent,/离开/);assert.equal(mutations.some(m=>rows.get('a').contains(m.target)),false,'unchanged friend text is untouched');assert.equal(mutations.filter(m=>m.type==='attributes').length,0);mutations=[];
+  friends[0].groupId=2;await refresh();assert.equal(rows.get('a').closest('[data-friends-group]').dataset.friendsGroup,'g2');for(const img of images)assert(img.isConnected);
+  const input=d.querySelector('#friends-search-input');input.value='乙';input.dispatchEvent(new w.Event('input'));assert.equal(rows.get('a').hidden,true);assert.equal(rows.get('b').hidden,false);input.value='';input.dispatchEvent(new w.Event('input'));for(const img of images)assert(img.isConnected);
+  const pending=[];w.Image=function(){const img=d.createElement('img');pending.push(img);return img};
+  const avatar=rows.get('a').querySelector('.friend-avatar img');friends[0].icon=99;await refresh();assert.equal(rows.get('a').querySelector('.friend-avatar img'),avatar,'old decoded image remains while replacement loads');assert.equal(pending.length,1);pending[0].onload();assert.equal(rows.get('a').querySelector('.friend-avatar img'),pending[0]);assert.equal(rows.get('b').querySelector('img'),images.find(n=>rows.get('b').contains(n)));
+  observer.disconnect();
+ }finally{w.dispatchEvent(new w.Event('deep-legends:dispose'));w.close()}
+});

@@ -321,8 +321,7 @@ type liveR263PlayerFields struct {
 	// SoloRank/FlexRank: Summoner's Rift shows both under the name (LeagueAkari).
 	SoloRank *gameplayRank `json:"soloRank,omitempty"`
 	FlexRank *gameplayRank `json:"flexRank,omitempty"`
-	// ArenaFame/ArenaRecord: Arena level + fame and 30-game top-half / first.
-	ArenaFame   *gameplayArenaFame   `json:"arenaFame,omitempty"`
+	// ArenaRecord preserves current-mode results.
 	ArenaRecord *gameplayArenaRecord `json:"arenaRecord,omitempty"`
 }
 

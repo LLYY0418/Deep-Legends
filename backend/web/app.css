@@ -1223,10 +1223,19 @@ html[data-ui-preferences="pending"] #app-frame { visibility: hidden; }
 .update-icon-button .update-border { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; fill:none; }
 .update-icon-button .update-border rect { x:.5px; y:.5px; width:calc(100% - 1px); height:calc(100% - 1px); rx:9.5px; stroke-width:1; }
 .update-icon-button .update-border-track { stroke:var(--line); }
-.update-icon-button .update-border .update-border-progress { x:2px; y:2px; width:calc(100% - 4px); height:calc(100% - 4px); rx:8px; stroke-width:4; display:none; stroke:var(--primary); stroke-dasharray:100; stroke-linecap:butt; transition:stroke-dashoffset .3s ease; }
+.update-icon-button .update-border .update-border-progress { x:3px; y:3px; width:calc(100% - 6px); height:calc(100% - 6px); rx:7px; stroke-width:6; display:none; stroke:var(--primary); stroke-dasharray:100; stroke-linecap:butt; transition:stroke-dashoffset .3s ease; }
 .update-icon-button.busy .update-border-progress { display:block; }
 .update-icon-button .dot { display:none; top:0; right:0; }
 .update-icon-button.ready .dot { display:block; }
 @media(prefers-reduced-motion:reduce){.update-icon-button .update-border-progress{transition:none;}}
 
 .appearance-boot *, .appearance-boot *::before, .appearance-boot *::after { transition:none !important; }
+
+.favorites-header { position:sticky; top:0; z-index:18; background:var(--bg); margin-bottom:0; padding-bottom:18px; }
+.favorites-subpanel .collection-toolbar, .pool-primary-tabs, .account-status-row { position:sticky; top:var(--favorites-header-height,100px); z-index:17; background:var(--bg); }
+.pool-primary-tabs, .account-status-row { padding-block:8px; margin-block:0; }
+
+.shell:has(> .favorites-header:not([hidden])) { padding-top:0; }
+.pool-workspace-head { position:sticky; top:var(--favorites-header-height,100px); z-index:17; background:var(--bg); }
+.pool-workspace-head .pool-primary-tabs { position:static; }
+.pool-catalog-controls { position:sticky; top:calc(var(--favorites-header-height,100px) + var(--favorites-pool-head-height,0px)); z-index:16; background:var(--bg); }

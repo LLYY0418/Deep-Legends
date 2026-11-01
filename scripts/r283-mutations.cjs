@@ -31,8 +31,6 @@ const js=[
 const go=[
  ['P1-early','backend/lp_tracker.go','TestR283LPFirstEligibleAndCorrection','snapshot.games() == baseline.games()+1 && afterOK','false && snapshot.games() == baseline.games()+1 && afterOK'],
  ['P1-unified','backend/gameplay.go','TestR283LPUnifiedPublicOutput','a.annotateOverviewLP(response, "public")','// annotation removed'],
- ['P3-help','backend/arena_fame_discovery.go','TestR283ArenaHelpFormats','case string:','case bool:'],
- ['P3-window','backend/arena_fame_discovery.go','TestR283ArenaPostGameWindow','schedule(120*time.Second','schedule(1*time.Second'],
  ['P4','backend/history_filter_fallback.go','TestR283FallbackUnion','[][]gameplayMatch{known, incoming}','[][]gameplayMatch{nil, incoming}'],
  ['P16','backend/data/augment_descriptions_20261017.json','TestR283Augment391Chinese','"id":391,','"id":999391,'],
  ['P17-classification','backend/live_history_freshness.go','TestR283LiveOfficialOutage','return errors.Is(err, errSGPHistoryCooling) ||','return err!=nil || errors.Is(err, errSGPHistoryCooling) ||'],

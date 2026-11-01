@@ -252,14 +252,14 @@
 		  <section id="favorites-account-panel" class="favorites-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="favorites-tab-account" hidden><div class="account-status-row"><span id="account-live-state" class="state-chip">等待客户端</span></div><div id="account-content" class="data-panel"><p class="muted">打开此页后读取当前客户端数据。</p></div></section>
 
           <section id="favorites-pools-panel" class="favorites-subpanel" role="tabpanel" tabindex="-1" aria-labelledby="favorites-tab-pools" hidden>
-            <div class="panel-heading page-heading"><div><h2>奖池皮肤</h2></div></div>
+            <div class="pool-workspace-head"><div class="panel-heading page-heading"><div><h2>奖池皮肤</h2></div></div>
             <div class="view-tabs pool-primary-tabs" role="tablist" aria-label="奖池功能">
               <button id="pool-tab-catalog" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="pool-catalog-panel" data-pool-page="catalog">奖池目录</button>
               <button id="pool-tab-upload" class="tab" type="button" role="tab" aria-selected="false" aria-controls="pool-upload-panel" data-pool-page="upload">清单上传</button>
               <button id="pool-tab-history" class="tab" type="button" role="tab" aria-selected="false" aria-controls="pool-history-panel" data-pool-page="history">本地历史</button>
             </div>
-            <section id="pool-catalog-panel" class="pool-subpanel" role="tabpanel" aria-labelledby="pool-tab-catalog">
-              <div class="pool-catalog-toolbar">
+            </div><section id="pool-catalog-panel" class="pool-subpanel" role="tabpanel" aria-labelledby="pool-tab-catalog">
+              <div class="pool-catalog-controls"><div class="pool-catalog-toolbar">
                 <div class="view-tabs" role="tablist" aria-label="奖池拥有状态">
                   <button class="tab is-active" type="button" role="tab" aria-selected="true" data-pool-view="owned">已拥有</button>
                   <button class="tab" type="button" role="tab" aria-selected="false" data-pool-view="unowned">未拥有</button>
@@ -271,7 +271,7 @@
                 <label class="select-wrap"><span class="sr-only">奖池品质</span><select id="pool-quality"><option value="all">全部品质</option><option value="legendary">传说</option><option value="limited">限定</option><option value="epic">史诗</option><option value="royal">王者</option><option value="brave">勇士</option><option value="archive">典藏</option><option value="unranked">未分级</option></select></label>
                 <label class="select-wrap"><span class="sr-only">奖池排序</span><select id="pool-sort"><option value="rarity">按品质排序</option><option value="champion">按英雄排序</option><option value="name">按皮肤名排序</option></select></label>
               </div>
-              <div id="pool-list-meta" class="list-meta" role="status" aria-live="polite">正在读取奖池目录</div>
+              </div><div id="pool-list-meta" class="list-meta" role="status" aria-live="polite">正在读取奖池目录</div>
               <div id="pool-skin-grid" class="skin-grid" aria-busy="true"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
             </section>
             <section id="pool-upload-panel" class="pool-subpanel" role="tabpanel" aria-labelledby="pool-tab-upload" hidden>

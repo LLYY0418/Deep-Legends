@@ -660,23 +660,7 @@ func (a *app) applyAutoConfig(ctx context.Context, client *LCUClient, s lcuChamp
 				mapID = 12
 			}
 			req := gameplayItemSetApplyRequest{Storage: "recommended", Title: "[DL] " + name, ChampionID: id, MapID: mapID, Position: "other"}
-			if len(entry.Items.Starter) > 0 {
-				block := gameplayItemSetBlockRequest{Type: "出门装"}
-				for _, item := range entry.Items.Starter {
-					block.Items = append(block.Items, gameplayItemSetItemRequest{ID: item.ID, Count: int(item.Count)})
-				}
-				req.Blocks = append(req.Blocks, block)
-			}
-			for i, ids := range [][]int64{entry.Items.Core, entry.Items.Situational} {
-				if len(ids) == 0 {
-					continue
-				}
-				block := gameplayItemSetBlockRequest{Type: []string{"核心出装", "备选"}[i]}
-				for _, item := range ids {
-					block.Items = append(block.Items, gameplayItemSetItemRequest{ID: item, Count: 1})
-				}
-				req.Blocks = append(req.Blocks, block)
-			}
+			req.Blocks = autoConfigItemBlocks(entry.Items)
 			if len(req.Blocks) == 0 {
 				results[kind] = "skipped-incomplete"
 				skip("no_config")
@@ -827,4 +811,29 @@ func (a *app) handleAutoConfigApply(w http.ResponseWriter, r *http.Request) {
 	}
 	a.autoConfig.Unlock()
 	respondJSON(w, map[string]any{"results": results})
+}
+
+func autoConfigItemBlocks(items *autoConfigItems) []gameplayItemSetBlockRequest {
+	var blocks []gameplayItemSetBlockRequest
+	if items == nil {
+		return blocks
+	}
+	if len(items.Starter) > 0 {
+		block := gameplayItemSetBlockRequest{Type: "出门装"}
+		for _, item := range items.Starter {
+			block.Items = append(block.Items, gameplayItemSetItemRequest{ID: item.ID, Count: int(item.Count)})
+		}
+		blocks = append(blocks, block)
+	}
+	for i, ids := range [][]int64{items.Boots, items.Core, items.Situational} {
+		if len(ids) == 0 {
+			continue
+		}
+		block := gameplayItemSetBlockRequest{Type: []string{"鞋子", "核心出装", "备选"}[i]}
+		for _, id := range ids {
+			block.Items = append(block.Items, gameplayItemSetItemRequest{ID: id, Count: 1})
+		}
+		blocks = append(blocks, block)
+	}
+	return blocks
 }

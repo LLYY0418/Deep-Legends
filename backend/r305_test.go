@@ -93,68 +93,6 @@ func TestR305ArenaPartialPremadesIncludeSelfAndExcludeUnknown(t *testing.T) {
 		t.Fatal("group/mine")
 	}
 }
-func TestR305ProgressionRestartExpiryAndConditionalDelete(t *testing.T) {
-	a := r175App(t)
-	a.summoner = Summoner{PUUID: "self"}
-	c := &LCUClient{}
-	p := &arenaProgressionProbe{account: a.storage.accountHash(a.summoner), platform: clientRiotPlatform(c) + "/" + clientTencentServerID(c), gameID: 305, at: time.Now(), lobbyAt: time.Now().Add(-3 * time.Minute), before: arenaProgressionSnapshot{Values: map[string]float64{"fame": 10}}}
-	a.persistArenaProgression(p)
-	restarted := &app{storage: a.storage, summoner: a.summoner}
-	restored := restarted.restoreArenaProgression(c)
-	if restored == nil || restored.before.Values["fame"] != 10 {
-		t.Fatal("restart lost before")
-	}
-	restored.gameID = 0
-	c.arenaDiscoveryState().progression = restored
-	restarted.startArenaProgressionDiscovery(c, "GameStart", 305)
-	if disk := restarted.restoreArenaProgression(c); disk == nil || disk.gameID != 305 {
-		t.Fatal("game start did not persist resolved game ID")
-	}
-	s := c.arenaDiscoveryState()
-	var scheduleMu sync.Mutex
-	var delay time.Duration
-	called := false
-	s.schedule = func(d time.Duration, fn func()) func() {
-		scheduleMu.Lock()
-		defer scheduleMu.Unlock()
-		delay, called = d, true
-		return func() {}
-	}
-	restarted.observeArenaProgressionPhase(c, "Lobby")
-	scheduleMu.Lock()
-	firstCalled, firstDelay := called, delay
-	scheduleMu.Unlock()
-	if !firstCalled || firstDelay != 0 {
-		t.Fatal("overdue lobby not immediate", firstDelay)
-	}
-	newer := *p
-	newer.gameID = 306
-	newer.at = p.at.Add(time.Second)
-	a.persistArenaProgression(&newer)
-	a.clearArenaProgression(p)
-	if a.restoreArenaProgression(c) == nil {
-		t.Fatal("old callback deleted new snapshot")
-	}
-	newer.at = time.Now().Add(-31 * time.Minute)
-	a.persistArenaProgression(&newer)
-	if a.restoreArenaProgression(c) != nil {
-		t.Fatal("expired restored")
-	}
-	if _, err := readLocalStoreFile(a.storage, "arena-progression-before.json"); !os.IsNotExist(err) {
-		t.Fatal("expired file remains")
-	}
-	none := &LCUClient{}
-	scheduleMu.Lock()
-	called = false
-	scheduleMu.Unlock()
-	none.arenaDiscoveryState().schedule = s.schedule
-	a.observeArenaProgressionPhase(none, "Lobby")
-	scheduleMu.Lock()
-	defer scheduleMu.Unlock()
-	if called {
-		t.Fatal("no snapshot scheduled")
-	}
-}
 func TestR305ModeBoundariesPersistAcrossIndependentCompleteSaves(t *testing.T) {
 	s := &localStore{root: t.TempDir()}
 	base := seasonStatsCache{SchemaVersion: seasonStatsCacheSchemaVersion, Source: seasonStatsSource, Season: "S26", AccountHash: "account", Streams: map[string]seasonStatsStream{"ranked": {Complete: true, OldestCreatedAt: 12}, "flex": {Complete: true, CappedByUpstream: true, OldestCreatedAt: 40}, "mayhem": {Complete: true, CappedByUpstream: true, OldestCreatedAt: 30}}}

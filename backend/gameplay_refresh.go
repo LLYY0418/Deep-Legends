@@ -41,7 +41,8 @@ func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase
 	}
 	f := &a.gameplayFlow
 	f.mu.Lock()
-	changed := f.client != client || f.phase != phase
+	clientChanged := f.client != client
+	changed := clientChanged || f.phase != phase
 	if changed {
 		if f.cancel != nil {
 			f.cancel()
@@ -74,6 +75,16 @@ func (a *app) observeGameplayPhase(ctx context.Context, client *LCUClient, phase
 	if phase != "ChampSelect" {
 		a.flushChampSelectLatency()
 	}
+	timeline := &a.arenaRecommendationTimeline
+	timeline.mu.Lock()
+	if clientChanged || phase == "ChampSelect" {
+		timeline.entries = nil
+		timeline.inProgress = time.Time{}
+	}
+	if phase == "InProgress" && timeline.inProgress.IsZero() {
+		timeline.inProgress = time.Now()
+	}
+	timeline.mu.Unlock()
 	a.observeArenaGroupingPhase(client, phase)
 	a.liveSnapshots.invalidate()
 	if isEndOfGamePhase(phase) {

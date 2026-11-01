@@ -23,6 +23,8 @@ type updateFlight struct {
 	source          *updateRoute
 	position, bytes int64
 	started         time.Time
+	lastProgress    time.Time
+	stalled         bool
 	window          updateSpeedWindow
 	speed           float64
 	slowSince       time.Time
@@ -33,6 +35,7 @@ type updateRoute struct {
 	prefix                  string
 	initial, speed          float64
 	demotedUntil, lastProbe time.Time
+	lastProgress, lastStall time.Time
 	bytes                   int64
 	connectionTime          time.Duration
 	connections, active     int
@@ -51,6 +54,9 @@ type updateScheduler struct {
 	progress                             updateSpeedWindow
 	demotions, steals, aborted, switches int
 	failure                              error
+	lastProgress                         time.Time
+	maxProgressGap                       time.Duration
+	stalledAborts                        int
 }
 
 // All shared accounting and route choices are protected by mu. Each request
@@ -164,7 +170,7 @@ func (s *updateScheduler) claim(ctx context.Context) (*updateFlight, context.Con
 	source.connections++
 	source.active++
 	attemptCtx, cancel := context.WithCancel(ctx)
-	f := &updateFlight{chunk: chunk, source: source, position: chunk.position, started: now, cancel: cancel}
+	f := &updateFlight{chunk: chunk, source: source, position: chunk.position, started: now, lastProgress: now, cancel: cancel}
 	f.window.speed(now, 0)
 	chunk.flights[f] = true
 	return f, attemptCtx
@@ -172,10 +178,17 @@ func (s *updateScheduler) claim(ctx context.Context) (*updateFlight, context.Con
 func (s *updateScheduler) add(f *updateFlight, n int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	now := time.Now()
+	f.lastProgress = now
+	f.source.lastProgress = now
 	f.bytes += n
 	f.position += n
 	f.source.bytes += n
 	if f.position > f.chunk.position {
+		if gap := now.Sub(s.lastProgress); gap > s.maxProgressGap {
+			s.maxProgressGap = gap
+		}
+		s.lastProgress = now
 		s.received += f.position - f.chunk.position
 		f.chunk.position = f.position
 	}
@@ -214,7 +227,7 @@ func (s *updateScheduler) finish(f *updateFlight, err error) {
 			}
 		}
 	}
-	if err != nil && !f.slow && !c.done && ctxErrorFree(err) {
+	if err != nil && !f.slow && !f.stalled && !c.done && ctxErrorFree(err) {
 		// Errors quarantine the route too; a different route resumes verified bytes.
 		route.demotedUntil = now.Add(30 * time.Second)
 		route.lastProbe = now
@@ -226,6 +239,48 @@ func ctxErrorFree(err error) bool { return !errors.Is(err, context.Canceled) }
 func (s *updateScheduler) tick(now time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if gap := now.Sub(s.lastProgress); gap > s.maxProgressGap {
+		s.maxProgressGap = gap
+	}
+	// A silent connection can migrate without waiting for its five-second rate.
+	// A first stall only replaces the connection; a repeated source stall quarantines it.
+	for _, c := range s.chunks {
+		if c.done {
+			continue
+		}
+		for f := range c.flights {
+			if f.stalled || f.slow || now.Sub(f.lastProgress) < 2*time.Second {
+				continue
+			}
+			otherProgress := len(s.routes) == 1
+			for _, other := range s.chunks {
+				for g := range other.flights {
+					if g != f && g.lastProgress.After(f.lastProgress) && now.Sub(g.lastProgress) <= 2*time.Second {
+						otherProgress = true
+					}
+				}
+			}
+			for _, route := range s.routes {
+				if route.lastProgress.After(f.lastProgress) && now.Sub(route.lastProgress) <= 2*time.Second {
+					otherProgress = true
+				}
+			}
+			if !otherProgress {
+				continue
+			}
+			f.stalled = true
+			s.stalledAborts++
+			s.switches++
+			if !f.source.lastStall.IsZero() && now.Sub(f.source.lastStall) <= 30*time.Second {
+				f.source.demotedUntil = now.Add(30 * time.Second)
+				f.source.lastProbe = now
+				s.demotions++
+				s.manager.recordUpdateCheck(map[string]any{"event": "update_download_source_demoted", "source": updateDiagnosticMirrorPrefix(f.source.prefix), "reason": "stalled"})
+			}
+			f.source.lastStall = now
+			f.cancel()
+		}
+	}
 	// Update every active connection's five-second rate, including idle periods.
 	for _, c := range s.chunks {
 		for f := range c.flights {
@@ -253,7 +308,7 @@ func (s *updateScheduler) tick(now time.Time) {
 		}
 		for f := range c.flights {
 			best := s.best(now, f.source)
-			if best == nil || f.slow {
+			if best == nil || f.slow || f.stalled {
 				continue
 			}
 			bestSpeed := best.speed
@@ -300,6 +355,7 @@ func (u *updateManager) downloadSharedChunks(parent context.Context, asset updat
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	s := &updateScheduler{manager: u, race: race, asset: asset, file: file, started: time.Now()}
+	s.lastProgress = s.started
 	s.progress.speed(s.started, 0)
 	for start := int64(0); start < asset.Size; start += updateChunkBytes {
 		s.chunks = append(s.chunks, &updateChunk{index: len(s.chunks), position: start, end: min(asset.Size-1, start+updateChunkBytes-1), flights: map[*updateFlight]bool{}})
@@ -363,7 +419,7 @@ func (u *updateManager) downloadSharedChunks(parent context.Context, asset updat
 				perSource = append(perSource, map[string]any{"source": updateDiagnosticMirrorPrefix(r.prefix), "bytes": r.bytes, "avg_kbps": float64(r.bytes) / math.Max(.001, r.connectionTime.Seconds()) / 1024, "connections": r.connections})
 			}
 			elapsed := time.Since(s.started)
-			u.recordUpdateCheck(map[string]any{"event": "update_download_segments_finished", "segments": 4, "chunks": len(s.chunks), "switches": s.switches, "total_ms": elapsed.Milliseconds(), "avg_kbps": float64(s.received) / math.Max(.001, elapsed.Seconds()) / 1024, "per_source": perSource, "demotions": s.demotions, "steals": s.steals, "aborted_slow_chunks": s.aborted, "predownload": u.predownloadActive()})
+			u.recordUpdateCheck(map[string]any{"event": "update_download_segments_finished", "segments": 4, "chunks": len(s.chunks), "switches": s.switches, "total_ms": elapsed.Milliseconds(), "avg_kbps": float64(s.received) / math.Max(.001, elapsed.Seconds()) / 1024, "per_source": perSource, "demotions": s.demotions, "steals": s.steals, "aborted_slow_chunks": s.aborted, "stalled_aborts": s.stalledAborts, "max_progress_gap_ms": s.maxProgressGap.Milliseconds(), "predownload": u.predownloadActive()})
 			if err = file.Sync(); err != nil {
 				return err
 			}

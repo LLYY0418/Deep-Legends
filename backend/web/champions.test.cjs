@@ -1513,9 +1513,9 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*minmax\(0,1fr\)/s);
 	assert.doesNotMatch(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*row-gap:\s*5px/);
 	assert.match(gameplayStyles, /\.match-players\.is-arena\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
-	assert.match(gameplayStyles, /\.arena-detail-columns\s*\{[^}]*grid-template-columns:\s*minmax\(140px,\.9fr\) 104px 96px 100px 116px 200px[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
-	assert.match(gameplayStyles, /\.arena-detail-player\s*\{[^}]*grid-template-columns:\s*minmax\(140px,\.9fr\) 104px 96px 100px 116px 200px[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
-	assert.match(gameplayStyles, /\.arena-detail-augments\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3,30px\)[^}]*justify-content:\s*center/s);
+	assert.match(gameplayStyles, /\.arena-detail-columns\s*\{[^}]*grid-template-columns:\s*minmax\(140px,\.9fr\) var\(--arena-augment-width,104px\) 96px 100px 116px 200px[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
+	assert.match(gameplayStyles, /\.arena-detail-player\s*\{[^}]*grid-template-columns:\s*minmax\(140px,\.9fr\) var\(--arena-augment-width,104px\) 96px 100px 116px 200px[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
+	assert.match(gameplayStyles, /\.arena-detail-augments\s*\{[^}]*display:\s*grid[^}]*grid-auto-flow:\s*column;[^}]*grid-auto-columns:\s*30px[^}]*justify-content:\s*center/s);
 	assert.match(gameplayStyles, /\.arena-detail-damage\s*\{[^}]*display:\s*flex[^}]*justify-content:\s*center[^}]*white-space:\s*nowrap/s);
 	assert.match(gameplayStyles, /\.arena-detail-columns > :first-child\s*\{[^}]*justify-self:\s*start[^}]*text-align:\s*left/s);
 	assert.match(gameplayStyles, /\.arena-detail-player > \.participant-link\s*\{[^}]*width:\s*auto[^}]*justify-self:\s*start[^}]*justify-content:\s*flex-start/s);
@@ -1526,7 +1526,7 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayStyles, /\.match-table \.participant-link\s*\{[^}]*width:\s*100%[^}]*min-width:\s*0[^}]*justify-content:\s*flex-start/s);
 	assert.match(gameplayStyles, /\.match-table \.table-items\s*\{[^}]*justify-content:\s*flex-start/s);
 	assert.match(gameplayStyles, /\.matches-column\s*\{[^}]*container:\s*matches-column \/ inline-size/);
-	assert.match(gameplayStyles, /@container matches-column \(max-width: 720px\)[\s\S]{0,260}\.arena-detail-columns, \.arena-detail-team\s*\{[^}]*min-width:\s*860px/);
+	assert.match(gameplayStyles, /@container matches-column \(max-width: 720px\)[\s\S]{0,260}\.arena-detail-columns, \.arena-detail-team\s*\{[^}]*min-width:\s*0/);
 	// Arena records now own the same matches-column container as player history.
 	assert.doesNotMatch(gameplayStyles, /@container arena-first \(max-width: 640px\)/);
 	assert.doesNotMatch(gameplayStyles, /\.arena-column-(?:augments|damage|items|score)[^}]*display:\s*none|\.arena-detail-(?:augments|damage|items)[^}]*display:\s*none/);

@@ -242,7 +242,6 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 	defer cancel()
 	client.mu.Lock()
 	client.sessionContext = sessionCtx
-	client.arenaDiscovery = &arenaFameDiscoveryState{}
 	client.mu.Unlock()
 	a.mu.Lock()
 	a.clientSessionCancel, a.clientSessionCancelClient = cancel, client
@@ -254,11 +253,6 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 		}
 		a.mu.Unlock()
 	}()
-	fameState := a.r263()
-	fameState.mu.Lock()
-	fameState.fame = arenaFameCache{}
-	fameState.mu.Unlock()
-	defer func() { a.finishArenaFameDiscovery(client.arenaDiscoveryState()) }()
 	a.beginConnectionPriority(sessionCtx, client)
 	a.scheduleConnectionWork(sessionCtx, client, "auto-config-catalog", false, func() {
 		if a.autoConfigSnapshot().Enabled {
@@ -341,7 +335,6 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 					a.sgp.observeTokenEvent(client, event)
 					a.observeClientCatalogVersion(client, event)
 					a.observeAutoConfigEvent(sessionCtx, client, event)
-					client.observeArenaDiscoveryEvent(event)
 				}
 				if currentTokenClient {
 					a.observeCollectionSkinEvent(sessionCtx, client, event)
@@ -358,7 +351,6 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 						if phase == "Matchmaking" {
 							a.goSafe("connection_manager.runConnectedSession.6", func() { a.collectAcceptFocusInspectionAt(sessionCtx, client, "matchmaking-not-at-accept") })
 						}
-						a.observeArenaDiscoveryPhase(client, phase)
 						a.observeGameplayPhase(sessionCtx, client, phase)
 						a.broadcastEvent("gameflow:" + phase)
 						if watch := a.activeWatch(); watch != nil {

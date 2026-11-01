@@ -171,48 +171,6 @@ func TestR263ChampSelectSignalPreferredOverInProgress(t *testing.T) {
 	}
 }
 
-func TestR263ArenaFameLevelsAndTierCrossCheck(t *testing.T) {
-	cases := []struct {
-		fame  int
-		level int
-	}{{99, 0}, {100, 1}, {1599, 1}, {1600, 2}, {47599, 11}, {47600, 12}, {87510, 12}}
-	for _, item := range cases {
-		if got := arenaLevelForFame(item.fame); got != item.level {
-			t.Fatalf("level(%d) = %d, want %d", item.fame, got, item.level)
-		}
-	}
-	if fame, reason := arenaFameFromRated("GLADIATOR", 87510); fame == nil || fame.Level != 12 || fame.Fame != 87510 || reason != "" {
-		t.Fatalf("gladiator = %#v %q", fame, reason)
-	}
-	if fame, reason := arenaFameFromRated("silver", 12600.4); fame == nil || fame.Level != 6 || fame.Tier != "SILVER" || reason != "" {
-		t.Fatalf("silver = %#v %q", fame, reason)
-	}
-	// A legacy hidden rating (e.g. 1500 with GOLD) is not Fame: do not guess.
-	for _, item := range []struct {
-		tier   string
-		rating float64
-		reason string
-	}{{"GOLD", 1500, "tier_mismatch"}, {"", 9000, "no_tier"}, {"NONE", 9000, "no_tier"}, {"WOOD", 0, "no_rating"}, {"WOOD", 50, "below_level_one"}} {
-		if fame, reason := arenaFameFromRated(item.tier, item.rating); fame != nil || reason != item.reason {
-			t.Fatalf("%s/%v = %#v %q, want %q", item.tier, item.rating, fame, reason, item.reason)
-		}
-	}
-}
-
-func TestR263SGPRankedQueueKeepsCherryRatedFields(t *testing.T) {
-	var queue sgpRankedQueue
-	if err := json.Unmarshal([]byte(`{"queueType":"CHERRY","ratedTier":"GLADIATOR","ratedRating":87510}`), &queue); err != nil {
-		t.Fatal(err)
-	}
-	if queue.RatedTier != "GLADIATOR" || queue.RatedRating != 87510 {
-		t.Fatalf("queue = %#v", queue)
-	}
-	// Fractional ratings must not break decoding of the entry.
-	if err := json.Unmarshal([]byte(`{"queueType":"RANKED_SOLO_5x5","tier":"GOLD","ratedRating":0.5}`), &queue); err != nil || queue.Tier != "GOLD" {
-		t.Fatalf("solo decode = %#v %v", queue, err)
-	}
-}
-
 func r263ArenaMatch(gameID int64, placement int, ref string) gameplayMatch {
 	match := gameplayMatch{GameID: gameID, QueueID: 1750, GameMode: "CHERRY", ModeGroup: "arena", CreatedAt: 1_800_000_000_000 - gameID, SubjectParticipantID: 1}
 	for team := int64(1); team <= 6; team++ {
@@ -262,13 +220,13 @@ func TestR263RecentGamesCarryGameIDAndPlacement(t *testing.T) {
 func TestR263LivePlayerJSONExposesNewFieldsFlat(t *testing.T) {
 	player := gameplayLivePlayer{}
 	player.ArenaSquadKey = "premade:A"
+	player.FlexRank = &gameplayRank{QueueType: "RANKED_FLEX_SR", Tier: "GOLD"}
 	player.SoloRank = &gameplayRank{QueueType: "RANKED_SOLO_5x5", Tier: "EMERALD", Division: "IV", LeaguePoints: 48}
-	player.ArenaFame = &gameplayArenaFame{Level: 12, Fame: 87510, Tier: "GLADIATOR"}
 	raw, err := json.Marshal(player)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"arenaSquadKey":"premade:A"`, `"soloRank":{`, `"arenaFame":{"level":12,"fame":87510,"tier":"GLADIATOR"}`} {
+	for _, want := range []string{`"arenaSquadKey":"premade:A"`, `"soloRank":{`, `"flexRank":{`} {
 		if !strings.Contains(string(raw), want) {
 			t.Fatalf("missing %s in %s", want, raw)
 		}

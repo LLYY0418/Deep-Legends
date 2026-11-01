@@ -1,12 +1,9 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
-	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 )
 
@@ -33,66 +30,6 @@ func TestR307WindowResizeTraceDiagnostics(t *testing.T) {
 }
 
 func stringMustR307(v any) string { b, _ := json.Marshal(v); return string(b) }
-
-func TestR307ProgressionThreeGroupsIdentityDeltaAndEventPrivacy(t *testing.T) {
-	a := r175App(t)
-	after := false
-	calls := map[string]int{}
-	var callsMu sync.Mutex
-	c := &LCUClient{baseURL: "https://fixture", token: "fixture"}
-	c.http = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		callsMu.Lock()
-		defer callsMu.Unlock()
-		calls[r.URL.Path]++
-		if strings.HasSuffix(r.URL.Path, "configuration") {
-			if after {
-				return r206RelayResponse(200, []byte(`{"groups":[{"groupId":"gamma"},{"groupId":"beta"},{"groupId":"alpha"}]}`)), nil
-			}
-			return r206RelayResponse(200, []byte(`{"groups":[{"groupId":"alpha"},{"groupId":"beta"},{"groupId":"gamma"}]}`)), nil
-		}
-		value := 92742
-		if after && strings.Contains(r.URL.Path, "/beta") {
-			value = 92842
-		}
-		raw, _ := json.Marshal(map[string]any{"counters": []map[string]any{{"counterValue": value}}, "milestones": []map[string]any{{"triggerValue": 100}}, "gameName": "SECRET"})
-		return r206RelayResponse(200, raw), nil
-	})}
-	ops := []lcuHelpOperation{{Name: "progression group configuration", Method: "GET", Path: "/lol-progression/v1/groups/configuration"}, {Name: "progression group instance-data", Method: "GET", Path: "/lol-progression/v1/groups/{id}/instance-data"}, {Name: "cherry inventory", Method: "GET", Path: "/lol-inventory/v1/cherry-inventory"}}
-	before := a.readArenaProgressionSnapshot(context.Background(), c, ops, Summoner{})
-	after = true
-	next := a.readArenaProgressionSnapshot(context.Background(), c, ops, Summoner{}, before)
-	groups := arenaProgressionGroupDiff(before, next)
-	if len(groups) != 1 || groups[0]["group_id"] != "beta" {
-		t.Fatalf("groups=%v", groups)
-	}
-	changes := groups[0]["changes"].(map[string]arenaProgressionDelta)
-	if len(changes) != 1 || changes["counters[0].counterValue"].Delta != 100 {
-		t.Fatal(changes)
-	}
-	for _, id := range []string{"alpha", "beta", "gamma"} {
-		if calls["/lol-progression/v1/groups/"+id+"/instance-data"] != 2 || calls["/lol-progression/v1/groups/"+id] != 2 {
-			t.Fatal(calls)
-		}
-	}
-	var events []map[string]any
-	var eventsMu sync.Mutex
-	c.setDiagnosticObserver(func(e map[string]any) { eventsMu.Lock(); events = append(events, e); eventsMu.Unlock() })
-	for _, uri := range []string{"/lol-progression/v1/groups/beta/instance-data", "/account-private/progression/v1/notifications/beta/12345"} {
-		c.observeArenaProgressionEvent(LCUEvent{URI: uri, Data: json.RawMessage(`{"counterValue":92842,"milestone":{"triggerValue":100},"message":"SECRET","playerId":12345}`)})
-	}
-	if len(events) != 2 {
-		t.Fatal(events)
-	}
-	for _, e := range events {
-		raw := stringMustR307(e)
-		if e["group_id"] != "beta" || strings.Contains(raw, "SECRET") || strings.Contains(raw, "account-private") || strings.Contains(raw, "12345") || strings.Contains(raw, "playerId") {
-			t.Fatal(raw)
-		}
-		if !strings.Contains(raw, "message") {
-			t.Fatal("payload key missing", raw)
-		}
-	}
-}
 
 func TestR307TagSavedRecordsGamePhaseAndChampionRestore(t *testing.T) {
 	a := r175App(t)

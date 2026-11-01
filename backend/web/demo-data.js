@@ -15,7 +15,7 @@
   const arenaLiveDemo = query.get("demo") === "arena" || query.has("demoArena") || location.hash.includes("arena");
   const arenaFullDemo = query.get("demo") === "arena-full" || query.has("demoArenaFull") || location.hash.includes("arena-full");
   const hextechLiveDemo = query.get("demo") === "hextech" || query.has("demoHextech") || location.hash.includes("hextech");
-  // R263：斗魂按预组队分卡片、等级名望、30 局胜率与吃鸡率、名次小卡。
+  // R263：斗魂按预组队分卡片、单双排段位、30 局胜率与吃鸡率、名次小卡。
   const arenaSquadsDemo = query.get("demo") === "arena-squads";
   const currentGameDemo = query.get("demo") === "current-game" || query.has("demoCurrentGame") || location.hash.includes("current-game");
   try { if (query.has("demo") || location.hash.includes("demo")) localStorage.setItem("lol-loot-demo", "1"); } catch (_) {}
@@ -725,13 +725,6 @@
   };
 
   const arenaSquadKeys = ["mine", "mine", "mine", "premade:A", "premade:A", "premade:B", "premade:B", ...Array(11).fill("")];
-  const arenaFameFor = (index) => {
-    if (index % 6 === 5) return undefined;
-    const level = [12, 9, 6, 4, 2, 12, 11, 7, 3, 12, 10, 5][index % 12];
-    const fame = [87_510, 28_430, 13_020, 6_480, 1_720, 52_300, 39_900, 18_250, 4_100, 61_880, 33_010, 9_900][index % 12];
-    const tier = level >= 12 ? "GLADIATOR" : level >= 9 ? "GOLD" : level >= 6 ? "SILVER" : level >= 3 ? "BRONZE" : "WOOD";
-    return { level, fame, tier };
-  };
   const arenaSquadsLive = {
     ...structuredClone(arenaFullLive),
     queueId: 1750,
@@ -744,7 +737,7 @@
       const topHalf = Math.round(games * (0.38 + (index % 5) * 0.06));
       return {
         ...player, playerRef: `demo-arena-player-${String(index).padStart(2, "0")}`, isAlly: index < 3, mySquad: index < 3, arenaSquadKey: arenaSquadKeys[index],
-        arenaFame: arenaFameFor(index), arenaRecord: { games, topHalf, top1: Math.round(topHalf * 0.35) },
+        soloRank:{tier:"EMERALD",division:"IV",queueType:"RANKED_SOLO_5x5"},flexRank:{tier:"GOLD",division:"II",queueType:"RANKED_FLEX_SR"}, arenaRecord: { games, topHalf, top1: Math.round(topHalf * 0.35) },
         recentGames: [...player.recentGames, ...player.recentGames.slice(0, 2)].slice(0, 10).map((game, gameIndex) => {
           const placement = ((index + gameIndex * 2) % 6) + 1;
           return { ...game, gameId: 90004, placement, win: placement <= 3 };

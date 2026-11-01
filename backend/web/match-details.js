@@ -54,7 +54,7 @@ function renderArenaMatchOverview(match) {
       }).join("");
       return `<section class="arena-detail-team${tone}"><header><b>#${number(group.placement || "—")}</b>${emblem}<strong>${escapeHTML(team.name)}</strong><span>${number(kills)} 击杀 · ${compactNumber(damage)} 伤害</span></header><div class="arena-detail-player-list">${players}</div></section>`;
     }).join("");
-	  return `<div class="arena-match-detail"><header><strong>最终排名</strong><span>按小队名次展示全部玩家、海克斯与装备</span></header><div class="arena-detail-columns" role="row"><span>玩家</span><span class="arena-column-augments">海克斯</span><span class="arena-column-score">评分</span><span>KDA</span><span class="arena-column-damage">伤害 / 承伤</span><span class="arena-column-items">装备</span></div>${sections}</div>`;
+	  return `<div class="arena-match-detail" data-augment-count="${Math.max(1,Math.min(6,...grouping.groups.flatMap(group=>group.players.map(player=>(player.augmentIds||[]).length))))}"><header><strong>最终排名</strong><span>按小队名次展示全部玩家、海克斯与装备</span></header><div class="arena-detail-columns" role="row"><span>玩家</span><span class="arena-column-augments">海克斯</span><span class="arena-column-score">评分</span><span>KDA</span><span class="arena-column-damage">伤害 / 承伤</span><span class="arena-column-items">装备</span></div>${sections}</div>`;
 	}
 
 function isARAMRelatedMatch(match) {
