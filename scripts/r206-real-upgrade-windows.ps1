@@ -31,6 +31,111 @@ function Show-PersistedFailure([string]$Log) {
         ($_ -replace 'RGAPI-[A-Za-z0-9-]+', '[riot-key]' -replace '(?i)([A-Z]:\\Users\\|/Users/|/home/)[^\\/\s]+', '$1[user]')
     }
 }
+# R317: only a stable, exact scale-fit clamp can explain changed window bounds.
+function Get-R317ScaleFitEvents([string]$LogDirectory, [DateTime]$Since) {
+    $events = @()
+    foreach ($name in @('desktop.4.log','desktop.3.log','desktop.2.log','desktop.1.log','desktop.log')) {
+        $log = Join-Path $LogDirectory $name
+        if (-not (Test-Path -LiteralPath $log)) { continue }
+        foreach ($line in Get-Content -LiteralPath $log -ErrorAction Stop) {
+            if ($line -notmatch '^(\S+) window_scale_fit (.*)$') { continue }
+            $stamp = $Matches[1]; $json = $Matches[2]
+            try { $at = [DateTimeOffset]::Parse($stamp, [Globalization.CultureInfo]::InvariantCulture) } catch { continue }
+            if ($at.UtcDateTime -lt $Since.ToUniversalTime()) { continue }
+            $value = $null
+            try {
+                $parsed = $json | ConvertFrom-Json -ErrorAction Stop
+                if ($parsed.event -ceq 'window_scale_fit') { $value = $parsed }
+            } catch {} # Count an incomplete line, but never let it explain a clamp.
+            $events += [pscustomobject]@{at=$at.UtcDateTime;value=$value;order=$events.Count}
+        }
+    }
+    $events | Sort-Object at,order
+}
+function Get-R317BoundsSnapshot([string]$BoundsFile, [string]$LogDirectory, [DateTime]$Since) {
+    $hash = $null; $text = $null; $events = @(); $readError = $null
+    try {
+        $bytes = [IO.File]::ReadAllBytes($BoundsFile)
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $hash = [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-','') } finally { $sha.Dispose() }
+        $text = [Text.Encoding]::UTF8.GetString($bytes).TrimStart([char]0xfeff)
+        $events = @(Get-R317ScaleFitEvents $LogDirectory $Since)
+    } catch { $readError = $_.Exception.Message }
+    return [pscustomobject]@{sha256=$hash;text=$text;events=$events;read_error=$readError}
+}
+function Wait-R317StableBounds {
+    param([string]$BoundsFile, [string]$LogDirectory, [DateTime]$Since, [string]$EvidencePath,
+        [ScriptBlock]$Clock = { [Diagnostics.Stopwatch]::GetTimestamp()*1000.0/[Diagnostics.Stopwatch]::Frequency },
+        [ScriptBlock]$Pause = { param($Milliseconds) Start-Sleep -Milliseconds $Milliseconds })
+    $started = & $Clock; $stableSince = $started; $previous = $null; $polls = 0
+    $observations = @(); $outcome = 'failure'; $snapshot = $null
+    try {
+        while ((& $Clock) - $started -lt 10000) {
+            $snapshot = Get-R317BoundsSnapshot $BoundsFile $LogDirectory $Since
+            $polls++; $now = & $Clock
+            $key = "$($snapshot.sha256)|$($snapshot.events.Count)|$($snapshot.read_error)"
+            if ($key -cne $previous) {
+                $stableSince = $now; $previous = $key
+                $observations += @{elapsed_ms=$now-$started;sha256=$snapshot.sha256;event_count=$snapshot.events.Count;read_error=$snapshot.read_error}
+            }
+            if ($now - $started -ge 10000) { break }
+            if ($now - $stableSince -ge 1500) { $outcome = 'success'; return $snapshot }
+            & $Pause ([Math]::Min(300,10000-((& $Clock)-$started)))
+        }
+        throw "R238 persistent fixture changed: $BoundsFile"
+    } finally {
+        @{outcome=$outcome;poll_ms=300;stable_required_ms=1500;timeout_ms=10000;polls=$polls;elapsed_ms=((& $Clock)-$started);stable_ms=((& $Clock)-$stableSince);since=$Since.ToUniversalTime().ToString('o');observations=$observations;final=$snapshot} |
+            ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $EvidencePath -Encoding utf8
+    }
+}
+function Test-R317Rectangle($Value) {
+    if ($null -eq $Value) { return $false }
+    foreach ($key in @('x','y','width','height')) {
+        $n = $Value.$key
+        if (($n -isnot [int] -and $n -isnot [long] -and $n -isnot [double] -and $n -isnot [decimal]) -or [double]::IsNaN([double]$n) -or [double]::IsInfinity([double]$n)) { return $false }
+    }
+    if ([double]::IsInfinity([double]$Value.x + [double]$Value.width) -or [double]::IsInfinity([double]$Value.y + [double]$Value.height)) { return $false }
+    return $Value.width -gt 0 -and $Value.height -gt 0
+}
+function Test-R317SameBounds($Left, $Right) {
+    if (-not (Test-R317Rectangle $Left) -or -not (Test-R317Rectangle $Right)) { return $false }
+    foreach ($key in @('x','y','width','height')) { if ($Left.$key -ne $Right.$key) { return $false } }
+    return $true
+}
+function Assert-R317PersistentFile([string]$File, [string]$BeforeHash, [string]$BeforeBounds, $Snapshot) {
+    $after = $null
+    try { $after = (Get-FileHash -LiteralPath $File -Algorithm SHA256 -ErrorAction Stop).Hash } catch {}
+    $record = [ordered]@{path=$File;name=(Split-Path $File -Leaf);before_sha256=$BeforeHash;after_sha256=$after}
+    if ($record.name -ne 'window-bounds.json') {
+        if (-not $after -or $after -cne $BeforeHash) { throw "R238 persistent fixture changed: $File" }
+        return $record
+    }
+    $record.explained_by = 'unchanged'; $record.matched_event = $null
+    if (-not $after -or $null -eq $Snapshot -or $Snapshot.read_error -or $after -cne $Snapshot.sha256) { throw "R238 persistent fixture changed: $File" }
+    if ($after -ceq $BeforeHash) { return $record }
+    try {
+        $before = $BeforeBounds | ConvertFrom-Json -ErrorAction Stop
+        $current = $Snapshot.text | ConvertFrom-Json -ErrorAction Stop
+        $last = @($Snapshot.events) | Select-Object -Last 1
+        $event = $last.value
+        $area = $event.work_area; $bounds = $event.after_bounds
+        foreach ($scale in @($event.from_scale,$event.to_scale)) {
+            if (($scale -isnot [int] -and $scale -isnot [long] -and $scale -isnot [double] -and $scale -isnot [decimal]) -or $scale -le 0 -or [double]::IsNaN([double]$scale) -or [double]::IsInfinity([double]$scale)) { throw 'Invalid fit scale' }
+        }
+        if ($event.clamped -isnot [bool] -or -not $event.clamped -or
+            -not (Test-R317SameBounds $event.before_bounds $before) -or
+            -not (Test-R317SameBounds $bounds $current) -or
+            $current.maximized -isnot [bool] -or $current.maximized -ne $false -or
+            -not (Test-R317Rectangle $area) -or
+            $bounds.x -lt $area.x -or $bounds.y -lt $area.y -or
+            ($bounds.x+$bounds.width) -gt ($area.x+$area.width) -or
+            ($bounds.y+$bounds.height) -gt ($area.y+$area.height)) { throw 'Unexplained bounds' }
+        $record.explained_by = 'window_scale_fit_clamp'
+        $record.matched_event = @{at=$last.at;from_scale=$event.from_scale;to_scale=$event.to_scale;before_bounds=$event.before_bounds;after_bounds=$bounds;work_area=$area;clamped=$event.clamped}
+        return $record
+    } catch { throw "R238 persistent fixture changed: $File" }
+}
+
 function Run-Setup([string]$File, [Parameter(Mandatory=$true)][string]$Version, [switch]$MonitorLegacy, [switch]$PublishedLegacy) {
     # These are the actual Go installer shells. --update auto-starts their
     # existing progress flow; /S alone would leave the Go setup page waiting.
@@ -254,6 +359,7 @@ try {
         $stagePath=Join-Path $data $stageFile
         if (Test-Path $stagePath) { Copy-Item $stagePath (Join-Path $evidence ("076-before-"+$stageFile)); Remove-Item $stagePath }
     }
+    $boundsFitSince = [DateTime]::UtcNow
     Run-Setup $online.download -Version $candidateVersion
     # Keep the real installer handoff alive until its once-only buffered timing
     # event is flushed. Killing/relaunching it here can destroy that evidence.
@@ -277,15 +383,18 @@ try {
         if ($timing.result -eq 'ok') {break}; Start-Sleep -Milliseconds 500
     } while ((Get-Date) -lt $deadline)
     if ($timing.result -ne 'ok' -or $null -eq $timing.uninstall_old_ms) {throw "Eight stages not imported as result=ok"}
+    $boundsSnapshot = Wait-R317StableBounds $boundsFile (Join-Path $userData 'logs') $boundsFitSince (Join-Path $evidence 'persistent-window-bounds-stability.json')
     $comparisons = @()
     foreach ($file in $sentinels.Keys) {
-        $afterHash = $null
-        if (Test-Path $file) { $afterHash = (Get-FileHash $file -Algorithm SHA256).Hash }
-        $comparisons += @{path=$file;before_sha256=$sentinels[$file];after_sha256=$afterHash}
+        $comparisons += Assert-R317PersistentFile $file $sentinels[$file] $publishedBounds $boundsSnapshot
     }
-    $comparisons | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $evidence 'persistent-fixture-comparison.json')
-    $comparisons | ConvertTo-Json -Depth 5 | Write-Output
-    foreach ($file in $sentinels.Keys) { if (-not (Test-Path $file) -or (Get-FileHash $file -Algorithm SHA256).Hash -ne $sentinels[$file]) { throw "R238 persistent fixture changed: $file" } }
+    $comparisons | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'persistent-fixture-comparison.json')
+    $comparisons | ConvertTo-Json -Depth 8 | Write-Output
+    # The other four sentinels retain their original second exact hash check.
+    foreach ($file in $sentinels.Keys) {
+        if ($file -eq $boundsFile) { continue }
+        if (-not (Test-Path $file) -or (Get-FileHash $file -Algorithm SHA256).Hash -ne $sentinels[$file]) { throw "R238 persistent fixture changed: $file" }
+    }
     $sentinels | ConvertTo-Json | Set-Content (Join-Path $evidence 'retained-persistent-fixtures.json')
     $shell = New-Object -ComObject WScript.Shell
     $icon = Join-Path $env:LOCALAPPDATA 'deep-legends/app.ico'
@@ -298,7 +407,7 @@ try {
     }
     $timing | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'update-install-timing-event.json')
     Copy-Item (Join-Path $data 'update-install-stages.txt'),(Join-Path $data 'update-install-nsis-stages.txt') $evidence
-    @{old_version='0.12.65';intermediate_version='0.12.68';upgrade_from='0.12.81';chain=@('0.12.65','0.12.68','0.12.76','0.12.80','0.12.81',$candidateVersion);upgrade_to=$candidateVersion;candidate_online_transport='real loopback HTTP fixture';anonymous_latest_candidate='pending publication';persistent_sentinels_retained=$true;key_mode='public';stages=$order.Count;icon_location_stable=$true;created_time_changed=$false;total_ms=$timing.total_ms;uninstall_old_ms=$timing.uninstall_old_ms;copy_ms=$timing.copy_ms} | ConvertTo-Json | Set-Content (Join-Path $evidence 'real-upgrade-summary.json')
+    @{old_version='0.12.65';intermediate_version='0.12.68';upgrade_from='0.12.81';chain=@('0.12.65','0.12.68','0.12.76','0.12.80','0.12.81',$candidateVersion);upgrade_to=$candidateVersion;candidate_online_transport='real loopback HTTP fixture';anonymous_latest_candidate='pending publication';persistent_sentinels_retained=(@($comparisons | Where-Object { $_.before_sha256 -cne $_.after_sha256 }).Count -eq 0);key_mode='public';stages=$order.Count;icon_location_stable=$true;created_time_changed=$false;total_ms=$timing.total_ms;uninstall_old_ms=$timing.uninstall_old_ms;copy_ms=$timing.copy_ms} | ConvertTo-Json | Set-Content (Join-Path $evidence 'real-upgrade-summary.json')
     Get-Content (Join-Path $evidence 'real-upgrade-summary.json')
     # Additional, independent published 0.12.79 -> candidate chain. Preferences
     # are written through actual installed 079 UI handlers, never injected as
@@ -349,6 +458,7 @@ try {
         $actual079Files[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
     }
     $candidateSetupPath=(Resolve-Path $Setup).Path
+    $boundsFitSince = [DateTime]::UtcNow
     Run-Setup $candidateSetupPath -Version $candidateVersion
     Assert-InstalledVersion $candidateVersion
     Wait-R265InstallerLaunch
@@ -371,8 +481,14 @@ try {
     }
     Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $evidence '080-second-normal-close.json') | Out-Null
     Stop-InstalledApp -ObserveOnly
+    $boundsSnapshot = Wait-R317StableBounds $boundsFile (Join-Path $userData 'logs') $boundsFitSince (Join-Path $evidence 'candidate-window-bounds-stability.json')
     $actual079Comparisons=@()
     foreach ($file in $actual079Files.Keys) {
+        if ($file -eq $boundsFile) {
+            $actual079Comparisons += Assert-R317PersistentFile $file $actual079Files[$file] $actual079Bounds $boundsSnapshot
+            Copy-Item $file (Join-Path $evidence ("080-actual-after-window-bounds.json")) -Force
+            continue
+        }
         $after=(Get-FileHash $file -Algorithm SHA256).Hash
         $actual079Comparisons+=@{name=(Split-Path $file -Leaf);before_sha256=$actual079Files[$file];after_sha256=$after}
         if ($after -ne $actual079Files[$file]) { throw "Actual 079 persisted file changed after upgrade: $file" }
@@ -380,7 +496,7 @@ try {
     }
     $actual079Comparisons | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $evidence '079-to-080-persistent-files.json')
     if (-not @($script:R279UpgradeStages | Where-Object { $_.status -ne 'passed' }).Count) {
-    @{upgrade_from='0.12.79';upgrade_to=$candidateVersion;key_mode='public';setup079_sha256='cabacc1b4e8bc8dcf51469e1d1e84f0ef6ff8f82090084bf0c3fd6b0bb794d96';settings_written_by='unmodified published 079 renderer UI';preset_scope='format compatibility only: published 079 cannot save presets; exact same-tag missing-script fixture used only before upgrade';preset_script_sha256='74699f9576ccd8686fce0e95c38b718b96718baa46bd68e9068cf947f7ea38f3';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;persisted_files_equal=$true;preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
+    @{upgrade_from='0.12.79';upgrade_to=$candidateVersion;key_mode='public';setup079_sha256='cabacc1b4e8bc8dcf51469e1d1e84f0ef6ff8f82090084bf0c3fd6b0bb794d96';settings_written_by='unmodified published 079 renderer UI';preset_scope='format compatibility only: published 079 cannot save presets; exact same-tag missing-script fixture used only before upgrade';preset_script_sha256='74699f9576ccd8686fce0e95c38b718b96718baa46bd68e9068cf947f7ea38f3';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;persisted_files_equal=(@($actual079Comparisons | Where-Object { $_.before_sha256 -cne $_.after_sha256 }).Count -eq 0);preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
     Get-Content (Join-Path $evidence '079-to-080-real-upgrade-summary.json')
     }
     # Subsequent chains use the same real profile and assert that corrupt removed presets.
@@ -423,6 +539,7 @@ try {
         $actual080Files[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
     }
     $candidateSetupPath=(Resolve-Path $Setup).Path
+    $boundsFitSince = [DateTime]::UtcNow
     Run-Setup $candidateSetupPath -Version $candidateVersion
     Assert-InstalledVersion $candidateVersion
     Wait-R265InstallerLaunch
@@ -439,15 +556,21 @@ try {
     if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r266Evidence '081-corrupt-preset.log'); throw 'Corrupt preset damaged other settings or was not discarded' }
     Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r266Evidence '081-second-normal-close.json') | Out-Null
     Stop-InstalledApp -ObserveOnly
+    $boundsSnapshot = Wait-R317StableBounds $boundsFile (Join-Path $userData 'logs') $boundsFitSince (Join-Path $r266Evidence 'candidate-window-bounds-stability.json')
     $actual080Comparisons=@()
     foreach ($file in $actual080Files.Keys) {
+        if ($file -eq $boundsFile) {
+            $actual080Comparisons += Assert-R317PersistentFile $file $actual080Files[$file] $actual080Bounds $boundsSnapshot
+            Copy-Item $file (Join-Path $r266Evidence ("081-actual-after-window-bounds.json")) -Force
+            continue
+        }
         $after=(Get-FileHash $file -Algorithm SHA256).Hash
         $actual080Comparisons+=@{name=(Split-Path $file -Leaf);before_sha256=$actual080Files[$file];after_sha256=$after}
         if ($after -ne $actual080Files[$file]) { throw "Actual 080 persisted file changed after upgrade: $file" }
         Copy-Item $file (Join-Path $r266Evidence ("081-actual-after-"+(Split-Path $file -Leaf))) -Force
     }
     $actual080Comparisons | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $r266Evidence '080-to-081-persistent-files.json')
-    @{upgrade_from='0.12.80';upgrade_to=$candidateVersion;key_mode='public';setup080_sha256='e62a12f286cef2a5b8dabaaf99dcd8de50557ba34f5c1b84cde3fa0c86744aaf';settings_written_by='unmodified published 080 renderer UI';preset_scope='actual published 080 UI-written presets, no resource substitution';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;persisted_files_equal=$true;preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $r266Evidence '080-to-081-real-upgrade-summary.json')
+    @{upgrade_from='0.12.80';upgrade_to=$candidateVersion;key_mode='public';setup080_sha256='e62a12f286cef2a5b8dabaaf99dcd8de50557ba34f5c1b84cde3fa0c86744aaf';settings_written_by='unmodified published 080 renderer UI';preset_scope='actual published 080 UI-written presets, no resource substitution';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;persisted_files_equal=(@($actual080Comparisons | Where-Object { $_.before_sha256 -cne $_.after_sha256 }).Count -eq 0);preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $r266Evidence '080-to-081-real-upgrade-summary.json')
     Get-Content (Join-Path $r266Evidence '080-to-081-real-upgrade-summary.json')
     foreach ($legacyScale in @('2.25','2.5')) {
     $env:R269_LEGACY_SCALE=$legacyScale
@@ -485,6 +608,7 @@ try {
         $actual081Files[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
     }
     $candidateSetupPath=(Resolve-Path $Setup).Path
+    $boundsFitSince = [DateTime]::UtcNow
     Run-Setup $candidateSetupPath -Version $candidateVersion
     Assert-InstalledVersion $candidateVersion
     Wait-R265InstallerLaunch
@@ -501,8 +625,14 @@ try {
     if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '082-corrupt-preset.log'); throw 'Corrupt preset damaged other settings or was not discarded' }
     Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r269Evidence '082-second-normal-close.json') | Out-Null
     Stop-InstalledApp -ObserveOnly
+    $boundsSnapshot = Wait-R317StableBounds $boundsFile (Join-Path $userData 'logs') $boundsFitSince (Join-Path $r269Evidence 'candidate-window-bounds-stability.json')
     $actual081Comparisons=@()
     foreach ($file in $actual081Files.Keys) {
+        if ($file -eq $boundsFile) {
+            $actual081Comparisons += Assert-R317PersistentFile $file $actual081Files[$file] $actual081Bounds $boundsSnapshot
+            Copy-Item $file (Join-Path $r269Evidence ("082-actual-after-window-bounds.json")) -Force
+            continue
+        }
         $after=(Get-FileHash $file -Algorithm SHA256).Hash
         $actual081Comparisons+=@{name=(Split-Path $file -Leaf);before_sha256=$actual081Files[$file];after_sha256=$after}
         if ((Split-Path $file -Leaf) -eq 'ui-scale.json') {
@@ -512,7 +642,7 @@ try {
         Copy-Item $file (Join-Path $r269Evidence ("082-actual-after-"+(Split-Path $file -Leaf))) -Force
     }
     $actual081Comparisons | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $r269Evidence '081-to-082-persistent-files.json')
-    @{upgrade_from='0.12.81';upgrade_to=$candidateVersion;key_mode='public';setup081_sha256='7dd3e6eb22aeb75c9e62deddd090231f8c93fa62e92de90bfc1baa174085862d';settings_written_by='unmodified published 081 renderer UI';preset_scope='actual published 081 UI-written presets, no resource substitution';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal_except_scale=$true;scale_before=$legacyScale;scale_after=2;window_bounds_equal=$true;preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $r269Evidence '081-to-082-real-upgrade-summary.json')
+    @{upgrade_from='0.12.81';upgrade_to=$candidateVersion;key_mode='public';setup081_sha256='7dd3e6eb22aeb75c9e62deddd090231f8c93fa62e92de90bfc1baa174085862d';settings_written_by='unmodified published 081 renderer UI';preset_scope='actual published 081 UI-written presets, no resource substitution';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal_except_scale=$true;scale_before=$legacyScale;scale_after=2;window_bounds_equal=(@($actual081Comparisons | Where-Object { $_.name -eq 'window-bounds.json' -and $_.explained_by -ne 'unchanged' }).Count -eq 0);preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $r269Evidence '081-to-082-real-upgrade-summary.json')
     Get-Content (Join-Path $r269Evidence '081-to-082-real-upgrade-summary.json')
     }
     Remove-Item Env:R269_LEGACY_SCALE
@@ -554,6 +684,7 @@ try {
         $actualPublished082Files[$file]=(Get-FileHash $file -Algorithm SHA256).Hash
     }
     $candidateSetupPath=(Resolve-Path $Setup).Path
+    $boundsFitSince = [DateTime]::UtcNow
     Run-Setup $candidateSetupPath -Version $candidateVersion
     Assert-InstalledVersion $candidateVersion
     Wait-R265InstallerLaunch
@@ -570,8 +701,14 @@ try {
     if ($LASTEXITCODE -ne 0) { Show-PersistedFailure (Join-Path $r269Evidence '083-corrupt-preset.log'); throw 'Corrupt preset damaged other settings or was not discarded' }
     Wait-R261PublishedWindowBounds -ProcessPath (Join-Path $install 'Deep Legends.exe') -BoundsFile $boundsFile -Deadline (Get-Date).AddSeconds(60) -EvidencePath (Join-Path $r269Evidence '083-second-normal-close.json') | Out-Null
     Stop-InstalledApp -ObserveOnly
+    $boundsSnapshot = Wait-R317StableBounds $boundsFile (Join-Path $userData 'logs') $boundsFitSince (Join-Path $r269Evidence 'candidate-window-bounds-stability.json')
     $actualPublished082Comparisons=@()
     foreach ($file in $actualPublished082Files.Keys) {
+        if ($file -eq $boundsFile) {
+            $actualPublished082Comparisons += Assert-R317PersistentFile $file $actualPublished082Files[$file] $actualPublished082Bounds $boundsSnapshot
+            Copy-Item $file (Join-Path $r269Evidence ("083-actual-after-window-bounds.json")) -Force
+            continue
+        }
         $after=(Get-FileHash $file -Algorithm SHA256).Hash
         $actualPublished082Comparisons+=@{name=(Split-Path $file -Leaf);before_sha256=$actualPublished082Files[$file];after_sha256=$after}
         if ((Split-Path $file -Leaf) -eq 'ui-scale.json') {
@@ -581,7 +718,7 @@ try {
         Copy-Item $file (Join-Path $r269Evidence ("083-actual-after-"+(Split-Path $file -Leaf))) -Force
     }
     $actualPublished082Comparisons | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $r269Evidence '082-to-083-persistent-files.json')
-    @{upgrade_from='0.12.82';upgrade_to=$candidateVersion;key_mode='public';setup082_sha256='c87bbeb6ea99eda83ec191c6026410851049e54ece9623ca4121ec70c06c88d6';settings_written_by='unmodified published 082 renderer UI';preset_scope='actual published 082 UI-written presets, no resource substitution';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;scale_before=2;scale_after=2;window_bounds_equal=$true;preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $r269Evidence '082-to-083-real-upgrade-summary.json')
+    @{upgrade_from='0.12.82';upgrade_to=$candidateVersion;key_mode='public';setup082_sha256='c87bbeb6ea99eda83ec191c6026410851049e54ece9623ca4121ec70c06c88d6';settings_written_by='unmodified published 082 renderer UI';preset_scope='actual published 082 UI-written presets, no resource substitution';candidate_resource_fixture=$false;player_data='synthetic demo';preferences_equal=$true;scale_before=2;scale_after=2;window_bounds_equal=(@($actualPublished082Comparisons | Where-Object { $_.name -eq 'window-bounds.json' -and $_.explained_by -ne 'unchanged' }).Count -eq 0);preset_apply_rename_save_restart=$true;corrupt_preset_isolated=$true} | ConvertTo-Json | Set-Content (Join-Path $r269Evidence '082-to-083-real-upgrade-summary.json')
     Get-Content (Join-Path $r269Evidence '082-to-083-real-upgrade-summary.json')
     }
     Remove-Item Env:R272_LEGACY_SCALE
