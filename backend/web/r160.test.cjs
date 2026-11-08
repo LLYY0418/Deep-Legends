@@ -32,8 +32,8 @@ test('R160 gameplay icon proxy accepts only the explicit bundled scheme', () => 
 });
 
 test('R160 overview augments paint from the fast catalog before perks arrive', () => {
-  const start = gameplaySource.indexOf('function augmentMetadata(id) {');
-  const end = gameplaySource.indexOf('\n  function augmentIconFigure(', start);
+  const start = gameplaySource.indexOf('function augmentMetadata(id)');
+  const end = gameplaySource.indexOf('function augmentIconFigure', start);
   assert.ok(start > 0 && end > start);
   const state = {
     perks: null,
@@ -43,5 +43,5 @@ test('R160 overview augments paint from the fast catalog before perks arrive', (
   assert.equal(augmentMetadata(110).iconPath, 'builtin:/augments/110.png');
   state.perks = { augments: [{ id: 110, iconPath: 'builtin:/augments/110.png', name: '晾衣绳' }] };
   assert.equal(augmentMetadata(110).name, '晾衣绳');
-  assert.equal(augmentMetadata(999999), undefined);
+  assert.equal(augmentMetadata(999999), null);
 });

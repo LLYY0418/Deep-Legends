@@ -437,10 +437,11 @@ test("R116-E the personal build query is lazy-loaded and wired end to end", () =
 test("R116-E adds no new CSS class of its own", () => {
   const championsStyles = fs.readFileSync(path.join(__dirname, "champions.css"), "utf8");
   const gameplayStyles = fs.readFileSync(path.join(__dirname, "gameplay.css"), "utf8");
+  const sharedStyles = fs.readFileSync(path.join(__dirname, "shared-cards.css"), "utf8");
   // 个人海斗出装块复用「装备排行」那套网格，所以它的类名必须都已经在 CSS 里。
   for (const name of ["recommendation-section", "mayhem-ranking-list", "section-count", "arena-section-icon", "mayhem-item-name-only", "metric-win"]) {
     assert.ok(
-      championsStyles.includes(`.${name}`) || gameplayStyles.includes(`.${name}`),
+      championsStyles.includes(`.${name}`) || gameplayStyles.includes(`.${name}`) || sharedStyles.includes(`.${name}`),
       `${name} must already exist in CSS; R116-E is not allowed to add new spacing values`,
     );
   }

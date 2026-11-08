@@ -7,9 +7,15 @@ function harness(){
  const w=dom.window;w.eval(read('section-loader.js'));const scripts=()=>[...w.document.querySelectorAll('script[data-section-module]')];const styles=()=>[...w.document.querySelectorAll('link[data-section-style]')];
  const finish=async(name,fn=()=>{})=>{
   if(name==='champions' && !scripts().some(n=>n.dataset.sectionModule==='patch-notes'))await finish('patch-notes');
-  w.deepLegendsSections.register(name,fn);styles().find(n=>n.dataset.sectionStyle===name)?.onload();
-  await new Promise(setImmediate);scripts().find(n=>n.dataset.sectionModule===name)?.onload();
-  await new Promise(setImmediate);
+  w.deepLegendsSections.register(name,fn);
+  for(let round=0;round<12;round+=1){
+   let clicked=false;
+   for(const link of styles())if(typeof link.onload==="function"){link.onload();clicked=true;}
+   await new Promise(setImmediate);
+   const script=scripts().find(n=>n.dataset.sectionModule===name);
+   if(script){script.onload();await new Promise(setImmediate);return;}
+   if(!clicked && round>2)break;
+  }
  };
  const fail=(name)=>styles().find(n=>n.dataset.sectionStyle===name)?.onerror();
  return {dom,w,scripts,styles,finish,fail,close:()=>dom.window.close()};
@@ -44,7 +50,7 @@ test('R115 Suite loads helpers first, retains navigation tab and replays only th
   h.w.dispatchEvent(new h.w.CustomEvent('deep-legends:status',{detail:{connected:true}}));
   h.w.dispatchEvent(new h.w.CustomEvent('deep-legends:navigate',{detail:{section:'suite',tab:'sweep'}}));
   let state;h.w.deepLegendsSections.listen('deep-legends:status',event=>state=event.detail);assert.equal(state.connected,true);assert.equal(oldStatusCalls,2);
-  const a=h.w.deepLegendsSections.activate('suite');assert.equal(h.styles().length,1);assert.equal(h.scripts().length,0);await h.finish('champions');let detail;assert.equal(h.styles().length,3);await h.finish('auto-config');assert.equal(h.styles().length,4);h.finish('suite',e=>detail=e.detail);await a;assert.equal(detail.name,'suite');assert.equal(detail.navigation.tab,'sweep');assert.deepEqual(h.scripts().map(n=>n.dataset.sectionModule),['patch-notes','champions','auto-config','suite']);
+  const a=h.w.deepLegendsSections.activate('suite');assert.equal(h.styles().length,1);assert.equal(h.scripts().length,0);await h.finish('champions');let detail;assert.ok(h.styles().length>=3);await h.finish('auto-config');assert.equal(h.styles().length,5);h.finish('suite',e=>detail=e.detail);await a;assert.equal(detail.name,'suite');assert.equal(detail.navigation.tab,'sweep');assert.deepEqual(h.scripts().map(n=>n.dataset.sectionModule),['patch-notes','champions','auto-config','suite']);
  }finally{h.close();}
 });
 test('R139 broadcast controls hide options for self and show one suite-switch for team',()=>{

@@ -181,5 +181,5 @@ test("R128 §2.4 概览顺序与推荐卡标题行", () => {
   assert.match(championsScript, /function renderARAMKitCombos/);
   assert.doesNotMatch(championsScript, /\["官方档位", escapeHTML\(label\), "is-hex-label"\]/);
   assert.match(championsScript, /function renderMayhemStageChips\(items\)/);
-  assert.match(championsStyles, /\.recommendation-section > header \{[^}]*justify-content: space-between/);
+  assert.match(fs.readFileSync(path.join(__dirname, "shared-cards.css"), "utf8"), /\.recommendation-section > header \{[^}]*justify-content: space-between/);
 });
