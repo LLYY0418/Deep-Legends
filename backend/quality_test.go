@@ -694,6 +694,7 @@ var privacyStoreWriteCallPins = map[string]int{
 	"riot_key_settings.go":       1, // 用户明确保存/清除及升级迁移的本机 Key；stores 明确声明。
 	"game_camera_mode.go":        1, // 根级 game-settings-sync.json：stores 的镜头模式偏好；沿用旧文件名以保留升级前的选择。
 	"rank_split_state.go":        1, // R316: root rank-split-windows.json; only server/queue and public season id/start/end/next, no account data.
+	"arena_self_fame.go":         1, // R318: root arena-self-fame.json; only self fame/level/thresholds/observedAt, no account or player identity.
 	"season_stats.go":            1, // season-stats/<source>/<hash>-<season>.json（source 子目录由 writeLocalStoreFile 隐式创建）
 	"update.go":                  3, // 根级 update-settings.json ×1、update-manifest.json ×2
 	"update_sources.go":          1, // 根级 update-settings.json 的成功线路偏好；既有 stores 自动更新设置，不含账号数据。
