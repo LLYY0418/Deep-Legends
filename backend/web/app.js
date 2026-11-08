@@ -37,7 +37,10 @@ function createFloatingLayerLifecycle(win = window) {
       const zoom=Number(win.getComputedStyle(doc.documentElement).getPropertyValue('--ui-zoom'))||1,rect=button.getBoundingClientRect();
       panel.style.maxWidth=`${(win.innerWidth-16)/zoom}px`;
       const bounds=panel.getBoundingClientRect(),width=bounds.width,height=bounds.height;
-      let left=rect.right-width;if(left<8)left=rect.left;left=Math.max(8,Math.min(left,win.innerWidth-width-8));
+      let left=rect.left;
+      if(left+width>win.innerWidth-8)left=win.innerWidth-width-8;
+      if(left<8)left=rect.right-width;
+      left=Math.max(8,Math.min(left,win.innerWidth-width-8));
       let top=rect.bottom+8;if(top+height>win.innerHeight-8)top=rect.top-height-8;top=Math.max(8,Math.min(top,win.innerHeight-height-8));
       panel.style.left=`${left/zoom}px`;panel.style.top=`${top/zoom}px`;
     };control._mmrPosition=position;position();

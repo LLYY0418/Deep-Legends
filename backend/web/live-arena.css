@@ -41,3 +41,127 @@ button.insight-match:focus-visible { outline: 2px solid var(--focus); outline-of
   .live-teams.is-arena.is-squads > .live-team.is-squad { display: block; grid-row: auto; }
   .live-teams.is-arena.is-squads .live-player-list.is-insight { display: grid; }
 }
+
+.live-player-copy>.live-player-rank .live-rank-label{color:var(--muted);font-weight:500}
+.live-player-copy>.live-player-rank .live-rank-title{color:var(--primary-strong);font-weight:700}
+.live-arena-fame{display:inline-flex;align-items:center;gap:3px;color:var(--muted)}
+.live-arena-fame-icon{width:16px;height:16px;flex:none}
+.live-arena-fame b{color:var(--primary-strong);font-weight:700;font-variant-numeric:tabular-nums}
+
+.arena-detail-player > .participant-link { grid-column: 1; grid-row: 1; min-width: 0; max-width: 100%; }
+.arena-detail-player .participant-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* R318 P2：斗魂上游没有技能加点时，鞋子占满整行，3 双等宽横排；过窄才换行。 */
+.build-summary-bar.is-arena-no-skill { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,auto); }
+.build-summary-bar.is-arena-no-skill > .build-summary-boots { border-left: 0; }
+.build-summary-bar.is-arena-no-skill > .build-summary-boots .config-option-list { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+@container build-recommendation (max-width: 560px) {
+  .build-summary-bar.is-arena-no-skill > .build-summary-boots .config-option-list { grid-template-columns: minmax(0,1fr); }
+}
+.arena-detail-columns { display: grid; grid-template-columns: minmax(208px,234px) var(--arena-augment-width,104px) minmax(54px,1fr) minmax(54px,1fr) minmax(96px,1.5fr); align-items: center; justify-items: center; column-gap: 12px; padding: 7px 10px; color: var(--faint); background: color-mix(in oklab,var(--surface-strong) 44%,transparent); border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; font-size: 10.5px; text-align: center; }
+.arena-detail-team { overflow: hidden; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 8px; }
+.arena-detail-columns + .arena-detail-team { border-radius: 0; }
+.arena-detail-team + .arena-detail-team { margin-top: -1px; border-radius: 0; }
+.arena-detail-team:last-child { border-radius: 0 0 8px 8px; }
+.arena-detail-team.is-first { border-color: color-mix(in oklab,var(--primary) 50%,var(--line)); }
+.arena-detail-team > header { display: grid; min-height: 40px; grid-template-columns: 30px 26px minmax(90px,1fr) auto; align-items: center; gap: 7px; padding: 5px 10px; background: color-mix(in oklab,var(--surface-strong) 60%,transparent); border-bottom: 1px solid var(--line); }
+.arena-detail-team > header > b { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.arena-detail-team.is-first > header > b { color: var(--primary-strong); }
+.arena-detail-team > header > strong { font-size: 12px; }
+.arena-detail-team > header > span:last-child { color: var(--muted); font-size: 10px; }
+.arena-detail-player-list { display: grid; }
+.arena-detail-player { display: grid; min-height: 52px; grid-template-columns: minmax(208px,234px) var(--arena-augment-width,104px) minmax(54px,1fr) minmax(54px,1fr) minmax(96px,1.5fr); grid-template-rows: minmax(0,auto) minmax(0,auto); align-items: center; justify-items: center; column-gap: 12px; padding: 6px 10px; border-top: 1px solid var(--line); text-align: center; }
+.arena-detail-player > .arena-detail-augments { grid-column: 2; grid-row: 1; }
+.arena-detail-player > .match-score-cell { grid-column: 3; grid-row: 1; }
+.arena-detail-player > .arena-detail-kda { grid-column: 4; grid-row: 1; }
+.arena-detail-player > .arena-detail-damage { grid-column: 5; grid-row: 1; }
+.arena-detail-player > .arena-detail-items { grid-column: 1; grid-row: 2; justify-self: start; align-self: start; max-width: 100%; overflow: hidden; }
+.arena-detail-player:first-child { border-top: 0; }
+.arena-detail-columns > :first-child { justify-self: start; text-align: left; }
+.arena-detail-player > .participant-link { width: auto; justify-self: start; justify-content: flex-start; }
+.arena-detail-kda { display: grid; justify-items: center; font-variant-numeric: tabular-nums; }
+.arena-detail-damage { display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.arena-detail-damage i { color: var(--muted); font-style: normal; }
+.arena-detail-kda b, .arena-detail-damage b { font-size: 10.5px; }
+.arena-detail-kda small { color: var(--muted); font-size: 9px; }
+.arena-detail-augments { display: grid; min-width: 0; grid-auto-flow:column; grid-auto-columns:26px; justify-content: center; gap: 3px; }
+.arena-detail-augments .arena-augment-icon { width: 26px; height: 26px; }
+.arena-detail-augments .arena-augment-icon > .game-icon.is-small { width: 24px; height: 24px; flex-basis: 24px; }
+.arena-detail-items { display: flex; min-width: 0; justify-self: stretch; justify-content: flex-start; flex-wrap: nowrap; gap: 3px; }
+.arena-detail-player .match-score-cell, .match-table .match-score-cell { width: 86px; grid-template-columns: 34px 48px; justify-content: center; justify-items: center; gap: 4px; }
+.arena-detail-player .match-score-value, .arena-detail-player .match-score-badge, .match-table .match-score-value, .match-table .match-score-badge { justify-items: center; }
+.arena-detail-player .match-score-badge:empty, .match-table .match-score-badge:empty { display: none; }
+@container matches-column (max-width: 720px) {
+	.arena-match-detail { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-gutter: stable; }
+	.arena-detail-columns, .arena-detail-team { min-width: 0; }
+}
+
+.live-augment-recommendations { overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.live-augment-recommendations > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.live-augment-recommendations > header h3 { margin: 0; font-size: 13px; }
+.live-augment-recommendations > header span { color: var(--muted); font-size: 10px; }
+.live-augment-option { --augment-accent: var(--rarity-iron); display: grid; min-width: 0; min-height: 64px; grid-template-columns: 48px minmax(0,1fr); align-items: center; gap: 10px; padding: 7px; color: var(--ink); background: var(--bg); border: 1px solid var(--augment-accent); border-radius: 8px; }
+.live-augment-option.is-bronze { --augment-accent: var(--rarity-bronze); }
+.live-augment-option.is-silver { --augment-accent: var(--rarity-silver); }
+.live-augment-option.is-gold { --augment-accent: var(--rarity-gold); }
+.live-augment-option.is-prismatic { --augment-accent: var(--rarity-prismatic-a); }
+.live-augment-option.is-event { --augment-accent: var(--rarity-event); }
+.live-augment-option .arena-augment-icon { border-radius: 5px; }
+.live-augment-option .arena-augment-icon > .game-icon.is-large { width: 48px; height: 48px; flex-basis: 48px; border-radius: 5px; }
+.live-augment-option > span:last-child { display: grid; min-width: 0; gap: 3px; }
+.live-augment-title { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.live-augment-title .tier-badge.live-augment-grade { width: 20px; height: 23px; flex: 0 0 20px; }
+.live-augment-option strong { overflow: hidden; color: var(--ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.live-augment-option small { color: var(--muted); font-size: 9px; line-height: 1.45; }
+.live-augment-option small.live-augment-stats { display: flex; min-width: 0; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.3; }
+.live-augment-stat { display: inline-flex; min-width: 0; align-items: baseline; gap: 3px; white-space: nowrap; }
+.live-augment-stat > span { color: var(--muted); font-size: 10px; }
+.live-augment-stat > b { color: var(--ink); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.live-augment-stat.is-win > b { color: var(--success); }
+.live-augment-stat.is-pick > b { color: var(--accent); }
+.live-augment-columns { display: grid; grid-template-columns: minmax(0,1fr); }
+.live-augment-column { min-width: 0; }
+.live-augment-column + .live-augment-column { border-top: 1px solid var(--line); }
+.live-augment-column > header { display: flex; min-height: 42px; align-items: center; gap: 7px; padding: 8px 11px; border-bottom: 1px solid var(--line); }
+.live-augment-column > header > span { width: 9px; height: 9px; flex: 0 0 9px; background: var(--rarity-iron); border-radius: 3px; }
+.live-augment-column.is-silver > header > span { background: var(--rarity-silver); }
+.live-augment-column.is-gold > header > span { background: var(--rarity-gold); }
+.live-augment-column.is-prismatic > header > span { background: linear-gradient(135deg,var(--rarity-prismatic-a),var(--rarity-prismatic-b),var(--rarity-prismatic-c)); }
+.live-augment-column > header strong { color: var(--ink); font-size: 11px; }
+.live-augment-column > header small { margin-left: auto; color: var(--muted); font-size: 9px; }
+.live-augment-column > div { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; padding: 10px 11px 12px; }
+.live-augment-column .live-augment-option { border: 1px solid var(--augment-accent); border-radius: 8px; }
+.live-augment-column.is-silver .arena-augment-icon { border-color: var(--rarity-silver); }
+.live-augment-column.is-gold .arena-augment-icon { border-color: var(--rarity-gold); }
+.live-augment-column.is-prismatic .arena-augment-icon { border-color: var(--rarity-prismatic-a); }
+.insight-score.is-poor { color: var(--faint); }
+.live-aramkit-combos { padding:0 12px 12px; }
+.live-aramkit-combos h4 { display:flex; gap:8px; margin:0 0 8px; padding-top:10px; border-top:1px solid var(--line); font-size:13px; }
+.live-aramkit-combos small { color:var(--muted); font-size:11px; }
+.live-aramkit-combo-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.live-aramkit-combo { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; height:62px; min-width:0; padding:0 12px; background:var(--bg); border:1px solid var(--line); border-radius:10px; }
+.live-combo-pair { display:flex; align-items:center; gap:6px; }
+.live-combo-pair>.arena-augment-icon { display:flex; width:32px; height:32px; flex:none; }
+
+.live-combo-pair .arena-augment-icon > .game-icon { width:100%; height:100%; flex-basis:100%; }
+.live-combo-names { display:grid; gap:3px; min-width:0; font-size:12px; }
+.live-combo-names>* { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.live-combo-names>span { color:var(--muted); }
+.live-combo-metrics { display:grid; gap:3px; text-align:right; white-space:nowrap; }
+.live-item-ranking .mayhem-ranking-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.live-item-ranking .mayhem-ranking-list article { height:56px; min-height:56px; grid-template-columns:18px 36px minmax(0,1fr) auto; gap:8px; border:1px solid var(--line); background:var(--bg); }
+.live-item-ranking .game-icon { width:36px; height:36px; }
+
+.build-core-ranking-row { display: grid; min-width: 0; grid-template-columns: minmax(0,1fr); align-items: start; border-bottom: 1px solid var(--line); }
+.build-core-ranking-row > .item-build-layout { border-bottom: 0; }
+.build-core-ranking-row > .live-item-ranking { margin-top: 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+.item-build-layout { display: block; min-width: 0; overflow: visible; border-bottom: 1px solid var(--line); }
+.item-depth-columns > section h4 { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.item-core-column { min-width: 0; padding: 12px 14px; }
+.late-option-band { padding: 12px 15px 14px; border-top: 1px solid var(--line); }
+.late-option-band
+@container matches-column (max-width:720px) {
+ .arena-detail-columns, .arena-detail-player { grid-template-columns:minmax(176px,1fr) var(--arena-augment-width,104px) minmax(48px,.7fr) minmax(48px,.7fr) minmax(88px,1.1fr); column-gap:8px; }
+ .arena-detail-columns, .arena-detail-team { min-width:640px; }
+ .arena-match-detail { overflow-x:auto; overscroll-behavior-x:contain; }
+}

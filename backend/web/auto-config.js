@@ -22,6 +22,10 @@
   const starterTrinket=i=>!trinket(i)||[3340,3364].includes(i.id);
   function normalizeStarterTrinkets(value,catalog){let seen=false;const rows=value?.items?.starter;if(!rows||!catalog.items?.length)return false;const next=rows.filter(row=>{const item=catalog.items.find(i=>i.id===row.id);if(!trinket(item))return true;if(seen||!starterTrinket(item))return false;seen=true;return true;}).map(row=>trinket(catalog.items.find(i=>i.id===row.id))?{...row,count:1}:row);const changed=JSON.stringify(rows)!==JSON.stringify(next);if(changed)value.items.starter=next;return changed;}
   function starterAllowed(i,mode){return !!(starterTrinket(i)&&i.inStore&&i.displayInItemSets&&!i.requiredChampion&&!i.requiredAlly&&i.maps?.[["aram","hextech"].includes(mode)?"12":"11"]&&i.priceTotal>=0);}
+  // R318 P6：出门装「能放什么」不再受预算限制；左侧「出门装」筛选恢复经典集合
+  // （500 金币，极地大乱斗 / 海克斯大乱斗 1400 的单件上限），只决定显示。
+  const starterBudget=mode=>["aram","hextech"].includes(mode)?1400:500;
+  function starterFilterAllowed(i,mode){return starterAllowed(i,mode)&&i.priceTotal<=starterBudget(mode);}
   function bootsAllowed(i,mode){return !!(i.categories?.includes("Boots")&&starterAllowed(i,mode));}
   function championImageURL(c){return c.imagePath?`/api/champion-asset?source=${encodeURIComponent(c.imageSource||"lcu")}&path=${encodeURIComponent(c.imagePath)}`:"/image-unavailable.svg";}
   function selectSecondary(order,row,id,picks) {
@@ -45,16 +49,19 @@
     }
     return !!(r||pair||items)||Object.keys(value).every(k=>k==="updatedAt");
   }
-  function runeFitGeometry(width,height,hasFour=false){
-    const compact=width<614,primaryWidth=(compact?(hasFour?306:284):(hasFour?346:304))*.9,columnGap=(compact?18:26)*.9,secondaryWidth=compact?Math.max(167.4,Math.min(244*.9,width-primaryWidth-columnGap)):284*.9,treeWidth=primaryWidth+secondaryWidth+columnGap;
-    const scale=Math.max(1,Math.min(width/treeWidth,height/315,1.3));
-    const f=Math.max(1,Math.min(1.6,(height/scale-56-21)/238));
+  function runeFitGeometry(width,height,hasFour=false,narrow=false){
+    // 窄屏统一走紧凑几何，避免 614px 断点导致树宽跳变、缩放随宽度非单调。
+    const compact=narrow||width<614,primaryWidth=(compact?(hasFour?306:284):(hasFour?346:304))*.9,columnGap=(compact?18:26)*.9,secondaryWidth=compact?Math.max(167.4,Math.min(244*.9,width-primaryWidth-columnGap)):284*.9,treeWidth=primaryWidth+secondaryWidth+columnGap;
+    // R318 P7：窄屏也按可用宽度放大到上限 1.3（高度随缩放变化），f 保持自然行距；
+    // 宽屏规则不变。宽窄判定在 runePanelFit 里只用一个测量值，随宽度单调。
+    const scale=narrow?Math.max(1,Math.min(width/treeWidth,1.3)):Math.max(1,Math.min(width/treeWidth,height/315,1.3));
+    const f=narrow?1:Math.max(1,Math.min(1.6,(height/scale-56-21)/238));
     const bottom=238*f+21;
     let shardPitch=32*f,gap=bottom-(162*f+2.5*shardPitch+14);
     if(gap<2){gap=2;shardPitch=(bottom-162*f-gap-14)/2.5;}
     return {scale,f,primaryWidth,secondaryWidth,columnGap,keyExtra:78*scale*(f-1),minorExtra:64*scale*(f-1),subExtra:54*scale*(f-1),shardExtra:scale*(shardPitch-32),subShardGap:gap*scale,treeHeight:(56+bottom)*scale};
   }
-  if(typeof module==="object"&&module.exports){module.exports={spellAllowed,itemAllowed,starterAllowed,bootsAllowed,championImageURL,selectSecondary,validEditorDraft,draftContent,normalizeStarterTrinkets,runeFitGeometry};return;}
+  if(typeof module==="object"&&module.exports){module.exports={spellAllowed,itemAllowed,starterAllowed,starterFilterAllowed,starterBudget,bootsAllowed,championImageURL,selectSecondary,validEditorDraft,draftContent,normalizeStarterTrinkets,runeFitGeometry};return;}
   const root=document.getElementById("suite-config-root");if(!root)return;
   const esc=window.deepLegendsRuntime.escapeHTML;
   const S={champ:0,mode:"ranked",pos:"",tab:"runes",draft:null,dirty:false,settings:null,catalog:null,champions:[],runtime:{},keys:{keys:["",""]},slot:0,itemGroup:"starter",filters:new Set(),q:"",iq:"",configured:false,sort:"price",mastery:{},subOrder:[],subPicks:{},pending:null,pageError:"",errors:{runes:"",spells:"",items:""},watch:{},generation:0,importing:false,catalogLoading:false,spellEditing:false,itemEditing:false,clearing:false};
@@ -89,7 +96,7 @@
   function loadDraft(){
     clearTimeout(draftTimer);draftTimer=0;S.draft=stored()?clone(stored()):null;S.dirty=false;S.pageError="";S.errors={runes:"",spells:"",items:""};draftBase=draftContent(stored());
     try{const raw=preferences().getItem(draftKey());if(raw){const row=JSON.parse(raw);normalizeStarterTrinkets(row.value,S.catalog);if(row.championId!==S.champ||row.modeKey!==modeKey()||!S.champions.some(c=>c.id===row.championId)||!(typeof row.baseContent==="string"||Number.isSafeInteger(row.revision)&&row.revision>=1)||!Number.isFinite(row.at)||!validEditorDraft(row.value,S.catalog,S.mode))removeDraft();else if(draftContent(row.value)!==draftContent(stored())){S.draft=clone(row.value);S.dirty=true;draftBase=typeof row.baseContent==="string"?row.baseContent:draftContent(stored());if(draftBase!==draftContent(stored()))S.pageError="配置已更新，请重新读取后保存";}else removeDraft();}}catch(_){removeDraft();}
-    S.spellEditing=!!S.draft?.spells;S.itemEditing=hasSection(S.draft,"items");lastContent=draftContent(S.draft);if(normalizeStarterTrinkets(S.draft,S.catalog))dirty(false);setItemGroup("starter");readSecondary();if(S.mode==="hextech")S.tab="kit";
+    S.spellEditing=!!S.draft?.spells;S.itemEditing=hasSection(S.draft,"items");lastContent=draftContent(S.draft);if(normalizeStarterTrinkets(S.draft,S.catalog))dirty(false);S.itemGroup="";setItemGroup("starter");readSecondary();if(S.mode==="hextech")S.tab="kit";
   }
   let pendingDialog=null,importController=null;
   function cancelImport(){S.generation++;importController?.abort();importController=null;S.importing=false;importStatus();}
@@ -205,12 +212,15 @@
   const itemCount=value=>value&&typeof value==="object"?(value.count||1):1;
   function itemLists(){const items=S.draft.items||={starter:[],boots:[],core:[],situational:[]};items.starter||=[];items.boots||=[];items.core||=[];items.situational||=[];return items;}
   function setItemGroup(group){
-    if(group==="boots" && S.itemGroup!=="boots"){S.savedFilters=new Set(S.filters);S.filters=new Set(["Boots"]);}
-    else if(group!=="boots" && S.itemGroup==="boots"){S.filters=S.savedFilters||new Set();S.savedFilters=null;}
+    // 离开旧分组时先恢复它之前的筛选状态，再按新分组决定默认筛选。
+    if(S.itemGroup==="starter" && group!=="starter"){const f=new Set(S.filters);f.delete("Starter");S.filters=f;S.savedFilters=null;}
+    else if(S.itemGroup==="boots" && group!=="boots"){S.filters=S.savedFilters||new Set();S.savedFilters=null;}
+    if(group==="starter" && S.itemGroup!=="starter"){S.savedFilters=new Set(S.filters);S.filters=new Set(["Starter"]);}
+    else if(group==="boots" && S.itemGroup!=="boots"){S.savedFilters=new Set(S.filters);S.filters=new Set(["Boots"]);}
     S.itemGroup=group;
   }
   function shopItems(shop,items){return shop.length?shop.map(i=>{const starting=S.itemGroup==="starter",used=!starting&&[...items.boots,...items.core,...items.situational].includes(i.id);return `<button class="ac-item${used?" is-used":""}" data-item="${i.id}" draggable="true" aria-disabled="false" aria-label="${esc(i.name)}" data-ac-tooltip="${esc(tip(i)+"\n"+i.priceTotal+" 金币")}">${icon(i.iconPath)}<span>${i.priceTotal}</span></button>`;}).join(""):`<div class="ac-shop-empty" role="status">${esc(poolMessage("items"))}${poolStatus("items")!=="ready"?'<button class="text-button" data-act="refresh-catalog">重新读取</button>':""}</div>`;}
-  function filteredItems(){const starting=S.itemGroup==="starter"||S.filters.has("Starter");const shop=S.catalog.items.filter(i=>(S.itemGroup==="boots"?bootsAllowed(i,S.mode):starting?starterAllowed(i,S.mode):itemAllowed(i,S.mode))&&[...S.filters].every(f=>f==="Starter"||f.split("|").some(c=>i.categories?.includes(c)))&&(!S.iq||i.name.includes(S.iq)));return shop.sort((a,b)=>S.sort==="name"?a.name.localeCompare(b.name,"zh-CN"):S.sort==="desc"?b.priceTotal-a.priceTotal:a.priceTotal-b.priceTotal);}
+  function filteredItems(){const placeable=i=>S.itemGroup==="boots"?bootsAllowed(i,S.mode):S.itemGroup==="starter"?starterAllowed(i,S.mode):itemAllowed(i,S.mode);const shop=S.catalog.items.filter(i=>placeable(i)&&[...S.filters].every(f=>f==="Starter"?starterFilterAllowed(i,S.mode):f.split("|").some(c=>i.categories?.includes(c)))&&(!S.iq||i.name.includes(S.iq)));return shop.sort((a,b)=>S.sort==="name"?a.name.localeCompare(b.name,"zh-CN"):S.sort==="desc"?b.priceTotal-a.priceTotal:a.priceTotal-b.priceTotal);}
   function updateShop(){hideTip();const grid=root.querySelector(".ac-item-grid");if(grid){grid.innerHTML=shopItems(filteredItems(),itemLists());renderedEditor=editor();}}
   function buildBlock(k,n,items){const starting=k==="starter",active=S.itemGroup===k,total=items[k].reduce((sum,value)=>sum+(itemLookup(itemID(value))?.priceTotal||0)*itemCount(value),0);return `<section class="ac-build-block${active?" is-active":""}" data-item-group="${k}" tabindex="0" aria-label="${n}"><header><strong>${n}</strong><span class="gold">${total} 金币</span></header><div class="ac-build-slots">${Array.from({length:k==="boots"?3:6},(_,i)=>{const value=items[k][i],id=itemID(value),item=itemLookup(id),invalid=id&&poolStatus("items")==="ready"&&(!item||!(starting?starterAllowed(item,S.mode):k==="boots"?bootsAllowed(item,S.mode):itemAllowed(item,S.mode)));return `<button class="ac-bslot${id?" has":""}${invalid?" ac-invalid":""}" data-build="${k}:${i}" draggable="${!!id}" aria-label="${n}第${i+1}格${id?item?.name||"目录未载入":"空"}" ${item?`data-ac-tooltip="${esc(tip(item))}"`:""}>${id?`<b class="${starting||k==='situational'?'ac-item-count':''}">${starting||k==="situational"?"×"+itemCount(value):i+1}</b>${icon(item?.iconPath)}<span class="x" data-remove="${k}:${i}">×</span>`:"+"}</button>`;}).join("")}</div></section>`;}
   function kit(){
@@ -297,11 +307,12 @@
   let layoutReason="render",lastFitSignature="",fitMinute=0,fitCount=0;
   function scheduleLayout(reason="observer"){layoutReason=typeof reason==="string"?reason:"observer";if(!layoutFrame)layoutFrame=requestAnimationFrame(()=>{layoutFrame=0;layout();});}
   function runePanelFit(width,availableHeight,narrow,above=0){
+    // narrow 由调用方用同一个测量值（卡片宽度）决定，保证随宽度单调。
     const padding=width<=640?8:width<=800?12:28,headerHeight=narrow?70:30;
     const inner=Math.max(0,width-2*padding);
     const headerGap=16,panelTop=12,panelBottom=16,gap=24;
     const overhead=28+headerHeight+headerGap+panelTop+panelBottom+gap;
-    const fit=runeFitGeometry(inner,narrow?315:Math.max(315,640-overhead,availableHeight-above-overhead),(style(S.draft?.runes?.primaryStyleId)?.slots[0]?.perks.length||0)>3);
+    const fit=runeFitGeometry(inner,narrow?315:Math.max(315,640-overhead,availableHeight-above-overhead),(style(S.draft?.runes?.primaryStyleId)?.slots[0]?.perks.length||0)>3,narrow);
     return {fit,width:inner,height:fit.treeHeight,headerGap,gap,narrow,contentHeight:overhead+fit.treeHeight};
   }
   let equipmentFitSignature="",equipmentFitMinute=0,equipmentFitCount=0;
@@ -316,7 +327,7 @@
   function layout(){
     const card=root.querySelector(".ac-editor"),tabs=card?.querySelector(".ac-tabs");if(!card||!tabs)return;
     const zoom=Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-zoom"))||1;
-    const width=card.clientWidth,narrow=width<=800 || root.clientWidth<=820,availableHeight=fillBody(),above=layoutOffset(tabs)+tabs.offsetHeight-layoutOffset(card);
+    const width=card.clientWidth,narrow=width<=820,availableHeight=fillBody(),above=layoutOffset(tabs)+tabs.offsetHeight-layoutOffset(card);
     const panel=runePanelFit(width,availableHeight,narrow,above),{fit}=panel,tree=root.querySelector(".ac-tree"),stage=tree?.closest(".ac-stage");
     if(tree&&stage){
       for(const [name,value]of Object.entries({"--ac-rune-scale":String(fit.scale),"--ac-rune-f":String(fit.f),"--ac-tree-height":fit.treeHeight+"px","--ac-primary-width":fit.primaryWidth+"px","--ac-secondary-width":fit.secondaryWidth+"px","--ac-column-gap":(fit.columnGap/.9)+"px","--ac-key-extra":fit.keyExtra+"px","--ac-minor-extra":fit.minorExtra+"px","--ac-sub-extra":fit.subExtra+"px","--ac-shard-extra":fit.shardExtra+"px","--ac-sub-shard-gap":fit.subShardGap+"px"}))if(stage.style.getPropertyValue(name)!==value)stage.style.setProperty(name,value);

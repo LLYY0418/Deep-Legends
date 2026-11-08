@@ -8,7 +8,7 @@ const script = read("champions.js");
 const gameplay = read("gameplay.js");
 const runtime = read("runtime.js");
 const css = read("app.css");
-const championCSS = read("champions.css");
+const championCSS = read("champions.css") + "\n" + read("shared-cards.css");
 const gradeSource = runtime.slice(runtime.indexOf("  const GRADE_ORDER ="), runtime.indexOf("  window.deepLegendsRuntime ="));
 const grades = Function(`${gradeSource}\nreturn { gradeBadge, gradeRank, orderArenaRows };`)();
 

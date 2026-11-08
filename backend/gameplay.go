@@ -7167,6 +7167,8 @@ type gameplayLivePlayer struct {
 	RecentGames         []gameplayRecentGame   `json:"recentGames,omitempty"`
 	RecentRankedRecord  *gameplayRecentRecord  `json:"recentRankedRecord,omitempty"`
 	RecentPositions     []gameplayPositionStat `json:"recentPositions,omitempty"`
+	// R318 P3：只给本人填充斗魂名望；其他玩家始终为空。
+	ArenaFame *gameplayArenaSelfFame `json:"arenaFame,omitempty"`
 	liveR263PlayerFields
 }
 
@@ -7507,7 +7509,9 @@ func (a *app) handleGameplayLive(w http.ResponseWriter, r *http.Request) {
 			}
 		})
 	}
-	respondJSON(w, a.cachedGameplayLive(ctx, client, current, phase))
+	response := a.cachedGameplayLive(ctx, client, current, phase)
+	a.attachArenaSelfFame(client, &response)
+	respondJSON(w, response)
 }
 
 func (a *app) loadGameplayLive(ctx context.Context, client *LCUClient, current Summoner, phase string) gameplayLiveResponse {
@@ -9945,6 +9949,9 @@ type gameplayAugment struct {
 	Rarity           string `json:"rarity,omitempty"`
 	IconPath         string `json:"iconPath,omitempty"`
 	FallbackIconPath string `json:"fallbackIconPath,omitempty"`
+	// R318 P8：统一目录返回的有序图标候选链；未知编号没有名称/图标。
+	IconCandidates []gameplayAugmentIcon `json:"iconCandidates,omitempty"`
+	Unknown        bool                  `json:"unknown,omitempty"`
 }
 
 type gameplayAugmentRaw struct {
@@ -10009,14 +10016,93 @@ func (a *app) handleGameplayPerks(w http.ResponseWriter, r *http.Request) {
 // Overview cards can paint their exact-ID artwork as soon as this local response
 // arrives, while the full perk catalog continues loading for rune details.
 func (a *app) handleGameplayAugments(w http.ResponseWriter, r *http.Request) {
-	augments := bundledAugmentCatalog()
+	provider := a.championDataProvider()
+	var local []gameplayAugment
+	if provider != nil && provider.gameplayAugments != nil {
+		if rows, err := provider.gameplayAugments(r.Context()); err == nil {
+			local = rows
+		}
+	}
+	var augments []gameplayAugment
+	if provider != nil {
+		augments = provider.unifiedAugmentCatalog(local)
+	} else {
+		augments = bundledAugmentCatalog()
+	}
+	ids := parseAugmentIDs(r.URL.Query().Get("ids"))
+	if len(ids) > 0 {
+		missing := missingAugmentIDs(augments, ids)
+		if len(missing) > 0 {
+			a.resolveAugmentIDs(r.Context(), provider, missing)
+			augments = provider.unifiedAugmentCatalog(local)
+		}
+		augments = filterAugmentIDs(augments, ids)
+	}
 	if len(augments) == 0 {
 		http.Error(w, "海克斯图标目录暂不可用", http.StatusServiceUnavailable)
 		return
 	}
+	version := ""
+	if provider != nil {
+		version = provider.augmentCatalogVersion(augments)
+	}
 	respondJSON(w, struct {
-		Augments []gameplayAugment `json:"augments"`
-	}{Augments: augments})
+		Augments       []gameplayAugment `json:"augments"`
+		CatalogVersion string            `json:"catalogVersion,omitempty"`
+	}{Augments: augments, CatalogVersion: version})
+}
+
+func parseAugmentIDs(raw string) []int64 {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	seen := map[int64]bool{}
+	ids := make([]int64, 0, 16)
+	for _, part := range strings.Split(raw, ",") {
+		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
+		if err != nil || id <= 0 || id > 100000 || seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
+		if len(ids) >= 64 {
+			break
+		}
+	}
+	return ids
+}
+
+func missingAugmentIDs(rows []gameplayAugment, ids []int64) []int64 {
+	known := make(map[int64]bool, len(rows))
+	for _, row := range rows {
+		if !row.Unknown {
+			known[row.ID] = true
+		}
+	}
+	missing := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if !known[id] {
+			missing = append(missing, id)
+		}
+	}
+	return missing
+}
+
+func filterAugmentIDs(rows []gameplayAugment, ids []int64) []gameplayAugment {
+	byID := make(map[int64]gameplayAugment, len(rows))
+	for _, row := range rows {
+		byID[row.ID] = row
+	}
+	result := make([]gameplayAugment, 0, len(ids))
+	for _, id := range ids {
+		if row, ok := byID[id]; ok {
+			result = append(result, row)
+		} else {
+			// 补全后仍查不到：返回显式的未知条目，前端只画统一占位图形并短期缓存。
+			result = append(result, gameplayAugment{ID: id, Unknown: true})
+		}
+	}
+	return result
 }
 
 type gameplayPerkCatalogFallback struct{ payload gameplayPerkCatalogResponse }

@@ -67,7 +67,8 @@ func TestR160OverviewAugmentCatalogDoesNotWaitForPerks(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if len(response.Augments) != 554 || response.Augments[0].IconPath != "builtin:/augments/1.png" {
+	// R318 P8：目录现在同时包含当前版本快照与内置快照，不再只有 554 条内置数据。
+	if len(response.Augments) < 554 || response.Augments[0].IconPath != "builtin:/augments/1.png" || len(response.Augments[0].IconCandidates) == 0 {
 		t.Fatalf("local augment index: count=%d first=%#v", len(response.Augments), response.Augments[0])
 	}
 }

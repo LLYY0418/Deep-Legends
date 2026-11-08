@@ -48,13 +48,19 @@
     if(!player.hidden && ['rift','aram','arena'].includes(kind)) {
       const rankHTML=(rank,label)=>{
         const tier=String(rank?.tier || '').toLowerCase(),known=valid(rank);
-        const title=(label?label+' ':'')+(known?h.rankTitle(rank):'未定级');
-        return {copy:title,html:(known?`<img class="live-rank-crest" src="/rank-crests/${tier}.png" alt="" decoding="async">`:'')+`<b class="live-rank-title">${h.escapeHTML(title)}</b>`};
+        const rankCopy=known?h.rankTitle(rank):'未定级';
+        // R318 P3：队列标签与段位拆成两个元素——标签用普通辅助文字色，段位保持主题色。
+        const title=(label?label+' ':'')+rankCopy;
+        return {copy:title,html:(label?`<span class="live-rank-label">${h.escapeHTML(label)} </span>`:'')+(known?`<img class="live-rank-crest" src="/rank-crests/${tier}.png" alt="" decoding="async">`:'')+`<b class="live-rank-title">${h.escapeHTML(rankCopy)}</b>`};
       };
       const position=kind==='rift' && player.position?String(legacyCopy).split(' · ')[0]:'';
       const ranks=kind!=='aram'?[rankHTML(player.soloRank,'单双'),rankHTML(player.flexRank,'组排')]:[rankHTML(player.soloRank,'')];
       const copy=[position,...ranks.map(r=>r.copy)].filter(Boolean).join(' · ');
-      return `<span class="live-player-rank" data-tooltip="${h.escapeHTML(copy)}" data-tooltip-overflow="self" data-tooltip-size="compact">${position?h.escapeHTML(position)+' · ':''}${ranks.map(r=>r.html).join(' · ')}</span>`;
+      // R318 P3：斗魂本人名望只接在段位后面；没有数据时整段不渲染，不留占位。
+      const selfFame=kind==='arena' && player.isCurrent && player.arenaFame && Number.isFinite(Number(player.arenaFame.level)) && Number.isFinite(Number(player.arenaFame.fame))
+        ? `<span class="live-arena-fame"><svg class="live-arena-fame-icon" viewBox="0 0 16 16" aria-hidden="true"><defs><linearGradient id="dl-arena-fame-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7ac8"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><path fill="url(#dl-arena-fame-gradient)" d="M11.9 1.6c-2.9.5-5.1 2-6.3 4.1-.7 1.3-.9 2.6-.6 3.9L2 12.7l1.2 1.2 3.1-3c1.3.3 2.6.1 3.9-.6 2.1-1.2 3.6-3.4 4.1-6.3.2-1.1-.7-2.1-1.8-2.2-.2 0-.4 0-.6.1Z"/><path fill="url(#dl-arena-fame-gradient)" opacity=".7" d="M2.3 14.5c2-3.1 4.2-5 6.9-6.5-2.1 2.2-3.3 4.3-3.7 7.1l-3.2-.6Z"/></svg><span>斗魂</span><b>${h.escapeHTML(String(Math.max(0, Math.trunc(Number(player.arenaFame.level)))))}级</b><span>·</span><b>${h.number(player.arenaFame.fame)}</b><span>名望</span></span>`
+        : '';
+      return `<span class="live-player-rank" data-tooltip="${h.escapeHTML(copy)}" data-tooltip-overflow="self" data-tooltip-size="compact">${position?h.escapeHTML(position)+' · ':''}${ranks.map(r=>r.html).join(' · ')}${selfFame?' · '+selfFame:''}</span>`;
     }
     const rank=[player.soloRank,player.flexRank,player.rank].find(valid);
     if(player.hidden===true && !rank)return '';

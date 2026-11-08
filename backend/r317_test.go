@@ -95,7 +95,18 @@ func TestR317RetiredArenaFilesRemovedOnceWithoutSquadLoss(t *testing.T) {
 }
 
 func TestR317RetiredArenaSourceAudit(t *testing.T) {
-	forbidden := []string{"arena_" + "fa" + "me", "arena" + "Fa" + "me", "arena-" + "fa" + "me"}
+	// R318 P3：只禁止已删除的「他人扫描 / 探测」标识符；本人名望的事件读取与
+	// 持久化恢复后允许出现。这里不用改名绕开断言，而是明确收窄禁止清单。
+	forbidden := []string{
+		"scanOtherArenaFame",
+		"probeOtherArenaChallenges",
+		"arena_fame_discovery",
+		"arena_fame_progression_",
+		"arena_fame_other_scan",
+		"fameOtherRef",
+		"fameOtherSources",
+		"fameOtherChallenges",
+	}
 	for _, dir := range []string{".", "../scripts"} {
 		err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
@@ -108,6 +119,10 @@ func TestR317RetiredArenaSourceAudit(t *testing.T) {
 				return nil
 			}
 			if !strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, ".js") && !strings.HasSuffix(path, ".cjs") && !strings.HasSuffix(path, ".css") && !strings.HasSuffix(path, ".svg") {
+				return nil
+			}
+			// 断言清单本身包含这些字符串；审计只针对产品源码。
+			if strings.HasSuffix(path, "r317_test.go") {
 				return nil
 			}
 			raw, err := os.ReadFile(path)

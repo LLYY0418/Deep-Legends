@@ -126,6 +126,8 @@ type championProvider struct {
 	augmentBackoff      communityDragonAugmentBackoff
 	remoteAugmentMu     sync.RWMutex
 	remoteAugments      []gameplayAugment
+	// R318 P8：在线（OP.GG / ARAMKit）补全的海克斯元数据；与 remoteAugments 共用锁。
+	onlineAugments      []gameplayAugment
 	mayhemWarmOnce      sync.Once
 	mayhemWarmWait      sync.WaitGroup
 	mayhemRSCWarmMu     sync.Mutex

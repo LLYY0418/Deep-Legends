@@ -335,6 +335,7 @@ func (a *app) runConnectedSession(ctx context.Context, client *LCUClient) error 
 					a.sgp.observeTokenEvent(client, event)
 					a.observeClientCatalogVersion(client, event)
 					a.observeAutoConfigEvent(sessionCtx, client, event)
+					a.observeArenaSelfFameEvent(client, event)
 				}
 				if currentTokenClient {
 					a.observeCollectionSkinEvent(sessionCtx, client, event)

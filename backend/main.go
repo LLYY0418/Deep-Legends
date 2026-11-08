@@ -41,8 +41,12 @@ type app struct {
 	snapshotDiagnosticWindows map[string]*diagnosticSnapshotWindow
 	milestoneCache            milestoneCache
 
-	shapeDiagnosticMu          sync.Mutex
-	shapeDiagnosticWindows     map[string]time.Time
+	shapeDiagnosticMu      sync.Mutex
+	shapeDiagnosticWindows map[string]time.Time
+	// R318 P8：未知海克斯编号的短期重查窗口（30 分钟后可再查）。
+	augmentResolveMu           sync.Mutex
+	augmentResolvedAt          map[int64]time.Time
+	augmentOnlineProbeAt       time.Time
 	collectionSkinEventMu      sync.Mutex
 	collectionSkinEventEpoch   uint64
 	collectionSkinEventSeen    map[int64]bool
@@ -836,6 +840,7 @@ func main() {
 	a.runtimeCancel = runtimeCancel
 	a.runtimeMetricsDone = make(chan struct{})
 	a.goSafe("backend_runtime_metrics", func() { defer close(a.runtimeMetricsDone); a.runBackendRuntimeMetrics(runtimeContext, nil, nil) })
+	a.goSafe("augment-catalog-warm", func() { a.warmAugmentCatalog(runtimeContext) })
 	a.startApplicationBusiness(runtimeContext)
 	a.startPatchNotes(runtimeContext)
 	a.goSafe("client-autostart-startup", a.scanClientAutostart)

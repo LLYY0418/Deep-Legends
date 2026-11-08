@@ -2,7 +2,7 @@
   "use strict";
 
   const modules = { overview: [], favorites: ["favorites-facade"], champions: ["patch-notes", "champions"], "pro-players": ["pro-players"], suite: ["patch-notes", "champions", "auto-config", "suite"], settings: ["patch-notes", "champions", "cache-controls", "settings-preferences", "player-tags"], live: ["player-tags", "live-arena", "auto-config-live"] };
-  const styles = { "auto-config": ["auto-config"], "auto-config-live": ["auto-config"], "favorites-facade": ["collection"], "patch-notes": ["patch-notes"], "player-tags": ["player-tags"], "settings-preferences": ["settings-preferences"], champions: ["patch-notes", "champions"], "pro-players": ["pro-players"], suite: ["patch-notes", "champions", "auto-config", "suite"], settings: ["patch-notes", "champions", "settings-preferences"], "live-arena": ["live-arena"], announcements: ["announcements"] };
+  const styles = { "auto-config": ["auto-config"], "auto-config-live": ["auto-config"], "favorites-facade": ["collection"], "patch-notes": ["patch-notes"], "player-tags": ["player-tags"], "settings-preferences": ["settings-preferences"], champions: ["patch-notes", "shared-cards", "champions"], "pro-players": ["pro-players"], suite: ["patch-notes", "shared-cards", "champions", "auto-config", "suite"], settings: ["patch-notes", "champions", "settings-preferences"], "live-arena": ["shared-cards", "live-arena"], announcements: ["announcements"] };
   const flights = new Map(), ready = new Set(), callbacks = new Map(), snapshots = new Map();
   const styleFlights = new Map(), styleReady = new Set();
   let current = "overview", navigation = {}, generation = 0;

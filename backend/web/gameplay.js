@@ -5218,6 +5218,8 @@
 
   // 图标目录（符文/装备/召唤师技能）：客户端连接时来自本机客户端；
   // 未连接时后端会回退到 Data Dragon，因此不再限制连接状态。
+  document.addEventListener("click", (event) => { if (event.target.closest?.("[data-live-card-style-retry]")) { state.liveCardStylesFailed = false; state.liveCardStyleFlight = null; if (state.live) renderLive("live-card-style-retry"); } });
+
   async function ensureAugments() {
     if (state.destroyed || state.augmentCatalog || state.augmentCatalogLoading) return;
     state.augmentCatalogLoading = true;
@@ -7086,6 +7088,12 @@
   // 不能包含 state.liveLoading；瞬时加载状态只更新工具栏的 data-live-status。
   function renderLive(source = "direct") {
     if (state.destroyed || (state.section && state.section !== "live")) return;
+    // R318 P1：对局页样式（共享卡片 + 对局页按需样式）未就绪时先画骨架，绝不渲染无样式的一帧。
+    if (!state.liveCardStylesReady && globalThis.deepLegendsSections?.loadStyle) {
+      state.liveCardStyleFlight ||= Promise.race([Promise.all(["shared-cards", "live-arena"].map((name) => globalThis.deepLegendsSections.loadStyle(name))), new Promise((resolve) => setTimeout(resolve, 60))]).then(() => { state.liveCardStylesReady = true; if (state.live) renderLive("live-card-styles"); });
+      nodes.liveContent.innerHTML = `<div class="panel-loading" role="status" aria-live="polite"><div class="panel-loading-content"><span class="panel-spinner" aria-hidden="true"></span><strong>${state.liveCardStylesFailed ? "对局页样式加载失败" : "正在准备对局页"}</strong></div></div>${state.liveCardStylesFailed ? '<button class="text-button" type="button" data-live-card-style-retry>重试</button>' : ""}</div>`;
+      return;
+    }
     state.liveRenderSource = state.liveRenderTrigger || liveRenderTriggerLabel(source);
     state.liveRenderTrigger = "";
     const toolbar = nodes.liveRefresh?.closest(".live-toolbar");
@@ -8435,14 +8443,16 @@
       : `<p class="build-group-empty">${escapeHTML(emptyCopy)}</p>`;
     const capabilities = recommendationCapabilities(data, liveRecommendationsFor(data) || {});
 	    const hasOpeningConfiguration = spellOptions.length > 0 || starterOptions.length > 0;
-	    const summaryLayout = capabilities.hasAugments ? (hasOpeningConfiguration ? "is-mayhem" : "is-arena") : "is-standard";
-	    const buildLayout = capabilities.hasAugments ? (hasOpeningConfiguration ? "is-mayhem-build" : "is-arena-build") : "is-standard-build";
+
+	    const hasSkillPlan = Boolean(build.skillPriority?.length || build.skillOrder?.length);
+	    const summaryLayout = capabilities.hasAugments ? (hasOpeningConfiguration ? "is-mayhem" : hasSkillPlan ? "is-arena" : "is-arena-no-skill") : "is-standard";
+	    const buildLayout = capabilities.hasAugments ? (hasOpeningConfiguration ? "is-mayhem-build" : hasSkillPlan ? "is-arena-build" : "is-arena-build is-arena-no-skill-build") : "is-standard-build";
 
 	    const summary = [
 	      starterOptions.length ? `<section class="build-summary-starter"><h3>出门装</h3>${optionList(starterOptions, "item", "该模式没有出门装样本")}</section>` : "",
 	      spellOptions.length ? `<section class="build-summary-spells"><h3>召唤师技能</h3>${optionList(spellOptions, "spell", "该模式不使用召唤师技能")}</section>` : "",
 	      `<section class="build-summary-boots"><h3>鞋子</h3>${optionList(bootOptions, "item", "暂无鞋子样本")}</section>`,
-	      build.skillPriority?.length || build.skillOrder?.length ? `<section class="skill-plan build-summary-skill"><div class="skill-plan-head"><h3>技能加点</h3></div>${renderSkillPlan(build, abilities, renderRecommendationStats(build.skillStats))}</section>` : "",
+	      hasSkillPlan ? `<section class="skill-plan build-summary-skill"><div class="skill-plan-head"><h3>技能加点</h3></div>${renderSkillPlan(build, abilities, renderRecommendationStats(build.skillStats))}</section>` : "",
 	    ].filter(Boolean).join("");
     const itemSet = buildItemSetPayload(build, self, data);
 	    const canApply = itemSet.blocks.length > 0 && data?.phase === "ChampSelect";
@@ -9137,19 +9147,13 @@
     const style = (state.perks?.styles || []).find((candidate) => Number(candidate.id) === Number(styleID));
     return style?.iconPath ? assetIcon(style.iconPath, `副系 · ${style.name}`, size) : "";
   }
-  function augmentMetadata(id) {
-    return (state.perks?.augments || []).find((candidate) => Number(candidate.id) === Number(id))
-      || state.augmentCatalog?.get(Number(id));
-  }
-  function augmentIconFigure(id, size = "") {
-    const augment = augmentMetadata(id);
-    const description = state.augmentDescriptions?.get(Number(id));
-    const details = { ...(augment || { id, name: `海克斯 ${id}`, rarity: "unknown" }), ...(description?.status === "ok" ? { description: description.description } : {}) };
-    const icon = augment?.iconPath
-      ? assetIcon(augment.iconPath, augment.name || `海克斯 ${id}`, size, false, augment.fallbackIconPath)
-      : state.perks || state.augmentCatalog ? iconFigure("augment", id, details.name, size, false) : pendingCatalogIcon(details.name, size, false);
-    return wrapAugmentIcon(icon, details, id);
-  }
+  function augmentMetadata(id){const n=+id,p=(state.perks?.augments||[]).find(x=>+x.id===n)||null,c=state.augmentCatalog?.get(n)||null;if(!p&&!c){ensureAugmentResolved(n);return null}return{...(c||{}),...(p||{}),name:p?.name||c?.name||"",description:p?.description||c?.description||"",rarity:c?.rarity||p?.rarity||"unknown",iconCandidates:c?.iconCandidates?.length?c.iconCandidates:null,iconPath:p?.iconPath||c?.iconPath||"",fallbackIconPath:p?.fallbackIconPath||c?.fallbackIconPath||"",unknown:c?.unknown===true}}
+  function augmentIconFigure(id,size=""){const a=augmentMetadata(id),desc=state.augmentDescriptions?.get(+id),d={...(a||{id,name:"",rarity:"unknown"}),...(desc?.status==="ok"?{description:desc.description}:{})},label=a?.name||d.name||"",list=(a?.iconCandidates||[]).filter(x=>x?.url).map(x=>({url:x.url,source:x.source||""})),cls=`game-icon${size?` is-${size}`:""}`;if(!a||a.unknown||!list.length)return wrapAugmentIcon(`<span class="${cls} has-image-error" data-augment-icon data-augment-id="${+id}" aria-hidden="true"><span class="game-icon-fallback augment-placeholder" aria-hidden="true"></span></span>`,d,id);return wrapAugmentIcon(`<span class="${cls}" data-augment-icon data-augment-id="${+id}" data-augment-candidates="${escapeHTML(JSON.stringify(list))}" data-augment-candidate="0" data-augment-started-at="${Date.now()}"><span class="game-icon-fallback augment-placeholder" aria-hidden="true"></span><img data-queued-src="${escapeHTML(list[0].url)}" alt="${escapeHTML(label||"海克斯")}" loading="lazy" decoding="async" data-game-image></span>`,d,id)}
+  function ensureAugmentResolved(id){if(!+id||!state.augmentCatalog||state.augmentCatalog.has(+id))return;const tried=state.augmentResolveTried||=new Map(),at=tried.get(+id);if(at&&Date.now()-at<18e5)return;tried.set(+id,Date.now());(state.augmentResolveQueue||=new Set()).add(+id);clearTimeout(state.augmentResolveTimer);state.augmentResolveTimer=setTimeout(flushAugmentResolves,60)}
+  async function flushAugmentResolves(){const ids=[...state.augmentResolveQueue||[]].slice(0,64);state.augmentResolveQueue?.clear();if(!ids.length)return;try{const r=await api(`/api/gameplay/augments?ids=${ids.join(",")}`,{},"augment-resolve",8000);for(const row of r?.augments||[]){const id=+row.id;if(!id)continue;if(row.unknown)(state.augmentUnknown||=new Map()).set(id,Date.now());else{(state.augmentCatalog||=new Map()).set(id,row);state.augmentUnknown?.delete(id)}refreshAugmentIconNodes(id)}}catch(_){}}
+  function refreshAugmentIconNodes(id){for(const node of document.querySelectorAll(`[data-augment-icon][data-augment-id="${+id}"]`)){const size=node.classList.contains("is-large")?"large":node.classList.contains("is-small")?"small":"",t=document.createElement("template");t.innerHTML=augmentIconFigure(id,size);const fresh=t.content.querySelector("[data-augment-icon]");if(fresh)node.replaceWith(fresh)}}
+  function reportAugmentIconResolve(id,source,errorKind,elapsed){const log=state.augmentIconResolveLog||=new Map(),at=log.get(+id);if(at&&Date.now()-at<6e5)return;log.set(+id,Date.now());if(log.size>128)log.delete(log.keys().next().value);window.reportFlowDiagnostic?.("augment_icon_resolve","failed",{augmentId:+id,source:String(source||""),errorKind:String(errorKind||"image_error"),elapsedMs:Math.max(0,Math.round(+elapsed||0))})}
+
   function renderItemIcons(items, size = "") { const valid = items.filter((id) => Number(id) > 0); return valid.map((id) => itemIconFigure(id, size)).join(""); }
   function gameImageLoaded(image) {
     image.hidden = false;
@@ -9159,9 +9163,24 @@
       else void window.deepLegendsSections?.load("augment-artwork").then(()=>window.deepLegendsAugmentArtwork?.prepare(image)).catch(()=>{});
     }
   }
+  function updateAugmentCandidate(host, image, list, index) {
+    if (index < list.length) { host.dataset.augmentCandidate = String(index); image.hidden = false; image.setAttribute("data-queued-src", list[index].url); return; }
+    image.hidden = true;
+    image.parentElement?.classList.remove("has-loaded-image");
+    image.parentElement?.classList.add("has-image-error");
+  }
   function gameImageFailed(image) {
     if (image.dataset.retryPending) return;
     const holder = image.parentElement;
+    const host = image.closest?.("[data-augment-icon]");
+    if (host) {
+      let list = [];
+      try { list = JSON.parse(host.dataset.augmentCandidates || "[]"); } catch (_) {}
+      const index = Number(host.dataset.augmentCandidate || 0) + 1;
+      reportAugmentIconResolve(host.dataset.augmentId, list[index - 1]?.source, "image_error", Number(host.dataset.augmentStartedAt) ? Date.now() - Number(host.dataset.augmentStartedAt) : 0);
+      updateAugmentCandidate(host, image, list, index);
+      return;
+    }
     const fallback = holder?.dataset.augmentFallback;
     if (fallback && !image.dataset.augmentFallbackUsed) {
       image.dataset.augmentFallbackUsed = "1";

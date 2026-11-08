@@ -1,0 +1,62 @@
+/* R318 P1：对局页实时推荐卡片与英雄页 / 工具页共用的样式。
+   这些类会出现在对局页冷启动（未打开英雄页）的实时推荐里；规则只保留这一份，
+   由 section-loader 在实时推荐首次渲染前加载，英雄页同样引用它。 */
+.arena-option-card { --arena-quality-color: var(--rarity-iron); position: relative; display: grid; min-width: 0; min-height: 102px; gap: 9px; overflow: hidden; padding: 10px; background: var(--bg); border: 1px solid color-mix(in oklab,var(--arena-quality-color) 38%,var(--line)); border-radius: 8px; }
+.arena-option-card.is-silver { --arena-quality: var(--rarity-silver); --arena-quality-color: var(--rarity-silver); }
+.arena-option-card.is-gold { --arena-quality: var(--rarity-gold); --arena-quality-color: var(--rarity-gold); }
+.arena-option-card.is-prismatic { --arena-quality: linear-gradient(180deg,var(--rarity-prismatic-a),var(--rarity-prismatic-b),var(--rarity-prismatic-c)); --arena-quality-color: var(--rarity-prismatic-a); }
+.arena-core-option { opacity: 1; }
+.arena-option-card:hover, .arena-option-card:focus-within { border-color: color-mix(in oklab,var(--primary) 55%,var(--line)); opacity: 1; }
+.arena-option-main { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.arena-prism-section .arena-option-main, .arena-core-section .arena-option-main { align-items: center; }
+.arena-option-icons, .arena-slim-icons { display: inline-flex; min-width: 0; align-items: center; gap: 4px; }
+.arena-option-main > strong { min-width: 0; flex: 1 1 auto; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.arena-option-rarity { flex: 0 0 auto; padding: 2px 6px; color: var(--muted); background: var(--surface-strong); border-radius: 6px; font-size: 9px; font-weight: 750; }
+.arena-option-rarity.is-silver { color: color-mix(in oklab,var(--rarity-silver) 58%,var(--ink)); background: color-mix(in oklab,var(--rarity-silver) 18%,var(--surface)); }
+.arena-option-rarity.is-gold { color: color-mix(in oklab,var(--rarity-gold) 58%,var(--ink)); background: color-mix(in oklab,var(--rarity-gold) 18%,var(--surface)); }
+.arena-option-rarity.is-prismatic { color: color-mix(in oklab,var(--rarity-prismatic-a) 58%,var(--ink)); background: color-mix(in oklab,var(--rarity-prismatic-a) 18%,var(--surface)); }
+.arena-option-card .item-option-button { width: 48px; height: 48px; flex: 0 0 48px; padding: 0; }
+.arena-option-card .config-icons { --option-icon-size: 48px; }
+.arena-option-card .recommend-icon { width: 48px; height: 48px; border-radius: 7px; }
+.arena-slim-row .item-option-button, .arena-slim-row .recommend-icon { width: 36px; height: 36px; flex: 0 0 36px; padding: 0; border-radius: 7px; }
+.arena-slim-row .config-icons { --option-icon-size: 36px; }
+.arena-option-card .route-arrow, .arena-slim-row .route-arrow { color: var(--muted); font-size: 11px; }
+.arena-option-card dl { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px; margin: 0; }
+/* 海斗是大乱斗口径，没有平均名次/吃鸡率，指标列按实际条数收敛。 */
+.arena-option-card[data-metric-count="3"] dl { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.arena-option-card[data-metric-count="4"] dl { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.arena-augment-section .arena-option-card[data-metric-count="4"] dl { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.arena-option-card dl > div { display: grid; min-width: 0; gap: 1px; }
+.arena-option-card dt { color: var(--muted); font-size: 8px; }
+.arena-option-card dd { margin: 0; overflow: hidden; color: var(--muted); font-size: 10px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.arena-option-card .is-win dd, .arena-option-card .is-placement dd, .arena-option-card .is-first dd, .arena-option-card .is-score dd { font-weight: 800; }
+.arena-option-card .is-win dd, .arena-slim-row .is-win { color: var(--success); }
+.arena-option-card .is-placement dd, .arena-slim-row .is-placement { color: var(--primary-strong); }
+.arena-option-card .is-first dd { color: var(--accent); }
+.arena-option-card .is-score dd { color: var(--ink); font-variant-numeric: tabular-nums; }
+.arena-core-option .arena-option-main { min-height: 48px; }
+.arena-augment-section .arena-option-card .item-option-button, .arena-augment-section .arena-option-card .recommend-icon { width: 48px; height: 48px; flex-basis: 48px; }
+.arena-augment-section .arena-option-card .config-icons { --option-icon-size: 48px; }
+
+/* 对局页「装备排行」容器与列表的基础排版；英雄页海斗详情共用。 */
+.recommendation-section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+.recommendation-section h3 { margin: 0; font-size: 15px; display: inline-flex; align-items: center; gap: 7px; }
+.recommendation-section header p { margin: 1px 0 0; color: var(--muted); font-size: 10px; }
+.recommendation-section > header { display: flex; min-height: 56px; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.mayhem-ranking-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.mayhem-ranking-list article { display: grid; min-height: 70px; grid-template-columns: 22px 46px minmax(92px,1fr) max-content; align-items: center; gap: 8px; padding: 9px 12px; border-top: 1px solid var(--line); }
+.mayhem-ranking-list article:nth-child(odd) { border-right: 1px solid var(--line); }
+.mayhem-ranking-list article:nth-child(-n+2) { border-top: 0; }
+.mayhem-ranking-list article > b { color: var(--muted); font-size: 10px; text-align: center; }
+.mayhem-ranking-list article > strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.mayhem-ranking-list article > .recommend-icon { width: 46px; height: 46px; border-radius: 8px; }
+.mayhem-item-name-only { width: 0; height: 46px; }
+.mayhem-ranking-list dl { display: grid; grid-template-columns: repeat(2,max-content); column-gap: 20px; margin: 0; white-space: nowrap; }
+.mayhem-ranking-list dl > div { display: grid; gap: 1px; padding-left: 0; }
+.mayhem-ranking-list dt { color: var(--muted); font-size: 8px; }
+.mayhem-ranking-list dd { margin: 0; font-size: 10px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mayhem-ranking-list .metric-win { color: var(--success); }
+
+/* 对局页分路筛选图标（英雄页分路页签共用）。 */
+.position-icon { display: grid; width: 25px; height: 25px; flex: 0 0 25px; place-items: center; }
+.position-icon img { display: block; width: 100%; height: 100%; object-fit: contain; opacity: .68; filter: grayscale(.7); }
