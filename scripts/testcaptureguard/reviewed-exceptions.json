@@ -855,9 +855,9 @@
   },
   {
     "file": "backend/quality_test.go",
-    "line": 750,
+    "line": 751,
     "target": "events",
-    "source_sha256": "a81506aa73622c32c17f9b58855a539b7246d8f5337b81c7a4fca902ae49bf67",
+    "source_sha256": "bca684f903cff1a83113164cf9599414d6df9d6c71f439fdd3d77f48552ddf19",
     "comment": "r276-capture-safe: TestLootFallbackDiagnosticRuntimePayloadNeverStoresItemDetails: enrichLootItemsWithMetadata directly invokes observe in its synchronous item loop on the caller; this call returns before events is inspected or marshaled"
   },
   {
@@ -1191,16 +1191,16 @@
   },
   {
     "file": "backend/r160_test.go",
-    "line": 81,
+    "line": 82,
     "target": "called",
-    "source_sha256": "447a53bb133114af386a2920e14ab541239798a99063bd58652fab6e38e97556",
+    "source_sha256": "8374e6312ce7b19c2129c0af8c9116ed457bd05806ea3b9a84df21c1449b4ec1",
     "comment": "r276-capture-safe: TestR160ArenaAggregateHasBoundedDetailBudget: the audited fixture operations in this test invoke this callback serially and return before called is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
     "file": "backend/r160_test.go",
-    "line": 84,
+    "line": 85,
     "target": "attempt",
-    "source_sha256": "447a53bb133114af386a2920e14ab541239798a99063bd58652fab6e38e97556",
+    "source_sha256": "8374e6312ce7b19c2129c0af8c9116ed457bd05806ea3b9a84df21c1449b4ec1",
     "comment": "r276-capture-safe: TestR160ArenaAggregateHasBoundedDetailBudget: the audited fixture operations in this test invoke this callback serially and return before attempt is asserted; this source-bound exception does not permit a concurrent fixture caller"
   },
   {
