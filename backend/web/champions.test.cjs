@@ -24,6 +24,8 @@ const mayhemMetricHelpers = [
 // R318 P1：斗魂/海斗卡片基础样式移入共享样式表，英雄页同样引用。
 const styles = fs.readFileSync(path.join(__dirname, "champions.css"), "utf8") + "\n" + fs.readFileSync(path.join(__dirname, "shared-cards.css"), "utf8");
 const liveStyles = fs.readFileSync(path.join(__dirname, "live-arena.css"), "utf8");
+const sharedStyles = fs.readFileSync(path.join(__dirname, "shared-cards.css"), "utf8");
+const detailStyles = fs.readFileSync(path.join(__dirname, "match-detail.css"), "utf8");
 const allStyles = styles + "\n" + liveStyles;
 
 test("R86 ADD-4 retired synergy panel selector stays absent without removing shared card styles", () => {
@@ -801,8 +803,8 @@ test("mayhem redesign keeps the two-column workspace, atlas, and R6 recommendati
   assert.match(styles, /\.tier-badge\.arena-option-grade/);
   assert.doesNotMatch(styles, /\.hex-rank\.is-1/);
   assert.doesNotMatch(styles, /\.arena-option-rank\s*\{/);
-	  assert.match(allStyles, /\.live-augment-columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
-	  assert.match(allStyles, /\.live-augment-column > div\s*\{[^}]*repeat\(4,minmax\(0,1fr\)\)[^}]*gap:\s*8px/s);
+	  assert.match(liveStyles, /\.live-augment-columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
+	  assert.match(liveStyles, /\.live-augment-column > div\s*\{[^}]*repeat\(4,minmax\(0,1fr\)\)[^}]*gap:\s*8px/s);
 	  assert.doesNotMatch(gameplayScript, /\["HexScore", row\.score/);
 	  assert.match(gameplayScript, /\["win", "胜率", row\.winRate, percent\]/);
 	  assert.doesNotMatch(functionSource(gameplayScript, "renderLiveAugmentRecommendations"), /\["pick", "选用率"/);
@@ -1152,8 +1154,8 @@ test("R8 arena augment icons preserve semantic first-place tone without fabricat
   assert.match(assetButton, /augment-icon/);
   assert.match(assetButton, /asset\?\.kind/);
   assert.match(functionSource(script, "renderArenaItemSection"), /arena-\$\{kind\}-section/);
-  assert.match(allStyles, /\.arena-prism-section \.arena-option-main/);
-  assert.match(allStyles, /\.arena-core-section \.arena-option-main/);
+  assert.match(sharedStyles, /\.arena-prism-section \.arena-option-main/);
+  assert.match(sharedStyles, /\.arena-core-section \.arena-option-main/);
   assert.match(styles, /\.arena-overview-metrics \.is-placement strong\s*\{[^}]*var\(--primary-strong\)/);
   assert.match(styles, /\.arena-overview-metrics \.is-first strong\s*\{[^}]*var\(--accent\)/);
   assert.doesNotMatch(styles, /\.arena-overview-metrics \.is-placement strong, \.arena-overview-metrics \.is-first strong/);
@@ -1517,20 +1519,20 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*minmax\(0,1fr\)/s);
 	assert.doesNotMatch(gameplayStyles, /\.match-main\.is-arena\s*\{[^}]*row-gap:\s*5px/);
 	assert.match(gameplayStyles, /\.match-players\.is-arena\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
-	assert.match(allStyles, /\.arena-detail-columns\s*\{[^}]*grid-template-columns:\s*minmax\(208px,234px\) var\(--arena-augment-width,104px\) minmax\(54px,1fr\) minmax\(54px,1fr\) minmax\(96px,1.5fr\)[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
-	assert.match(allStyles, /\.arena-detail-player\s*\{[^}]*grid-template-columns:\s*minmax\(208px,234px\) var\(--arena-augment-width,104px\) minmax\(54px,1fr\) minmax\(54px,1fr\) minmax\(96px,1.5fr\)[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
-	assert.match(allStyles, /\.arena-detail-augments\s*\{[^}]*display:\s*grid[^}]*grid-auto-flow:\s*column;[^}]*grid-auto-columns:\s*26px[^}]*justify-content:\s*center/s);
-	assert.match(allStyles, /\.arena-detail-damage\s*\{[^}]*display:\s*flex[^}]*justify-content:\s*center[^}]*white-space:\s*nowrap/s);
-	assert.match(allStyles, /\.arena-detail-columns > :first-child\s*\{[^}]*justify-self:\s*start[^}]*text-align:\s*left/s);
-	assert.match(allStyles, /\.arena-detail-player > \.participant-link\s*\{[^}]*min-width:\s*0[^}]*max-width:\s*100%/s);
-	assert.match(allStyles, /\.arena-detail-player > \.arena-detail-items\s*\{[^}]*grid-column:\s*1[^}]*grid-row:\s*2[^}]*justify-self:\s*start[^}]*max-width:\s*100%[^}]*overflow:\s*hidden/s);
-	assert.match(allStyles, /\.arena-detail-player \.match-score-cell, \.match-table \.match-score-cell\s*\{[^}]*width:\s*86px[^}]*grid-template-columns:\s*34px 48px[^}]*justify-content:\s*center[^}]*justify-items:\s*center/s);
+	assert.match(detailStyles, /\.arena-detail-columns\s*\{[^}]*grid-template-columns:\s*minmax\(208px,234px\) var\(--arena-augment-width,104px\) minmax\(54px,1fr\) minmax\(54px,1fr\) minmax\(96px,1.5fr\)[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
+	assert.match(detailStyles, /\.arena-detail-player\s*\{[^}]*grid-template-columns:\s*minmax\(208px,234px\) var\(--arena-augment-width,104px\) minmax\(54px,1fr\) minmax\(54px,1fr\) minmax\(96px,1.5fr\)[^}]*justify-items:\s*center[^}]*column-gap:\s*12px[^}]*text-align:\s*center/s);
+	assert.match(detailStyles, /\.arena-detail-augments\s*\{[^}]*display:\s*grid[^}]*grid-auto-flow:\s*column;[^}]*grid-auto-columns:\s*26px[^}]*justify-content:\s*center/s);
+	assert.match(detailStyles, /\.arena-detail-damage\s*\{[^}]*display:\s*flex[^}]*justify-content:\s*center[^}]*white-space:\s*nowrap/s);
+	assert.match(detailStyles, /\.arena-detail-columns > :first-child\s*\{[^}]*justify-self:\s*start[^}]*text-align:\s*left/s);
+	assert.match(detailStyles, /\.arena-detail-player > \.participant-link\s*\{[^}]*min-width:\s*0[^}]*max-width:\s*100%/s);
+	assert.match(detailStyles, /\.arena-detail-player > \.arena-detail-items\s*\{[^}]*grid-column:\s*1[^}]*grid-row:\s*2[^}]*justify-self:\s*start[^}]*max-width:\s*100%[^}]*overflow:\s*hidden/s);
+	assert.match(detailStyles, /\.arena-detail-player \.match-score-cell, \.match-table \.match-score-cell\s*\{[^}]*width:\s*86px[^}]*grid-template-columns:\s*34px 48px[^}]*justify-content:\s*center[^}]*justify-items:\s*center/s);
 	assert.match(gameplayStyles, /\.match-table th, \.match-table td\s*\{[^}]*text-align:\s*center[^}]*vertical-align:\s*middle/s);
 	assert.match(gameplayStyles, /\.match-table th:first-child, \.match-table td:first-child\s*\{[^}]*text-align:\s*left/s);
 	assert.match(gameplayStyles, /\.match-table \.participant-link\s*\{[^}]*width:\s*100%[^}]*min-width:\s*0[^}]*justify-content:\s*flex-start/s);
 	assert.match(gameplayStyles, /\.match-table \.table-items\s*\{[^}]*justify-content:\s*flex-start/s);
 	assert.match(gameplayStyles, /\.matches-column\s*\{[^}]*container:\s*matches-column \/ inline-size/);
-	assert.match(allStyles, /\.arena-detail-columns, \.arena-detail-team\s*\{[^}]*min-width:\s*640px/);
+	assert.match(detailStyles, /\.arena-detail-columns, \.arena-detail-team\s*\{[^}]*min-width:\s*640px/);
 	// Arena records now own the same matches-column container as player history.
 	assert.doesNotMatch(gameplayStyles, /@container arena-first \(max-width: 640px\)/);
 	assert.doesNotMatch(gameplayStyles, /\.arena-column-(?:augments|damage|items|score)[^}]*display:\s*none|\.arena-detail-(?:augments|damage|items)[^}]*display:\s*none/);
@@ -2723,6 +2725,7 @@ test("round 9 augment rendering uses upstream images, descriptions, and all rari
     plainText: (value) => String(value || ""),
     escapeHTML: (value) => String(value ?? ""),
     assetIcon: (path) => `<img data-path="${path}">`,
+    proxyAsset: (path) => path,
     iconFigure: (_kind, id) => `<span>fallback-${id}</span>`,
     pendingCatalogIcon: (name) => `<span>${name}</span>`,
   };
@@ -3691,7 +3694,7 @@ test("live build recommendations use a wide core column and only the available d
   assert.match(sharedBuildStyles, /\.build-item-row\[data-depth-count="1"\]/);
   assert.match(sharedBuildStyles, /\.build-item-row\s*>\s*\.item-depth-columns\s*\{[^}]*display:\s*contents/s);
   assert.match(sharedBuildStyles, /\.build-item-row\s*\{[^}]*--build-row-height:\s*64px/s);
-	assert.match(allStyles, /\.build-core-ranking-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
+	assert.match(detailStyles, /\.build-core-ranking-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
   const wideRanking = cssBlockAfter(gameplayStyles, "@container recommendation-area (min-width: 1081px)");
   // 核心装列比第四/五/六件宽；列与卡片两侧留空隙；胜率与场次紧凑排列。海斗行保持原来的固定宽度。
   assert.match(wideRanking, /\.build-core-ranking-row:not\(\.is-mayhem-build-row\) \.build-item-row\[data-depth-count="3"\]\s*\{[^}]*grid-template-columns:\s*minmax\(340px,1\.5fr\) repeat\(3,minmax\(0,1fr\)\)/s);
@@ -3708,7 +3711,7 @@ test("live build recommendations use a wide core column and only the available d
   assert.match(compact, /\.build-core-ranking-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
   const medium = cssBlockAfter(gameplayStyles, "@container recommendation-area (max-width: 900px)");
   assert.match(medium, /\.live-item-ranking \.mayhem-ranking-list\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
-  assert.doesNotMatch(allStyles, /\.item-build-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
+  assert.doesNotMatch(detailStyles, /\.item-build-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
   assert.doesNotMatch(gameplayStyles, /\.item-depth-grid\s*\{/);
 });
 
@@ -4828,8 +4831,8 @@ test("hextech augments retain tier ordering and the top three of each rarity", (
 	  assert.match(sparseCard, /class="tier-badge live-augment-grade"[^>]*yourgg-s\.svg/);
 	  assert.doesNotMatch(sparseCard, /<small>|—/);
 
-	  assert.match(allStyles, /\.live-augment-columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
-	  assert.match(allStyles, /\.live-augment-column > div\s*\{[^}]*repeat\(4,minmax\(0,1fr\)\)[^}]*gap:\s*8px[^}]*padding:\s*10px 11px 12px/s);
+	  assert.match(liveStyles, /\.live-augment-columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/s);
+	  assert.match(liveStyles, /\.live-augment-column > div\s*\{[^}]*repeat\(4,minmax\(0,1fr\)\)[^}]*gap:\s*8px[^}]*padding:\s*10px 11px 12px/s);
 	  assert.match(liveStyles, /\.live-augment-column \.live-augment-option\s*\{[^}]*border:\s*1px solid var\(--augment-accent\)[^}]*border-radius:\s*8px/s);
 	  const mediumAugments = cssBlockAfter(gameplayStyles, "@container recommendation-area (max-width: 900px)");
 	  assert.match(mediumAugments, /\.live-augment-column > div\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/s);
@@ -5073,8 +5076,8 @@ test("live rune style icons preserve their 4:5 artwork ratio", () => {
 });
 
 test("arena medium cards keep one-line identities and compact recommendation icons", () => {
-	assert.match(allStyles, /\.arena-option-main > strong\s*\{[^}]*font-size:\s*15px/s);
-	assert.match(allStyles, /\.arena-option-card \.recommend-icon\s*\{[^}]*width:\s*48px[^}]*height:\s*48px/s);
+	assert.match(sharedStyles, /\.arena-option-main > strong\s*\{[^}]*font-size:\s*15px/s);
+	assert.match(sharedStyles, /\.arena-option-card \.recommend-icon\s*\{[^}]*width:\s*48px[^}]*height:\s*48px/s);
 	assert.match(styles, /\.arena-section-icon\s*\{[^}]*font-size:\s*18px[^}]*line-height:\s*1/s);
 	const medium = cssBlockAfter(styles, "@container arena-pane (max-width: 820px)");
 	assert.match(medium, /\.arena-option-grid, \.arena-augment-section \.arena-option-grid\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/s);

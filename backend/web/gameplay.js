@@ -5225,12 +5225,21 @@
     state.augmentCatalogLoading = true;
     try {
       const result = await api("/api/gameplay/augments", {}, "augments", 5000);
-      if (state.destroyed || !Array.isArray(result?.augments) || !result.augments.length) return;
+      if (state.destroyed) return;
+      if (!Array.isArray(result?.augments) || !result.augments.length) throw new Error("empty augment catalog");
       state.augmentCatalog = new Map(result.augments.map((item) => [Number(item.id), item]));
       state.augmentCatalogLoaded = true;
-      scheduleCatalogViews();
+      state.augmentRetryCount = 0;
+      clearTimeout(state.augmentRetryTimer); state.augmentRetryTimer = 0;
+      const ids = [...new Set([...document.querySelectorAll("[data-augment-icon][data-augment-id]")].map((node) => node.dataset.augmentId))];
+      if (ids.length) for (const id of ids) refreshAugmentIconNodes(id);
+      else scheduleCatalogViews();
     } catch (_) {
-      // The full perk catalog remains the existing fallback for this index.
+      const delays = [3000, 10000, 30000, 300000];
+      const count = Number(state.augmentRetryCount || 0);
+      state.augmentRetryCount = count + 1;
+      clearTimeout(state.augmentRetryTimer);
+      state.augmentRetryTimer = setTimeout(() => { state.augmentRetryTimer = 0; void ensureAugments(); }, delays[Math.min(count, delays.length - 1)]);
     } finally {
       state.augmentCatalogLoading = false;
     }
@@ -7091,7 +7100,7 @@
     if (state.destroyed || (state.section && state.section !== "live")) return;
     // R318 P1：对局页样式（共享卡片 + 对局页按需样式）未就绪时先画骨架，绝不渲染无样式的一帧。
     if (!state.liveCardStylesReady && globalThis.deepLegendsSections?.loadStyle) {
-      state.liveCardStyleFlight ||= Promise.race([Promise.all(["shared-cards", "live-arena"].map((name) => globalThis.deepLegendsSections.loadStyle(name))), new Promise((resolve) => setTimeout(resolve, 60))]).then(() => { state.liveCardStylesReady = true; if (state.live) renderLive("live-card-styles"); });
+      state.liveCardStyleFlight ||= Promise.race([Promise.all(["shared-cards", "match-detail", "live-arena"].map((name) => globalThis.deepLegendsSections.loadStyle(name))), new Promise((resolve) => setTimeout(resolve, 60))]).then(() => { state.liveCardStylesReady = true; if (state.live) renderLive("live-card-styles"); });
       nodes.liveContent.innerHTML = `<div class="panel-loading" role="status" aria-live="polite"><div class="panel-loading-content"><span class="panel-spinner" aria-hidden="true"></span><strong>${state.liveCardStylesFailed ? "对局页样式加载失败" : "正在准备对局页"}</strong></div></div>${state.liveCardStylesFailed ? '<button class="text-button" type="button" data-live-card-style-retry>重试</button>' : ""}</div>`;
       return;
     }
@@ -9148,9 +9157,9 @@
     const style = (state.perks?.styles || []).find((candidate) => Number(candidate.id) === Number(styleID));
     return style?.iconPath ? assetIcon(style.iconPath, `副系 · ${style.name}`, size) : "";
   }
-  function augmentMetadata(id){const n=+id,p=(state.perks?.augments||[]).find(x=>+x.id===n)||null,c=state.augmentCatalog?.get(n)||null;if(!p&&!c){if(typeof ensureAugmentResolved==="function")ensureAugmentResolved(n);return null}return{...(c||{}),...(p||{}),name:p?.name||c?.name||"",description:p?.description||c?.description||"",rarity:c?.rarity||p?.rarity||"unknown",iconCandidates:c?.iconCandidates?.length?c.iconCandidates:null,iconPath:p?.iconPath||c?.iconPath||"",fallbackIconPath:p?.fallbackIconPath||c?.fallbackIconPath||"",unknown:c?.unknown===true}}
-  function augmentIconFigure(id,size=""){const a=augmentMetadata(id),desc=state.augmentDescriptions?.get(+id),d={...(a||{id,name:"",rarity:"unknown"}),...(desc?.status==="ok"?{description:desc.description}:{})},label=a?.name||d.name||"",list=(a?.iconCandidates||[]).filter(x=>x?.url).map(x=>({url:x.url,source:x.source||""})),cls=`game-icon${size?` is-${size}`:""}`;if(!a||a.unknown||!list.length)return wrapAugmentIcon(`<span class="${cls} has-image-error" data-augment-icon data-augment-id="${+id}" aria-hidden="true"><span class="game-icon-fallback augment-placeholder" aria-hidden="true"></span></span>`,d,id);return wrapAugmentIcon(`<span class="${cls}" data-augment-icon data-augment-id="${+id}" data-augment-candidates="${escapeHTML(JSON.stringify(list))}" data-augment-candidate="0" data-augment-started-at="${Date.now()}"><span class="game-icon-fallback augment-placeholder" aria-hidden="true"></span><img data-queued-src="${escapeHTML(list[0].url)}" alt="${escapeHTML(label||"海克斯")}" loading="lazy" decoding="async" data-game-image></span>`,d,id)}
-  function ensureAugmentResolved(id){if(!+id||!state.augmentCatalogLoaded||state.augmentCatalog?.has(+id))return;const tried=state.augmentResolveTried||=new Map(),at=tried.get(+id);if(at&&Date.now()-at<18e5)return;tried.set(+id,Date.now());(state.augmentResolveQueue||=new Set()).add(+id);clearTimeout(state.augmentResolveTimer);state.augmentResolveTimer=setTimeout(flushAugmentResolves,60)}
+  function augmentMetadata(id){const n=+id,p=(state.perks?.augments||[]).find(x=>+x.id===n)||null,c=state.augmentCatalog?.get(n)||null;if((!c||c.unknown)&&typeof ensureAugmentResolved==="function")ensureAugmentResolved(n);if(!p&&!c)return null;return{...(c||{}),...(p||{}),name:p?.name||c?.name||"",description:p?.description||c?.description||"",rarity:c?.rarity||p?.rarity||"unknown",iconCandidates:c?.iconCandidates?.length?c.iconCandidates:null,iconPath:p?.iconPath||c?.iconPath||"",fallbackIconPath:p?.fallbackIconPath||c?.fallbackIconPath||"",unknown:c?.unknown===true}}
+  function augmentIconFigure(id,size=""){const a=augmentMetadata(id),desc=state.augmentDescriptions?.get(+id),d={...(a||{id,name:"",rarity:"unknown"}),...(desc?.status==="ok"?{description:desc.description}:{})},label=a?.name||d.name||"",list=(a?.iconCandidates||[]).filter(x=>x?.url).map(x=>({url:x.url,source:x.source||""}));for(const path of [a?.iconPath,a?.fallbackIconPath]){if(!path)continue;const url=proxyAsset(path);if(!list.some(x=>x.url===url))list.push({url,source:"perks"})}const cls=`game-icon${size?` is-${size}`:""}`;if(!a||!list.length)return wrapAugmentIcon(`<span class="${cls} has-image-error" data-augment-icon data-augment-id="${+id}" aria-hidden="true"><span class="game-icon-fallback augment-placeholder" aria-hidden="true"></span></span>`,d,id);return wrapAugmentIcon(`<span class="${cls}" data-augment-icon data-augment-id="${+id}" data-augment-candidates="${escapeHTML(JSON.stringify(list))}" data-augment-candidate="0" data-augment-started-at="${Date.now()}"><span class="game-icon-fallback augment-placeholder" aria-hidden="true"></span><img data-queued-src="${escapeHTML(list[0].url)}" alt="${escapeHTML(label||"海克斯")}" loading="lazy" decoding="async" data-game-image></span>`,d,id)}
+  function ensureAugmentResolved(id){if(!+id||!state.augmentCatalogLoaded)return;const known=state.augmentCatalog?.get(+id);if(known&&!known.unknown)return;const tried=state.augmentResolveTried||=new Map(),at=tried.get(+id);if(at&&Date.now()-at<18e5)return;tried.set(+id,Date.now());(state.augmentResolveQueue||=new Set()).add(+id);clearTimeout(state.augmentResolveTimer);state.augmentResolveTimer=setTimeout(flushAugmentResolves,60)}
   async function flushAugmentResolves(){const ids=[...state.augmentResolveQueue||[]].slice(0,64);state.augmentResolveQueue?.clear();if(!ids.length)return;try{const r=await api(`/api/gameplay/augments?ids=${ids.join(",")}`,{},"augment-resolve",8000);for(const row of r?.augments||[]){const id=+row.id;if(!id)continue;if(row.unknown)(state.augmentUnknown||=new Map()).set(id,Date.now());else{(state.augmentCatalog||=new Map()).set(id,row);state.augmentUnknown?.delete(id)}refreshAugmentIconNodes(id)}}catch(_){}}
   function refreshAugmentIconNodes(id){for(const node of document.querySelectorAll(`[data-augment-icon][data-augment-id="${+id}"]`)){const size=node.classList.contains("is-large")?"large":node.classList.contains("is-small")?"small":"",t=document.createElement("template");t.innerHTML=augmentIconFigure(id,size);const fresh=t.content.querySelector("[data-augment-icon]");if(fresh)node.replaceWith(fresh)}}
   function reportAugmentIconResolve(id,source,errorKind,elapsed){const log=state.augmentIconResolveLog||=new Map(),at=log.get(+id);if(at&&Date.now()-at<6e5)return;log.set(+id,Date.now());if(log.size>128)log.delete(log.keys().next().value);window.reportFlowDiagnostic?.("augment_icon_resolve","failed",{augmentId:+id,source:String(source||""),errorKind:String(errorKind||"image_error"),elapsedMs:Math.max(0,Math.round(+elapsed||0))})}

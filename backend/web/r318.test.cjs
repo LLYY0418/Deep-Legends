@@ -9,7 +9,7 @@ const read = (name) => fs.readFileSync(path.join(__dirname, name), 'utf8');
 test('R318 P1 shared card styles are loaded before first live recommendation render', () => {
   const loader = read('section-loader.js');
   assert.match(loader, /champions: \["patch-notes", "shared-cards", "champions"\]/);
-  assert.match(loader, /"live-arena": \["shared-cards", "live-arena"\]/);
+  assert.match(loader, /"live-arena": \["shared-cards", "match-detail", "live-arena"\]/);
   const shared = read('shared-cards.css');
   for (const selector of ['.arena-option-card', '.arena-option-main', '.arena-option-icons', '.mayhem-ranking-list', '.position-icon']) {
     assert.ok(shared.includes(selector), `${selector} missing from shared-cards.css`);
@@ -42,7 +42,7 @@ test('R318 P2 arena without skills puts three boots on one row', () => {
   const gameplay = read('gameplay.js');
   assert.match(gameplay, /const hasSkillPlan = Boolean\(build\.skillPriority\?\.length \|\| build\.skillOrder\?\.length\)/);
   assert.match(gameplay, /"is-arena-no-skill"/);
-  const css = read('gameplay.css') + "\n" + read('live-arena.css');
+  const css = read('live-arena.css');
   assert.match(css, /\.build-summary-bar\.is-arena-no-skill > \.build-summary-boots \.config-option-list \{ grid-template-columns: repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(css, /@container build-recommendation \(max-width: 560px\)[\s\S]{0,160}grid-template-columns: minmax\(0,1fr\)/);
 });
@@ -62,7 +62,7 @@ test('R318 P3 rank label is muted, rank text keeps the theme color, and fame is 
   assert.match(self, /97,312/);
   const noData = api.identityLine({ ...base, isCurrent: true }, 'arena', '');
   assert.doesNotMatch(noData, /live-arena-fame/);
-  const css = read('gameplay.css') + "\n" + read('live-arena.css');
+  const css = read('live-arena.css');
   assert.match(css, /\.live-rank-label\{color:var\(--muted\)/);
   assert.match(css, /\.live-arena-fame b\{color:var\(--primary-strong\)/);
 });
@@ -72,11 +72,12 @@ test('R318 P4 arena detail header is one cell and columns cannot overlap', () =>
   assert.match(details, /class="arena-column-player">玩家 \/ 装备</);
   assert.doesNotMatch(details, /class="arena-column-items">装备</);
   assert.match(details, /slice\(0, 7\)/);
-  const css = read('gameplay.css') + "\n" + read('live-arena.css');
+  const css = read('match-detail.css');
   assert.match(css, /\.arena-detail-columns \{ display: grid; grid-template-columns: minmax\(208px,234px\) var\(--arena-augment-width,104px\) minmax\(54px,1fr\) minmax\(54px,1fr\) minmax\(96px,1\.5fr\)/);
   assert.match(css, /\.arena-detail-augments \{[^}]*grid-auto-columns:26px/);
+  const widthVars = read('gameplay.css');
   for (const [count, width] of [[1, 26], [2, 55], [3, 84], [4, 113], [5, 142], [6, 171]]) {
-    assert.match(css, new RegExp(`data-augment-count="${count}"\\] \\{ --arena-augment-width:${width}px`));
+    assert.match(widthVars, new RegExp(`data-augment-count="${count}"\\] \\{ --arena-augment-width:${width}px`));
   }
 });
 
@@ -144,7 +145,7 @@ test('R318 P8 augment icons use an ordered candidate chain and a text-free place
   assert.match(gameplay, /augment-placeholder/);
   assert.match(gameplay, /flushAugmentResolves/);
   assert.match(gameplay, /\/api\/gameplay\/augments\?ids=/);
-  const css = read('gameplay.css') + "\n" + read('live-arena.css');
+  const css = read('gameplay.css');
   assert.match(css, /game-icon-fallback\.augment-placeholder/);
   const backend = read('../augment_unified.go');
   for (const source of ['lcu', 'communitydragon', 'opgg', 'bundled']) assert.match(backend, new RegExp(`"${source}"`));

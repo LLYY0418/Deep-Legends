@@ -14,7 +14,7 @@ test('initial production assets remain below original 420KiB gzip level-one budg
 });
 async function fixture(){
  const {bootDemoApp}=require('../../desktop/overview-render-helpers.cjs'),{waitForOverview}=require('../../desktop/renderer-wait.cjs');
- const setup=`(()=>{const append=document.head.append.bind(document.head);window.__r277DeferredRequests=[];document.head.append=(node)=>{if(node.tagName==='SCRIPT'&&node.getAttribute('src')==='/match-details.js'){__r277DeferredRequests.push(node);return append(node);}return append(node);};})();\n`;
+ const setup=`(()=>{const append=document.head.append.bind(document.head);window.__r277DeferredRequests=[];document.head.append=(node)=>{if(node.tagName==='LINK'&&node.getAttribute('href')==='/match-detail.css'){append(node);queueMicrotask(()=>node.onload&&node.onload());return;}if(node.tagName==='SCRIPT'&&node.getAttribute('src')==='/match-details.js'){__r277DeferredRequests.push(node);return append(node);}return append(node);};})();\n`;
  const f=bootDemoApp({deferredMatchDetails:true,gameplaySourceTransform:()=>setup+read('section-loader.js')+'\n'+read('gameplay.js')});await waitForOverview(f.window,17);
  const w=f.window,d=w.document;
  const flush=async()=>{await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r));};

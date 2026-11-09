@@ -194,3 +194,37 @@ try {
     }
     Write-Output 'R317 all candidate chains share bounds validation; scale migration and unrelated assertions retained PASS'
 } finally { Remove-Item $root -Recurse -Force }
+
+# R319：安装器会在 clamp 后追加 no-op window_scale_fit；解释逻辑必须选最后一条
+# 真正 clamped 且 before_bounds 等于安装前快照的事件，不能整体豁免 bounds 文件。
+$r319Root = Join-Path ([IO.Path]::GetTempPath()) ('r319-bounds-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory $r319Root | Out-Null
+$r206Source = Get-Content (Join-Path $PSScriptRoot 'r206-real-upgrade-windows.ps1') -Raw
+$r317Start = $r206Source.IndexOf('function Test-R317Rectangle')
+$r317End = $r206Source.IndexOf('function Run-Setup')
+if ($r317Start -lt 0 -or $r317End -le $r317Start) { throw 'R319_WINDOW_BOUNDS: explanation helpers missing' }
+. ([ScriptBlock]::Create($r206Source.Substring($r317Start, $r317End - $r317Start)))
+function Invoke-R319BoundsCase([object[]]$Events, [string]$BeforeBounds, [string]$CurrentBounds) {
+    $dir = Join-Path $r319Root ('r319-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory $dir | Out-Null
+    $file = Join-Path $dir 'window-bounds.json'
+    [IO.File]::WriteAllText($file, $CurrentBounds)
+    $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+    $snapshot = [pscustomobject]@{read_error=$null;sha256=$hash;text=$CurrentBounds;events=$Events}
+    return Assert-R317PersistentFile $file 'BEFORE' $BeforeBounds $snapshot
+}
+$before = '{"width":1024,"height":680,"x":0,"y":20,"maximized":false}'
+$current = '{"width":1024,"height":720,"x":0,"y":0,"maximized":false}'
+$clamped = @{at='2026-11-08T15:58:12.806Z';value=@{event='window_scale_fit';from_scale=1;to_scale=1.25;before_bounds=@{x=0;y=20;width=1024;height=680};after_bounds=@{x=0;y=0;width=1024;height=720};work_area=@{x=0;y=0;width=1024;height=720};clamped=$true}}
+$noop = @{at='2026-11-08T15:58:12.838Z';value=@{event='window_scale_fit';from_scale=1.25;to_scale=1.25;before_bounds=@{x=0;y=0;width=1024;height=720};after_bounds=@{x=0;y=0;width=1024;height=720};work_area=@{x=0;y=0;width=1024;height=720};clamped=$false}}
+$record = Invoke-R319BoundsCase @($noop,$clamped,$noop) $before $current
+if ($record.explained_by -ne 'window_scale_fit_clamp' -or $record.matched_event.from_scale -ne 1 -or $record.matched_event.to_scale -ne 1.25) { throw 'R319_ASSERT_CLAMP: clamped event was not selected' }
+$rejected = $false
+try { $null = Invoke-R319BoundsCase @($noop) $before $current } catch { if ($_.Exception.Message -notmatch 'persistent fixture changed') { throw }; $rejected = $true }
+if (-not $rejected) { throw 'R319_ASSERT_NOOP: no-op event accepted as explanation' }
+$wrongBefore = @{at='x';value=@{event='window_scale_fit';from_scale=1;to_scale=1.25;before_bounds=@{x=0;y=0;width=1024;height=680};after_bounds=@{x=0;y=0;width=1024;height=720};work_area=@{x=0;y=0;width=1024;height=720};clamped=$true}}
+$rejected = $false
+try { $null = Invoke-R319BoundsCase @($wrongBefore) $before $current } catch { if ($_.Exception.Message -notmatch 'persistent fixture changed') { throw }; $rejected = $true }
+if (-not $rejected) { throw 'R319_ASSERT_BEFORE: mismatched before_bounds accepted' }
+Remove-Item $r319Root -Recurse -Force
+Write-Output 'R319 clamped/after-noop explanation selection and mismatched-before rejection PASS'

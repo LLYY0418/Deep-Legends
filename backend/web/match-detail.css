@@ -1,0 +1,50 @@
+/* R319：总览展开战绩的详情布局。match-details 模块加载后、插入 HTML 前由
+   section-loader 加载本表；对局页的推荐/装备分区也引用同一份规则。 */
+.arena-detail-player > .participant-link { grid-column: 1; grid-row: 1; min-width: 0; max-width: 100%; }
+.arena-detail-player .participant-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arena-detail-columns { display: grid; grid-template-columns: minmax(208px,234px) var(--arena-augment-width,104px) minmax(54px,1fr) minmax(54px,1fr) minmax(96px,1.5fr); align-items: center; justify-items: center; column-gap: 12px; padding: 7px 10px; color: var(--faint); background: color-mix(in oklab,var(--surface-strong) 44%,transparent); border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; font-size: 10.5px; text-align: center; }
+.arena-detail-team { overflow: hidden; background: color-mix(in oklab,var(--bg) 58%,transparent); border: 1px solid var(--line); border-radius: 8px; }
+.arena-detail-columns + .arena-detail-team { border-radius: 0; }
+.arena-detail-team + .arena-detail-team { margin-top: -1px; border-radius: 0; }
+.arena-detail-team:last-child { border-radius: 0 0 8px 8px; }
+.arena-detail-team.is-first { border-color: color-mix(in oklab,var(--primary) 50%,var(--line)); }
+.arena-detail-team > header { display: grid; min-height: 40px; grid-template-columns: 30px 26px minmax(90px,1fr) auto; align-items: center; gap: 7px; padding: 5px 10px; background: color-mix(in oklab,var(--surface-strong) 60%,transparent); border-bottom: 1px solid var(--line); }
+.arena-detail-team > header > b { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.arena-detail-team.is-first > header > b { color: var(--primary-strong); }
+.arena-detail-team > header > strong { font-size: 12px; }
+.arena-detail-team > header > span:last-child { color: var(--muted); font-size: 10px; }
+.arena-detail-player-list { display: grid; }
+.arena-detail-player { display: grid; min-height: 52px; grid-template-columns: minmax(208px,234px) var(--arena-augment-width,104px) minmax(54px,1fr) minmax(54px,1fr) minmax(96px,1.5fr); grid-template-rows: minmax(0,auto) minmax(0,auto); align-items: center; justify-items: center; column-gap: 12px; padding: 6px 10px; border-top: 1px solid var(--line); text-align: center; }
+.arena-detail-player > .arena-detail-augments { grid-column: 2; grid-row: 1; }
+.arena-detail-player > .match-score-cell { grid-column: 3; grid-row: 1; }
+.arena-detail-player > .arena-detail-kda { grid-column: 4; grid-row: 1; }
+.arena-detail-player > .arena-detail-damage { grid-column: 5; grid-row: 1; }
+.arena-detail-player > .arena-detail-items { grid-column: 1; grid-row: 2; justify-self: start; align-self: start; max-width: 100%; overflow: hidden; }
+.arena-detail-player:first-child { border-top: 0; }
+.arena-detail-columns > :first-child { justify-self: start; text-align: left; }
+.arena-detail-player > .participant-link { width: auto; justify-self: start; justify-content: flex-start; }
+.arena-detail-kda { display: grid; justify-items: center; font-variant-numeric: tabular-nums; }
+.arena-detail-damage { display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.arena-detail-damage i { color: var(--muted); font-style: normal; }
+.arena-detail-kda b, .arena-detail-damage b { font-size: 10.5px; }
+.arena-detail-kda small { color: var(--muted); font-size: 9px; }
+.arena-detail-augments { display: grid; min-width: 0; grid-auto-flow:column; grid-auto-columns:26px; justify-content: center; gap: 3px; }
+.arena-detail-augments .arena-augment-icon { width: 26px; height: 26px; }
+.arena-detail-augments .arena-augment-icon > .game-icon.is-small { width: 24px; height: 24px; flex-basis: 24px; }
+.arena-detail-items { display: flex; min-width: 0; justify-self: stretch; justify-content: flex-start; flex-wrap: nowrap; gap: 3px; }
+.arena-detail-player .match-score-cell, .match-table .match-score-cell { width: 86px; grid-template-columns: 34px 48px; justify-content: center; justify-items: center; gap: 4px; }
+.arena-detail-player .match-score-value, .arena-detail-player .match-score-badge, .match-table .match-score-value, .match-table .match-score-badge { justify-items: center; }
+.arena-detail-player .match-score-badge:empty, .match-table .match-score-badge:empty { display: none; }
+.build-core-ranking-row { display: grid; min-width: 0; grid-template-columns: minmax(0,1fr); align-items: start; border-bottom: 1px solid var(--line); }
+.build-core-ranking-row > .item-build-layout { border-bottom: 0; }
+.build-core-ranking-row > .live-item-ranking { margin-top: 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+.item-build-layout { display: block; min-width: 0; overflow: visible; border-bottom: 1px solid var(--line); }
+.item-depth-columns > section h4 { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.item-core-column { min-width: 0; padding: 12px 14px; }
+.late-option-band { padding: 12px 15px 14px; border-top: 1px solid var(--line); }
+.late-option-band .config-option-list { grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); }
+@container matches-column (max-width:720px) {
+ .arena-detail-columns, .arena-detail-player { grid-template-columns:minmax(176px,1fr) var(--arena-augment-width,104px) minmax(48px,.7fr) minmax(48px,.7fr) minmax(88px,1.1fr); column-gap:8px; }
+ .arena-detail-columns, .arena-detail-team { min-width:640px; }
+ .arena-match-detail { overflow-x:auto; overscroll-behavior-x:contain; }
+}

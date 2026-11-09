@@ -116,8 +116,11 @@ function Assert-R317PersistentFile([string]$File, [string]$BeforeHash, [string]$
     try {
         $before = $BeforeBounds | ConvertFrom-Json -ErrorAction Stop
         $current = $Snapshot.text | ConvertFrom-Json -ErrorAction Stop
-        $last = @($Snapshot.events) | Select-Object -Last 1
-        $event = $last.value
+        # 安装器会在 clamp 之后再写一条 no-op window_scale_fit（clamped=false）。
+        # 只接受「最后一条真正 clamped 且 before_bounds = 安装前快照」的事件，
+        # 仍要求 after_bounds = 当前文件、落在工作区内，不整体豁免文件。
+        $event = @($Snapshot.events) | Where-Object { $_.value.clamped -eq $true -and (Test-R317SameBounds $_.value.before_bounds $before) } | Select-Object -Last 1 | ForEach-Object { $_.value }
+        if ($null -eq $event) { throw 'No clamped scale-fit event explains the new bounds' }
         $area = $event.work_area; $bounds = $event.after_bounds
         foreach ($scale in @($event.from_scale,$event.to_scale)) {
             if (($scale -isnot [int] -and $scale -isnot [long] -and $scale -isnot [double] -and $scale -isnot [decimal]) -or $scale -le 0 -or [double]::IsNaN([double]$scale) -or [double]::IsInfinity([double]$scale)) { throw 'Invalid fit scale' }
