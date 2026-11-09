@@ -218,7 +218,10 @@ $current = '{"width":1024,"height":720,"x":0,"y":0,"maximized":false}'
 $clamped = @{at='2026-11-08T15:58:12.806Z';value=@{event='window_scale_fit';from_scale=1;to_scale=1.25;before_bounds=@{x=0;y=20;width=1024;height=680};after_bounds=@{x=0;y=0;width=1024;height=720};work_area=@{x=0;y=0;width=1024;height=720};clamped=$true}}
 $noop = @{at='2026-11-08T15:58:12.838Z';value=@{event='window_scale_fit';from_scale=1.25;to_scale=1.25;before_bounds=@{x=0;y=0;width=1024;height=720};after_bounds=@{x=0;y=0;width=1024;height=720};work_area=@{x=0;y=0;width=1024;height=720};clamped=$false}}
 $record = Invoke-R319BoundsCase @($noop,$clamped,$noop) $before $current
-if ($record.explained_by -ne 'window_scale_fit_clamp' -or $record.matched_event.from_scale -ne 1 -or $record.matched_event.to_scale -ne 1.25) { throw 'R319_ASSERT_CLAMP: clamped event was not selected' }
+if ($record.explained_by -ne 'window_scale_fit_clamp' -or $record.matched_event.from_scale -ne 1 -or $record.matched_event.to_scale -ne 1.25 -or $record.trailing_noops -ne 1) { throw 'R319_ASSERT_CLAMP: clamped event/trailing noops not selected' }
+$leading = @{at='2026-11-08T15:58:12.700Z';value=@{event='window_scale_fit';from_scale=1;to_scale=1;before_bounds=@{x=0;y=20;width=1024;height=680};after_bounds=@{x=0;y=20;width=1024;height=680};work_area=@{x=0;y=0;width=1024;height=720};clamped=$false}}
+$record = Invoke-R319BoundsCase @($leading,$clamped,$noop) $before $current
+if ($record.trailing_noops -ne 1 -or $record.matched_event.from_scale -ne 1) { throw 'R319_ASSERT_LEADING: leading no-op changed the explanation' }
 $rejected = $false
 try { $null = Invoke-R319BoundsCase @($noop) $before $current } catch { if ($_.Exception.Message -notmatch 'persistent fixture changed') { throw }; $rejected = $true }
 if (-not $rejected) { throw 'R319_ASSERT_NOOP: no-op event accepted as explanation' }
@@ -226,5 +229,31 @@ $wrongBefore = @{at='x';value=@{event='window_scale_fit';from_scale=1;to_scale=1
 $rejected = $false
 try { $null = Invoke-R319BoundsCase @($wrongBefore) $before $current } catch { if ($_.Exception.Message -notmatch 'persistent fixture changed') { throw }; $rejected = $true }
 if (-not $rejected) { throw 'R319_ASSERT_BEFORE: mismatched before_bounds accepted' }
+function Assert-R319Rejected($Events) {
+    $failed = $false
+    try { $null = Invoke-R319BoundsCase $Events $before $current } catch { if ($_.Exception.Message -notmatch 'persistent fixture changed') { throw }; $failed = $true }
+    if (-not $failed) { throw 'R319 invalid trailing/no-op case accepted' }
+}
+$latest = @{at='2026-11-08T15:58:12.900Z';value=@{event='window_scale_fit';from_scale=1;to_scale=1.25;before_bounds=@{x=0;y=20;width=1024;height=680};after_bounds=@{x=0;y=0;width=1024;height=720};work_area=@{x=0;y=0;width=1024;height=720};clamped=$false}}
+$badNoops = @(
+    @{at='a';value=@{event='window_scale_fit';from_scale=1.25;to_scale=1.25;before_bounds=@{x=0;y=0;width=1024;height=720};after_bounds=@{x=0;y=0;width=1024;height=721};work_area=@{x=0;y=0;width=1024;height=720};clamped=$false}},
+    @{at='b';value=@{event='window_scale_fit';from_scale=1.25;to_scale=1.3;before_bounds=@{x=0;y=0;width=1024;height=720};after_bounds=@{x=0;y=0;width=1024;height=720};work_area=@{x=0;y=0;width=1024;height=720};clamped=$false}},
+    @{at='c';value=@{event='window_scale_fit';from_scale=1.25;to_scale=1.25;before_bounds=@{x=0;y=0;width=800;height=720};after_bounds=@{x=0;y=0;width=800;height=720};work_area=@{x=0;y=0;width=1024;height=720};clamped=$false}},
+    @{at='d';value=@{event='window_scale_fit';from_scale=1.25;to_scale=1.25;before_bounds=@{x=0;y=0;width=1024;height=720};after_bounds=@{x=0;y=0;width=1024;height=720};work_area=@{x=0;y=0;width=1024;height=720};clamped='false'}},
+    @{at='e';value=@{event='window_scale_fit';from_scale=1.25;to_scale=1.25;before_bounds=@{x=0;y=0;width=1024;height=720};after_bounds=@{x=0;y=0;width=1024;height=720};work_area=@{x=0;y=0;width=1024;height=720}}}
+)
+foreach ($bad in $badNoops) { Assert-R319Rejected @($clamped,$bad) }
+Assert-R319Rejected @($clamped,$noop,$latest)
+Assert-R319Rejected @($noop)
+Assert-R319Rejected @($wrongBefore,$noop)
+Write-Output 'R319 trailing no-op matrix (valid no-op, leading no-op, malformed/mismatch/latest/no-clamp) PASS'
+# 变异：只检查 clamped=false，latest-event 必须被误接受并使负例失败。
+function Test-R319TrueNoOp($Value, $Current) {
+    return ($null -ne $Value -and $Value.clamped -is [bool] -and $Value.clamped -eq $false)
+}
+$killed = $false
+try { Assert-R319Rejected @($clamped,$latest) } catch { if ($_.Exception.Message -notmatch 'R319 invalid trailing/no-op case accepted') { throw }; $killed = $true }
+if (-not $killed) { throw 'R319_ASSERT_MUTATION: clamped-only no-op condition survived' }
+Write-Output 'R319 clamped-only mutation rejected latest-event PASS'
 Remove-Item $r319Root -Recurse -Force
 Write-Output 'R319 clamped/after-noop explanation selection and mismatched-before rejection PASS'

@@ -102,6 +102,17 @@ function Test-R317SameBounds($Left, $Right) {
     foreach ($key in @('x','y','width','height')) { if ($Left.$key -ne $Right.$key) { return $false } }
     return $true
 }
+function Test-R319TrueNoOp($Value, $Current) {
+    if ($null -eq $Value) { return $false }
+    if ($Value.clamped -isnot [bool] -or $Value.clamped -ne $false) { return $false }
+    foreach ($scale in @($Value.from_scale,$Value.to_scale)) {
+        if (($scale -isnot [int] -and $scale -isnot [long] -and $scale -isnot [double] -and $scale -isnot [decimal]) -or $scale -le 0 -or [double]::IsNaN([double]$scale) -or [double]::IsInfinity([double]$scale)) { return $false }
+    }
+    if ([double]$Value.from_scale -ne [double]$Value.to_scale) { return $false }
+    if (-not (Test-R317SameBounds $Value.before_bounds $Value.after_bounds)) { return $false }
+    if (-not (Test-R317SameBounds $Value.after_bounds $Current)) { return $false }
+    return $true
+}
 function Assert-R317PersistentFile([string]$File, [string]$BeforeHash, [string]$BeforeBounds, $Snapshot) {
     $after = $null
     try { $after = (Get-FileHash -LiteralPath $File -Algorithm SHA256 -ErrorAction Stop).Hash } catch {}
@@ -116,11 +127,16 @@ function Assert-R317PersistentFile([string]$File, [string]$BeforeHash, [string]$
     try {
         $before = $BeforeBounds | ConvertFrom-Json -ErrorAction Stop
         $current = $Snapshot.text | ConvertFrom-Json -ErrorAction Stop
-        # 安装器会在 clamp 之后再写一条 no-op window_scale_fit（clamped=false）。
-        # 只接受「最后一条真正 clamped 且 before_bounds = 安装前快照」的事件，
-        # 仍要求 after_bounds = 当前文件、落在工作区内，不整体豁免文件。
-        $event = @($Snapshot.events) | Where-Object { $_.value.clamped -eq $true -and (Test-R317SameBounds $_.value.before_bounds $before) } | Select-Object -Last 1 | ForEach-Object { $_.value }
-        if ($null -eq $event) { throw 'No clamped scale-fit event explains the new bounds' }
+        # 从末尾向前跳过真正的空操作（clamped=false、比例相等、before=after=当前
+        # 文件 bounds）；遇到的第一条其它事件才作为解释事件，仍按 R317 原规则校验。
+        $events = @($Snapshot.events)
+        $index = $events.Count - 1
+        $trailingNoops = 0
+        while ($index -ge 0 -and (Test-R319TrueNoOp $events[$index].value $current)) {
+            $trailingNoops++; $index--
+        }
+        if ($index -lt 0) { throw 'No clamped scale-fit event explains the new bounds' }
+        $event = $events[$index].value
         $area = $event.work_area; $bounds = $event.after_bounds
         foreach ($scale in @($event.from_scale,$event.to_scale)) {
             if (($scale -isnot [int] -and $scale -isnot [long] -and $scale -isnot [double] -and $scale -isnot [decimal]) -or $scale -le 0 -or [double]::IsNaN([double]$scale) -or [double]::IsInfinity([double]$scale)) { throw 'Invalid fit scale' }
@@ -134,7 +150,8 @@ function Assert-R317PersistentFile([string]$File, [string]$BeforeHash, [string]$
             ($bounds.x+$bounds.width) -gt ($area.x+$area.width) -or
             ($bounds.y+$bounds.height) -gt ($area.y+$area.height)) { throw 'Unexplained bounds' }
         $record.explained_by = 'window_scale_fit_clamp'
-        $record.matched_event = @{at=$last.at;from_scale=$event.from_scale;to_scale=$event.to_scale;before_bounds=$event.before_bounds;after_bounds=$bounds;work_area=$area;clamped=$event.clamped}
+        $record.trailing_noops = $trailingNoops
+        $record.matched_event = @{at=$events[$index].at;from_scale=$event.from_scale;to_scale=$event.to_scale;before_bounds=$event.before_bounds;after_bounds=$bounds;work_area=$area;clamped=$event.clamped}
         return $record
     } catch { throw "R238 persistent fixture changed: $File" }
 }
