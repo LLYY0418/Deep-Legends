@@ -47,7 +47,7 @@ test('R191 10 shared IDs update active and cached tabs plus overlay and external
  for(const i of [1,11]){assert.equal(f.entries[i].querySelector('.match-detail'),before[i]);assert.match(f.entries[i].textContent,/真实正文/)}
  assert.equal(f.entries[2].querySelector('.match-detail'),before[2]);assert.equal(overlayCard,f.nodes.playerOverlayContent.firstElementChild);assert.equal(overlayDetail,overlayCard.querySelector('.match-detail'));assert.deepEqual(calls,[]);assert.match(external.textContent,/真实正文/);assert.deepEqual([...f.state.tabs.map(t=>t.matchViewRevision),overlay.matchViewRevision],[7,7,3]);
 });
-const css=read('gameplay.css');
+const css=read('match-detail.css');
 test('R191 14 effect icons and value gaps use corrected dimensions, wide tree is centered',()=>{
  assert.match(css,/\.eff \.game-icon\s*\{[^}]*width:\s*28px;\s*height:\s*28px/);
  assert.match(css,/\.eff\.is-keystone \.game-icon\s*\{[^}]*width:\s*44px;\s*height:\s*44px/);
@@ -58,6 +58,6 @@ test('R191 15–16 R195 removes effect shards while preserving the shared tree i
  const {extract}=require('./r188-harness.cjs');
  const f=fixture(source);const d=new JSDOM(f.renderRuneEffects(f.subject)).window.document;
  assert.equal(d.querySelectorAll('.shards-line,.shard-chip').length,0);
- assert.doesNotMatch(css,/shards-line|shard-chip/);
+ assert.doesNotMatch([read('gameplay.css'),css].join("\n"),/shards-line|shard-chip/);
  assert.match(extract(source,'renderRuneOption'),/dataDragonRuneShardPath\(id\)/);
 });

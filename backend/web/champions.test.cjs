@@ -1527,10 +1527,10 @@ test("match history keeps arena summaries compact and arena details purpose-buil
 	assert.match(detailStyles, /\.arena-detail-player > \.participant-link\s*\{[^}]*min-width:\s*0[^}]*max-width:\s*100%/s);
 	assert.match(detailStyles, /\.arena-detail-player > \.arena-detail-items\s*\{[^}]*grid-column:\s*1[^}]*grid-row:\s*2[^}]*justify-self:\s*start[^}]*max-width:\s*100%[^}]*overflow:\s*hidden/s);
 	assert.match(detailStyles, /\.arena-detail-player \.match-score-cell, \.match-table \.match-score-cell\s*\{[^}]*width:\s*86px[^}]*grid-template-columns:\s*34px 48px[^}]*justify-content:\s*center[^}]*justify-items:\s*center/s);
-	assert.match(gameplayStyles, /\.match-table th, \.match-table td\s*\{[^}]*text-align:\s*center[^}]*vertical-align:\s*middle/s);
-	assert.match(gameplayStyles, /\.match-table th:first-child, \.match-table td:first-child\s*\{[^}]*text-align:\s*left/s);
-	assert.match(gameplayStyles, /\.match-table \.participant-link\s*\{[^}]*width:\s*100%[^}]*min-width:\s*0[^}]*justify-content:\s*flex-start/s);
-	assert.match(gameplayStyles, /\.match-table \.table-items\s*\{[^}]*justify-content:\s*flex-start/s);
+	assert.match(detailStyles, /\.match-table th, \.match-table td\s*\{[^}]*text-align:\s*center[^}]*vertical-align:\s*middle/s);
+	assert.match(detailStyles, /\.match-table th:first-child, \.match-table td:first-child\s*\{[^}]*text-align:\s*left/s);
+	assert.match(detailStyles, /\.match-table \.participant-link\s*\{[^}]*width:\s*100%[^}]*min-width:\s*0[^}]*justify-content:\s*flex-start/s);
+	assert.match(detailStyles, /\.match-table \.table-items\s*\{[^}]*justify-content:\s*flex-start/s);
 	assert.match(gameplayStyles, /\.matches-column\s*\{[^}]*container:\s*matches-column \/ inline-size/);
 	assert.match(detailStyles, /\.arena-detail-columns, \.arena-detail-team\s*\{[^}]*min-width:\s*640px/);
 	// Arena records now own the same matches-column container as player history.
@@ -2295,7 +2295,7 @@ test("damage analysis sorts by a real metric and shows full colored values", () 
 	assert.match(gameplayScript, /data-blue-share="\$\{share\}"/);
 	assert.match(gameplayScript, /function applyRenderedMetricStyles\(container\)/);
 	assert.doesNotMatch(gameplayScript, /<i style="width:/);
-	assert.match(gameplayStyles, /\.damage-bar\s*\{[^}]*background:\s*color-mix/s);
+	assert.match(detailStyles, /\.damage-bar\s*\{[^}]*background:\s*color-mix/s);
 	  assert.match(gameplayStyles, /\.match-damage-value\s*\{[^}]*var\(--danger\)/);
   assert.match(gameplayStyles, /\.match-stat-damage\s*>\s*b,\s*\.match-stat-taken > b\s*\{[^}]*display:\s*inline-flex/);
   assert.match(gameplayStyles, /\.match-stat\s*\{[^}]*minmax\(0,1fr\)/s);
@@ -2318,9 +2318,9 @@ test("team analysis compares both sides across every requested metric", () => {
 	assert.match(gameplayScript, /class="team-duel-row"/);
 	assert.match(gameplayScript, /class="team-duel-player is-\$\{tone\}"/);
 	assert.match(gameplayScript, /tab\.teamAnalysisMetrics\.set\(gameID, metric\)/);
-	assert.match(gameplayStyles, /\.team-analysis-metrics\s*\{[^}]*overflow-x:\s*auto/s);
-	assert.match(gameplayStyles, /\.team-analysis-metrics button\[aria-selected="true"\]\s*\{[^}]*var\(--primary-strong\)[^}]*var\(--primary-soft\)[^}]*var\(--primary\)/s);
-	assert.match(gameplayStyles, /\.team-duel-row\s*\{[^}]*grid-template-columns:\s*26px minmax\(44px,64px\) minmax\(120px,1fr\) minmax\(44px,64px\) 26px/s);
+	assert.match(detailStyles, /\.team-analysis-metrics\s*\{[^}]*overflow-x:\s*auto/s);
+	assert.match(detailStyles, /\.team-analysis-metrics button\[aria-selected="true"\]\s*\{[^}]*var\(--primary-strong\)[^}]*var\(--primary-soft\)[^}]*var\(--primary\)/s);
+	assert.match(detailStyles, /\.team-duel-row\s*\{[^}]*grid-template-columns:\s*26px minmax\(44px,64px\) minmax\(120px,1fr\) minmax\(44px,64px\) 26px/s);
 	assert.match(gameplayBackend, /ControlWardsBought \*int `json:"controlWardsBought,omitempty"`/);
 	assert.match(demoScript, /controlWardsBought:\s*\(participantId \* 3\) % 7/);
 
@@ -5070,7 +5070,7 @@ test("live rune style icons preserve their 4:5 artwork ratio", () => {
 	  assert.match(boardRule, /--rune-icon-size:\s*32px/);
 	  assert.match(boardRule, /--rune-header-height:\s*52px/);
 	  assert.match(boardRule, /min-height:\s*284px/);
-	  const compactBoardRule = cssBlockAfter(gameplayStyles, ".rune-detail .unified-rune-board");
+	  const compactBoardRule = cssBlockAfter(detailStyles, ".rune-detail .unified-rune-board");
 	  assert.match(compactBoardRule, /--rune-icon-size:\s*30px/);
 	  assert.match(compactBoardRule, /min-height:\s*252px/);
 });
@@ -6280,8 +6280,8 @@ test("live rune secondary style row stays aligned beneath the primary keystone r
 test("R16 build, rune, skill, and Korean overview guards preserve the corrected contracts", () => {
   // R190 design explicitly enlarges only the match-build split tree.
   const splitTreeRule = /\.rune-split-tree \.unified-rune-board \{[^}]*\}/g;
-  assert.match(gameplayStyles, /\.rune-split-tree \.unified-rune-board \{[^}]*--rune-icon-size:\s*34px/);
-  assert.doesNotMatch(gameplayStyles.replace(splitTreeRule, ""), /--rune-icon-size:\s*(3[3-9]|[4-9]\d)px/);
+  assert.match(detailStyles, /\.rune-split-tree \.unified-rune-board \{[^}]*--rune-icon-size:\s*34px/);
+  assert.doesNotMatch([gameplayStyles, detailStyles].join("\n").replace(splitTreeRule, ""), /--rune-icon-size:\s*(3[3-9]|[4-9]\d)px/);
   assert.match(gameplayStyles, /\.config-option\.is-route \.config-icons\s*\{[^}]*flex-wrap:\s*nowrap/s);
   assert.match(sharedBuildStyles, /--build-row-height:\s*64px/);
   assert.doesNotMatch(script, /class="route-row"/);

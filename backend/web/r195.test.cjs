@@ -17,7 +17,7 @@ test('R195 1 effect list removes shards and preserves shared board',()=>{
  const f=effects(),d=new JSDOM(f.renderRuneEffects({...f.subject,statModIds:[5005,5008,5001]})).window.document;
  assert.doesNotMatch(d.body.textContent,/属性碎片|攻击速度 \+10%|生命值 \+10/);
  assert.equal(d.querySelectorAll('.shards-line,.shard-chip').length,0);
- assert.doesNotMatch(read('gameplay.css'),/shards-line|shard-chip/);
+ assert.doesNotMatch([read('gameplay.css'),read('match-detail.css')].join('\n'),/shards-line|shard-chip/);
  assert.match(f.renderUnifiedRuneBoard(f.subject),/data-perk-id="5005"/);
 });
 test('R195 2 lethal tempo keeps confirmed var2 damage and suppresses malformed time',()=>{
@@ -42,7 +42,7 @@ test('R195 5 keystone with values shows only tree subtitle; missing values retai
  assert.doesNotMatch(withValue.querySelector('.name').textContent,/攻击一个敌方英雄/);
  const missing=new JSDOM(f.renderRuneEffects({...f.subject,perkStats:undefined})).window.document;
  assert.match(missing.querySelector('.is-keystone .name small').textContent,/精密 · 攻击一个敌方英雄/);
- const css=read('gameplay.css');assert.match(css,/\.eff\.is-keystone \.game-icon\s*\{[^}]*width:\s*44px;\s*height:\s*44px/);
+ const css=read('match-detail.css');assert.match(css,/\.eff\.is-keystone \.game-icon\s*\{[^}]*width:\s*44px;\s*height:\s*44px/);
  assert.match(css,/\.eff\.is-keystone \.stat b\s*\{[^}]*var\(--primary-strong\);\s*font-size:\s*18px/);
 });
 test('R195 6 header damage includes the confirmed lethal tempo value',()=>{

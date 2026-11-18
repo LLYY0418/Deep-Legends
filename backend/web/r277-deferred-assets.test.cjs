@@ -12,6 +12,14 @@ test('initial production assets remain below original 420KiB gzip level-one budg
  assert(!/function matchTableRows\(/.test(read('gameplay.js')),'rich table rows cannot enter initial production asset');
  for(const name of ['renderMatchOverview','renderTeamAnalysis','renderRuneEffects'])assert(read('gameplay.js').includes('R277 deferred detail renderer: '+name),name+' rich body cannot enter initial production asset');
 });
+test('R320 ladder assets stay lazy and startup leaves at least 4 KiB of gzip headroom', () => {
+  const assets = initialAssets();
+  for (const file of ['/ladder.js', '/ladder.css']) {
+    assert.ok(!assets.includes(file), `${file} must load on demand`);
+  }
+  const total = assets.reduce((bytes, file) => bytes + zlib.gzipSync(read(file), { level: 1 }).length, 0);
+  assert.ok(420 * 1024 - total >= 4 * 1024, `startup gzip ${total} leaves less than 4 KiB of headroom`);
+});
 async function fixture(){
  const {bootDemoApp}=require('../../desktop/overview-render-helpers.cjs'),{waitForOverview}=require('../../desktop/renderer-wait.cjs');
  const setup=`(()=>{const append=document.head.append.bind(document.head);window.__r277DeferredRequests=[];document.head.append=(node)=>{if(node.tagName==='LINK'&&node.getAttribute('href')==='/match-detail.css'){append(node);queueMicrotask(()=>node.onload&&node.onload());return;}if(node.tagName==='SCRIPT'&&node.getAttribute('src')==='/match-details.js'){__r277DeferredRequests.push(node);return append(node);}return append(node);};})();\n`;

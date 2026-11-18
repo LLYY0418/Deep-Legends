@@ -75,9 +75,8 @@ test('R318 P4 arena detail header is one cell and columns cannot overlap', () =>
   const css = read('match-detail.css');
   assert.match(css, /\.arena-detail-columns \{ display: grid; grid-template-columns: minmax\(208px,234px\) var\(--arena-augment-width,104px\) minmax\(54px,1fr\) minmax\(54px,1fr\) minmax\(96px,1\.5fr\)/);
   assert.match(css, /\.arena-detail-augments \{[^}]*grid-auto-columns:26px/);
-  const widthVars = read('gameplay.css');
   for (const [count, width] of [[1, 26], [2, 55], [3, 84], [4, 113], [5, 142], [6, 171]]) {
-    assert.match(widthVars, new RegExp(`data-augment-count="${count}"\\] \\{ --arena-augment-width:${width}px`));
+    assert.match(css, new RegExp(`data-augment-count="${count}"\\] \\{ --arena-augment-width:${width}px`));
   }
 });
 

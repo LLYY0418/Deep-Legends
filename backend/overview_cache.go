@@ -50,6 +50,9 @@ func riotOverviewQuerySnapshotKey(reference gameplayReference, begIndex, count i
 
 func riotOverviewRequestKey(ctx context.Context, reference gameplayReference, begIndex, count int, filters ...string) string {
 	key := riotOverviewQuerySnapshotKey(reference, begIndex, count, filters...) + "|credential:" + riotCredentialScope(riotPinnedIdentityContext(ctx))
+	if reference.ExactRiotID && reference.PlayerRef == "" {
+		key += "|exact:" + reference.Region
+	}
 	if span, ok := ctx.Value(riotHistoryTimeRangeKey{}).(riotHistoryTimeRange); ok {
 		key += "|time:" + strconv.FormatInt(span.Start, 10) + ":" + strconv.FormatInt(span.End, 10)
 	}

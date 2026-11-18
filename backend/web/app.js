@@ -2794,6 +2794,7 @@ window.deepLegendsFloatingLayers=createFloatingLayerLifecycle();
     const tab = el.sectionTabs.find((item) => item.dataset.section === name);
     const standalonePanels = {
       "pro-players": document.getElementById("pro-players-panel"),
+      ladder: document.getElementById("ladder-panel"),
     };
     const standalone = standalonePanels[name] || null;
     if (!tab && !standalone) return;
@@ -2815,7 +2816,7 @@ window.deepLegendsFloatingLayers=createFloatingLayerLifecycle();
     }
     state.section = name;
     applySidebar();
-    const sectionTitles = { "pro-players": ["职业选手", "一队选手 · 公开韩服账号"], overview: ["总览", "召唤师生涯与最近对局"], champions: ["英雄", "韩服梯度、符文与构建推荐"], live: ["对局", "实时队伍与赛前配置"], favorites: ["收藏", "皮肤、物品与三合一奖池"], suite: ["工具", "自动 · 维护 · 生涯 · 领奖 · 征召"], settings: ["设置", "显示、对局行为与隐私"] };
+    const sectionTitles = { ladder: ["天梯榜", ""], "pro-players": ["职业选手", "一队选手 · 公开韩服账号"], overview: ["总览", "召唤师生涯与最近对局"], champions: ["英雄", "韩服梯度、符文与构建推荐"], live: ["对局", "实时队伍与赛前配置"], favorites: ["收藏", "皮肤、物品与三合一奖池"], suite: ["工具", "自动 · 维护 · 生涯 · 领奖 · 征召"], settings: ["设置", "显示、对局行为与隐私"] };
     const title = sectionTitles[name] || ["Deep Legends", "战绩 · 英雄 · 对局 · 收藏"];
     el.currentSectionTitle.textContent = title[0];
     el.topbarSubtitle.textContent = title[1];
@@ -2871,6 +2872,14 @@ window.deepLegendsFloatingLayers=createFloatingLayerLifecycle();
     if (link) window.dispatchEvent(new CustomEvent("deep-legends:navigate", { detail: { section: "suite", tab: link.dataset.navigateSuite || "watch" } }));
   });
   document.getElementById("pro-players-return")?.addEventListener("click", () => activateSection("pro-players"));
+  document.getElementById("ladder-return")?.addEventListener("click", () => activateSection("ladder"));
+  document.addEventListener("click", (event) => {
+    const section = event.target.closest("[data-kr-section]")?.dataset.krSection;
+    if (section && section !== state.section) {
+      activateSection(section);
+      document.getElementById(`${section}-title`)?.focus({ preventScroll: true });
+    }
+  });
   let openFriendsFromLink = false;
   function openPendingFriendsLink() {
     if (openFriendsFromLink && state.status?.connected) {
@@ -3850,9 +3859,15 @@ window.deepLegendsFloatingLayers=createFloatingLayerLifecycle();
   }
 
   function closeRegionMenu() { el.playerSearchRegionMenu.hidden = true; el.playerSearchRegion.setAttribute("aria-expanded", "false"); }
+  function prefetchLadder() {
+    void window.deepLegendsSections?.load?.("ladder")?.then(() => {
+      window.dispatchEvent(new CustomEvent("deep-legends:ladder-prefetch"));
+    }).catch(() => {});
+  }
+  document.getElementById("player-search-ladder")?.addEventListener("pointerenter", prefetchLadder);
   el.playerSearchRegion.addEventListener("click", () => {
     const opening = el.playerSearchRegionMenu.hidden;
-    if (opening) { setCNRegionExpanded(false); setRiotRegionExpanded(false); }
+    if (opening) { setCNRegionExpanded(false); setRiotRegionExpanded(false); prefetchLadder(); }
     el.playerSearchRegionMenu.hidden = !opening;
     el.playerSearchRegion.setAttribute("aria-expanded", String(opening));
     if (opening) {
@@ -3863,6 +3878,12 @@ window.deepLegendsFloatingLayers=createFloatingLayerLifecycle();
   el.playerSearchCnToggle.addEventListener("click", () => setCNRegionExpanded(el.playerSearchCnToggle.getAttribute("aria-expanded") !== "true"));
   el.playerSearchRiotToggle.addEventListener("click", () => setRiotRegionExpanded(el.playerSearchRiotToggle.getAttribute("aria-expanded") !== "true"));
   el.playerSearchRegionMenu.addEventListener("click", (event) => {
+    if (event.target.closest("#player-search-ladder")) {
+      closeRegionMenu();
+      activateSection("ladder");
+      document.getElementById("ladder-title")?.focus({ preventScroll: true });
+      return;
+    }
     if (event.target.closest("#player-search-pro")) {
       closeRegionMenu();
       activateSection("pro-players");
@@ -4400,6 +4421,7 @@ window.deepLegendsFloatingLayers=createFloatingLayerLifecycle();
           if(detail?.type==='collection-new-skins'){window.deepLegendsCollectionNewItems?.newSkins(detail);window.reportFlowDiagnostic?.('collection_new_marker','skin',{latency_ms:Math.max(0,Date.now()-Number(detail.at || Date.now())),source:'event'});return;}
           if(detail?.type==='patch-notes-changed'){window.dispatchEvent(new CustomEvent('deep-legends:patch-notes-changed'));return;}
           if(detail?.type==='mayhem-data-changed'){window.dispatchEvent(new CustomEvent('deep-legends:mayhem-data-changed'));return;}
+          if (detail?.type === "ladder-updated") { window.dispatchEvent(new CustomEvent("deep-legends:ladder-updated", { detail })); return; }
           if(detail?.type==='announcements-changed'){window.dispatchEvent(new CustomEvent('deep-legends:announcements-changed'));return;}
 		  const slices = LIVE_UPDATE_STATE_SLICES[detail?.type] || [];
 		  if (slices.includes("riot-relay-recovered")) window.dispatchEvent(new CustomEvent("deep-legends:riot-relay-recovered", {detail}));

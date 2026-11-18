@@ -84,7 +84,7 @@ test('总览战绩详情只突出当前玩家名称', () => {
   assert.match(html, /<span class="participant-name">队友<\/span>/);
   assert.match(html, /<span class="participant-name">对手<\/span>/);
   assert.doesNotMatch(context.matchTableRows(players, new Map(), {}), /is-current-player/, '缺少可靠 ID 时不猜测当前玩家');
-  const css = read('gameplay.css');
+  const css = read('match-detail.css');
   assert.match(css, /\.match-detail \.participant-name\.is-current-player\s*\{[^}]*color:\s*var\(--primary-strong\);[^}]*font-weight:\s*750;/);
 });
 

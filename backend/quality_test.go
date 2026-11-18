@@ -474,6 +474,7 @@ func TestPrivacyListsEveryClientWrite(t *testing.T) {
 // 必须出现的关键词。声明写的是存了什么内容而不是目录名，所以这里用内容关键词对齐，
 // 一个目录的全部关键词都命中才算被声明覆盖。
 var privacyStoreDirectoryCoverage = map[string][]string{
+	ladderDirectory:  {"kr-solo-ladder-v1", "公开榜单的 Riot ID"},
 	"mayhem-ratings": {"mayhem-ratings", "24 小时", "2 分钟", "4 MiB"},
 	"client-catalog": {"client-catalog", "装备", "符文", "召唤师技能", "不含账号标识"},
 	// storage.go openLocalStore 启动期创建
@@ -597,6 +598,10 @@ func TestPrivacyStoresDeclareEveryLocalDirectory(t *testing.T) {
 		if name == "client_history_snapshot.go" && strings.Contains(text, `filepath.Join("client-history"`) {
 			record("client-history", name)
 		}
+		if name == "opgg_ladder.go" && strings.Contains(text, "filepath.Join(ladderDirectory,") &&
+			strings.Contains(text, "writeLocalStoreFile(p.store, key.file(),") {
+			record(ladderDirectory, name)
+		}
 		// (b) newPublicBinaryCache(store, "dir", 条数上限, 字节上限)
 		for _, match := range regexp.MustCompile(`newPublicBinaryCache\([^,]+,\s*"([a-z0-9-]+)"`).FindAllStringSubmatch(text, -1) {
 			record(match[1], name)
@@ -684,6 +689,7 @@ var privacyStoreWriteCallPins = map[string]int{
 	"patch_notes.go":             1, // Root patch-notes.json: public official patch text cache; no player data.
 	"github_stars.go":            1, // github-stars.json: fixed public repository star count and timestamp, six-hour cache; no user data.
 	"client_autostart.go":        1, // client-autostart.json: declared local original startup bytes for reversible changes.
+	"opgg_ladder.go":             1, // kr-solo-ladder-v1: public Riot IDs and leaderboard metrics, declared in stores.
 	"pro_scoped_refresh.go":      1, // pro-account-identities.json: declared permanent public roster Riot ID -> PUUID only; excludes the user/friends.
 	"announcements.go":           1, // Public notice cache; no account, player identity or read state.
 	"collection_retry_cache.go":  1, // R241: declared blank-entry failure digests + 1h expiry; no account/ownership/quantity.

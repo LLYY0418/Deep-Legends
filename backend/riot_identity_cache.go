@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// Hover lookups reuse a fresh disk entry without starting a detached refresh.
+type riotPassiveAccountLookupKey struct{}
+
 // Public lookup results only: never credentials, request headers or LCU data.
 // Short freshness windows avoid serial identity requests after a restart while
 // still resolving renamed accounts again. No stale-on-error reuse is allowed.

@@ -155,6 +155,11 @@ func fetchOPGGLadderRank(ctx context.Context, provider *championProvider, gameNa
 	if gameName == "" || tagLine == "" || len(gameName) > 128 || len(tagLine) > 32 || strings.ContainsAny(gameName+tagLine, "#") {
 		return 0, errors.New("invalid pro ladder account")
 	}
+	if owner, _ := ctx.Value(proRefreshOwnerKey{}).(*app); owner != nil && owner.ladder != nil {
+		if cached := owner.ladder.cachedRank(gameName, tagLine); cached.Rank > 0 {
+			return cached.Rank, nil
+		}
+	}
 	query := url.Values{"type": {"ladder"}, "region": {"kr"}, "summoner": {gameName + "-" + tagLine}, "tier": {"all"}}
 	body, _, err := provider.fetchWithMetadataCacheKeyLoader(ctx, opggPageHost, proLadderPath, query, proLadderMaxBytes, "text/html,application/xhtml+xml", "", func(ctx context.Context) ([]byte, error) {
 		if err := waitProBackground(ctx); err != nil {

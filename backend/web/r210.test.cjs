@@ -31,7 +31,7 @@ test('R210 Riot Key follows network and content protection with help, an embedde
     assert(input.parentElement.contains(eye));
     assert.equal(input.placeholder, '粘贴 Riot API Key');
     assert(input.classList.contains('setting-network-field')); assert(doc.getElementById('setting-proxy-mode').classList.contains('setting-network-field'));
-    const css = read('app.css');
+    const css = [read('app.css'), read('settings-preferences.css')].join('\n');
     assert.match(css, /\.setting-network-controls \.setting-network-field, [^{]+\.app-select-trigger \{[^}]*min-height: var\(--setting-field-height\)[^}]*border: 1px solid var\(--setting-field-border\)[^}]*border-radius: 10px/);
     assert.doesNotMatch(css, /\.setting-riot-key-card \{ margin-top:/);
     assert.match(css, /\.setting-riot-key-input \{[^}]*width: 300px/);

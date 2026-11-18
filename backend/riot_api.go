@@ -1072,7 +1072,7 @@ func (p *riotProvider) fetchAccountByRiotID(ctx context.Context, gameName, tagLi
 		}
 		return nil
 	})
-	if err == nil && diskHit {
+	if err == nil && diskHit && ctx.Value(riotPassiveAccountLookupKey{}) == nil {
 		p.refreshPersistedAccount(ctx, identity, path)
 	}
 	return account, err
@@ -1737,7 +1737,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 	}
 	gameName := strings.TrimSpace(reference.GameName)
 	tagLine := strings.TrimSpace(reference.TagLine)
-	resolvedScope := ""
+	resolvedScope := reference.RiotCredentialScope
 	if puuid == "" {
 		lookupCtx := riotPinnedIdentityContext(ctx)
 		resolvedScope = riotCredentialScope(lookupCtx)
@@ -1746,7 +1746,7 @@ func (a *app) loadRiotOverview(ctx context.Context, reference gameplayReference,
 		if tagLine != "" {
 			account, err = provider.accountByRiotID(lookupCtx, gameName, tagLine)
 		}
-		if errors.Is(err, errRiotNotFound) {
+		if !reference.ExactRiotID && errors.Is(err, errRiotNotFound) {
 			// 编号错误或玩家改过名时，Riot 的精确查询会直接 404，而 OP.GG
 			// 按名称模糊搜索仍能找到人。这里用 OP.GG 自动补全接口纠正
 			// 编号后重查一次，让搜索体验与 OP.GG 一致。

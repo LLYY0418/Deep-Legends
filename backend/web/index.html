@@ -118,6 +118,7 @@
                 </div>
                 <div class="region-menu-divider" role="separator"></div>
                 <button id="player-search-pro" class="region-menu-pro" type="button" role="menuitem" aria-controls="pro-players-panel" data-region-menu-entry><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v5a4 4 0 0 1-8 0V3Zm0 2H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 1v6m-4 3h8m-10 0h12"/></svg><b>职业选手</b><span aria-hidden="true">→</span></button>
+                <button id="player-search-ladder" class="region-menu-pro" type="button" role="menuitem" aria-controls="ladder-panel" data-region-menu-entry><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-6m5 6V9m5 11V5m5 15V2M3 20h19"/></svg><b>天梯榜</b><span aria-hidden="true">→</span></button>
               </div>
             </div>
             <div class="player-search-fields">
@@ -175,7 +176,7 @@
           </section>
 
           <section id="pro-players-panel" class="pro-page" data-standalone-page role="region" aria-labelledby="pro-players-title" hidden>
-            <div class="pro-page-nav"><button id="pro-players-home" class="text-button pro-return" type="button">← 返回总览</button></div>
+            <div class="pro-page-nav"><nav class="kr-directory-switch" aria-label="韩服榜单"><button type="button" data-kr-section="pro-players" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v5a4 4 0 0 1-8 0V3Zm0 2H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 1v6m-4 3h8m-10 0h12"/></svg>职业选手</button><button type="button" data-kr-section="ladder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-6m5 6V9m5 11V5m5 15V2M3 20h19"/></svg>天梯榜</button></nav><button id="pro-players-home" class="text-button pro-return" type="button">← 返回总览</button></div>
             <header class="pro-header">
               <div><p class="pro-eyebrow">PRO PLAYERS · KR</p><h1 id="pro-players-title" tabindex="-1">职业选手</h1></div>
               <div class="pro-header-meta"><div id="pro-players-status" class="pro-status" role="status" aria-live="polite"></div><button id="pro-players-refresh" class="text-button" type="button"><span aria-hidden="true">↻</span> 刷新账号</button></div>
@@ -185,6 +186,58 @@
               <div class="pro-toolbar-right"><button id="pro-primary-only" class="pro-primary-switch" type="button" role="switch" aria-checked="false"><span aria-hidden="true"></span>只看最新账号</button><label class="pro-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="pro-players-search" type="search" placeholder="搜索选手或账号" aria-label="搜索职业选手或账号" maxlength="80" autocomplete="off"></label></div>
             </div>
             <div id="pro-players-content" class="pro-content" aria-busy="false"></div>
+          </section>
+
+          <section id="ladder-panel" class="ladder-page" data-ladder-style-pending data-standalone-page role="region" aria-labelledby="ladder-title" hidden>
+            <header class="ladder-header">
+              <nav class="kr-directory-switch" aria-label="韩服榜单"><button type="button" data-kr-section="pro-players"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v5a4 4 0 0 1-8 0V3Zm0 2H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 1v6m-4 3h8m-10 0h12"/></svg>职业选手</button><button type="button" data-kr-section="ladder" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-6m5 6V9m5 11V5m5 15V2M3 20h19"/></svg>天梯榜</button></nav>
+              <h1 id="ladder-title" tabindex="-1">单排/双排</h1>
+              <div class="ladder-update" id="ladder-update" hidden>更新于 <time id="ladder-time"></time></div>
+              <button id="ladder-refresh" class="text-button" type="button" disabled><span aria-hidden="true">↻</span> 刷新</button>
+            </header>
+            <dl class="ladder-cards">
+              <div><img src="/rank-crests/challenger.png" alt="" loading="lazy" width="32" height="32"><div><dt>王者门槛</dt><dd id="ladder-challenger">—</dd></div></div>
+              <div><img src="/rank-crests/grandmaster.png" alt="" loading="lazy" width="32" height="32"><div><dt>宗师门槛</dt><dd id="ladder-grandmaster">—</dd></div></div>
+              <div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-6m5 6V9m5 11V5m5 15V2M3 20h19"/></svg><div><dt>上榜召唤师</dt><dd id="ladder-total">—</dd></div></div>
+            </dl>
+            <div class="ladder-toolbar">
+              <div class="ladder-tiers" role="group" aria-label="段位">
+                <button type="button" data-ladder-tier="" aria-pressed="true">全部段位</button>
+                <button type="button" data-ladder-tier="challenger" aria-pressed="false">王者</button>
+                <button type="button" data-ladder-tier="grandmaster" aria-pressed="false">宗师</button>
+                <button type="button" data-ladder-tier="master" aria-pressed="false">大师</button>
+                <button type="button" data-ladder-tier="diamond" aria-pressed="false">钻石</button>
+                <button type="button" data-ladder-tier="emerald" aria-pressed="false">翡翠</button>
+              </div>
+              <button id="ladder-pro-only" class="toggle-control" type="button" role="switch" aria-checked="false"><span class="ladder-switch-track" aria-hidden="true"></span>只看职业选手</button>
+              <form class="ladder-find" id="ladder-find" role="search">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg>
+                <input type="search" aria-label="查找名次" placeholder="查找名次 · 名字#编号" autocomplete="off" maxlength="57" required>
+                <span class="ladder-find-result" role="status" hidden></span>
+              </form>
+            </div>
+            <div id="ladder-failed" class="gameplay-empty" hidden><span aria-hidden="true">⬡</span><strong>连接已断开</strong><button type="button" class="text-button" data-ladder-retry>重试</button></div>
+            <div id="ladder-table-scroll" class="ladder-table-scroll" tabindex="0" role="group" aria-label="天梯榜表格">
+              <table class="ladder-table">
+                <colgroup><col class="ladder-col-rank"><col><col class="ladder-col-tier"><col class="ladder-col-lp"><col class="ladder-col-champions"><col class="ladder-col-level"><col class="ladder-col-record"></colgroup>
+                <thead><tr><th scope="col">#</th><th scope="col">召唤师</th><th scope="col">段位</th><th scope="col" class="ladder-lp">LP</th><th scope="col">常用英雄</th><th scope="col">等级</th><th scope="col">胜率</th></tr></thead>
+                <tbody id="ladder-rows" aria-busy="true">
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                  <tr class="ladder-skeleton" aria-hidden="true"><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td><td><span class="skeleton-line"></span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <footer class="ladder-footer" id="ladder-footer" hidden><span id="ladder-range"></span><nav id="ladder-pages" aria-label="天梯榜分页"></nav></footer>
           </section>
 
           <section id="overview-panel" class="panel gameplay-panel" role="tabpanel" tabindex="-1" aria-labelledby="section-overview">
@@ -199,6 +252,7 @@
                 <button id="player-tabs-next" class="player-tabs-arrow" type="button" aria-label="向右滚动玩家标签" aria-controls="player-tabs" data-tooltip="向右滚动" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
               </div>
               <button id="pro-players-return" class="text-button pro-return" type="button" hidden>返回职业选手 →</button>
+              <button id="ladder-return" class="text-button pro-return" type="button" hidden>返回天梯榜 →</button>
               <button id="overview-refresh" class="text-button" type="button">刷新战绩</button>
             </div>
             <div id="overview-content" class="gameplay-content" aria-live="polite"><div class="gameplay-skeleton"><span></span><span></span><span></span></div></div>

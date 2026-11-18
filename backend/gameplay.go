@@ -68,6 +68,7 @@ var (
 var hiddenPlayerUUIDMask = [16]byte{0x81, 0x70, 0x76, 0xa9, 0xf4, 0x51, 0x50, 0x9b, 0x95, 0x98, 0x68, 0x13, 0xce, 0x91, 0x17, 0xe7}
 
 type gameplayOverviewRequest struct {
+	ExactRiotID  bool   `json:"exactRiotId,omitempty"`
 	Background   bool   `json:"background,omitempty"`
 	StartTime    int64  `json:"startTime,omitempty"`
 	EndTime      int64  `json:"endTime,omitempty"`
@@ -308,6 +309,8 @@ type gameplayPlayer struct {
 // keeps enough identity hints to continue loading match data when the client
 // hides a player's visible name or exposes an obfuscated champ-select ID.
 type gameplayReference struct {
+	ExactRiotID         bool
+	RiotCredentialScope string
 	TagSource           string
 	TagVisibilityKnown  bool // only fresh live identity may clear hidden status
 	TagBlocked          bool // hidden or unresolved live identity: never expose personal tags
@@ -932,7 +935,7 @@ func (a *app) handleGameplayOverview(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if reference.Region == "" {
-			reference = gameplayReference{GameName: request.GameName, TagLine: request.TagLine, Region: riotPlatform(request.Region)}
+			reference = gameplayReference{GameName: request.GameName, TagLine: request.TagLine, Region: riotPlatform(request.Region), ExactRiotID: request.ExactRiotID}
 		}
 		if request.Background {
 			r = r.WithContext(withRiotBackground(r.Context()))
@@ -3066,6 +3069,9 @@ func mergeGameplayReferences(preferred, fallback gameplayReference) gameplayRefe
 	fallback = normalizeGameplayReference(fallback)
 	if preferred.PlayerRef == "" {
 		preferred.PlayerRef = fallback.PlayerRef
+	}
+	if preferred.RiotCredentialScope == "" && preferred.PlayerRef == fallback.PlayerRef {
+		preferred.RiotCredentialScope = fallback.RiotCredentialScope
 	}
 	for _, candidate := range []string{fallback.PlayerRef, fallback.AlternatePlayerRef} {
 		if preferred.AlternatePlayerRef == "" && candidate != "" && candidate != preferred.PlayerRef {

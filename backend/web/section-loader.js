@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const modules = { overview: [], favorites: ["favorites-facade"], champions: ["patch-notes", "champions"], "pro-players": ["pro-players"], suite: ["patch-notes", "champions", "auto-config", "suite"], settings: ["patch-notes", "champions", "cache-controls", "settings-preferences", "player-tags"], live: ["player-tags", "live-arena", "auto-config-live"] };
-  const styles = { "auto-config": ["auto-config"], "auto-config-live": ["auto-config"], "favorites-facade": ["collection"], "patch-notes": ["patch-notes"], "player-tags": ["player-tags"], "settings-preferences": ["settings-preferences"], champions: ["patch-notes", "shared-cards", "champions"], "pro-players": ["pro-players"], suite: ["patch-notes", "shared-cards", "champions", "auto-config", "suite"], settings: ["patch-notes", "champions", "settings-preferences"], "live-arena": ["shared-cards", "match-detail", "live-arena"], "match-details": ["match-detail"], announcements: ["announcements"] };
+  const modules = { overview: [], favorites: ["favorites-facade"], champions: ["patch-notes", "champions"], "pro-players": ["pro-players"], ladder: ["ladder"], suite: ["patch-notes", "champions", "auto-config", "suite"], settings: ["patch-notes", "champions", "cache-controls", "settings-preferences", "player-tags"], live: ["player-tags", "live-arena", "auto-config-live"] };
+  const styles = { "auto-config": ["auto-config"], "auto-config-live": ["auto-config"], "favorites-facade": ["collection"], "patch-notes": ["patch-notes"], "player-tags": ["player-tags"], "settings-preferences": ["settings-preferences"], champions: ["patch-notes", "shared-cards", "champions"], "pro-players": ["pro-players"], ladder: ["ladder"], suite: ["patch-notes", "shared-cards", "champions", "auto-config", "suite"], settings: ["patch-notes", "champions", "settings-preferences"], "live-arena": ["shared-cards", "match-detail", "live-arena"], "match-details": ["match-detail"], announcements: ["announcements"] };
   const flights = new Map(), ready = new Set(), callbacks = new Map(), snapshots = new Map();
   const styleFlights = new Map(), styleReady = new Set();
   let current = "overview", navigation = {}, generation = 0;
@@ -19,7 +19,7 @@
       link.rel = "stylesheet";
       link.href = `/${name}.css`;
       link.dataset.sectionStyle = name;
-      link.onload = () => { styleReady.add(name); if (name === "settings-preferences") document.getElementById("settings-panel")?.removeAttribute("data-settings-style-pending"); styleFlights.delete(name); link.onload = link.onerror = null; resolve(); };
+      link.onload = () => { styleReady.add(name); if (name === "settings-preferences") document.getElementById("settings-panel")?.removeAttribute("data-settings-style-pending"); if (name === "ladder") document.getElementById("ladder-panel")?.removeAttribute("data-ladder-style-pending"); styleFlights.delete(name); link.onload = link.onerror = null; resolve(); };
       link.onerror = () => {
         link.remove();
         styleFlights.delete(name);
@@ -74,7 +74,7 @@
     notice.dataset.sectionLoading = name;
     notice.setAttribute("role", "status");
     notice.textContent = "正在加载页面…";
-    panel?.prepend(notice);
+    if (name !== "ladder") panel?.prepend(notice);
     try {
       // Suite uses the champion search and image helpers. Load those first.
       for (const module of needed) await load(module);
@@ -83,6 +83,7 @@
       for (const module of fresh) callbacks.get(module)?.({ detail: { name: current, navigation } });
     } catch (_) {
       if (revision !== generation) return;
+      if (!notice.isConnected) panel?.prepend(notice);
       notice.setAttribute("role", "alert");
       notice.textContent = "页面资源加载失败。";
       const retry = document.createElement("button");

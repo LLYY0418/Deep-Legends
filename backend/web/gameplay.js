@@ -1147,7 +1147,7 @@
       const verificationTime={};
       const verification = { ...verificationTime, ...(background?{background:true}:{}), ...(tabGroup(tab) === "pro" && !append ? { expectedTier: tab.expectedTier || "" } : {}), ...(!append && tab.dirty ? { expectGameId: String(tab.dirtyGameId || "0") } : {}) };
       const body = tab.current && connected() ? null : JSON.stringify(tab.riotId && !tab.playerRef
-		? { ...verification, gameName: tab.riotId.gameName, tagLine: tab.riotId.tagLine, region: tab.region || "", serverId: tab.serverId || "", count: requestCount, begIndex, force, freshHistory:manual, ...(retryDetails?{retryDetails:true}:{}), matchFilter: tab.matchFilter }
+		? { ...verification, ...(tab.fromLadder ? { exactRiotId: true } : {}), gameName: tab.riotId.gameName, tagLine: tab.riotId.tagLine, region: tab.region || "", serverId: tab.serverId || "", count: requestCount, begIndex, force, freshHistory:manual, ...(retryDetails?{retryDetails:true}:{}), matchFilter: tab.matchFilter }
 		: { ...verification, playerRef: tab.playerRef, serverId: tab.serverId || "", count: requestCount, begIndex, force, freshHistory:manual, ...(retryDetails?{retryDetails:true}:{}), matchFilter: tab.matchFilter });
       const retryHistory = riotTab(tab) || tab.current && connected() && state.status?.clientRegion !== "TENCENT";
       const timeout = retryHistory ? 190_000 : 25_000;
@@ -1833,6 +1833,8 @@
     renderPlayerTabWorkspace(group);
     const back = document.getElementById("pro-players-return");
     if (back) back.hidden = group !== "pro";
+    const ladderBack = document.getElementById("ladder-return");
+    if (ladderBack) ladderBack.hidden = !activeTab()?.fromLadder;
     window.dispatchEvent(new CustomEvent("deep-legends:active-player-tab", { detail: { group, key: activeTab()?.key || "", proCount: state.tabs.filter(tab => tabGroup(tab) === "pro").length } }));
   }
 
@@ -1846,7 +1848,7 @@
       const masked = state.settings.maskNames;
       const label = masked ? privacyName(tab.data?.player || tab.identity || tab.riotId || {playerRef:tab.key},{index,context:"identity"}) : tab.label;
       const icon = !masked && tab.icon ? assetIcon(assetPath("profile", tab.icon), "", "", false) : '<span class="player-tab-placeholder" aria-hidden="true">◉</span>';
-      const regionBadge = mixedRegions ? `<small class="player-tab-region">${escapeHTML(tabServerLabel(tab))}</small>` : "";
+      const regionBadge = mixedRegions || tab.fromLadder ? `<small class="player-tab-region">${escapeHTML(tabServerLabel(tab))}</small>` : "";
       const selfBadge = tab.current ? '<span class="player-tab-self" data-tooltip="当前登录的召唤师" data-tooltip-size="compact" aria-hidden="true">★</span>' : "";
       return `<span class="player-tab-wrap${selected ? " is-active" : ""}${tab.current ? " is-self" : ""}" data-player-tab-wrap="${escapeHTML(tab.key)}" draggable="${!tab.current}"><button class="player-tab" type="button" role="tab" aria-selected="${selected}" tabindex="${selected ? 0 : -1}" data-player-tab="${escapeHTML(tab.key)}">${selfBadge}${icon}<span class="player-tab-copy"><span class="player-tab-name" data-tooltip="${escapeHTML(label+' · '+(typeof tabServerLabel==='function'?tabServerLabel(tab):tab.region || '国服'))}" data-tooltip-overflow="self" data-tooltip-size="compact">${escapeHTML(label)}</span>${regionBadge}</span>${tab.loading ? '<span class="mini-loading" aria-label="正在读取"></span>' : ""}</button>${tab.current ? "" : `<button class="player-tab-close" type="button" aria-label="关闭 ${escapeHTML(label)}" data-close-player="${escapeHTML(tab.key)}">×</button>`}</span>`;
     }).join("") : `<span class="player-tab-skeleton">${group === "pro" ? "请选择职业选手账号…" : "暂无可用玩家页签"}</span>`;
@@ -1891,9 +1893,11 @@
 
   function normalizePlayerTabContext(context = {}) {
     const group = context?.group === "pro" ? "pro" : riotRegion(context?.region) || context?.group === "kr" ? "kr" : "players";
-    if (group !== "pro") return { group };
+    if (group !== "pro" && !context.fromLadder) return { group };
     return {
       group,
+      fromLadder: context.fromLadder === true,
+      proMark: context.proMark === true,
       proTeam: String(context.proTeam || "").trim().slice(0, 64),
       proSecondary: context.proSecondary === true,
       proPlayer: String(context.proPlayer || "").trim().slice(0, 48),
@@ -1905,12 +1909,17 @@
     if (!tab) return;
     const normalized = normalizePlayerTabContext(context);
     tab.group = normalized.group;
-    if (normalized.group === "pro") {
+    if (normalized.fromLadder) {
+      tab.fromLadder = true;
+      tab.proMark = normalized.proMark;
+      tab.proTeam = normalized.proTeam;
+      tab.proPlayer = normalized.proPlayer;
+    } else if (normalized.group === "pro") {
       tab.proTeam = normalized.proTeam || tab.proTeam || "";
       tab.proPlayer = normalized.proPlayer || tab.proPlayer || "";
       tab.proSecondary = normalized.proSecondary;
       tab.expectedTier = normalized.expectedTier || tab.expectedTier || "";
-    } else {
+    } else if (!tab.fromLadder) {
       delete tab.proTeam;
       delete tab.proPlayer;
     }
@@ -1958,10 +1967,13 @@
     window.dispatchEvent(new CustomEvent("deep-legends:pro-verification", { detail: { ...tab.riotId, mismatch: true } }));
   }
 
-  function summonerProChip(tab) {
-    if (state.settings.maskNames || tabGroup(tab) !== "pro") return "";
-    const label = [tab.proTeam, tab.proPlayer].filter(Boolean).join(" ");
-    return label ? `<span class="pro-identity-chip${tab.proSecondary ? " is-secondary" : ""}">${escapeHTML(label)}${tab.proSecondary ? " · 二队" : ""}</span>${tab.proMismatch ? '<span class="pro-verification-warning">该账号与公开来源记录不一致</span>' : ""}` : "";
+  function summonerProChip(tab, badge) {
+    if (state.settings.maskNames) return "";
+    const team = badge?.teamCode || tab.proTeam;
+    const name = badge?.playerName || tab.proPlayer;
+    return team && name
+      ? `<span class="pro-tag pro-identity-chip"><b>${escapeHTML(team)}</b> ${escapeHTML(name)}${tab.proSecondary ? " · 二队" : ""}</span>${tab.proMismatch ? '<span class="pro-verification-warning">该账号与公开来源记录不一致</span>' : ""}`
+      : "";
   }
 
   function summonerRegionChip(tab) {
@@ -2327,6 +2339,10 @@
     }
     if (activeTab(group)) activeTab(group).restoreScrollPending = true;
     renderPlayerTabs();
+    if (closedTab.fromLadder && !state.tabs.some(tab => tab.fromLadder)) {
+      window.dispatchEvent(new CustomEvent("deep-legends:navigate", { detail: { section: "ladder" } }));
+      return;
+    }
     if(group==='pro' && !state.tabs.some(tab=>tabGroup(tab)==='pro')) {
       window.dispatchEvent(new CustomEvent('deep-legends:navigate',{detail:{section:'pro-players'}}));
       return;
@@ -2585,13 +2601,17 @@
   function renderSummonerStrip(data,tab,pending=false) {
     const player=data?.player || tab.identity || tab.riotId || {},masked=state.settings.maskNames;
     const profileName=masked?privacyName(player,{index:Math.max(0,state.tabs.findIndex(t=>t.key===tab.key)),context:"identity"}):(player.gameName || player.displayName || tab.riotId?.gameName || tab.label || '');
+    const proMarked = !masked && (tab.proMark || player.proPlayer || (tab.proTeam && tab.proPlayer));
+    const nameMarkup = proMarked
+      ? `<span class="summoner-identity-name"><span class="pro-mark" role="img" aria-label="职业选手" data-tooltip="职业选手">P</span><span class="pro-name">${escapeHTML(profileName)}</span></span>`
+      : profileName ? escapeHTML(profileName) : '<span class="skeleton-line"></span>';
     const tag=`<span class="summoner-tag${!masked && player.tagLine?'':' is-identity-placeholder'}">${!masked && player.tagLine?'#'+escapeHTML(player.tagLine):'&nbsp;'}</span>`;
-    const meta=tag+summonerRegionChip(tab)+renderOverviewStreak(tab.overviewStreak)+(!masked?summonerProChip(tab):'');
+    const meta=tag+summonerRegionChip(tab)+renderOverviewStreak(tab.overviewStreak)+summonerProChip(tab, player.proPlayer);
     const copy=!masked && !player.hidden && profileName?`${profileName}${player.tagLine?'#'+player.tagLine:''}`:'';
     const avatar=pending && !player.profileIconId?'<span class="game-icon is-summoner-avatar is-pending"></span>':masked?maskedProfileIcon('summoner-avatar'):iconFigure('profile',player.profileIconId,profileName,'summoner-avatar',false).replace(`alt="${escapeHTML(profileName)}"`,'alt=""');
     const art=window.deepLegendsOverviewArt?.render(player,tab.key,!pending && !tab.loading && !tab.initialPagePending) || (player.backgroundSource && player.backgroundPath?`<img class="summoner-strip-art" data-queued-src="/api/champion-asset?source=${encodeURIComponent(player.backgroundSource)}&path=${encodeURIComponent(player.backgroundPath)}" alt="" aria-hidden="true" decoding="async" data-game-image>`:'');
     const highlights=renderSummonerHighlights(data?.ranks || [],data?.masteries || [],{pending:pending || Boolean(tab.loading || tab.initialPagePending),capabilities:data?.capabilities || []});
-    return `<section class="summoner-strip${pending?' is-pending-strip':''}">${art}${avatar}<div class="summoner-strip-copy"><div><h2${copy?` class="summoner-copy-name" data-tooltip="${escapeHTML(profileName)}" data-tooltip-overflow="self" role="button" tabindex="0" data-copy-summoner="${escapeHTML(copy)}"`:''}>${profileName?escapeHTML(profileName):'<span class="skeleton-line"></span>'}</h2><div class="summoner-name-meta">${meta}</div></div><p class="summoner-level-row"><span>${Number(player.summonerLevel)>0?`召唤师等级 <b class="summoner-level-value">${number(player.summonerLevel)}</b>`:pending?'<span class="skeleton-line"></span>':''}${player.hidden?' · 身份已隐藏':''}</span>${player.privateHistory?'<span class="player-tab-hidden">隐藏战绩</span>':''}</p><p class="player-live-chip" data-friend-presence="${escapeHTML(tab.key)}" hidden></p></div>${highlights}</section>`;
+    return `<section class="summoner-strip${pending?' is-pending-strip':''}">${art}${avatar}<div class="summoner-strip-copy"><div><h2${copy?` class="summoner-copy-name" data-tooltip="${escapeHTML(profileName)}" data-tooltip-overflow="self" role="button" tabindex="0" data-copy-summoner="${escapeHTML(copy)}"`:''}>${nameMarkup}</h2><div class="summoner-name-meta">${meta}</div></div><p class="summoner-level-row"><span>${Number(player.summonerLevel)>0?`召唤师等级 <b class="summoner-level-value">${number(player.summonerLevel)}</b>`:pending?'<span class="skeleton-line"></span>':''}${player.hidden?' · 身份已隐藏':''}</span>${player.privateHistory?'<span class="player-tab-hidden">隐藏战绩</span>':''}</p><p class="player-live-chip" data-friend-presence="${escapeHTML(tab.key)}" hidden></p></div>${highlights}</section>`;
   }
 
   function renderSelfIdentityHeader(tab) {return renderSummonerStrip(null,tab,true);}
@@ -9598,12 +9618,15 @@
     const serverId = String(event.detail?.serverId || "").trim().toUpperCase();
     const source = String(event.detail?.source || "champions");
     const badge = event.detail?.proPlayer;
-    const isPro = region === "kr" && (source === "pro-players" || Boolean(badge?.playerName && badge?.teamCode));
-    const tabContext = isPro ? { group: "pro", proTeam: badge?.teamCode || event.detail?.teamCode, proPlayer: badge?.playerName || event.detail?.playerName, proSecondary: badge?.secondary || event.detail?.secondary, expectedTier: event.detail?.expectedTier } : { group: "players" };
+    const fromLadder = source === "ladder" && region === "kr";
+    const isPro = !fromLadder && region === "kr" && (source === "pro-players" || Boolean(badge?.playerName && badge?.teamCode));
+    const tabContext = isPro ? { group: "pro", proTeam: badge?.teamCode || event.detail?.teamCode, proPlayer: badge?.playerName || event.detail?.playerName, proSecondary: badge?.secondary || event.detail?.secondary, expectedTier: event.detail?.expectedTier } : fromLadder
+      ? { group: "kr", fromLadder, proMark: event.detail?.proMark === true, proTeam: badge?.team, proPlayer: badge?.name }
+      : { group: "players" };
     const targetSection = "overview";
     const label = `${gameName || "好友"}${tagLine ? `#${tagLine}` : ""}`;
     if (playerRef) {
-      if (source === "search" || isPro) {
+      if (source === "search" || fromLadder || isPro) {
         window.dispatchEvent(new CustomEvent("deep-legends:navigate", { detail: { section: targetSection } }));
         openPlayer(playerRef, label, region, serverId, tabContext);
       } else {
@@ -9612,7 +9635,7 @@
       return;
     }
     if (!gameName) return;
-    if (source === "search" || isPro) {
+    if (source === "search" || fromLadder || isPro) {
       // 同一总览内按来源切换国服、韩服、职业分组。
       window.dispatchEvent(new CustomEvent("deep-legends:navigate", { detail: { section: targetSection } }));
       openPlayerByRiotId(gameName, tagLine, region, serverId, tabContext);

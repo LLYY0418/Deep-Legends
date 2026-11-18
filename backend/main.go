@@ -233,6 +233,7 @@ type app struct {
 	itemSetPrices                   map[int64]int64
 	itemSetPricesAt                 time.Time
 	champions                       *championProvider
+	ladder                          *ladderProvider
 	arenaRecommendationTimeline     arenaRecommendationTimeline
 	liveRecommendationPrewarmer     *liveRecommendationPrewarmer
 	riot                            *riotProvider
@@ -571,6 +572,7 @@ func main() {
 		consumeUpdateInstallTiming(store.root, a.recordDiagnostic)
 		consumeUpdateShortcutState(store.root, a.recordDiagnostic)
 	}
+	a.ladder = newLadderProvider(a)
 	championProvider.gameplayAugments = func(ctx context.Context) ([]gameplayAugment, error) {
 		client, _, err := a.gameplayClient()
 		if err != nil {
@@ -753,6 +755,9 @@ func main() {
 	mux.HandleFunc("POST /api/gameplay/item-sets/apply", a.authorized(a.handleGameplayItemSetApply))
 	mux.HandleFunc("GET /api/gameplay/replay", a.authorized(a.handleGameplayReplayMetadata))
 	mux.HandleFunc("POST /api/gameplay/replay", a.authorized(a.handleGameplayReplayAction))
+	mux.HandleFunc("GET /api/ladder", a.authorized(a.handleLadder))
+	mux.HandleFunc("GET /api/ladder/find", a.authorized(a.handleLadderFind))
+	mux.HandleFunc("GET /api/ladder/prewarm", a.authorized(a.handleLadderPrewarm))
 	mux.HandleFunc("GET /api/pro-players", a.authorized(a.handleProPlayers))
 	mux.HandleFunc("POST /api/pro-players/visibility", a.authorized(a.handleProVisibility))
 	mux.HandleFunc("GET /api/champions/catalog", a.authorized(a.handleChampionCatalog))

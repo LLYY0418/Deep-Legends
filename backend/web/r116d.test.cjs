@@ -476,11 +476,16 @@ test("R116-D stage two stays out of the client until the probe verdict lands", (
 test("R116-D styles reuse tokens and existing values only", () => {
   const start = gameplayStyles.indexOf(".live-roster-supplement {");
   assert.notEqual(start, -1, "the R116-D style block is missing");
-  const block = gameplayStyles.slice(start, gameplayStyles.indexOf("/* R211:", start));
+  const detailStyles = fs.readFileSync(path.join(__dirname, "match-detail.css"), "utf8");
+  const rosterEnd = gameplayStyles.indexOf(".summoner-strip-copy > div { align-items:center; }", start);
+  const runeStart = detailStyles.indexOf(".rune-split {");
+  const runeEnd = detailStyles.indexOf("/* R211:", runeStart);
+  assert.ok(rosterEnd > start && runeStart >= 0 && runeEnd > runeStart, "both parts of the audited style block are required");
+  const block = gameplayStyles.slice(start, rosterEnd) + detailStyles.slice(runeStart, runeEnd);
   // 不许写死新 hex 色值（R117 的样式棘轮盯着重复 hex 的预算，已经顶格）。
   assert.doesNotMatch(block, /#[0-9A-Fa-f]{3,8}\b/, "R116-D styles must not hard-code hex colors");
   // 每个用到的变量都必须是既有变量。
-  const declared = new Set([...gameplayStyles.matchAll(/--([\w-]+)\s*:/g)].map((match) => match[1]));
+  const declared = new Set([...(gameplayStyles + detailStyles).matchAll(/--([\w-]+)\s*:/g)].map((match) => match[1]));
   const appStyles = fs.readFileSync(path.join(__dirname, "app.css"), "utf8");
   for (const match of appStyles.matchAll(/--([\w-]+)\s*:/g)) declared.add(match[1]);
   for (const name of new Set([...block.matchAll(/var\(--([\w-]+)/g)].map((match) => match[1]))) {
