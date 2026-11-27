@@ -933,6 +933,16 @@ func (p *ladderProvider) recordRankLocked(id string, page, rank int, fetchedAt t
 	}
 }
 
+func ladderDiskRankPage(filename string) (int, bool) {
+	base := filepath.Base(strings.ReplaceAll(filename, `\`, "/"))
+	number, ok := strings.CutSuffix(base, "-.json")
+	if !ok {
+		return 0, false
+	}
+	page, err := strconv.Atoi(number)
+	return page, err == nil && page >= 1 && page <= ladderMaxPage
+}
+
 func (p *ladderProvider) cachedRank(name, tag string) ladderLocation {
 	p.diskRanksOnce.Do(func() {
 		if p.store == nil {
@@ -940,9 +950,7 @@ func (p *ladderProvider) cachedRank(name, tag string) ladderLocation {
 		}
 		files, _ := filepath.Glob(filepath.Join(p.store.root, ladderDirectory, "*-.json"))
 		for _, file := range files {
-			number := strings.TrimSuffix(path.Base(file), "-.json")
-			page, err := strconv.Atoi(number)
-			if err == nil && page >= 1 && page <= ladderMaxPage {
+			if page, ok := ladderDiskRankPage(file); ok {
 				key := ladderKey{page: page}
 				ranks := indexLadderPage(key, p.read(key))
 				p.mu.Lock()

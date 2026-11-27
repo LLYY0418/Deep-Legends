@@ -751,10 +751,17 @@ func TestPrivacyStoreDirectoryCreationCallSitesArePinned(t *testing.T) {
 }
 
 func TestLootFallbackDiagnosticRuntimePayloadNeverStoresItemDetails(t *testing.T) {
+	var eventsMu sync.Mutex
 	events := make([]map[string]any, 0, 1)
 	items := enrichLootItemsWithMetadata([]LootItem{{
 		LootID: "CHAMPION_266", LocalizedName: "未命名战利品", Type: "CHAMPION_RENTAL", Count: 30,
-	}}, nil, nil, func(event map[string]any) { events = append(events, event) })
+	}}, nil, nil, func(event map[string]any) {
+		eventsMu.Lock()
+		defer eventsMu.Unlock()
+		events = append(events, event)
+	})
+	eventsMu.Lock()
+	defer eventsMu.Unlock()
 	if len(items) != 1 || len(events) != 1 {
 		t.Fatalf("fallback runtime fixture = items:%#v events:%#v", items, events)
 	}

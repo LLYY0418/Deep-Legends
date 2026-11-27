@@ -5,14 +5,16 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { WEB, bootDemoApp, installWindowCleanup } = require("./overview-render-helpers.cjs");
 const { waitForOverview, waitForRender } = require("./renderer-wait.cjs");
+const { waitFor } = require("../scripts/lib/wait-progress.cjs");
 
 installWindowCleanup(test);
 
 test("R320 menu prefetch, KR overview, return and last tab close use the real renderer", async () => {
-  const { window: w, errors } = bootDemoApp();
+  const { window: w, errors } = bootDemoApp({ deferredMatchDetails: true });
   const d = w.document;
   const get = (selector) => d.querySelector(selector);
   const requests = [], lookups = [];
+  let prewarmRead = false;
   const scroll = get("#app-scroll");
   scroll.scrollTo = ({ top }) => { scroll.scrollTop = top; };
   const baseFetch = w.fetch;
@@ -43,7 +45,12 @@ test("R320 menu prefetch, KR overview, return and last tab close use the real re
       }));
       return new Response(JSON.stringify({ page, tier, rows, totalSummoners: 300, fetchedAt: new Date().toISOString() }));
     }
-    if (url.pathname === "/api/ladder/prewarm") return new Response('{"playerRef":"player_prewarmed"}');
+    if (url.pathname === "/api/ladder/prewarm") {
+      return { ok: true, status: 200, json: async () => {
+        prewarmRead = true;
+        return { playerRef: "player_prewarmed" };
+      } };
+    }
     if (url.pathname === "/api/gameplay/overview" && init?.body) lookups.push(JSON.parse(init.body));
     return baseFetch(input, init);
   };
@@ -69,7 +76,7 @@ test("R320 menu prefetch, KR overview, return and last tab close use the real re
   const warm = get("[data-ladder-row] button");
   get("#app-scroll").scrollTop = 185;
   warm.dispatchEvent(new w.MouseEvent("pointerover", { bubbles: true }));
-  await new Promise((resolve) => setTimeout(resolve, 260));
+  await waitFor(() => prewarmRead, { label: "ladder hover did not read its warm reference" });
   warm.click();
 
   await waitForRender(w, () => lookups.some((req) => req.playerRef === "player_prewarmed"));

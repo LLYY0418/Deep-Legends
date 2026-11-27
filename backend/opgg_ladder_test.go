@@ -78,16 +78,16 @@ func TestR320LadderURLAndRedirect(t *testing.T) {
 		}
 	}
 	cp := proTestProvider()
-	calls := 0
+	var calls atomic.Int32
 	cp.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		calls++
+		calls.Add(1)
 		if r.Header.Get("Cookie") != "" || r.URL.Query().Get("region") != "kr" {
 			t.Errorf("unexpected ladder request: %v", r.URL)
 		}
 		return &http.Response{StatusCode: 302, Header: http.Header{"Location": {base + "&page=101"}}, Body: http.NoBody, Request: r}, nil
 	})}
-	if _, err := fetchOPGGLadderPage(context.Background(), cp, ladderKey{page: 1}, ""); err == nil || calls != 1 {
-		t.Fatalf("invalid redirect: %v, requests %d", err, calls)
+	if _, err := fetchOPGGLadderPage(context.Background(), cp, ladderKey{page: 1}, ""); err == nil || calls.Load() != 1 {
+		t.Fatalf("invalid redirect: %v, requests %d", err, calls.Load())
 	}
 }
 
@@ -248,9 +248,9 @@ func TestR320LadderFindReusesDownloadedPage(t *testing.T) {
 	})
 	a := new(app)
 	a.ladder = newLadderProvider(a)
-	calls := 0
+	var calls atomic.Int32
 	a.ladder.fetch = func(_ context.Context, key ladderKey, summoner string) ([]byte, error) {
-		calls++
+		calls.Add(1)
 		if key != (ladderKey{}) || summoner != "抖音阿甘爱跑步-xtz小弟" {
 			return nil, errors.New("unexpected find request")
 		}
@@ -263,8 +263,8 @@ func TestR320LadderFindReusesDownloadedPage(t *testing.T) {
 		t.Fatalf("find response: %d %s", rec.Code, rec.Body.String())
 	}
 	data, err := a.ladder.load(context.Background(), ladderKey{page: 2}, false, false)
-	if err != nil || data.Page != 2 || calls != 1 {
-		t.Fatalf("lookup re-fetch: page %d, %d network calls, %v", data.Page, calls, err)
+	if err != nil || data.Page != 2 || calls.Load() != 1 {
+		t.Fatalf("lookup re-fetch: page %d, %d network calls, %v", data.Page, calls.Load(), err)
 	}
 }
 
@@ -322,9 +322,12 @@ func TestR320LadderPrewarmUsesKRScopeAndPublicReference(t *testing.T) {
 	a.riot = newRiotProvider(a.champions)
 	a.ladder = newLadderProvider(a)
 
+	var pathsMu sync.Mutex
 	var paths []string
 	a.champions.client = &http.Client{Transport: gameplayRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		pathsMu.Lock()
 		paths = append(paths, r.Host+r.URL.Path)
+		pathsMu.Unlock()
 		body := `{"puuid":"ladder-fixture-puuid","gameName":"Riot Fixture","tagLine":"KR1"}`
 		if strings.Contains(r.URL.Path, "/league/") {
 			body = `[{"queueType":"RANKED_SOLO_5x5","tier":"MASTER","leaguePoints":123}]`
@@ -348,8 +351,11 @@ func TestR320LadderPrewarmUsesKRScopeAndPublicReference(t *testing.T) {
 		t.Fatalf("ranks cache: %+v %v", entries, err)
 	}
 	want := []string{"asia.api.riotgames.com/riot/account/v1/accounts/by-riot-id/Riot Fixture/KR1", "kr.api.riotgames.com/lol/league/v4/entries/by-puuid/ladder-fixture-puuid"}
-	if !reflect.DeepEqual(paths, want) {
-		t.Fatalf("Riot calls: %v", paths)
+	pathsMu.Lock()
+	gotPaths := append([]string(nil), paths...)
+	pathsMu.Unlock()
+	if !reflect.DeepEqual(gotPaths, want) {
+		t.Fatalf("Riot calls: %v", gotPaths)
 	}
 	r274Flush(t, a.riot.identityDisk)
 }
@@ -495,6 +501,19 @@ func TestLadderMemoryPageLimit(t *testing.T) {
 	}
 }
 
+func TestLadderDiskRankPageUsesLocalPathSeparators(t *testing.T) {
+	for _, filename := range []string{`C:\cache\kr-solo-ladder-v1\002-.json`, "/cache/kr-solo-ladder-v1/002-.json"} {
+		if page, ok := ladderDiskRankPage(filename); !ok || page != 2 {
+			t.Errorf("%q: page=%d valid=%v", filename, page, ok)
+		}
+	}
+	for _, filename := range []string{`C:\cache\002-master.json`, "/cache/101-.json", "/cache/000-.json", "2"} {
+		if page, ok := ladderDiskRankPage(filename); ok {
+			t.Errorf("%q parsed as page %d", filename, page)
+		}
+	}
+}
+
 func TestLadderCachedRankIndex(t *testing.T) {
 	a := &app{storage: &localStore{root: t.TempDir()}}
 	p := newLadderProvider(a)
@@ -567,12 +586,15 @@ var ladderFixtureRowPattern = regexp.MustCompile(`(?s)<tr\b.*?</tr>`)
 var ladderFixtureCellPattern = regexp.MustCompile(`(?s)<td>.*?</td>`)
 
 func mapLadderFixtureRows(body string, update func(int, string) string) string {
-	i := 0
-	return ladderFixtureRowPattern.ReplaceAllStringFunc(body, func(row string) string {
-		mapped := update(i, row)
-		i++
-		return mapped
-	})
+	var result strings.Builder
+	offset := 0
+	for i, span := range ladderFixtureRowPattern.FindAllStringIndex(body, -1) {
+		result.WriteString(body[offset:span[0]])
+		result.WriteString(update(i, body[span[0]:span[1]]))
+		offset = span[1]
+	}
+	result.WriteString(body[offset:])
+	return result.String()
 }
 
 func replaceLadderFixtureCell(row string, column int, html string) string {
@@ -666,8 +688,13 @@ func TestLadderValidationKeepsGoodCache(t *testing.T) {
 			key := ladderKey{page: 1, tier: tt.tier}
 			now := time.Now().UTC()
 			p.now = func() time.Time { return now }
+			var eventsMu sync.Mutex
 			var events []map[string]any
-			p.observe = func(event map[string]any) { events = append(events, event) }
+			p.observe = func(event map[string]any) {
+				eventsMu.Lock()
+				defer eventsMu.Unlock()
+				events = append(events, event)
+			}
 			var calls atomic.Int32
 			p.fetch = func(context.Context, ladderKey, string) ([]byte, error) {
 				if calls.Add(1) == 1 {
@@ -718,8 +745,11 @@ func TestLadderValidationKeepsGoodCache(t *testing.T) {
 			}
 			want := map[string]any{"event": "ladder_parse_rejected", "page": 1, "tier": tt.tier,
 				"reason": tt.reason, "rows": tt.rows, "skipped": tt.skipped, "bytes": len(tt.broken)}
+			eventsMu.Lock()
+			received := append([]map[string]any(nil), events...)
+			eventsMu.Unlock()
 			rejections := 0
-			for _, event := range events {
+			for _, event := range received {
 				if event["event"] == "ladder_parse_rejected" {
 					rejections++
 					if !reflect.DeepEqual(event, want) {
@@ -774,12 +804,19 @@ func TestLadderValidationAcceptsFixtureAndSmallGaps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := newLadderProvider(new(app))
 			p.fetch = func(context.Context, ladderKey, string) ([]byte, error) { return []byte(tt.html), nil }
+			var reportMu sync.Mutex
 			var report map[string]any
-			p.observe = func(event map[string]any) { report = event }
+			p.observe = func(event map[string]any) {
+				reportMu.Lock()
+				defer reportMu.Unlock()
+				report = event
+			}
 			got, err := p.fetchPage(context.Background(), ladderKey{page: 1, tier: tt.tier}, "")
 			if err != nil || len(got.Rows) != tt.rows {
 				t.Fatalf("valid page: rows=%d err=%v", len(got.Rows), err)
 			}
+			reportMu.Lock()
+			defer reportMu.Unlock()
 			if report["event"] != "ladder_fetch" || report["parse_version"] != 1 || report["rows"] != tt.rows ||
 				report["rows_skipped"] != tt.fieldRows || report["field_invalid_rows"] != tt.fieldRows {
 				t.Fatalf("successful parse diagnostic: %v", report)

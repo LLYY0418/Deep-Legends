@@ -43,6 +43,8 @@ function serveStaticAPI(req,res){
    });return true;
   }
  }
+ if(['GET','POST'].includes(method)&&pathname==='/api/ui-preferences')data={schema:1,values:{}};
+ if(method==='POST'&&pathname==='/api/pro-players/refresh')data={updating:false,due:0};
  if(method==='GET'&&pathname==='/api/gameplay/client-recommendation')data=browserAPI(url);
  if(method==='GET'&&pathname==='/api/announcements')data={source:'synthetic',announcements:[]};
  if(method==='GET'&&pathname==='/api/gameplay/summoner-spells')data={source:'synthetic',spells:[{id:4,name:'闪现'},{id:11,name:'惩戒'},{id:14,name:'引燃'}]};

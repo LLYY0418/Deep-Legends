@@ -23,7 +23,7 @@ test('R278 P5 pending ranks never invent unranked and CN uses milestones',()=>{
  const f=compile(source,['renderRanks'],{renderRankMMRPopover:()=>'',riotTab:()=>false,escapeHTML,renderRankHistory:()=>'<div class="rank-history">foreign</div>',renderRankMilestones:()=>'<div>历史最高</div>',renderCareerPendingMarkup:markup=>markup});
  const pending=f.renderRanks([],[],[],null,null,{loading:true});assert.doesNotMatch(pending,/未定级|Unranked/);
  const html=f.renderRanks([],[{name:'ranked-stats',state:'available'}],[],{},null,{loading:false});assert.match(html,/未定级/);assert.doesNotMatch(html,/rank-history|尚未定级/);
- const css=fs.readFileSync(process.env.R278_CSS_SOURCE || __dirname+'/gameplay.css','utf8');assert.doesNotMatch(css,/\[data-career-key="ranks"\]\s*\{\s*min-height:\s*450px/);
+ const css=[__dirname+'/gameplay.css',process.env.R278_CSS_SOURCE || __dirname+'/match-detail.css'].map(file=>fs.readFileSync(file,'utf8')).join('\n');assert.doesNotMatch(css,/\[data-career-key="ranks"\]\s*\{\s*min-height:\s*450px/);
 });
 test('R278 P6 completion clears all pending flags and marks filter/highlights ready',()=>{
  const tab={loading:true,initialPagePending:true,initialPageError:'old',matchesReceived:false,recentStatsReceived:false,overviewCardLoad:{ready:new Set()}};

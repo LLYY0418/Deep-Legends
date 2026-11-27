@@ -26,20 +26,18 @@ const eagerNames = [...read("index.html").matchAll(/<link rel="stylesheet" href=
 const eager = eagerNames.map((name) => name === "gameplay.css" ? gameplay : read(name));
 const oldEager = eagerNames.map((name) => name === "gameplay.css" ? oldGameplay : read(name));
 
-function withBrowser(files, page) {
+function withBrowser(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "r320-match-styles-"));
   try {
     for (const [name, source] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), source);
     const html = execFileSync(chrome, [
       "--headless=new", "--no-sandbox", "--disable-background-networking", "--no-first-run", "--no-default-browser-check",
       "--window-size=1440,960", "--virtual-time-budget=8000", `--user-data-dir=${path.join(dir, "profile")}`,
-      "--dump-dom", pathToFileURL(path.join(dir, page)).href,
+      "--dump-dom", pathToFileURL(path.join(dir, "run.html")).href,
     ], { timeout: 30000, maxBuffer: 8 * 1024 * 1024, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     const result = html.match(/<pre id="result">([A-Za-z0-9+/=]+)<\/pre>/);
     assert.ok(result, "Chromium did not report a result");
-    const value = JSON.parse(Buffer.from(result[1], "base64").toString("utf8"));
-    assert.equal(value.error, undefined, value.error);
-    return value;
+    return JSON.parse(Buffer.from(result[1], "base64").toString("utf8"));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true, maxRetries: 4 });
   }
@@ -48,15 +46,12 @@ function withBrowser(files, page) {
 function pageScript(run, inputs) {
   return `
     const input = ${JSON.stringify(inputs)};
-    function report(result) {
-      const bytes = new TextEncoder().encode(JSON.stringify(result));
-      document.querySelector("#result").textContent = btoa(Array.from(bytes, byte => String.fromCharCode(byte)).join(""));
-    }
+    const report = (result) => parent.postMessage(result, "*");
     Promise.resolve().then(() => (${run})(input)).then(report, error => report({error: error.stack || String(error)}));
   `;
 }
 
-const fixture = `<!doctype html><html data-theme="dark"><meta charset="utf-8"><pre id="result"></pre>
+const fixture = `<!doctype html><html data-theme="dark"><meta charset="utf-8">
   <main id="fixture"></main><script src="renderer-fixture.js"></script>`;
 const rendererFunctions = [
   "ensureMatchDetailRenderer", "renderMatchDetail", "renderMatchOverview", "renderArenaMatchOverview", "renderTeamAnalysis",
@@ -213,9 +208,9 @@ function compare(input) {
     for (const property of getComputedStyle(document.body)) {
       if (names.some((name) => property.startsWith(name + "-"))) properties.add(property);
     }
-    const createFrame = (styles, width, surface) => {
+    const createFrame = (styles, surface) => {
       const frame = document.createElement("iframe");
-      frame.style.cssText = `display:block;width:${width}px;height:200px;border:0`;
+      frame.style.cssText = "display:block;height:200px;border:0";
       document.body.append(frame);
       const doc = frame.contentDocument;
       for (const css of styles) {
@@ -249,36 +244,47 @@ function compare(input) {
       [820, ["light", "dark"]],
       [660, ["light", "dark"]],
     ];
-    for (const { surface, before: beforeStyles, after: afterStyles } of input.surfaces) for (const [width, themes] of areas) {
-      const before = createFrame(beforeStyles, width, surface);
-      const after = createFrame(afterStyles, width, surface);
-      for (const theme of themes) {
-        const snapshots = [before, after].map((frame) => {
-          const doc = frame.contentDocument;
-          doc.documentElement.dataset.theme = theme;
-          const targets = new Map();
-          for (const state of ["rest", "hover", "focus"]) {
-            for (const node of doc.querySelectorAll(".match-detail-tabs button, .damage-sort-toggle, .team-analysis-metrics button, .build-player")) {
-              node.toggleAttribute("data-r320-hover", state === "hover");
-              node.toggleAttribute("data-r320-focus", state === "focus");
-            }
-            for (const selector of selectors) {
-              if (state === "hover" && !selector.includes(":hover") || state === "focus" && !selector.includes(":focus-visible")) continue;
-              const matches = getTargets(doc, selector);
-              if (matches.length) compared.add(selector);
-              for (const [index, { element, pseudo }] of matches.entries()) {
-                const computed = frame.contentWindow.getComputedStyle(element, pseudo);
-                const id = `${state} ${selector} [${index}]`;
-                targets.set(id, Array.from(properties, (property) => computed.getPropertyValue(property)));
+    for (const { surface, before: beforeStyles, after: afterStyles } of input.surfaces) {
+      const before = createFrame(beforeStyles, surface);
+      const after = createFrame(afterStyles, surface);
+      for (const [width, themes] of areas) {
+        for (const frame of [before, after]) {
+          frame.style.width = width + "px";
+          if (frame.contentWindow.innerWidth !== width) throw Error("unexpected fixture width");
+        }
+        for (const theme of themes) {
+          const snapshots = [before, after].map((frame) => {
+            const doc = frame.contentDocument;
+            doc.documentElement.dataset.theme = theme;
+            const targets = new Map();
+            for (const state of ["rest", "hover", "focus"]) {
+              for (const node of doc.querySelectorAll(".match-detail-tabs button, .damage-sort-toggle, .team-analysis-metrics button, .build-player")) {
+                node.toggleAttribute("data-r320-hover", state === "hover");
+                node.toggleAttribute("data-r320-focus", state === "focus");
+              }
+              const computedByElement = new Map();
+              for (const selector of selectors) {
+                if (state === "hover" && !selector.includes(":hover") || state === "focus" && !selector.includes(":focus-visible")) continue;
+                const matches = getTargets(doc, selector);
+                if (matches.length) compared.add(selector);
+                for (const [index, { element, pseudo }] of matches.entries()) {
+                  let values = computedByElement.get(element);
+                  if (!values) computedByElement.set(element, values = new Map());
+                  if (!values.has(pseudo)) {
+                    const computed = frame.contentWindow.getComputedStyle(element, pseudo);
+                    values.set(pseudo, Array.from(properties, (property) => computed.getPropertyValue(property)));
+                  }
+                  targets.set(`${state} ${selector} [${index}]`, values.get(pseudo));
+                }
               }
             }
+            return targets;
+          });
+          for (const [id, prior] of snapshots[0]) {
+            const current = snapshots[1].get(id);
+            const differences = namesForDifference(prior, current, properties);
+            if (differences.length) results.differences.push({ surface, width, theme, id, differences });
           }
-          return targets;
-        });
-        for (const [id, prior] of snapshots[0]) {
-          const current = snapshots[1].get(id);
-          const differences = namesForDifference(prior, current, properties);
-          if (differences.length) results.differences.push({ surface, width, theme, id, differences });
         }
       }
       before.remove();
@@ -348,24 +354,66 @@ function stylesheetGate(input) {
   });
 }
 
+const runner = `<!doctype html><pre id="result"></pre><script>
+  const results = {};
+  let frame;
+  const run = (probe) => {
+    frame = document.createElement("iframe");
+    frame.id = probe;
+    frame.src = probe + ".html";
+    frame.width = 1440;
+    frame.height = 960;
+    document.body.append(frame);
+  };
+  addEventListener("message", ({source, data}) => {
+    if (source !== frame?.contentWindow) return;
+    results[frame.id] = data;
+    frame.remove();
+    if (!results.gate) return run("gate");
+    const bytes = new TextEncoder().encode(JSON.stringify(results));
+    document.getElementById("result").textContent = btoa(Array.from(bytes, byte => String.fromCharCode(byte)).join(""));
+  });
+  run("compare");
+</script>`;
+
+let browserResults;
+function browserResult(probe) {
+  if (!browserResults) {
+    const candidate = detail();
+    const playerTags = read("player-tags.css");
+    const sharedCards = read("shared-cards.css");
+    const liveArena = read("live-arena.css");
+    const stylesheet = eager.map((css) => `<style>${css}</style>`).join("");
+    browserResults = withBrowser({
+      "run.html": runner,
+      "compare.html": fixture + '<script src="runtime.js"></script><script src="compare-match-details.js"></script><script src="compare.js"></script>',
+      "gate.html": fixture.replace('<main', stylesheet + '<main') +
+        '<script src="section-loader.js"></script><script src="gate.js"></script>',
+      "renderer-fixture.js": `const rendererFunctions = ${JSON.stringify(rendererFunctions)};\n${rendererFixture}`,
+      "runtime.js": read("runtime.js"),
+      "section-loader.js": read("section-loader.js"),
+      "match-details.js": read("match-details.js"),
+      "compare-match-details.js": 'window.deepLegendsSections = { register() {}, load: () => Promise.resolve() };\n' + read("match-details.js"),
+      "match-detail.css": candidate,
+      "compare.js": pageScript(compare, {
+        oldGameplay, oldDetail, gameplay, detail: candidate,
+        eagerSelectors: [".match-detail"],
+        surfaces: [
+          { surface: "overview", before: [...oldEager, oldDetail], after: [...eager, candidate] },
+          { surface: "live", before: [...oldEager, playerTags, sharedCards, oldDetail, liveArena],
+            after: [...eager, playerTags, sharedCards, candidate, liveArena] },
+        ],
+      }),
+      "gate.js": pageScript(stylesheetGate, { oldGameplay }),
+    });
+  }
+  const result = browserResults[probe];
+  assert.equal(result.error, undefined, result.error);
+  return result;
+}
+
 test("R320 Chromium preserves computed match-detail styles and verifies the migration inventory", () => {
-  const candidate = detail();
-  const playerTags = read("player-tags.css");
-  const result = withBrowser({
-    "fixture.html": fixture + '<script src="runtime.js"></script><script src="match-details.js"></script><script src="compare.js"></script>',
-    "runtime.js": read("runtime.js"),
-    "match-details.js": 'window.deepLegendsSections = { register() {}, load: () => Promise.resolve() };\n' + read("match-details.js"),
-    "renderer-fixture.js": `const rendererFunctions = ${JSON.stringify(rendererFunctions)};\n${rendererFixture}`,
-    "compare.js": pageScript(compare, {
-      oldGameplay, oldDetail, gameplay, detail: candidate,
-      eagerSelectors: [".match-detail"],
-      surfaces: [
-        { surface: "overview", before: [...oldEager, oldDetail], after: [...eager, candidate] },
-        { surface: "live", before: [...oldEager, playerTags, read("shared-cards.css"), oldDetail, read("live-arena.css")],
-          after: [...eager, playerTags, read("shared-cards.css"), candidate, read("live-arena.css")] },
-      ],
-    }),
-  }, "fixture.html");
+  const result = browserResult("compare");
   if (process.env.R320_STYLE_AUDIT_REPORT) fs.writeFileSync(process.env.R320_STYLE_AUDIT_REPORT, JSON.stringify(result, null, 2));
   assert.deepEqual(result.missing, [], "Every migrated selector must match the fixture");
   assert.deepEqual(result.differences.slice(0, 12), [], `${result.differences.length} computed style differences`);
@@ -375,16 +423,7 @@ test("R320 Chromium preserves computed match-detail styles and verifies the migr
 });
 
 test("R320 Chromium styles the loading placeholder and waits for CSS before inserting match details", () => {
-  const stylesheet = eager.map((css) => `<style>${css}</style>`).join("");
-  const result = withBrowser({
-    "fixture.html": fixture.replace('<pre id="result">', stylesheet + '<pre id="result">') +
-      '<script src="section-loader.js"></script><script src="gate.js"></script>',
-    "renderer-fixture.js": `const rendererFunctions = ${JSON.stringify(rendererFunctions)};\n${rendererFixture}`,
-    "section-loader.js": read("section-loader.js"),
-    "match-details.js": read("match-details.js"),
-    "match-detail.css": detail(),
-    "gate.js": pageScript(stylesheetGate, { oldGameplay }),
-  }, "fixture.html");
+  const result = browserResult("gate");
   assert.deepEqual(result.before, { sheetPending: true, skeleton: true, earlyModule: false, earlyMarkup: false, skeletonStyle: result.priorSkeleton });
   assert.equal(result.sheetReady, true);
   assert.equal(result.moduleStartedBeforeCSS, false);

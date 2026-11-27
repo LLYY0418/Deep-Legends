@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix='r278-mutants-') as d:
  mutate('P2-frontend-outage-timer-restored','backend/web/gameplay.js','if(historyServiceState(tab))return;','if(historyServiceState(tab)){setTimeout(()=>loadOverview(tab,true),60000);return;}','R278_GAMEPLAY_SOURCE')
  mutate('P3-empty-revision-reference-restored','backend/overview_wire.go','ok && match.Revision != "" && revision == match.Revision','ok && revision == match.Revision',test='TestR278P3NeverReferenceEmptyRevision')
  mutate('P4-foreign-scan-restored','backend/web/app.js','if (!foreign && !installations.some(item => item.available)) {','if (!installations.some(item => item.available)) {','R278_APP_SOURCE')
- mutate('P5-loaded-fixed-height-restored','backend/web/gameplay.css','/* R211:','[data-career-key="ranks"] { min-height: 450px; }\n/* R211:','R278_CSS_SOURCE')
+ mutate('P5-loaded-fixed-height-restored','backend/web/match-detail.css','/* R211:','[data-career-key="ranks"] { min-height: 450px; }\n/* R211:','R278_CSS_SOURCE')
  mutate('P6-completion-pending-left','backend/web/gameplay.js','tab.initialPagePending=false;tab.initialPageError="";','tab.initialPagePending=true;tab.initialPageError="";','R278_GAMEPLAY_SOURCE')
  mutate('P7-cleanup-before-admission','backend/web/gameplay.js','if(blocked)return;','if(blocked){cleanup();return;}','R278_GAMEPLAY_SOURCE')
  mutate('P7-half-page-budget-restored','backend/riot_page_budget.go','need := count + 1','need := 1',test='TestR278P7WholePageQuota')
