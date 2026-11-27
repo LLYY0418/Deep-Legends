@@ -104,8 +104,12 @@ func TestR292LegacyCacheUsesTeamIDsWithoutExtraRequests(t *testing.T) {
 	store := trackTestStore(t, &localStore{root: t.TempDir()})
 	p := newProRuneProvider(proTestProvider(), store, nil)
 	now := proOPGGNow()
-	// Exact pre-R292 cache shape: no team-region field, only the original IDs.
-	p.writeDisk("opgg-builds-103", proOPGGCache{ChampionID: 103, ReadAt: now, Attempted: now, Rows: []proOPGGBuild{r292Build(t, 1, "563", 1), r292Build(t, 2, "385", 2)}})
+	// Only the cache envelope is segment-scoped. The build rows still have
+	// the old shape with no team-region field, so ranking must use team IDs.
+	heads := []proRuneScope{{proRuneLeague{"96", "Worlds", false}, "741", now.Add(-time.Hour)}}
+	p.writeDisk(proOPGGSegmentCacheKey, proOPGGSegmentState{Heads: heads, At: now})
+	key := proCurrentPeriod(heads).buildKey(103)
+	p.writeDisk(key, proOPGGCache{ChampionID: 103, Segment: key, ReadAt: now, Attempted: now, Rows: []proOPGGBuild{r292Build(t, 1, "563", 1), r292Build(t, 2, "385", 2)}})
 	restarted := newProRuneProvider(proTestProvider(), store, nil)
 	restarted.now = proOPGGNow
 	var requests atomic.Int32

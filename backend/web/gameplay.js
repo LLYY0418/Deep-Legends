@@ -8185,15 +8185,15 @@
     if(section.key==="custom")return renderCustomConfiguration(section.items[0]);
     if (section.key === "pro") {
       const status = section.proStatus || {};
-      const unavailableReason = { pro: status.reason === "upstream-timeout" ? "职业赛事上游超时，请稍后重试。" : status.reason === "network-unavailable" ? "无法连接职业赛事数据源，请检查网络或代理后重试。" : status.reason === "no-sample" ? "近 30 天暂无该英雄在当前所选位置的职业选手符文。" : status.reason === "cache-write-failed" ? "职业数据缓存写入失败，请检查本地存储。" : "职业赛事数据暂不可用，请重试。" };
+      const unavailableReason = { pro: status.reason === "upstream-timeout" ? "职业赛事上游超时，请稍后重试。" : status.reason === "network-unavailable" ? "无法连接职业赛事数据源，请检查网络或代理后重试。" : status.reason === "no-sample" ? "最新赛段暂无该英雄在当前所选位置的职业选手符文。" : status.reason === "cache-write-failed" ? "职业数据缓存写入失败，请检查本地存储。" : "职业赛事数据暂不可用，请重试。" };
       const preparing = status.preparing || status.reason === "preparing" || section.loading;
       const totalGames = Math.max(0, Number(status.totalGames) || 0);
       const failedGames = Math.min(totalGames, Math.max(0, Number(status.failedGames) || 0));
       const failureRate = totalGames ? failedGames / totalGames : 0;
       const degraded = failureRate > 0.1;
       const stale = status.stale || (status.readAt && Date.now() - Date.parse(status.readAt) > 300000);
-      const note = section.items.length && !stale && status.outcomesLoading ? "正在核对近 30 天战绩，未确认胜负不计入统计。" : "";
-      const content = section.items.length ? renderSpecialistPlayers(section.items, "pro") : `<div class="recommendation-empty"><strong>${!championSelected ? "请先选定英雄" : preparing ? "正在准备职业选手数据" : "暂无职业选手符文"}</strong><p>${preparing ? "正在后台索引近 30 天官方比赛，不影响其它推荐。" : unavailableReason.pro}</p></div>`;
+      const note = section.items.length && !stale && status.outcomesLoading ? "正在核对赛段战绩，未确认胜负不计入统计。" : "";
+      const content = section.items.length ? renderSpecialistPlayers(section.items, "pro") : `<div class="recommendation-empty"><strong>${!championSelected ? "请先选定英雄" : preparing ? "正在准备职业选手数据" : "暂无职业选手符文"}</strong><p>${preparing ? "正在后台索引最新赛段的官方比赛，不影响其它推荐。" : unavailableReason.pro}</p></div>`;
       return `<section class="rune-source-section">${note ? `<p class="pro-rune-status" role="status">${escapeHTML(note)}</p>` : ""}${content}${!preparing && (stale || degraded || !section.items.length) ? `<button class="text-button" type="button" data-retry-pro-runes${stale && section.items.length ? ' data-tooltip="当前显示上次读取结果，点击重新获取"' : ''}>重试</button>` : ""}</section>`;
     }
     const target = specialistRequestTarget(state.live);

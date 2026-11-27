@@ -39,12 +39,16 @@ func TestProRuneLiveCaptureReplay(t *testing.T) {
 		var mu sync.Mutex
 		requests := []string{}
 		cp.client = &http.Client{Transport: championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			leagueID := r.URL.Query().Get("leagueId")
 			name := "schedule"
 			if r.URL.Query().Get("pageToken") != "" {
 				name = "schedule-80"
 			}
 			if strings.HasSuffix(r.URL.Path, "getEventDetails") {
 				name = "event-" + r.URL.Query().Get("id")
+			}
+			if strings.HasSuffix(r.URL.Path, "getTournamentsForLeague") {
+				name = "tournaments-" + leagueID
 			}
 			if strings.Contains(r.URL.Path, "/window/") {
 				name = "window-" + filepath.Base(r.URL.Path)
@@ -62,6 +66,12 @@ func TestProRuneLiveCaptureReplay(t *testing.T) {
 			requests = append(requests, name)
 			mu.Unlock()
 			data, err := os.ReadFile(filepath.Join(root, name+".json"))
+			if strings.HasPrefix(name, "tournaments-") && os.IsNotExist(err) {
+				data, err = proRuneReplayCalendar(leagueID)
+			}
+			if err == nil && strings.HasPrefix(name, "schedule") {
+				data, err = proRuneReplaySchedule(root, leagueID, name == "schedule-80", data)
+			}
 			if err != nil || len(data) == 0 {
 				return nil, fmt.Errorf("capture missing %s", name)
 			}
@@ -100,7 +110,7 @@ func TestProRuneLiveCaptureReplay(t *testing.T) {
 				}
 			}
 		}
-		t.Logf("UTC window 2026-08-10T04:16Z..2026-09-09T04:16Z: games=%d unknown=%d rate=%.2f%% rejected=%d indexFailures=%d", total, unknown, 100*float64(unknown)/float64(total), rejected, p.failed)
+		t.Logf("Segments in the capture as of 2026-09-09T04:16Z: games=%d unknown=%d rate=%.2f%% rejected=%d indexFailures=%d", total, unknown, 100*float64(unknown)/float64(total), rejected, p.failed)
 		start := time.Now()
 		res := p.recommend(ctx, 69, "mid")
 		cold := time.Since(start)
@@ -125,6 +135,58 @@ func TestProRuneLiveCaptureReplay(t *testing.T) {
 		data, _ := json.MarshalIndent(res, "", "  ")
 		os.WriteFile(filepath.Join(root, "production-response.json"), data, 0600)
 	})
+}
+
+// The September 2026 archive predates the tournament request. Supply the
+// published calendars for that checkpoint and scope its combined schedule
+// using the league recorded on each captured match.
+func proRuneReplayCalendar(leagueID string) ([]byte, error) {
+	type tournament struct{ ID, StartDate, EndDate string }
+	calendars := map[string][]tournament{
+		"98767991314006698":  {{"115616254668930796", "2026-07-21", "2026-09-19"}, {"115615907996665826", "2026-04-03", "2026-06-14"}},
+		"98767991310872058":  {{"115548147890329817", "2026-07-28", "2026-09-13"}, {"115548128960088078", "2026-03-31", "2026-06-14"}},
+		"113464388705111224": {{"115570858980956868", "2026-03-16", "2026-03-23"}},
+		"98767991325878492":  {{"115570934354631452", "2026-06-27", "2026-07-12"}},
+		"116838530616006090": {{"116854907266085633", "2026-07-14", "2026-07-19"}},
+		"98767975604431411":  {{"113475452383887518", "2025-10-14", "2025-11-09"}},
+	}
+	return json.Marshal(map[string]any{"data": map[string]any{"leagues": []any{map[string]any{"tournaments": calendars[leagueID]}}}})
+}
+
+func proRuneReplaySchedule(root, leagueID string, lastPage bool, data []byte) ([]byte, error) {
+	var wire struct {
+		Data struct {
+			Schedule struct {
+				Pages  json.RawMessage
+				Events []json.RawMessage
+			}
+		}
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return nil, err
+	}
+	var events []json.RawMessage
+	for _, raw := range wire.Data.Schedule.Events {
+		var entry struct {
+			Match struct{ ID string }
+		}
+		if json.Unmarshal(raw, &entry) != nil || !proNumericID(entry.Match.ID) {
+			continue
+		}
+		captured, err := os.ReadFile(filepath.Join(root, "event-"+entry.Match.ID+".json"))
+		var detail struct {
+			Data struct{ Event proRuneEvent }
+		}
+		if err == nil && json.Unmarshal(captured, &detail) == nil && detail.Data.Event.League.ID == leagueID {
+			events = append(events, raw)
+		}
+	}
+	wire.Data.Schedule.Events = events
+	if lastPage {
+		// The archive contains exactly two schedule pages.
+		wire.Data.Schedule.Pages = json.RawMessage("{}")
+	}
+	return json.Marshal(wire)
 }
 
 func TestProRuneLiveSupplementLatency(t *testing.T) {

@@ -40,7 +40,7 @@ func proTestEnd(g proRuneIndexGame) proWindow {
 	return proWindow{Metadata: g.Metadata, Frames: []proFrame{{Timestamp: g.Start.Add(30 * time.Minute), State: "finished", Blue: proFrameTeam{Inhibitors: 1, TotalGold: 40000}, Red: proFrameTeam{TotalGold: 50000}}}}
 }
 func TestProRuneWhiteLists(t *testing.T) {
-	leagues := map[string]string{"98767991314006698": "LPL", "98767991310872058": "LCK", "113464388705111224": "First Stand", "98767991325878492": "MSI", "98767975604431411": "Worlds"}
+	leagues := map[string]string{"98767991314006698": "LPL", "98767991310872058": "LCK", "113464388705111224": "First Stand", "98767991325878492": "MSI", "98767975604431411": "Worlds", "116838530616006090": "EWC"}
 	teams := map[string]string{"99566404853854212": "BLG", "99566404848691211": "IG", "98767991853197861": "T1", "100205573496804586": "HLE", "100205573495116443": "GEN", "100725845018863243": "DK"}
 	if !reflect.DeepEqual(proRuneLeagues, leagues) || !reflect.DeepEqual(proRuneTeams, teams) {
 		t.Fatal("V1/V2 exact official ID whitelist changed")
@@ -475,6 +475,8 @@ func TestProRunePartialFailureCounts(t *testing.T) {
 			provider.client.Transport = championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 				var data any
 				switch {
+				case strings.HasSuffix(r.URL.Path, "getTournamentsForLeague"):
+					data = proTestCalendar(r.URL.Query().Get("leagueId"), e.League.ID, now.Add(-time.Hour))
 				case strings.HasSuffix(r.URL.Path, "getSchedule"):
 					data = map[string]any{"data": map[string]any{"schedule": map[string]any{"events": []any{map[string]any{"startTime": now.Add(-time.Hour), "state": "completed", "match": map[string]string{"id": e.ID}}}}}}
 				case strings.HasSuffix(r.URL.Path, "getEventDetails"):
@@ -547,6 +549,8 @@ func TestProRuneFailureCountsAcrossIndexTerminalAndDetail(t *testing.T) {
 	provider.client.Transport = championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		var body []byte
 		switch {
+		case strings.HasSuffix(r.URL.Path, "getTournamentsForLeague"):
+			body, _ = json.Marshal(proTestCalendar(r.URL.Query().Get("leagueId"), e.League.ID, g.Start))
 		case strings.HasSuffix(r.URL.Path, "getSchedule"):
 			body, _ = json.Marshal(map[string]any{"data": map[string]any{"schedule": map[string]any{"events": []any{map[string]any{"startTime": g.Start, "state": "completed", "match": map[string]string{"id": e.ID}}}}}})
 		case strings.HasSuffix(r.URL.Path, "getEventDetails"):
@@ -673,7 +677,7 @@ func TestProRuneMultiPlayerRecommendationKeepsFullRecord(t *testing.T) {
 		// Both Faker and Chovy played the same hero in this fixture.
 		g.Metadata.Red.Participants[0].ChampionID = "Cassiopeia"
 		if i == 8 {
-			g.Start = time.Now().Add(-31 * 24 * time.Hour)
+			g.PreviousPeriod = true
 		}
 		e := proTestEvent()
 		e.ID = g.MatchID
@@ -693,7 +697,7 @@ func TestProRuneMultiPlayerRecommendationKeepsFullRecord(t *testing.T) {
 	for _, row := range result.Pros {
 		counts[row.PlayerName]++
 		if row.RecordGames != 8 {
-			t.Fatalf("record must include all 8 in-window games, not 5 displayed or 9 all-time: %+v", row)
+			t.Fatalf("record must include all 8 current-segment games, not 5 displayed or 9 all-time: %+v", row)
 		}
 		if len(row.ItemIDs) != 2 || len(row.SelectedPerkIDs) != 9 {
 			t.Fatal("missing game loadout", row)
@@ -778,4 +782,15 @@ func TestProBackgroundWorkersLeaveForegroundSlot(t *testing.T) {
 	}) {
 		t.Fatal("no foreground capacity")
 	}
+}
+
+func proTestCalendar(requested, league string, match time.Time) any {
+	tournaments := []map[string]string{}
+	if requested == league {
+		tournaments = append(tournaments, map[string]string{
+			"id": "800", "startDate": match.AddDate(0, 0, -2).UTC().Format(time.DateOnly),
+			"endDate": match.AddDate(0, 0, 2).UTC().Format(time.DateOnly),
+		})
+	}
+	return map[string]any{"data": map[string]any{"leagues": []any{map[string]any{"tournaments": tournaments}}}}
 }

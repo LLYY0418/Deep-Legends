@@ -30,6 +30,10 @@ func proOPGGFixture(t *testing.T) []proOPGGBuild {
 	}
 	for i := range data.Data.Builds {
 		data.Data.Builds[i].League = "Worlds"
+		data.Data.Builds[i].Game.Match.Tournament.Serie.ID = "741"
+		if data.Data.Builds[i].Game.BeginAt.Year() == 2014 {
+			data.Data.Builds[i].Game.Match.Tournament.Serie.ID = "1"
+		}
 	}
 	return data.Data.Builds
 }
@@ -39,15 +43,25 @@ func proOPGGReply(rows []proOPGGBuild) *http.Response {
 	return proHTTPBody(b)
 }
 
-func TestProOPGGRealRecordsExactChampionAndWindow(t *testing.T) {
+func TestProOPGGRealRecordsExactChampion(t *testing.T) {
 	rows := proOPGGFixture(t)
 	wrong := rows[0]
 	wrong.ID = "other-hero"
 	wrong.ChampionID = "59"
-	rows = append(rows, wrong)
+	wireRows := append([]proOPGGBuild{wrong}, rows...)
+	p := newProRuneProvider(proTestProvider(), nil, nil)
+	p.provider.client = &http.Client{Transport: championRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		return proOPGGReply(wireRows), nil
+	})}
+	scope := proRuneScope{proRuneLeague{"96", "Worlds", false}, "741", rows[0].Game.BeginAt}
+	var err error
+	rows, err = p.opggLeagueBuilds(t.Context(), 103, scope, proRunePeriod{}, proOPGGNow())
+	if err != nil {
+		t.Fatal(err)
+	}
 	configs, games, failed := proOPGGRecommendations(rows, 103, "mid", "阿狸", proOPGGNow(), proOPGGNow(), false)
 	if len(configs) != 3 || games != 3 || failed != 0 {
-		t.Fatal("wrong champion or old game admitted", len(configs), games, failed)
+		t.Fatal("wrong champion or wrong serie admitted", len(configs), games, failed)
 	}
 	first := configs[0]
 	encoded, _ := json.Marshal(first)
@@ -66,11 +80,11 @@ func TestProOPGGRealRecordsExactChampionAndWindow(t *testing.T) {
 		t.Fatal("per-player record lost", configs[1])
 	}
 	rows[0].Perk = nil
-	configs, _, failed = proOPGGRecommendations(rows[:4], 103, "mid", "阿狸", proOPGGNow(), proOPGGNow(), false)
+	configs, _, failed = proOPGGRecommendations(rows, 103, "mid", "阿狸", proOPGGNow(), proOPGGNow(), false)
 	if len(configs) != 2 || failed != 1 {
 		t.Fatal("incomplete rune page must not be invented", len(configs), failed)
 	}
-	rows = proOPGGFixture(t)
+	rows = proOPGGFixture(t)[:3]
 	rows[0].Player.ID = ""
 	_, _, failed = proOPGGRecommendations(rows, 103, "mid", "阿狸", proOPGGNow(), proOPGGNow(), false)
 	if failed != 1 {
@@ -110,13 +124,13 @@ func TestProOPGGAnonymousTransportAndBoundaries(t *testing.T) {
 		}
 		return proOPGGReply([]proOPGGBuild{}), nil
 	})}
-	if _, err := p.fetchOPGGBuilds(t.Context(), 103, "96", 0); err != nil {
+	if _, err := p.fetchOPGGBuilds(t.Context(), 103, "96", 0, proOPGGPageSize); err != nil {
 		t.Fatal(err)
 	}
 	for _, m := range []string{"redirect", "oversized", "graphql"} {
 		mode = m
 		before := calls
-		if _, err := p.fetchOPGGBuilds(t.Context(), 103, "96", 0); err == nil {
+		if _, err := p.fetchOPGGBuilds(t.Context(), 103, "96", 0, proOPGGPageSize); err == nil {
 			t.Fatal("unsafe response accepted", m)
 		}
 		if calls != before+1 {
@@ -125,7 +139,7 @@ func TestProOPGGAnonymousTransportAndBoundaries(t *testing.T) {
 	}
 	p.provider.featureGates.apply(map[string]bool{featureGateOPGG: false})
 	before := calls
-	if _, err := p.fetchOPGGBuilds(t.Context(), 103, "96", 0); err == nil || calls != before {
+	if _, err := p.fetchOPGGBuilds(t.Context(), 103, "96", 0, proOPGGPageSize); err == nil || calls != before {
 		t.Fatal("disabled source sent request")
 	}
 	if featureGateForChampionHost(esportsOPGGHost) != featureGateOPGG || !allowedChampionHost(esportsOPGGHost) || systemProxyTargets()[esportsOPGGHost] != "https://esports.op.gg/" {
@@ -143,15 +157,31 @@ func TestProOPGGCacheSingleflightRestartAndPartialFailure(t *testing.T) {
 	mode := "ok"
 	transport := championRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		calls.Add(1)
-		var body struct{ Variables struct{ LeagueID string } }
+		var body struct {
+			Variables struct {
+				LeagueID, ChampionID string
+				Limit                int
+			}
+		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		if mode == "all-fail" || mode == "partial" && body.Variables.LeagueID == "96" {
+		league, head := body.Variables.LeagueID, body.Variables.ChampionID == ""
+		if mode == "all-fail" || mode == "partial" && !head && league == "98" {
 			return &http.Response{StatusCode: 503, Body: io.NopCloser(strings.NewReader(""))}, nil
 		}
-		if body.Variables.LeagueID == "96" {
-			return proOPGGReply(fixture), nil
+		var rows []proOPGGBuild
+		switch league {
+		case "98":
+			rows = fixture[:2]
+		case "99":
+			rows = fixture[2:3]
 		}
-		return proOPGGReply([]proOPGGBuild{}), nil
+		if head && len(rows) > 0 {
+			rows = rows[:1]
+		}
+		if rows == nil {
+			rows = []proOPGGBuild{}
+		}
+		return proOPGGReply(rows), nil
 	})
 	p.provider.client = &http.Client{Transport: transport}
 	var wg sync.WaitGroup
@@ -166,13 +196,13 @@ func TestProOPGGCacheSingleflightRestartAndPartialFailure(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	if calls.Load() != 5 {
+	if calls.Load() != 8 {
 		t.Fatal("duplicate requests", calls.Load())
 	}
 	restarted := newProRuneProvider(proTestProvider(), store, nil)
 	restarted.now = p.now
 	restarted.provider.client = p.provider.client
-	if r, err := restarted.opggRecommend(t.Context(), 103, "mid", false); err != nil || len(r.Pros) != 3 || calls.Load() != 5 {
+	if r, err := restarted.opggRecommend(t.Context(), 103, "mid", false); err != nil || len(r.Pros) != 3 || calls.Load() != 8 {
 		t.Fatal("restart ignored cache", err, calls.Load())
 	}
 	now = now.Add(time.Minute)
@@ -211,6 +241,7 @@ func TestProOPGGEmptySuccessDoesNotStartOfficialFallback(t *testing.T) {
 		t.Fatal("empty success incorrectly fell back", result, official.Load())
 	}
 	// An overall failure reaches the existing official provider (already preparing).
+	p.now = func() time.Time { return proOPGGNow().Add(proOPGGSegmentTTL) }
 	p.preparing = true
 	p.provider.client = &http.Client{Transport: championRoundTripFunc(func(*http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: 503, Body: io.NopCloser(strings.NewReader(""))}, nil
@@ -223,7 +254,7 @@ func TestProOPGGEmptySuccessDoesNotStartOfficialFallback(t *testing.T) {
 	}
 }
 
-func TestProOPGGPaginationStopsAtThirtyDaysAndRejectsDisorder(t *testing.T) {
+func TestProOPGGPaginationStopsAtOlderSerieAndRejectsDisorder(t *testing.T) {
 	p := newProRuneProvider(proTestProvider(), nil, nil)
 	row := proOPGGFixture(t)[0]
 	calls := 0
@@ -245,15 +276,16 @@ func TestProOPGGPaginationStopsAtThirtyDaysAndRejectsDisorder(t *testing.T) {
 			return proOPGGReply(rows), nil
 		}
 		old := row
-		old.Game.BeginAt = proOPGGNow().Add(-31 * 24 * time.Hour)
+		old.Game.BeginAt = row.Game.BeginAt.Add(-time.Minute)
+		old.Game.Match.Tournament.Serie.ID = "700"
 		return proOPGGReply([]proOPGGBuild{old}), nil
 	})}
-	rows, err := p.opggLeagueBuilds(t.Context(), 103, "96", "Worlds", proOPGGNow())
+	rows, err := p.opggLeagueBuilds(t.Context(), 103, proRuneScope{proRuneLeague{"96", "Worlds", false}, "741", row.Game.BeginAt}, proRunePeriod{}, proOPGGNow())
 	if err != nil || calls != 2 || len(rows) != 100 {
-		t.Fatal("pagination/window", len(rows), calls, err)
+		t.Fatal("pagination/serie", len(rows), calls, err)
 	}
 	disorder = true
-	if _, err = p.opggLeagueBuilds(t.Context(), 103, "96", "Worlds", proOPGGNow()); err == nil {
+	if _, err = p.opggLeagueBuilds(t.Context(), 103, proRuneScope{proRuneLeague{"96", "Worlds", false}, "741", row.Game.BeginAt}, proRunePeriod{}, proOPGGNow()); err == nil {
 		t.Fatal("unordered feed could silently truncate recent matches")
 	}
 }

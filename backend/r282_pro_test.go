@@ -125,6 +125,8 @@ func r282RecordedWorlds(t *testing.T, prefix string) {
 	provider.client = &http.Client{Transport: r196RoundTrip(func(r *http.Request) (*http.Response, error) {
 		var body []byte
 		switch {
+		case strings.HasSuffix(r.URL.Path, "getTournamentsForLeague"):
+			body, _ = json.Marshal(proTestCalendar(r.URL.Query().Get("leagueId"), event.League.ID, window.Frames[0].Timestamp))
 		case strings.HasSuffix(r.URL.Path, "getSchedule"):
 			schedule := map[string]any{"data": map[string]any{"schedule": map[string]any{"events": []any{}, "pages": map[string]string{}}}}
 			if r.URL.Query().Get("leagueId") == event.League.ID {
@@ -151,7 +153,7 @@ func r282RecordedWorlds(t *testing.T, prefix string) {
 	if len(selected) == 0 || selected[0].Participant.Role != "top" {
 		t.Fatal("recorded top lane must be available for mid request")
 	}
-	if len(events) != 5 {
+	if len(events) != len(proRuneLeagues) {
 		t.Fatal("one index diagnostic per league required", events)
 	}
 	for _, e := range events {

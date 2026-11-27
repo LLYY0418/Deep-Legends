@@ -669,7 +669,7 @@ test("R76 pro degradation uses game failure ratio, not a nonempty reason", () =>
   const empty=proStatus=>render({key:"pro",items:[],proStatus},true);
   assert.match(empty({reason:"preparing",preparing:true}),/正在准备职业选手数据/);
   assert.doesNotMatch(empty({reason:"preparing",preparing:true}),/data-retry-pro-runes/);
-  assert.match(empty({reason:"no-sample"}),/近 30 天暂无该英雄在当前所选位置/);
+  assert.match(empty({reason:"no-sample"}),/最新赛段暂无该英雄在当前所选位置/);
   assert.match(empty({reason:"network-unavailable",stale:true}),/无法连接职业赛事数据源/);
 });
 

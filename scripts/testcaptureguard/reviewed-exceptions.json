@@ -806,17 +806,17 @@
   },
   {
     "file": "backend/pro_runes_opgg_test.go",
-    "line": 89,
+    "line": 103,
     "target": "calls",
-    "source_sha256": "57ef391c1ffb9aedf7bff97ddad14a911ba904f5a32eeb6a5be343d5de1f1ac4",
+    "source_sha256": "f60a3b9a1c0b4c81b88da33d52a1ded0e3b161145df25bd0b09d683558faa59a",
     "comment": "r276-capture-safe: TestProOPGGAnonymousTransportAndBoundaries: the test directly calls fetchOPGGBuilds sequentially; client.Do invokes this Transport.RoundTrip inline and returns before mode/calls changes or assertions; no opggRecommend fan-out runs in this test"
   },
   {
     "file": "backend/pro_runes_opgg_test.go",
-    "line": 232,
+    "line": 263,
     "target": "calls",
-    "source_sha256": "57ef391c1ffb9aedf7bff97ddad14a911ba904f5a32eeb6a5be343d5de1f1ac4",
-    "comment": "r276-capture-safe: TestProOPGGPaginationStopsAtThirtyDaysAndRejectsDisorder: opggLeagueBuilds fetches pages in its ordinary synchronous for loop through fetchOPGGBuilds/client.Do; both direct calls return before calls is inspected or disorder is changed"
+    "source_sha256": "f60a3b9a1c0b4c81b88da33d52a1ded0e3b161145df25bd0b09d683558faa59a",
+    "comment": "r276-capture-safe: TestProOPGGPaginationStopsAtOlderSerieAndRejectsDisorder: opggLeagueBuilds fetches pages in its ordinary synchronous for loop through fetchOPGGBuilds/client.Do; both direct calls return before calls is inspected or disorder is changed"
   },
   {
     "file": "backend/qq101_test.go",

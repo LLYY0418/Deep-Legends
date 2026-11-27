@@ -227,7 +227,7 @@ type proRuneRow struct {
 func (p *proRuneProvider) rows(snapshot proRuneSnapshot, now time.Time) []proRuneRow {
 	result := []proRuneRow{}
 	for _, g := range snapshot.Games {
-		if !g.Start.After(now.Add(-30*24*time.Hour)) || g.Start.After(now) || !proEventAllowed(snapshot.Events[g.MatchID]) {
+		if g.Start.IsZero() || g.Start.After(now) || !proEventAllowed(snapshot.Events[g.MatchID]) {
 			continue
 		}
 		for _, pair := range [][2]proTeamMetadata{{g.Metadata.Blue, g.Metadata.Red}, {g.Metadata.Red, g.Metadata.Blue}} {
@@ -387,8 +387,20 @@ func (p *proRuneProvider) recommend(ctx context.Context, championID int, positio
 		response.Stale = true
 		return response
 	}
-	rows := p.rows(snapshot, now)
+	var current, previous []proRuneRow
+	for _, row := range p.rows(snapshot, now) {
+		if row.Game.PreviousPeriod {
+			previous = append(previous, row)
+		} else {
+			current = append(current, row)
+		}
+	}
+	rows := current
 	selected := proNewestRows(rows, meta.Key, position)
+	if len(selected) == 0 {
+		rows = previous
+		selected = proNewestRows(rows, meta.Key, position)
+	}
 	if len(selected) == 0 {
 		if response.Reason == "" {
 			response.Reason = "no-sample"

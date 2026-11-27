@@ -21,6 +21,7 @@ import (
 var proRuneLeagues = map[string]string{
 	"98767991314006698": "LPL", "98767991310872058": "LCK",
 	"113464388705111224": "First Stand", "98767991325878492": "MSI", "98767975604431411": "Worlds",
+	"116838530616006090": "EWC",
 }
 var proRuneTeams = map[string]string{
 	"99566404853854212": "BLG", "99566404848691211": "IG", "98767991853197861": "T1",
@@ -100,12 +101,13 @@ type proDetails struct {
 	} `json:"frames"`
 }
 type proRuneIndexGame struct {
-	ID       string
-	MatchID  string
-	LeagueID string
-	Number   int
-	Start    time.Time
-	Metadata proGameMetadata
+	ID             string
+	MatchID        string
+	LeagueID       string
+	Number         int
+	Start          time.Time
+	Metadata       proGameMetadata
+	PreviousPeriod bool
 }
 type proRuneSnapshot struct {
 	Games  map[string]proRuneIndexGame
@@ -138,6 +140,9 @@ type proRuneProvider struct {
 	diskMu           sync.Mutex
 	cacheWriteFailed bool
 	opggBuilds       map[int]proOPGGCache
+	opggSegments     proOPGGSegmentState
+	opggPreviousAt   time.Time
+	opggPrevious     proRunePeriod
 	starterLinks     map[string]proStarterLink
 	opggOpenings     map[string]proOPGGOpeningCache
 }
@@ -422,14 +427,13 @@ func (p *proRuneProvider) kick(force bool) {
 	}()
 }
 func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
-	cutoff := now.Add(-30 * 24 * time.Hour)
 	var old proRuneSnapshot
 	p.mu.Lock()
 	p.cacheWriteFailed = false
 	old = p.snapshot
 	p.mu.Unlock()
 	if len(old.Games) == 0 {
-		p.readDisk("snapshot", &old)
+		p.readDisk("snapshot-segments-v1", &old)
 	}
 	identities := map[string]string{}
 	p.readDisk("identities", &identities)
@@ -441,7 +445,7 @@ func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
 	next := proRuneSnapshot{Games: map[string]proRuneIndexGame{}, Events: map[string]proRuneEvent{}, ReadAt: old.ReadAt}
 	// Preserve partial/offline index without extending its last successful time.
 	for id, g := range old.Games {
-		if g.Start.After(cutoff) && !g.Start.After(now) && proEventAllowed(old.Events[g.MatchID]) {
+		if !g.Start.IsZero() && !g.Start.After(now) && proEventAllowed(old.Events[g.MatchID]) {
 			next.Games[id] = g
 			next.Events[g.MatchID] = old.Events[g.MatchID]
 		}
@@ -464,101 +468,48 @@ func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
 	failedGames := map[string]bool{}
 	sourceIncomplete := false
 	reason := ""
-	matches := map[string]bool{}
-	matchLeagues := map[string]string{}
 	indexStats := map[string]*proIndexDiagnostic{}
 	for id := range proRuneLeagues {
 		indexStats[id] = &proIndexDiagnostic{Dropped: map[string]int{"team": 0, "time": 0, "missing-data": 0}}
 	}
-	ids := make([]string, 0, 5)
-	for id := range proRuneLeagues {
-		ids = append(ids, id)
-	}
-	proParallel(ctx, ids, func(leagueID string) {
-		token := ""
-		seen := map[string]bool{}
-		for page := 0; page < 20; page++ {
-			q := url.Values{"hl": {"zh-CN"}, "leagueId": {leagueID}}
-			if token != "" {
-				q.Set("pageToken", token)
-			}
-			var response struct {
-				Data struct {
-					Schedule struct {
-						Pages struct {
-							Older string `json:"older"`
-						} `json:"pages"`
-						Events []struct {
-							Start time.Time `json:"startTime"`
-							State string    `json:"state"`
-							Match struct {
-								ID string `json:"id"`
-							} `json:"match"`
-						} `json:"events"`
-					} `json:"schedule"`
-				} `json:"data"`
-			}
-			if err := p.fetch(ctx, false, "getSchedule", q, &response); err != nil {
-				mu.Lock()
-				failed++
-				sourceIncomplete = true
-				reason = proRuneErrorReason(err)
-				mu.Unlock()
-				return
-			}
-			s := response.Data.Schedule
-			oldest := now
-			mu.Lock()
-			for _, e := range s.Events {
-				if e.Start.Before(oldest) {
-					oldest = e.Start
-				}
-				if e.State == "completed" && !e.Start.After(now) && e.Start.After(cutoff.Add(-24*time.Hour)) && proNumericID(e.Match.ID) {
-					matches[e.Match.ID] = true
-					matchLeagues[e.Match.ID] = leagueID
-				}
-			}
-			mu.Unlock()
-			// Include series straddling the UTC window; individual games are filtered below.
-			token = s.Pages.Older
-			if token == "" || oldest.Before(cutoff.Add(-24*time.Hour)) {
-				return
-			}
-			if seen[token] {
-				mu.Lock()
-				failed++
-				sourceIncomplete = true
-				reason = "upstream-error"
-				mu.Unlock()
-				return
-			}
-			seen[token] = true
-		}
-		mu.Lock()
+	matches, discoveryErr := p.officialSegments(ctx, now)
+	if discoveryErr != nil {
 		failed++
 		sourceIncomplete = true
-		reason = "upstream-error"
-		mu.Unlock()
-	})
+		reason = proRuneErrorReason(discoveryErr)
+	} else {
+		storedEvents := next.Events
+		next.Events = map[string]proRuneEvent{}
+		for id, game := range next.Games {
+			if match, ok := matches[game.MatchID]; ok && officialGameInPeriod(game, match, now) {
+				game.PreviousPeriod = match.previous
+				next.Games[id] = game
+				next.Events[game.MatchID] = storedEvents[game.MatchID]
+			} else {
+				delete(next.Games, id)
+			}
+		}
+	}
 	matchIDs := make([]string, 0, len(matches))
 	for id := range matches {
 		matchIDs = append(matchIDs, id)
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(matchIDs)))
 	proParallel(ctx, matchIDs, func(id string) {
+		match := matches[id]
 		e, err := p.event(ctx, id)
 		if err != nil {
 			mu.Lock()
-			indexStats[matchLeagues[id]].Dropped["missing-data"]++
+			indexStats[match.leagueID].Dropped["missing-data"]++
 			failed++
 			sourceIncomplete = true
 			reason = proRuneErrorReason(err)
 			mu.Unlock()
 			return
 		}
-		if !proEventAllowed(e) {
+		if e.League.ID != match.leagueID || !proEventAllowed(e) {
 			mu.Lock()
-			stats := indexStats[matchLeagues[id]]
+			stats := indexStats[match.leagueID]
 			for _, g := range e.Match.Games {
 				if g.State == "completed" {
 					stats.Completed++
@@ -577,14 +528,15 @@ func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
 			}
 			row, err := p.indexGame(ctx, e, g)
 			mu.Lock()
-			stats := indexStats[matchLeagues[id]]
+			stats := indexStats[match.leagueID]
 			stats.Completed++
 			if err != nil {
 				stats.Dropped["missing-data"]++
 				failed++
 				failedGames[g.ID] = true
 				reason = proRuneErrorReason(err)
-			} else if row.Start.After(cutoff) && !row.Start.After(now) {
+			} else if officialGameInPeriod(row, match, now) {
+				row.PreviousPeriod = match.previous
 				next.Games[row.ID] = row
 				stats.Included++
 				if row.Start.After(stats.Latest) {
@@ -638,8 +590,13 @@ func (p *proRuneProvider) refresh(ctx context.Context, now time.Time) {
 		}
 	}
 	p.mu.Unlock()
-	p.writeDisk("snapshot", next)
+	p.writeDisk("snapshot-segments-v1", next)
 }
+func officialGameInPeriod(game proRuneIndexGame, match proOfficialSelection, now time.Time) bool {
+	return game.LeagueID == match.leagueID && !game.Start.IsZero() && !game.Start.After(now) &&
+		game.Start.After(match.period.After) && (match.period.Before.IsZero() || game.Start.Before(match.period.Before))
+}
+
 func proRuneErrorReason(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "upstream-timeout"

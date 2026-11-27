@@ -18,10 +18,28 @@ const esportsOPGGHost = "esports.op.gg"
 const proOPGGPageSize = 100
 const proOPGGMaxPages = 20
 
-// Exact IDs from the public esports site's league metadata. Keep R75's scope.
-var proOPGGLeagues = []struct{ ID, Name string }{{"98", "LPL"}, {"99", "LCK"}, {"141", "First Stand"}, {"100", "MSI"}, {"96", "Worlds"}}
+type proRuneLeague struct {
+	ID, Name string
+	Domestic bool
+}
 
-const proOPGGBuildQuery = `query ListBuilds($leagueId:ID,$championId:ID,$page:Int,$limit:Int){builds(leagueId:$leagueId,championId:$championId,page:$page,limit:$limit){id championId position gameVersion items spells perk{primary{style selections}sub{style selections}stats{offense flex defense}}skillLevelUps{skillSlot levelUpType}player{id nickName}team{id acronym}opponentGamePlayer{championId player{nickName}team{acronym}}game{id length beginAt set winner{id}match{id homeTeam{acronym}awayTeam{acronym}}}}}`
+// Exact IDs from the public esports site's league metadata.
+var proOPGGLeagues = []proRuneLeague{
+	{"98", "LPL", true}, {"99", "LCK", true},
+	{"141", "First Stand", false}, {"100", "MSI", false}, {"166", "EWC", false}, {"96", "Worlds", false},
+}
+
+const proOPGGTournamentFields = `tournament{id name serie{id year season}}`
+const proOPGGBuildQuery = `query ListBuilds($leagueId:ID,$championId:ID,$page:Int,$limit:Int){builds(leagueId:$leagueId,championId:$championId,page:$page,limit:$limit){id championId position gameVersion items spells perk{primary{style selections}sub{style selections}stats{offense flex defense}}skillLevelUps{skillSlot levelUpType}player{id nickName}team{id acronym}opponentGamePlayer{championId player{nickName}team{acronym}}game{id length beginAt set winner{id}match{id homeTeam{acronym}awayTeam{acronym} ` + proOPGGTournamentFields + `}}}}`
+const proOPGGSeriesQuery = `query ListBuilds($leagueId:ID,$page:Int,$limit:Int){builds(leagueId:$leagueId,page:$page,limit:$limit){game{id beginAt match{` + proOPGGTournamentFields + `}}}}`
+
+type proOPGGTournament struct {
+	ID, Name string
+	Serie    struct {
+		ID, Season string
+		Year       int
+	}
+}
 
 type proOPGGTeam struct{ ID, Acronym string }
 type proOPGGPlayer struct{ ID, NickName string }
@@ -55,6 +73,7 @@ type proOPGGBuild struct {
 		Match   struct {
 			ID                 string
 			HomeTeam, AwayTeam proOPGGTeam
+			Tournament         proOPGGTournament
 		}
 	}
 	League string // Set from the exact requested league, never a roster lookup.
@@ -62,13 +81,14 @@ type proOPGGBuild struct {
 type proOPGGCache struct {
 	Revision          uint64
 	ChampionID        int
+	Segment           string
 	ReadAt, Attempted time.Time
 	Rows              []proOPGGBuild
 	FailedLeagues     int
 	OverallFailed     bool
 }
 
-func (p *proRuneProvider) fetchOPGGBuilds(ctx context.Context, championID int, league string, page int) ([]proOPGGBuild, error) {
+func (p *proRuneProvider) fetchOPGGBuilds(ctx context.Context, championID int, league string, page, limit int) ([]proOPGGBuild, error) {
 	if !p.provider.featureGates.enabled(featureGateOPGG) {
 		return nil, errors.New("OP.GG source disabled")
 	}
@@ -80,7 +100,13 @@ func (p *proRuneProvider) fetchOPGGBuilds(ctx context.Context, championID int, l
 	defer func() { <-p.gate }()
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	body, _ := json.Marshal(map[string]any{"operationName": "ListBuilds", "query": proOPGGBuildQuery, "variables": map[string]any{"leagueId": league, "championId": strconv.Itoa(championID), "page": page, "limit": proOPGGPageSize}})
+	query := proOPGGSeriesQuery
+	variables := map[string]any{"leagueId": league, "page": page, "limit": limit}
+	if championID > 0 {
+		query = proOPGGBuildQuery
+		variables["championId"] = strconv.Itoa(championID)
+	}
+	body, _ := json.Marshal(map[string]any{"operationName": "ListBuilds", "query": query, "variables": variables})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://"+esportsOPGGHost+"/matches/graphql/__query__ListBuilds", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -111,19 +137,18 @@ func (p *proRuneProvider) fetchOPGGBuilds(ctx context.Context, championID int, l
 	if err = json.Unmarshal(data, &payload); err != nil {
 		return nil, err
 	}
-	if payload.Data == nil || payload.Data.Builds == nil || len(payload.Errors) > 0 || len(payload.Data.Builds) > proOPGGPageSize {
+	if payload.Data == nil || payload.Data.Builds == nil || len(payload.Errors) > 0 || len(payload.Data.Builds) > limit {
 		return nil, errors.New("invalid OP.GG builds response")
 	}
 	return payload.Data.Builds, nil
 }
 
-func (p *proRuneProvider) opggLeagueBuilds(ctx context.Context, championID int, league, label string, now time.Time) ([]proOPGGBuild, error) {
+func (p *proRuneProvider) opggLeagueBuilds(ctx context.Context, championID int, scope proRuneScope, period proRunePeriod, now time.Time) ([]proOPGGBuild, error) {
 	rows := []proOPGGBuild{}
 	seen := map[string]bool{}
 	previous := now.Add(24 * time.Hour)
-	cutoff := now.Add(-30 * 24 * time.Hour)
 	for page := 0; page < proOPGGMaxPages; page++ {
-		batch, err := p.fetchOPGGBuilds(ctx, championID, league, page)
+		batch, err := p.fetchOPGGBuilds(ctx, championID, scope.ID, page, proOPGGPageSize)
 		if err != nil {
 			return nil, err
 		}
@@ -133,15 +158,21 @@ func (p *proRuneProvider) opggLeagueBuilds(ctx context.Context, championID int, 
 				return nil, errors.New("unordered OP.GG build dates")
 			}
 			previous = row.Game.BeginAt
-			if !row.Game.BeginAt.After(cutoff) {
+			at, serie := row.Game.BeginAt, row.Game.Match.Tournament.Serie.ID
+			if !proNumericID(serie) {
+				return nil, errors.New("missing OP.GG serie")
+			}
+			if !period.After.IsZero() && !at.After(period.After) ||
+				serie != scope.Serie && at.Before(scope.Last) {
 				past = true
 				continue
 			}
-			if row.Game.BeginAt.After(now) || seen[row.ID] {
+			if past || serie != scope.Serie || at.After(now) || (!period.Before.IsZero() && !at.Before(period.Before)) ||
+				row.ChampionID != strconv.Itoa(championID) || seen[row.ID] {
 				continue
 			}
 			seen[row.ID] = true
-			row.League = label
+			row.League = scope.Name
 			rows = append(rows, row)
 		}
 		if past || len(batch) < proOPGGPageSize {
@@ -161,72 +192,71 @@ func (p *proRuneProvider) opggRecommend(ctx context.Context, championID int, pos
 	if p.now != nil {
 		now = p.now()
 	}
-	key := "opgg-builds-" + strconv.Itoa(championID)
+	state, err := p.opggSegmentState(ctx, now)
+	if err != nil {
+		response.Reason, response.Stale = proRuneErrorReason(err), true
+		return response, err
+	}
+	current := proCurrentPeriod(state.Heads)
+	if len(current.Scopes) == 0 && state.Attempted.After(state.At) {
+		response.Reason, response.Stale = "network-unavailable", true
+		return response, errors.New("OP.GG tournament metadata unavailable")
+	}
+	key := current.buildKey(championID)
 	p.mu.Lock()
-	initialRevision := p.opggBuilds[championID].Revision
+	var initialRevision uint64
+	if old := p.opggBuilds[championID]; old.Segment == key {
+		initialRevision = old.Revision
+	}
 	p.mu.Unlock()
+	var cached proOPGGCache
 	err = p.gameResource(ctx, key, func() error {
 		p.mu.Lock()
-		old, exists := p.opggBuilds[championID]
+		old := p.opggBuilds[championID]
 		p.mu.Unlock()
+		exists := old.Segment == key
 		if !exists {
+			old = proOPGGCache{}
 			p.readDisk(key, &old)
-			if old.ChampionID != championID || old.Attempted.After(now) {
+			if old.Segment != key || old.ChampionID != championID || old.Attempted.After(now) {
 				old = proOPGGCache{}
 			}
 		}
 		if force && exists && old.Revision != initialRevision || !force && !old.Attempted.IsZero() && now.Sub(old.Attempted) < proRuneTTL {
-			p.mu.Lock()
+			cached = old
+		} else {
+			cached = proOPGGCache{Revision: old.Revision + 1, ChampionID: championID, Segment: key, Attempted: now, ReadAt: now, Rows: []proOPGGBuild{}}
+			p.loadOPGGPeriod(ctx, championID, current, now, old, &cached)
+			if len(current.Scopes) > 0 && len(cached.Rows) == 0 && cached.FailedLeagues == 0 {
+				previous, priorErr := p.previousOPGGPeriod(ctx, state, current, now)
+				if priorErr == nil {
+					p.loadOPGGPeriod(ctx, championID, previous, now, old, &cached)
+				} else {
+					cached.FailedLeagues, cached.OverallFailed = 1, true
+					cached.ReadAt, cached.Rows = old.ReadAt, old.Rows
+				}
+			}
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			p.writeDisk(key, cached)
+		}
+		p.mu.Lock()
+		if proCurrentPeriod(p.opggSegments.Heads).buildKey(championID) == key {
 			if p.opggBuilds == nil {
 				p.opggBuilds = map[int]proOPGGCache{}
 			}
-			p.opggBuilds[championID] = old
-			p.mu.Unlock()
-			return nil
+			p.opggBuilds[championID] = cached
 		}
-		next := proOPGGCache{Revision: old.Revision + 1, ChampionID: championID, Attempted: now, ReadAt: now, Rows: []proOPGGBuild{}}
-		var mu sync.Mutex
-		failed := map[string]bool{}
-		proParallelLimit(ctx, proOPGGLeagues, 3, func(league struct{ ID, Name string }) {
-			rows, loadErr := p.opggLeagueBuilds(ctx, championID, league.ID, league.Name, now)
-			mu.Lock()
-			defer mu.Unlock()
-			if loadErr != nil {
-				failed[league.Name] = true
-				return
-			}
-			next.Rows = append(next.Rows, rows...)
-		})
-		// Cancelled, unscheduled leagues count as failed, too.
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		next.FailedLeagues = len(failed)
-		next.OverallFailed = len(failed) == len(proOPGGLeagues)
-		for _, row := range old.Rows {
-			if failed[row.League] {
-				next.Rows = append(next.Rows, row)
-			}
-		}
-		if next.FailedLeagues > 0 {
-			next.ReadAt = old.ReadAt
-		}
-		p.writeDisk(key, next)
-		p.mu.Lock()
-		if p.opggBuilds == nil {
-			p.opggBuilds = map[int]proOPGGCache{}
-		}
-		p.opggBuilds[championID] = next
 		p.mu.Unlock()
 		return nil
 	})
 	p.mu.Lock()
-	cached := p.opggBuilds[championID]
 	writeFailed := p.cacheWriteFailed
 	p.mu.Unlock()
 	response.ReadAt = cached.ReadAt
-	response.Stale = cached.FailedLeagues > 0 || writeFailed || cached.ReadAt.IsZero() || now.Sub(cached.ReadAt) > proRuneTTL
-	if cached.FailedLeagues > 0 || err != nil {
+	response.Stale = state.Attempted.After(state.At) || cached.FailedLeagues > 0 || writeFailed || cached.ReadAt.IsZero() || now.Sub(cached.ReadAt) > proRuneTTL
+	if state.Attempted.After(state.At) || cached.FailedLeagues > 0 || err != nil {
 		response.Reason = "network-unavailable"
 	} else if writeFailed {
 		response.Reason = "cache-write-failed"
@@ -267,6 +297,44 @@ func (p *proRuneProvider) opggRecommend(ctx context.Context, championID int, pos
 	return response, nil
 }
 
+func (p *proRuneProvider) loadOPGGPeriod(ctx context.Context, championID int, period proRunePeriod, now time.Time, old proOPGGCache, next *proOPGGCache) {
+	var mu sync.Mutex
+	failed := map[string]bool{}
+	proParallelLimit(ctx, period.Scopes, 3, func(scope proRuneScope) {
+		rows, err := p.opggLeagueBuilds(ctx, championID, scope, period, now)
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			failed[scope.Name] = true
+		} else {
+			next.Rows = append(next.Rows, rows...)
+		}
+	})
+	next.FailedLeagues = len(failed)
+	next.OverallFailed = len(failed) > 0 && len(failed) == len(period.Scopes)
+	if next.FailedLeagues > 0 {
+		next.ReadAt = old.ReadAt
+		for _, row := range old.Rows {
+			if failed[row.League] && period.includes(row) {
+				next.Rows = append(next.Rows, row)
+			}
+		}
+	}
+}
+
+func (period proRunePeriod) includes(row proOPGGBuild) bool {
+	at := row.Game.BeginAt
+	if !at.After(period.After) || !period.Before.IsZero() && !at.Before(period.Before) {
+		return false
+	}
+	for _, scope := range period.Scopes {
+		if row.League == scope.Name && row.Game.Match.Tournament.Serie.ID == scope.Serie {
+			return true
+		}
+	}
+	return false
+}
+
 func proOPGGRecommendations(rows []proOPGGBuild, championID int, position, name string, now, readAt time.Time, stale bool) ([]gameplayRecommendationRune, int, int) {
 	selected := []proOPGGBuild{}
 	seen := map[string]bool{}
@@ -275,7 +343,7 @@ func proOPGGRecommendations(rows []proOPGGBuild, championID int, position, name 
 		if row.ChampionID != strconv.Itoa(championID) {
 			continue
 		}
-		if !row.Game.BeginAt.After(now.Add(-30*24*time.Hour)) || row.Game.BeginAt.After(now) {
+		if row.Game.BeginAt.IsZero() || row.Game.BeginAt.After(now) {
 			continue
 		}
 		if row.ID == "" || seen[row.ID] {

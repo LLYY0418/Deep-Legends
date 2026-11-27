@@ -241,9 +241,20 @@ func proStarterFailureReason(err error) string {
 func (p *proRuneProvider) opggStarterRows(ctx context.Context, championID int, championKey string, wanted map[string]int64) []runeStarterRow {
 	p.mu.Lock()
 	cached, exists := p.opggBuilds[championID]
+	state := p.opggSegments
 	p.mu.Unlock()
-	if !exists {
-		p.readDisk("opgg-builds-"+strconv.Itoa(championID), &cached)
+	if state.At.IsZero() {
+		p.readDisk(proOPGGSegmentCacheKey, &state)
+	}
+	if !state.At.IsZero() {
+		key := proCurrentPeriod(state.Heads).buildKey(championID)
+		if !exists || cached.Segment != key {
+			cached = proOPGGCache{}
+			p.readDisk(key, &cached)
+			if cached.Segment != key {
+				cached = proOPGGCache{}
+			}
+		}
 	}
 	selected := []proOPGGBuild{}
 	matched := map[string]bool{}
